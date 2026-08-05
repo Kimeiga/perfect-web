@@ -35,7 +35,7 @@ Full assessment: `docs/milestones/M0.md`.
 **next milestone:** Milestone 1 — Koka semantic kernel. **Not started, and must
 not start** until the charter question above is resolved.
 
-**last passing commit:** see `git log -1` — the Milestone 0 bootstrap commit.
+**last passing commit:** `a943b17` — Milestone 0 bootstrap.
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---
