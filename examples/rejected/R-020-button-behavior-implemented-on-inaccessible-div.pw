@@ -1,0 +1,20 @@
+// @corpus: rejected
+// @id: R-020
+// @category: button behavior implemented on inaccessible div
+// @rule: PW0318
+// @charter: §8.2
+// @milestone: 3
+// @expect-error: `<div>` with an `on:press` handler is not keyboard accessible
+// @expect-error: use `<button>`, or supply `role`, `tabindex`, and keyboard activation
+//
+// A click target that only responds to a mouse excludes keyboard and screen
+// reader users. The compiler can see the shape and reject it.
+
+module cart.add_view
+
+view AddButton(item: MenuItemId) !{} {
+    // ERROR: interactive behavior on a non-interactive element.
+    <div class="btn" on:press={() => add_to_cart(item, PositiveInt(1))}>
+        Add
+    </div>
+}

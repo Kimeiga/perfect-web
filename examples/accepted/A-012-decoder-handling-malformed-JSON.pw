@@ -1,0 +1,34 @@
+// @corpus: accepted
+// @id: A-012
+// @category: decoder handling malformed JSON
+// @charter: §7.10
+// @milestone: 2
+//
+// Every field is decoded explicitly and every failure is a typed value.
+// Nothing is cast, defaulted, or assumed non-null. This is the only legal way
+// for external data to enter the program.
+
+module store.decode
+
+import domain.{ StoreId, Store, StoreHours }
+import decode.{ Unknown, Decoder, DecodeError, field, string, int, list }
+
+fn decode_store(raw: Unknown) -> Result<Store, DecodeError> !{} {
+    let id    = field(raw, "id", string)?
+    let name  = field(raw, "name", string)?
+    let hours = field(raw, "hours", decode_hours)?
+    Ok(Store {
+        id: StoreId.from_string(id)?,
+        name: name,
+        hours: hours,
+    })
+}
+
+fn decode_hours(raw: Unknown) -> Result<StoreHours, DecodeError> !{} {
+    let opens  = field(raw, "opens_minute", int)?
+    let closes = field(raw, "closes_minute", int)?
+    if opens >= closes {
+        return Err(DecodeError.Invalid("hours", "opens must precede closes"))
+    }
+    Ok(StoreHours { opens_minute: opens, closes_minute: closes })
+}

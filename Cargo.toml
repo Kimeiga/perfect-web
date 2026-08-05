@@ -1,0 +1,42 @@
+[workspace]
+resolver = "3"
+members = [
+    "spikes/compiler-diagnostic",
+    "tools/corpus-check",
+]
+# spikes/wasmtime-component/{host,guest} are intentionally NOT workspace members:
+# the guest targets wasm32-wasip2 and must not be pulled into a host-target
+# `cargo test --workspace`. They are built by spikes/wasmtime-component/run.sh.
+exclude = [
+    "spikes/wasmtime-component/host",
+    "spikes/wasmtime-component/guest",
+    "spikes/wasmtime-component/guest-minimal",
+]
+
+# The `compiler/` and `runtime/rust-host/` crate trees are created by later
+# milestones (PROJECT_CHARTER.md §12). Empty directories are deliberately not
+# created here: §12 says "Do not create empty directories merely to look complete".
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+repository = "local-only"
+publish = false
+
+[workspace.dependencies]
+# Verified on crates.io 2026-08-05. See docs/DECISIONS/ADR-0009-parser-and-diagnostics-stack.md
+# annotate-snippets is the renderer rustc itself uses; MIT OR Apache-2.0.
+annotate-snippets = "0.12.16"
+anyhow = "1.0.104"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+# Wasmtime host + guest bindings for spikes/wasmtime-component (Milestone 0 task 10).
+wasmtime = "47.0.3"
+wasmtime-wasi = "47.0.3"
+wit-bindgen = "0.60.0"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,23 @@
+// @corpus: accepted
+// @id: A-004
+// @category: private cart query
+// @charter: §7.8, §9.2, §15.2
+// @milestone: 4
+//
+// Session-labeled data in a private cache partition with read-your-writes
+// consistency and zero staleness. The privacy label makes shared caching a
+// compile error, so the partition need not be defended by convention.
+
+module cart.queries
+
+import domain.{ SessionId, Cart, CartError }
+
+session query Cart(session: SessionId) -> Result<Cart, CartError> {
+    freshness   0.seconds
+    consistency read_your_writes
+    cache       private
+    concurrency one_per_key
+    timeout     2.seconds
+{
+    Carts.current(session)
+}

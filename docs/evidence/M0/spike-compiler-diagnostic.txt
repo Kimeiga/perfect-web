@@ -1,0 +1,227 @@
+spike: compiler-diagnostic
+generated: 2026-08-05T22:26:25Z
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+host: Darwin arm64 / 26.5.2
+commands:
+  cargo test -p spike-compiler-diagnostic
+  cargo run -p spike-compiler-diagnostic -- --demo --plain
+  cargo run -p spike-compiler-diagnostic -- --demo --plain --explain
+
+=============================== TESTS ===============================
+
+running 18 tests
+..................
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+========================= DEMO DIAGNOSTICS ==========================
+── accepted/public-store.pw ────────────────────────────────────
+(accepted — no diagnostics)
+
+── accepted/session-cart.pw ────────────────────────────────────
+(accepted — no diagnostics)
+
+── rejected/session-cart-in-shared-cache.pw ────────────────────
+error: [PW0100] cannot materialize `cart` in a shared public cache
+ --> rejected/session-cart-in-shared-cache.pw:4:5
+  |
+1 | session query cart(id: SessionId)
+  | ------- `cart` is declared here, so its result is labeled `Session<SessionId>`
+...
+4 |     cache shared
+  |     ^^^^^^^^^^^^ this cache is shared across all sessions
+  |
+  = note: a shared cache may contain only `Public` values; this query's result is `Session<SessionId>`
+  = help: change this to `cache private`, or move the value into a private streamed slot
+  = help: if the value really is public, declare the query `public`
+── rejected/public-read-your-writes.pw ─────────────────────────
+error: [PW0101] `read_your_writes` requires a session-scoped query
+ --> rejected/public-read-your-writes.pw:2:5
+  |
+1 | public query store(id: StoreId)
+  | ------ declared `public` here, so there is no session to read the writes of
+2 |     consistency read_your_writes
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ this consistency policy needs a writer identity
+  |
+  = help: use `consistency snapshot` for public data, or declare the query `session`
+warning: [PW0200] shared materialization of `store` declares no freshness policy
+ --> rejected/public-read-your-writes.pw:3:5
+  |
+3 |     cache shared
+  |     ^^^^^^^^^^^^ nothing here says when this may go stale
+  |
+  = note: Milestone 6 replaces time-based freshness with typed invalidation events; until then a shared entry with neither is unbounded
+  = help: add `freshness <n>.seconds`, or an `invalidates_on <Event>` clause once Milestone 6 lands
+── rejected/stale-session-query.pw ─────────────────────────────
+error: [PW0102] session query `cart` declares a 30.seconds staleness window
+ --> rejected/stale-session-query.pw:2:5
+  |
+1 | session query cart(id: SessionId)
+  | ------- declared `session` here
+2 |     freshness 30.seconds
+  |     ^^^^^^^^^^^^^^^^^^^^ session data served this stale can be wrong for the user
+  |
+  = help: use `freshness 0.seconds` with `consistency read_your_writes` for session-owned state
+── rejected/two-independent-typos.pw ───────────────────────────
+error: [PW0004] unknown consistency policy `evantual`
+ --> rejected/two-independent-typos.pw:2:17
+  |
+2 |     consistency evantual
+  |                 ^^^^^^^^ not a known consistency policy
+  |
+  = help: expected one of: `snapshot`, `read_your_writes`, `eventual`
+error: [PW0005] unknown cache partition `sharedd`
+ --> rejected/two-independent-typos.pw:3:11
+  |
+3 |     cache sharedd
+  |           ^^^^^^^ not a known cache partition
+  |
+  = help: expected one of: `shared`, `private`
+── rejected/missing-paren.pw ───────────────────────────────────
+error: [PW0001] expected `)` to close the parameter list, found `cache`
+ --> rejected/missing-paren.pw:2:5
+  |
+2 |     cache shared
+  |     ^^^^^ expected `)` here
+demo: 7 sources, 2 clean, 6 errors, 1 warnings
+
+======================= EXPLAIN (pw explain) ========================
+── accepted/public-store.pw ────────────────────────────────────
+query        store
+declared at  line 1
+privacy      Public
+key          (id: StoreId)
+             └ `id: StoreId` spans bytes 19..30 of the source
+freshness    30.seconds
+consistency  snapshot
+cache        shared   (readable across sessions)
+placement    Edge   (public + shared cache => materializable at the edge)
+
+(accepted — no diagnostics)
+
+── accepted/session-cart.pw ────────────────────────────────────
+query        cart
+declared at  line 1
+privacy      Session<SessionId>
+key          (id: SessionId)
+             └ `id: SessionId` spans bytes 19..32 of the source
+freshness    0.seconds
+consistency  read_your_writes
+cache        private  (partitioned per session)
+placement    Origin (session-scoped read; never shared-cached)
+
+(accepted — no diagnostics)
+
+── rejected/session-cart-in-shared-cache.pw ────────────────────
+error: [PW0100] cannot materialize `cart` in a shared public cache
+ --> rejected/session-cart-in-shared-cache.pw:4:5
+  |
+1 | session query cart(id: SessionId)
+  | ------- `cart` is declared here, so its result is labeled `Session<SessionId>`
+...
+4 |     cache shared
+  |     ^^^^^^^^^^^^ this cache is shared across all sessions
+  |
+  = note: a shared cache may contain only `Public` values; this query's result is `Session<SessionId>`
+  = help: change this to `cache private`, or move the value into a private streamed slot
+  = help: if the value really is public, declare the query `public`
+query        cart
+declared at  line 1
+privacy      Session<SessionId>
+key          (id: SessionId)
+             └ `id: SessionId` spans bytes 19..32 of the source
+freshness    0.seconds
+consistency  read_your_writes
+cache        shared   (readable across sessions)
+placement    Origin (session-scoped read; never shared-cached)
+
+── rejected/public-read-your-writes.pw ─────────────────────────
+error: [PW0101] `read_your_writes` requires a session-scoped query
+ --> rejected/public-read-your-writes.pw:2:5
+  |
+1 | public query store(id: StoreId)
+  | ------ declared `public` here, so there is no session to read the writes of
+2 |     consistency read_your_writes
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ this consistency policy needs a writer identity
+  |
+  = help: use `consistency snapshot` for public data, or declare the query `session`
+warning: [PW0200] shared materialization of `store` declares no freshness policy
+ --> rejected/public-read-your-writes.pw:3:5
+  |
+3 |     cache shared
+  |     ^^^^^^^^^^^^ nothing here says when this may go stale
+  |
+  = note: Milestone 6 replaces time-based freshness with typed invalidation events; until then a shared entry with neither is unbounded
+  = help: add `freshness <n>.seconds`, or an `invalidates_on <Event>` clause once Milestone 6 lands
+query        store
+declared at  line 1
+privacy      Public
+key          (id: StoreId)
+             └ `id: StoreId` spans bytes 19..30 of the source
+freshness    (unset — implementation default)
+consistency  read_your_writes
+cache        shared   (readable across sessions)
+placement    Edge   (public + shared cache => materializable at the edge)
+
+── rejected/stale-session-query.pw ─────────────────────────────
+error: [PW0102] session query `cart` declares a 30.seconds staleness window
+ --> rejected/stale-session-query.pw:2:5
+  |
+1 | session query cart(id: SessionId)
+  | ------- declared `session` here
+2 |     freshness 30.seconds
+  |     ^^^^^^^^^^^^^^^^^^^^ session data served this stale can be wrong for the user
+  |
+  = help: use `freshness 0.seconds` with `consistency read_your_writes` for session-owned state
+query        cart
+declared at  line 1
+privacy      Session<SessionId>
+key          (id: SessionId)
+             └ `id: SessionId` spans bytes 19..32 of the source
+freshness    30.seconds
+consistency  (unset)
+cache        private  (partitioned per session)
+placement    Origin (session-scoped read; never shared-cached)
+
+── rejected/two-independent-typos.pw ───────────────────────────
+error: [PW0004] unknown consistency policy `evantual`
+ --> rejected/two-independent-typos.pw:2:17
+  |
+2 |     consistency evantual
+  |                 ^^^^^^^^ not a known consistency policy
+  |
+  = help: expected one of: `snapshot`, `read_your_writes`, `eventual`
+error: [PW0005] unknown cache partition `sharedd`
+ --> rejected/two-independent-typos.pw:3:11
+  |
+3 |     cache sharedd
+  |           ^^^^^^^ not a known cache partition
+  |
+  = help: expected one of: `shared`, `private`
+query        store
+declared at  line 1
+privacy      Public
+key          (id: StoreId)
+             └ `id: StoreId` spans bytes 19..30 of the source
+freshness    (unset — implementation default)
+consistency  evantual
+cache        (unset)
+placement    Edge or Origin  (public, but not shared-cached)
+
+── rejected/missing-paren.pw ───────────────────────────────────
+error: [PW0001] expected `)` to close the parameter list, found `cache`
+ --> rejected/missing-paren.pw:2:5
+  |
+2 |     cache shared
+  |     ^^^^^ expected `)` here
+query        store
+declared at  line 1
+privacy      Public
+key          (id: StoreId)
+             └ `id: StoreId` spans bytes 19..30 of the source
+freshness    (unset — implementation default)
+consistency  (unset)
+cache        shared   (readable across sessions)
+placement    Edge   (public + shared cache => materializable at the edge)
+
+demo: 7 sources, 2 clean, 6 errors, 1 warnings

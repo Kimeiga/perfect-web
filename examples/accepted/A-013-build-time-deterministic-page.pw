@@ -1,0 +1,28 @@
+// @corpus: accepted
+// @id: A-013
+// @category: build-time deterministic page
+// @charter: §9.3, §7.9
+// @milestone: 6
+//
+// A page whose inputs are all known at build time and whose effect row
+// excludes the clock and randomness, so it can be statically generated.
+// Determinism is a type property here, not a convention.
+
+module marketing.terms
+
+// !{} plus build-known inputs => the placement solver chooses Build.
+page Terms() !{} {
+    placement build
+    privacy   Public
+    cache     shared
+    revision  content_hash
+
+    view {
+        <main>
+            <h1>Terms of Service</h1>
+            <article>
+                {include_markdown("content/terms.md")}
+            </article>
+        </main>
+    }
+}

@@ -1,0 +1,67 @@
+/*
+ * Route: /counter
+ *
+ * Charter §14 Milestone 0 task 9, claim 3:
+ *   "one interactive button resumes or activates without eagerly hydrating the
+ *    entire page"
+ *
+ * The page is mostly static: a large block of inert semantic HTML surrounds ONE
+ * interactive control. If Marko 6's resumability works as advertised, the client
+ * payload should be proportional to the interactive island, not to the page.
+ *
+ * This is the charter §8.5 claim under test: "SSR should emit semantic HTML plus
+ * only the metadata needed to resume interactions. Do not generally re-execute
+ * the complete component tree in the browser."
+ */
+
+<let/count=0>
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Interactive route — perfect-web spike</title>
+  </head>
+  <body>
+    <main>
+      <h1>Blue Bottle</h1>
+
+/*
+ * A deliberately large inert region. None of this needs client code.
+ */
+      <section aria-label="Store information">
+        <p>A static description block, present so the page is not dominated by
+           the one interactive control. Charter §8.5 predicts the client payload
+           should not grow with this content.</p>
+        <h2>Menu</h2>
+        <ul aria-label="Menu">
+          <li><span>Espresso</span> <span>$3.50</span></li>
+          <li><span>Cortado</span> <span>$4.75</span></li>
+          <li><span>Cold Brew</span> <span>$5.25</span></li>
+          <li><span>Macchiato</span> <span>$4.00</span></li>
+          <li><span>Flat White</span> <span>$5.00</span></li>
+        </ul>
+        <h2>Hours</h2>
+        <table>
+          <caption>Opening hours</caption>
+          <thead><tr><th scope="col">Day</th><th scope="col">Open</th></tr></thead>
+          <tbody>
+            <tr><td>Monday</td><td>07:00–18:00</td></tr>
+            <tr><td>Tuesday</td><td>07:00–18:00</td></tr>
+            <tr><td>Wednesday</td><td>07:00–18:00</td></tr>
+            <tr><td>Thursday</td><td>07:00–18:00</td></tr>
+            <tr><td>Friday</td><td>07:00–19:00</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+/*
+ * The ONLY interactive part of the page.
+ */
+      <section aria-label="Cart">
+        <p>In cart: <output id="count">${count}</output></p>
+        <button id="add" onClick() { count++ }>Add to cart</button>
+      </section>
+    </main>
+  </body>
+</html>

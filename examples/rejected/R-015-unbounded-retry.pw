@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-015
+// @category: unbounded retry
+// @rule: PW0313
+// @charter: §9.5
+// @milestone: 4
+// @expect-error: `retry forever` is not a permitted policy
+// @expect-error: retry policies must declare a finite bound and jitter
+//
+// Unbounded retry is a self-inflicted denial of service. The policy vocabulary
+// excludes it.
+
+module store.queries
+
+public query Store(id: StoreId) -> Result<Store, StoreError> {
+    freshness   30.seconds
+    consistency snapshot
+    cache       shared
+    // ERROR: unbounded retry.
+    retry       forever
+{
+    Stores.get(id)
+}

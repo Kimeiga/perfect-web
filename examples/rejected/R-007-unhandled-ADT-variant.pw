@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-007
+// @category: unhandled ADT variant
+// @rule: PW0305
+// @charter: §7.1, §16.2
+// @milestone: 2
+// @expect-error: match on `OrderState` is not exhaustive
+// @expect-error: missing variant: `Cancelled(CancellationReason)`
+//
+// Exhaustiveness must be an independent static rule. The koka-js-interop spike
+// (finding F-8) showed Koka enforces this only for total functions, so `pw`
+// must own it.
+
+module order.label
+
+fn label(state: OrderState) -> String !{} {
+    // ERROR: `Cancelled` and `Failed` are not handled.
+    match state {
+        Draft         => "draft",
+        Pricing       => "pricing",
+        Confirmed(_)  => "confirmed",
+        InProgress(_) => "in progress",
+        Delivered(_)  => "delivered",
+    }
+}

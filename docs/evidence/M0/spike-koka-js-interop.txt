@@ -1,0 +1,95 @@
+spike: koka-js-interop
+generated: 2026-08-05T22:26:26Z
+koka: Koka 3.2.3, 01:29:29 Mar 18 2026 (ghc release version)
+node: v22.21.1
+host: Darwin arm64
+commands:
+  koka --target=js --outputdir=build -o build/store kk/store.kk
+  node --test node/test.mjs
+
+======================= 1. COMPILE TO JS ============================
+created : build/store
+compiled: kk/store.kk -> build/kk_store.mjs (+ build/kk_store.kki)
+
+=================== 2. NEGATIVE: EXHAUSTIVENESS =====================
+A. non-exhaustive match in a TOTAL function — expected to FAIL:
+    kk/negative-nonexhaustive.kk(19,50): type error: effects do not match
+    rejected=1
+
+B. same omission in a function declaring `exn` — expected to COMPILE:
+    compiled cleanly (no exhaustiveness error)
+    running it:
+      Draft     -> draft
+      Cancelled -> EXN:kk/negative-nonexhaustive-exn(27, 3): describe-order: pattern match failure
+    compiled=1
+
+  => exhaustiveness_statically_enforced_only_for_total_functions=1
+     (see finding F-8: Koka models a partial match as the `exn` effect,
+      not as an independent exhaustiveness rule)
+
+=================== 3. GENERATED REPRESENTATION =====================
+-- ADT constructors as emitted to JavaScript --
+  export function Money_usd(minor_units)   {
+    return minor_units;
+  }
+  export function Store(id, name)   {
+    return { id: id, name: name };
+  }
+  export const Draft = { _tag: 1 }; // order-state
+  export const Pricing = { _tag: 2 }; // order-state
+  export function Confirmed(confirmation)   {
+    return { _tag: 3, confirmation: confirmation };
+  }
+  export function QOk(value)   {
+    return { _tag: 1, value: value };
+  }
+  export function QErr(error)   {
+    return { _tag: 2, error: error };
+  }
+  export const StoreUnavailable = { _tag: 2 }; // store-error
+  export function StoreDecodeFailed(field)   {
+    return { _tag: 3, field: field };
+  export function Store_id(value)   {
+    return value;
+  }
+
+-- std_core_types: Nothing / Nil --
+  export const Nil = null; // forall<a> list<a>
+  export const Nothing = null; // forall<a> maybe<a>
+
+============= 4. INFERRED EFFECT ROWS FROM .kki (no fork) ===========
+  calculate-subtotal     !{}   <- pure
+  available-items        !{}   <- pure
+  describe-order         !{}   <- pure
+  load-store             !{database-read, trace-effect}
+  load-store-subtotal    !{database-read, trace-effect}
+  load-store-for-js      !{}   <- pure
+  load-subtotal-for-js   !{}   <- pure
+  main                   !{console}
+
+======================== 5. RUNTIME OUTPUT ==========================
+  load-store-for-js(store_47) -> QOk(Blue Bottle)
+  load-store-for-js(store_99) -> QErr(StoreNotFound:store_99)
+  sample-order-states -> draft, pricing, confirmed:conf_1, delivered:rcpt_1, cancelled:out of stock
+
+========================== 6. NODE TESTS ===========================
+ok 1 - generated module exports the domain constructors and predicates
+ok 2 - effect handlers run: a database-read + trace computation produces a value
+ok 3 - pure computation over an ADT list produces the expected total
+ok 4 - qresult decodes to an explicit JS-side Result
+ok 5 - qresult error side decodes to a typed domain error, not a string
+ok 6 - every order-state variant decodes; none falls through to a default
+ok 7 - decoder REJECTS malformed input instead of guessing
+ok 8 - decoder rejects a field of the wrong runtime type rather than coercing
+ok 9 - finding F-5: Koka's is_* predicates are NOT validators
+ok 10 - finding F-7: Nothing and Nil are BOTH null — runtime discrimination is impossible
+ok 11 - finding F-4: single-field value structs are ERASED to their payload
+ok 12 - koka version matches what the .kki reader was verified against
+ok 13 - .kki exposes inferred effect rows: pure functions have an EMPTY row
+ok 14 - .kki exposes inferred effect rows: effectful functions NAME their effects
+ok 15 - .kki shows handlers DISCHARGE effects — the JS-facing surface is pure
+ok 16 - .kki carries source spans usable for mapping diagnostics back to .pw
+# tests 16
+# pass 16
+# fail 0
+# skipped 0

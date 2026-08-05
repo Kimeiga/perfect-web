@@ -1,0 +1,21 @@
+// @corpus: rejected
+// @id: R-023
+// @category: dead internal route
+// @rule: PW0321
+// @charter: §8.2
+// @milestone: 3
+// @expect-error: internal link target `/stores/{id}/reviews` matches no declared route
+// @expect-error: internal links are checked against the route table
+//
+// A broken internal link is statically detectable, so it should never reach
+// production.
+
+module store.page
+
+view StoreLinks(id: StoreId) !{} {
+    <nav aria-label="Store">
+        <a href="/stores/{id}">Overview</a>
+        // ERROR: no such route is declared anywhere in the program.
+        <a href="/stores/{id}/reviews">Reviews</a>
+    </nav>
+}

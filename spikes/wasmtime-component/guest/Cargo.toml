@@ -1,0 +1,21 @@
+[package]
+name = "spike-wasmtime-guest"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Not a workspace member: this crate targets wasm32-wasip2 and must not be pulled
+# into a host-target `cargo test --workspace`. See the root Cargo.toml `exclude`.
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.60.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

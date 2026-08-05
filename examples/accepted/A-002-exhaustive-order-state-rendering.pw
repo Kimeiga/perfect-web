@@ -1,0 +1,43 @@
+// @corpus: accepted
+// @id: A-002
+// @category: exhaustive order-state rendering
+// @charter: §7.1, §7.4, §15.1
+// @milestone: 2
+//
+// Every variant of the OrderState ADT is handled. Adding a variant must break
+// this match at compile time. The view is pure: it maps values to semantic
+// HTML and does nothing else.
+
+module order.status_view
+
+import domain.{ OrderConfirmation, OrderProgress, DeliveryReceipt,
+                CancellationReason, OrderFailure }
+
+type OrderState =
+    | Draft
+    | Pricing
+    | AuthorizingPayment
+    | Submitting
+    | SearchingForDasher
+    | Confirmed(OrderConfirmation)
+    | InProgress(OrderProgress)
+    | Delivered(DeliveryReceipt)
+    | Cancelled(CancellationReason)
+    | Failed(OrderFailure)
+
+view OrderStatus(state: OrderState) !{} {
+    <section aria-label="Order status">
+        {match state {
+            Draft              => <p>Building your order</p>,
+            Pricing            => <p>Calculating total</p>,
+            AuthorizingPayment => <p>Authorizing payment</p>,
+            Submitting         => <p>Sending to the store</p>,
+            SearchingForDasher => <p>Finding a courier</p>,
+            Confirmed(c)       => <p>Confirmed: {c.reference}</p>,
+            InProgress(p)      => <p>On the way: {p.stage_label}</p>,
+            Delivered(r)       => <p>Delivered at {r.delivered_at_local}</p>,
+            Cancelled(reason)  => <p>Cancelled: {reason.label}</p>,
+            Failed(failure)    => <p>Failed: {failure.label}</p>,
+        }}
+    </section>
+}

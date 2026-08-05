@@ -1,0 +1,69 @@
+spike: wasmtime-component
+generated: 2026-08-05T22:26:26Z
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+wasmtime cli: wasmtime 47.0.3 (5554cc1a6 2026-07-31)
+wasmtime crate: 47.0.3   wit-bindgen: 0.60.0
+target: wasm32-wasip2 (WASI 0.2 / Component Model)
+host: Darwin arm64
+commands:
+  (cd guest         && cargo build --release --target wasm32-wasip2)
+  (cd guest-minimal && cargo build --release --target wasm32-wasip2)
+  (cd host          && cargo build --release)
+  host/target/release/spike-wasmtime-host <minimal.wasm> observe:<std.wasm>
+
+=========================== 1. BUILD ===============================
+    Finished `release` profile [optimized] target(s) in 0.05s
+    Finished `release` profile [optimized] target(s) in 0.03s
+    Finished `release` profile [optimized] target(s) in 0.22s
+
+artifact sizes:
+  guest               43837 bytes  (std, wasm32-wasip2)
+  guest-minimal        5276 bytes  (no_std, wasm32-wasip2)
+
+===================== 2. WASI VERSION ACTUALLY USED ================
+  The wasm32-wasip2 target produced imports at version:
+    wasi:cli/environment@0.2.9
+    wasi:cli/exit@0.2.9
+    wasi:cli/stderr@0.2.9
+    wasi:cli/stdin@0.2.9
+    wasi:cli/stdout@0.2.9
+    wasi:cli/terminal-input@0.2.9
+    wasi:cli/terminal-output@0.2.9
+    wasi:cli/terminal-stderr@0.2.9
+    wasi:cli/terminal-stdin@0.2.9
+    wasi:cli/terminal-stdout@0.2.9
+    wasi:clocks/monotonic-clock@0.2.9
+    wasi:io/error@0.2.9
+    wasi:io/poll@0.2.9
+    wasi:io/streams@0.2.9
+  => charter §10.3 decision: WASI 0.2 is the stable path. See ADR-0008.
+
+======================= 3. CAPABILITY CHECKS =======================
+wasmtime crate: 47.0.3
+
+===================================================================
+component: /Users/haki/code/perfect-web/spikes/wasmtime-component/guest-minimal/target/wasm32-wasip2/release/spike_wasmtime_guest_minimal.wasm
+bytes:     5276
+===================================================================
+check:ambient=pass
+  component imports = ["perfect-web:store/stores@0.1.0"]
+
+check:granted=pass
+  lookup(store_47)="found:store_47:Blue Bottle" lookup(store_99)="missing:store_99" host_reads=2
+
+check:denied=pass
+  instantiation refused (diagnostic names the missing import: true)
+  error: component imports instance `perfect-web:store/stores@0.1.0`, but a matching implementation was not found in the linker: instance export `read` has the wrong type: function implementation is missing
+
+check:fuel=pass
+  trapped as expected: wasm trap: all fuel consumed by WebAssembly
+
+===================================================================
+component: /Users/haki/code/perfect-web/spikes/wasmtime-component/guest/target/wasm32-wasip2/release/spike_wasmtime_guest.wasm
+bytes:     43837
+mode:      OBSERVE — import surface only, not a gate
+===================================================================
+check:ambient=fail
+  component imports = ["perfect-web:store/stores@0.1.0", "wasi:cli/environment@0.2.9", "wasi:cli/exit@0.2.9", "wasi:cli/stderr@0.2.9", "wasi:cli/stdin@0.2.9", "wasi:cli/stdout@0.2.9", "wasi:cli/terminal-input@0.2.9", "wasi:cli/terminal-output@0.2.9", "wasi:cli/terminal-stderr@0.2.9", "wasi:cli/terminal-stdin@0.2.9", "wasi:cli/terminal-stdout@0.2.9", "wasi:clocks/monotonic-clock@0.2.9", "wasi:io/error@0.2.9", "wasi:io/poll@0.2.9", "wasi:io/streams@0.2.9"]
+
+result: ALL GATED CHECKS PASSED

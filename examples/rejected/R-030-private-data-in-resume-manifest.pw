@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-030
+// @category: private data in resume manifest
+// @rule: PW0328
+// @charter: §8.5, §7.8
+// @milestone: 7
+// @expect-error: resume manifest for `CartSummary` would contain a `Session<SessionId>` value
+// @expect-error: the resume manifest is served with the public shell and may contain only `Public` values
+//
+// The resume manifest ships with the document. Anything in it inherits the
+// document's cacheability, so private values must not be captured.
+
+module cart.summary_view
+
+view CartSummary(cart: Cart) !{} {
+    <section aria-label="Cart">
+        <button
+            // ERROR: capturing session-labeled data into the resume manifest.
+            on:press={resumable(captures = { cart }) => checkout(cart.id)}
+        >
+            Checkout ({cart.line_count})
+        </button>
+    </section>
+}

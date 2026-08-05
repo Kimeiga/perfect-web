@@ -1,0 +1,99 @@
+spike: marko-stream-resume
+generated: 2026-08-05T22:26:28Z
+node: v22.21.1   pnpm: 10.15.1
+marko: 6.3.32   @marko/run: 0.11.8   @marko/run-adapter-node: 2.0.6   vite: 8.2.0
+host: Darwin arm64
+commands:
+  pnpm --filter spike-marko-stream-resume build
+  node spikes/marko-stream-resume/measure.mjs
+
+routes:
+  /static         no state, no handlers, no await   -> tests the 0-JS budget
+  /stream         two delayed subtrees (400/1200ms) -> tests streaming
+  /counter        one button in a small document    -> tests resumption
+  /counter-large  same button, 200 extra inert rows -> tests payload scaling
+
+============================ BUILD =================================
+> spike-marko-stream-resume@0.0.0 build /Users/haki/code/perfect-web/spikes/marko-stream-resume
+> marko-run build
+┌────────┬────────────────┬───────┬────────────┐
+│ METHOD │ PATH           │ ENTRY │  SIZE/GZIP │
+├────────┼────────────────┼───────┼────────────┤
+│ GET    │ /counter       │ page  │ 3.9/2.2 kB │
+│ GET    │ /counter-large │ page  │ 3.9/2.2 kB │
+│ GET    │ /static        │ page  │     0.0 kB │
+│ GET    │ /stream        │ page  │     0.0 kB │
+└────────┴────────────────┴───────┴────────────┘
+
+========================= MEASUREMENTS =============================
+server: node dist/index.mjs (PORT=3111, NODE_ENV=production)
+node:   v22.21.1
+
+=================== 1. PER-ROUTE BYTE BUDGET ======================
+route      html       html.gz   scripts              clientJS   clientJS.gz
+/static    588        357       0 (0 ext/0 inline)   0          0          
+/stream    1669       986       3 (0 ext/3 inline)   0          0          
+/counter   1721       930       2 (1 ext/1 inline)   3921       2197       
+/counter-large 16537      2468      2 (1 ext/1 inline)   3927       2203       
+
+  /static: NO external client JS referenced
+  /stream: NO external client JS referenced
+  /counter: /assets/counter-BeC2WMPf.js -> 176 bytes (173 gzip)
+  /counter: /assets/_CHORBbUX.js -> 3745 bytes (2024 gzip)
+  /counter-large: /assets/counter-large-Ck8f4Tnk.js -> 182 bytes (179 gzip)
+  /counter-large: /assets/_CHORBbUX.js -> 3745 bytes (2024 gzip)
+
+=================== 2. STREAMING BEHAVIOR =========================
+  transfer-encoding : chunked
+  response chunks   : 3
+  time to first byte: 2.7 ms
+  SHELL_READY       : 2.7 ms
+  ESTIMATE_READY    : 405.7 ms
+  RECS_READY        : 1208.7 ms
+  response complete : 1210.5 ms
+
+  expected (charter §15.5): estimate ~400 ms, recommendations ~1200 ms,
+  shell well before both, and the shell must NOT wait on either.
+
+  check:shell-not-blocked=pass (shell at 2.7 ms)
+  check:estimate-streamed=pass (at 405.7 ms)
+  check:recs-streamed=pass (at 1208.7 ms)
+  check:out-of-order-ok=pass (faster subtree arrived first)
+
+=================== 3. ZERO-JS CLAIM =============================
+  Charter §18.4 budget: 'static page: 0 application JS and 0 runtime JS'.
+  Two things must be counted separately, because they cost differently:
+    downloaded JS = extra requests + parse/execute + cache
+    inline JS     = bytes in the HTML, no extra request
+
+  /static          downloaded=0 B       inline=0 B      tags=0 ext / 0 inline
+  /stream          downloaded=0 B       inline=849 B    tags=0 ext / 3 inline
+  /counter         downloaded=3921 B    inline=350 B    tags=1 ext / 1 inline
+  /counter-large   downloaded=3927 B    inline=356 B    tags=1 ext / 1 inline
+
+  check:static-truly-zero-js=pass  (no script tags at all, no downloaded JS)
+  check:stream-zero-downloaded-js=pass  (streaming needs an INLINE shim, but downloads nothing)
+
+=================== 4. PAYLOAD vs PAGE SIZE ======================
+  Charter §8.5: SSR should emit semantic HTML plus only the metadata needed
+  to resume interactions — the client payload must track the INTERACTIVE
+  ISLAND, not the size of the surrounding inert document.
+
+  /counter and /counter-large contain the SAME single button. /counter-large
+  wraps it in 200 extra inert table rows.
+
+  route            html bytes   client JS   client JS.gz
+  /counter         1721         3921        2197        
+  /counter-large   16537        3927        2203        
+
+  HTML grew 9.6x;  client JS grew 1.002x
+
+  shared runtime chunk (amortized) : 3745 B
+  /counter route-specific code     : 176 B
+  /counter-large route-specific    : 182 B
+
+  check:payload-tracks-island=pass (route code grew 1.034x across a 9.6x larger document)
+
+  This is the charter's 'no whole-tree hydration' budget (§18.4) holding:
+  a hydrating framework would need code proportional to the rendered tree.
+

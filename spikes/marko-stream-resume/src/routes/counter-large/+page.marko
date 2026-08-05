@@ -1,0 +1,240 @@
+/*
+ * Route: /counter-large
+ *
+ * Identical interactive island to /counter, wrapped in ~10x the inert markup.
+ *
+ * Charter §8.5 predicts the client payload tracks the INTERACTIVE ISLAND, not
+ * the size of the surrounding document. If Marko 6 resumes rather than hydrates,
+ * the client JS for this route must be the SAME as for /counter even though the
+ * HTML is far larger. measure.mjs compares the two directly.
+ */
+
+<let/count=0>
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Interactive route, large document — perfect-web spike</title>
+  </head>
+  <body>
+    <main>
+      <h1>Blue Bottle</h1>
+      <section aria-label="Full inventory">
+        <table>
+          <caption>Inventory</caption>
+          <thead>
+            <tr><th scope="col">Item</th><th scope="col">Category</th><th scope="col">Price</th><th scope="col">Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Item 1</td><td>Category 1</td><td>$4.01</td><td>Available</td></tr>
+            <tr><td>Item 2</td><td>Category 2</td><td>$5.02</td><td>Available</td></tr>
+            <tr><td>Item 3</td><td>Category 3</td><td>$6.03</td><td>Available</td></tr>
+            <tr><td>Item 4</td><td>Category 4</td><td>$7.04</td><td>Available</td></tr>
+            <tr><td>Item 5</td><td>Category 5</td><td>$8.05</td><td>Available</td></tr>
+            <tr><td>Item 6</td><td>Category 6</td><td>$9.06</td><td>Available</td></tr>
+            <tr><td>Item 7</td><td>Category 0</td><td>$10.07</td><td>Available</td></tr>
+            <tr><td>Item 8</td><td>Category 1</td><td>$11.08</td><td>Available</td></tr>
+            <tr><td>Item 9</td><td>Category 2</td><td>$12.09</td><td>Available</td></tr>
+            <tr><td>Item 10</td><td>Category 3</td><td>$13.10</td><td>Available</td></tr>
+            <tr><td>Item 11</td><td>Category 4</td><td>$14.11</td><td>Available</td></tr>
+            <tr><td>Item 12</td><td>Category 5</td><td>$15.12</td><td>Available</td></tr>
+            <tr><td>Item 13</td><td>Category 6</td><td>$16.13</td><td>Available</td></tr>
+            <tr><td>Item 14</td><td>Category 0</td><td>$17.14</td><td>Available</td></tr>
+            <tr><td>Item 15</td><td>Category 1</td><td>$18.15</td><td>Available</td></tr>
+            <tr><td>Item 16</td><td>Category 2</td><td>$19.16</td><td>Available</td></tr>
+            <tr><td>Item 17</td><td>Category 3</td><td>$20.17</td><td>Available</td></tr>
+            <tr><td>Item 18</td><td>Category 4</td><td>$21.18</td><td>Available</td></tr>
+            <tr><td>Item 19</td><td>Category 5</td><td>$22.19</td><td>Available</td></tr>
+            <tr><td>Item 20</td><td>Category 6</td><td>$23.20</td><td>Available</td></tr>
+            <tr><td>Item 21</td><td>Category 0</td><td>$24.21</td><td>Available</td></tr>
+            <tr><td>Item 22</td><td>Category 1</td><td>$25.22</td><td>Available</td></tr>
+            <tr><td>Item 23</td><td>Category 2</td><td>$26.23</td><td>Available</td></tr>
+            <tr><td>Item 24</td><td>Category 3</td><td>$27.24</td><td>Available</td></tr>
+            <tr><td>Item 25</td><td>Category 4</td><td>$28.25</td><td>Available</td></tr>
+            <tr><td>Item 26</td><td>Category 5</td><td>$29.26</td><td>Available</td></tr>
+            <tr><td>Item 27</td><td>Category 6</td><td>$30.27</td><td>Available</td></tr>
+            <tr><td>Item 28</td><td>Category 0</td><td>$31.28</td><td>Available</td></tr>
+            <tr><td>Item 29</td><td>Category 1</td><td>$32.29</td><td>Available</td></tr>
+            <tr><td>Item 30</td><td>Category 2</td><td>$33.30</td><td>Available</td></tr>
+            <tr><td>Item 31</td><td>Category 3</td><td>$34.31</td><td>Available</td></tr>
+            <tr><td>Item 32</td><td>Category 4</td><td>$35.32</td><td>Available</td></tr>
+            <tr><td>Item 33</td><td>Category 5</td><td>$36.33</td><td>Available</td></tr>
+            <tr><td>Item 34</td><td>Category 6</td><td>$37.34</td><td>Available</td></tr>
+            <tr><td>Item 35</td><td>Category 0</td><td>$38.35</td><td>Available</td></tr>
+            <tr><td>Item 36</td><td>Category 1</td><td>$39.36</td><td>Available</td></tr>
+            <tr><td>Item 37</td><td>Category 2</td><td>$40.37</td><td>Available</td></tr>
+            <tr><td>Item 38</td><td>Category 3</td><td>$41.38</td><td>Available</td></tr>
+            <tr><td>Item 39</td><td>Category 4</td><td>$42.39</td><td>Available</td></tr>
+            <tr><td>Item 40</td><td>Category 5</td><td>$3.40</td><td>Available</td></tr>
+            <tr><td>Item 41</td><td>Category 6</td><td>$4.41</td><td>Available</td></tr>
+            <tr><td>Item 42</td><td>Category 0</td><td>$5.42</td><td>Available</td></tr>
+            <tr><td>Item 43</td><td>Category 1</td><td>$6.43</td><td>Available</td></tr>
+            <tr><td>Item 44</td><td>Category 2</td><td>$7.44</td><td>Available</td></tr>
+            <tr><td>Item 45</td><td>Category 3</td><td>$8.45</td><td>Available</td></tr>
+            <tr><td>Item 46</td><td>Category 4</td><td>$9.46</td><td>Available</td></tr>
+            <tr><td>Item 47</td><td>Category 5</td><td>$10.47</td><td>Available</td></tr>
+            <tr><td>Item 48</td><td>Category 6</td><td>$11.48</td><td>Available</td></tr>
+            <tr><td>Item 49</td><td>Category 0</td><td>$12.49</td><td>Available</td></tr>
+            <tr><td>Item 50</td><td>Category 1</td><td>$13.50</td><td>Available</td></tr>
+            <tr><td>Item 51</td><td>Category 2</td><td>$14.51</td><td>Available</td></tr>
+            <tr><td>Item 52</td><td>Category 3</td><td>$15.52</td><td>Available</td></tr>
+            <tr><td>Item 53</td><td>Category 4</td><td>$16.53</td><td>Available</td></tr>
+            <tr><td>Item 54</td><td>Category 5</td><td>$17.54</td><td>Available</td></tr>
+            <tr><td>Item 55</td><td>Category 6</td><td>$18.55</td><td>Available</td></tr>
+            <tr><td>Item 56</td><td>Category 0</td><td>$19.56</td><td>Available</td></tr>
+            <tr><td>Item 57</td><td>Category 1</td><td>$20.57</td><td>Available</td></tr>
+            <tr><td>Item 58</td><td>Category 2</td><td>$21.58</td><td>Available</td></tr>
+            <tr><td>Item 59</td><td>Category 3</td><td>$22.59</td><td>Available</td></tr>
+            <tr><td>Item 60</td><td>Category 4</td><td>$23.60</td><td>Available</td></tr>
+            <tr><td>Item 61</td><td>Category 5</td><td>$24.61</td><td>Available</td></tr>
+            <tr><td>Item 62</td><td>Category 6</td><td>$25.62</td><td>Available</td></tr>
+            <tr><td>Item 63</td><td>Category 0</td><td>$26.63</td><td>Available</td></tr>
+            <tr><td>Item 64</td><td>Category 1</td><td>$27.64</td><td>Available</td></tr>
+            <tr><td>Item 65</td><td>Category 2</td><td>$28.65</td><td>Available</td></tr>
+            <tr><td>Item 66</td><td>Category 3</td><td>$29.66</td><td>Available</td></tr>
+            <tr><td>Item 67</td><td>Category 4</td><td>$30.67</td><td>Available</td></tr>
+            <tr><td>Item 68</td><td>Category 5</td><td>$31.68</td><td>Available</td></tr>
+            <tr><td>Item 69</td><td>Category 6</td><td>$32.69</td><td>Available</td></tr>
+            <tr><td>Item 70</td><td>Category 0</td><td>$33.70</td><td>Available</td></tr>
+            <tr><td>Item 71</td><td>Category 1</td><td>$34.71</td><td>Available</td></tr>
+            <tr><td>Item 72</td><td>Category 2</td><td>$35.72</td><td>Available</td></tr>
+            <tr><td>Item 73</td><td>Category 3</td><td>$36.73</td><td>Available</td></tr>
+            <tr><td>Item 74</td><td>Category 4</td><td>$37.74</td><td>Available</td></tr>
+            <tr><td>Item 75</td><td>Category 5</td><td>$38.75</td><td>Available</td></tr>
+            <tr><td>Item 76</td><td>Category 6</td><td>$39.76</td><td>Available</td></tr>
+            <tr><td>Item 77</td><td>Category 0</td><td>$40.77</td><td>Available</td></tr>
+            <tr><td>Item 78</td><td>Category 1</td><td>$41.78</td><td>Available</td></tr>
+            <tr><td>Item 79</td><td>Category 2</td><td>$42.79</td><td>Available</td></tr>
+            <tr><td>Item 80</td><td>Category 3</td><td>$3.80</td><td>Available</td></tr>
+            <tr><td>Item 81</td><td>Category 4</td><td>$4.81</td><td>Available</td></tr>
+            <tr><td>Item 82</td><td>Category 5</td><td>$5.82</td><td>Available</td></tr>
+            <tr><td>Item 83</td><td>Category 6</td><td>$6.83</td><td>Available</td></tr>
+            <tr><td>Item 84</td><td>Category 0</td><td>$7.84</td><td>Available</td></tr>
+            <tr><td>Item 85</td><td>Category 1</td><td>$8.85</td><td>Available</td></tr>
+            <tr><td>Item 86</td><td>Category 2</td><td>$9.86</td><td>Available</td></tr>
+            <tr><td>Item 87</td><td>Category 3</td><td>$10.87</td><td>Available</td></tr>
+            <tr><td>Item 88</td><td>Category 4</td><td>$11.88</td><td>Available</td></tr>
+            <tr><td>Item 89</td><td>Category 5</td><td>$12.89</td><td>Available</td></tr>
+            <tr><td>Item 90</td><td>Category 6</td><td>$13.90</td><td>Available</td></tr>
+            <tr><td>Item 91</td><td>Category 0</td><td>$14.91</td><td>Available</td></tr>
+            <tr><td>Item 92</td><td>Category 1</td><td>$15.92</td><td>Available</td></tr>
+            <tr><td>Item 93</td><td>Category 2</td><td>$16.93</td><td>Available</td></tr>
+            <tr><td>Item 94</td><td>Category 3</td><td>$17.94</td><td>Available</td></tr>
+            <tr><td>Item 95</td><td>Category 4</td><td>$18.95</td><td>Available</td></tr>
+            <tr><td>Item 96</td><td>Category 5</td><td>$19.96</td><td>Available</td></tr>
+            <tr><td>Item 97</td><td>Category 6</td><td>$20.97</td><td>Available</td></tr>
+            <tr><td>Item 98</td><td>Category 0</td><td>$21.98</td><td>Available</td></tr>
+            <tr><td>Item 99</td><td>Category 1</td><td>$22.99</td><td>Available</td></tr>
+            <tr><td>Item 100</td><td>Category 2</td><td>$23.00</td><td>Available</td></tr>
+            <tr><td>Item 101</td><td>Category 3</td><td>$24.01</td><td>Available</td></tr>
+            <tr><td>Item 102</td><td>Category 4</td><td>$25.02</td><td>Available</td></tr>
+            <tr><td>Item 103</td><td>Category 5</td><td>$26.03</td><td>Available</td></tr>
+            <tr><td>Item 104</td><td>Category 6</td><td>$27.04</td><td>Available</td></tr>
+            <tr><td>Item 105</td><td>Category 0</td><td>$28.05</td><td>Available</td></tr>
+            <tr><td>Item 106</td><td>Category 1</td><td>$29.06</td><td>Available</td></tr>
+            <tr><td>Item 107</td><td>Category 2</td><td>$30.07</td><td>Available</td></tr>
+            <tr><td>Item 108</td><td>Category 3</td><td>$31.08</td><td>Available</td></tr>
+            <tr><td>Item 109</td><td>Category 4</td><td>$32.09</td><td>Available</td></tr>
+            <tr><td>Item 110</td><td>Category 5</td><td>$33.10</td><td>Available</td></tr>
+            <tr><td>Item 111</td><td>Category 6</td><td>$34.11</td><td>Available</td></tr>
+            <tr><td>Item 112</td><td>Category 0</td><td>$35.12</td><td>Available</td></tr>
+            <tr><td>Item 113</td><td>Category 1</td><td>$36.13</td><td>Available</td></tr>
+            <tr><td>Item 114</td><td>Category 2</td><td>$37.14</td><td>Available</td></tr>
+            <tr><td>Item 115</td><td>Category 3</td><td>$38.15</td><td>Available</td></tr>
+            <tr><td>Item 116</td><td>Category 4</td><td>$39.16</td><td>Available</td></tr>
+            <tr><td>Item 117</td><td>Category 5</td><td>$40.17</td><td>Available</td></tr>
+            <tr><td>Item 118</td><td>Category 6</td><td>$41.18</td><td>Available</td></tr>
+            <tr><td>Item 119</td><td>Category 0</td><td>$42.19</td><td>Available</td></tr>
+            <tr><td>Item 120</td><td>Category 1</td><td>$3.20</td><td>Available</td></tr>
+            <tr><td>Item 121</td><td>Category 2</td><td>$4.21</td><td>Available</td></tr>
+            <tr><td>Item 122</td><td>Category 3</td><td>$5.22</td><td>Available</td></tr>
+            <tr><td>Item 123</td><td>Category 4</td><td>$6.23</td><td>Available</td></tr>
+            <tr><td>Item 124</td><td>Category 5</td><td>$7.24</td><td>Available</td></tr>
+            <tr><td>Item 125</td><td>Category 6</td><td>$8.25</td><td>Available</td></tr>
+            <tr><td>Item 126</td><td>Category 0</td><td>$9.26</td><td>Available</td></tr>
+            <tr><td>Item 127</td><td>Category 1</td><td>$10.27</td><td>Available</td></tr>
+            <tr><td>Item 128</td><td>Category 2</td><td>$11.28</td><td>Available</td></tr>
+            <tr><td>Item 129</td><td>Category 3</td><td>$12.29</td><td>Available</td></tr>
+            <tr><td>Item 130</td><td>Category 4</td><td>$13.30</td><td>Available</td></tr>
+            <tr><td>Item 131</td><td>Category 5</td><td>$14.31</td><td>Available</td></tr>
+            <tr><td>Item 132</td><td>Category 6</td><td>$15.32</td><td>Available</td></tr>
+            <tr><td>Item 133</td><td>Category 0</td><td>$16.33</td><td>Available</td></tr>
+            <tr><td>Item 134</td><td>Category 1</td><td>$17.34</td><td>Available</td></tr>
+            <tr><td>Item 135</td><td>Category 2</td><td>$18.35</td><td>Available</td></tr>
+            <tr><td>Item 136</td><td>Category 3</td><td>$19.36</td><td>Available</td></tr>
+            <tr><td>Item 137</td><td>Category 4</td><td>$20.37</td><td>Available</td></tr>
+            <tr><td>Item 138</td><td>Category 5</td><td>$21.38</td><td>Available</td></tr>
+            <tr><td>Item 139</td><td>Category 6</td><td>$22.39</td><td>Available</td></tr>
+            <tr><td>Item 140</td><td>Category 0</td><td>$23.40</td><td>Available</td></tr>
+            <tr><td>Item 141</td><td>Category 1</td><td>$24.41</td><td>Available</td></tr>
+            <tr><td>Item 142</td><td>Category 2</td><td>$25.42</td><td>Available</td></tr>
+            <tr><td>Item 143</td><td>Category 3</td><td>$26.43</td><td>Available</td></tr>
+            <tr><td>Item 144</td><td>Category 4</td><td>$27.44</td><td>Available</td></tr>
+            <tr><td>Item 145</td><td>Category 5</td><td>$28.45</td><td>Available</td></tr>
+            <tr><td>Item 146</td><td>Category 6</td><td>$29.46</td><td>Available</td></tr>
+            <tr><td>Item 147</td><td>Category 0</td><td>$30.47</td><td>Available</td></tr>
+            <tr><td>Item 148</td><td>Category 1</td><td>$31.48</td><td>Available</td></tr>
+            <tr><td>Item 149</td><td>Category 2</td><td>$32.49</td><td>Available</td></tr>
+            <tr><td>Item 150</td><td>Category 3</td><td>$33.50</td><td>Available</td></tr>
+            <tr><td>Item 151</td><td>Category 4</td><td>$34.51</td><td>Available</td></tr>
+            <tr><td>Item 152</td><td>Category 5</td><td>$35.52</td><td>Available</td></tr>
+            <tr><td>Item 153</td><td>Category 6</td><td>$36.53</td><td>Available</td></tr>
+            <tr><td>Item 154</td><td>Category 0</td><td>$37.54</td><td>Available</td></tr>
+            <tr><td>Item 155</td><td>Category 1</td><td>$38.55</td><td>Available</td></tr>
+            <tr><td>Item 156</td><td>Category 2</td><td>$39.56</td><td>Available</td></tr>
+            <tr><td>Item 157</td><td>Category 3</td><td>$40.57</td><td>Available</td></tr>
+            <tr><td>Item 158</td><td>Category 4</td><td>$41.58</td><td>Available</td></tr>
+            <tr><td>Item 159</td><td>Category 5</td><td>$42.59</td><td>Available</td></tr>
+            <tr><td>Item 160</td><td>Category 6</td><td>$3.60</td><td>Available</td></tr>
+            <tr><td>Item 161</td><td>Category 0</td><td>$4.61</td><td>Available</td></tr>
+            <tr><td>Item 162</td><td>Category 1</td><td>$5.62</td><td>Available</td></tr>
+            <tr><td>Item 163</td><td>Category 2</td><td>$6.63</td><td>Available</td></tr>
+            <tr><td>Item 164</td><td>Category 3</td><td>$7.64</td><td>Available</td></tr>
+            <tr><td>Item 165</td><td>Category 4</td><td>$8.65</td><td>Available</td></tr>
+            <tr><td>Item 166</td><td>Category 5</td><td>$9.66</td><td>Available</td></tr>
+            <tr><td>Item 167</td><td>Category 6</td><td>$10.67</td><td>Available</td></tr>
+            <tr><td>Item 168</td><td>Category 0</td><td>$11.68</td><td>Available</td></tr>
+            <tr><td>Item 169</td><td>Category 1</td><td>$12.69</td><td>Available</td></tr>
+            <tr><td>Item 170</td><td>Category 2</td><td>$13.70</td><td>Available</td></tr>
+            <tr><td>Item 171</td><td>Category 3</td><td>$14.71</td><td>Available</td></tr>
+            <tr><td>Item 172</td><td>Category 4</td><td>$15.72</td><td>Available</td></tr>
+            <tr><td>Item 173</td><td>Category 5</td><td>$16.73</td><td>Available</td></tr>
+            <tr><td>Item 174</td><td>Category 6</td><td>$17.74</td><td>Available</td></tr>
+            <tr><td>Item 175</td><td>Category 0</td><td>$18.75</td><td>Available</td></tr>
+            <tr><td>Item 176</td><td>Category 1</td><td>$19.76</td><td>Available</td></tr>
+            <tr><td>Item 177</td><td>Category 2</td><td>$20.77</td><td>Available</td></tr>
+            <tr><td>Item 178</td><td>Category 3</td><td>$21.78</td><td>Available</td></tr>
+            <tr><td>Item 179</td><td>Category 4</td><td>$22.79</td><td>Available</td></tr>
+            <tr><td>Item 180</td><td>Category 5</td><td>$23.80</td><td>Available</td></tr>
+            <tr><td>Item 181</td><td>Category 6</td><td>$24.81</td><td>Available</td></tr>
+            <tr><td>Item 182</td><td>Category 0</td><td>$25.82</td><td>Available</td></tr>
+            <tr><td>Item 183</td><td>Category 1</td><td>$26.83</td><td>Available</td></tr>
+            <tr><td>Item 184</td><td>Category 2</td><td>$27.84</td><td>Available</td></tr>
+            <tr><td>Item 185</td><td>Category 3</td><td>$28.85</td><td>Available</td></tr>
+            <tr><td>Item 186</td><td>Category 4</td><td>$29.86</td><td>Available</td></tr>
+            <tr><td>Item 187</td><td>Category 5</td><td>$30.87</td><td>Available</td></tr>
+            <tr><td>Item 188</td><td>Category 6</td><td>$31.88</td><td>Available</td></tr>
+            <tr><td>Item 189</td><td>Category 0</td><td>$32.89</td><td>Available</td></tr>
+            <tr><td>Item 190</td><td>Category 1</td><td>$33.90</td><td>Available</td></tr>
+            <tr><td>Item 191</td><td>Category 2</td><td>$34.91</td><td>Available</td></tr>
+            <tr><td>Item 192</td><td>Category 3</td><td>$35.92</td><td>Available</td></tr>
+            <tr><td>Item 193</td><td>Category 4</td><td>$36.93</td><td>Available</td></tr>
+            <tr><td>Item 194</td><td>Category 5</td><td>$37.94</td><td>Available</td></tr>
+            <tr><td>Item 195</td><td>Category 6</td><td>$38.95</td><td>Available</td></tr>
+            <tr><td>Item 196</td><td>Category 0</td><td>$39.96</td><td>Available</td></tr>
+            <tr><td>Item 197</td><td>Category 1</td><td>$40.97</td><td>Available</td></tr>
+            <tr><td>Item 198</td><td>Category 2</td><td>$41.98</td><td>Available</td></tr>
+            <tr><td>Item 199</td><td>Category 3</td><td>$42.99</td><td>Available</td></tr>
+            <tr><td>Item 200</td><td>Category 4</td><td>$3.00</td><td>Available</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-label="Cart">
+        <p>In cart: <output id="count">${count}</output></p>
+        <button id="add" onClick() { count++ }>Add to cart</button>
+      </section>
+    </main>
+  </body>
+</html>

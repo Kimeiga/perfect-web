@@ -1,0 +1,43 @@
+# Build outputs
+/target/
+**/target/
+dist/
+build/
+# the koka spike writes build-negA/ and build-negB/ for its negative cases
+# (a trailing comment on the same line as a pattern does NOT work in .gitignore)
+build-*/
+.output/
+*.wasm.map
+
+# Toolchain artifacts fetched by `just bootstrap` (pinned in tools/versions.lock)
+/.toolchain/
+
+# Node
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+
+# Generated intermediate sources (never authoring source of truth)
+/generated/
+**/.pw-build/
+
+# Local environment
+.env
+.env.local
+.DS_Store
+
+# Test / benchmark scratch
+/benchmarks/results/tmp/
+playwright-report/
+test-results/
+blob-report/
+
+# Local CA material — never commit (PROJECT_CHARTER.md §3.7, §14 M11)
+lab/certs/*.pem
+lab/certs/*.key
+lab/certs/rootCA*
+
+# Editor
+.idea/
+.vscode/*
+!.vscode/extensions.json

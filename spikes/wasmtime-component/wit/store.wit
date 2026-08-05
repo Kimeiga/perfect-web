@@ -1,0 +1,46 @@
+// spike: wasmtime-component — the WIT contract.
+//
+// Charter §14 Milestone 0 task 10: "compile and run one minimal typed component
+// with one host-provided capability."
+//
+// This is a deliberately small preview of the Milestone 8 worlds (§14 M8 task 2).
+// The point is the SHAPE: the guest declares what it imports, the host decides
+// whether to supply it, and a capability the host does not provide cannot be
+// reached — not by convention, but because the import is unresolvable.
+
+package perfect-web:store@0.1.0;
+
+/// The one host-granted capability. In charter §10.2 terms this is the
+/// `database.read<Stores>` effect lowered to a host interface.
+interface stores {
+    record store {
+        id: string,
+        name: string,
+    }
+
+    /// Reads are fallible and say so in the type. Charter §7.10: values entering
+    /// from outside start undecoded; `option` forces the guest to handle absence.
+    read: func(id: string) -> option<store>;
+}
+
+/// A capability the guest in THIS spike must NOT receive. Declared so that the
+/// denial test has something concrete to ask for. Charter §14 M8 task 8:
+/// "edge component requests payment secret".
+interface payments-secret {
+    api-key: func() -> string;
+}
+
+/// The public store-query component (charter §14 M8 task 6, first of two).
+/// It imports `stores` and nothing else.
+world public-store-query {
+    import stores;
+    export lookup: func(id: string) -> string;
+}
+
+/// A world that additionally demands the secret. Used only to demonstrate that
+/// instantiation fails when the host declines to provide it.
+world privileged-store-query {
+    import stores;
+    import payments-secret;
+    export lookup: func(id: string) -> string;
+}

@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-002
+// @category: database access in browser
+// @rule: PW0301
+// @charter: §7.3, §7.9, §14 M5
+// @milestone: 5
+// @expect-error: `database.read<Stores>` is not available at placement Browser
+// @expect-error: the browser world grants no database capability
+//
+// Placement is derived from effects. A browser-placed function requiring a
+// database effect has no capability to satisfy it, and this must fail at
+// compile time rather than at runtime.
+
+module store.browser_widget
+
+component StoreBadge(store_id: StoreId) {
+    placement browser
+
+    fn load() -> Store !{ database.read<Stores> } {
+        // ERROR: no database capability exists in the browser world.
+        Stores.get(store_id)
+    }
+}

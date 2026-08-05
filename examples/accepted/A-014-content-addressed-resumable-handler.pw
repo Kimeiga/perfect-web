@@ -1,0 +1,31 @@
+// @corpus: accepted
+// @id: A-014
+// @category: content-addressed resumable handler
+// @charter: §8.5
+// @milestone: 7
+//
+// A handler that captures only serializable immutable values and a resource
+// key. Its identity is the hash of its code and captures, so a stale manifest
+// is detectable rather than silently wrong.
+
+module store.add_button
+
+import domain.{ MenuItemId, PositiveInt }
+
+view AddToCartButton(item: MenuItemId, available: Bool) !{} {
+    // The handler captures `item` (an immutable opaque id) and nothing else.
+    // No DOM node, no connection, no closure over server state.
+    <button
+        disabled={!available}
+        on:press={resumable(captures = { item }) => add_to_cart(item, PositiveInt(1))}
+    >
+        Add
+    </button>
+}
+
+handler_policy {
+    identity          content_address(code, captures)
+    captures          serializable_only
+    on_version_mismatch safe_refetch
+    load              on_first_interaction
+}

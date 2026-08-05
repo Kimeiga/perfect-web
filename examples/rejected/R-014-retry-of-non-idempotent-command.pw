@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-014
+// @category: retry of non-idempotent command
+// @rule: PW0312
+// @charter: §9.5, §15.4
+// @milestone: 4
+// @expect-error: `charge_card` declares `retry bounded_exponential` but is not idempotent
+// @expect-error: only commands with an `idempotent_by` key may be retried
+//
+// Retrying a non-idempotent mutation double-charges. The policy fields make
+// the contradiction visible to the compiler.
+
+module payments.charge
+
+command charge_card(order: OrderId, amount: Money<USD>)
+    -> Result<PaymentReceipt, PaymentError>
+{
+    requires SignedIn
+    // ERROR: retry without an idempotency key.
+    retry    bounded_exponential(max = 5, jitter = true)
+{
+    Payments.charge(order, amount)
+}

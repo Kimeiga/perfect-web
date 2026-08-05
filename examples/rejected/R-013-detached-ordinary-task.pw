@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-013
+// @category: detached ordinary task
+// @rule: PW0311
+// @charter: §7.6
+// @milestone: 9
+// @expect-error: `task.spawn` requires an owning scope
+// @expect-error: no fire-and-forget task: attach it to a request, route, component, session, or declare it `durable`
+//
+// Structured concurrency means every ordinary task has a parent that cancels
+// it. A detached task is precisely the leak the model forbids.
+
+module analytics.ping
+
+view ProductCard(item: MenuItemId) !{} {
+    <article>
+        <button on:press={() => {
+            // ERROR: detached task with no owning scope.
+            task.spawn(detached) { Analytics.record_view(item) }
+        }}>
+            View
+        </button>
+    </article>
+}

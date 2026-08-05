@@ -1,0 +1,19 @@
+// @corpus: rejected
+// @id: R-008
+// @category: ambient null assumption
+// @rule: PW0306
+// @charter: §7.1, §7.10
+// @milestone: 2
+// @expect-error: `Option<Store>` cannot be used where `Store` is expected
+// @expect-error: there is no ambient `null` in this language; match on `Some`/`None`
+//
+// Absence is a value of type Option<T>, never an ambient null. This program
+// assumes a lookup succeeded.
+
+module store.lookup
+
+fn store_name(id: StoreId) -> String !{ database.read<Stores> } {
+    let store: Option<Store> = Stores.find(id)
+    // ERROR: Option<Store> is not Store.
+    store.name
+}

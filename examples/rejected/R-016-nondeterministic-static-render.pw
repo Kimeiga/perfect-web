@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-016
+// @category: nondeterministic static render
+// @rule: PW0314
+// @charter: §7.9, §9.3
+// @milestone: 6
+// @expect-error: a `Build`-placed page may not use effect `clock.wall`
+// @expect-error: static generation requires a deterministic effect row
+//
+// Build-time output must be reproducible. Reading the wall clock makes the
+// artifact depend on when it was generated.
+
+module marketing.landing
+
+page Landing() {
+    placement build
+    cache     shared
+
+    view {
+        <main>
+            // ERROR: wall clock read in a build-time render.
+            <p>Generated at {clock.now_wall()}</p>
+        </main>
+    }
+}

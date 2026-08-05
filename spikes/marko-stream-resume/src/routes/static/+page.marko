@@ -1,0 +1,40 @@
+/*
+ * Route: /static
+ *
+ * Charter §14 Milestone 0 task 9, claim 1:
+ *   "a static Marko page emits no application JavaScript or document the actual
+ *    output"
+ *
+ * Deliberately contains ZERO reactive state, ZERO event handlers, and ZERO
+ * await. Semantic HTML only (charter §8.2). If Marko still ships client
+ * JavaScript for this route, that is a measured fact to record, not a failure to
+ * hide — charter §18.4 states the 0-JS budget is "a target to test, not a fact
+ * to fake".
+ */
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Static route — perfect-web spike</title>
+  </head>
+  <body>
+    <main>
+      <h1>Blue Bottle</h1>
+      <p>A static store page. No state, no handlers, no streaming.</p>
+
+      <h2>Menu</h2>
+      <ul aria-label="Menu">
+        <li><span>Espresso</span> <span>$3.50</span></li>
+        <li><span>Cortado</span> <span>$4.75</span></li>
+        <li><span>Cold Brew</span> <span>$5.25</span></li>
+      </ul>
+
+      <nav aria-label="Spike routes">
+        <a href="/stream">streamed route</a>
+        <a href="/counter">interactive route</a>
+      </nav>
+    </main>
+  </body>
+</html>

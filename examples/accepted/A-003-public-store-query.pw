@@ -1,0 +1,26 @@
+// @corpus: accepted
+// @id: A-003
+// @category: public store query
+// @charter: §9.2, §7.8, §15.2
+// @milestone: 4
+//
+// Public data with a declared freshness window, snapshot consistency, a shared
+// cache partition, event-driven invalidation and a bounded retry policy. Every
+// field charter §9.2 requires is present, so placement can be derived: Edge.
+
+module store.queries
+
+import domain.{ StoreId, Store, StoreError }
+
+public query Store(id: StoreId) -> Result<Store, StoreError> {
+    freshness      30.seconds
+    consistency    snapshot
+    cache          shared
+    invalidates_on StoreChanged(id)
+    fallback       last_known_good
+    retry          bounded_exponential(max = 3, jitter = true)
+    concurrency    one_per_key
+    timeout        2.seconds
+{
+    Stores.get(id)
+}

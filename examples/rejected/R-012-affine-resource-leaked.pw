@@ -1,0 +1,21 @@
+// @corpus: rejected
+// @id: R-012
+// @category: affine resource leaked
+// @rule: PW0310
+// @charter: §7.7
+// @milestone: 9
+// @expect-error: affine resource `handle: MapHandle` escapes the scope that acquired it
+// @expect-error: an affine value may not outlive its acquiring scope
+//
+// Escaping an affine handle defeats the acquire/release pairing. The value
+// would be usable after release.
+
+module store.map_leak
+
+let mut cached_handle: Option<MapHandle> = None
+
+fn setup(container: Element) -> () !{ resource.acquire<MapHandle> } {
+    use handle = Maps.create(container, default_center())
+    // ERROR: the handle escapes into module state and outlives `use`.
+    cached_handle = Some(handle)
+}

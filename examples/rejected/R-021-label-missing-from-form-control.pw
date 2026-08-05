@@ -1,0 +1,21 @@
+// @corpus: rejected
+// @id: R-021
+// @category: label missing from form control
+// @rule: PW0319
+// @charter: §8.2
+// @milestone: 3
+// @expect-error: `<input>` has no associated label
+// @expect-error: associate a `<label for=...>`, or supply `aria-label`/`aria-labelledby`
+//
+// An unlabeled control is unusable with a screen reader and often with voice
+// control.
+
+module checkout.address_form
+
+view AddressForm() !{} {
+    <form on:submit={save_address}>
+        // ERROR: no label associated with this control.
+        <input type="text" name="street" />
+        <button type="submit">Save</button>
+    </form>
+}

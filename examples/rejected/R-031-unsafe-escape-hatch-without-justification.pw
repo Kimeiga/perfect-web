@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-031
+// @category: unsafe escape hatch without justification
+// @rule: PW0329
+// @charter: §7.5
+// @milestone: 5
+// @expect-error: `unsafe.lifecycle` requires a `because` justification string
+// @expect-error: every unsafe escape hatch must record why it is necessary
+//
+// Escape hatches are permitted but never anonymous: they must be justified,
+// warned about, and surfaced in the semantic diff.
+
+module legacy.widget
+
+component LegacyWidget() {
+    // ERROR: unsafe escape hatch with no justification.
+    unsafe.lifecycle {
+        on_mount  { Legacy.init() }
+        on_unmount { Legacy.teardown() }
+    }
+
+    view { <div id="legacy" /> }
+}

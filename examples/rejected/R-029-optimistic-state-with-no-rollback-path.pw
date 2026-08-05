@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-029
+// @category: optimistic state with no rollback path
+// @rule: PW0327
+// @charter: §7.5, §15.4
+// @milestone: 4
+// @expect-error: `add_to_cart` declares `optimistic` without `rollback`
+// @expect-error: an optimistic transition must declare how it is reversed on failure
+//
+// An optimistic update with no rollback leaves the UI permanently inconsistent
+// with the server after a rejected mutation.
+
+module cart.commands
+
+command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+    -> Result<Cart, CartError>
+{
+    requires      SignedIn
+    idempotent_by InteractionId
+    optimistic    cart.add(item, quantity)
+    // ERROR: no `rollback` declared.
+    invalidates   Cart(current_session())
+{
+    Carts.add(current_consumer(), item, quantity)
+}

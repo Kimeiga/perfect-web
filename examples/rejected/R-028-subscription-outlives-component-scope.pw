@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-028
+// @category: subscription outlives component scope
+// @rule: PW0326
+// @charter: §7.6
+// @milestone: 4
+// @expect-error: subscription `OrderTracking` declares `scope application` inside a component
+// @expect-error: a component-owned subscription may not outlive its component
+//
+// A subscription that outlives its owner keeps a socket open and pushes
+// updates into a scope that no longer exists.
+
+module order.tracking_view
+
+component OrderCard(order: OrderId) {
+    // ERROR: application scope requested from within a component.
+    let progress = subscribe OrderTracking(order) { scope application }
+
+    view {
+        <article aria-label="Order">{progress.stage_label}</article>
+    }
+}

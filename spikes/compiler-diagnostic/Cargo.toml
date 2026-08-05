@@ -1,0 +1,14 @@
+[package]
+name = "spike-compiler-diagnostic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "pw-spike-diag"
+path = "src/main.rs"
+
+[dependencies]
+annotate-snippets.workspace = true

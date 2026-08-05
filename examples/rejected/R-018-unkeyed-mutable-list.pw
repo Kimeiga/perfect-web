@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-018
+// @category: unkeyed mutable list
+// @rule: PW0316
+// @charter: §8.2, §14 M2
+// @milestone: 2
+// @expect-error: `#each` over a mutable collection requires a key expression
+// @expect-error: without a stable key, reordering cannot preserve element identity, focus, or state
+//
+// Unkeyed lists silently corrupt focus and form state on reorder. Keys are
+// required where the collection can change.
+
+module cart.lines_view
+
+view CartLines(lines: List<CartLine>) !{} {
+    <ul aria-label="Cart">
+        // ERROR: no key for a mutable list.
+        {#each lines as line}
+            <li>{line.item_name} x{line.quantity}</li>
+        {/each}
+    </ul>
+}

@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-019
+// @category: invalid HTML nesting
+// @rule: PW0317
+// @charter: §8.2
+// @milestone: 3
+// @expect-error: `<div>` is not permitted as a child of `<ul>`
+// @expect-error: `<ul>` accepts only `<li>`, `<script>`, or `<template>` children
+//
+// Invalid nesting produces a DOM that does not match the server HTML, which
+// breaks resumption in addition to being wrong.
+
+module store.menu_view
+
+view Menu(items: List<MenuItem>) !{} {
+    <ul aria-label="Menu">
+        // ERROR: <div> is not a valid child of <ul>.
+        <div class="header">Today</div>
+        {#each items as item (item.id)}
+            <li>{item.name}</li>
+        {/each}
+    </ul>
+}

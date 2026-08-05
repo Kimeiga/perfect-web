@@ -1,0 +1,31 @@
+// @corpus: accepted
+// @id: A-007
+// @category: map widget resource with cleanup
+// @charter: §7.5, §7.7
+// @milestone: 4
+//
+// An affine handle for an imperative browser widget. Acquire and release are
+// paired by the compiler; the handle cannot escape the scope that owns it.
+
+module store.map_widget
+
+import browser.{ Element, MapHandle, MapError }
+
+resource StoreMap(container: Element, center: LatLng)
+    -> Result<MapHandle, MapError>
+{
+    placement browser
+    affine
+    acquire {
+        Maps.create(container, center)
+    }
+    release(handle) {
+        Maps.destroy(handle)
+    }
+}
+
+view StoreLocation(center: LatLng) !{} {
+    <section aria-label="Store location">
+        <map-container resource={StoreMap} center={center} />
+    </section>
+}

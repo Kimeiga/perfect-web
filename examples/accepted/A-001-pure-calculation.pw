@@ -1,0 +1,34 @@
+// @corpus: accepted
+// @id: A-001
+// @category: pure calculation
+// @charter: §7.1, §7.2, §16.1
+// @milestone: 2
+//
+// A function with an empty effect row. It reads no clock, performs no I/O, and
+// returns a nominal Money<USD> rather than a bare integer. The compiler must
+// infer !{} here; anything else is a bug in the effect checker.
+
+module store.pricing
+
+import domain.{ MenuItemId, Money, USD, PositiveInt }
+
+type CartLine = CartLine {
+    item_id: MenuItemId,
+    quantity: PositiveInt,
+    unit_price: Money<USD>,
+}
+
+type Cart = Cart {
+    lines: List<CartLine>,
+}
+
+// !{} — no effects. Enforced, not merely intended.
+fn line_total(line: CartLine) -> Money<USD> !{} {
+    Money(line.unit_price.minor_units * line.quantity.value)
+}
+
+fn subtotal(cart: Cart) -> Money<USD> !{} {
+    cart.lines
+        |> List.map(line_total)
+        |> List.fold(Money(0), Money.add)
+}

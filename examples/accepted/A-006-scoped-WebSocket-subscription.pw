@@ -1,0 +1,25 @@
+// @corpus: accepted
+// @id: A-006
+// @category: scoped WebSocket subscription
+// @charter: §7.5, §7.6
+// @milestone: 4
+//
+// A subscription bound to the component scope. Leaving the scope closes the
+// socket; there is no manual teardown to forget. Reconnection is declared, not
+// hand-rolled.
+
+module order.tracking
+
+import domain.{ OrderId, OrderProgress, TrackingError }
+
+subscription OrderTracking(order: OrderId)
+    -> Stream<OrderProgress, TrackingError>
+{
+    scope       component
+    transport   websocket
+    reconnect   bounded_exponential(max = 5, jitter = true)
+    dedupe_by   order
+    on_scope_exit close
+{
+    Tracking.follow(order)
+}

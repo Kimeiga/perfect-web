@@ -1,0 +1,43 @@
+// @corpus: accepted
+// @id: A-008
+// @category: streamed public recommendations
+// @charter: §9.3, §15.3, §15.5
+// @milestone: 4
+//
+// A slow public resource declared as a streamed region so it cannot block the
+// shell. The placeholder is part of the declaration, so there is no state in
+// which the slot is undefined.
+
+module store.recommendations
+
+import domain.{ StoreId, Recommendation, RecommendationError }
+
+public query Recommendations(id: StoreId)
+    -> Result<List<Recommendation>, RecommendationError>
+{
+    freshness      10.minutes
+    consistency    eventual
+    cache          shared
+    invalidates_on MenuChanged(id)
+    fallback       empty
+    delivery       streamed
+    timeout        3.seconds
+{
+    Recommender.for_store(id)
+}
+
+view Recommendations(id: StoreId) !{} {
+    <section aria-label="Recommendations">
+        <stream query={Recommendations(id)}>
+            <placeholder><p>Finding recommendations</p></placeholder>
+            <ready as={items}>
+                <ul>
+                    {#each items as item (item.id)}
+                        <li>{item.name}</li>
+                    {/each}
+                </ul>
+            </ready>
+            <failed as={_error}><p>No recommendations right now</p></failed>
+        </stream>
+    </section>
+}

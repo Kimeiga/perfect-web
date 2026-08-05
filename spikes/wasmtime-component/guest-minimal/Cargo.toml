@@ -1,0 +1,23 @@
+[package]
+name = "spike-wasmtime-guest-minimal"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# `no_std` companion to ../guest. See spikes/wasmtime-component/README.md finding F-2:
+# the std guest imports 15 WASI instances; this one should import only the
+# capability its WIT world declares.
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = { version = "0.60.0", default-features = false, features = ["macros", "realloc"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+panic = "abort"

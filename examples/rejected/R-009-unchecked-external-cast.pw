@@ -1,0 +1,18 @@
+// @corpus: rejected
+// @id: R-009
+// @category: unchecked external cast
+// @rule: PW0307
+// @charter: §7.1, §7.10
+// @milestone: 2
+// @expect-error: `Unknown` cannot be cast to `Store`
+// @expect-error: external values must be decoded with a `Decoder<Store>` returning `Result`
+//
+// External data enters as Unknown. There is no cast that skips decoding; that
+// is what makes the boundary trustworthy.
+
+module store.ingest
+
+fn parse(raw: Unknown) -> Store !{} {
+    // ERROR: unchecked cast at an external boundary.
+    raw as Store
+}

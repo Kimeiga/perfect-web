@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-011
+// @category: open transaction not committed or rolled back
+// @rule: PW0309
+// @charter: §7.7
+// @milestone: 9
+// @expect-error: affine resource `tx: DatabaseTransaction` is not consumed on every path
+// @expect-error: a transaction must end exactly once, in `commit` or `rollback`
+//
+// A transaction is an affine handle. The early return leaves one path where it
+// is never resolved, which the compiler must reject.
+
+module cart.write
+
+command clear_cart() -> Result<(), CartError> {
+    requires SignedIn
+{
+    let tx = Database.begin()
+    if Carts.is_empty(current_session()) {
+        // ERROR: `tx` is still live on this path.
+        return Ok(())
+    }
+    Carts.clear(tx, current_session())
+    tx.commit()
+}

@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-025
+// @category: browser-only API on origin
+// @rule: PW0323
+// @charter: §7.3, §7.9
+// @milestone: 5
+// @expect-error: `device.location` is not available at placement Origin
+// @expect-error: the origin world grants no device capabilities
+//
+// Device APIs exist only in the browser world. Requiring one on the origin has
+// no possible capability grant.
+
+module delivery.estimate
+
+query DeliveryEstimate(session: SessionId) -> Result<DeliveryEstimate, EstimateError> {
+    placement origin
+    cache     private
+{
+    // ERROR: browser-only capability required at origin placement.
+    let here = device.current_location()
+    Estimates.for_location(here)
+}

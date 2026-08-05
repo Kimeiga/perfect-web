@@ -1,0 +1,32 @@
+// @corpus: accepted
+// @id: A-005
+// @category: idempotent command
+// @charter: §7.5, §15.4
+// @milestone: 4
+//
+// A mutation with an authorization precondition, an idempotency key, a
+// transaction boundary, an optimistic local transition with a rollback path,
+// declared invalidations, and retry restricted to transport failures only.
+
+module cart.commands
+
+import domain.{ MenuItemId, PositiveInt, InteractionId, CartError }
+
+command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+    -> Result<Cart, CartError>
+{
+    requires       SignedIn
+    idempotent_by  InteractionId
+    transaction    serializable
+    optimistic     cart.add(item, quantity)
+    rollback       cart.remove(item, quantity)
+    invalidates    Cart(current_session())
+    retry          transport_only(max = 2, jitter = true)
+{
+    // Revalidate availability inside the transaction, not before it.
+    let available = Menu.is_available(item)?
+    if !available {
+        return Err(CartError.ItemUnavailable(item))
+    }
+    Carts.add(current_consumer(), item, quantity)
+}

@@ -1,0 +1,19 @@
+{
+  "name": "spike-marko-stream-resume",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "marko-run",
+    "build": "marko-run build",
+    "preview": "node dist/index.mjs"
+  },
+  "dependencies": {
+    "marko": "6.3.32"
+  },
+  "devDependencies": {
+    "@marko/run": "0.11.8",
+    "@marko/run-adapter-node": "2.0.6",
+    "vite": "8.2.0"
+  }
+}

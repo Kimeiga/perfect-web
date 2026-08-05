@@ -1,0 +1,18 @@
+[package]
+name = "spike-wasmtime-host"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Not a workspace member — see the root Cargo.toml `exclude`. This crate is built
+# by spikes/wasmtime-component/run.sh, which first builds the wasm32-wasip2 guest.
+
+[[bin]]
+name = "spike-wasmtime-host"
+path = "src/main.rs"
+
+[dependencies]
+wasmtime = "47.0.3"
+anyhow = "1.0.104"

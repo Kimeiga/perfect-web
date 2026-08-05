@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-017
+// @category: wall-clock read in shared deterministic materialization
+// @rule: PW0315
+// @charter: §9.4, §7.9
+// @milestone: 6
+// @expect-error: materialization `MenuFragment` may not depend on `clock.wall`
+// @expect-error: a shared materialized fragment must be a pure function of its declared dependencies
+//
+// If a shared fragment reads the clock, two readers can be served different
+// content from the same cache key.
+
+module store.menu_materialization
+
+materialize MenuFragment(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
+    invalidates_on MenuChanged(id)
+
+    view {
+        // ERROR: wall-clock read inside shared materialization.
+        <p>as of {clock.now_wall()}</p>
+    }
+}

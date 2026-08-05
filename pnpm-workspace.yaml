@@ -1,0 +1,4 @@
+packages:
+  - "spikes/marko-stream-resume"
+  # runtime/*, benchmarks/baselines/* and examples/* join as milestones need them
+  # (PROJECT_CHARTER.md §12: do not create empty directories to look complete).

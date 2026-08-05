@@ -1,0 +1,26 @@
+// @corpus: accepted
+// @id: A-009
+// @category: edge materialized menu
+// @charter: §9.4, §14 M6
+// @milestone: 6
+//
+// A public fragment materialized at the edge and invalidated by typed events
+// rather than a route timer. The dependency list is explicit, so invalidating
+// one store cannot regenerate another.
+
+module store.menu_materialization
+
+import domain.{ StoreId, MenuItemId }
+
+materialize MenuFragment(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Store(id), Menu(id)
+    invalidates_on MenuChanged(id),
+                   InventoryChanged(id, _item: MenuItemId)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+    locale         included_in_key
+}

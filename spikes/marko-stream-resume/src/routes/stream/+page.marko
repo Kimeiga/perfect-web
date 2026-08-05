@@ -1,0 +1,63 @@
+/* Route: /stream
+ *
+ * Charter §14 Milestone 0 task 9, claim 2: "a delayed subtree streams
+ * independently".
+ *
+ * Models the charter §15.3 store page: heading and menu are available
+ * immediately; the delivery estimate takes 400 ms and recommendations 1200 ms
+ * (charter §15.5 specifies exactly those delays). Both must arrive AFTER the
+ * shell without blocking it.
+ *
+ * run.sh measures the wall-clock arrival time of each marker string in the
+ * response stream, which is what makes this a measurement rather than a claim.
+ */
+import { delay } from "../../delay.js";
+
+/* Both promises start now, in parallel — not when their <await> is reached.
+ * Charter §9.5 / Marko guidance: start loads early, await where rendered. */
+<const/estimatePromise=delay(400, "25-35 min")>
+<const/recsPromise=delay(1200, ["Affogato", "Gibraltar"])>
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Streamed route — perfect-web spike</title>
+  </head>
+  <body>
+    <main>
+      <h1>Blue Bottle</h1>
+      <p id="shell-marker">SHELL_READY</p>
+
+      <h2>Menu</h2>
+      <ul aria-label="Menu">
+        <li>Espresso</li>
+        <li>Cortado</li>
+        <li>Cold Brew</li>
+      </ul>
+
+      <section aria-label="Delivery estimate">
+        <try>
+          <await|estimate|=estimatePromise>
+            <p id="estimate-marker">ESTIMATE_READY ${estimate}</p>
+          </await>
+          <@placeholder><p>Estimating delivery...</p></@placeholder>
+        </try>
+      </section>
+
+      <section aria-label="Recommendations">
+        <try>
+          <await|recs|=recsPromise>
+            <ul id="recs-marker">
+              <li>RECS_READY</li>
+              <for|r| of=recs by=(r) => r>
+                <li>${r}</li>
+              </for>
+            </ul>
+          </await>
+          <@placeholder><p>Loading recommendations...</p></@placeholder>
+        </try>
+      </section>
+    </main>
+  </body>
+</html>

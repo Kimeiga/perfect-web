@@ -1,0 +1,20 @@
+// @corpus: rejected
+// @id: R-001
+// @category: network request inside view
+// @rule: PW0300
+// @charter: §7.4, §16.2
+// @milestone: 2
+// @expect-error: a `view` may not perform network I/O
+// @expect-error: `fetch_store` requires !{network}, but a view's effect row is !{}
+//
+// The canonical rejection. A view must be a pure function of its inputs; a
+// network call in one is the bug class the whole effect system exists to make
+// unrepresentable.
+
+module store.page
+
+view StorePage(store_id: StoreId) !{} {
+    // ERROR: network effect inside a pure view.
+    let store = fetch_store(store_id)
+    <main><h1>{store.name}</h1></main>
+}
