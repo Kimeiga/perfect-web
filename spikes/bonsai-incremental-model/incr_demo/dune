@@ -1,0 +1,3 @@
+(executable
+ (name incr_demo)
+ (libraries core incremental))

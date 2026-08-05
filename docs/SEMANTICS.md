@@ -125,6 +125,81 @@ encode the boundaries.
 
 ---
 
+## 5A. Layout effects and frame phases (charter §7.5A)
+
+Added by charter v2. The premise:
+
+> *"Fine-grained DOM updates do not by themselves prevent forced synchronous
+> layout."*
+
+Phase/effect families — **specified**, none enforced yet:
+
+```text
+dom.mutate                 # attributes, classes, text, insertion/removal
+style.mutate<LayoutAffect> # writes that may invalidate style/layout
+layout.measure             # geometry: boxes, scroll metrics, computed layout
+observe.resize             # browser-delivered element-size changes
+observe.intersection       # browser-delivered visibility/intersection changes
+animation.composite        # transform/opacity-style compositor work
+paint.custom               # canvas/custom painting escape hatch
+post_paint                 # work deferred until after presentation
+```
+
+Ordinary application code may not call `offsetWidth`, `clientHeight`,
+`scrollHeight`, `getBoundingClientRect`, or layout-dependent computed-style reads
+directly. Typed primitives return a scheduled `LayoutSnapshot<T>` instead.
+
+The default frame transaction (§7.5A):
+
+```text
+1. receive input and resource changes
+2. stabilize pure/incremental computations
+3. collect all requested measurements while layout is clean
+4. compute the mutation plan without touching the DOM
+5. apply all DOM/style mutations in one batched commit
+6. allow browser style/layout/paint/composite
+7. deliver observer and post-paint results into a later transaction
+```
+
+**Demonstrated — and the effect size is the largest measured anywhere in
+Milestone 0.** `spikes/layout-phase-scheduler` implements steps 3–5 as a runtime
+`FrameScheduler` and compares it against the interleaved read/write anti-pattern
+on identical work (checksums match):
+
+| elements | thrash | phased | ratio |
+|---:|---:|---:|---:|
+| 400 | 79.1 ms | 0.3 ms | **264×** |
+| 1200 | 678.6 ms | 0.8 ms | **848×** |
+
+Long Animation Frame count: **7 long frames** thrashing, **0** phased.
+
+**Learned:**
+
+- **A runtime-enforced API captures the entire benefit.** The scheduler separates
+  `measure()` from `mutate()` by shape alone, with no compiler involvement. This
+  supports the charter's own fallback: *"keep the phase scheduler as a
+  runtime-enforced API even if compile-time proof is initially incomplete."* The
+  compiler's job is to make the unsafe path **unrepresentable**, not to make the
+  safe path fast — it already is.
+- **`forcedStyleAndLayoutDuration` is not exposed** in Chrome 150, so the
+  instrumentation uses long-frame count and `blockingDuration` instead. The
+  charter said "where available"; it is not available.
+- **Containment is not a decoration.** `contain: layout style paint` +
+  `content-visibility: auto` made building and laying out a 3,000-row subtree
+  **4.18× faster** (23.8 ms → 5.7 ms), but made a forced layout after an
+  unrelated host mutation marginally *slower*. §7.5A's instruction to emit it
+  "only when subtree independence is semantically valid" is a performance
+  constraint as well as a correctness one.
+- **ResizeObserver feedback loops are detectable**: the browser emits
+  `ResizeObserver loop completed with undelivered notifications` as a window
+  error, which is the signal §7.5A's required warning can be built on.
+
+**Open:** everything else in §7.5A — coalescing by document part, cancelling
+measurements for unmounted scopes, virtualization requirements, frame-budget and
+layout-causality devtools, and the compile-time phase separation itself.
+
+---
+
 ## 6. Structured concurrency (charter §7.6)
 
 Every ordinary task belongs to a parent scope and is cancelled or completed when

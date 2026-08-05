@@ -1,0 +1,61 @@
+spike: layout-phase-scheduler
+generated: 2026-08-05T22:58:06Z
+node: v22.21.1
+chrome: Google Chrome 150.0.7871.187 
+host: Darwin arm64 / Apple M2 Pro
+command: node spikes/layout-phase-scheduler/measure.mjs
+
+pages under test:
+  public/thrash.html     interleaves geometry reads with layout-invalidating writes
+  public/phased.html     batches all reads, plans, then commits all writes
+  public/observers.html  ResizeObserver + feedback loop + containment
+
+NOTE: headless, single machine, no CPU throttling, no sample distribution.
+This is a BASELINE for detecting forced synchronous layout (charter §14 M0
+task 13), not a benchmark result (charter §18.5).
+
+=========== 1. FORCED SYNCHRONOUS LAYOUT: THRASH vs PHASED ==========
+
+  elements   mode     median ms   runs                               checksum
+  400        thrash   78.4        [75.6,76.6,79.8,78,80.7,78.4,79.4] 59600
+  400        phased   0.3         [0.5,0.3,0.3,0.3,0.3,0.3,0.2]      59600
+             -> phase scheduling is 261.3x faster; identical checksum: true
+
+  1200       thrash   686.5       [665,661.1,686.5,689.7,685.3,731.3,687.9] 178800
+  1200       phased   0.9         [2,0.9,1.1,0.7,1,0.8,0.7]          178800
+             -> phase scheduling is 762.8x faster; identical checksum: true
+
+=========== 2. LONG ANIMATION FRAME ATTRIBUTION =====================
+
+  n=400   thrash  loafSupported=true longFrames=7  duration=81.3ms blocking=31.4ms
+  n=400   phased  loafSupported=true longFrames=0  (no frame exceeded the 50ms LoAF threshold)
+  n=1200  thrash  loafSupported=true longFrames=7  duration=689.5ms blocking=639.3ms
+  n=1200  phased  loafSupported=true longFrames=0  (no frame exceeded the 50ms LoAF threshold)
+
+  forcedStyleAndLayoutDuration exposed by this browser: false
+  -> the charter's preferred signal is UNAVAILABLE here.
+     Long-frame COUNT plus blockingDuration is the usable proxy:
+     thrash produced 7 long frames, phased produced 0.
+
+=========== 3. RESIZE OBSERVER + FEEDBACK LOOP ======================
+
+  resizeObserver deliveries      : 1
+  feedback-loop iterations       : 30
+  browser reported the RO loop   : true
+  check:feedback-loop-detectable=pass
+
+=========== 4. CSS CONTAINMENT / content-visibility =================
+
+  supported: contain=true  content-visibility=true
+  build + first layout of 3000 rows:
+    plain     median 25.4 ms   [27.3,25.4,24.6,26.2,23.3]
+    contained median 6.1 ms   [6.2,6.4,6.1,5.5,5.5]
+    -> 4.16x faster with contain + content-visibility
+  check:containment-helps-initial-layout=pass
+
+  CAVEAT (measured): containment does NOT help a forced layout that
+  follows an unrelated mutation on the host element. An earlier
+  version of this harness measured that case and found the contained
+  subtree marginally SLOWER. Containment helps building and laying out
+  a large independent subtree, which is a different thing.
+

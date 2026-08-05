@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phase-scheduled implementation — perfect-web spike</title>
+<!--
+  Charter §14 Milestone 0 task 13, case B: "create a phase-scheduled
+  implementation that batches measurements before mutations".
+
+  Same visible result as thrash.html, same element count, same arithmetic.
+  The ONLY difference is the discipline: all reads happen while layout is clean,
+  then a mutation plan is computed without touching the DOM, then all writes are
+  applied in one commit.
+
+  This is charter §7.5A's default frame transaction, steps 3-5:
+
+      3. collect all requested measurements while layout is clean
+      4. compute the mutation plan without touching the DOM
+      5. apply all DOM/style mutations in one batched commit
+-->
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 16px; }
+  #grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+  .cell { background: #ded; padding: 4px; font-size: 11px; min-height: 18px; }
+  #out { margin-top: 12px; white-space: pre; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<h1>Phase-scheduled</h1>
+<p>All measurements first, then a mutation plan, then one batched commit.</p>
+<div id="grid"></div>
+<div id="out">not run</div>
+
+<script type="module">
+const COUNT = Number(new URLSearchParams(location.search).get("n") ?? 400);
+
+const grid = document.getElementById("grid");
+const cells = [];
+for (let i = 0; i < COUNT; i++) {
+  const d = document.createElement("div");
+  d.className = "cell";
+  d.textContent = String(i);
+  grid.appendChild(d);
+  cells.push(d);
+}
+
+/**
+ * A miniature of the §7.5A frame transaction.
+ *
+ * `measure()` may only read. `mutate()` may only write. The scheduler runs every
+ * measurement before any mutation, so layout is flushed at most once.
+ *
+ * In the real language these are separate EFFECTS (`layout.measure` vs
+ * `style.mutate<LayoutAffect>`) and the compiler enforces the ordering. Here the
+ * separation is enforced only by the API shape — which is the charter's own
+ * fallback position: "keep the phase scheduler as a runtime-enforced API even if
+ * compile-time proof is initially incomplete".
+ */
+class FrameScheduler {
+  #reads = [];
+  #writes = [];
+  #measureCache = new Map();
+
+  measure(fn) { this.#reads.push(fn); }
+  mutate(fn) { this.#writes.push(fn); }
+
+  /**
+   * Deduplicate measurements of the same element+property within one frame.
+   * Charter §7.5A: "deduplicate measurements of the same element/property in
+   * one frame".
+   */
+  read(el, prop) {
+    const key = `${el.dataset.i}:${prop}`;
+    if (!this.#measureCache.has(key)) this.#measureCache.set(key, el[prop]);
+    return this.#measureCache.get(key);
+  }
+
+  flush() {
+    // PHASE 1 — every read, while layout is clean. At most one forced layout
+    // for the whole batch, and only if something dirtied it beforehand.
+    const snapshots = this.#reads.map((fn) => fn(this));
+    // PHASE 2 — plan, touching nothing.
+    const plan = snapshots;
+    // PHASE 3 — one batched commit. No reads interleaved, so no forced layout.
+    for (let i = 0; i < this.#writes.length; i++) this.#writes[i](plan[i]);
+    const dedup = this.#measureCache.size;
+    this.#reads = [];
+    this.#writes = [];
+    this.#measureCache.clear();
+    return { measurements: dedup };
+  }
+}
+
+let runIndex = 0;
+
+function phased() {
+  // Same salt discipline as thrash.html so the two are directly comparable:
+  // identical element count, identical arithmetic, identical write values.
+  const salt = ++runIndex;
+  const t0 = performance.now();
+  const s = new FrameScheduler();
+  let acc = 0;
+
+  for (const cell of cells) {
+    s.measure(() => {
+      const w = cell.offsetWidth;
+      const h = cell.offsetHeight;
+      acc += w + h;
+      return w;
+    });
+    s.mutate((w) => {
+      cell.style.paddingLeft = ((w + salt) % 7 + 2) + "px";
+    });
+  }
+
+  const info = s.flush();
+  return { ms: performance.now() - t0, acc, ...info };
+}
+
+window.__run = () => {
+  const r = phased();
+  document.getElementById("out").textContent =
+    `mode=phased elements=${COUNT} duration=${r.ms.toFixed(1)}ms checksum=${r.acc}`;
+  return { mode: "phased", elements: COUNT, ms: r.ms, checksum: r.acc };
+};
+
+window.__loaf = [];
+if ("PerformanceObserver" in window &&
+    PerformanceObserver.supportedEntryTypes?.includes("long-animation-frame")) {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) {
+      window.__loaf.push({
+        duration: e.duration,
+        blockingDuration: e.blockingDuration,
+        forcedStyleAndLayoutDuration: e.forcedStyleAndLayoutDuration,
+        renderStart: e.renderStart,
+        styleAndLayoutStart: e.styleAndLayoutStart,
+      });
+    }
+  }).observe({ type: "long-animation-frame", buffered: true });
+  window.__loafSupported = true;
+} else {
+  window.__loafSupported = false;
+}
+</script>
+</body>
+</html>

@@ -31,12 +31,11 @@ Build a credible path toward a web stack with these properties:
 9. **Declarative remote resources** with keys, freshness, consistency, deduplication, cancellation, retry policy, invalidation, optimistic updates, and idempotency.
 10. **Semantic HTML and CSS**, not an opaque canvas or generic cross-platform scene graph.
 11. **Static document parts and fine-grained updates**, not repeated whole-component rendering plus virtual-DOM reconciliation.
-12. **Frame-phase and layout safety**. Ordinary application code cannot synchronously interleave layout-invalidating DOM writes with geometry/style reads. Measurements, mutations, animation work, and post-paint work are represented by distinct typed phases and scheduled in batches.
-13. **Streaming server rendering and resumption**, not general hydration that re-executes an already-rendered application tree.
-14. **Incremental materialization**, where the modern equivalent of ISR is derived from resource dependencies and invalidation events rather than manually configured route timers.
-15. **Capability-secure server and edge components**, eventually using WIT, the WebAssembly Component Model, WASI, and Wasmtime.
-16. **A browser-compatible implementation first**, followed only later by experimental native browser primitives and Servo work.
-17. **AI-friendly development**: a small regular language, deterministic compiler feedback, compile-fail tests, semantic diffs, generated evidence, and a benchmark that measures whether smaller agents can succeed more reliably than on React.
+12. **Streaming server rendering and resumption**, not general hydration that re-executes an already-rendered application tree.
+13. **Incremental materialization**, where the modern equivalent of ISR is derived from resource dependencies and invalidation events rather than manually configured route timers.
+14. **Capability-secure server and edge components**, eventually using WIT, the WebAssembly Component Model, WASI, and Wasmtime.
+15. **A browser-compatible implementation first**, followed only later by experimental native browser primitives and Servo work.
+16. **AI-friendly development**: a small regular language, deterministic compiler feedback, compile-fail tests, semantic diffs, generated evidence, and a benchmark that measures whether smaller agents can succeed more reliably than on React.
 
 The governing principle is:
 
@@ -259,8 +258,6 @@ Study these projects for specific ideas:
 | Links | one language split across browser/server/database and typed RPC | that its renderer and runtime match modern resumable web needs |
 | Ur/Web | compile-time web-safety guarantee checklist | that its implementation should be reused directly |
 | Skip | effects tied to safe memoization and incremental invalidation | that it supplies the full UI and server platform |
-| Jane Street Incremental | a stable dependency DAG, cutoffs, stabilization, and incremental recomputation of arbitrary derived values | that its OCaml implementation should become the permanent cross-target runtime |
-| Bonsai/Bonsai_web | purely functional state machines, a static computation DAG, lifecycle/scoping, whole-program incrementality, and unusually strong UI expect tests | that its virtual-DOM diff/patch loop, Js_of_ocaml target, or lifecycle APIs prevent forced layout or provide SSR/resumption/placement |
 | Svelte/SvelteKit | SFC ergonomics, semantic HTML, scoped CSS, compiled targeted updates, typed remote-function direction | that JavaScript semantics, generic effects, hydration, and manual placement are ideal |
 | Marko 6 | streaming, resumability, zero-JS static output, lazy interaction code | that JavaScript semantics should remain the permanent core |
 | Qwik | serialized resumption and interaction-lazy code | that arbitrary closure serialization is automatically safe |
@@ -499,54 +496,6 @@ Use distinct concepts:
 | `task` | structured child computation owned by a scope |
 | `durable` | explicit background job that outlives the request |
 | `unsafe lifecycle` | infrastructure-only escape hatch, visibly audited and forbidden by default in app packages |
-
-### 7.5A Layout effects and frame phases
-
-Fine-grained DOM updates do not by themselves prevent forced synchronous layout. The language and browser runtime must distinguish layout-sensitive operations and make the safe path the default.
-
-Model at least these effect/phase families:
-
-```text
-dom.mutate                 # attributes, classes, text, insertion/removal
-style.mutate<LayoutAffect> # writes that may invalidate style/layout
-layout.measure             # geometry such as boxes, scroll metrics, computed layout
-observe.resize             # browser-delivered element-size changes
-observe.intersection       # browser-delivered visibility/intersection changes
-animation.composite        # transform/opacity-style compositor work
-paint.custom               # canvas/custom painting escape hatch
-post_paint                 # work intentionally deferred until after presentation
-```
-
-Ordinary application code must not directly call synchronous geometry APIs such as `offsetWidth`, `clientHeight`, `scrollHeight`, `getBoundingClientRect`, or layout-dependent computed-style reads. Expose typed framework primitives that return a scheduled `LayoutSnapshot<T>` instead.
-
-The default frame transaction is:
-
-```text
-1. receive input and resource changes
-2. stabilize pure/incremental computations
-3. collect all requested measurements while layout is clean
-4. compute the mutation plan without touching the DOM
-5. apply all DOM/style mutations in one batched commit
-6. allow browser style/layout/paint/composite
-7. deliver observer and post-paint results into a later transaction
-```
-
-A mutation that requires a fresh measurement of its result must observe that result in a later frame or through a browser observer; it must not force the browser to synchronously flush layout mid-transaction. Provide an explicit audited infrastructure escape hatch for cases where this latency is unacceptable, and attribute its forced-layout cost.
-
-The compiler/runtime should additionally:
-
-- group all reads before all writes;
-- deduplicate measurements of the same element/property in one frame;
-- coalesce DOM mutations by stable document part;
-- cancel measurements for scopes that unmount;
-- prefer `ResizeObserver` and `IntersectionObserver` over polling;
-- warn on feedback loops where a resize observation immediately changes the observed size;
-- generate CSS `contain` or `content-visibility` only when subtree independence is semantically valid;
-- require virtualization/windowing for unbounded rendered collections;
-- prefer transforms and opacity for high-frequency visual motion when equivalent to the requested semantics;
-- expose frame-budget and layout-causality data in developer tools.
-
-Do not claim that the compiler can abolish layout cost. Text, fonts, intrinsic sizing, CSS Grid/Flexbox, images, viewport changes, and genuine document geometry still require browser layout. The goal is to eliminate accidental read/write thrashing, constrain the affected subtree, and make unavoidable layout observable and budgeted.
 
 ### 7.6 Structured concurrency
 
@@ -1246,7 +1195,7 @@ Can the proposed semantic architecture be made concrete enough that accepted and
 
 1. Initialize the repository, licenses, formatting, CI skeleton, `justfile`, toolchain pins, and status documents.
 2. Build `just doctor` and `just bootstrap` without installing unnecessary tools.
-3. Research current primary sources for Koka, Marko 6, Svelte/SvelteKit remote resources, Qwik resumption, Links, Ur/Web, Roc, Effekt, Skip, Jane Street Incremental, Bonsai/Bonsai_web, WIT/WASI, Wasmtime, Lima, Servo, declarative partial updates, browser rendering phases, forced synchronous layout, CSS containment, `content-visibility`, ResizeObserver, and Long Animation Frame attribution.
+3. Research current primary sources for Koka, Marko 6, Svelte/SvelteKit remote resources, Qwik resumption, Links, Ur/Web, Roc, Effekt, Skip, WIT/WASI, Wasmtime, Lima, Servo, and declarative partial updates.
 4. Create `docs/research/technology-matrix.md` with columns:
 
 ```text
@@ -1270,15 +1219,13 @@ deletion or migration condition
    - no browser fork before profiling;
    - explicit invalidation before automatic dependency tracking.
 6. Create the first accepted/rejected program corpus as plain specification files, even before they compile.
-7. Build six isolated feasibility spikes:
+7. Build four isolated feasibility spikes:
 
 ```text
 spikes/koka-js-interop
 spikes/marko-stream-resume
 spikes/wasmtime-component
 spikes/compiler-diagnostic
-spikes/bonsai-incremental-model
-spikes/layout-phase-scheduler
 ```
 
 8. In `koka-js-interop`, prove:
@@ -1292,27 +1239,14 @@ spikes/layout-phase-scheduler
    - emitted assets and runtime bytes are measured.
 10. In `wasmtime-component`, compile and run one minimal typed component with one host-provided capability. If WASI 0.3 bindings are not yet reliable in the tested toolchain, record that and use the stable supported path.
 11. In `compiler-diagnostic`, build a tiny Rust CLI that parses one toy declaration and emits a source-span diagnostic. This validates the development ergonomics before choosing parser libraries.
-12. In `bonsai-incremental-model`:
-   - build or run a minimal current Bonsai/Bonsai_web application on Apple Silicon, or document the exact blocker if the current toolchain cannot be installed reproducibly;
-   - demonstrate that an unrelated state update does not recompute an instrumented expensive derived value;
-   - inspect the static computation DAG, lifecycle/scoping model, and expect-test workflow;
-   - confirm from source which portions use Jane Street Incremental and which portions still produce a virtual DOM and diff/patch it;
-   - record which semantics should be borrowed into the own computation/resource graph and why Bonsai is not the permanent renderer by default.
-13. In `layout-phase-scheduler`:
-   - create an intentionally thrashing page that alternates layout-invalidating writes and geometry reads;
-   - create a phase-scheduled implementation that batches measurements before mutations;
-   - instrument both with Chromium performance traces and, where available, Long Animation Frame `forcedStyleAndLayoutDuration`;
-   - test size observation with ResizeObserver and one feedback-loop case;
-   - test CSS containment and `content-visibility` on an isolated large subtree;
-   - record a reproducible baseline proving the project can detect forced synchronous layout before attempting to prevent it.
-14. Create `docs/vision/non-goals.md` to resist scope creep.
+12. Create `docs/vision/non-goals.md` to resist scope creep.
 
 #### Gate
 
 Milestone 0 passes only when:
 
 - `just doctor` works on the Mac;
-- all six spikes run from documented commands, or a primary-source-backed blocker is recorded for any upstream toolchain that cannot currently run;
+- all four spikes run from documented commands;
 - versions and licenses are pinned;
 - at least 10 accepted and 20 rejected semantic examples exist;
 - the reuse/fork/tape/build matrix is complete enough to justify Milestone 1;
@@ -1773,10 +1707,6 @@ handler loading
 scope cancellation
 patch application
 version mismatch recovery
-frame transaction scheduler
-batched layout measurement
-batched DOM/style mutation
-layout/paint attribution
 ```
 
 6. Implement content-addressed handler artifacts.
@@ -1784,36 +1714,20 @@ layout/paint attribution
 8. Implement resumption without replaying the complete component tree.
 9. Implement out-of-order `<template>`-style patches through a narrow shim.
 10. Preserve focus, selection, form state, scroll, and accessibility during updates.
-11. Implement the layout-phase contract from section 7.5A:
-   - prohibit arbitrary synchronous geometry reads in normal app packages;
-   - expose scheduled measurement snapshots;
-   - apply document-part writes in one commit phase;
-   - deduplicate same-frame measurements;
-   - surface an audited escape hatch with runtime attribution;
-   - generate containment hints only when proven safe;
-   - support virtualized keyed collections.
-12. Add tests for:
+11. Add tests for:
 
 ```text
 keyed insertion/reordering
 rapid optimistic update/rollback
-rapid menu filtering over a 1,000-item fixture with bounded live DOM
-cart drawer open/close animation under 60 Hz and 120 Hz profiles
-font load, image intrinsic-size change, and viewport resize
 streamed patch arriving after navigation
 handler version mismatch
 focus preservation
 form submission without JS
 JavaScript disabled
-read-write-read layout-thrash attempt rejected or deferred
-measurement after mutation delivered in a later frame
-ResizeObserver feedback loop contained
-1,000-item menu remains virtualized
-cart drawer animation avoids layout-triggering properties in the hot path
 ```
 
-13. Compare output and behavior against Marko.
-14. Keep the Marko adapter as a benchmark and fallback until parity is demonstrated.
+12. Compare output and behavior against Marko.
+13. Keep the Marko adapter as a benchmark and fallback until parity is demonstrated.
 
 #### Gate
 
@@ -1824,9 +1738,6 @@ cart drawer animation avoids layout-triggering properties in the hot path
 - Keyed updates preserve identity and focus.
 - All renderer golden tests pass against both Marko and own renderer or documented intentional differences.
 - Browser runtime size and activation CPU are measured.
-- Standard store-page interactions produce no script-attributed forced synchronous layout in the supported Chromium trace harness.
-- Layout measurements and mutations appear as separate runtime phases in debug traces.
-- The large-menu benchmark uses bounded DOM size through virtualization or `content-visibility` where semantically correct.
 
 #### Rationale
 
@@ -2759,13 +2670,6 @@ streamed patches
 version mismatch
 multiple tabs
 session isolation
-forced synchronous layout detection
-measurement/mutation phase ordering
-ResizeObserver feedback loops
-large-list virtualization
-font and image intrinsic-size changes
-viewport resize and orientation changes
-60 Hz and 120 Hz frame pacing where hardware supports it
 ```
 
 ### 17.4 Accessibility
@@ -2842,12 +2746,6 @@ time to usable Add button
 FCP/LCP/INP where meaningful
 main-thread CPU
 memory
-frame-time distribution at 60 Hz and 120 Hz where supported
-script-attributed forced style/layout duration
-number and duration of layout/reflow events
-style recalculation, layout, paint, raster, and composite time where tooling exposes them
-DOM node count and maximum live rendered collection size
-layout-shift score for interactions where stability is expected
 number of requests
 duplicate requests
 query cancellation latency
@@ -2885,12 +2783,6 @@ one in-flight request per resource key by default
 no whole-tree hydration
 unrelated resource change: no unrelated DOM updates
 unrelated store invalidation: no unrelated regeneration
-normal app code: no direct synchronous layout-read API
-standard interactions: no script-attributed forced synchronous layout
-frame transaction: measurements precede mutations; fresh post-mutation geometry arrives in a later transaction
-large menu: bounded live DOM through virtualization/windowing
-60 Hz target: p95 interaction animation frame under 16.7 ms on the named test device
-120 Hz stretch target: p95 interaction animation frame under 8.3 ms on supported ProMotion hardware
 compiler feedback: interactive after warm cache
 ```
 
@@ -3087,24 +2979,6 @@ arm64 Linux VMs
 case-sensitive checks
 container/component reproducibility
 ```
-
-### Fine-grained updates are mistaken for layout safety
-
-Risk: the renderer minimizes DOM writes but application or third-party code alternates geometry reads with layout-invalidating writes, causing forced synchronous layout and poor frame pacing.
-
-Mitigation:
-
-- encode measurement and mutation as separate effects/phases;
-- deny direct synchronous geometry APIs in normal app packages;
-- build forced-layout instrumentation in Milestone 0;
-- require layout-specific regression gates in the store demo;
-- use containment and virtualization only when semantically safe;
-- retain an audited escape hatch rather than pretending every imperative widget can be statically proven.
-
-Fallback:
-
-- keep the phase scheduler as a runtime-enforced API even if compile-time proof is initially incomplete;
-- quarantine third-party widgets behind a measurable imperative-resource boundary.
 
 ### Performance work compromises semantics
 

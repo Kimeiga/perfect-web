@@ -137,9 +137,13 @@ That is a one-line move plus a pointer update.
 
 ---
 
-## A-008 — `PROJECT_CHARTER.md` (v1) is the governing charter
+## A-008 — charter v2 is the governing charter
 
-**Status:** `open` — **needs a human decision before Milestone 1.**
+**Status:** `RESOLVED 2026-08-05` — the operator chose **adopt v2 and reopen
+Milestone 0**. `PROJECT_CHARTER.md` is now v2 (3,206 lines, sha256
+`5711d0d6…f686e6`); v1 is archived at
+`docs/research/charter-v1-superseded.md`. Both new spikes were built and run, and
+the Milestone 0 gate was re-evaluated against the six-spike requirement.
 
 `perfect-web-master-agent-prompt-v2.md` was added to the repository at 17:39 on
 2026-08-05, after `PROJECT_CHARTER.md` had been created from the v1 prompt and
@@ -166,16 +170,18 @@ consequential, human decision. Charter §3.2 permits resolving design questions
 experimentally, but this is not a design question — it is which document is
 authoritative.
 
-**Resolution needed:**
+**What the resolution required, all done:**
 
-- **If v2 governs:** `PROJECT_CHARTER.md` is replaced by v2, `docs/milestones/M0.md`
-  reopens, `docs/SEMANTICS.md` gains a layout-phase section, the technology matrix
-  gains Incremental/Bonsai rows, and the two outstanding spikes are built.
-  Note that `bonsai-incremental-model` requires an OCaml toolchain, which the v2
-  gate explicitly allows to be recorded as a blocker if it cannot be installed
-  reproducibly.
-- **If v1 governs:** delete or archive the v2 file so there is one constitution,
-  and Milestone 1 may begin.
+- `PROJECT_CHARTER.md` replaced by v2; v1 archived, not deleted.
+- `docs/SEMANTICS.md` gained §5A (layout effects and frame phases).
+- `docs/research/technology-matrix.md` gained Jane Street Incremental and
+  Bonsai/Bonsai_web rows.
+- `spikes/layout-phase-scheduler` and `spikes/bonsai-incremental-model` built,
+  run, and evidenced.
+- `docs/milestones/M0.md` re-evaluated against the six-spike gate.
+
+The OCaml toolchain **did** install on Apple Silicon, so the charter's
+"record the blocker" escape clause was not needed.
 
 ---
 

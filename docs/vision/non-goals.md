@@ -66,6 +66,17 @@ orders milestones to answer the highest-risk questions first (§14 preamble:
 
 ## Not this project's problem
 
+- **Abolishing layout cost.** Charter §7.5A is explicit: *"Do not claim that the
+  compiler can abolish layout cost. Text, fonts, intrinsic sizing, CSS
+  Grid/Flexbox, images, viewport changes, and genuine document geometry still
+  require browser layout."* The goal is to eliminate **accidental** read/write
+  thrashing, constrain the affected subtree, and make unavoidable layout
+  observable and budgeted — measured at 264×–848× for the accidental part.
+- **Proving every imperative widget safe.** §7.5A and §20 both require retaining
+  an **audited escape hatch** rather than pretending static proof covers
+  third-party widgets. Quarantine them behind a measurable imperative-resource
+  boundary instead.
+
 - **Complete web compatibility** in any experimental browser work. §14 M13:
   *"Do not spend time chasing complete web compatibility."*
 - **Rust-equivalent performance universally.** §14 M10 task 5 forbids promising it.

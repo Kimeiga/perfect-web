@@ -58,6 +58,29 @@ import list against the declared world rather than trusting it.
 → ADR-0008. Consequence: WASI 0.3's async story is unavailable, which matters for
 charter §7.6 at the component boundary.
 
+**`forcedStyleAndLayoutDuration` is not exposed by Chrome 150.**
+The `long-animation-frame` entry type works and reports `duration` and
+`blockingDuration`, but the forced-layout-specific field the charter names
+(§14 M0 task 13) is `undefined`.
+→ Layout instrumentation uses long-frame **count** plus `blockingDuration` as the
+proxy. The harness probes for the field and will use it automatically if a later
+Chrome exposes it.
+
+**CSS containment can be slower where it does not belong.**
+`contain: layout style paint` + `content-visibility: auto` made building and
+laying out a 3,000-row subtree **4.18× faster** — but made a forced layout after
+an unrelated mutation on the host element marginally **slower**.
+→ Charter §7.5A's "only when subtree independence is semantically valid" is a
+performance constraint as well as a correctness one. The compiler must not emit
+`contain` speculatively.
+
+**Bonsai's incrementality stops at the virtual DOM.**
+`virtual_dom/node.mli` exposes `Patch.create ~previous ~current`, which compares
+two complete trees — exactly what charter §8.4 forbids.
+→ Confirms the charter's own warning not to assume Bonsai's vdom loop provides
+what this project needs. Borrow the DAG/cutoff/stabilize semantics, not the
+renderer.
+
 **"Zero JS" is exactly true only for a fully static route.**
 `/static` emits zero `<script>` tags. The **streamed** route downloads nothing but
 carries **849 bytes of inline script** to apply out-of-order patches.
@@ -79,10 +102,21 @@ No evidence exists in either direction. Do not assume these work.
   callback effects is untested.
 - **Koka → Wasm Component.** The wasmtime spike's guest is Rust. The
   Koka-to-component path is completely unvalidated.
-- **Anything in a browser.** No Playwright, no Safari, no JS-disabled test, no
-  accessibility audit, no INP/LCP measurement. The Marko spike's interactivity
-  claim rests on payload sizes and the emitted resume manifest — **nobody has
-  clicked the button.**
+- **Anything in a browser except headless Chromium.** No Playwright, no Safari,
+  no Firefox, no JS-disabled test, no accessibility audit, no INP/LCP
+  measurement. The Marko spike's interactivity claim rests on payload sizes and
+  the emitted resume manifest — **nobody has clicked the button.** The layout
+  spike used headless Chrome only; **Safari's layout behaviour is untested**, and
+  Safari has no Long Animation Frame API at all.
+- **Layout-phase semantics in the corpus.** Charter v2 §7.5A adds eight effect
+  families and a prohibition on direct geometry reads, but `examples/` contains
+  **no** accepted or rejected example for any of them. Charter §16 requires
+  examples before features; this is now the largest corpus gap.
+- **A Bonsai web application.** The library installs and its dependency graph and
+  rendering API were read from source, but no `Bonsai_web` app was compiled to
+  JavaScript and run. Incremental behaviour was demonstrated with Incremental
+  directly. Bonsai's lifecycle/scoping model and expect-test workflow were read,
+  not exercised.
 - **SQLite, the outbox, materialization, the resource runtime.** Milestones 4–6.
 - **Multi-node, network shaping, HTTP/3.** Milestones 11–12.
 - **Semantic diff, LSP, the AI benchmark.** Milestone 14.

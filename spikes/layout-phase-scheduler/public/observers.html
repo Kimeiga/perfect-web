@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ResizeObserver + containment — perfect-web spike</title>
+<!--
+  Charter §14 Milestone 0 task 13, cases C and D:
+    - "test size observation with ResizeObserver and one feedback-loop case"
+    - "test CSS containment and `content-visibility` on an isolated large subtree"
+
+  Charter §7.5A requires the runtime to "warn on feedback loops where a resize
+  observation immediately changes the observed size", and to "generate CSS
+  `contain` or `content-visibility` only when subtree independence is
+  semantically valid". Both are measured here rather than asserted.
+-->
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 16px; }
+  #box { background: #dde; padding: 8px; width: 200px; }
+  .row { padding: 2px 4px; border-bottom: 1px solid #eee; font-size: 12px; }
+
+  /* Case D: an isolated large subtree. `contain` tells the browser that layout
+     inside cannot affect anything outside, so it may skip work. `content-visibility`
+     lets it skip offscreen subtrees entirely. Both are only valid when the
+     subtree really is independent — which is a SEMANTIC property the compiler
+     would have to know, not a decoration to sprinkle on. */
+  .contained {
+    contain: layout style paint;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 24px;
+  }
+  #out { margin-top: 12px; white-space: pre; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<h1>Observers and containment</h1>
+<div id="box">observed box</div>
+<div id="subtree"></div>
+<div id="out">not run</div>
+
+<script type="module">
+const N = Number(new URLSearchParams(location.search).get("n") ?? 3000);
+const results = {};
+
+// ---------------------------------------------------------------------------
+// Case C1 — ResizeObserver delivers size changes without polling.
+// ---------------------------------------------------------------------------
+const box = document.getElementById("box");
+results.resizeDeliveries = 0;
+const ro = new ResizeObserver((entries) => {
+  results.resizeDeliveries += entries.length;
+  results.lastWidth = entries[0].contentRect.width;
+});
+ro.observe(box);
+
+// ---------------------------------------------------------------------------
+// Case C2 — THE FEEDBACK LOOP.
+//
+// A resize observation that immediately changes the observed element's size.
+// The browser detects this and, rather than looping forever, delivers an error:
+//   "ResizeObserver loop completed with undelivered notifications."
+//
+// Charter §7.5A wants the runtime to WARN on this. First we have to be able to
+// detect it, which is what this measures.
+// ---------------------------------------------------------------------------
+const loopBox = document.createElement("div");
+loopBox.style.cssText = "background:#edd;padding:4px;width:100px";
+loopBox.textContent = "feedback";
+document.body.appendChild(loopBox);
+
+results.feedbackIterations = 0;
+results.feedbackLoopErrorSeen = false;
+window.addEventListener("error", (e) => {
+  if (String(e.message).includes("ResizeObserver loop")) {
+    results.feedbackLoopErrorSeen = true;
+  }
+});
+
+const feedbackRo = new ResizeObserver(() => {
+  results.feedbackIterations++;
+  // Deliberately violate the rule: change the observed size from inside the
+  // observation. Bounded so the page stays usable.
+  if (results.feedbackIterations < 30) {
+    loopBox.style.width = (100 + results.feedbackIterations) + "px";
+  }
+});
+feedbackRo.observe(loopBox);
+
+// ---------------------------------------------------------------------------
+// Case D — containment / content-visibility on a large subtree.
+// Same DOM built twice; only the class differs. We measure the cost of a forced
+// layout over each.
+// ---------------------------------------------------------------------------
+function buildSubtree(contained) {
+  const host = document.getElementById("subtree");
+  host.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < N; i++) {
+    const d = document.createElement("div");
+    d.className = "row" + (contained ? " contained" : "");
+    d.textContent = `row ${i} — some text that requires intrinsic sizing and font metrics`;
+    frag.appendChild(d);
+  }
+  host.appendChild(frag);
+  return host;
+}
+
+/** Force a full layout and time it. */
+function forceLayoutCost(host) {
+  // Dirty the tree, then read — the read must flush layout.
+  host.style.paddingTop = (Math.random() * 2 + 1).toFixed(2) + "px";
+  const t0 = performance.now();
+  const h = document.body.offsetHeight; // forces layout
+  const ms = performance.now() - t0;
+  return { ms, h };
+}
+
+window.__run = async () => {
+  // Give the observers a chance to fire.
+  await new Promise((r) => setTimeout(r, 300));
+
+  const plainHost = buildSubtree(false);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const plain = forceLayoutCost(plainHost);
+
+  const containedHost = buildSubtree(true);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const contained = forceLayoutCost(containedHost);
+
+  results.subtreeRows = N;
+  results.plainForcedLayoutMs = plain.ms;
+  results.containedForcedLayoutMs = contained.ms;
+  results.containmentSupported = CSS.supports("contain", "layout style paint");
+  results.contentVisibilitySupported = CSS.supports("content-visibility", "auto");
+
+  document.getElementById("out").textContent = JSON.stringify(results, null, 2);
+  return results;
+};
+</script>
+</body>
+</html>

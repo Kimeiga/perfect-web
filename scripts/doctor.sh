@@ -92,6 +92,16 @@ check koka   required 'koka --version | head -1'           "spikes/koka-js-inter
 check wasmtime required 'wasmtime --version'               "spikes/wasmtime-component"        "just bootstrap"
 check jq     required 'jq --version'                       "evidence extraction in spikes"    "brew install jq"
 
+# Charter v2 added two Milestone 0 spikes with their own toolchains.
+if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+    ok "chrome" "$(/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version 2>/dev/null)"
+else
+    bad "chrome" "MISSING - needed by spikes/layout-phase-scheduler (charter v2 §7.5A)"
+    printf '      get it: install Google Chrome, or set CHROME_PATH to another Chromium build\n'
+    missing=$((missing + 1))
+fi
+check opam   optional 'opam --version'                     "spikes/bonsai-incremental-model (charter v2)" "brew install opam && opam switch create pw-bonsai 5.2.0"
+
 echo
 bold "Rust targets"
 if command -v rustup >/dev/null 2>&1; then

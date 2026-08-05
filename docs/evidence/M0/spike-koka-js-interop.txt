@@ -1,5 +1,5 @@
 spike: koka-js-interop
-generated: 2026-08-05T22:26:26Z
+generated: 2026-08-05T22:58:01Z
 koka: Koka 3.2.3, 01:29:29 Mar 18 2026 (ghc release version)
 node: v22.21.1
 host: Darwin arm64

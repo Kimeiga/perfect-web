@@ -6,6 +6,10 @@ build/
 # the koka spike writes build-negA/ and build-negB/ for its negative cases
 # (a trailing comment on the same line as a pattern does NOT work in .gitignore)
 build-*/
+# dune (spikes/bonsai-incremental-model)
+_build/
+# headless-chrome profile created by spikes/layout-phase-scheduler
+.chrome-profile/
 .output/
 *.wasm.map
 

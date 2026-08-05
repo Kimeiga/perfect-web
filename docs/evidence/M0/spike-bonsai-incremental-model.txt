@@ -1,0 +1,91 @@
+spike: bonsai-incremental-model
+generated: 2026-08-05T22:58:18Z
+host: Darwin arm64 / 26.5.2
+command: just spike-bonsai
+
+opam:  2.5.2
+switch: pw-bonsai
+ocaml:  The OCaml toplevel, version 5.2.0
+
+=========== INSTALLED PACKAGES ===============================
+bonsai                      v0.16.0     A library for building dynamic webapps, using Js_of_ocaml
+core                        v0.16.2     Industrial strength alternative to OCaml's standard library
+incr_dom                    v0.16.0     A library for building dynamic webapps, using Js_of_ocaml
+incremental                 v0.16.1     Library for incremental computations
+js_of_ocaml                 5.9.1       Compiler from OCaml bytecode to JavaScript
+virtual_dom                 v0.16.0     OCaml bindings for the virtual-dom library
+
+=========== 1. INCREMENTAL: UNRELATED UPDATE TEST ============
+Charter §14 M0 task 12: 'demonstrate that an unrelated state update does
+not recompute an instrumented expensive derived value'.
+
+=== Incremental: does an unrelated update recompute the expensive node? ===
+
+  initial stabilize                      expensive=1 cheap=1
+  set cart_count := 1 (unrelated)        expensive=1 cheap=2
+  set cart_count := 2 (unrelated)        expensive=1 cheap=3
+  set cart_count := 3 (unrelated)        expensive=1 cheap=4
+  set cart_count := 4 (unrelated)        expensive=1 cheap=5
+  set cart_count := 5 (unrelated)        expensive=1 cheap=6
+  set store_id := 48 (related)           expensive=2 cheap=6
+  set store_id := 48 again (cutoff)      expensive=2 cheap=6
+
+  value = menu=4799752 badge=5 items
+
+=== results ===
+  check:unrelated-update-does-not-recompute=pass  (1 -> 1 across 5 unrelated updates)
+  check:related-update-does-recompute=pass        (1 -> 2)
+  check:same-value-write-is-cut-off=pass          (2 -> 2)
+
+  Charter §9.5: 'A rerender or local reactive recomputation must not create
+  a new request unless the semantic resource key or policy changed.'
+  Incremental enforces exactly that shape for pure derived values.
+
+=========== 2. BONSAI APPLICATION ===========================
+bonsai is installed: bonsai                      v0.16.0     A library for building dynamic webapps, using Js_of_ocaml
+virtual_dom:         virtual_dom                 v0.16.0     OCaml bindings for the virtual-dom library
+
+-- does bonsai depend on incremental? (from opam metadata) --
+  "virtual_dom" {>= "v0.16" & < "v0.17"}
+  "js_of_ocaml" {>= "5.1.1"}
+  "js_of_ocaml-ppx" {>= "5.1.1"}
+
+=========== 3. SOURCE INSPECTION ============================
+Charter §14 M0 task 12: 'confirm from source which portions use Jane
+Street Incremental and which portions still produce a virtual DOM and
+diff/patch it'.
+
+-- bonsai's declared library dependencies (from its dune-package) --
+    incr_map
+    incr_map.collate
+    js_of_ocaml
+    ui_incr
+    virtual_dom
+    virtual_dom.html
+    virtual_dom.input_widgets
+    virtual_dom.keyboard
+    virtual_dom.layout
+    virtual_dom.svg
+    virtual_dom.ui_effect
+    virtual_dom.vdom_test_helpers
+
+-- bonsai modules naming Incremental --
+    annotate_incr.ml
+    annotate_incr.mli
+    incr0.ml
+    incr0.mli
+
+-- THE VIRTUAL DOM DIFF/PATCH LOOP, from virtual_dom/node.mli --
+    module Patch : sig
+      type node := t
+      type t
+    
+      val create : previous:node -> current:node -> t
+      val apply : t -> Dom_html.element Js.t -> Dom_html.element Js.t
+      val is_empty : t -> bool
+    end
+
+    ^ Patch.create ~previous ~current compares two whole trees.
+      Charter §8.4: "Do not conceptually rerender the entire component
+      and compare virtual trees." Bonsai's incrementality governs the
+      COMPUTATION graph; rendering still goes through a vdom diff.

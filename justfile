@@ -85,8 +85,8 @@ lab-down:
 # Milestone 0 feasibility spikes (charter §14 M0 task 7)
 # ---------------------------------------------------------------------------
 
-# Run all four spikes and write evidence to docs/evidence/M0/.
-spikes: spike-compiler-diagnostic spike-koka spike-wasmtime spike-marko
+# Run all six spikes and write evidence to docs/evidence/M0/.
+spikes: spike-compiler-diagnostic spike-koka spike-wasmtime spike-marko spike-layout spike-bonsai
 
 spike-compiler-diagnostic:
     @bash spikes/compiler-diagnostic/run.sh
@@ -99,6 +99,14 @@ spike-wasmtime:
 
 spike-marko:
     @bash spikes/marko-stream-resume/run.sh
+
+# Charter §7.5A / §14 M0 task 13 — forced-synchronous-layout instrumentation.
+spike-layout:
+    @bash spikes/layout-phase-scheduler/run.sh
+
+# Charter §14 M0 task 12 — Bonsai/Incremental study.
+spike-bonsai:
+    @bash spikes/bonsai-incremental-model/run.sh
 
 # ---------------------------------------------------------------------------
 # CI

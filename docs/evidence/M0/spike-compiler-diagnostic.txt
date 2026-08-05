@@ -1,5 +1,5 @@
 spike: compiler-diagnostic
-generated: 2026-08-05T22:26:25Z
+generated: 2026-08-05T22:58:01Z
 rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
 host: Darwin arm64 / 26.5.2
 commands:

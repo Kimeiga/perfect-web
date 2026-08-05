@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Layout thrashing baseline — perfect-web spike</title>
+<!--
+  Charter §14 Milestone 0 task 13, case A: "create an intentionally thrashing
+  page that alternates layout-invalidating writes and geometry reads".
+
+  This is the ANTI-PATTERN, written the way ordinary application code written
+  without a phase discipline naturally comes out. Each iteration:
+
+      read  el.offsetWidth        <- forces layout, because the previous
+                                     iteration dirtied it
+      write el.style.width = ...  <- invalidates layout again
+
+  The browser cannot batch this. Every read must synchronously flush style and
+  layout for the whole document. Charter §7.5A exists to make this
+  unrepresentable in ordinary application code.
+-->
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 16px; }
+  #grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+  .cell { background: #dde; padding: 4px; font-size: 11px; min-height: 18px; }
+  #out { margin-top: 12px; white-space: pre; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<h1>Thrashing baseline</h1>
+<p>Alternates a layout-invalidating write with a geometry read, per element.</p>
+<div id="grid"></div>
+<div id="out">not run</div>
+
+<script type="module">
+const COUNT = Number(new URLSearchParams(location.search).get("n") ?? 400);
+
+const grid = document.getElementById("grid");
+const cells = [];
+for (let i = 0; i < COUNT; i++) {
+  const d = document.createElement("div");
+  d.className = "cell";
+  d.textContent = String(i);
+  grid.appendChild(d);
+  cells.push(d);
+}
+
+/**
+ * The thrashing loop. Read/write/read/write, interleaved.
+ * Every `offsetWidth` read after a style write forces a synchronous layout.
+ */
+let runIndex = 0;
+
+function thrash() {
+  // NOTE: the written value must CHANGE each run. Writing an identical value
+  // does not invalidate layout, so a naive benchmark shows thrashing only on
+  // the first run and ~0ms thereafter. Measured, not assumed — see README F-2.
+  const salt = ++runIndex;
+  const t0 = performance.now();
+  let acc = 0;
+  for (const cell of cells) {
+    // READ  — forces layout, because the previous iteration's write dirtied it
+    const w = cell.offsetWidth;
+    const h = cell.offsetHeight;
+    acc += w + h;
+    // WRITE — invalidates layout again for the next iteration's read
+    cell.style.paddingLeft = ((w + salt) % 7 + 2) + "px";
+  }
+  return { ms: performance.now() - t0, acc };
+}
+
+window.__run = () => {
+  const r = thrash();
+  document.getElementById("out").textContent =
+    `mode=thrash elements=${COUNT} duration=${r.ms.toFixed(1)}ms checksum=${r.acc}`;
+  return { mode: "thrash", elements: COUNT, ms: r.ms, checksum: r.acc };
+};
+
+// Long Animation Frame attribution, where supported. This is the browser telling
+// us how much time it spent in forced style and layout — charter §14 M0 task 13
+// asks for exactly this signal.
+window.__loaf = [];
+if ("PerformanceObserver" in window &&
+    PerformanceObserver.supportedEntryTypes?.includes("long-animation-frame")) {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) {
+      window.__loaf.push({
+        duration: e.duration,
+        blockingDuration: e.blockingDuration,
+        // The number this spike exists to surface:
+        forcedStyleAndLayoutDuration: e.forcedStyleAndLayoutDuration,
+        renderStart: e.renderStart,
+        styleAndLayoutStart: e.styleAndLayoutStart,
+      });
+    }
+  }).observe({ type: "long-animation-frame", buffered: true });
+  window.__loafSupported = true;
+} else {
+  window.__loafSupported = false;
+}
+</script>
+</body>
+</html>
