@@ -6,13 +6,27 @@
 2026-08-05 mid-session; v1 archived at `docs/research/charter-v1-superseded.md`.
 See `docs/ASSUMPTIONS.md` A-008.
 
-**current milestone:** **Milestone 0 — COMPLETE.** Gate passed against charter v2
+**numbering:** engineering `E0`–`E15`, public proofs `P0`–`P9`, risk-retirement
+experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
+
+**current milestone:** **E0 — COMPLETE.** Gate passed against charter v2
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
-Full assessment: `docs/milestones/M0.md`.
+Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** Milestone 1 — Koka semantic kernel. **Not started.**
+**next milestone:** **E1 — Koka effect-system feasibility**, narrowed to effects
+and handlers only by ADR-0011. **In progress:** its central question was answered
+early by RQ-2 (clean pass). Then **E1A** — `pw` value semantics and boundary ABI.
 
-**last passing commit:** `dccc5db` — charter v2 adoption + spikes 5 and 6.
+**risk-retirement queue:** RQ-1 (Marko resumption, Chrome + Safari) and RQ-2
+(Koka higher-order effects) are **done** and both passed their pre-registered
+decision rules. RQ-3 (`pw` exhaustiveness + typed ABI) is next.
+See `docs/RISK_QUEUE.md`.
+
+**public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
+— six of the claims it needs are unstarted, and **45 corpus files exist of which
+0 compile**.
+
+**last passing commit:** `e202f99` — RQ-2 Koka higher-order effects.
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---
