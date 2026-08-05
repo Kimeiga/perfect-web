@@ -88,6 +88,9 @@ lab-down:
 # Run all six spikes and write evidence to docs/evidence/M0/.
 spikes: spike-compiler-diagnostic spike-koka spike-wasmtime spike-marko spike-layout spike-bonsai
 
+# Every risk-retirement experiment.
+rq: rq-resumption
+
 spike-compiler-diagnostic:
     @bash spikes/compiler-diagnostic/run.sh
 
@@ -107,6 +110,16 @@ spike-layout:
 # Charter §14 M0 task 12 — Bonsai/Incremental study.
 spike-bonsai:
     @bash spikes/bonsai-incremental-model/run.sh
+
+# ---------------------------------------------------------------------------
+# Risk-retirement experiments (see docs/RISK_QUEUE.md)
+# These may use temporary dependencies to test assumptions early. Passing one
+# retires a risk; it does NOT close the corresponding implementation milestone.
+# ---------------------------------------------------------------------------
+
+# RQ-1 — is Marko's resumption real, in Chrome AND Safari?
+rq-resumption:
+    @bash spikes/browser-resumption/run.sh
 
 # ---------------------------------------------------------------------------
 # CI

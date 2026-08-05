@@ -1,0 +1,81 @@
+spike: browser-resumption  (risk-retirement experiment RQ-1)
+generated: 2026-08-05T23:51:58Z
+node: v22.21.1
+chrome: Google Chrome 150.0.7871.187 
+safari: 26.5.2
+under test: marko 6.3.32 / @marko/run 0.11.8 (spikes/marko-stream-resume)
+host: Darwin arm64 / Apple M2 Pro
+command: node spikes/browser-resumption/drive.mjs
+
+The checks below were PRE-REGISTERED before the experiment ran, together
+with the decision rule applied at the end. See README.md.
+
+=================== PRE-REGISTERED RESUMPTION CHECKS ================
+
+  check                                      chrome   safari
+  ------------------------------------------ -------- ------
+  page usable before interaction code loads  pass     pass
+  no component/template replay during startup pass     pass
+  first click invokes its handler            pass     pass
+  handler artifact absent until needed       FAIL     FAIL
+  only the expected artifact loads           pass     pass
+  existing DOM nodes retained, not replaced  pass     pass
+  focus survives resumption                  pass     pass
+  second interaction does not reinitialize   pass     pass
+  both streamed regions arrive               pass     pass
+  out-of-order completion lands in document order pass     pass
+  placeholders replaced, not appended        pass     pass
+  10-handler failure observable              pass     pass
+
+=================== CHROME DETAIL ============================
+  counter route:
+    content at DOMContentLoaded : {"at":54,"hasButton":true,"hasMenu":true,"hasHeading":true,"countText":"0","scriptsSoFar":1}
+    mutations during parse      : 72 (browser parsing the server HTML — not replay)
+    mutations AFTER parse       : {"total":0,"inertRegion":0}  <- replay would show here
+    first click                 : {"countBefore":"0","countAfter1":"1","waitedMs":28}
+    second click                : {"countAfter2":"2","waitedMs":26,"inertMutationsDuring":0}
+    node identity               : {"sameButton":true,"sameOutput":true,"sameFirstRow":true,"rowCountStable":true}
+    focus                       : {"focusedBefore":true,"focusedAfter":true,"activeElement":"add"}
+    scripts loaded              : [{"name":"/__harness.js","startTime":49,"responseEnd":52,"transferSize":15624,"initiatorType":"script"},{"name":"/assets/counter-BeC2WMPf.js","startTime":49,"responseEnd":58,"transferSize":476,"initiatorType":"script"},{"name":"/assets/_CHORBbUX.js","startTime":49,"responseEnd":60,"transferSize":4045,"initiatorType":"other"}]
+    earliest app script start   : 49 ms
+    page errors                 : []
+  stream route:
+    arrival ms                  : {"estimate":240,"recommendations":809}
+    document order              : {"iShell":11,"iEstimate":50,"iRecs":74}
+    placeholders remaining      : 0
+  handler-load failure:
+    {"countBefore":"0","countAfter":"0","controlStillWorks":false,"jsErrors":[],"resourceErrors":[{"tag":"LINK","src":"/assets/_CHORBbUX.js"},{"tag":"SCRIPT","src":"/assets/counter-BeC2WMPf.js"}],"failureSignals":2}
+
+=================== SAFARI DETAIL ============================
+  mode: autorun (WebDriver blocked)
+  userAgent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5.2 Safari/605.1.15
+  webdriver blocker: Error: safaridriver refused a session: {"value":{"error":"session not created","message":"Could not create a session: You must enable 'Allow remote automation' in the Developer section of Safari Settings to control Safari via WebDriver.","stacktrace":""}}
+  counter route:
+    content at DOMContentLoaded : {"at":36,"hasButton":true,"hasMenu":true,"hasHeading":true,"countText":"0","scriptsSoFar":0}
+    mutations during parse      : 72 (browser parsing the server HTML — not replay)
+    mutations AFTER parse       : {"total":0,"inertRegion":0}  <- replay would show here
+    first click                 : {"countBefore":"0","countAfter1":"1","waitedMs":26}
+    second click                : {"countAfter2":"2","waitedMs":26,"inertMutationsDuring":0}
+    node identity               : {"sameButton":true,"sameOutput":true,"sameFirstRow":true,"rowCountStable":true}
+    focus                       : {"focusedBefore":true,"focusedAfter":true,"activeElement":"add"}
+    scripts loaded              : [{"name":"/__harness.js","startTime":26,"responseEnd":31,"transferSize":15637,"initiatorType":"script"},{"name":"/assets/_CHORBbUX.js","startTime":35,"responseEnd":35,"transferSize":0,"initiatorType":"link"},{"name":"/assets/counter-BeC2WMPf.js","startTime":29,"responseEnd":57,"transferSize":487,"initiatorType":"script"}]
+    earliest app script start   : 29 ms
+    page errors                 : ["Script error."]
+  stream route:
+    arrival ms                  : {"estimate":0,"recommendations":0}
+      NOTE: autorun mode starts the harness 400ms after DOMContentLoaded,
+      so both regions have usually already landed. Arrival TIMING is not
+      measured here; document order and placeholder replacement are.
+    document order              : {"iShell":11,"iEstimate":50,"iRecs":74}
+    placeholders remaining      : 0
+  handler-load failure:
+    {"countBefore":"0","countAfter":"0","controlStillWorks":false,"jsErrors":["Script error."],"resourceErrors":[{"tag":"LINK","src":"/assets/_CHORBbUX.js"},{"tag":"SCRIPT","src":"/assets/counter-BeC2WMPf.js"}],"failureSignals":3}
+
+=================== PRE-REGISTERED DECISION ========================
+
+  core properties pass in chrome : true
+  safari session established     : true
+  core properties pass in safari : true
+
+  RULING: Marko is the behavioural oracle for E7 (both engines pass).
+

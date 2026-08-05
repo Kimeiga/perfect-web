@@ -1,0 +1,1959 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="The Web, Recompiled — a research project for a semantic application platform spanning browser, edge, and origin." />
+  <meta name="theme-color" content="#090b0f" />
+  <title>The Web, Recompiled</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090b0f;
+      --bg-soft: #10141b;
+      --panel: rgba(19, 24, 33, 0.78);
+      --panel-solid: #131821;
+      --line: rgba(235, 239, 247, 0.12);
+      --line-strong: rgba(235, 239, 247, 0.23);
+      --text: #f4f1e9;
+      --muted: #a8afbc;
+      --faint: #737b88;
+      --blue: #7eb7ff;
+      --blue-strong: #4294ff;
+      --amber: #ffcc72;
+      --red: #ff8d8d;
+      --green: #8de2b4;
+      --violet: #c3a7ff;
+      --max: 1240px;
+      --radius: 20px;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(900px 650px at 85% -10%, rgba(66, 148, 255, 0.17), transparent 68%),
+        radial-gradient(700px 500px at 10% 22%, rgba(255, 204, 114, 0.08), transparent 68%),
+        var(--bg);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black 0%, transparent 72%);
+    }
+
+    a { color: inherit; }
+
+    button, a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--amber);
+      outline-offset: 4px;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      transform: translateY(-160%);
+      z-index: 100;
+      padding: 10px 14px;
+      color: #080b10;
+      background: var(--amber);
+      border-radius: 8px;
+      font-weight: 700;
+    }
+
+    .skip-link:focus { transform: none; }
+
+    .topbar {
+      position: fixed;
+      z-index: 50;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 66px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      background: rgba(9, 11, 15, 0.82);
+      backdrop-filter: blur(18px) saturate(130%);
+    }
+
+    .topbar-inner {
+      width: min(calc(100% - 36px), var(--max));
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(126,183,255,.25), transparent 48%),
+        var(--panel-solid);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--blue);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+    }
+
+    .nav a {
+      padding: 8px 10px;
+      text-decoration: none;
+      color: var(--muted);
+      border-radius: 8px;
+      transition: color .2s ease, background .2s ease;
+    }
+
+    .nav a:hover,
+    .nav a[aria-current="true"] {
+      color: var(--text);
+      background: rgba(255,255,255,.055);
+    }
+
+    .top-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 13px;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      background: rgba(255,255,255,.045);
+    }
+
+    main { display: block; }
+
+    .section {
+      position: relative;
+      width: min(calc(100% - 36px), var(--max));
+      margin: 0 auto;
+      padding: 126px 0;
+    }
+
+    .section + .section {
+      border-top: 1px solid var(--line);
+    }
+
+    .hero {
+      min-height: 100svh;
+      padding-top: 130px;
+      padding-bottom: 72px;
+      display: grid;
+      align-content: center;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(420px, .95fr);
+      gap: 64px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+      color: var(--blue);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 28px;
+      height: 1px;
+      background: currentColor;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 820px;
+      margin-bottom: 26px;
+      font-size: clamp(58px, 7.5vw, 112px);
+      line-height: .88;
+      letter-spacing: -.075em;
+      font-weight: 760;
+    }
+
+    h1 .accent {
+      color: var(--blue);
+      text-shadow: 0 0 44px rgba(66, 148, 255, .18);
+    }
+
+    .hero-copy {
+      max-width: 720px;
+      font-size: clamp(18px, 2vw, 23px);
+      line-height: 1.45;
+      letter-spacing: -.025em;
+      color: #c9cfd8;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-height: 46px;
+      padding: 11px 16px;
+      border-radius: 11px;
+      border: 1px solid var(--line-strong);
+      text-decoration: none;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 730;
+      cursor: pointer;
+      transition: transform .2s ease, border-color .2s ease, background .2s ease;
+    }
+
+    .button:hover { transform: translateY(-1px); }
+
+    .button-primary {
+      color: #07101e;
+      border-color: var(--blue);
+      background: var(--blue);
+    }
+
+    .button-secondary { background: rgba(255,255,255,.045); }
+
+    .status-note {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-top: 28px;
+      max-width: 650px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-note .dot {
+      width: 7px;
+      height: 7px;
+      flex: none;
+      margin-top: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 16px rgba(255, 204, 114, .55);
+    }
+
+    .proof-window {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 24px;
+      background: rgba(12, 16, 23, .92);
+      box-shadow: var(--shadow);
+    }
+
+    .proof-window::before {
+      content: "";
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      right: -110px;
+      top: -140px;
+      border-radius: 50%;
+      background: rgba(66, 148, 255, .14);
+      filter: blur(70px);
+      pointer-events: none;
+    }
+
+    .window-bar {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 15px;
+      border-bottom: 1px solid var(--line);
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .window-dots { display: flex; gap: 7px; }
+    .window-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.2);
+    }
+
+    .code-tabs {
+      display: flex;
+      gap: 3px;
+      padding: 12px 12px 0;
+    }
+
+    .code-tab {
+      appearance: none;
+      border: 0;
+      padding: 8px 11px;
+      border-radius: 8px 8px 0 0;
+      color: var(--muted);
+      background: transparent;
+      font: 650 12px var(--mono);
+      cursor: pointer;
+    }
+
+    .code-tab[aria-selected="true"] {
+      color: var(--text);
+      background: rgba(255,255,255,.055);
+    }
+
+    .code-view {
+      display: none;
+      min-height: 264px;
+      padding: 18px 20px 20px;
+      border-top: 1px solid var(--line);
+      font: 12.5px/1.72 var(--mono);
+      white-space: pre-wrap;
+      color: #cbd3df;
+    }
+
+    .code-view.active { display: block; }
+    .code-view .kw { color: var(--violet); }
+    .code-view .fn { color: var(--blue); }
+    .code-view .str { color: var(--green); }
+    .code-view .comment { color: #677181; }
+    .code-view .warning { color: var(--amber); }
+    .code-view .error { color: var(--red); }
+
+    .simulator {
+      padding: 16px;
+      border-top: 1px solid var(--line);
+      background: rgba(255,255,255,.025);
+    }
+
+    .sim-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 13px;
+    }
+
+    .sim-title {
+      font: 700 12px var(--mono);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .sim-actions { display: flex; gap: 7px; }
+
+    .mini-button {
+      appearance: none;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 7px 9px;
+      color: var(--text);
+      background: rgba(255,255,255,.045);
+      font: 650 11px var(--mono);
+      cursor: pointer;
+    }
+
+    .sim-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    .sim-metric {
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(0,0,0,.16);
+    }
+
+    .sim-label {
+      margin-bottom: 2px;
+      color: var(--faint);
+      font: 11px var(--mono);
+    }
+
+    .sim-value {
+      font: 760 31px/1 var(--mono);
+      letter-spacing: -.05em;
+    }
+
+    .sim-value.bad { color: var(--red); }
+    .sim-value.good { color: var(--green); }
+
+    .sim-caption {
+      margin: 11px 1px 0;
+      color: var(--faint);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: .78fr 1.22fr;
+      gap: 72px;
+      align-items: start;
+    }
+
+    .section-kicker {
+      position: sticky;
+      top: 104px;
+    }
+
+    .section-number {
+      margin-bottom: 18px;
+      color: var(--blue);
+      font: 12px var(--mono);
+      letter-spacing: .08em;
+    }
+
+    h2 {
+      max-width: 860px;
+      margin-bottom: 22px;
+      font-size: clamp(39px, 5vw, 72px);
+      line-height: 1;
+      letter-spacing: -.055em;
+      font-weight: 735;
+    }
+
+    .section-lede {
+      max-width: 760px;
+      color: #c5cbd5;
+      font-size: clamp(17px, 1.7vw, 21px);
+      line-height: 1.55;
+      letter-spacing: -.018em;
+    }
+
+    .small-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      font: 11px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .small-label::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+    }
+
+    .problem-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .problem-card {
+      display: grid;
+      grid-template-columns: 46px 1fr auto;
+      gap: 17px;
+      align-items: center;
+      padding: 17px 18px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(255,255,255,.025);
+    }
+
+    .problem-icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--amber);
+      font: 15px var(--mono);
+      background: rgba(255,204,114,.035);
+    }
+
+    .problem-card h3 {
+      margin: 0 0 3px;
+      font-size: 15px;
+      letter-spacing: -.015em;
+    }
+
+    .problem-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .problem-owner {
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--faint);
+      font: 10px var(--mono);
+      white-space: nowrap;
+    }
+
+    .quote-block {
+      margin-top: 32px;
+      padding: 26px 28px;
+      border-left: 3px solid var(--blue);
+      background: linear-gradient(90deg, rgba(126,183,255,.075), transparent);
+      font-size: clamp(21px, 2.6vw, 34px);
+      line-height: 1.25;
+      letter-spacing: -.035em;
+    }
+
+    .quote-block strong { color: var(--blue); }
+
+    .ladder {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      margin-top: 54px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: rgba(255,255,255,.02);
+    }
+
+    .ladder-step {
+      position: relative;
+      min-height: 170px;
+      padding: 22px;
+      border-right: 1px solid var(--line);
+    }
+
+    .ladder-step:last-child { border-right: 0; }
+
+    .ladder-step::after {
+      content: "→";
+      position: absolute;
+      top: 20px;
+      right: -11px;
+      z-index: 1;
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      color: var(--faint);
+      background: var(--bg);
+      font: 14px var(--mono);
+    }
+
+    .ladder-step:last-child::after { display: none; }
+
+    .ladder-step .step-index {
+      color: var(--faint);
+      font: 11px var(--mono);
+    }
+
+    .ladder-step h3 {
+      margin: 30px 0 7px;
+      font-size: 18px;
+    }
+
+    .ladder-step p {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .ladder-step:last-child {
+      background: linear-gradient(150deg, rgba(66,148,255,.13), rgba(255,255,255,.02));
+    }
+
+    .architecture-shell {
+      display: grid;
+      grid-template-columns: minmax(360px, .86fr) minmax(0, 1.14fr);
+      gap: 52px;
+      align-items: start;
+      margin-top: 52px;
+    }
+
+    .arch-graph {
+      position: sticky;
+      top: 100px;
+      min-height: 610px;
+      padding: 24px;
+      border: 1px solid var(--line-strong);
+      border-radius: 24px;
+      background:
+        radial-gradient(420px 320px at 50% 0%, rgba(66,148,255,.12), transparent 70%),
+        rgba(12,16,23,.88);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .arch-graph::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(to bottom, black, transparent 90%);
+      pointer-events: none;
+    }
+
+    .arch-title {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      color: var(--faint);
+      font: 11px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+
+    .source-node,
+    .compiler-node,
+    .target-node {
+      position: absolute;
+      z-index: 2;
+      border: 1px solid var(--line-strong);
+      background: rgba(12,16,23,.94);
+      transition: border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+    }
+
+    .source-node {
+      left: 50%;
+      top: 78px;
+      width: 78%;
+      transform: translateX(-50%);
+      padding: 17px;
+      border-radius: 15px;
+    }
+
+    .source-node code {
+      display: block;
+      color: #c8d0db;
+      font: 11.5px/1.55 var(--mono);
+      white-space: pre-wrap;
+    }
+
+    .compiler-node {
+      left: 50%;
+      top: 282px;
+      width: 126px;
+      height: 126px;
+      display: grid;
+      place-items: center;
+      transform: translateX(-50%) rotate(45deg);
+      border-radius: 22px;
+      border-color: rgba(126,183,255,.58);
+      box-shadow: 0 0 46px rgba(66,148,255,.15);
+      background: linear-gradient(135deg, rgba(66,148,255,.22), rgba(12,16,23,.95));
+    }
+
+    .compiler-node span {
+      transform: rotate(-45deg);
+      text-align: center;
+      font: 700 11px/1.4 var(--mono);
+      color: var(--blue);
+    }
+
+    .target-node {
+      bottom: 38px;
+      width: 29%;
+      min-height: 103px;
+      padding: 13px;
+      border-radius: 14px;
+    }
+
+    .target-node.browser { left: 3.5%; }
+    .target-node.edge { left: 35.5%; }
+    .target-node.origin { right: 3.5%; }
+
+    .target-node strong {
+      display: block;
+      margin-bottom: 8px;
+      font: 700 11px var(--mono);
+      color: var(--text);
+      text-transform: uppercase;
+    }
+
+    .target-node span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .arch-line {
+      position: absolute;
+      z-index: 1;
+      background: linear-gradient(to bottom, rgba(126,183,255,.65), rgba(126,183,255,.1));
+      transform-origin: top;
+    }
+
+    .line-a { left: 50%; top: 226px; width: 1px; height: 60px; }
+    .line-b { left: 50%; top: 405px; width: 1px; height: 87px; }
+    .line-c {
+      left: 18%; top: 490px; width: 64%; height: 1px;
+      background: linear-gradient(to right, rgba(126,183,255,.18), rgba(126,183,255,.65), rgba(126,183,255,.18));
+    }
+    .line-d { left: 18%; top: 490px; width: 1px; height: 44px; }
+    .line-e { left: 50%; top: 490px; width: 1px; height: 44px; }
+    .line-f { left: 82%; top: 490px; width: 1px; height: 44px; }
+
+    .arch-graph[data-active="language"] .source-node,
+    .arch-graph[data-active="compiler"] .compiler-node,
+    .arch-graph[data-active="browser"] .target-node.browser,
+    .arch-graph[data-active="edge"] .target-node.edge,
+    .arch-graph[data-active="origin"] .target-node.origin {
+      border-color: var(--blue);
+      box-shadow: 0 0 38px rgba(66,148,255,.18);
+    }
+
+    .arch-graph[data-active="language"] .source-node { transform: translateX(-50%) translateY(-2px); }
+    .arch-graph[data-active="compiler"] .compiler-node { transform: translateX(-50%) rotate(45deg) scale(1.03); }
+    .arch-graph[data-active="browser"] .target-node.browser,
+    .arch-graph[data-active="edge"] .target-node.edge,
+    .arch-graph[data-active="origin"] .target-node.origin { transform: translateY(-3px); }
+
+    .arch-explainers {
+      display: grid;
+      gap: 14px;
+    }
+
+    .arch-card {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 16px;
+      padding: 21px;
+      text-align: left;
+      color: inherit;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.022);
+      cursor: pointer;
+      transition: border-color .2s ease, background .2s ease;
+    }
+
+    .arch-card:hover,
+    .arch-card.active {
+      border-color: rgba(126,183,255,.45);
+      background: rgba(126,183,255,.055);
+    }
+
+    .arch-card-index {
+      color: var(--blue);
+      font: 12px var(--mono);
+    }
+
+    .arch-card h3 {
+      margin: 0 0 7px;
+      font-size: 21px;
+      letter-spacing: -.025em;
+    }
+
+    .arch-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.58;
+    }
+
+    .primitive-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 13px;
+      margin-top: 46px;
+    }
+
+    .primitive {
+      min-height: 190px;
+      padding: 21px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.02);
+    }
+
+    .primitive code {
+      display: inline-block;
+      margin-bottom: 34px;
+      color: var(--blue);
+      font: 700 13px var(--mono);
+    }
+
+    .primitive h3 {
+      margin-bottom: 7px;
+      font-size: 19px;
+    }
+
+    .primitive p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .render-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 50px;
+    }
+
+    .render-panel {
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 20px;
+      background: rgba(255,255,255,.022);
+    }
+
+    .render-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      font: 700 12px var(--mono);
+    }
+
+    .render-panel-head .tag {
+      padding: 4px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--faint);
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .render-flow {
+      min-height: 335px;
+      padding: 24px;
+      display: grid;
+      gap: 12px;
+      align-content: center;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 26px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(0,0,0,.12);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .flow-step .flow-index {
+      color: var(--faint);
+      font: 10px var(--mono);
+    }
+
+    .flow-step .flow-cost {
+      font: 10px var(--mono);
+      color: var(--amber);
+    }
+
+    .render-panel.good .flow-step:last-child,
+    .render-panel.good .flow-step:nth-last-child(2) {
+      border-color: rgba(141,226,180,.3);
+    }
+
+    .render-panel.good .flow-cost { color: var(--green); }
+
+    .parts-diagram {
+      margin-top: 15px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.018);
+    }
+
+    .parts-line {
+      display: grid;
+      grid-template-columns: 1fr auto 1.2fr;
+      gap: 18px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+      font: 12px var(--mono);
+    }
+
+    .parts-line:last-child { border-bottom: 0; }
+    .parts-line .arrow { color: var(--blue); }
+    .parts-line .part { color: var(--muted); }
+
+    .proofs-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, .8fr) minmax(0, 1.2fr);
+      gap: 18px;
+      margin-top: 52px;
+    }
+
+    .proof-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .proof-select {
+      appearance: none;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      gap: 13px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: inherit;
+      background: rgba(255,255,255,.018);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .proof-select:hover,
+    .proof-select.active {
+      border-color: rgba(126,183,255,.48);
+      background: rgba(126,183,255,.055);
+    }
+
+    .proof-select-num {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: rgba(255,255,255,.045);
+      color: var(--blue);
+      font: 11px var(--mono);
+    }
+
+    .proof-select strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .proof-select span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .proof-status {
+      padding: 4px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--faint) !important;
+      font: 9px var(--mono) !important;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .proof-detail {
+      min-height: 590px;
+      padding: 30px;
+      border: 1px solid var(--line-strong);
+      border-radius: 21px;
+      background:
+        radial-gradient(520px 300px at 90% 0%, rgba(66,148,255,.105), transparent 75%),
+        rgba(12,16,23,.84);
+      box-shadow: var(--shadow);
+    }
+
+    .proof-detail .proof-detail-number {
+      margin-bottom: 48px;
+      color: var(--blue);
+      font: 11px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .proof-detail h3 {
+      max-width: 640px;
+      margin-bottom: 14px;
+      font-size: clamp(30px, 4vw, 52px);
+      line-height: 1;
+      letter-spacing: -.05em;
+    }
+
+    .proof-detail > p {
+      max-width: 680px;
+      color: #c3cad5;
+      font-size: 16px;
+    }
+
+    .proof-detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 38px;
+    }
+
+    .proof-detail-card {
+      min-height: 148px;
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(0,0,0,.14);
+    }
+
+    .proof-detail-card .label {
+      margin-bottom: 15px;
+      color: var(--faint);
+      font: 10px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .proof-detail-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .marketplace {
+      position: relative;
+      margin-top: 52px;
+      padding: 30px;
+      border: 1px solid var(--line-strong);
+      border-radius: 25px;
+      background:
+        radial-gradient(600px 420px at 50% 40%, rgba(66,148,255,.11), transparent 72%),
+        rgba(12,16,23,.8);
+      overflow: hidden;
+    }
+
+    .marketplace-top {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 46px;
+      align-items: end;
+      margin-bottom: 42px;
+    }
+
+    .marketplace h3 {
+      margin-bottom: 12px;
+      font-size: clamp(32px, 4.3vw, 58px);
+      line-height: 1;
+      letter-spacing: -.05em;
+    }
+
+    .marketplace p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .role-card {
+      min-height: 216px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(0,0,0,.16);
+    }
+
+    .role-index {
+      margin-bottom: 55px;
+      color: var(--blue);
+      font: 11px var(--mono);
+    }
+
+    .role-card h4 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .role-card p {
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .chaos-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 13px;
+      padding: 15px;
+      border: 1px dashed rgba(255,204,114,.3);
+      border-radius: 13px;
+    }
+
+    .chaos-chip {
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font: 10px var(--mono);
+      background: rgba(255,255,255,.025);
+    }
+
+    .evaluation-table {
+      width: 100%;
+      margin-top: 48px;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 18px;
+      background: rgba(255,255,255,.02);
+    }
+
+    .evaluation-table th,
+    .evaluation-table td {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .evaluation-table tr:last-child td { border-bottom: 0; }
+
+    .evaluation-table th {
+      color: var(--faint);
+      font: 10px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      background: rgba(255,255,255,.025);
+    }
+
+    .evaluation-table td:first-child {
+      width: 18%;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .evaluation-table td {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .evaluation-table code {
+      color: var(--blue);
+      font: 11px var(--mono);
+    }
+
+    .roadmap {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-top: 52px;
+    }
+
+    .roadmap::before {
+      content: "";
+      position: absolute;
+      left: 5%;
+      right: 5%;
+      top: 25px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--blue), rgba(126,183,255,.1));
+    }
+
+    .roadmap-phase {
+      position: relative;
+      padding-top: 58px;
+    }
+
+    .roadmap-dot {
+      position: absolute;
+      z-index: 2;
+      top: 17px;
+      left: 17px;
+      width: 17px;
+      height: 17px;
+      border: 4px solid var(--bg);
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 20px rgba(66,148,255,.35);
+    }
+
+    .roadmap-card {
+      min-height: 226px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(255,255,255,.02);
+    }
+
+    .roadmap-card .phase-label {
+      margin-bottom: 28px;
+      color: var(--faint);
+      font: 10px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+
+    .roadmap-card h3 {
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .roadmap-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+
+    .limitations-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 45px;
+    }
+
+    .limitation {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(255,255,255,.018);
+    }
+
+    .limitation .x {
+      margin-bottom: 36px;
+      color: var(--amber);
+      font: 12px var(--mono);
+    }
+
+    .limitation h3 {
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    .limitation p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .final-cta {
+      text-align: center;
+      padding-top: 145px;
+      padding-bottom: 145px;
+    }
+
+    .final-cta h2 {
+      max-width: 920px;
+      margin: 0 auto 24px;
+      font-size: clamp(50px, 7.5vw, 104px);
+    }
+
+    .final-cta p {
+      max-width: 730px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .final-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 11px;
+      margin-top: 34px;
+    }
+
+    .evidence {
+      margin-top: 54px;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.018);
+    }
+
+    .evidence summary {
+      padding: 15px 17px;
+      color: var(--muted);
+      font: 11px var(--mono);
+      cursor: pointer;
+    }
+
+    .evidence-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px 26px;
+      padding: 4px 17px 18px 37px;
+      color: var(--faint);
+      font-size: 11px;
+    }
+
+    .evidence-list a { color: var(--muted); }
+
+    footer {
+      width: min(calc(100% - 36px), var(--max));
+      margin: 0 auto;
+      padding: 28px 0 46px;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      border-top: 1px solid var(--line);
+      color: var(--faint);
+      font-size: 11px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 1050px) {
+      .nav { display: none; }
+      .hero-grid,
+      .intro-grid,
+      .architecture-shell,
+      .proofs-layout,
+      .marketplace-top { grid-template-columns: 1fr; }
+      .hero { min-height: auto; padding-top: 145px; }
+      .proof-window { max-width: 720px; }
+      .section-kicker { position: static; }
+      .arch-graph { position: relative; top: auto; min-height: 610px; }
+      .primitive-grid { grid-template-columns: repeat(2, 1fr); }
+      .role-grid { grid-template-columns: repeat(2, 1fr); }
+      .roadmap { grid-template-columns: repeat(2, 1fr); }
+      .roadmap::before { display: none; }
+      .roadmap-phase { padding-top: 0; }
+      .roadmap-dot { display: none; }
+      .limitations-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .topbar-inner { width: min(calc(100% - 24px), var(--max)); }
+      .top-cta { display: none; }
+      .section { width: min(calc(100% - 24px), var(--max)); padding: 92px 0; }
+      .hero { padding-top: 120px; padding-bottom: 52px; }
+      h1 { font-size: clamp(52px, 17vw, 82px); }
+      .hero-copy { font-size: 17px; }
+      .proof-window { border-radius: 18px; }
+      .code-view { min-height: 300px; font-size: 11px; padding: 16px; }
+      .sim-grid,
+      .render-comparison,
+      .proof-detail-grid,
+      .primitive-grid,
+      .role-grid,
+      .roadmap,
+      .limitations-grid,
+      .evidence-list { grid-template-columns: 1fr; }
+      .problem-card { grid-template-columns: 42px 1fr; }
+      .problem-owner { grid-column: 2; justify-self: start; }
+      .ladder { grid-template-columns: 1fr; }
+      .ladder-step { min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .ladder-step:last-child { border-bottom: 0; }
+      .ladder-step::after { display: none; }
+      .arch-graph { min-height: 650px; padding: 18px; }
+      .source-node { width: 90%; }
+      .target-node { width: 30%; padding: 10px; }
+      .target-node span { font-size: 9.5px; }
+      .proof-detail { padding: 23px; min-height: auto; }
+      .marketplace { padding: 22px; }
+      .evaluation-table { display: block; overflow-x: auto; }
+      footer { width: min(calc(100% - 24px), var(--max)); flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#top" aria-label="The Web, Recompiled home">
+        <span class="brand-mark" aria-hidden="true">WR</span>
+        <span>The Web, Recompiled</span>
+      </a>
+
+      <nav class="nav" aria-label="Primary">
+        <a href="#problem">Problem</a>
+        <a href="#system">System</a>
+        <a href="#proofs">Proofs</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#paper">Paper</a>
+      </nav>
+
+      <a class="top-cta" href="#proofs">Explore the proofs <span aria-hidden="true">↘</span></a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="section hero" id="top" data-nav="top">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">Research design · browser compatible first</div>
+          <h1>The web should be <span class="accent">harder to get wrong.</span></h1>
+          <p class="hero-copy">
+            One readable language describes state, effects, privacy, caching, and consistency. A compiler turns it into semantic HTML, resumable browser code, edge materializations, and origin services.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#proofs">Run the proof ladder <span aria-hidden="true">↓</span></a>
+            <a class="button button-secondary" href="#paper">Read the design paper</a>
+          </div>
+          <div class="status-note">
+            <span class="dot" aria-hidden="true"></span>
+            <span>This page presents a proposed architecture and evaluation plan. Claims become results only when their reproducible demonstrations ship.</span>
+          </div>
+        </div>
+
+        <div class="proof-window" aria-label="Request amplification pattern demonstration">
+          <div class="window-bar">
+            <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span>failure-pattern.sim</span>
+          </div>
+          <div class="code-tabs" role="tablist" aria-label="Code comparison">
+            <button class="code-tab" type="button" role="tab" aria-selected="true" aria-controls="react-code" id="react-tab" data-code="react">React pattern</button>
+            <button class="code-tab" type="button" role="tab" aria-selected="false" aria-controls="semantic-code" id="semantic-tab" data-code="semantic">Semantic query</button>
+          </div>
+          <div class="code-view active" id="react-code" role="tabpanel" aria-labelledby="react-tab"><span class="kw">function</span> <span class="fn">Organizations</span>({ accountId }) {
+  <span class="kw">const</span> options = { accountId };
+
+  <span class="fn">useEffect</span>(() =&gt; {
+    <span class="fn">getOrganizations</span>(options);
+  }, [options]);
+
+  <span class="comment">// `options` is a new identity after rendering.</span>
+  <span class="warning">// The code type-checks. The lifecycle contract is folklore.</span>
+}</div>
+          <div class="code-view" id="semantic-code" role="tabpanel" aria-labelledby="semantic-tab"><span class="kw">private query</span> <span class="fn">organizations</span>(account: AccountId) {
+  freshness <span class="str">30s</span>
+  concurrency <span class="str">one_per_key</span>
+  retry <span class="str">exponential(max: 3, jitter: true)</span>
+
+  Organizations.get(account)
+}
+
+<span class="comment">// Rendering reads a resource. It cannot start the network effect.</span>
+<span class="comment">// The logical key is AccountId, not incidental object identity.</span></div>
+          <div class="simulator">
+            <div class="sim-title-row">
+              <div class="sim-title">Illustrative rerender storm</div>
+              <div class="sim-actions">
+                <button class="mini-button" type="button" id="run-storm">Run ×1000</button>
+                <button class="mini-button" type="button" id="reset-storm">Reset</button>
+              </div>
+            </div>
+            <div class="sim-grid" aria-live="polite">
+              <div class="sim-metric">
+                <div class="sim-label">effect-coupled requests</div>
+                <div class="sim-value bad" id="react-count">1</div>
+              </div>
+              <div class="sim-metric">
+                <div class="sim-label">logical query requests</div>
+                <div class="sim-value good" id="semantic-count">1</div>
+              </div>
+            </div>
+            <p class="sim-caption">A conceptual simulation of identity-coupled request amplification, not a benchmark or reproduction of Cloudflare’s complete incident.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="problem" data-nav="problem">
+      <div class="intro-grid">
+        <div class="section-kicker">
+          <div class="section-number">01 / THE PROBLEM</div>
+          <h2>The most important rules are missing from the program.</h2>
+          <p class="section-lede">A web developer coordinates a browser, renderer, server, cache, network, database, and deployment system—while the compiler understands only a fraction of the contract.</p>
+        </div>
+
+        <div>
+          <div class="small-label">Where correctness lives today</div>
+          <div class="problem-stack">
+            <div class="problem-card">
+              <div class="problem-icon" aria-hidden="true">↻</div>
+              <div><h3>Effect lifecycle and object identity</h3><p>When should a request, subscription, timer, or imperative library start and stop?</p></div>
+              <span class="problem-owner">docs + linter</span>
+            </div>
+            <div class="problem-card">
+              <div class="problem-icon" aria-hidden="true">◎</div>
+              <div><h3>Public versus private data</h3><p>May a value be serialized to a browser or influence a globally shared cache?</p></div>
+              <span class="problem-owner">architecture review</span>
+            </div>
+            <div class="problem-card">
+              <div class="problem-icon" aria-hidden="true">⇄</div>
+              <div><h3>Retry, cancellation, and idempotency</h3><p>What happens when a network request is duplicated, abandoned, delayed, or uncertain?</p></div>
+              <span class="problem-owner">library conventions</span>
+            </div>
+            <div class="problem-card">
+              <div class="problem-icon" aria-hidden="true">◇</div>
+              <div><h3>Placement and serialization</h3><p>Which code may run in the browser, edge, or origin, and what state can cross each boundary?</p></div>
+              <span class="problem-owner">meta-framework</span>
+            </div>
+            <div class="problem-card">
+              <div class="problem-icon" aria-hidden="true">∴</div>
+              <div><h3>Cache freshness and invalidation</h3><p>Which mutation makes which resource or rendered fragment stale?</p></div>
+              <span class="problem-owner">human-maintained graph</span>
+            </div>
+            <div class="problem-card">
+              <div class="problem-icon" aria-hidden="true">⊕</div>
+              <div><h3>Business state completeness</h3><p>Which combinations and transitions are valid across loading, failure, permissions, and domain state?</p></div>
+              <span class="problem-owner">tests + review</span>
+            </div>
+          </div>
+
+          <div class="quote-block">
+            When correctness depends on remembering an idiom, the developer is performing work that should be done by <strong>a machine.</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="ladder" aria-label="Moving rules down the stack">
+        <div class="ladder-step"><span class="step-index">01</span><h3>Convention</h3><p>Someone must know and remember the correct pattern.</p></div>
+        <div class="ladder-step"><span class="step-index">02</span><h3>Review</h3><p>A human or model notices the pattern after code exists.</p></div>
+        <div class="ladder-step"><span class="step-index">03</span><h3>Lint</h3><p>A heuristic recognizes some local manifestations.</p></div>
+        <div class="ladder-step"><span class="step-index">04</span><h3>Type</h3><p>The rule becomes part of the program’s static meaning.</p></div>
+        <div class="ladder-step"><span class="step-index">05</span><h3>Impossible</h3><p>The unsafe representation or capability is unavailable.</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="system" data-nav="system">
+      <div class="section-number">02 / THE SYSTEM</div>
+      <h2>One semantic application. Three execution environments.</h2>
+      <p class="section-lede">The permanent product is not a UI library plus a separate meta-framework. It is a whole-application compiler whose source model includes effects, capabilities, privacy, consistency, resources, and document structure.</p>
+
+      <div class="architecture-shell">
+        <div class="arch-graph" id="arch-graph" data-active="language" aria-label="Application compilation architecture">
+          <div class="arch-title"><span>application.graph</span><span>inspectable placement</span></div>
+          <div class="source-node"><code><span style="color:var(--violet)">public query</span> store(id: StoreId)
+  freshness 30s
+  invalidates StoreChanged(id)
+
+<span style="color:var(--violet)">command</span> add_to_cart(item)
+  requires SignedIn
+  idempotent_by InteractionId</code></div>
+          <div class="arch-line line-a"></div>
+          <div class="compiler-node"><span>semantic<br />compiler</span></div>
+          <div class="arch-line line-b"></div>
+          <div class="arch-line line-c"></div>
+          <div class="arch-line line-d"></div>
+          <div class="arch-line line-e"></div>
+          <div class="arch-line line-f"></div>
+          <div class="target-node browser"><strong>Browser</strong><span>semantic HTML<br />document parts<br />device capabilities</span></div>
+          <div class="target-node edge"><strong>Edge</strong><span>public materializations<br />streamed views<br />restricted reads</span></div>
+          <div class="target-node origin"><strong>Origin</strong><span>transactions<br />secrets<br />authoritative writes</span></div>
+        </div>
+
+        <div class="arch-explainers">
+          <button class="arch-card active" type="button" data-arch="language"><span class="arch-card-index">01</span><span><h3>A readable application language</h3><p>Algebraic states, nominal domain types, explicit failure, inferred effects, structured tasks, and automatic memory. Ordinary UI code gets GC-like ergonomics; scarce handles receive affine discipline.</p></span></button>
+          <button class="arch-card" type="button" data-arch="compiler"><span class="arch-card-index">02</span><span><h3>A compiler that understands web policy</h3><p>It checks render purity, privacy flows, capability requirements, serializability, resource ownership, placement constraints, cache safety, and state exhaustiveness before target splitting.</p></span></button>
+          <button class="arch-card" type="button" data-arch="browser"><span class="arch-card-index">03</span><span><h3>A semantic browser artifact</h3><p>Static content remains HTML. Dynamic expressions become stable document parts. Only permitted captures and handlers cross into the browser, with code loaded by intent or interaction.</p></span></button>
+          <button class="arch-card" type="button" data-arch="edge"><span class="arch-card-index">04</span><span><h3>Materialized public views at the edge</h3><p>What is often called SSR, SSG, or ISR becomes a compiler-selected implementation of declared privacy, freshness, consistency, dependency, and fallback policy.</p></span></button>
+          <button class="arch-card" type="button" data-arch="origin"><span class="arch-card-index">05</span><span><h3>Capability-limited origin components</h3><p>Transactions and secrets remain where their capabilities exist. Typed component interfaces make imports explicit, while the runtime denies ambient authority.</p></span></button>
+        </div>
+      </div>
+
+      <div class="primitive-grid" aria-label="Application primitives">
+        <div class="primitive"><code>derived</code><h3>Pure local computation</h3><p>Recomputed from explicit dependencies. Cannot perform I/O or mutate domain state.</p></div>
+        <div class="primitive"><code>query</code><h3>Keyed remote read</h3><p>Freshness, cache, cancellation, consistency, placement, and invalidation are part of its meaning.</p></div>
+        <div class="primitive"><code>command</code><h3>Explicit mutation</h3><p>Authorization, idempotency, transactions, optimistic behavior, and emitted changes are declared.</p></div>
+        <div class="primitive"><code>subscription</code><h3>Scoped changing input</h3><p>Reconnect, ordering, cursor, cancellation, and owner lifetime are mechanically managed.</p></div>
+        <div class="primitive"><code>resource</code><h3>Acquire and release</h3><p>Maps, editors, streams, and imperative libraries receive lifecycle-aware handles instead of generic effects.</p></div>
+        <div class="primitive"><code>task</code><h3>Structured concurrency</h3><p>Every child belongs to a request, route, component, interaction, session, or explicit durable job.</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="rendering" data-nav="system">
+      <div class="section-number">03 / THE DOCUMENT</div>
+      <h2>HTML without replay.</h2>
+      <p class="section-lede">The browser receives a useful semantic document. It does not need to rerun the initial component tree merely to discover listeners and reconstruct framework state.</p>
+
+      <div class="render-comparison">
+        <div class="render-panel">
+          <div class="render-panel-head"><span>Conventional hydration</span><span class="tag">replay</span></div>
+          <div class="render-flow">
+            <div class="flow-step"><span class="flow-index">01</span><span>Server runs component tree</span><span class="flow-cost">compute</span></div>
+            <div class="flow-step"><span class="flow-index">02</span><span>Browser receives HTML</span><span class="flow-cost">network</span></div>
+            <div class="flow-step"><span class="flow-index">03</span><span>Browser downloads component code</span><span class="flow-cost">bytes</span></div>
+            <div class="flow-step"><span class="flow-index">04</span><span>Browser reruns initial application logic</span><span class="flow-cost">CPU</span></div>
+            <div class="flow-step"><span class="flow-index">05</span><span>Framework reconstructs listeners and graph</span><span class="flow-cost">startup</span></div>
+          </div>
+        </div>
+
+        <div class="render-panel good">
+          <div class="render-panel-head"><span>Semantic resumption</span><span class="tag">continue</span></div>
+          <div class="render-flow">
+            <div class="flow-step"><span class="flow-index">01</span><span>Server emits semantic HTML</span><span class="flow-cost">useful</span></div>
+            <div class="flow-step"><span class="flow-index">02</span><span>Static regions remain plain document</span><span class="flow-cost">0 app JS</span></div>
+            <div class="flow-step"><span class="flow-index">03</span><span>Interactive parts receive stable identities</span><span class="flow-cost">minimal state</span></div>
+            <div class="flow-step"><span class="flow-index">04</span><span>Handler loads on intent or interaction</span><span class="flow-cost">lazy</span></div>
+            <div class="flow-step"><span class="flow-index">05</span><span>Only dependent document part changes</span><span class="flow-cost">targeted</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="parts-diagram" aria-label="Document part dependency examples">
+        <div class="parts-line"><span>cart.total</span><span class="arrow">→</span><span class="part">TextPart · “$24.50”</span></div>
+        <div class="parts-line"><span>item.available</span><span class="arrow">→</span><span class="part">AttributePart · button.disabled + availability label</span></div>
+        <div class="parts-line"><span>store.menu</span><span class="arrow">→</span><span class="part">KeyedListPart&lt;MenuItemId&gt;</span></div>
+        <div class="parts-line"><span>recommendations</span><span class="arrow">→</span><span class="part">Streamed RangePart · independent completion</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="proofs" data-nav="proofs">
+      <div class="section-number">04 / PROOF, NOT PROMISES</div>
+      <h2>Every major claim gets a public failure test.</h2>
+      <p class="section-lede">The project should become believable through a ladder of demonstrations. Each proof has a comparator, a failure condition, a measurable output, and an explicit statement of what it does not establish.</p>
+
+      <div class="proofs-layout">
+        <div class="proof-list" role="tablist" aria-label="Proof demonstrations">
+          <button class="proof-select active" type="button" role="tab" aria-selected="true" data-proof="0"><span class="proof-select-num">00</span><span><strong>The Bug Museum</strong><span>Programs that must not compile</span></span><span class="proof-status">first</span></button>
+          <button class="proof-select" type="button" role="tab" aria-selected="false" data-proof="1"><span class="proof-select-num">01</span><span><strong>Zero Means Zero</strong><span>Static and resumable rendering</span></span><span class="proof-status">UI</span></button>
+          <button class="proof-select" type="button" role="tab" aria-selected="false" data-proof="2"><span class="proof-select-num">02</span><span><strong>The Bug That Compiled</strong><span>Request amplification pattern</span></span><span class="proof-status">effects</span></button>
+          <button class="proof-select" type="button" role="tab" aria-selected="false" data-proof="3"><span class="proof-select-num">03</span><span><strong>Make It Leak</strong><span>Privacy and cache placement</span></span><span class="proof-status">security</span></button>
+          <button class="proof-select" type="button" role="tab" aria-selected="false" data-proof="4"><span class="proof-select-num">04</span><span><strong>Chaos Checkout</strong><span>Hostile network and service faults</span></span><span class="proof-status">system</span></button>
+          <button class="proof-select" type="button" role="tab" aria-selected="false" data-proof="5"><span class="proof-select-num">05</span><span><strong>Change One Menu</strong><span>Incremental materialization</span></span><span class="proof-status">data</span></button>
+          <button class="proof-select" type="button" role="tab" aria-selected="false" data-proof="6"><span class="proof-select-num">06</span><span><strong>Small Model, Strong System</strong><span>AI reliability and review</span></span><span class="proof-status">AI</span></button>
+          <button class="proof-select" type="button" role="tab" aria-selected="false" data-proof="7"><span class="proof-select-num">07</span><span><strong>Remove the Shim</strong><span>Experimental browser-native mode</span></span><span class="proof-status">later</span></button>
+        </div>
+
+        <div class="proof-detail" id="proof-detail" role="tabpanel" aria-live="polite">
+          <div class="proof-detail-number" id="proof-number">Proof 00 · compiler semantics</div>
+          <h3 id="proof-title">The Bug Museum</h3>
+          <p id="proof-description">A live gallery of accepted and rejected programs: network in render, private data in a public cache, a browser importing a database, an escaped task, an unclosed transaction, a non-serializable handler capture, and an unhandled business state.</p>
+          <div class="proof-detail-grid">
+            <div class="proof-detail-card"><div class="label">What the visitor sees</div><p id="proof-sees">They edit a safe program into a dangerous one and receive a domain-specific explanation with safe architectural alternatives.</p></div>
+            <div class="proof-detail-card"><div class="label">What it proves</div><p id="proof-proves">The project has a coherent static model whose errors are useful to an application developer.</p></div>
+            <div class="proof-detail-card"><div class="label">Comparator</div><p id="proof-comparator">The equivalent TypeScript or framework pattern that compiles and relies on documentation, linting, review, or runtime tests.</p></div>
+            <div class="proof-detail-card"><div class="label">Success condition</div><p id="proof-success">Every negative example fails for its intended reason; every accepted example remains stable under incremental edits.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="flagship" data-nav="proofs">
+      <div class="section-number">05 / THE FLAGSHIP</div>
+      <h2>A marketplace is the smallest demo that is not a toy.</h2>
+      <p class="section-lede">One domain can force the platform to compose public content, private state, role permissions, transactions, realtime streams, offline work, edge caching, and operational recovery.</p>
+
+      <div class="marketplace">
+        <div class="marketplace-top">
+          <div><div class="small-label">The Marketplace</div><h3>Four applications. One domain model.</h3></div>
+          <p>A polished open-data marketplace—not proprietary employer code—becomes the end-to-end benchmark. Every route has an inspectable effect, privacy, placement, cache, and document-parts graph.</p>
+        </div>
+        <div class="role-grid">
+          <div class="role-card"><div class="role-index">ROLE / 01</div><h4>Consumer</h4><p>Public discovery, private cart, address, promotions, optimistic commands, checkout, and order tracking.</p></div>
+          <div class="role-card"><div class="role-index">ROLE / 02</div><h4>Merchant</h4><p>Catalog edits, item availability, pricing, incoming orders, capability-limited operations, and invalidation events.</p></div>
+          <div class="role-card"><div class="role-index">ROLE / 03</div><h4>Courier</h4><p>Offers, navigation, offline transitions, reconnect policy, location privacy, and authoritative state validation.</p></div>
+          <div class="role-card"><div class="role-index">ROLE / 04</div><h4>Operations</h4><p>Live system state, permissions, audit trace, intervention commands, and degraded-service visibility.</p></div>
+        </div>
+        <div class="chaos-strip" aria-label="Fault injection scenarios">
+          <span class="chaos-chip">120 ms latency</span><span class="chaos-chip">2% packet loss</span><span class="chaos-chip">3 Mbps</span><span class="chaos-chip">origin restart</span><span class="chaos-chip">duplicate command delivery</span><span class="chaos-chip">stale edge view</span><span class="chaos-chip">offline courier</span><span class="chaos-chip">slow recommendations</span>
+        </div>
+      </div>
+
+      <table class="evaluation-table">
+        <thead><tr><th>Claim</th><th>Public evidence</th><th>Measurements</th></tr></thead>
+        <tbody>
+          <tr><td>Correctness</td><td>Real failure-pattern reproductions and a versioned negative compiler corpus.</td><td><code>rejection coverage · diagnostic accuracy · escaped invalid states</code></td></tr>
+          <tr><td>Performance</td><td>Identical marketplace spec in Next/React, SvelteKit, and the new platform under the same network.</td><td><code>bytes · startup CPU · useful content · first successful interaction · server work</code></td></tr>
+          <tr><td>Security</td><td>Private/public flow attempts, capability denial, secret serialization, and malicious component tests.</td><td><code>static rejection · runtime denial · manifest diff</code></td></tr>
+          <tr><td>Resilience</td><td>Fault injection with causal traces and policy-derived expected outcomes.</td><td><code>duplicate effects · stale fallback · recovery · lost/escaped work</code></td></tr>
+          <tr><td>Developer effort</td><td>Side-by-side source and task studies rather than line-count theater.</td><td><code>concepts authored · completion time · repair time · review time</code></td></tr>
+          <tr><td>AI suitability</td><td>Reproducible repository tasks across stacks and model sizes.</td><td><code>pass rate · tokens · repair cycles · model size · semantic review issues</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="roadmap" data-nav="roadmap">
+      <div class="section-number">06 / BUILD ORDER</div>
+      <h2>Deployable framework first. New browser second.</h2>
+      <p class="section-lede">The project becomes useful before it changes the web platform. Current browsers are the compatibility target; browser-native work begins only after profiling reveals what the shim actually costs.</p>
+
+      <div class="roadmap">
+        <div class="roadmap-phase"><span class="roadmap-dot"></span><div class="roadmap-card"><div class="phase-label">Phase 1</div><h3>Semantic core</h3><p>Accepted/rejected corpus, algebraic types, effects, capabilities, diagnostics, and the browser compiler playground.</p></div></div>
+        <div class="roadmap-phase"><span class="roadmap-dot"></span><div class="roadmap-card"><div class="phase-label">Phase 2</div><h3>Browser-compatible vertical slice</h3><p>Semantic HTML, document parts, resumption, queries, commands, streaming, and the first store/cart route.</p></div></div>
+        <div class="roadmap-phase"><span class="roadmap-dot"></span><div class="roadmap-card"><div class="phase-label">Phase 3</div><h3>Distributed marketplace</h3><p>Edge/origin placement, privacy, capability runtime, materialized views, network lab, and four-role application.</p></div></div>
+        <div class="roadmap-phase"><span class="roadmap-dot"></span><div class="roadmap-card"><div class="phase-label">Phase 4</div><h3>AI and adoption proof</h3><p>Agent benchmark, semantic PRs, interop, one-feature migration, and the first real pilot outside the demo.</p></div></div>
+        <div class="roadmap-phase"><span class="roadmap-dot"></span><div class="roadmap-card"><div class="phase-label">Phase 5</div><h3>Native web experiments</h3><p>Servo embedding, direct document-part interfaces, native resumption, declarative patches, and standards proposals.</p></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="limits" data-nav="paper">
+      <div class="section-number">07 / HONEST BOUNDARIES</div>
+      <h2>A compiler can remove mechanism errors. It cannot invent the product.</h2>
+      <p class="section-lede">The project becomes more credible by stating what remains difficult.</p>
+
+      <div class="limitations-grid">
+        <div class="limitation"><div class="x">NOT SOLVED / 01</div><h3>Ambiguous requirements</h3><p>The compiler cannot know whether a discount, cancellation, substitution, or permission rule is what the business intended.</p></div>
+        <div class="limitation"><div class="x">NOT SOLVED / 02</div><h3>Physical latency</h3><p>It can remove waterfalls and place work intelligently, but it cannot abolish distance, slow databases, or external services.</p></div>
+        <div class="limitation"><div class="x">NOT SOLVED / 03</div><h3>Universal consistency</h3><p>Offline and distributed conflicts need explicit domain policy. There is no one correct merge strategy.</p></div>
+        <div class="limitation"><div class="x">NOT SOLVED / 04</div><h3>All outages</h3><p>Removing a trigger class does not replace capacity planning, isolation, observability, rollback, and fault tolerance.</p></div>
+        <div class="limitation"><div class="x">NOT SOLVED / 05</div><h3>Foreign ecosystems</h3><p>JavaScript, native libraries, databases, and third-party APIs weaken guarantees unless their boundaries are decoded and capability-wrapped.</p></div>
+        <div class="limitation"><div class="x">NOT SOLVED / 06</div><h3>Free compiler complexity</h3><p>Effects, privacy, placement, and invalidation interact. Diagnostics and incremental compilation are core research work, not polish.</p></div>
+      </div>
+    </section>
+
+    <section class="section final-cta" id="paper" data-nav="paper">
+      <div class="eyebrow" style="justify-content:center">Open design · reproducible evaluation</div>
+      <h2>Describe meaning. Compile the rest.</h2>
+      <p>The landing page is the conceptual journey. The technical paper specifies the semantics, architecture, tradeoffs, related systems, evaluation protocol, and unresolved research questions.</p>
+      <div class="final-actions">
+        <a class="button button-primary" href="whitepaper.md">Open the design paper</a>
+        <a class="button button-secondary" href="proof-roadmap.md">Read the proof roadmap</a>
+      </div>
+
+      <details class="evidence">
+        <summary>Evidence and predecessor links used in this design</summary>
+        <ol class="evidence-list">
+          <li><a href="https://blog.cloudflare.com/deep-dive-into-cloudflares-sept-12-dashboard-and-api-outage/" target="_blank" rel="noreferrer">Cloudflare September 2025 postmortem</a></li>
+          <li><a href="https://react.dev/learn/you-might-not-need-an-effect" target="_blank" rel="noreferrer">React: You Might Not Need an Effect</a></li>
+          <li><a href="https://svelte.dev/docs/svelte/best-practices" target="_blank" rel="noreferrer">Svelte best practices</a></li>
+          <li><a href="https://svelte.dev/docs/kit/remote-functions" target="_blank" rel="noreferrer">SvelteKit remote functions</a></li>
+          <li><a href="https://markojs.com/docs/explanation/why-is-marko-fast" target="_blank" rel="noreferrer">Marko rendering and fine-grained bundling</a></li>
+          <li><a href="https://qwik.dev/docs/concepts/resumable/" target="_blank" rel="noreferrer">Qwik resumability</a></li>
+          <li><a href="https://koka-lang.github.io/koka/doc/book.html" target="_blank" rel="noreferrer">Koka effects and handlers</a></li>
+          <li><a href="https://component-model.bytecodealliance.org/" target="_blank" rel="noreferrer">WebAssembly Component Model</a></li>
+          <li><a href="https://wasi.dev/" target="_blank" rel="noreferrer">WASI capability sandbox</a></li>
+          <li><a href="https://github.com/WICG/declarative-partial-updates" target="_blank" rel="noreferrer">WICG declarative partial updates</a></li>
+          <li><a href="https://www.reactbench.com/" target="_blank" rel="noreferrer">ReactBench</a></li>
+          <li><a href="https://servo.org/" target="_blank" rel="noreferrer">Servo browser engine</a></li>
+        </ol>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <span>The Web, Recompiled · working project title</span>
+    <span>Design draft · August 2026 · no benchmark claims without reproducible runs</span>
+  </footer>
+
+  <script>
+    (() => {
+      const codeTabs = [...document.querySelectorAll('.code-tab')];
+      const codeViews = [...document.querySelectorAll('.code-view')];
+      codeTabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          const target = tab.dataset.code;
+          codeTabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+          codeViews.forEach((view) => view.classList.toggle('active', view.id === `${target}-code`));
+        });
+      });
+
+      const reactCount = document.getElementById('react-count');
+      const semanticCount = document.getElementById('semantic-count');
+      const runStorm = document.getElementById('run-storm');
+      const resetStorm = document.getElementById('reset-storm');
+      let stormTimer = null;
+
+      const resetCounts = () => {
+        if (stormTimer) cancelAnimationFrame(stormTimer);
+        reactCount.textContent = '1';
+        semanticCount.textContent = '1';
+      };
+
+      runStorm.addEventListener('click', () => {
+        resetCounts();
+        const start = performance.now();
+        const duration = 850;
+        const tick = (now) => {
+          const progress = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          reactCount.textContent = String(Math.max(1, Math.round(eased * 1000)));
+          semanticCount.textContent = '1';
+          if (progress < 1) stormTimer = requestAnimationFrame(tick);
+        };
+        stormTimer = requestAnimationFrame(tick);
+      });
+      resetStorm.addEventListener('click', resetCounts);
+
+      const archGraph = document.getElementById('arch-graph');
+      const archCards = [...document.querySelectorAll('.arch-card')];
+      archCards.forEach((card) => {
+        card.addEventListener('click', () => {
+          archCards.forEach((item) => item.classList.toggle('active', item === card));
+          archGraph.dataset.active = card.dataset.arch;
+        });
+      });
+
+      const proofs = [
+        {
+          number: 'Proof 00 · compiler semantics',
+          title: 'The Bug Museum',
+          description: 'A live gallery of accepted and rejected programs: network in render, private data in a public cache, a browser importing a database, an escaped task, an unclosed transaction, a non-serializable handler capture, and an unhandled business state.',
+          sees: 'They edit a safe program into a dangerous one and receive a domain-specific explanation with safe architectural alternatives.',
+          proves: 'The project has a coherent static model whose errors are useful to an application developer.',
+          comparator: 'The equivalent TypeScript or framework pattern that compiles and relies on documentation, linting, review, or runtime tests.',
+          success: 'Every negative example fails for its intended reason; every accepted example remains stable under incremental edits.'
+        },
+        {
+          number: 'Proof 01 · rendering',
+          title: 'Zero Means Zero',
+          description: 'One source language emits a fully static route with zero application JavaScript, a partially interactive page with one lazy handler, and a streamed page whose slow region does not block the useful document.',
+          sees: 'A live artifact inspector shows HTML, CSS, startup code, code executed before interaction, and the exact document parts capable of changing.',
+          proves: 'The UI compiler preserves semantic HTML while avoiding whole-tree replay and unnecessary client inclusion.',
+          comparator: 'The same page in conventional hydration, plus Marko/Qwik-style predecessor implementations where useful.',
+          success: 'Static means zero app JS; interactive code is not executed before necessary; only dependent document parts update.'
+        },
+        {
+          number: 'Proof 02 · effects and resources',
+          title: 'The Bug That Compiled',
+          description: 'A reconstruction of identity-coupled request amplification runs beside a keyed query that rendering can read but cannot start or retrigger through incidental object identity.',
+          sees: 'A rerender storm creates request amplification in the reproduction while the semantic resource remains one logical in-flight request per key.',
+          proves: 'Typed effects alone are insufficient; typed domain resources plus pure rendering remove a framework lifecycle class.',
+          comparator: 'A React effect pattern modeled on the trigger described in Cloudflare’s September 2025 postmortem.',
+          success: 'Render has no network capability, requests deduplicate by logical key, tasks cancel with scope, and every retry is bounded and explainable.'
+        },
+        {
+          number: 'Proof 03 · privacy and placement',
+          title: 'Make It Leak',
+          description: 'A store page combines a public menu, session-private cart, origin-only payment token, and device-private location. The visitor attempts to make the whole result globally cacheable.',
+          sees: 'The compiler refuses unsafe flows and proposes a public shell, private slot, browser-only device region, or fully private page.',
+          proves: 'Privacy and deployment placement are program properties rather than route comments and review conventions.',
+          comparator: 'A framework configuration in which public/private safety depends on manually coordinated loaders, headers, cache keys, and serialization.',
+          success: 'Private values cannot influence public artifacts; secrets cannot serialize to browsers; runtime components cannot use undeclared capabilities.'
+        },
+        {
+          number: 'Proof 04 · end-to-end system',
+          title: 'Chaos Checkout',
+          description: 'An identical marketplace flow runs in Next/React, SvelteKit, and the new platform under controlled latency, loss, bandwidth, origin failure, slow dependencies, and duplicate delivery.',
+          sees: 'Useful HTML streams early, optional code stays lazy, repeated command delivery remains one business interaction, and causal traces explain every fallback.',
+          proves: 'The language, renderer, resource model, cache, and runtime compose under real application pressure.',
+          comparator: 'Feature-equivalent applications with published source, data, deployment topology, and test harness.',
+          success: 'Raw traces and full results are downloadable; no preselected metric or hidden framework tuning decides the conclusion.'
+        },
+        {
+          number: 'Proof 05 · incremental dataflow',
+          title: 'Change One Menu',
+          description: 'A merchant changes one item. The system reveals the causal path from the change event to the exact resources, materialized fragments, and live clients affected.',
+          sees: 'Only the menu, search card, and dependent clients update; unrelated stores, private carts, and page regions do not recompute.',
+          proves: 'ISR can become dependency maintenance rather than route-level timers and broad manual invalidation.',
+          comparator: 'Timed route regeneration, broad tag invalidation, and full application refetching.',
+          success: 'No unaffected fragment regenerates in the controlled test, and every dependency is inspectable and explainable.'
+        },
+        {
+          number: 'Proof 06 · AI development',
+          title: 'Small Model, Strong System',
+          description: 'Realistic feature tasks are attempted by frontier and progressively smaller local models across React and the new platform, with compiler repair loops and semantic PR evaluation.',
+          sees: 'Every rollout, compiler rejection, patch, token count, model requirement, and reviewer issue is available for inspection.',
+          proves: 'A stronger language may reduce the probabilistic framework and style knowledge required from a coding model.',
+          comparator: 'The same behavior, accessibility, performance, and maintainability requirements in realistic React repositories.',
+          success: 'Publish the honest quality-versus-model-size curve rather than promising that a predetermined small model will win.'
+        },
+        {
+          number: 'Proof 07 · web-platform experiment',
+          title: 'Remove the Shim',
+          description: 'The same compiled marketplace runs in ordinary browser compatibility mode and an experimental Servo-based native runtime with selected document-part and component interfaces built in.',
+          sees: 'A diff shows which JavaScript glue, runtime bytes, state metadata, and registration work disappear while source semantics remain unchanged.',
+          proves: 'The deployable framework can evolve into evidence-backed browser proposals rather than a permanent proprietary island.',
+          comparator: 'Safari/Chrome compatibility mode using standard HTML, CSS, JavaScript/Wasm, and the small generated runtime.',
+          success: 'Native substitutions produce measurable benefits and preserve accessibility, security, and open-web behavior.'
+        }
+      ];
+
+      const proofButtons = [...document.querySelectorAll('.proof-select')];
+      const proofFields = {
+        number: document.getElementById('proof-number'),
+        title: document.getElementById('proof-title'),
+        description: document.getElementById('proof-description'),
+        sees: document.getElementById('proof-sees'),
+        proves: document.getElementById('proof-proves'),
+        comparator: document.getElementById('proof-comparator'),
+        success: document.getElementById('proof-success')
+      };
+
+      proofButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const proof = proofs[Number(button.dataset.proof)];
+          proofButtons.forEach((item) => {
+            const active = item === button;
+            item.classList.toggle('active', active);
+            item.setAttribute('aria-selected', String(active));
+          });
+          Object.entries(proofFields).forEach(([key, element]) => {
+            element.textContent = proof[key];
+          });
+        });
+      });
+
+      const navLinks = [...document.querySelectorAll('.nav a')];
+      const sections = [...document.querySelectorAll('[data-nav]')];
+      const observer = new IntersectionObserver((entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        const current = visible.target.dataset.nav;
+        navLinks.forEach((link) => {
+          const target = link.getAttribute('href').slice(1);
+          link.setAttribute('aria-current', String(target === current));
+        });
+      }, { rootMargin: '-25% 0px -58% 0px', threshold: [0, .1, .25, .5] });
+      sections.forEach((section) => observer.observe(section));
+    })();
+  </script>
+</body>
+</html>

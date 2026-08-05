@@ -45,3 +45,5 @@ lab/certs/rootCA*
 .idea/
 .vscode/*
 !.vscode/extensions.json
+# headless-chrome profile created by spikes/browser-resumption
+spikes/browser-resumption/.chrome-profile/
