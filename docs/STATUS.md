@@ -12,7 +12,7 @@ Full assessment: `docs/milestones/M0.md`.
 
 **next milestone:** Milestone 1 — Koka semantic kernel. **Not started.**
 
-**last passing commit:** `a943b17` — Milestone 0 bootstrap.
+**last passing commit:** `dccc5db` — charter v2 adoption + spikes 5 and 6.
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---
