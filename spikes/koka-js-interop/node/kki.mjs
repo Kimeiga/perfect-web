@@ -98,6 +98,17 @@ export function effectNames(signature) {
   if (lastArrow < 0) return [];
 
   const tail = signature.slice(lastArrow + 2).trim();
+
+  // DEFECT FOUND BY RQ-2: an effect-POLYMORPHIC result is written as a bare row
+  // variable of kind E, e.g. `-> (e :: E) list<b>`, with no angle brackets. The
+  // original code fell through to `return []` and reported such functions as
+  // TOTAL. A generic helper that faithfully propagates its callback's effects
+  // was therefore indistinguishable from a pure function — which would have
+  // made E1's gate item "every effectful example has a visible inferred effect"
+  // pass while hiding exactly the case that matters most.
+  const polyRow = /^\(\s*([A-Za-z][A-Za-z0-9_]*)\s*::\s*E\s*\)/.exec(tail);
+  if (polyRow) return [`polymorphic:${polyRow[1]}`];
+
   if (!tail.startsWith("<")) return []; // total — no effect row
 
   // Take the balanced <...> group, again skipping `->`.

@@ -1,0 +1,65 @@
+spike: koka-row-polymorphism  (risk-retirement experiment RQ-2)
+generated: 2026-08-05T23:55:22Z
+koka: Koka 3.2.3, 01:29:29 Mar 18 2026 (ghc release version)
+host: Darwin arm64
+command: just rq-row-polymorphism
+
+PRE-REGISTERED DECISION TABLE (fixed before the experiment):
+  1. automatic propagation + selective narrowing      -> E1 clean pass
+  2. definition-level annotation required, conservative
+     omission, narrowing works                        -> E1 conditional pass
+  2'. annotation omission silently understates effects -> E1 FAIL
+  3. higher-order effect disappears                    -> E1 FAIL
+  4. cannot selectively discharge while preserving rest-> E1 FAIL
+  Governing criterion: Koka may OVERSTATE an effect, but must never
+  silently understate or erase one.
+
+=========== CASE A: propagation through UNANNOTATED generics ========
+kk/inferred.kk declares my-map and transform-items with NO type
+signature at all, then calls a database-reading callback through both.
+
+  my-map               !{polymorphic:e}
+  transform-items      !{polymorphic:e}
+  page-loader          !{database-read}
+  pure-loader          !{}
+
+  my-map / transform-items are effect-POLYMORPHIC (inferred, unannotated).
+  page-loader shows database-read propagated through TWO generic layers.
+  pure-loader stays total through the same helpers.
+
+=========== CASE B: selective discharge =============================
+kk/selective.kk handles one effect at a time out of a two-effect row,
+and passes a secret-reading callback through a generic helper.
+
+  both-effects         !{database-read, trace-effect}
+  discharge-db         !{trace-effect}
+  discharge-trace      !{database-read}
+  discharge-all        !{}
+  my-map               !{polymorphic:e}
+  leaky                !{secret-read}
+
+  discharge-db     keeps trace-effect  -> narrowing preserves the remainder
+  discharge-trace  keeps database-read -> narrowing works in both directions
+  discharge-all    is total            -> full discharge reaches {}
+  leaky            shows secret-read   -> a generic helper cannot HIDE a capability
+
+=========== NEGATIVE: can a total signature accept an effectful callback? ===
+kk/negative-total-helper.kk annotates a helper as taking a TOTAL callback
+and then passes it an effectful one. This MUST fail to compile.
+    kk/negative-total-helper.kk(21,27): type error: effects do not match
+  check:total-helper-rejects-effectful-callback=pass
+
+=========== RUNTIME ================================================
+  2,3,4
+  store:a,store:b
+  store:s1
+
+=========== RULING =================================================
+  Observed: propagation is AUTOMATIC through unannotated generic helpers,
+  across two layers, and selective discharge preserves the remaining row.
+  That is pre-registered OUTCOME 1.
+
+  RULING: E1 CLEAN PASS on higher-order effect propagation.
+  Koka remains the temporary effects-and-handlers oracle (ADR-0001,
+  as narrowed by ADR-0011). The pw effect checker is NOT pulled forward
+  on these grounds.

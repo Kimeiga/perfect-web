@@ -89,7 +89,7 @@ lab-down:
 spikes: spike-compiler-diagnostic spike-koka spike-wasmtime spike-marko spike-layout spike-bonsai
 
 # Every risk-retirement experiment.
-rq: rq-resumption
+rq: rq-resumption rq-row-polymorphism
 
 spike-compiler-diagnostic:
     @bash spikes/compiler-diagnostic/run.sh
@@ -120,6 +120,10 @@ spike-bonsai:
 # RQ-1 — is Marko's resumption real, in Chrome AND Safari?
 rq-resumption:
     @bash spikes/browser-resumption/run.sh
+
+# RQ-2 — does Koka propagate effects through higher-order abstraction?
+rq-row-polymorphism:
+    @bash spikes/koka-row-polymorphism/run.sh
 
 # ---------------------------------------------------------------------------
 # CI
