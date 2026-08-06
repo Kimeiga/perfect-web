@@ -1,0 +1,16 @@
+// @expect: clean
+//
+// The valid case. Without it the suite would pass on a checker that simply
+// banned every unsafe escape, which is not the rule.
+
+module legacy.ok_complete
+
+component VendorMap() {
+    placement browser
+
+    unsafe capability imperative_dom
+    because "The embedded map SDK requires direct DOM ownership during init."
+    attributes_forced_layout_to VendorMap
+
+    view { <section aria-label="Map" /> }
+}

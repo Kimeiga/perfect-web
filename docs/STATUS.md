@@ -39,9 +39,18 @@ set of compile-fail cases; E2's needs effect inference.
 files and they all parse, with precise spans and error recovery. The
 specification is executable in CI rather than merely well-formed.
 
-**Nineteen rejected corpus files now fail to compile** — up from four when E2
-began — each caught by the invariant its `@rule` header declares, with a primary
-span, an origin span, a note and a legal alternative. `just rejections` shows
+**Corpus enforcement, as three numbers** (architect ruling, 2026-08-06 — a
+single figure hides the difference between a red diagnostic, the *right* red
+diagnostic, and the whole declared invariant being checked):
+
+```text
+19 / 44  rejected fixtures produce a compile error
+19 / 44  emit their declared canonical code
+19 / 44  fully enforce the complete declared invariant
+```
+
+Up from four when E2 began, each with a primary span, an origin span, a note and
+a legal alternative. `just rejections` shows
 the current state. Four are declaration rules; **fifteen are caught by
 algorithms running on HIR lowered from source**: the exhaustiveness checker, the
 E2A-S scope graph, E5's placement solver and label algebra, and E5's markup

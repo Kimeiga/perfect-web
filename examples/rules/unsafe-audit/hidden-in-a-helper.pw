@@ -1,0 +1,19 @@
+// @expect: PW5010
+//
+// The escape is nested inside a resource block rather than declared at the top
+// of the component. An audit rule that only looked at a declaration's first
+// statements would miss it — the same helper-hidden shape the effect families
+// are tested for.
+
+module legacy.hidden
+
+component VendorMap() {
+    placement browser
+
+    resource widget {
+        scope component
+        acquire { unsafe.imperative { VendorSdk.mount(self) } }
+    }
+
+    view { <section aria-label="Map" /> }
+}

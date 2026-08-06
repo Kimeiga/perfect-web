@@ -159,7 +159,7 @@ impl Diagnostic {
 ///
 /// Two permanent codes for one invariant would be wrong. Aliasing during a
 /// migration is fine.
-const DEPRECATED_ALIASES: &[(&str, &str)] = &[
+pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // (alias as written in the corpus, canonical invariant code)
     ("PW0326", "PW2004"), // a resource cannot outlive the scope that owns it
     ("PW0311", "PW2002"), // an ordinary task cannot be detached from its scope

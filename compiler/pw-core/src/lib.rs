@@ -22,6 +22,7 @@
 pub mod abi;
 pub mod capability;
 pub mod check;
+pub mod codes;
 pub mod diag;
 pub mod diagnostics;
 pub mod exhaust;

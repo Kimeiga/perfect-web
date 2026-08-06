@@ -1,0 +1,16 @@
+// @expect: PW5015
+//
+// Both halves are present and the target names nothing. This is worse than no
+// attribution at all: it reads as reviewed.
+
+module legacy.bad_owner
+
+component VendorMap() {
+    placement browser
+
+    unsafe capability imperative_dom
+    because "The embedded map SDK requires direct DOM ownership during init."
+    attributes_forced_layout_to SomeoneElse
+
+    view { <section aria-label="Map" /> }
+}

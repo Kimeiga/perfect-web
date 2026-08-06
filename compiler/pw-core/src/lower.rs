@@ -679,10 +679,24 @@ impl Lowerer<'_> {
             .find(|t| matches!(t.kind(), K::Str | K::UnterminatedStr))
             .map(|t| t.text().to_string());
 
+        // `attributes_forced_layout_to VendorMap` — the word ending in `_to`
+        // names the clause, and the identifier after it names the owner. Read
+        // from the tokens rather than a fixed keyword so a new attribution
+        // clause does not need a parser change to be visible.
+        let attribution = toks
+            .iter()
+            .position(|t| {
+                t.kind() == K::Ident && (t.text().ends_with("_to") || t.text() == "attributed")
+            })
+            .and_then(|i| toks.get(i + 1))
+            .filter(|t| t.kind() == K::Ident)
+            .map(|t| t.text().to_string());
+
         b.expr(
             Expr::Keyword {
                 keyword,
                 justification,
+                attribution,
                 modifiers,
                 args,
                 block,

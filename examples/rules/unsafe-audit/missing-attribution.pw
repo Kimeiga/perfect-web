@@ -1,0 +1,15 @@
+// @expect: PW5010
+//
+// A reason is given but nobody is answerable for the consequence. This is the
+// half R-044 exposed: the rule checked the justification and stopped.
+
+module legacy.no_owner
+
+component VendorMap() {
+    placement browser
+
+    unsafe capability imperative_dom
+    because "The embedded map SDK requires direct DOM ownership during init."
+
+    view { <section aria-label="Map" /> }
+}

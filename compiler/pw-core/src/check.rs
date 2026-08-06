@@ -1095,12 +1095,15 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
     // covers the uses of it inside: A-024 justifies the capability once and
     // then calls `unsafe.imperative` twice, and demanding a fresh string at
     // every use would make the justification boilerplate rather than a reason.
+    // A complete audit record is BOTH halves: a reason, and an owner answerable
+    // for the consequence. A reason nobody is attributed for is a comment.
     let audited = body.walk().iter().any(|id| {
         matches!(
             body.expr(*id),
             Expr::Keyword {
                 keyword,
                 justification: Some(_),
+                attribution: Some(_),
                 ..
             } if keyword.starts_with("unsafe")
         )
@@ -1109,21 +1112,74 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
         let Expr::Keyword {
             keyword,
             justification,
+            attribution,
             ..
         } = body.expr(id)
         else {
             continue;
         };
-        if !keyword.starts_with("unsafe") || justification.is_some() || audited {
+        if !keyword.starts_with("unsafe") {
+            continue;
+        }
+        // An attribution naming a declaration nobody can find is worse than
+        // none: it reads as reviewed. Separate invariant, separate code —
+        // and checked BEFORE the `audited` short-circuit, because a record
+        // with both halves present is exactly what that short-circuit treats
+        // as complete.
+        if let Some(target) = attribution {
+            let resolves = hir.all_decls().any(|(_, d)| &d.name == target) || decl.name == *target;
+            if justification.is_some() && !resolves {
+                out.push(Diagnostic {
+                    code: crate::codes::UNSAFE_ATTRIBUTION_INVALID.id,
+                    invariant: crate::codes::UNSAFE_ATTRIBUTION_INVALID.invariant,
+                    reason: "attribution_target_unresolved",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message: format!(
+                        "`{keyword}` is attributed to `{target}`, which names no declaration"
+                    ),
+                    primary_span: body.expr_span(id),
+                    related: vec![Related {
+                        span: hir.decl_span(decl_id_of(hir, decl)),
+                        label: format!("`{}` opens the escape hatch here", decl.name),
+                    }],
+                    explanation: Some(
+                        "An attribution target names who is answerable for the \
+                         consequence. One that resolves to nothing reads as reviewed \
+                         and is not — which is worse than an escape hatch with no \
+                         attribution at all."
+                            .to_string(),
+                    ),
+                    repairs: vec![Repair {
+                        description: "name a declaration in this package, or an ADR".to_string(),
+                        replacement: None,
+                    }],
+                });
+                continue;
+            }
+        }
+        if audited {
+            continue;
+        }
+        let missing: Vec<&str> = [
+            justification
+                .is_none()
+                .then_some("a `because` justification"),
+            attribution.is_none().then_some("an attribution target"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if missing.is_empty() {
             continue;
         }
         out.push(Diagnostic {
-            code: "PW5010",
-            invariant: "an unsafe escape hatch must record why it is necessary",
-            reason: "unsafe_without_justification",
+            code: crate::codes::UNSAFE_AUDIT_INCOMPLETE.id,
+            invariant: crate::codes::UNSAFE_AUDIT_INCOMPLETE.invariant,
+            reason: "unsafe_audit_incomplete",
             detector: Detector::DeclarationRule,
             severity: Severity::Error,
-            message: format!("`{keyword}` requires a `because` justification string"),
+            message: format!("`{keyword}` requires {}", missing.join(" and ")),
             primary_span: body.expr_span(id),
             related: vec![Related {
                 span: hir.decl_span(decl_id_of(hir, decl)),
@@ -1131,13 +1187,15 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
             }],
             explanation: Some(
                 "An escape hatch is a promise that the compiler's rule is wrong here \
-                 and someone checked. Without a written reason there is nothing to \
-                 review, and nothing to delete when the reason stops being true."
+                 and someone checked. The audit record has two halves: a written \
+                 reason, so there is something to review and something to delete when \
+                 the reason stops being true, and an attribution target, so the cost \
+                 lands on a named owner rather than on the frame at large."
                     .to_string(),
             ),
             repairs: vec![Repair {
                 description: format!(
-                    "write `{keyword} because \"…\"` naming what is unavailable and why"
+                    "write `{keyword} because \"…\" attributes_forced_layout_to Owner`"
                 ),
                 replacement: None,
             }],

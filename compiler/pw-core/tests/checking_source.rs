@@ -317,6 +317,84 @@ fn a_caught_file_conveys_every_fact_its_expect_error_lines_declare() {
     assert!(missing.is_empty(), "{}", missing.join("\n"));
 }
 
+/// Fixtures whose declared invariant is only *partly* enforced.
+///
+/// Architect ruling, 2026-08-06:
+///
+/// > A corpus fixture counts as enforced only when the entire invariant it
+/// > specifies is checked, not merely when its canonical code appears.
+///
+/// R-044 was the case that produced the rule: the checker required a `because`
+/// justification and stopped, so a fixture missing its *attribution target*
+/// went green. Both halves are now checked and the list is empty — it stays,
+/// because the next partial rule will need somewhere to be recorded rather
+/// than rounded up.
+const PARTIALLY_ENFORCED: &[(&str, &str)] = &[];
+
+#[test]
+fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
+    // "19/44 enforced" hides the difference between a red diagnostic, the
+    // *right* red diagnostic, and the whole declared invariant being checked.
+    use pw_core::diagnostics::canonical_code;
+    use pw_core::rules;
+    use pw_syntax::parse;
+
+    let results: std::collections::HashMap<_, _> =
+        check_sources(&whole_corpus()).into_iter().collect();
+
+    let (mut errored, mut declared_code, mut fully) = (0, 0, 0);
+    let mut total = 0;
+
+    for p in corpus_dir("rejected") {
+        total += 1;
+        let name = p.file_name().unwrap().to_string_lossy().to_string();
+        let src = std::fs::read_to_string(&p).expect("read");
+
+        let mut codes: Vec<&str> = rules::check(&parse(&src).file)
+            .iter()
+            .filter(|f| f.is_error())
+            .map(|f| f.code)
+            .collect();
+        codes.extend(results.get(&name).into_iter().flatten().map(|d| d.code));
+        if codes.is_empty() {
+            continue;
+        }
+        errored += 1;
+
+        let want = src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("// @rule:"))
+            .map(|r| canonical_code(r.trim()));
+        if !want.is_some_and(|w| codes.contains(&w)) {
+            continue;
+        }
+        declared_code += 1;
+
+        let id = &name[..5];
+        if !PARTIALLY_ENFORCED.iter().any(|(f, _)| *f == id) {
+            fully += 1;
+        }
+    }
+
+    // Recorded rather than asserted at an exact value: these move as rules land.
+    eprintln!("  {errored}/{total} rejected fixtures produce a compile error");
+    eprintln!("  {declared_code}/{total} emit their declared canonical code");
+    eprintln!("  {fully}/{total} fully enforce the complete declared invariant");
+
+    assert!(
+        errored >= 19,
+        "regressed: {errored}/{total} produce an error"
+    );
+    assert_eq!(
+        declared_code, errored,
+        "every catch must be for the declared invariant, not merely red"
+    );
+    assert!(
+        fully >= 19,
+        "regressed: {fully}/{total} fully enforced, partial list = {PARTIALLY_ENFORCED:?}"
+    );
+}
+
 #[test]
 fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
     // The ratchet from docs/NEXT.md item 8, counting declaration rules AND

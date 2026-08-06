@@ -224,3 +224,11 @@ would leave the tested exhaustiveness algorithm unreachable from source.
 module's imports rather than from the invocation's file list. The test
 `the_environment_spans_every_file_checked_together` pins the current behaviour
 in both directions, so the change will be visible.
+
+**Narrowed by architect ruling, 2026-08-06.** The correct reading is *"`pw
+check` constructs one workspace module graph"*, **not** *"every declaration in
+every supplied file is ambiently visible everywhere"*. There is to be no ambient
+union of user declarations, and no opaque-symbol fallback: external
+implementation is allowed through an explicit interface module, a missing
+declaration is not. E2B owns the change; `examples/domain.pw` was written so the
+corpus can survive it.

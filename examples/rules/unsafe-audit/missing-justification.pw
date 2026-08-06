@@ -1,0 +1,14 @@
+// @expect: PW5010
+//
+// An owner is named but no reason is given. Half an audit record.
+
+module legacy.no_reason
+
+component VendorMap() {
+    placement browser
+
+    unsafe capability imperative_dom
+    attributes_forced_layout_to VendorMap
+
+    view { <section aria-label="Map" /> }
+}

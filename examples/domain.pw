@@ -1,0 +1,139 @@
+// @corpus: fixture
+// @id: DOMAIN
+// @category: shared domain types for the corpus
+// @charter: §7.1, §15.1
+// @milestone: E2B
+//
+// The types the corpus imports from `domain`. Written as real source on the
+// architect's ruling of 2026-08-06:
+//
+//   External implementation is allowed. Missing declaration is not.
+//
+// Twelve corpus files import from this module and, until now, it did not
+// exist — so strict name resolution would have failed all of them on E2B's
+// first day. Declaring them here also makes the corpus an actual program, so
+// imports, visibility, constructor resolution and cross-file exhaustiveness
+// are exercised rather than assumed.
+//
+// `decode`, `capability` and `browser` are NOT here. They are platform
+// modules and arrive with E2C's signature manifests.
+
+module domain
+
+// --- identities -----------------------------------------------------------
+//
+// Opaque, so a raw String cannot be passed where an id is expected. E0 finding
+// F-4 measured that Koka erases such wrappers at the JS boundary; `pw` owns
+// the nominal identity regardless (ADR-0011).
+
+opaque type StoreId = String
+opaque type MenuItemId = String
+opaque type SessionId = String
+opaque type ConsumerId = String
+opaque type OrderId = String
+opaque type InteractionId = String
+
+// --- quantities -----------------------------------------------------------
+
+opaque type PositiveInt = Int
+
+type USD = USD { code: String }
+
+type Money = Money { minor_units: Int }
+
+// --- store ----------------------------------------------------------------
+
+type StoreHours = StoreHours {
+    opens_minute: Int,
+    closes_minute: Int,
+}
+
+type Store = Store {
+    id: StoreId,
+    name: String,
+    hours: StoreHours,
+}
+
+type StoreError =
+    | NotFound
+    | Unavailable
+    | DecodeFailed(String)
+
+// --- cart -----------------------------------------------------------------
+
+type CartLine = CartLine {
+    item_id: MenuItemId,
+    quantity: PositiveInt,
+    unit_price: Money,
+}
+
+type Cart = Cart {
+    lines: List<CartLine>,
+}
+
+type CartError =
+    | ItemUnavailable(MenuItemId)
+    | QuantityTooLarge
+    | CartExpired
+
+// --- orders ---------------------------------------------------------------
+
+type OrderDraft = OrderDraft {
+    id: OrderId,
+    cart: Cart,
+}
+
+type OrderProgress = OrderProgress {
+    stage_label: String,
+}
+
+type PaymentError =
+    | Declined
+    | InsufficientFunds
+    | TransportFailed
+
+type TrackingError =
+    | OrderNotFound
+    | TrackingUnavailable
+
+// The four `OrderState` payloads. A-002 declares the union and imports these;
+// R-007 matches on it non-exhaustively, and the witness names them — which is
+// how `Cancelled(CancellationReason)` reaches the diagnostic rather than
+// `Cancelled(String)`.
+
+type OrderConfirmation = OrderConfirmation {
+    reference: String,
+}
+
+type OrderProgressStage = OrderProgressStage {
+    stage_label: String,
+}
+
+type DeliveryReceipt = DeliveryReceipt {
+    delivered_at_local: String,
+}
+
+type CancellationReason = CancellationReason {
+    label: String,
+}
+
+type OrderFailure = OrderFailure {
+    label: String,
+}
+
+// --- recommendations ------------------------------------------------------
+
+type Recommendation = Recommendation {
+    id: MenuItemId,
+    name: String,
+}
+
+type RecommendationError =
+    | NoneAvailable
+    | Timeout
+
+// --- sync -----------------------------------------------------------------
+
+type SyncError =
+    | Conflict
+    | Offline

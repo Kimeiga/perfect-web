@@ -483,6 +483,10 @@ pub enum Expr {
         /// mandatory on an escape hatch, so it is a field rather than an
         /// argument: a rule should not have to guess which argument it was.
         justification: Option<String>,
+        /// The `attributes_…_to X` / `attributed_to X` target — who owns the
+        /// consequence. An audit record needs both halves: a reason nobody is
+        /// answerable for is a comment, not an audit.
+        attribution: Option<String>,
         /// The bare modifier words between the keyword and any punctuation:
         /// `unsafe capability synchronous_geometry` yields
         /// `["capability", "synchronous_geometry"]`.
