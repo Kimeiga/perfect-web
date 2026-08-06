@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: secret_to_browser
+// @dimension: indirect invalid — the secret is rebound and interpolated
+module generality.secret_markup
+
+import secrets
+import capability.{ Secret, Payments }
+
+page Checkout() {
+    placement origin
+    let key: Secret<Payments> = secrets.payments()
+    let same = key
+    view { <main><p>key {same}</p></main> }
+}

@@ -1,0 +1,10 @@
+// @status: NEIGHBOUR
+// @invariant: handler_on_inert
+// @dimension: valid neighbour — the same handler on an interactive element
+module generality.inert_ok
+
+import domain.{ MenuItemId }
+
+view AddButton(item: MenuItemId) !{} {
+    <button type="button" on:keydown={() => add_to_cart(item)}>Add</button>
+}

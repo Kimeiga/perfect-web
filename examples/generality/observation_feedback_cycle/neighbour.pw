@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: observation_feedback_cycle
+// @dimension: valid neighbour — observed, and a NON-layout property written
+//
+// A rule banning any write inside a component that observes its own size
+// would catch this. Setting a custom property does not change the observed
+// dimension, so there is no cycle.
+module generality.feedback_ok
+
+import style
+
+component Panel() {
+    placement browser
+    let width = observe resize(self) -> Float
+    frame {
+        mutate { self.style.set_custom("--w", "8px") }
+    }
+}

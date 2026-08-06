@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: secret_to_browser
+// @dimension: valid neighbour — a secret held and never rendered
+//
+// Reading a secret at the origin is what the origin is for. What may not
+// happen is it reaching the markup, and this file never renders it.
+
+module generality.secret_held
+
+import secrets
+import Payments
+
+query Charge(order: OrderId) -> Result<Int, PaymentError>
+    placement origin
+    cache     private
+{
+    let key = secrets.payments()
+    Payments.capture(key, order, 100)
+}

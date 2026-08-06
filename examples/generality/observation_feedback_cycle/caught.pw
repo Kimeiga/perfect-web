@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: observation_feedback_cycle
+// @dimension: indirect invalid — a different property, written via a helper
+module generality.feedback_helper
+
+import style
+import browser.{ ElementRef }
+
+fn shrink(target: ElementRef) -> () !{ style.mutate<LayoutAffect> } {
+    target.style.set_height(1.px)
+}
+
+component Panel() {
+    placement browser
+    let h = observe resize(self) -> Float
+    frame {
+        mutate { shrink(self) }
+    }
+}

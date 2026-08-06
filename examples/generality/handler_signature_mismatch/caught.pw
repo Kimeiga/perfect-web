@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: handler_signature_mismatch
+// @dimension: indirect invalid — a different event pair, deeper in the markup
+module generality.handler_input
+
+import events.{ PressEvent }
+
+fn on_press(event: PressEvent) -> () !{} { () }
+
+view Search() !{} {
+    <form>
+        <fieldset>
+            <input id="q" type="text" name="q" on:input={on_press} />
+        </fieldset>
+        <label for="q">Query</label>
+    </form>
+}

@@ -1,0 +1,11 @@
+// @status: GENERAL
+// @invariant: control_without_label
+// @dimension: indirect invalid — a select rather than an input
+module generality.label_select
+
+view AddressForm() !{} {
+    <form>
+        <select name="country"><option>US</option></select>
+        <button type="submit">Save</button>
+    </form>
+}

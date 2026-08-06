@@ -1,0 +1,12 @@
+// @status: GENERAL
+// @invariant: invalid_nesting
+// @dimension: indirect invalid — a different pairing, one level deeper
+module generality.nesting_deep
+
+view Menu() !{} {
+    <table>
+        <tbody>
+            <span>not a row</span>
+        </tbody>
+    </table>
+}

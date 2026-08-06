@@ -1,0 +1,20 @@
+// @status: NEIGHBOUR
+// @invariant: task_detached
+// @dimension: valid neighbour — the same spawn, attached to a scope
+//
+// A rule banning `task.spawn` would catch this. What is forbidden is
+// spawning with no owner, not spawning.
+module generality.task_scoped
+
+import Analytics
+import domain.{ MenuItemId }
+
+view ProductCard(item: MenuItemId) !{} {
+    <article>
+        <button on:press={() => {
+            task.spawn(scope component) { Analytics.record_view(item) }
+        }}>
+            View
+        </button>
+    </article>
+}

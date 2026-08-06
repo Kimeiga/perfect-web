@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: optimistic_no_rollback
+// @dimension: indirect invalid — a different optimistic transition
+module generality.optimistic_remove
+
+import Carts
+
+command remove_from_cart(item: MenuItemId)
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    optimistic    cart.remove(item)
+    invalidates   Cart(current_session())
+{
+    Carts.clear(current_consumer(), item)
+}

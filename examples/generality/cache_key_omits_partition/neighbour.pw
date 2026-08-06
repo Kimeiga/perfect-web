@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: cache_key_omits_partition
+// @dimension: valid neighbour — the partition IS in the key
+//
+// The same shared cache, the same dependency on the current user, with the
+// user in the key. A rule reacting to `cache shared` plus a partitioned value,
+// without looking at the key, would catch this.
+
+module generality.key_ok
+
+import Menus
+import context
+
+query Recent(store: StoreId, limit: Int) -> Result<List<MenuItem>, MenuError>
+    cache shared
+    key   store, limit, user
+{
+    Menus.for_user(store, limit, context.current_user())
+}

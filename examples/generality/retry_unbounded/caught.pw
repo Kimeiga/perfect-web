@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: retry_unbounded
+// @dimension: indirect invalid — unbounded, but otherwise correct
+//
+// Idempotent, keyed, and still wrong: an unbounded retry is a defect on its
+// own, not a consequence of the mutation being unsafe to repeat.
+module generality.retry_forever
+
+import Payments
+
+command sync(order: OrderId) -> Result<Int, PaymentError>
+    requires SignedIn
+    retry    forever
+    idempotent_by InteractionId
+{
+    Payments.charge(order, 1)
+}

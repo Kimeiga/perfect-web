@@ -48,6 +48,11 @@ use crate::signatures::Signatures;
 pub struct Types<'a> {
     sigs: &'a Signatures,
     bindings: BTreeMap<String, String>,
+    /// The module this body lives in, so a bare name resolves to a sibling
+    /// declaration. Without it `shrink(self)` looked up `shrink` and found
+    /// nothing, because signatures are stored module-qualified — so a rule
+    /// following a helper stopped at the module boundary of its own file.
+    module: Option<String>,
 }
 
 impl<'a> Types<'a> {
@@ -90,7 +95,11 @@ impl<'a> Types<'a> {
             }
         }
 
-        let mut types = Types { sigs, bindings };
+        let mut types = Types {
+            sigs,
+            bindings,
+            module: None,
+        };
 
         // A binding whose initialiser has a knowable type. Iterated, so
         // `let a = f()` then `let b = a.g()` both resolve; bounded because each
@@ -124,6 +133,20 @@ impl<'a> Types<'a> {
         types
     }
 
+    /// Resolve bare names against this module's own declarations.
+    pub fn in_module(mut self, module: Option<&str>) -> Self {
+        self.module = module.map(str::to_string);
+        self
+    }
+
+    /// A declaration by path, trying this module first.
+    fn by_path(&self, path: &str) -> Option<&'a crate::signatures::Signature> {
+        self.module
+            .as_deref()
+            .and_then(|m| self.sigs.by_path(&format!("{m}.{path}")))
+            .or_else(|| self.sigs.by_path(path))
+    }
+
     /// The type of an expression, or `None` when nothing declared says.
     ///
     /// `None` is a real answer and callers must treat it as one. It means "this
@@ -146,10 +169,9 @@ impl<'a> Types<'a> {
                         .member_of(&receiver, name)
                         .and_then(|s| s.returns.clone())
                 }
-                _ => {
-                    let path = path_of(body, *callee);
-                    self.sigs.by_path(&path).and_then(|s| s.returns.clone())
-                }
+                _ => self
+                    .by_path(&path_of(body, *callee))
+                    .and_then(|s| s.returns.clone()),
             },
             _ => None,
         }
@@ -163,7 +185,7 @@ impl<'a> Types<'a> {
                 let receiver = self.of(body, *base)?;
                 self.sigs.member_of(&receiver, name)
             }
-            _ => self.sigs.by_path(&path_of(body, callee)),
+            _ => self.by_path(&path_of(body, callee)),
         }
     }
 }

@@ -1,0 +1,12 @@
+// @status: NEIGHBOUR
+// @invariant: invalid_nesting
+// @dimension: valid neighbour — the same elements, nested legally
+module generality.nesting_ok
+
+view Menu() !{} {
+    <table>
+        <tbody>
+            <tr><td><span>fine here</span></td></tr>
+        </tbody>
+    </table>
+}

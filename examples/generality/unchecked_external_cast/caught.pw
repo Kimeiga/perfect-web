@@ -1,0 +1,9 @@
+// @status: GENERAL
+// @invariant: unchecked_external_cast
+// @dimension: indirect invalid — the Unknown is rebound first
+module generality.cast_rebound
+
+fn parse(raw: Unknown) -> Store !{} {
+    let same = raw
+    same as Store
+}

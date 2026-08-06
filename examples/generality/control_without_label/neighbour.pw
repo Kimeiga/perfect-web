@@ -1,0 +1,12 @@
+// @status: NEIGHBOUR
+// @invariant: control_without_label
+// @dimension: valid neighbour — the same control, labelled
+module generality.label_ok
+
+view AddressForm() !{} {
+    <form>
+        <label for="country">Country</label>
+        <select id="country" name="country"><option>US</option></select>
+        <button type="submit">Save</button>
+    </form>
+}

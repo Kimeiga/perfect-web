@@ -485,11 +485,16 @@ fn generality_is_reported_separately_from_conformance() {
         untested.len()
     );
 
-    // Recorded, and ratcheted so it cannot fall.
-    assert!(
-        general.len() >= 14,
-        "generality-tested regressed: {} / {}",
+    // Every invariant the corpus exercises now has at least one challenge
+    // witness and no known-narrow one. That is an equality, not a floor:
+    // an invariant losing its witness is a claim losing its evidence.
+    //
+    // It does NOT mean the analyses are general. It means each has survived a
+    // program its fixture did not anticipate, which is the strongest thing a
+    // finite suite can say.
+    assert_eq!(
         general.len(),
-        exercised.len()
+        exercised.len(),
+        "an invariant lost its challenge witness: narrow={narrow:?} untested={untested:?}"
     );
 }

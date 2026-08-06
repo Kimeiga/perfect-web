@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: no_feasible_placement
+// @dimension: indirect invalid — two capabilities no single world grants
+//
+// Not "the world you named cannot", which is a different invariant with a
+// different code: NO world can grant both a device read and a database read.
+module generality.no_world
+
+import Stores
+import device
+import domain.{ Location }
+
+fn locate(id: StoreId) -> Result<Store, StoreError>
+    !{ device.location, database.read }
+{
+    Stores.get(id)
+}

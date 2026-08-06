@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: false_independence
+// @dimension: indirect invalid — the var() is nested two elements deep
+module generality.independence_nested
+
+
+component Table() {
+    placement browser
+    subtree independent { intrinsic_height 24.px }
+    view {
+        <table>
+            <tbody>
+                <tr style:padding-inline={var("--gutter")}><td>x</td></tr>
+            </tbody>
+        </table>
+    }
+}

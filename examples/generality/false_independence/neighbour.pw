@@ -1,0 +1,24 @@
+// @status: NEIGHBOUR
+// @invariant: false_independence
+// @dimension: valid neighbour — a var() the subtree defines itself
+//
+// A rule banning `var()` inside an independent subtree would catch this. The
+// invariant is about crossing the boundary, and this value does not.
+module generality.independence_own
+
+import style
+
+component Table() {
+    placement browser
+    subtree independent { intrinsic_height 24.px }
+    frame {
+        mutate { self.style.set_custom("--gutter", "8px") }
+    }
+    view {
+        <table>
+            <tbody>
+                <tr style:padding-inline={var("--gutter")}><td>x</td></tr>
+            </tbody>
+        </table>
+    }
+}

@@ -1,0 +1,11 @@
+// @status: NEIGHBOUR
+// @invariant: unchecked_external_cast
+// @dimension: valid neighbour — a cast between known types
+//
+// A cast is not banned; a cast that skips DECODING is. This one starts from a
+// value the program already knows the type of.
+module generality.cast_known
+
+fn widen(id: StoreId) -> String !{} {
+    id as String
+}

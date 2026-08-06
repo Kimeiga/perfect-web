@@ -37,8 +37,9 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
         let module = module_of(hir, id);
+        let types = crate::infer::Types::of_body(sigs, decl, body);
         optional_used_as_present(hir, sigs, body, decl, &at, out);
-        unchecked_cast(hir, body, decl, &at, out);
+        unchecked_cast(hir, &types, body, decl, &at, out);
         handler_matches_event(hir, body, sigs, decl, module, &at, out);
     }
 }
@@ -163,40 +164,29 @@ fn optional_used_as_present(
 
 // --- R-009: a cast where a decode belongs -----------------------------------
 
-fn unchecked_cast(hir: &Hir, body: &Body, decl: &Decl, at: &Span, out: &mut Vec<Diagnostic>) {
-    // Parameters and bindings whose written type is `Unknown`.
-    let mut unknown: Vec<String> = decl
-        .params
-        .iter()
-        .filter(|p| p.ty.as_deref() == Some("Unknown"))
-        .map(|p| p.name.clone())
-        .collect();
-    for id in body.walk() {
-        if let Expr::Let {
-            pat: Some(pat),
-            ty: Some(ty),
-            ..
-        } = body.expr(id)
-            && let crate::hir::Pattern::Bind { name, .. } = body.pat(*pat)
-            && body
-                .types
-                .get(ty.index())
-                .is_some_and(|t| t.path == "Unknown")
-        {
-            unknown.push(name.clone());
-        }
-    }
-
+fn unchecked_cast(
+    hir: &Hir,
+    types: &crate::infer::Types<'_>,
+    body: &Body,
+    decl: &Decl,
+    at: &Span,
+    out: &mut Vec<Diagnostic>,
+) {
     for id in body.walk() {
         let Expr::Cast { value, ty } = body.expr(id) else {
             continue;
         };
-        let Expr::Name(name) = body.expr(*value) else {
-            continue;
-        };
-        if !unknown.contains(name) {
+        // The operand's INFERRED type, so a rebinding does not launder it.
+        // Reading only parameters and annotated `let`s meant `let same = raw`
+        // produced a value the rule no longer recognised as external — the
+        // same narrowness privacy labels had, in a different analysis.
+        if types.of(body, *value).as_deref() != Some("Unknown") {
             continue;
         }
+        let name = match body.expr(*value) {
+            Expr::Name(n) => n.clone(),
+            _ => "this value".to_string(),
+        };
         let target = written(body, *ty);
         out.push(Diagnostic {
             code: codes::UNCHECKED_EXTERNAL_CAST.id,

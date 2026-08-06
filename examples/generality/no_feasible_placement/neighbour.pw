@@ -1,0 +1,15 @@
+// @status: NEIGHBOUR
+// @invariant: no_feasible_placement
+// @dimension: valid neighbour — two capabilities one world DOES grant
+//
+// A secret read and a network fetch: the origin grants both. A rule reacting
+// to "more than one capability family" would catch this.
+module generality.one_world_ok
+
+import Payments
+
+fn charge(order: OrderId) -> Result<Int, PaymentError>
+    !{ secret.read, network.fetch }
+{
+    Payments.charge(order, 100)
+}

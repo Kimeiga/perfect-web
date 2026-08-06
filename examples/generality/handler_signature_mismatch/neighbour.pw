@@ -1,0 +1,17 @@
+// @status: NEIGHBOUR
+// @invariant: handler_signature_mismatch
+// @dimension: valid neighbour — the matching handler in the same place
+module generality.handler_ok
+
+import events.{ InputEvent }
+
+fn on_type(event: InputEvent) -> () !{} { () }
+
+view Search() !{} {
+    <form>
+        <fieldset>
+            <input id="q" type="text" name="q" on:input={on_type} />
+        </fieldset>
+        <label for="q">Query</label>
+    </form>
+}

@@ -1,0 +1,17 @@
+// @status: NEIGHBOUR
+// @invariant: optimistic_no_rollback
+// @dimension: valid neighbour — the same transition, with a rollback
+module generality.optimistic_ok
+
+import Carts
+
+command remove_from_cart(item: MenuItemId)
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    optimistic    cart.remove(item)
+    rollback      cart.restore(item)
+    invalidates   Cart(current_session())
+{
+    Carts.clear(current_consumer(), item)
+}

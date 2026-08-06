@@ -59,11 +59,13 @@ diagnostic, and the whole declared invariant being checked):
 There is now a **second gate, and it is open**:
 
 ```text
-corpus conformance:      44 / 44   closed at C1
-generality-tested:       11 / 29
-headline matrices:        2 / 8
-robustness:               5 suites, 0 panics
-historical compatibility: 9 / 10
+corpus conformance        44 / 44   closed at C1
+single-defect isolation   44 / 44
+generality-tested         29 / 29
+headline matrices          8 / 8
+known narrow witness       0 / 29
+robustness                 9 suites, 0 panics, 2 regressions retained
+historical compatibility   9 / 10   the miss classified
 ```
 
 An invariant counts as *generally* enforced only when a program its fixture did

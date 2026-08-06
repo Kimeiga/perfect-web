@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: task_detached
+// @dimension: indirect invalid — inside a frame rather than a handler
+module generality.task_frame
+
+import Analytics
+import domain.{ MenuItemId }
+
+component Ping(item: MenuItemId) {
+    placement browser
+    frame {
+        post_paint {
+            task.spawn(detached) { Analytics.record_view(item) }
+        }
+    }
+}

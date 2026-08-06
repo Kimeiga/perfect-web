@@ -36,6 +36,14 @@ use crate::signatures::Signatures;
 /// effects, so a checker can tell a padding change from a colour change.
 const LAYOUT_AFFECTING: &str = "style.mutate<LayoutAffect>";
 
+/// The module a declaration belongs to.
+fn module_of(hir: &Hir, decl: crate::hir::DeclId) -> Option<&str> {
+    hir.modules
+        .iter()
+        .find(|(_, m, _)| m.decls.contains(&decl))
+        .map(|(_, m, _)| m.name.as_str())
+}
+
 pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -44,7 +52,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         // Resolved by receiver TYPE. `self.style.set_padding(..)` is
         // `ElementRef` -> `Style` -> a member of `Style`; no step asks whether
         // `set_padding` happens to be unique in the program.
-        let types = Types::of_body(sigs, decl, body);
+        let types = Types::of_body(sigs, decl, body).in_module(module_of(hir, id));
         frame_transaction_order(body, &types, decl, &at, out);
         observation_feedback(body, &types, decl, &at, out);
         compositor_animation(body, sigs, decl, &at, out);
@@ -469,20 +477,34 @@ fn custom_property_arg(body: &Body, id: ExprId, callee: &str) -> Option<String> 
 
 // --- shared ------------------------------------------------------------------
 
-/// Does this expression call a setter the platform declares layout-affecting?
-/// Returns the receiver it writes to and the setter's name.
+/// Does this expression perform a layout-affecting write, and on what?
+///
+/// Two shapes, and the second is why this is not just a member lookup:
+///
+/// - `self.style.set_width(..)` — the receiver is the chain's root;
+/// - `shrink(self)` where `shrink` DECLARES `style.mutate<LayoutAffect>` —
+///   the target is whichever argument the helper was handed.
+///
+/// Without the second, moving the write into a helper removed the feedback
+/// cycle from view, which would make the rule about where the code sits.
 fn layout_affecting_write(body: &Body, types: &Types<'_>, id: ExprId) -> Option<(String, String)> {
-    let Expr::Call { callee, .. } = body.expr(id) else {
-        return None;
-    };
-    let Expr::Field { base, name } = body.expr(*callee) else {
+    let Expr::Call { callee, args } = body.expr(id) else {
         return None;
     };
     let sig = types.callee(body, *callee)?;
     if !sig.effects.iter().any(|e| e == LAYOUT_AFFECTING) {
         return None;
     }
-    Some((root_name(body, *base)?, name.clone()))
+    match body.expr(*callee) {
+        // A member call: the receiver is what is written.
+        Expr::Field { base, name } => Some((root_name(body, *base)?, name.clone())),
+        // A free function that declares the effect: whatever it was given.
+        Expr::Name(name) => args
+            .iter()
+            .find_map(|a| root_name(body, a.value))
+            .map(|target| (target, name.clone())),
+        _ => None,
+    }
 }
 
 fn layout_affecting_write_in(body: &Body, types: &Types<'_>, span: &Span) -> Option<ExprId> {

@@ -1,0 +1,14 @@
+// @status: NEIGHBOUR
+// @invariant: retry_unbounded
+// @dimension: valid neighbour — bounded, and idempotent
+module generality.retry_bounded_ok
+
+import Payments
+
+command sync(order: OrderId) -> Result<Int, PaymentError>
+    requires SignedIn
+    retry    bounded_exponential(max = 5, jitter = true)
+    idempotent_by InteractionId
+{
+    Payments.charge(order, 1)
+}

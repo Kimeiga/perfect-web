@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: retry_not_idempotent
+// @dimension: valid neighbour — the same retry, with an idempotency key
+//
+// A rule banning `retry` would catch this. What is required is that a
+// retryable mutation be idempotent, and this one says how.
+
+module generality.retry_ok
+
+import Payments
+
+command refund(order: OrderId, amount: Money<USD>)
+    -> Result<PaymentReceipt, PaymentError>
+    requires SignedIn
+    retry    fixed(max = 3)
+    idempotent_by InteractionId
+{
+    Payments.charge(order, amount)
+}

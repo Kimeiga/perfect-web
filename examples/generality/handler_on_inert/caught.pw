@@ -1,0 +1,10 @@
+// @status: GENERAL
+// @invariant: handler_on_inert
+// @dimension: indirect invalid — a different element and event
+module generality.inert_span
+
+import domain.{ MenuItemId }
+
+view AddButton(item: MenuItemId) !{} {
+    <span class="btn" on:keydown={() => add_to_cart(item)}>Add</span>
+}
