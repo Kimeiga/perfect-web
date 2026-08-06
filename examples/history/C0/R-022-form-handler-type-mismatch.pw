@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-022
+// @category: form handler type mismatch
+// @rule: PW0320
+// @charter: §8.2
+// @milestone: 3
+// @expect-error: `on:submit` expects a handler taking `SubmitEvent`, found one taking `PressEvent`
+// @expect-error: form submission and pointer activation are different events
+//
+// Event handler types are checked against the element and event, so a
+// mismatched handler cannot silently never fire.
+
+module checkout.address_form
+
+fn on_press(event: PressEvent) -> () !{} { () }
+
+view AddressForm() !{} {
+    // ERROR: handler signature does not match `on:submit`.
+    <form on:submit={on_press}>
+        <label for="street">Street</label>
+        <input id="street" type="text" name="street" />
+        <button type="submit">Save</button>
+    </form>
+}

@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-010
+// @category: nonserializable handler capture
+// @rule: PW0308
+// @charter: §8.5
+// @milestone: 7
+// @expect-error: handler captures `connection: DatabaseConnection`, which is not serializable
+// @expect-error: a resumable handler may capture only serializable immutable values and resource keys
+//
+// Resumption serializes captures. A live connection cannot be serialized, so
+// capturing one must fail at compile time rather than producing a broken
+// manifest.
+
+module admin.panel
+
+view AdminPanel(connection: DatabaseConnection) !{} {
+    <button
+        // ERROR: capturing a live database connection in a resumable handler.
+        on:press={resumable(captures = { connection }) => connection.flush()}
+    >
+        Flush
+    </button>
+}

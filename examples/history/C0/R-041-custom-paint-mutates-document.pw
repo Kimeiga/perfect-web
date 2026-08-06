@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-041
+// @category: custom paint mutates document
+// @rule: PW3007
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `paint.custom` may not use effect `dom.mutate`
+// @expect-error: a painter must be a pure function of its declared inputs
+//
+// A painter that mutates the document re-enters the pipeline calling it. Its
+// inputs are declared precisely so it can be replayed and cached.
+
+module store.rating_spark
+
+paint RatingSpark(values: List<Float>) !{ paint.custom } {
+    inputs values
+    draw(ctx) {
+        // ERROR: dom.mutate inside a painter.
+        document.query("#legend").set_text("painted")
+        ctx.rect(0.0, 0.0, 10.0, 10.0)
+    }
+}
