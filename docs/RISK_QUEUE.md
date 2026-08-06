@@ -16,8 +16,8 @@ Order was fixed by the project architect after reviewing E0's evidence.
 |---|---|---|---|
 | **RQ-1** | Is Marko's resumption real, in Chrome **and** Safari? | **done** | 11/12 pre-registered checks pass in both engines → Marko accepted as the behavioural oracle for E7 |
 | **RQ-2** | Does Koka propagate effects through higher-order abstraction? | **done** | Outcome 1, clean pass → Koka remains the effects oracle; `pw` effect checker not pulled forward |
-| **RQ-3** | `pw`-owned exhaustiveness and canonical typed ABI decoding | next | — |
-| **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | queued | — |
+| **RQ-3** | `pw`-owned exhaustiveness and canonical typed ABI decoding | **partial** | exhaustiveness + type-directed ABI land in `compiler/pw-core`; 30 tests. Remaining: wire to a real parser (E2) so corpus files can drive it |
+| **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | next | — |
 | **RQ-5** | Final-artifact declared-vs-actual component import verification | queued | — |
 | **RQ-6** | Backfill direct / helper-hidden / generic-callback rejection cases for **every** effect family | queued | — |
 | **RQ-7** | Generate and adopt the E→P claim/evidence table before publishing P0 | **done** (first draft) | `docs/EVIDENCE_LEDGER.md` |
@@ -52,22 +52,27 @@ discharge, and no capability hiding. E1 clean pass on effects.
 Evidence: `docs/evidence/M0/spike-koka-row-polymorphism.txt` ·
 `spikes/koka-row-polymorphism/README.md`
 
-## RQ-3 — `pw` exhaustiveness and typed ABI (next)
+## RQ-3 — `pw` exhaustiveness and typed ABI (partial)
 
-Delivers the core of E1A. Pre-registered acceptance:
+Delivers the core of E1A. Pre-registered acceptance, with what is done marked:
 
-- an incomplete match is rejected **regardless of the function's effect row** —
-  the case Koka provably does not catch;
-- `Option<T>` and `List<T>` cannot be confused at the boundary, even though both
-  collapse to `null` in Koka's JS output;
-- a raw primitive cannot enter a nominal position through an untyped binding;
-- decoding is type-directed: `decode(payload, ExpectedType)`, never
-  `infer_runtime_type(payload)`;
-- every rejection carries a stable `PW####` code, a primary span, and an origin
-  span.
+- **done** — an incomplete match is rejected **regardless of the function's
+  effect row**, the case Koka provably does not catch
+  (`tests/differential_vs_koka.rs`);
+- **done** — `Option<T>` and `List<T>` cannot be confused at the boundary, even
+  though both collapse to `null` in Koka's JS output;
+- **done** — a raw primitive cannot enter a nominal position undetected: debug
+  mode catches a `Money<EUR>` payload arriving in a `Money<USD>` slot;
+- **done** — decoding is type-directed: `decode(path, ExpectedType, payload)`,
+  and there is deliberately no `decode_unknown(payload)` entry point;
+- **done** — rejections carry a stable `PW1004` code, a primary span and an
+  origin span.
 
-Fails if any accepted-corpus program is rejected, or if any rejected-corpus
-program compiles.
+**Open:** there is no parser, so the checker runs on a constructed pattern
+matrix rather than on `.pw` files. The original acceptance line — *"fails if any
+accepted-corpus program is rejected, or any rejected-corpus program compiles"* —
+cannot be evaluated until **E2** puts a front end in front of it. RQ-3 is
+therefore `partial`, not `done`.
 
 ## RQ-4 — structured concurrency
 

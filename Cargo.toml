@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "compiler/pw-core",
     "spikes/compiler-diagnostic",
     "tools/corpus-check",
 ]

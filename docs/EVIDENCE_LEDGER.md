@@ -32,6 +32,8 @@ Absolute numbers are **not** comparable to the M3 Max the charter assumes.
 | P3 | "A minimal component imports exactly the one capability its interface declares." | E0 | `spike-wasmtime-component.txt` §3 | as above | **measured** | that this is automatic — it required `no_std`; a `std` guest requests 15 WASI interfaces |
 | P2 | "Interleaving layout reads and writes costs 264×–848× on identical work; phase scheduling removes it." | E0 | `spike-layout-phase-scheduler.txt` §1 | Chrome 150 | **measured** | that this is a universal speedup — it is workload-specific, and it is a *runtime* result, not a compiler one |
 | P5 | "An unrelated state change does not recompute an expensive derived value." | E0 | `spike-bonsai-incremental-model.txt` §1 | incremental v0.16.1 | **measured** | that this is *our* implementation — it is Jane Street Incremental, a design donor |
+| P0 | "An incomplete domain match is rejected even in a fallible function — the effect row cannot buy an exemption." | E1A | `docs/evidence/E1A/pw-core.txt`; `compiler/pw-core/tests/differential_vs_koka.rs` | rust 1.97.1 | **measured** | that a `.pw` *file* is rejected — there is no parser yet; the checker runs on a constructed pattern matrix |
+| P0 | "An empty `Option` and an empty `List` cannot be confused at a boundary, even where the backend represents both as `null`." | E1A | as above | rust 1.97.1 | **measured** | that this holds for Koka's raw output — it holds for the canonical `pw` ABI, which generated codecs must produce |
 | P0 | "Compiler errors name the rule, where the offending value came from, and which boundary rejected it." | E0 | `spike-compiler-diagnostic.txt` | rust 1.97.1, annotate-snippets 0.12.16 | **measured** | that the language exists — this is one rule in a toy parser |
 
 ## Not yet proven — the claims P0 actually needs
@@ -41,7 +43,6 @@ Absolute numbers are **not** comparable to the M3 Max the charter assumes.
 
 | proof | claim | deps | status | blocking |
 |---|---|---|---|---|
-| P0 | "An incomplete domain match is rejected even in a fallible function." | E1A | **unstarted** | RQ-3. Koka provably does **not** do this; `pw` must. |
 | P0 | "A private cart cannot enter a public materialization." | E5 | **unstarted** | corpus example R-004 exists; no checker |
 | P0 | "A secret cannot be serialized into a browser artifact." | E5 | **unstarted** | corpus R-003 exists; no checker |
 | P0 | "A task handle cannot escape its component scope." | E2A-S | **unstarted** | RQ-4. Runtime detection cannot support a compile-time claim. |

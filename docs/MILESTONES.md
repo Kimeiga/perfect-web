@@ -28,7 +28,7 @@ evidence; see ADR-0011.
 |---|---|---|
 | **E0** | Repository bootstrap, research matrix, specification corpus, feasibility spikes | **complete** |
 | **E1** | Koka **effect-system** feasibility (narrowed — effects and handlers only) | in progress |
-| **E1A** | `pw` value semantics and boundary ABI *(inserted, ADR-0011)* | not started |
+| **E1A** | `pw` value semantics and boundary ABI *(inserted, ADR-0011)* | **in progress** — exhaustiveness, opaque nominal types, platform `Option`/`List`/`Result`, type-directed ABI decoder all landed in `compiler/pw-core` |
 | **E2** | Source language parser, modules, lowering to Koka | not started |
 | **E2A** | Structured concurrency = **E2A-R** (runtime) + **E2A-S** (static scope checker) *(inserted)* | not started |
 | **E3** | Marko rendering adapter, streaming SSR, first resumption | not started |

@@ -17,16 +17,17 @@ Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 and handlers only by ADR-0011. **In progress:** its central question was answered
 early by RQ-2 (clean pass). Then **E1A** — `pw` value semantics and boundary ABI.
 
-**risk-retirement queue:** RQ-1 (Marko resumption, Chrome + Safari) and RQ-2
-(Koka higher-order effects) are **done** and both passed their pre-registered
-decision rules. RQ-3 (`pw` exhaustiveness + typed ABI) is next.
-See `docs/RISK_QUEUE.md`.
+**risk-retirement queue:** RQ-1 (Marko resumption) and RQ-2 (Koka higher-order
+effects) are **done**, both passing their pre-registered decision rules. RQ-3
+(`pw` exhaustiveness + typed ABI) is **partial** — the checker exists and is
+tested, but has no parser in front of it until E2. RQ-4 (structured concurrency,
+E2A-R + E2A-S) is next. See `docs/RISK_QUEUE.md`.
 
 **public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
 — six of the claims it needs are unstarted, and **45 corpus files exist of which
 0 compile**.
 
-**last passing commit:** `e202f99` — RQ-2 Koka higher-order effects.
+**last passing commit:** `pw-core` — E1A exhaustiveness + typed ABI.
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---

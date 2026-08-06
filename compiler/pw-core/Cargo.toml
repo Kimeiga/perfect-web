@@ -1,0 +1,18 @@
+[package]
+name = "pw-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# E1A — `pw`-owned value semantics and boundary ABI (ADR-0011).
+#
+# This is the first code that belongs to the LANGUAGE rather than to a spike.
+# It exists because E0 measured that Koka does not provide effect-independent
+# exhaustiveness, nominal runtime identity, or a generic Result<T, E>.
+
+[dependencies]
+annotate-snippets.workspace = true
+serde.workspace = true
+serde_json.workspace = true

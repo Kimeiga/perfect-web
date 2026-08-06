@@ -1,0 +1,64 @@
+milestone: E1A — pw value semantics and boundary ABI (partial)
+generated: 2026-08-06T00:04:41Z
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+commands: cargo test -p pw-core ; cargo run -p pw-core --example pw1004
+
+=========== TESTS ===========================================
+test abi::tests::nested_recursive_values_decode ... ok
+test abi::tests::a_bare_null_is_never_accepted_for_either ... ok
+test exhaust::tests::bool_needs_both_arms ... ok
+test diag::tests::an_exhaustive_match_renders_nothing ... ok
+test abi::tests::raw_primitive_cannot_enter_a_nominal_position_undetected_in_debug_mode ... ok
+test abi::tests::unknown_constructor_lists_the_legal_ones ... ok
+test abi::tests::decoding_is_type_directed_not_shape_directed ... ok
+test abi::tests::wrong_field_type_is_rejected_rather_than_coerced ... ok
+test abi::tests::option_and_list_cannot_be_confused_even_though_koka_makes_both_null ... ok
+test abi::tests::arity_mismatch_is_an_error ... ok
+test exhaust::tests::complete_match_is_exhaustive ... ok
+test exhaust::tests::empty_arm_list_over_a_finite_type_reports_every_constructor ... ok
+test exhaust::tests::infinite_types_always_need_a_wildcard ... ok
+test exhaust::tests::opaque_types_cannot_be_matched_structurally ... ok
+test exhaust::tests::missing_variants_are_named_not_merely_counted ... ok
+test exhaust::tests::nested_patterns_find_nested_gaps ... ok
+test exhaust::tests::recursive_list_type_terminates_and_reports_cons ... ok
+test exhaust::tests::or_patterns_count_toward_coverage ... ok
+test exhaust::tests::unreachable_arms_are_reported ... ok
+test exhaust::tests::wildcard_makes_any_match_exhaustive ... ok
+test types::tests::opaque_types_do_not_expose_their_representation ... ok
+test types::tests::option_and_list_are_distinct_types ... ok
+test types::tests::result_error_side_is_generic ... ok
+test types::tests::two_opaques_over_the_same_representation_are_different_types ... ok
+test diag::tests::pw1004_names_every_missing_case_and_the_effect_rule ... ok
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test nominal_wrappers_stay_distinct_where_koka_erases_them ... ok
+test option_and_list_stay_distinct_where_koka_conflates_them ... ok
+test pw_rejects_the_match_koka_accepts_under_exn ... ok
+test the_checker_can_distinguish_exhaustive_from_not ... ok
+test the_result_does_not_depend_on_any_effect_row ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=========== PW1004, THE RULE KOKA DOES NOT ENFORCE ==========
+error: [PW1004] non-exhaustive match on `OrderState`
+ --> order/label.pw:2:5
+  |
+1 |   fn label(state: OrderState) -> String !{panic} {
+  |            ----------------- scrutinee has type `OrderState`
+2 | /     match state {
+3 | |         Draft => "draft",
+4 | |         Confirmed(ref) => ref,
+5 | |     }
+  | |_____^ this match does not cover every `OrderState`
+  |
+  = note: missing cases:
+          - Cancelled(CancellationReason)
+          - Failed(OrderFailure)
+  = note: the presence of `panic`, `exception`, or any other effect does not permit an incomplete domain-state match
+  = help: add the missing arms, or — if the case is genuinely impossible — use `unreachable(proof)`; `unsafe.partial_match` is audited and carries the `panic` effect
+=========== DIFFERENTIAL CLAIM ==============================
+  E0 measured that Koka COMPILES a non-exhaustive match whenever the
+  enclosing effect row admits exn, failing only at runtime.
+  tests/differential_vs_koka.rs asserts pw rejects the same program,
+  and that the result cannot depend on any effect row.
