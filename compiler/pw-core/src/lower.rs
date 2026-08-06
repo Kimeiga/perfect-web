@@ -322,6 +322,7 @@ impl Lowerer<'_> {
                     .unwrap_or_else(|| text(self.src, &e).trim().to_string());
                 EffectRef {
                     path,
+                    written: text(self.src, &e).trim().to_string(),
                     span: span_of(&e),
                 }
             })

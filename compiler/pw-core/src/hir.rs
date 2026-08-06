@@ -225,7 +225,14 @@ impl Decl {
 /// diagnostic can underline the specific effect rather than the whole row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectRef {
+    /// The effect's name without type arguments: `style.mutate`. Used for
+    /// family grouping.
     pub path: String,
+    /// The effect **as written**: `style.mutate<LayoutAffect>`. Charter §7.5A
+    /// makes the type argument load-bearing — a write that can invalidate
+    /// layout is a different effect from one that cannot — so the identity a
+    /// checker compares and the text a developer reads must both keep it.
+    pub written: String,
     pub span: Span,
 }
 

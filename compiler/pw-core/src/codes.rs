@@ -121,6 +121,8 @@ codes! {
         "an effect row must name every effect the body performs";
     FORBIDDEN_EFFECT = "PW0401", Effects,
         "some effects are not permitted where a declaration runs, whatever it declares";
+    WRONG_FRAME_PHASE = "PW0402", Effects,
+        "each frame phase permits only the work it exists to do";
 
     // --- exhaustiveness ---------------------------------------------------
     NON_EXHAUSTIVE_MATCH = "PW0305", Exhaustiveness,

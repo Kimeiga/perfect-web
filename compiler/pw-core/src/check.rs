@@ -1599,7 +1599,7 @@ fn effect_rows(
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
 ) {
-    use crate::effects::{deferred_spans, forbidden_in};
+    use crate::effects::{deferred_spans, forbidden_in, forbidden_in_phase, phase_at};
 
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
@@ -1639,6 +1639,44 @@ fn effect_rows(
     // Forbidden first: it is the stronger statement, and reporting both for one
     // call would say the same thing twice.
     let mut reported: BTreeSet<String> = BTreeSet::new();
+
+    // The frame phase an effect happens in decides what it may do, and that is
+    // an ordering question rather than a question of which effects exist.
+    for source in &found.sources {
+        let Some(phase) = phase_at(body, &source.span) else {
+            continue;
+        };
+        let Some(why) = forbidden_in_phase(&phase, &source.effect) else {
+            continue;
+        };
+        if !reported.insert(source.effect.clone()) {
+            continue;
+        }
+        out.push(Diagnostic {
+            code: crate::codes::WRONG_FRAME_PHASE.id,
+            invariant: crate::codes::WRONG_FRAME_PHASE.invariant,
+            reason: "effect_in_wrong_phase",
+            detector: Detector::PatternMatrix,
+            severity: Severity::Error,
+            message: format!(
+                "`{}` happens in the `{phase}` phase, which may not do it",
+                source.effect
+            ),
+            primary_span: source.span.clone(),
+            related: vec![Related {
+                span: hir.decl_span(decl_id_of(hir, decl)),
+                label: format!("`{}` declares this frame", decl.name),
+            }],
+            explanation: Some(format!("{why}. The chain: {}.", source.via.describe())),
+            repairs: vec![Repair {
+                description: "move it to the phase that owns it — read in `measure`, \
+                              write in `mutate`"
+                    .to_string(),
+                replacement: None,
+            }],
+        });
+    }
+
     for source in &found.sources {
         let Some(why) = forbidden_in(decl, &source.effect) else {
             continue;
@@ -1684,7 +1722,7 @@ fn effect_rows(
     let declared: Option<Vec<String>> = decl
         .declared_effects
         .as_ref()
-        .map(|r| r.iter().map(|e| e.path.clone()).collect());
+        .map(|r| r.iter().map(|e| e.written.clone()).collect());
     for source in found.undeclared(declared.as_deref()) {
         // Same distinction: an event handler's effects and a streamed region's
         // are not the enclosing view's row. The handler is a separate body that

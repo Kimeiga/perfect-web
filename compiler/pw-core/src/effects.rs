@@ -115,8 +115,33 @@ fn covered(declared: &BTreeSet<&str>, effect: &str) -> bool {
     if declared.contains(effect) {
         return true;
     }
-    let family = effect.split('.').next().unwrap_or(effect);
-    declared.contains(family)
+    let want = family_of(effect);
+    declared
+        .iter()
+        .any(|d| family_of(d) == want && is_broader(d, effect))
+}
+
+/// An effect's family: `style.mutate<LayoutAffect>` and `style.mutate` are both
+/// `style`.
+///
+/// Type arguments are stripped **before** splitting on `.`, because
+/// `secret<Payments>` has no dot at all — comparing families without stripping
+/// made a row declaring `secret<Payments>` fail to cover `secret.read`, and two
+/// corpus fixtures were reported for an effect they had declared.
+fn family_of(effect: &str) -> &str {
+    let base = effect.split('<').next().unwrap_or(effect);
+    base.split('.').next().unwrap_or(base)
+}
+
+/// Is `declared` at least as permissive as `effect`?
+///
+/// A family covers its members: declaring `database` accepts `database.read`.
+/// A member does not cover a sibling — declaring `database.read` must not
+/// permit `database.write`, which is what makes a query that writes detectable.
+fn is_broader(declared: &str, effect: &str) -> bool {
+    let d = declared.split('<').next().unwrap_or(declared);
+    let e = effect.split('<').next().unwrap_or(effect);
+    d == e || !d.contains('.')
 }
 
 /// Infer the effects of every declaration in a program.
@@ -144,8 +169,10 @@ impl<'a> Inference<'a> {
         for hir in hirs {
             for (_, d) in hir.all_decls() {
                 if let Some(row) = &d.declared_effects {
-                    self.known
-                        .insert(d.name.clone(), row.iter().map(|e| e.path.clone()).collect());
+                    self.known.insert(
+                        d.name.clone(),
+                        row.iter().map(|e| e.written.clone()).collect(),
+                    );
                 }
             }
         }
@@ -454,6 +481,70 @@ pub fn deferred_spans(body: &Body) -> Vec<Span> {
         }
     }
     out
+}
+
+/// The frame phase a span sits inside, innermost first.
+///
+/// Charter §7.5A gives the frame a shape: measure, then mutate, then paint,
+/// then post-paint. Which phase code is in decides what it may do — and that is
+/// an ordering question, not a question of *which* effects exist. E2D's
+/// inference answers the second; this answers the first.
+pub fn phase_at(body: &Body, span: &Span) -> Option<String> {
+    let mut best: Option<(usize, String)> = None;
+    for id in body.walk() {
+        let Expr::Keyword { keyword, .. } = body.expr(id) else {
+            continue;
+        };
+        if !matches!(
+            keyword.as_str(),
+            "measure" | "mutate" | "post_paint" | "animate" | "frame" | "draw" | "subtree"
+        ) {
+            continue;
+        }
+        let k = body.expr_span(id);
+        if k.start <= span.start && span.end <= k.end && k != *span {
+            let width = k.end - k.start;
+            if best.as_ref().is_none_or(|(w, _)| width < *w) {
+                best = Some((width, keyword.clone()));
+            }
+        }
+    }
+    best.map(|(_, k)| k)
+}
+
+/// May an effect happen in this frame phase?
+///
+/// Each entry is charter §7.5A stating what a phase is *for*. A phase that
+/// permitted everything would not be a phase.
+pub fn forbidden_in_phase(phase: &str, effect: &str) -> Option<&'static str> {
+    let family = effect.split('.').next().unwrap_or(effect);
+    match (phase, family) {
+        // The measure phase reads. A write inside it invalidates the very
+        // geometry the phase exists to read consistently.
+        ("measure", "style") | ("measure", "dom") => Some(
+            "the measure phase reads geometry; writing inside it invalidates what \
+                  the rest of the phase is about to read",
+        ),
+        // After paint, the frame is already on screen. Measuring forces the
+        // browser to lay out again for a frame nobody will see.
+        ("post_paint", "layout") => Some(
+            "the frame is already presented; measuring now forces a second layout \
+                  for a frame nobody will see",
+        ),
+        // A painter draws. Touching the document from inside one re-enters
+        // layout from a phase that runs after it.
+        ("draw", "dom") | ("draw", "style") | ("draw", "layout") => Some(
+            "a painter draws; reaching the document from inside one re-enters \
+                  layout from a phase that runs after it",
+        ),
+        // A compositor animation runs off the main thread. An animated property
+        // that invalidates layout drags it back on.
+        ("animate", "layout") => Some(
+            "a compositor animation runs without layout; animating a property that \
+                  invalidates it forces a layout every frame",
+        ),
+        _ => None,
+    }
 }
 
 /// Declarations whose bodies must be pure regardless of what they declare.

@@ -17,8 +17,11 @@ fn measure(el: Element) -> Int !{ layout.measure } { 0 }
 
 fn mutate(el: Element, property: String, value: String) -> () !{ style.mutate } { () }
 
+// Charter §7.5A's own spelling. The type argument is the point: a write that
+// can invalidate layout is a DIFFERENT effect from one that cannot, and naming
+// them the same would make the distinction a comment.
 fn mutate_layout_affecting(el: Element, property: String, value: String) -> ()
-    !{ style.mutate, layout.invalidate }
+    !{ style.mutate<LayoutAffect> }
 {
     ()
 }
@@ -33,10 +36,10 @@ fn composite(el: Element, property: String, value: String) -> ()
 // padding invalidate layout, so a geometry read after one of them is a forced
 // synchronous reflow (corpus R-034). A custom property does not.
 
-fn set_width(el: Element, value: String) -> () !{ style.mutate, layout.invalidate } { () }
+fn set_width(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_height(el: Element, value: String) -> () !{ style.mutate, layout.invalidate } { () }
+fn set_height(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_padding(el: Element, value: String) -> () !{ style.mutate, layout.invalidate } { () }
+fn set_padding(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
 fn set_custom(el: Element, property: String, value: String) -> () !{ style.mutate } { () }

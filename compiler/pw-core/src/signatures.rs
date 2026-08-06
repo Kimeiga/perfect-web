@@ -97,7 +97,7 @@ impl Signatures {
                         .as_deref()
                         .unwrap_or_default()
                         .iter()
-                        .map(|e| e.path.clone())
+                        .map(|e| e.written.clone())
                         .collect(),
                     label: label_from_return(decl.ret.as_deref(), &decl.ret_args),
                     returns: decl.ret.clone(),

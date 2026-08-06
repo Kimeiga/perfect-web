@@ -180,6 +180,11 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // effect family.
     ("PW3001", "PW0401"),
     ("PW3002", "PW0401"),
+    // The frame-phase family. Each names "work happening in a phase that does
+    // not permit it" — a write during measure, a measure after paint. One
+    // invariant, stated once; which phase and which effect are metadata.
+    ("PW3004", "PW0402"),
+    ("PW3008", "PW0402"),
     ("PW0316", "PW5011"), // a list over a mutable collection needs a stable key
     ("PW0317", "PW5012"), // an element may only contain the children HTML permits
     ("PW0318", "PW5013"), // interactive behaviour belongs on an interactive element
