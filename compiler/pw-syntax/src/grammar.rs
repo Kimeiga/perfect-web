@@ -729,10 +729,20 @@ impl<'a> P<'a> {
     ///
     /// Deliberately NOT a full HTML grammar: nesting validity, ARIA rules and
     /// keyed-loop checking are E3 and are not pretended here.
+    /// A markup region, as a **tree**: elements, their attributes, their text.
+    ///
+    /// The first version consumed tags as a run of tokens. That round-tripped
+    /// and parsed, and it was still wrong: E3 has to lower this to a renderer
+    /// and E5 has to know which attribute carries which value, and neither can
+    /// read a token soup. Losslessness was never the hard part — structure is.
     fn template_region(&mut self) {
         self.start(K::TemplateRegion);
         let mut depth = 0i32;
         let mut guard = 0;
+        // Elements are opened and closed by separate tokens, so the tree is
+        // built by starting a node on `<tag` and finishing it on `</tag`.
+        // `open` counts how many `Element` nodes are waiting to be finished.
+        let mut open = 0usize;
         while !self.at_eof() {
             guard += 1;
             if guard > 50_000 {
@@ -740,30 +750,31 @@ impl<'a> P<'a> {
                 break;
             }
             match self.cur() {
-                Kind::LAngle => {
-                    // `</tag>` closes; `<tag ...>` opens unless self-closing.
-                    let closing = self.nth_is(1, Kind::Slash);
-                    self.bump();
-                    if closing {
-                        depth -= 1;
-                    } else {
-                        depth += 1;
-                    }
-                    // Consume the tag up to its `>`, noting `/>`.
-                    let mut self_closing = false;
+                Kind::LAngle if self.nth_is(1, Kind::Slash) => {
+                    depth -= 1;
+                    self.start(K::CloseTag);
                     while !self.at_eof() && !self.at(Kind::RAngle) {
-                        if self.at(Kind::Slash) && self.nth_is(1, Kind::RAngle) {
-                            self_closing = true;
-                        }
-                        if self.at(Kind::LBrace) {
-                            self.interpolation();
-                            continue;
-                        }
                         self.bump();
                     }
                     self.eat(Kind::RAngle);
+                    self.finish(); // CloseTag
+                    if open > 0 {
+                        open -= 1;
+                        self.finish(); // Element
+                    }
+                    if depth <= 0 {
+                        break;
+                    }
+                }
+                Kind::LAngle => {
+                    depth += 1;
+                    self.start(K::Element);
+                    let self_closing = self.open_tag();
                     if self_closing {
                         depth -= 1;
+                        self.finish(); // Element
+                    } else {
+                        open += 1;
                     }
                     if depth <= 0 {
                         break;
@@ -780,8 +791,91 @@ impl<'a> P<'a> {
                 }
                 // A `}` at depth 0 belongs to the enclosing block, not to us.
                 Kind::RBrace if depth <= 0 => break,
-                _ => self.bump(),
+                _ => self.text_run(),
             }
+        }
+        // An unclosed element must still produce a well-formed tree. Recovery
+        // that leaves nodes open would corrupt every ancestor's text range.
+        for _ in 0..open {
+            self.finish();
+        }
+        self.finish(); // TemplateRegion
+    }
+
+    /// `<tag attr="v" on:press={h} />`. Returns whether it self-closed.
+    fn open_tag(&mut self) -> bool {
+        self.start(K::OpenTag);
+        self.bump(); // `<`
+        // The tag name, which may be dotted for a component: `<store.Card />`.
+        if self.at(Kind::Ident) {
+            self.start(K::Name);
+            self.bump();
+            while self.at(Kind::Dot) && self.nth_is(1, Kind::Ident) {
+                self.bump();
+                self.bump();
+            }
+            self.finish();
+        }
+        let mut self_closing = false;
+        while !self.at_eof() && !self.at(Kind::RAngle) {
+            if self.at(Kind::Slash) && self.nth_is(1, Kind::RAngle) {
+                self_closing = true;
+                self.bump();
+                continue;
+            }
+            if self.at(Kind::Ident) {
+                self.attribute();
+                continue;
+            }
+            self.bump(); // stray punctuation; kept so the tree stays lossless
+        }
+        self.eat(Kind::RAngle);
+        self.finish(); // OpenTag
+        self_closing
+    }
+
+    /// `class="x"`, `on:press={handler}`, `style:width={w}`, `disabled`.
+    fn attribute(&mut self) {
+        self.start(K::Attr);
+        self.start(K::AttrName);
+        self.bump();
+        // A namespaced attribute: `on:press`, `style:width`.
+        while self.at(Kind::Colon) && self.nth_is(1, Kind::Ident) {
+            self.bump();
+            self.bump();
+        }
+        // `aria-label` lexes as three tokens; the name is all of them.
+        while self.at(Kind::Minus) && self.nth_is(1, Kind::Ident) {
+            self.bump();
+            self.bump();
+        }
+        self.finish(); // AttrName
+        if self.eat(Kind::Eq) {
+            self.start(K::AttrValue);
+            if self.at(Kind::LBrace) {
+                self.interpolation();
+            } else if self.at(Kind::Str) || self.at(Kind::Int) || self.at(Kind::Ident) {
+                self.bump();
+            }
+            self.finish(); // AttrValue
+        }
+        self.finish(); // Attr
+    }
+
+    /// Character data between tags, as one node per run.
+    fn text_run(&mut self) {
+        self.start(K::Text);
+        let mut moved = false;
+        while !self.at_eof()
+            && !self.at(Kind::LAngle)
+            && !self.at(Kind::LBrace)
+            && !self.at(Kind::RBrace)
+        {
+            self.bump();
+            moved = true;
+        }
+        if !moved {
+            self.bump(); // never spin
         }
         self.finish();
     }
@@ -1400,6 +1494,121 @@ mod tests {
             .descendants()
             .find(|n| n.kind() == kind)
             .map(|n| n.text().to_string())
+    }
+
+    /// Text of every node of `kind`, in document order.
+    fn texts(p: &Parse, kind: K) -> Vec<String> {
+        p.green
+            .descendants()
+            .filter(|n| n.kind() == kind)
+            .map(|n| n.text().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn markup_nests_elements_rather_than_listing_them() {
+        // The token-run version round-tripped and parsed and was still useless:
+        // a renderer cannot read a token soup. Assert the NESTING, because a
+        // flat list of Element nodes would satisfy every other check here.
+        let src = "view V() !{} {\n    <main><h1>Title</h1><p>Body</p></main>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+
+        let main = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::Element)
+            .expect("an element");
+        assert!(main.text().to_string().starts_with("<main>"));
+        assert!(main.text().to_string().ends_with("</main>"));
+
+        let inner: Vec<String> = main
+            .children()
+            .filter(|c| c.kind() == K::Element)
+            .map(|c| c.text().to_string())
+            .collect();
+        assert_eq!(
+            inner,
+            ["<h1>Title</h1>", "<p>Body</p>"],
+            "h1 and p must be CHILDREN of main, not siblings"
+        );
+    }
+
+    #[test]
+    fn a_self_closing_element_has_no_children() {
+        let src = "view V() !{} {\n    <section><img />after</section>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let img = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::Element && n.text().to_string().starts_with("<img"))
+            .expect("the img");
+        assert_eq!(img.text().to_string(), "<img />");
+        assert!(
+            img.children().all(|c| c.kind() != K::Element),
+            "a self-closing element must not swallow what follows it"
+        );
+    }
+
+    #[test]
+    fn attributes_keep_their_names_and_values_apart() {
+        let src = "view V() !{} {\n    <button aria-label=\"Add\" on:press={handler} disabled>Go</button>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+
+        assert_eq!(
+            texts(&p, K::AttrName),
+            ["aria-label", "on:press", "disabled"],
+            "a namespaced or hyphenated name is ONE name"
+        );
+        let values = texts(&p, K::AttrValue);
+        assert_eq!(
+            values,
+            ["\"Add\"", "{handler}"],
+            "a bare attribute has no value"
+        );
+
+        // The interpolated handler must be a real expression, not text: an
+        // effect checker has to be able to look inside it.
+        assert!(
+            p.green
+                .descendants()
+                .any(|n| n.kind() == K::NameExpr && n.text() == "handler"),
+            "the attribute value must parse as an expression"
+        );
+        assert_eq!(texts(&p, K::Text), ["Go"]);
+    }
+
+    #[test]
+    fn a_component_tag_keeps_its_qualified_name() {
+        let src = "view V() !{} {\n    <store.Card id={x} />\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let name = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::Name && n.text().to_string().contains('.'))
+            .expect("a dotted tag name");
+        assert_eq!(name.text().to_string(), "store.Card");
+    }
+
+    #[test]
+    fn an_unclosed_element_still_produces_a_well_formed_tree() {
+        // Recovery that left nodes open would corrupt every ancestor's text
+        // range, and the losslessness suite would then fail for a reason that
+        // has nothing to do with the missing tag.
+        let src = "view V() !{} {\n    <main><p>oops\n}\n";
+        let p = parse_tree(src);
+        assert_eq!(tree_text(&p.green), src, "still lossless");
+        assert!(
+            p.green
+                .descendants()
+                .filter(|n| n.kind() == K::Element)
+                .count()
+                >= 1,
+            "the elements that did open must still be nodes"
+        );
     }
 
     #[test]

@@ -122,6 +122,24 @@ pub enum SyntaxKind {
     /// A `{ expr }` interpolation inside a template region.
     Interpolation,
 
+    // ---- markup ---------------------------------------------------------- 400..
+    // A template region is a tree, not a token soup: E3 lowers it to a
+    // renderer and E5 has to know which attribute carries which value.
+    /// `<p class="x">…</p>` or `<img />`.
+    Element = 400,
+    /// The `<tag` … `>` head of an element, including its attributes.
+    OpenTag,
+    /// `</tag>`.
+    CloseTag,
+    /// `class="x"`, `on:press={h}`, `disabled`.
+    Attr,
+    /// The attribute's name, including any `:` namespace.
+    AttrName,
+    /// The attribute's value: a quoted string or an interpolation.
+    AttrValue,
+    /// Literal character data between tags.
+    Text,
+
     // ---- patterns -------------------------------------------------------- 300..
     WildcardPat = 300,
     BindingPat,
@@ -316,6 +334,13 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         LiteralPat,
         OrPat,
         TuplePat,
+        Element,
+        OpenTag,
+        CloseTag,
+        Attr,
+        AttrName,
+        AttrValue,
+        Text,
     ]
 };
 
