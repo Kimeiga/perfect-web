@@ -290,6 +290,26 @@ pub fn generate(
     sigs: &Signatures,
     build: &str,
 ) -> Vec<(ResumeManifest, HandlerArtifact)> {
+    located(src, hir, sigs, build)
+        .into_iter()
+        .map(|(_, _, m, a)| (m, a))
+        .collect()
+}
+
+/// Every resumable handler, with **where** it is.
+///
+/// E7-R needs the handler identity on the template IR's `Event` part, and the
+/// identity is derived here. Exposing the location rather than re-deriving the
+/// id elsewhere keeps one derivation with two readers: an `Event` part whose
+/// handler id was computed by a second walk could disagree with the manifest
+/// the runtime compares it against, and the disagreement would be silent —
+/// `decide` would refuse a handler that is in fact the right one.
+pub fn located(
+    src: &str,
+    hir: &Hir,
+    sigs: &Signatures,
+    build: &str,
+) -> Vec<(crate::hir::DeclId, ExprId, ResumeManifest, HandlerArtifact)> {
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -308,7 +328,7 @@ pub fn generate(
                 manifest_of(src, body, &types, lambda, *d, &document_schema, build),
                 artifact_of(src, body, &types, lambda, *d, &document_schema, build),
             ) {
-                out.push((m, a));
+                out.push((id, lambda, m, a));
             }
         }
     }

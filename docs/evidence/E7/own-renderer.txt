@@ -1,8 +1,28 @@
-E7 task 2 — the own renderer
+E7-2 and E7-R — the own renderer, and the store page through it
 
 chain:  .pw → pw check → pw emit-template → pw-render → HTML → browser
         Marko is not in it.
 
-pages:  HelloStatic.html Tricky.html 
-script tags in the output: 0
-two renders of one IR: byte-identical
+pages:  HelloStatic.html pw-resume.wasm pw-runtime.mjs StorePage.html Tricky.html 
+
+STATIC ROUTES
+  HelloStatic, Tricky: 0 script tags, 0 runtime, usable with JS off
+  two renders of one IR: byte-identical
+
+THE STORE PAGE — E7-R's vertical slice
+  server renderer → HTML with only the required anchors
+  → parts manifest → decide() → Authorised → handler attaches
+  → click Add → command → only cart-related PartIds update
+
+  12 assertions, 3 engine families:
+    no Marko participates in this route
+    only dynamic regions carry identity markup
+    the page is readable with JavaScript disabled
+    a compatible manifest authorises; the handler attaches
+    an INCOMPATIBLE manifest is refused and nothing attaches
+    the menu keeps node identity across the update
+    the cart element survives its content changing, twice
+    focus survives the update
+    only the cart part id updates
+    replacing a menu node makes the identity assertion RED
+    handler bytes are still eager — the E7-L gap, recorded

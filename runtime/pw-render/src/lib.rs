@@ -35,7 +35,7 @@
 pub mod escape;
 pub mod ir;
 
-pub use ir::{Anchor, Chunk, Context, ElementId, Part, PartId, Template};
+pub use ir::{Anchor, Chunk, Context, ElementId, Part, PartEntry, PartId, Template};
 
 use std::collections::BTreeMap;
 

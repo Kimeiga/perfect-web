@@ -64,6 +64,21 @@ fn main() -> std::process::ExitCode {
         return std::process::ExitCode::from(2);
     }
 
+    // The resume metadata the page presents to `decide`, as data the server
+    // supplies rather than as a string the client composes. A test that wants
+    // an INCOMPATIBLE manifest changes this file; it does not edit the runtime,
+    // which is what makes the refusal path testable at all.
+    let resume = match flag("--resume") {
+        Some(path) => match std::fs::read_to_string(&path) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                eprintln!("pw-render: cannot read {path}: {e}");
+                return std::process::ExitCode::from(2);
+            }
+        },
+        None => None,
+    };
+
     let mut written = 0usize;
     for t in &templates {
         let body = match render(t, &env, &templates) {
@@ -77,7 +92,15 @@ fn main() -> std::process::ExitCode {
             }
         };
         let title = flag("--wrap").unwrap_or_else(|| t.name.clone());
-        let page = document(&title, &body);
+        let manifest = t.manifest();
+        let page = document(
+            &title,
+            &body,
+            t,
+            &manifest,
+            flag("--runtime").as_deref(),
+            resume.as_deref(),
+        );
         let path = format!("{out_dir}/{}.html", t.name);
         if let Err(e) = std::fs::write(&path, page) {
             eprintln!("pw-render: cannot write {path}: {e}");
@@ -98,10 +121,48 @@ fn main() -> std::process::ExitCode {
 /// The doctype matters and is not decoration — without it the browser parses in
 /// quirks mode, where the tree and the layout both differ, so gate 4 would be
 /// measuring a document nobody ships.
-fn document(title: &str, body: &str) -> String {
+fn document(
+    title: &str,
+    body: &str,
+    t: &Template,
+    manifest: &[pw_render::PartEntry],
+    runtime: Option<&str>,
+    resume: Option<&str>,
+) -> String {
+    // The parts manifest travels with the document, as data. A page with no
+    // dynamic part gets neither the manifest nor the runtime — charter §14 M7
+    // gate 2: a static route ships no browser runtime, and "no dynamic parts"
+    // is exactly when that is true.
+    let mut head = String::new();
+    let mut tail = String::new();
+    if let Some(src) = runtime.filter(|_| !manifest.is_empty()) {
+        let resume: serde_json::Value = resume
+            .and_then(|r| serde_json::from_str(r).ok())
+            .unwrap_or(serde_json::Value::Null);
+        let json = serde_json::json!({
+            "template": t.path,
+            "schema": t.schema,
+            "parts": manifest,
+            "resume": resume,
+        });
+        // In `<script type="application/json">`, `</script` is the only
+        // sequence that ends the element, so it is the only one that has to be
+        // broken. Escaping the JSON as HTML would corrupt it.
+        let json = serde_json::to_string(&json)
+            .unwrap_or_default()
+            .replace("</script", "<\\/script");
+        tail.push_str(&format!(
+            "<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n"
+        ));
+        tail.push_str(&format!(
+            "<script type=\"module\" src=\"{}\"></script>\n",
+            pw_render::escape::attribute(src)
+        ));
+        let _ = &mut head;
+    }
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <title>{}</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n",
+         <title>{}</title>\n{head}</head>\n<body>\n{body}\n{tail}</body>\n</html>\n",
         pw_render::escape::text(title)
     )
 }

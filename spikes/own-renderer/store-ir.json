@@ -1,0 +1,89 @@
+[
+  {
+    "path": "store.page.StorePage",
+    "name": "StorePage",
+    "params": [
+      "id"
+    ],
+    "schema": "345e5c71496587d7",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<main>\n            <h1 id=\"store-name\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 0,
+          "value": "store.name",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</h1>\n\n            <section aria-label=\"Menu\">\n                <ul id=\"menu\">\n                    "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "each",
+          "id": 1,
+          "collection": "menu",
+          "binding": "item",
+          "key": "id",
+          "body": [
+            {
+              "chunk": "static",
+              "value": "\n                        <li>\n                            <span>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 2,
+                "value": "item.name",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                            <button data-pw=\"0\" type=\"button\""
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 3,
+                "owner": 0,
+                "event": "press",
+                "handler": "215128a6db429d05"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                                Add\n                            </button>\n                        </li>\n                    "
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n                </ul>\n            </section>\n\n            <section aria-label=\"Cart\">\n                <p id=\"cart-count\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 4,
+          "value": "cart.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</p>\n            </section>\n        </main>"
+      }
+    ]
+  }
+]

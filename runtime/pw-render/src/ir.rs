@@ -291,6 +291,20 @@ pub enum Chunk {
     Dynamic(Part),
 }
 
+/// One row of the parts manifest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartEntry {
+    pub id: PartId,
+    pub kind: String,
+    pub anchor: Anchor,
+    /// Set for the element-anchored kinds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<ElementId>,
+    /// What the part reads, for a text or attribute part; the collection for a
+    /// loop; the handler for an event.
+    pub value: String,
+}
+
 /// One renderable declaration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Template {
@@ -313,6 +327,58 @@ pub struct Template {
 }
 
 impl Template {
+    /// The **parts manifest**: dynamic regions only (charter §14 M7 task 4).
+    ///
+    /// What the browser runtime needs in order to find and update a part, and
+    /// nothing else. Static regions do not appear, because there is nothing for
+    /// the runtime to do with them — which is the same invariant that keeps
+    /// them free of identity markup.
+    ///
+    /// Read from the same numbering the server renderer emitted, because there
+    /// is one indexing pass and everybody reads it. A manifest generator that
+    /// walked the IR again would be the second traversal.
+    pub fn manifest(&self) -> Vec<PartEntry> {
+        fn walk(chunks: &[Chunk], out: &mut Vec<PartEntry>) {
+            for c in chunks {
+                let Chunk::Dynamic(p) = c else { continue };
+                let (Some(id), Some(anchor)) = (p.id(), p.anchor()) else {
+                    continue;
+                };
+                out.push(PartEntry {
+                    id,
+                    kind: p.kind().to_string(),
+                    anchor,
+                    owner: p.owner(),
+                    value: match p {
+                        Part::Text { value, .. }
+                        | Part::Attribute { value, .. }
+                        | Part::BooleanAttribute { value, .. }
+                        | Part::RawHtml { value, .. }
+                        | Part::Conditional { value, .. } => value.clone(),
+                        Part::Each { collection, .. } => collection.clone(),
+                        Part::Event { handler, .. } => handler.clone(),
+                        Part::Component { path, .. } => path.clone(),
+                        Part::Blocked { .. } => String::new(),
+                    },
+                });
+                match p {
+                    Part::Conditional {
+                        then, otherwise, ..
+                    } => {
+                        walk(then, out);
+                        walk(otherwise, out);
+                    }
+                    Part::Each { body, .. } => walk(body, out),
+                    _ => {}
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(&self.chunks, &mut out);
+        out.sort_by_key(|e| e.id);
+        out
+    }
+
     /// Every `Blocked` part, anywhere in the tree.
     ///
     /// The renderer refuses a template with any, so this is what a caller asks

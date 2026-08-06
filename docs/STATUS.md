@@ -9,9 +9,15 @@ See `docs/ASSUMPTIONS.md` A-008.
 **numbering:** engineering `E0`–`E15`, public proofs `P0`–`P9`, risk-retirement
 experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
-**current milestone:** **E7 — the own renderer.** Tasks 1 and 2 are closed: the
-renderer-independent golden suite is frozen, and `.pw` → template IR → HTML runs
-with Marko nowhere in the chain (`just spike-own-renderer`). E7-R is next.
+**current milestone:** **E7 — the own renderer.** Tasks 1 and 2 are closed and
+E7-R's vertical slice runs: the **real store page** is rendered by the own
+renderer, its handler is authorised by `decide()` before it attaches, and a
+click updates only the cart's part while every menu node keeps its identity.
+72 browser assertions across Chromium, Firefox and WebKit
+(`just spike-own-renderer`).
+
+Handler bytes are still fetched eagerly. That is E7-L's work and it is recorded
+as a measured fact rather than a note.
 
 **current milestone:** **E7 — the own renderer (E7-R/E7-P/E7-L).** Everything
 before it is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and the inserted
@@ -99,7 +105,7 @@ robustness                11 suites, 0 panics, 3 regressions retained
 coverage-guided fuzzing    6 targets, 3600 execs, 0 findings
 resource graph            E6 closed — 6 gate items, 24 materializer tests
 one parser                E6F closed — 5 tests, 0 second trees
-own renderer              E7-2 — 36 browser + 28 unit, 3 engines
+own renderer              E7-2 closed, E7-R slice — 72 browser + 37 unit
 historical compatibility   9 / 10   the miss classified
 KNOWN_GAPs                 0
 ```

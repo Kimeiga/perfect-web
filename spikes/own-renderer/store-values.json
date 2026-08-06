@@ -1,0 +1,9 @@
+{
+  "store.name": "Blue Bottle",
+  "menu": [
+    { "id": "espresso", "name": "Espresso" },
+    { "id": "cortado", "name": "Cortado" },
+    { "id": "cold-brew", "name": "Cold Brew" }
+  ],
+  "cart.line_count": 0
+}

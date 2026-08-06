@@ -1,0 +1,12 @@
+{
+  "//": "What the page presents to `decide`. Compatible with the runtime the E7V wasm was built with: scheme 2, ABI 1, build B1, the handler it knows, and a public construct. `e2e/store.spec.mjs` serves a second, incompatible version to exercise the refusal.",
+  "scheme": "2",
+  "abi": "1",
+  "build": "B1",
+  "handler": "add_to_cart",
+  "capture": "cart",
+  "document": "cart-doc",
+  "scope": "public",
+  "captures": "x",
+  "construct": "region"
+}

@@ -518,8 +518,24 @@ pub const BOOLEAN_ATTRIBUTES: &[&str] = &[
     "selected",
 ];
 
+/// Handler identities by where the lambda is, from `resume_artifacts::located`.
+pub type Handlers = std::collections::BTreeMap<(crate::hir::DeclId, crate::hir::ExprId), String>;
+
 /// Build the template IR for every renderable declaration in a program.
+///
+/// Without handler identities: an `Event` part gets an empty handler, which is
+/// honest for a caller that has no signatures to derive one from.
 pub fn build(hirs: &[&Hir]) -> Vec<Template> {
+    build_with(hirs, &Handlers::new())
+}
+
+/// Build with the handler identities the resume artifacts derived.
+///
+/// The identity is derived ONCE, in `resume_artifacts`, and read here. A second
+/// derivation could disagree with the manifest the runtime compares against,
+/// and the disagreement would be silent: `decide` would refuse a handler that
+/// is in fact the right one, and the page would simply not respond.
+pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
     let mut out = Vec::new();
     for hir in hirs {
         for (id, decl) in hir.all_decls() {
@@ -532,8 +548,9 @@ pub fn build(hirs: &[&Hir]) -> Vec<Template> {
             let module = hir.module_of(id).unwrap_or_default();
             let mut chunks = Vec::new();
             let mut ix = Indexer::default();
+            let ctx = Lowering { handlers, decl: id };
             for root in roots_of(body) {
-                lower_node(body, root, &mut ix, &mut chunks);
+                lower_node(body, root, &ctx, &mut ix, &mut chunks);
             }
             let chunks = coalesce(chunks);
             let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
@@ -552,6 +569,13 @@ pub fn build(hirs: &[&Hir]) -> Vec<Template> {
     }
     out.sort_by(|a, b| a.path.cmp(&b.path));
     out
+}
+
+/// What lowering needs beyond the body: which declaration it is in, and the
+/// handler identities derived for it.
+struct Lowering<'a> {
+    handlers: &'a Handlers,
+    decl: crate::hir::DeclId,
 }
 
 fn roots_of(body: &Body) -> Vec<NodeId> {
@@ -580,7 +604,7 @@ fn coalesce(chunks: Vec<Chunk>) -> Vec<Chunk> {
     out
 }
 
-fn lower_node(body: &Body, id: NodeId, ix: &mut Indexer, out: &mut Vec<Chunk>) {
+fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out: &mut Vec<Chunk>) {
     match body.node(id) {
         Node::Text(t) => out.push(Chunk::Static(escape_static_text(t))),
         Node::Interpolation(e) => out.push(Chunk::Dynamic(Part::Text {
@@ -593,23 +617,50 @@ fn lower_node(body: &Body, id: NodeId, ix: &mut Indexer, out: &mut Vec<Chunk>) {
             attrs,
             children,
             self_closing,
-        } => lower_element(body, tag, attrs, children, *self_closing, ix, out),
+        } => lower_element(
+            body,
+            Element {
+                tag,
+                attrs,
+                children,
+                self_closing: *self_closing,
+            },
+            ctx,
+            ix,
+            out,
+        ),
         Node::Block {
             directive,
             children,
-        } => lower_block(body, directive, children, ix, out),
+        } => lower_block(body, directive, children, ctx, ix, out),
     }
+}
+
+/// The element being lowered, as one value.
+///
+/// Four of these travelled as separate parameters and clippy was right to
+/// object: they are one thing — the element — and passing them apart invites a
+/// call site that pairs the wrong tag with the wrong attributes.
+struct Element<'a> {
+    tag: &'a str,
+    attrs: &'a [crate::hir::Attr],
+    children: &'a [NodeId],
+    self_closing: bool,
 }
 
 fn lower_element(
     body: &Body,
-    tag: &str,
-    attrs: &[crate::hir::Attr],
-    children: &[NodeId],
-    self_closing: bool,
+    el: Element<'_>,
+    ctx: &Lowering<'_>,
     ix: &mut Indexer,
     out: &mut Vec<Chunk>,
 ) {
+    let Element {
+        tag,
+        attrs,
+        children,
+        self_closing,
+    } = el;
     // An element gets an identity only if it OWNS something dynamic. Charter
     // §14 M7 task 3: stable IDs for dynamic parts "without making static HTML
     // noisy", and the invariant that gives it meaning is that a static region
@@ -640,8 +691,15 @@ fn lower_element(
         if let Some((_, event)) = a.name.split_once(':')
             && a.name.starts_with("on:")
         {
+            // The identity `resume_artifacts` derived for this exact lambda.
+            // Empty when the handler is not resumable — an ordinary handler has
+            // no resume manifest and nothing to compare against.
             let handler = match &a.value {
-                AttrValue::Expr(e) => crate::infer::path_of(body, *e),
+                AttrValue::Expr(e) => ctx
+                    .handlers
+                    .get(&(ctx.decl, *e))
+                    .cloned()
+                    .unwrap_or_default(),
                 _ => String::new(),
             };
             out.push(Chunk::Dynamic(Part::Event {
@@ -703,7 +761,7 @@ fn lower_element(
 
     out.push(Chunk::Static(">".to_string()));
     for c in children {
-        lower_node(body, *c, ix, out);
+        lower_node(body, *c, ctx, ix, out);
     }
     // A closing tag for everything that is not void, whether or not the source
     // wrote `/>`. A first version branched on `self_closing` and produced the
@@ -718,6 +776,7 @@ fn lower_block(
     body: &Body,
     directive: &str,
     children: &[NodeId],
+    ctx: &Lowering<'_>,
     ix: &mut Indexer,
     out: &mut Vec<Chunk>,
 ) {
@@ -728,7 +787,7 @@ fn lower_block(
     let id = ix.part();
     let mut inner = Vec::new();
     for c in children {
-        lower_node(body, *c, ix, &mut inner);
+        lower_node(body, *c, ctx, ix, &mut inner);
     }
     let inner = coalesce(inner);
 

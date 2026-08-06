@@ -589,7 +589,22 @@ fn emit_template_command(paths: &[&String], plain: bool) -> ExitCode {
         hirs.push(pw_core::lower::lower_file(&src, &parsed.green));
     }
     let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
-    let templates = pw_core::template_ir::build(&refs);
+
+    // Handler identities, derived once by the resume artifacts and read by the
+    // template IR. Per file, because `located` walks one HIR against the whole
+    // program's signatures.
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = pw_core::signatures::Signatures::build(&ws, &refs);
+    let mut handlers = pw_core::template_ir::Handlers::new();
+    for (path, hir) in paths.iter().zip(&hirs) {
+        let src = std::fs::read_to_string(path).unwrap_or_default();
+        for (decl, lambda, m, _) in
+            pw_core::resume_artifacts::located(&src, hir, &sigs, pw_core::resume_artifacts::BUILD)
+        {
+            handlers.insert((decl, lambda), m.handler);
+        }
+    }
+    let templates = pw_core::template_ir::build_with(&refs, &handlers);
 
     let mut blocked = 0usize;
     for t in &templates {
