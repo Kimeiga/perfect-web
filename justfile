@@ -82,6 +82,14 @@ test-compile:
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
+# The platform library is compiler INPUT and is checked like it: it parses,
+# resolves, checks clean, its signatures are internally consistent, the
+# declarations the rules read are exercised by a program, and the trusted
+# contract — declarations with no implementation here — is content-hashed so a
+# change to one is a visible event.
+platform:
+    @cargo test --quiet -p pw-core --test platform_contracts -- --nocapture 2>&1 | grep -E 'platform contract|test result'
+
 # The THIRD gate: for every syntactically representable program the compiler
 # must produce output, ordinary diagnostics, or a marked internal error — never
 # terminate without a report. A panic takes every other rule down with it, so a
