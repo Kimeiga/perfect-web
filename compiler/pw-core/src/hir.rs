@@ -357,8 +357,15 @@ impl Body {
 
     /// Every expression reachable from `root`, parents before children.
     pub fn walk(&self) -> Vec<ExprId> {
+        self.walk_from(self.root)
+    }
+
+    /// The same walk, rooted at an arbitrary expression. Used where a check is
+    /// about one subtree — the value of a single attribute, say — rather than
+    /// about the whole body.
+    pub fn walk_from(&self, root: ExprId) -> Vec<ExprId> {
         let mut out = Vec::new();
-        let mut stack = vec![self.root];
+        let mut stack = vec![root];
         while let Some(id) = stack.pop() {
             out.push(id);
             let kids = self.children(id);

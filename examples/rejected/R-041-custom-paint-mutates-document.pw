@@ -12,6 +12,8 @@
 
 module store.rating_spark
 
+import document
+
 paint RatingSpark(values: List<Float>) !{ paint.custom } {
     inputs values
     draw(ctx) {

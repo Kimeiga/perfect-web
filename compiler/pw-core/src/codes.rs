@@ -45,6 +45,9 @@ pub enum Owner {
     Placement,
     Privacy,
     Markup,
+    /// Charter §7.5A relations that are not effect-row violations: an
+    /// ordering, a cycle, a declared assertion that does not hold.
+    Layout,
 }
 
 impl fmt::Display for Code {
@@ -123,6 +126,12 @@ codes! {
         "some effects are not permitted where a declaration runs, whatever it declares";
     WRONG_FRAME_PHASE = "PW0402", Effects,
         "each frame phase permits only the work it exists to do";
+
+    // --- layout relations (PW04xx) ----------------------------------------
+    OBSERVATION_FEEDBACK_CYCLE = "PW0403", Layout,
+        "an observation must not cause the change it observes";
+    FALSE_INDEPENDENCE = "PW0404", Layout,
+        "a subtree declared independent must not depend on anything outside it";
 
     // --- exhaustiveness ---------------------------------------------------
     NON_EXHAUSTIVE_MATCH = "PW0305", Exhaustiveness,
@@ -263,37 +272,12 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
         "effect inference — the layout and frame-phase family",
     ),
     (
-        "PW3003",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
         "PW3004",
         "E2D",
         "effect inference — the layout and frame-phase family",
     ),
     (
-        "PW3005",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
-        "PW3006",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
-        "PW3007",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
         "PW3008",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
-        "PW3009",
         "E2D",
         "effect inference — the layout and frame-phase family",
     ),

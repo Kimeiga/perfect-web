@@ -554,7 +554,26 @@ pub fn forbidden_in_phase(phase: &str, effect: &str) -> Option<&'static str> {
 /// is the corpus's very first rejected case.
 pub fn forbidden_in(decl: &Decl, effect: &str) -> Option<&'static str> {
     use crate::hir::DeclKind::*;
-    let family = effect.split('.').next().unwrap_or(effect);
+    let family = family_of(effect);
+
+    // A painter is identified by what it declares, not by a declaration kind:
+    // `paint.custom` in the row *is* the statement "this runs inside the paint
+    // pipeline". Charter §7.5A gives it inputs precisely so it can be replayed
+    // and cached, which is only sound if it is a pure function of them.
+    if decl
+        .declared_effects
+        .as_ref()
+        .is_some_and(|r| r.iter().any(|e| e.path == "paint.custom"))
+        && matches!(family, "dom" | "style" | "layout" | "database" | "network")
+    {
+        return Some(
+            "a painter must be a pure function of its declared inputs, so that the \
+             result can be replayed and cached — `paint.custom` may not use effect \
+             `dom.mutate`, nor any other reach outside the inputs it names. A painter \
+             that touches the document re-enters the pipeline that called it",
+        );
+    }
+
     match (decl.kind, family) {
         (View | Component | Page, "database") => {
             Some("a view renders; it cannot reach the database while doing so")

@@ -364,6 +364,12 @@ fn check_unit_with(
         }
     }
 
+    // Charter §7.5A relations: an ordering inside one frame, an observation
+    // that feeds itself, a property the compositor cannot animate, a subtree
+    // that is not as independent as it claims. None is an effect-row
+    // violation, so none belongs in `effect_rows`.
+    crate::layout::check(&unit.hir, sigs, &mut out);
+
     for (id, decl) in unit.hir.all_decls() {
         privacy_and_placement(
             &unit.hir,
@@ -1697,12 +1703,12 @@ fn effect_rows(
                 "`{}` performs `{}`, which a {} may not do",
                 decl.name,
                 source.effect,
-                kind_noun(decl.kind)
+                context_noun(decl)
             ),
             primary_span: source.span.clone(),
             related: vec![Related {
                 span: hir.decl_span(decl_id_of(hir, decl)),
-                label: format!("`{}` is a {}", decl.name, kind_noun(decl.kind)),
+                label: format!("`{}` is a {}", decl.name, context_noun(decl)),
             }],
             explanation: Some(format!(
                 "{why}. The chain: {}. Declaring the effect would not help — the \
@@ -1758,6 +1764,22 @@ fn effect_rows(
             }],
         });
     }
+}
+
+/// What to call this declaration in a diagnostic.
+///
+/// A painter has no `DeclKind` of its own — `paint X(..) !{ paint.custom }`
+/// lowers as an ordinary declaration — so the row is what names it. Saying
+/// "which a declaration may not do" would be true and useless.
+fn context_noun(decl: &Decl) -> &'static str {
+    if decl
+        .declared_effects
+        .as_ref()
+        .is_some_and(|r| r.iter().any(|e| e.path == "paint.custom"))
+    {
+        return "painter";
+    }
+    kind_noun(decl.kind)
 }
 
 fn kind_noun(kind: DeclKind) -> &'static str {

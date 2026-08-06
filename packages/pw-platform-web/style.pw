@@ -43,3 +43,13 @@ fn set_height(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } 
 fn set_padding(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
 fn set_custom(el: Element, property: String, value: String) -> () !{ style.mutate } { () }
+
+// The compositor-only properties. Charter §7.5A: `animation.composite` runs off
+// the main thread, which is possible exactly because these two do not
+// invalidate layout. Declaring them here rather than listing them in the
+// compiler is what lets the animation check ask a signature "can this property
+// be composited?" instead of consulting a table of property names.
+
+fn set_transform(el: Element, value: String) -> () !{ animation.composite } { () }
+
+fn set_opacity(el: Element, value: String) -> () !{ animation.composite } { () }

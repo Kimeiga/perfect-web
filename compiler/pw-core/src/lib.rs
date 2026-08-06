@@ -29,6 +29,7 @@ pub mod effects;
 pub mod exhaust;
 pub mod hir;
 pub mod koka;
+pub mod layout;
 pub mod lower;
 pub mod manifest;
 pub mod marko;

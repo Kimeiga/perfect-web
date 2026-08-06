@@ -153,6 +153,13 @@ impl Signatures {
         self.unique_member.get(name)?.as_ref()
     }
 
+    /// Every signature by path. A checker that needs to ask "which declarations
+    /// have this property" — rather than "what does this name do" — reads the
+    /// table instead of carrying its own copy of the answer.
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Signature)> {
+        self.by_path.iter()
+    }
+
     pub fn len(&self) -> usize {
         self.by_def.len()
     }

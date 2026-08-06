@@ -1,0 +1,24 @@
+// @corpus: platform
+// @id: PLATFORM-document
+// @category: platform — the document
+// @charter: §7.5A
+// @milestone: E2D
+//
+// Reaching the document is `dom.read` or `dom.mutate`. The distinction matters
+// where a phase forbids one and permits the other: a painter may compute, but
+// touching the document from inside one re-enters the pipeline that called it
+// (corpus R-041).
+
+module document
+
+import browser.{ Element }
+
+fn query(selector: String) -> Element !{ dom.read } { Element }
+
+fn query_all(selector: String) -> List<Element> !{ dom.read } { [] }
+
+fn set_text(el: Element, text: String) -> () !{ dom.mutate } { () }
+
+fn set_attribute(el: Element, name: String, value: String) -> () !{ dom.mutate } { () }
+
+fn append(parent: Element, child: Element) -> () !{ dom.mutate } { () }

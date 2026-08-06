@@ -185,6 +185,20 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // invariant, stated once; which phase and which effect are metadata.
     ("PW3004", "PW0402"),
     ("PW3008", "PW0402"),
+    // R-034 measures after a layout-affecting write in one transaction. The
+    // measure block is measuring, which is what it is for — but a measure that
+    // an earlier write has already invalidated is not the measure phase at all,
+    // so it is the same invariant seen from the ordering side.
+    ("PW3003", "PW0402"),
+    // A compositor animation and a painter both forbid work regardless of what
+    // the declaration admits to, which is what PW0401 says.
+    ("PW3006", "PW0401"),
+    ("PW3007", "PW0401"),
+    // These two are NOT effect-row violations, so they are not aliased onto
+    // one. A cycle is a relation between an observation and a write; a false
+    // independence is a declared assertion the code contradicts.
+    ("PW3005", "PW0403"),
+    ("PW3009", "PW0404"),
     ("PW0316", "PW5011"), // a list over a mutable collection needs a stable key
     ("PW0317", "PW5012"), // an element may only contain the children HTML permits
     ("PW0318", "PW5013"), // interactive behaviour belongs on an interactive element
