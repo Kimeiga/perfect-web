@@ -1,0 +1,45 @@
+milestone: E2 — source language front end (partial)
+generated: 2026-08-06T02:35:17Z
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+commands:
+  cargo test -p pw-syntax -p pw-cli
+  cargo run -p pw-cli -- check examples/accepted/*.pw examples/rejected/*.pw
+  cargo run -p pw-cli -- explain examples/accepted/A-003-public-store-query.pw
+
+=========== TESTS ===========================================
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=========== pw check OVER THE WHOLE CORPUS ==================
+pw check: 68 file(s), no diagnostics
+
+=========== pw explain ======================================
+── A-003-public-store-query.pw
+module       store.queries
+corpus       A-003 (accepted)
+
+query        Store
+             privacy: Public
+             freshness      30.seconds
+             consistency    snapshot
+             cache          shared
+             invalidates_on StoreChanged(id)
+             fallback       last_known_good
+             retry          bounded_exponential(max = 3, jitter = true)
+             concurrency    one_per_key
+             timeout        2.seconds
+             at bytes 430..791
+             line 14
+
+--- a session value in a shared cache (E5 preview) ---
+── R-004-private-cart-in-shared-cache.pw
+module       store.page
+corpus       R-004 (rejected)
+
+page         StorePage
+             at bytes 518..876
+             line 15
+

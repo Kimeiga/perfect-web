@@ -1,0 +1,17 @@
+[package]
+name = "pw-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# E2 — the developer-facing command surface (charter §14 M2 task 12).
+
+[[bin]]
+name = "pw"
+path = "src/main.rs"
+
+[dependencies]
+pw-syntax = { path = "../pw-syntax" }
+annotate-snippets.workspace = true

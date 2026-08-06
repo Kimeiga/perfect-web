@@ -392,7 +392,10 @@ impl<'a> Parser<'a> {
                 span: kw_tok.span.clone(),
             };
             // Value = everything up to the next policy keyword, `{`, or EOF.
-            let mut parts: Vec<&str> = Vec::new();
+            // Reconstructed from the SOURCE SPAN rather than by joining token
+            // texts: joining turns `30.seconds` into `30 . seconds`, and the
+            // span is already exact.
+            let mut value_start = None;
             let mut end = kw_tok.span.end;
             let mut depth = 0i32;
             while !self.at_eof() {
@@ -409,12 +412,21 @@ impl<'a> Parser<'a> {
                     _ => {}
                 }
                 let t = self.bump();
+                if value_start.is_none() {
+                    value_start = Some(t.span.start);
+                }
                 end = t.span.end;
-                parts.push(self.text(&t));
             }
+            let value = match value_start {
+                Some(vs) => self.src[vs..end]
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                None => String::new(),
+            };
             out.push(Policy {
                 keyword,
-                value: parts.join(" ").trim().to_string(),
+                value,
                 span: kw_tok.span.start..end,
             });
         }

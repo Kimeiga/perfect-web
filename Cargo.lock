@@ -45,6 +45,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-cli"
+version = "0.0.0"
+dependencies = [
+ "annotate-snippets",
+ "pw-syntax",
+]
+
+[[package]]
 name = "pw-core"
 version = "0.0.0"
 dependencies = [

@@ -51,11 +51,18 @@ test: test-unit test-compile
 test-unit:
     cargo test --workspace
 
-# Validates the accepted/rejected corpus (examples/) against its expectation
-# headers. Until Milestone 2 there is no `pw` compiler, so this checks corpus
-# well-formedness and coverage, not compilation. See tools/corpus-check.
+# Validates the accepted/rejected corpus. Two phases since E2:
+#   1. corpus-check — header well-formedness and full charter §16 coverage
+#   2. pw check     — every file must PARSE
+# Type checking is not yet wired to the parser; see docs/milestones/E2.md.
 test-compile:
     cargo run --quiet -p corpus-check -- examples
+    cargo run --quiet -p pw-cli -- check examples/accepted/*.pw examples/rejected/*.pw
+
+# `pw explain` over an example — the semantic facts a developer would otherwise
+# have to infer by reading the whole file.
+explain FILE:
+    @cargo run --quiet -p pw-cli -- explain {{FILE}}
 
 test-integration:
     @echo "test-integration: not yet applicable (first delivered in Milestone 3)"; exit 1
