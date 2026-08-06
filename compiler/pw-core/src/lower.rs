@@ -88,6 +88,12 @@ fn first_name(n: &SyntaxNode) -> Option<String> {
         .map(|c| c.text().to_string())
 }
 
+fn first_name_span(n: &SyntaxNode) -> Option<Span> {
+    n.children()
+        .find(|c| c.kind() == K::Name)
+        .map(|c| span_of(&c))
+}
+
 /// Significant (non-trivia) tokens of a node, excluding those inside children.
 fn own_tokens(n: &SyntaxNode) -> Vec<pw_syntax::SyntaxToken> {
     n.children_with_tokens()
@@ -215,6 +221,7 @@ impl Lowerer<'_> {
 
         let kind = decl_kind_of(node, self.src);
         let name = first_name(node).unwrap_or_default();
+        let name_span = first_name_span(node).unwrap_or_else(|| span_of(node));
         let declared_effects = node
             .children()
             .find(|c| c.kind() == K::EffectRow)
@@ -225,6 +232,7 @@ impl Lowerer<'_> {
         let id = DeclId(self.hir.decls.alloc(
             Decl {
                 name,
+                name_span,
                 kind,
                 params: self.params(node),
                 ret: self.return_type(node),

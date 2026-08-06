@@ -127,10 +127,13 @@ fn symbols_for(w: &Witness) -> BTreeSet<&'static str> {
     let mut out: BTreeSet<&'static str> = diags.iter().map(|d| d.symbol()).collect();
     // The declaration rules run on the syntax tree, not through `check_sources`.
     out.extend(
-        pw_core::rules::check(&pw_syntax::parse(&w.src).file)
-            .iter()
-            .filter(|f| f.is_error())
-            .filter_map(|f| lookup(f.code).map(|c| c.symbol)),
+        pw_core::rules::check(&pw_core::lower::lower_file(
+            &w.src,
+            &pw_syntax::parse_tree(&w.src).green,
+        ))
+        .iter()
+        .filter(|f| f.is_error())
+        .filter_map(|f| lookup(f.code).map(|c| c.symbol)),
     );
     out
 }
@@ -207,7 +210,7 @@ fn validity(w: &Witness) -> Validity {
     use pw_core::codes::lookup;
 
     let mut v = Validity::default();
-    let parsed = pw_syntax::parse(&w.src);
+    let parsed = pw_syntax::parse_tree(&w.src);
     v.parsed = parsed.errors.is_empty();
     if !v.parsed {
         v.failures.push(format!(

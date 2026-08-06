@@ -24,7 +24,10 @@ fn main() {
             let _ = pw_core::lower::lower_file(&text, &parsed.green);
         }
         "resolution-to-typing" | "labels-and-effects" | "exhaustiveness" => {
-            let _ = pw_core::rules::check(&pw_syntax::parse(&text).file);
+            // E6F: one parser. The legacy declaration AST is gone, so this
+            // target exercises the same path a real invocation takes.
+            let p = pw_syntax::parse_tree(&text);
+            let _ = pw_core::rules::check(&pw_core::lower::lower_file(&text, &p.green));
             let _ = pw_core::check::check_sources(&[("fuzz.pw".to_string(), text.clone())]);
         }
         "manifest-decoding" | "resume-compatibility" => resume(&text),

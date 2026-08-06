@@ -1,0 +1,43 @@
+E6F — one parser decides what a `.pw` program means
+
+$ just one-parser
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+  every declaration keyword reaches a DeclKind
+  every policy keyword reaches the HIR as a Policy, from both
+    positions the language writes one in
+  no crate outside pw-syntax builds a second semantic tree
+
+=== WHAT WAS DELETED =====================================================
+
+ compiler/pw-syntax/src/ast.rs             |  169 -----
+ compiler/pw-syntax/src/grammar.rs         |    8 +-
+ compiler/pw-syntax/src/lib.rs             |   22 +-
+ compiler/pw-syntax/src/parser.rs          | 1043 -----------------------------
+ compiler/pw-syntax/tests/corpus_parses.rs |  180 -----
+ 6 files changed, 139 insertions(+), 1484 deletions(-)
+
+  compiler/pw-syntax/src/parser.rs   the second declaration parser
+  compiler/pw-syntax/src/ast.rs      its declaration tree
+  compiler/pw-syntax/tests/          its corpus test, ported to the HIR
+
+  pw explain, pw check's declaration rules, the generality validity
+  pipeline, the robustness suites and the fuzz harness all read the HIR.
+
+=== THE FOUR TABLES, NOW ONE EACH ========================================
+
+  grammar.rs lines: 2290
+  DECL_STARTERS, UI_NOUNS, RESOURCE_NOUNS, POLICY_KEYWORDS — all pub,
+  all read by the gate above rather than copied into it.
+
+=== GATES ================================================================
+
+pw check: 34 file(s), no diagnostics
+
+ci: OK
+  generality-tested:      29 / 29
+  generality untested:    0 — []

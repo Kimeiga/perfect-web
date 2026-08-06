@@ -766,6 +766,7 @@ mod tests {
         use crate::hir::DeclKind;
         let view = crate::hir::Decl {
             name: "V".into(),
+            name_span: 0..0,
             kind: DeclKind::View,
             params: vec![],
             ret: None,

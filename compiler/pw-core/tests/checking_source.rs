@@ -5,6 +5,16 @@
 //! that reports more by reporting wrongly is worse than one that reports less.
 
 use pw_core::check::{Env, Unit, check_sources};
+
+/// Declaration-level rules over one file, through the one parser.
+///
+/// E6F: `rules::check` reads the HIR. Before, this went through a second
+/// declaration parser with its own tables — the thing E6 showed can disagree
+/// with the real one about the same file.
+fn declaration_rules(src: &str) -> Vec<pw_core::diagnostics::Diagnostic> {
+    let p = parse_tree(src);
+    pw_core::rules::check(&lower_file(src, &p.green))
+}
 use pw_core::lower::lower_file;
 use pw_syntax::parse_tree;
 
@@ -439,15 +449,12 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     // "19/44 enforced" hides the difference between a red diagnostic, the
     // *right* red diagnostic, and the whole declared invariant being checked.
     use pw_core::diagnostics::canonical_code;
-    use pw_core::rules;
-    use pw_syntax::parse;
-
     let (mut errored, mut declared_code, mut fully) = (0, 0, 0);
     let mut total = 0;
 
     for (name, src, diags) in rejected_results() {
         total += 1;
-        let mut codes: Vec<&str> = rules::check(&parse(&src).file)
+        let mut codes: Vec<&str> = declaration_rules(&src)
             .iter()
             .filter(|f| f.is_error())
             .map(|f| f.code)
@@ -502,14 +509,11 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
 fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
     // The ratchet from docs/NEXT.md item 8, counting declaration rules AND
     // body-level checks together, each fixture as its own program.
-    use pw_core::rules;
-    use pw_syntax::parse;
-
     let mut caught = Vec::new();
     let mut total = 0;
     for (name, src, diags) in rejected_results() {
         total += 1;
-        let decl_hits = rules::check(&parse(&src).file).iter().any(|f| f.is_error());
+        let decl_hits = declaration_rules(&src).iter().any(|f| f.is_error());
         if decl_hits || !diags.is_empty() {
             caught.push(name);
         }
@@ -682,15 +686,12 @@ fn an_unmodelled_capability_family_never_manufactures_a_placement_error() {
 #[test]
 fn corpus_enforcement_table_is_written_when_asked() {
     use pw_core::diagnostics::canonical_code;
-    use pw_core::rules;
-    use pw_syntax::parse;
-
     let mut rows: Vec<String> = Vec::new();
     let (mut caught, mut total) = (0, 0);
 
     for (name, src, diags) in rejected_results() {
         total += 1;
-        let mut codes: Vec<String> = rules::check(&parse(&src).file)
+        let mut codes: Vec<String> = declaration_rules(&src)
             .iter()
             .filter(|f| f.is_error())
             .map(|f| f.code.to_string())
@@ -766,9 +767,6 @@ fn corpus_enforcement_table_is_written_when_asked() {
 fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
     use pw_core::codes::lookup;
     use pw_core::diagnostics::{UNREGISTERED, canonical_code};
-    use pw_core::rules;
-    use pw_syntax::parse;
-
     let mut wrong = Vec::new();
     let mut checked = 0;
 
@@ -805,7 +803,7 @@ fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
         }
 
         // What actually caught it.
-        let mut symbols: Vec<&str> = rules::check(&parse(&src).file)
+        let mut symbols: Vec<&str> = declaration_rules(&src)
             .iter()
             .filter(|f| f.is_error())
             .filter_map(|f| lookup(f.code).map(|c| c.symbol))
@@ -882,9 +880,6 @@ const MULTI_DEFECT: &[(&str, &[&str])] = &[];
 #[test]
 fn every_rejected_fixture_emits_only_its_own_defect() {
     use pw_core::codes::lookup;
-    use pw_core::rules;
-    use pw_syntax::parse;
-
     let mut clean = 0;
     let mut total = 0;
     let mut noisy = Vec::new();
@@ -895,7 +890,7 @@ fn every_rejected_fixture_emits_only_its_own_defect() {
             .find_map(|l| l.trim().strip_prefix("// @invariant:"))
             .map(str::trim)
             .unwrap_or("");
-        let mut got: Vec<&str> = rules::check(&parse(&src).file)
+        let mut got: Vec<&str> = declaration_rules(&src)
             .iter()
             .filter(|f| f.is_error())
             .filter_map(|f| lookup(f.code).map(|c| c.symbol))

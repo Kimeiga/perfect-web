@@ -20,10 +20,8 @@ use std::process::ExitCode;
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use pw_core::diagnostics::{Diagnostic, Severity};
 use pw_core::rules;
-use pw_syntax::ast::{DeclKind, SourceFile, Visibility};
-use pw_syntax::parser::{ParseError, parse};
 
-fn render(source: &str, path: &str, errors: &[ParseError], styled: bool) -> String {
+fn render(source: &str, path: &str, errors: &[pw_syntax::SyntaxError], styled: bool) -> String {
     let renderer = if styled {
         Renderer::styled()
     } else {
@@ -93,63 +91,66 @@ fn render_findings(source: &str, path: &str, found: &[Diagnostic], styled: bool)
 /// Nothing here may name a generated artifact — no Koka module, no Marko
 /// template, no build directory. That is a charter gate item, and
 /// `explain_never_leaks_generated_paths` asserts it.
-fn explain(file: &SourceFile, source: &str) -> String {
+///
+/// E6F: reads the HIR. It used to read a second declaration tree from a second
+/// parser, and E6 showed what two parsers cost — a `materialize` block had
+/// policies to one of them and none to the other, in the same build, for the
+/// same file. There is now one parser that decides what a `.pw` program means.
+fn explain(hir: &pw_core::hir::Hir, source: &str) -> String {
+    use pw_core::hir::DeclKind;
     use std::fmt::Write as _;
     let mut s = String::new();
 
-    let _ = writeln!(
-        s,
-        "module       {}",
-        file.module
-            .as_ref()
-            .map(|m| m.name.as_str())
-            .unwrap_or("(none)")
-    );
-    if let Some(id) = file.attr("id") {
-        let _ = writeln!(
-            s,
-            "corpus       {} ({})",
-            id,
-            file.attr("corpus").unwrap_or("?")
-        );
+    let module = hir
+        .modules
+        .iter()
+        .next()
+        .map(|(_, m, _)| m.name.clone())
+        .unwrap_or_else(|| "(none)".to_string());
+    let _ = writeln!(s, "module       {module}");
+
+    // `@id:` and `@corpus:` are doc attributes in comments. Read from the
+    // source, because neither tree carries trivia into its declarations.
+    let attr = |k: &str| {
+        source
+            .lines()
+            .find_map(|l| l.trim().strip_prefix(&format!("// @{k}:")))
+            .map(str::trim)
+    };
+    if let Some(id) = attr("id") {
+        let _ = writeln!(s, "corpus       {} ({})", id, attr("corpus").unwrap_or("?"));
     }
     let _ = writeln!(s);
 
-    for d in &file.decls {
-        match &d.kind {
-            DeclKind::Module | DeclKind::Import => continue,
-            DeclKind::Opaque { representation } => {
-                let _ = writeln!(
-                    s,
-                    "opaque type  {}",
-                    d.name.as_ref().map(|n| n.name.as_str()).unwrap_or("?")
-                );
+    for (id, d) in hir.all_decls() {
+        let name = if d.name.is_empty() { "?" } else { &d.name };
+        let effects: Option<Vec<&str>> = d
+            .declared_effects
+            .as_ref()
+            .map(|row| row.iter().map(|e| e.written.as_str()).collect());
+
+        match d.kind {
+            DeclKind::Import => continue,
+            DeclKind::Opaque => {
+                let _ = writeln!(s, "opaque type  {name}");
                 let _ = writeln!(
                     s,
                     "             represented as {} — distinct from it everywhere in the checker",
-                    representation
-                        .as_ref()
-                        .map(|r| r.name.as_str())
-                        .unwrap_or("?")
+                    d.opaque_of.as_deref().unwrap_or("?")
                 );
             }
-            DeclKind::Union { variants } => {
-                let _ = writeln!(
-                    s,
-                    "union        {} ({} variants)",
-                    d.name.as_ref().map(|n| n.name.as_str()).unwrap_or("?"),
-                    variants.len()
-                );
+            DeclKind::Type if d.variants.is_some() => {
+                let variants = d.variants.as_deref().unwrap_or_default();
+                let _ = writeln!(s, "union        {name} ({} variants)", variants.len());
                 for v in variants {
-                    let args: Vec<&str> = v.fields.iter().map(|f| f.name.as_str()).collect();
                     let _ = writeln!(
                         s,
                         "             | {}{}",
-                        v.name.name,
-                        if args.is_empty() {
+                        v.name,
+                        if v.fields.is_empty() {
                             String::new()
                         } else {
-                            format!("({})", args.join(", "))
+                            format!("({})", v.fields.join(", "))
                         }
                     );
                 }
@@ -158,70 +159,64 @@ fn explain(file: &SourceFile, source: &str) -> String {
                     "             a match on this must cover every variant, whatever its effect row"
                 );
             }
-            DeclKind::Function {
-                params,
-                result,
-                effects,
-            } => {
-                let _ = writeln!(
-                    s,
-                    "fn           {}",
-                    d.name.as_ref().map(|n| n.name.as_str()).unwrap_or("?")
-                );
-                let ps: Vec<String> = params
+            DeclKind::Type => {
+                let _ = writeln!(s, "record       {name}");
+                for f in d.fields.as_deref().unwrap_or_default() {
+                    let _ = writeln!(
+                        s,
+                        "             {}: {}",
+                        f.name,
+                        f.ty.as_deref().unwrap_or("?")
+                    );
+                }
+            }
+            DeclKind::Fn => {
+                let _ = writeln!(s, "fn           {name}");
+                let ps: Vec<String> = d
+                    .params
                     .iter()
-                    .map(|p| {
-                        format!(
-                            "{}: {}",
-                            p.name.name,
-                            p.ty.as_ref().map(|t| t.name.as_str()).unwrap_or("?")
-                        )
-                    })
+                    .map(|p| format!("{}: {}", p.name, p.ty.as_deref().unwrap_or("?")))
                     .collect();
                 let _ = writeln!(s, "             ({})", ps.join(", "));
-                if let Some(r) = result {
-                    let _ = writeln!(s, "             -> {}", r.name);
+                if let Some(r) = &d.ret {
+                    let _ = writeln!(s, "             -> {r}");
                 }
-                match effects {
+                match &effects {
                     None => {
                         let _ = writeln!(s, "             effects: (unannotated — claims nothing)");
                     }
-                    Some(row) if row.effects.is_empty() => {
+                    Some(row) if row.is_empty() => {
                         let _ =
                             writeln!(s, "             effects: !{{}}  <- explicit purity claim");
                     }
                     Some(row) => {
-                        let names: Vec<&str> =
-                            row.effects.iter().map(|e| e.name.as_str()).collect();
-                        let _ = writeln!(s, "             effects: !{{{}}}", names.join(", "));
-                        let _ = writeln!(s, "             placement: {}", derive_placement(&names));
+                        let _ = writeln!(s, "             effects: !{{{}}}", row.join(", "));
+                        let _ = writeln!(s, "             placement: {}", derive_placement(row));
                     }
                 }
             }
-            DeclKind::Resource {
-                noun,
-                visibility,
-                policies,
-                ..
-            } => {
-                let _ = writeln!(
-                    s,
-                    "{noun:<12} {}",
-                    d.name.as_ref().map(|n| n.name.as_str()).unwrap_or("?")
-                );
-                let label = match visibility {
-                    Visibility::Public => "Public",
-                    Visibility::Session => "Session<SessionId>",
-                    Visibility::Private => "User<UserId>",
-                    Visibility::Unspecified => "(unspecified)",
+            DeclKind::Query
+            | DeclKind::Command
+            | DeclKind::Subscription
+            | DeclKind::Resource
+            | DeclKind::Materialize
+            | DeclKind::Event
+            | DeclKind::Task => {
+                let noun = noun_of(d.kind);
+                let _ = writeln!(s, "{noun:<12} {name}");
+                let label = match d.visibility.as_deref() {
+                    Some("public") => "Public",
+                    Some("session") => "Session<SessionId>",
+                    Some("private") => "User<UserId>",
+                    _ => "(unspecified)",
                 };
                 let _ = writeln!(s, "             privacy: {label}");
-                for p in policies {
-                    let _ = writeln!(s, "             {:<14} {}", p.keyword.name, p.value);
+                for p in &d.policies {
+                    let _ = writeln!(s, "             {:<14} {}", p.name, p.value);
                 }
-                let cache = policies.iter().find(|p| p.keyword.name == "cache");
-                if let (Some(c), Visibility::Session | Visibility::Private) = (cache, visibility)
+                if let Some(c) = d.policies.iter().find(|p| p.name == "cache")
                     && c.value.starts_with("shared")
+                    && matches!(d.visibility.as_deref(), Some("session") | Some("private"))
                 {
                     let _ = writeln!(
                         s,
@@ -229,29 +224,28 @@ fn explain(file: &SourceFile, source: &str) -> String {
                     );
                 }
             }
-            DeclKind::Ui { noun, effects, .. } => {
-                let _ = writeln!(
-                    s,
-                    "{noun:<12} {}",
-                    d.name.as_ref().map(|n| n.name.as_str()).unwrap_or("?")
-                );
-                if let Some(row) = effects {
-                    let names: Vec<&str> = row.effects.iter().map(|e| e.name.as_str()).collect();
-                    if names.is_empty() {
+            DeclKind::View | DeclKind::Component | DeclKind::Page => {
+                let noun = noun_of(d.kind);
+                let _ = writeln!(s, "{noun:<12} {name}");
+                for p in &d.policies {
+                    let _ = writeln!(s, "             {:<14} {}", p.name, p.value);
+                }
+                if let Some(row) = &effects {
+                    if row.is_empty() {
                         let _ = writeln!(s, "             effects: !{{}}  <- pure render");
                     } else {
-                        let _ = writeln!(s, "             effects: !{{{}}}", names.join(", "));
+                        let _ = writeln!(s, "             effects: !{{{}}}", row.join(", "));
                     }
                 }
             }
-            DeclKind::Record { .. } | DeclKind::Unrecognised => {
-                if let Some(n) = &d.name {
-                    let _ = writeln!(s, "declaration  {}", n.name);
-                }
+            DeclKind::Let | DeclKind::Other => {
+                let _ = writeln!(s, "declaration  {name}");
             }
         }
-        let _ = writeln!(s, "             at bytes {}..{}", d.span.start, d.span.end);
-        let line = source[..d.span.start.min(source.len())]
+
+        let span = hir.decl_span(id);
+        let _ = writeln!(s, "             at bytes {}..{}", span.start, span.end);
+        let line = source[..span.start.min(source.len())]
             .lines()
             .count()
             .max(1);
@@ -259,6 +253,24 @@ fn explain(file: &SourceFile, source: &str) -> String {
         let _ = writeln!(s);
     }
     s
+}
+
+/// The declaration keyword, so `explain` names what the author wrote.
+fn noun_of(kind: pw_core::hir::DeclKind) -> &'static str {
+    use pw_core::hir::DeclKind::*;
+    match kind {
+        Query => "query",
+        Command => "command",
+        Subscription => "subscription",
+        Resource => "resource",
+        Materialize => "materialize",
+        Event => "event",
+        Task => "task",
+        View => "view",
+        Component => "component",
+        Page => "page",
+        _ => "declaration",
+    }
 }
 
 /// Placement derived from effects alone — charter §7.9's claim, in miniature.
@@ -685,7 +697,11 @@ fn run() -> ExitCode {
     struct Input {
         display: String,
         src: String,
-        parsed: pw_syntax::Parsed,
+        parsed: pw_syntax::Parse,
+        /// `None` when the file did not parse cleanly. Recovery invents
+        /// plausible declarations, and lowering those would put fictional types
+        /// in the environment for every other file (E0 finding F-4).
+        hir: Option<pw_core::hir::Hir>,
     }
     let mut inputs = Vec::new();
     for path in paths {
@@ -701,11 +717,16 @@ fn run() -> ExitCode {
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| path.clone());
-        let parsed = parse(&src);
+        let parsed = pw_syntax::parse_tree(&src);
+        let hir = parsed
+            .errors
+            .is_empty()
+            .then(|| pw_core::lower::lower_file(&src, &parsed.green));
         inputs.push(Input {
             display,
             src,
             parsed,
+            hir,
         });
     }
 
@@ -725,6 +746,7 @@ fn run() -> ExitCode {
             display,
             src,
             parsed,
+            hir,
         } = input;
 
         if !parsed.errors.is_empty() {
@@ -732,7 +754,10 @@ fn run() -> ExitCode {
             errors += parsed.errors.len();
         } else {
             // Semantic rules only run on a clean parse, for the same reason.
-            let mut found = rules::check(&parsed.file);
+            // `hir` is `Some` exactly when `parsed.errors` is empty, three
+            // lines up. The `else` branch is unreachable and says so rather
+            // than silently reporting a clean file.
+            let mut found = hir.as_ref().map(rules::check).unwrap_or_default();
             found.extend(body_diags.get(display).cloned().unwrap_or_default());
             found.sort_by_key(|d| d.primary_span.start);
             if !found.is_empty() {
@@ -743,7 +768,9 @@ fn run() -> ExitCode {
         }
         if cmd == "explain" && parsed.errors.is_empty() {
             println!("── {display}");
-            print!("{}", explain(&parsed.file, src));
+            if let Some(hir) = hir {
+                print!("{}", explain(hir, src));
+            }
         }
     }
 
@@ -766,13 +793,19 @@ fn run() -> ExitCode {
 mod tests {
     use super::*;
 
+    /// Parse and lower, the one way the compiler does it.
+    fn hir_of(src: &str) -> pw_core::hir::Hir {
+        let p = pw_syntax::parse_tree(src);
+        assert!(p.ok(), "parse errors: {:?}", p.errors);
+        pw_core::lower::lower_file(src, &p.green)
+    }
+
     #[test]
     fn explain_never_leaks_generated_paths() {
         // Charter §14 M2 gate: the compiler prints an effect summary "without
         // exposing generated-file paths to the user".
         let src = "module store.pricing\n\npublic query Store(id: StoreId) -> Store\n    cache shared\n{\n    Stores.get(id)\n}\n\nfn subtotal(c: Cart) -> Money !{} { 0 }\n";
-        let parsed = parse(src);
-        let text = explain(&parsed.file, src);
+        let text = explain(&hir_of(src), src);
         for leak in [
             "koka",
             "Koka",
@@ -804,8 +837,8 @@ mod tests {
                 continue;
             }
             let src = std::fs::read_to_string(&path).expect("read");
-            let text = explain(&parse(&src).file, &src);
-            let hir = pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green);
+            let hir = hir_of(&src);
+            let text = explain(&hir, &src);
 
             for (_, decl) in hir.all_decls() {
                 for policy in &decl.policies {
@@ -894,8 +927,7 @@ mod tests {
         // The charter §7.8 rule, surfaced as a forward-looking warning until E5
         // makes it an error.
         let src = "module cart\n\nsession query Cart(s: SessionId) -> Cart\n    cache shared\n{\n    Carts.current(s)\n}\n";
-        let parsed = parse(src);
-        let text = explain(&parsed.file, src);
+        let text = explain(&hir_of(src), src);
         assert!(text.contains("Session<SessionId>"), "{text}");
         assert!(text.contains("rejected at E5"), "{text}");
     }
@@ -903,8 +935,7 @@ mod tests {
     #[test]
     fn explain_derives_placement_from_effects_alone() {
         let src = "module m\nfn f() -> () !{ secret<Payments> } { 0 }\nfn g() -> () !{ layout.measure } { 0 }\n";
-        let parsed = parse(src);
-        let text = explain(&parsed.file, src);
+        let text = explain(&hir_of(src), src);
         assert!(text.contains("Origin (secret"), "{text}");
         assert!(text.contains("Browser (browser-only"), "{text}");
     }
@@ -912,7 +943,7 @@ mod tests {
     #[test]
     fn check_renders_a_diagnostic_with_a_real_span() {
         let src = "module m\n\n$$$\n";
-        let parsed = parse(src);
+        let parsed = pw_syntax::parse_tree(src);
         assert!(!parsed.ok());
         let text = render(src, "m.pw", &parsed.errors, false);
         // Syntax errors live in PW00xx; PW01xx and above are semantic
@@ -925,7 +956,7 @@ mod tests {
     #[test]
     fn unannotated_and_empty_effect_rows_read_differently() {
         let src = "module m\nfn a() -> Int { 0 }\nfn b() -> Int !{} { 0 }\n";
-        let text = explain(&parse(src).file, src);
+        let text = explain(&hir_of(src), src);
         assert!(text.contains("unannotated — claims nothing"), "{text}");
         assert!(text.contains("explicit purity claim"), "{text}");
     }

@@ -123,6 +123,17 @@ each-typing:
     @echo "  refusing:  a non-collection, an unbound name — PW5016, not a"
     @echo "             quiet downgrade to an ordinary handler"
 
+# E6F. There is only one parser that decides what a `.pw` program means.
+# Enumerates the real keyword tables rather than a copy of them — a test with
+# its own list would be the fifth copy of the thing this milestone removed.
+one-parser:
+    @cargo test --quiet -p pw-core --test one_parser 2>&1 | tail -3
+    @cargo test --quiet -p pw-core --test corpus_declarations 2>&1 | tail -3
+    @echo "  every declaration keyword reaches a DeclKind"
+    @echo "  every policy keyword reaches the HIR as a Policy, from both"
+    @echo "    positions the language writes one in"
+    @echo "  no crate outside pw-syntax builds a second semantic tree"
+
 # E6. The resource dependency graph, and the materializer that consumes it.
 # Regenerates the committed graph fixture, because the runtime's tests read
 # real compiler output and a checked-in artifact goes stale silently.

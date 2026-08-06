@@ -197,6 +197,13 @@ pub struct VariantDef {
 #[derive(Debug, Clone)]
 pub struct Decl {
     pub name: String,
+    /// Where the name itself is written, not the whole declaration.
+    ///
+    /// A diagnostic that says "`Cart` is declared here, so its result is
+    /// `Session<SessionId>`" wants to underline the name. Pointing at the whole
+    /// declaration says the same words about a twenty-line span, which is how a
+    /// precise message becomes a vague one.
+    pub name_span: Span,
     pub kind: DeclKind,
     pub params: Vec<Param>,
     /// The declared return type's head, without arguments: `Result`.

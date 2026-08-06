@@ -4,6 +4,14 @@
 //
 // A rule banning `task.spawn` would catch this. What is forbidden is
 // spawning with no owner, not spawning.
+//
+// E6F: this file said `task.spawn(scope = component)` — a policy-clause spelling
+// inside an argument list, which is not the language. The legacy declaration
+// parser accepted it and the real grammar never did, so the validity pipeline
+// called this witness "parses without recovery" while every analysis saw a
+// broken parse and reported nothing. A valid neighbour that does not parse
+// proves nothing, and it proved it silently. `scope = component` is the named
+// argument the grammar has, the same shape as `bounded_exponential(max = 3)`.
 module generality.task_scoped
 
 import Analytics
@@ -12,7 +20,7 @@ import domain.{ MenuItemId }
 view ProductCard(item: MenuItemId) !{} {
     <article>
         <button on:press={() => {
-            task.spawn(scope component) { Analytics.record_view(item) }
+            task.spawn(scope = component) { Analytics.record_view(item) }
         }}>
             View
         </button>

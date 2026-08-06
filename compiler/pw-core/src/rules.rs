@@ -13,9 +13,22 @@
 //! Every rule carries a stable `PW####` code, a primary span, and — where the
 //! rule involves two places — an origin span, per charter §16.3. The E0
 //! diagnostic spike established that shape; this applies it to real files.
+//!
+//! # E6F: this reads the HIR
+//!
+//! It used to read `pw_syntax::ast::SourceFile`, a second declaration tree
+//! produced by a second parser. Two parsers deciding what a program means is
+//! two programs, and E6 showed what that costs: the tree grammar learned to
+//! parse a `materialize` block's policies and this path did not, so the same
+//! file had policies to one analysis and none to another.
+//!
+//! Architect ruling, 2026-08-06:
+//!
+//! > There is only one parser that decides what a `.pw` program means.
+//!
+//! The rules themselves did not change. What changed is where they read from.
 
-use pw_syntax::ast::{Decl, DeclKind, EffectRow, Policy, SourceFile, Visibility};
-use pw_syntax::lexer::Span;
+use crate::hir::{Decl, DeclKind, Hir, Policy, Span};
 
 use crate::diagnostics::{Detector, Diagnostic};
 
@@ -42,16 +55,60 @@ fn warn(
 }
 
 fn policy<'a>(policies: &'a [Policy], name: &str) -> Option<&'a Policy> {
-    policies.iter().find(|p| p.keyword.name == name)
+    policies.iter().find(|p| p.name == name)
 }
 
-fn privacy_label(v: Visibility) -> &'static str {
+/// The visibility keyword as written, or `""`.
+fn vis(decl: &Decl) -> &str {
+    decl.visibility.as_deref().unwrap_or("")
+}
+
+fn privacy_label(v: &str) -> &'static str {
     match v {
-        Visibility::Public => "Public",
-        Visibility::Session => "Session<SessionId>",
-        Visibility::Private => "User<UserId>",
-        Visibility::Unspecified => "unlabelled",
+        "public" => "Public",
+        "session" => "Session<SessionId>",
+        "private" => "User<UserId>",
+        _ => "unlabelled",
     }
+}
+
+/// The declaration keyword, for a message that names what the reader wrote.
+///
+/// A `DeclKind` and a noun are not the same thing: the kind is what the
+/// compiler decided, the noun is what the author typed, and a diagnostic that
+/// says "session query" when the source says `subscription` is describing a
+/// different program from the one on screen.
+fn noun_of(kind: DeclKind) -> &'static str {
+    match kind {
+        DeclKind::Query => "query",
+        DeclKind::Command => "command",
+        DeclKind::Subscription => "subscription",
+        DeclKind::Resource => "resource",
+        DeclKind::Materialize => "materialize",
+        DeclKind::View => "view",
+        DeclKind::Component => "component",
+        DeclKind::Page => "page",
+        DeclKind::Task => "task",
+        DeclKind::Event => "event",
+        DeclKind::Fn => "fn",
+        DeclKind::Type | DeclKind::Opaque => "type",
+        DeclKind::Let => "let",
+        DeclKind::Import => "import",
+        DeclKind::Other => "declaration",
+    }
+}
+
+/// The declarations `check_resource` applies to: the ones with a policy block
+/// describing a cached, placed or retried operation.
+fn is_resource_like(kind: DeclKind) -> bool {
+    matches!(
+        kind,
+        DeclKind::Query
+            | DeclKind::Command
+            | DeclKind::Subscription
+            | DeclKind::Resource
+            | DeclKind::Materialize
+    )
 }
 
 /// Effects a placement cannot satisfy, and why.
@@ -87,24 +144,27 @@ fn placement_conflict(placement: &str, effect: &str) -> Option<(&'static str, &'
     }
 }
 
-fn check_effects_against_placement(
-    policies: &[Policy],
-    effects: Option<&EffectRow>,
-    out: &mut Vec<Finding>,
-) {
-    let (Some(placement), Some(row)) = (policy(policies, "placement"), effects) else {
+fn check_effects_against_placement(decl: &Decl, out: &mut Vec<Finding>) {
+    let (Some(placement), Some(row)) = (
+        policy(&decl.policies, "placement"),
+        decl.declared_effects.as_ref(),
+    ) else {
         return;
     };
     let target = placement.value.split_whitespace().next().unwrap_or("");
-    for e in &row.effects {
-        if let Some((why, help)) = placement_conflict(target, &e.name) {
+    for e in row {
+        // `path`, not `written`: the conflict is with the effect FAMILY, and
+        // `style.mutate<LayoutAffect>` is as unavailable at `origin` as
+        // `style.mutate` is. The message uses the written form, because that is
+        // what the reader typed.
+        if let Some((why, help)) = placement_conflict(target, &e.path) {
             out.push(
                 err(
                     crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.id,
                     crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.invariant,
                     format!(
                         "effect `{}` is not available at placement `{target}`",
-                        e.name
+                        e.written
                     ),
                     e.span.clone(),
                 )
@@ -119,26 +179,19 @@ fn check_effects_against_placement(
     }
 }
 
-fn check_resource(
-    name: &str,
-    noun: &str,
-    visibility: Visibility,
-    policies: &[Policy],
-    decl: &Decl,
-    out: &mut Vec<Finding>,
-) {
+fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
+    let name = decl.name.as_str();
+    let noun = noun_of(decl.kind);
+    let visibility = vis(decl);
+    let policies: &[Policy] = &decl.policies;
     let label = privacy_label(visibility);
-    let name_span = decl
-        .name
-        .as_ref()
-        .map(|n| n.span.clone())
-        .unwrap_or(decl.span.clone());
+    let name_span: Span = decl.name_span.clone();
 
     // --- PW0100: a non-Public value in a shared cache -----------------------
     // The charter §16.3 worked example, now on real files.
     if let Some(cache) = policy(policies, "cache")
         && cache.value.starts_with("shared")
-        && matches!(visibility, Visibility::Session | Visibility::Private)
+        && matches!(visibility, "session" | "private")
     {
         out.push(
             err(
@@ -163,7 +216,7 @@ fn check_resource(
     // --- PW0101: read_your_writes on a public read --------------------------
     if let Some(c) = policy(policies, "consistency")
         && c.value.starts_with("read_your_writes")
-        && visibility == Visibility::Public
+        && visibility == "public"
     {
         out.push(
             err(
@@ -182,7 +235,7 @@ fn check_resource(
 
     // --- PW0102: a stale session read ---------------------------------------
     if let Some(f) = policy(policies, "freshness")
-        && visibility == Visibility::Session
+        && visibility == "session"
         && !f.value.starts_with('0')
     {
         out.push(
@@ -247,7 +300,7 @@ fn check_resource(
 
     // --- PW0306: a keyed query with no stale-work policy --------------------
     if noun == "query"
-        && !decl_params_empty(decl)
+        && !decl.params.is_empty()
         && policy(policies, "on_key_change").is_none()
         && policy(policies, "concurrency").is_some()
     {
@@ -298,7 +351,7 @@ fn check_resource(
     // --- PW0200 (warning): a shared cache with nothing to invalidate it -----
     if let Some(cache) = policy(policies, "cache")
         && cache.value.starts_with("shared")
-        && visibility == Visibility::Public
+        && visibility == "public"
         && policy(policies, "freshness").is_none()
         && policy(policies, "invalidates_on").is_none()
         && policy(policies, "invalidates").is_none()
@@ -316,45 +369,18 @@ fn check_resource(
     }
 }
 
-fn decl_params_empty(decl: &Decl) -> bool {
-    match &decl.kind {
-        DeclKind::Resource { params, .. } | DeclKind::Ui { params, .. } => params.is_empty(),
-        DeclKind::Function { params, .. } => params.is_empty(),
-        _ => true,
-    }
-}
-
-/// Run every declaration-level rule over a parsed file.
-pub fn check(file: &SourceFile) -> Vec<Finding> {
+/// Run every declaration-level rule over one program's HIR.
+///
+/// Nested declarations included (`all_decls`), which the AST walk did not do:
+/// a `fn` inside a component is a declaration with an effect row, and its
+/// placement conflict is the same conflict.
+pub fn check(hir: &Hir) -> Vec<Finding> {
     let mut out = Vec::new();
-    for d in &file.decls {
-        let name = d
-            .name
-            .as_ref()
-            .map(|n| n.name.as_str())
-            .unwrap_or("<anonymous>");
-        match &d.kind {
-            DeclKind::Resource {
-                noun,
-                visibility,
-                policies,
-                ..
-            } => {
-                check_resource(name, noun, *visibility, policies, d, &mut out);
-                check_effects_against_placement(policies, None, &mut out);
-            }
-            DeclKind::Ui {
-                policies, effects, ..
-            } => {
-                check_effects_against_placement(policies, effects.as_ref(), &mut out);
-            }
-            DeclKind::Function { effects, .. } => {
-                // A function's placement comes from a policy clause when it has
-                // one; bare functions get their placement solved at E5.
-                check_effects_against_placement(&[], effects.as_ref(), &mut out);
-            }
-            _ => {}
+    for (_, decl) in hir.all_decls() {
+        if is_resource_like(decl.kind) {
+            check_resource(decl, &mut out);
         }
+        check_effects_against_placement(decl, &mut out);
     }
     out
 }
@@ -362,12 +388,12 @@ pub fn check(file: &SourceFile) -> Vec<Finding> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pw_syntax::parser::parse;
+    use pw_syntax::parse_tree;
 
     fn findings(src: &str) -> Vec<Finding> {
-        let p = parse(src);
+        let p = parse_tree(src);
         assert!(p.ok(), "parse errors: {:?}", p.errors);
-        check(&p.file)
+        check(&crate::lower::lower_file(src, &p.green))
     }
 
     fn codes(src: &str) -> Vec<&'static str> {
@@ -507,7 +533,7 @@ mod tests {
 mod corpus_tests {
     use super::*;
     use crate::diagnostics::canonical_code;
-    use pw_syntax::parser::parse;
+    use pw_syntax::parse_tree;
     use std::path::{Path, PathBuf};
 
     fn corpus(bucket: &str) -> Vec<PathBuf> {
@@ -533,9 +559,10 @@ mod corpus_tests {
         let mut offenders = Vec::new();
         for path in corpus("accepted") {
             let src = std::fs::read_to_string(&path).expect("read");
-            let p = parse(&src);
+            let p = parse_tree(&src);
             assert!(p.ok(), "{} failed to parse: {:?}", path.display(), p.errors);
-            for f in check(&p.file).into_iter().filter(|f| f.is_error()) {
+            let hir = crate::lower::lower_file(&src, &p.green);
+            for f in check(&hir).into_iter().filter(|f| f.is_error()) {
                 offenders.push(format!(
                     "{}: [{}] {}",
                     path.file_name().unwrap().to_string_lossy(),
@@ -559,11 +586,18 @@ mod corpus_tests {
         let mut caught = 0;
         for path in corpus("rejected") {
             let src = std::fs::read_to_string(&path).expect("read");
-            let p = parse(&src);
-            let Some(expected) = p.file.attr("rule") else {
+            let p = parse_tree(&src);
+            // `@rule:` is a doc attribute in a comment, so it is read from the
+            // source text rather than from either tree.
+            let Some(expected) = src
+                .lines()
+                .find_map(|l| l.trim().strip_prefix("// @rule:"))
+                .map(str::trim)
+            else {
                 continue;
             };
-            let found: Vec<&str> = check(&p.file)
+            let hir = crate::lower::lower_file(&src, &p.green);
+            let found: Vec<&str> = check(&hir)
                 .into_iter()
                 .filter(|f| f.is_error())
                 .map(|f| f.code)
@@ -600,8 +634,9 @@ mod corpus_tests {
         for path in corpus("rejected") {
             total += 1;
             let src = std::fs::read_to_string(&path).expect("read");
-            let p = parse(&src);
-            if check(&p.file).iter().any(|f| f.is_error()) {
+            let p = parse_tree(&src);
+            let hir = crate::lower::lower_file(&src, &p.green);
+            if check(&hir).iter().any(|f| f.is_error()) {
                 caught += 1;
             }
         }

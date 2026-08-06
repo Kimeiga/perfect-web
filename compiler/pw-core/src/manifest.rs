@@ -381,6 +381,7 @@ mod tests {
         for v in ["snapshot", "eventual", "read_your_writes", "strong"] {
             let d = crate::hir::Decl {
                 name: "Q".into(),
+                name_span: 0..0,
                 kind: DeclKind::Query,
                 params: vec![],
                 ret: None,

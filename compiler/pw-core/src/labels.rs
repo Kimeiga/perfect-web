@@ -314,6 +314,7 @@ fn label_of_written(body: &Body, t: &crate::hir::TypeRef) -> Option<Label> {
 fn dummy() -> Decl {
     Decl {
         name: String::new(),
+        name_span: 0..0,
         kind: crate::hir::DeclKind::Fn,
         params: vec![],
         ret: None,

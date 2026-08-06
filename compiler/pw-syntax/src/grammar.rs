@@ -48,7 +48,7 @@ impl Parse {
 /// grammar accepted the declaration and the declaration parser reported
 /// "expected a declaration", for the same file, in the same build. Two lists
 /// that must be identical are one list.
-pub(crate) const DECL_STARTERS: &[&str] = &[
+pub const DECL_STARTERS: &[&str] = &[
     "module",
     "import",
     "opaque",
@@ -72,7 +72,7 @@ pub(crate) const DECL_STARTERS: &[&str] = &[
     "let",
 ];
 
-pub(crate) const UI_NOUNS: &[&str] = &["view", "component", "page"];
+pub const UI_NOUNS: &[&str] = &["view", "component", "page"];
 
 /// Statement keywords that may appear inside a body and take a
 /// `kw [name] [(args)] [-> Type] [{ block }]` shape.
@@ -102,7 +102,7 @@ const STMT_KEYWORDS: &[&str] = &[
     "subscribe",
     "unsafe",
 ];
-pub(crate) const RESOURCE_NOUNS: &[&str] = &[
+pub const RESOURCE_NOUNS: &[&str] = &[
     "query",
     "command",
     "subscription",
@@ -148,7 +148,7 @@ fn is_decl_kind(k: K) -> bool {
 const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
-pub(crate) const POLICY_KEYWORDS: &[&str] = &[
+pub const POLICY_KEYWORDS: &[&str] = &[
     "freshness",
     "consistency",
     "cache",

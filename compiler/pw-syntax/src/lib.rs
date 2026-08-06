@@ -12,21 +12,33 @@
 //! ([`tree`], [`kind`]). The invariants the hand-rolled representation
 //! established are retained as tests against it. Semantic analysis consumes HIR
 //! ids and spans, never these nodes.
+//!
+//! # One parser (E6F)
+//!
+//! [`parse_tree`] is the only function in this crate that decides what a `.pw`
+//! program means. There used to be a second — a hand-rolled declaration parser
+//! with its own AST, behind `pw explain` and the declaration rules — and E6
+//! showed what two parsers cost: they had four independent tables describing
+//! one language, disagreed when `event` was added, and disagreed for a whole
+//! milestone about whether a `materialize` block contained policies. The
+//! analyses downstream built a coherent story on information that was never
+//! there.
+//!
+//! The keyword tables are `pub` so a test can enumerate the real list rather
+//! than keep a copy of it. A test with its own copy would be the fifth.
 
-pub mod ast;
 pub mod fmt;
 pub mod grammar;
 pub mod kind;
 pub mod lexer;
-pub mod parser;
 pub mod tree;
 
-pub use ast::{Decl, DeclKind, SourceFile, Visibility};
 pub use fmt::{format_source, format_tree};
-pub use grammar::{Parse, SyntaxError, parse_tree};
+pub use grammar::{
+    DECL_STARTERS, POLICY_KEYWORDS, Parse, RESOURCE_NOUNS, SyntaxError, UI_NOUNS, parse_tree,
+};
 pub use kind::{Pw, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use lexer::{Kind, Span, Token, lex};
-pub use parser::{ParseError, Parsed, parse};
 pub use tree::{TreeBuilder, flat_tree, tree_text};
 
 /// A policy value with its layout removed, so wrapping a long clause across

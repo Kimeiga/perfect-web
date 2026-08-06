@@ -78,7 +78,8 @@ fn corpus() -> Vec<(String, String)> {
 fn survives(name: &str, src: &str) -> Result<(), String> {
     let owned = (name.to_string(), src.to_string());
     catch_unwind(AssertUnwindSafe(|| {
-        let _ = pw_core::rules::check(&pw_syntax::parse(src).file);
+        let p = pw_syntax::parse_tree(src);
+        let _ = pw_core::rules::check(&pw_core::lower::lower_file(src, &p.green));
         let _ = check_sources(std::slice::from_ref(&owned));
     }))
     .map_err(|e| {
