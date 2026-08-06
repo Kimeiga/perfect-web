@@ -49,6 +49,8 @@ pub enum Owner {
     Placement,
     Privacy,
     Markup,
+    /// Types: what a value is, and where it may be used as one.
+    Types,
     /// Charter §7.5A relations that are not effect-row violations: an
     /// ordering, a cycle, a declared assertion that does not hold.
     Layout,
@@ -141,6 +143,14 @@ codes! {
     NON_EXHAUSTIVE_MATCH = "PW0305", Exhaustiveness,
         "a match must cover every value its scrutinee can take";
 
+    // --- types (PW06xx) ---------------------------------------------------
+    OPTION_USED_AS_VALUE = "PW0600", Types,
+        "a value that may be absent must be matched before it is used";
+    UNCHECKED_EXTERNAL_CAST = "PW0601", Types,
+        "an external value must be decoded, not cast";
+    HANDLER_SIGNATURE_MISMATCH = "PW0602", Types,
+        "a handler must accept the event its attribute delivers";
+
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001", ScopeGraph,
         "a handle cannot outlive the scope that owns it";
@@ -216,8 +226,6 @@ pub enum RuleStatus {
 /// milestones land; it grows only when a new specification fixture is added.
 pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     // (code, intended owner, missing analysis)
-    ("PW0306", "E9", "type checking — an ambient null assumption"),
-    ("PW0307", "E9", "type checking — an unchecked external cast"),
     (
         "PW0308",
         "E7",
@@ -232,11 +240,6 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
         "PW0310",
         "E9C",
         "affine types — a resource handle that escapes",
-    ),
-    (
-        "PW0320",
-        "E9",
-        "type checking — a handler signature that does not match its event",
     ),
     (
         "PW0321",
@@ -281,6 +284,7 @@ impl Owner {
         match self {
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
+            Owner::Types => "PW06",
             _ => "",
         }
     }

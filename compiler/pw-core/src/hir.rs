@@ -331,6 +331,7 @@ impl Body {
                 v
             }
             Expr::Binary { lhs, rhs, .. } => vec![*lhs, *rhs],
+            Expr::Cast { value, .. } => vec![*value],
             Expr::Unary { operand, .. } => vec![*operand],
             Expr::Block { stmts } => stmts.clone(),
             Expr::If { cond, then, els } => {
@@ -460,6 +461,11 @@ pub enum Expr {
         op: BinOp,
         lhs: ExprId,
         rhs: ExprId,
+    },
+    /// `raw as Store`. The target is a type, not an expression.
+    Cast {
+        value: ExprId,
+        ty: TypeRefId,
     },
     Unary {
         op: UnOp,

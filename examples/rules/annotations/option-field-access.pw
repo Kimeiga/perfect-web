@@ -1,0 +1,11 @@
+// @expect: PW0600
+// The positive case: a field of the contents asked of the container.
+
+module rules.opt_bad
+
+import Stores
+
+fn name_of(id: StoreId) -> String !{ database.read } {
+    let store: Option<Store> = Stores.find(id)
+    store.name
+}

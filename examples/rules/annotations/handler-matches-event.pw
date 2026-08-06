@@ -1,0 +1,18 @@
+// @expect: clean
+// The control for the handler rule: the same form, the same binding, a handler
+// that takes what `on:submit` delivers. A rule that reported every `on:`
+// binding, or every handler whose parameter is any event type, would catch it.
+
+module rules.handler_good
+
+import events
+
+fn on_save(event: SubmitEvent) -> () !{} { () }
+
+view AddressForm() !{} {
+    <form on:submit={on_save}>
+        <label for="street">Street</label>
+        <input id="street" type="text" name="street" />
+        <button type="submit">Save</button>
+    </form>
+}

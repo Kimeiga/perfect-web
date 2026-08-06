@@ -471,6 +471,25 @@ impl Lowerer<'_> {
                 b.expr(Expr::Binary { op, lhs, rhs }, span)
             }
 
+            K::CastExpr => {
+                let kids: Vec<_> = node.children().collect();
+                let value = match kids.first() {
+                    Some(c) => self.expr(b, c),
+                    None => b.expr(Expr::Error, span.clone()),
+                };
+                let ty = match kids.iter().find(|c| c.kind() == K::TypeRef) {
+                    Some(t) => self.type_ref(b, t),
+                    None => b.ty(
+                        crate::hir::TypeRef {
+                            path: String::new(),
+                            args: vec![],
+                        },
+                        span.clone(),
+                    ),
+                };
+                b.expr(Expr::Cast { value, ty }, span)
+            }
+
             K::UnaryExpr => {
                 let op = match own_tokens(node).first().map(|t| t.kind()) {
                     Some(K::Bang) => UnOp::Not,
@@ -1030,6 +1049,7 @@ fn is_expr(k: K) -> bool {
             | K::IfExpr
             | K::MatchExpr
             | K::BinaryExpr
+            | K::CastExpr
             | K::UnaryExpr
             | K::ParenExpr
             | K::RecordExpr

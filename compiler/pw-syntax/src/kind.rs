@@ -109,6 +109,10 @@ pub enum SyntaxKind {
     MatchExpr,
     MatchArm,
     BinaryExpr,
+    /// `raw as Store`. Its right operand is a TYPE, not an expression, which
+    /// is why it is not a `BinaryExpr` — a checker asking "what is being cast
+    /// to" must find a `TypeRef` there and not a name it has to guess about.
+    CastExpr,
     UnaryExpr,
     ParenExpr,
     RecordExpr,
@@ -324,6 +328,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         MatchExpr,
         MatchArm,
         BinaryExpr,
+        CastExpr,
         UnaryExpr,
         ParenExpr,
         RecordExpr,

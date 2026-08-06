@@ -1,0 +1,13 @@
+// @expect: clean
+// The control for the cast rule. External data enters as `Unknown` and leaves
+// as `Result` — the boundary is crossed by decoding, which is the whole point.
+// A rule that banned the `Unknown` type, or banned `as` outright, would catch
+// this.
+
+module rules.decode_good
+
+import decode
+
+fn parse(raw: Unknown) -> Result<Store, DecodeError> !{} {
+    decode.run(store_decoder(), raw)
+}

@@ -608,6 +608,21 @@ impl<'a> P<'a> {
                 break;
             }
             let text = self.cur_text();
+            // `as` is a keyword operator whose right operand is a TYPE. It
+            // binds tighter than every arithmetic operator, so `a as T + b`
+            // is `(a as T) + b`.
+            if k == Kind::Ident && text == "as" && !self.newline_ahead() {
+                if 9 < min_bp {
+                    break;
+                }
+                self.b.start_at(cp, K::CastExpr);
+                self.bump();
+                if !self.type_ref() {
+                    self.error("PW0009", "expected a type after `as`");
+                }
+                self.finish();
+                continue;
+            }
             let Some((lbp, rbp)) = Self::infix_power(k, text) else {
                 break;
             };

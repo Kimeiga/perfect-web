@@ -370,6 +370,10 @@ fn check_unit_with(
     // violation, so none belongs in `effect_rows`.
     crate::layout::check(&unit.hir, sigs, &mut out);
 
+    // Charter §7.1, §7.10, §8.2: three questions about what a value is, each
+    // answered from a type the author wrote down.
+    crate::annotations::check(&unit.hir, sigs, &mut out);
+
     for (id, decl) in unit.hir.all_decls() {
         privacy_and_placement(
             &unit.hir,

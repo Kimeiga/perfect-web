@@ -1,0 +1,16 @@
+// @expect: clean
+// The control. Same annotation, same field, same lookup — matched first. A
+// rule that banned `Option<T>` bindings, or banned field access on one
+// anywhere in the body, would catch this too.
+
+module rules.opt_good
+
+import Stores
+
+fn name_of(id: StoreId) -> String !{ database.read } {
+    let store: Option<Store> = Stores.find(id)
+    match store {
+        Some(s) => s.name
+        None => "unknown"
+    }
+}

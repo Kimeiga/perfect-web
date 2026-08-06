@@ -1,0 +1,33 @@
+// @corpus: platform
+// @id: PLATFORM-events
+// @category: platform — DOM events
+// @charter: §8.2
+// @milestone: E9
+//
+// Which event an `on:` attribute delivers is a platform fact, so it is
+// declared here rather than listed in the compiler. `on:submit` resolves to
+// `events.submit`, whose parameter type IS the event type — so a handler is
+// checked against a signature, and declaring a new event is a change to this
+// file rather than to a checker.
+
+module events
+
+type SubmitEvent = SubmitEvent { prevented: String }
+
+type PressEvent = PressEvent { x: Int, y: Int }
+
+type InputEvent = InputEvent { value: String }
+
+type KeyEvent = KeyEvent { key: String }
+
+type ChangeEvent = ChangeEvent { value: String }
+
+fn submit(event: SubmitEvent) -> () !{} { () }
+
+fn press(event: PressEvent) -> () !{} { () }
+
+fn input(event: InputEvent) -> () !{} { () }
+
+fn keydown(event: KeyEvent) -> () !{} { () }
+
+fn change(event: ChangeEvent) -> () !{} { () }

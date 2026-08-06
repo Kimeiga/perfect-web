@@ -485,7 +485,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     // equality and not as another floor — a catch that is merely red is a
     // regression even when the count goes up.
     assert!(
-        errored >= 36,
+        errored >= 39,
         "regressed: {errored}/{total} produce an error"
     );
     assert_eq!(
@@ -493,7 +493,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
         "every catch must be for the declared invariant, not merely red"
     );
     assert!(
-        fully >= 36,
+        fully >= 39,
         "regressed: {fully}/{total} fully enforced, partial list = {PARTIALLY_ENFORCED:?}"
     );
 }

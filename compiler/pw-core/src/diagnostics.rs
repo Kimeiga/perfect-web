@@ -210,6 +210,11 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     ("PW0300", "PW0401"),
     ("PW0314", "PW0401"),
     ("PW0315", "PW0401"),
+    // Types. Each is a distinct question about what a value IS: one may be
+    // absent, one has not been decoded, one does not accept what it is given.
+    ("PW0306", "PW0600"),
+    ("PW0307", "PW0601"),
+    ("PW0320", "PW0602"),
     ("PW0316", "PW5011"), // a list over a mutable collection needs a stable key
     ("PW0317", "PW5012"), // an element may only contain the children HTML permits
     ("PW0318", "PW5013"), // interactive behaviour belongs on an interactive element

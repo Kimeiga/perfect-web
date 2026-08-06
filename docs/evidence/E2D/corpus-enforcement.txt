@@ -1,7 +1,7 @@
 corpus enforcement — every rejected fixture, checked as its own program
 (the shared library, the accepted modules it imports, and the fixture)
 
-36/44 enforce their declared invariant
+39/44 enforce their declared invariant
 
 R-001  enforced                  PW0401 (declared PW0300)
        network request inside view
@@ -17,9 +17,9 @@ R-006  enforced                  PW5006 (declared PW0304)
        public log of secret value
 R-007  enforced                  PW0305
        unhandled ADT variant
-R-008  UNCAUGHT                  PW0306
+R-008  enforced                  PW0600 (declared PW0306)
        ambient null assumption
-R-009  UNCAUGHT                  PW0307
+R-009  enforced                  PW0601 (declared PW0307)
        unchecked external cast
 R-010  UNCAUGHT                  PW0308
        nonserializable handler capture
@@ -45,7 +45,7 @@ R-020  enforced                  PW5013 (declared PW0318)
        button behavior implemented on inaccessible div
 R-021  enforced                  PW5014 (declared PW0319)
        label missing from form control
-R-022  UNCAUGHT                  PW0320
+R-022  enforced                  PW0602 (declared PW0320)
        form handler type mismatch
 R-023  UNCAUGHT                  PW0321
        dead internal route

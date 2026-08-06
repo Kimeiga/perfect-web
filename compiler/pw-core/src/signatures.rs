@@ -37,6 +37,9 @@ pub struct Signature {
     pub label: Label,
     /// The return type's head, without arguments.
     pub returns: Option<String>,
+    /// Each parameter's declared type head, in order. `None` where the
+    /// parameter carries no annotation.
+    pub params: Vec<Option<String>>,
 }
 
 impl Signature {
@@ -101,6 +104,7 @@ impl Signatures {
                         .collect(),
                     label: label_from_return(decl.ret.as_deref(), &decl.ret_args),
                     returns: decl.ret.clone(),
+                    params: decl.params.iter().map(|p| p.ty.clone()).collect(),
                 };
                 // A function whose first parameter is a declared type reads as
                 // that type's member. `offsetWidth(el: ElementRef)` is what
