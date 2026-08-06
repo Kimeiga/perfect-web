@@ -1,15 +1,46 @@
 # E2B — Program graph and name resolution
 
-**Status: PARTIAL.** Architect ruling, 2026-08-06 — E2B stays open until
-use-site resolution is *integrated*, not merely checked.
+**Status: COMPLETE.** The architect's condition — use-site resolution
+*integrated*, not merely checked — is met.
 
 ```text
 module graph                complete
 namespaces                  complete
 import resolution           complete
-declaration/use resolution  in progress
-fixture isolation           in progress
+declaration/use resolution  complete
+fixture isolation           complete
 ```
+
+## What "integrated" turned out to require
+
+The ruling was that E2B stays open until the downstream analyses *consume*
+resolution rather than comparing strings. Three things closed it, and the last
+was the one that mattered:
+
+1. **`Signatures::member_of`** resolves a member by its receiver's TYPE.
+2. **The by-name fallback is deleted**, not deprecated. It resolved an unknown
+   receiver to the one declaration with that spelling — conservative-looking,
+   and unsafe in a way conservatism does not fix, because *whether a
+   correctness check ran at all* depended on a global accident.
+   `there_is_no_by_name_member_lookup_in_the_compiler` greps the compiler to
+   keep it gone; the failure mode is silence, and nothing turns red when it
+   returns.
+3. **`infer::Types`** resolves a receiver chain from declared sources, so
+   `self.style.set_padding(..)` is `ElementRef` → `Style` → a member of
+   `Style`. No step asks whether a name is unique.
+
+Measured before designing: with the fallback disabled the corpus was 41/44, so
+it was load-bearing for exactly three fixtures — all with one root cause, that
+`self.style` had no type. Giving it one fixed all three, and the fallback could
+then be removed with the corpus unchanged at 44/44. That is the point: the
+score is the same and it now rests on something.
+
+## Fixture isolation
+
+`resolve_corpus.rs` checks every rejected fixture reports the same diagnostics
+alone as it does beside a sibling that shares its module name. It found the
+handler rule going **silent** — not wrong, silent — when a duplicate sibling
+made a name ambiguous.
 
 I had marked this "gate met" on the strength of `pw check` reporting an
 unresolved use. That was overstated: the check runs, but the downstream analyses
