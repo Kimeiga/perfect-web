@@ -1,0 +1,84 @@
+P0 readiness — recomputed from the ownership map
+recorded: 2026-08-06T13:17:08Z
+commit:   b99389652a8da0b81cecd65304556c7586a67ab6
+command:  pw check <library> <one rejected fixture>   (each fixture is its own program)
+
+================= THE GATE ======================================
+  At least 40 of 44 rejected corpus programs are source-level
+  compile errors, each failing for its declared invariant.
+
+================= WHERE IT STANDS ==============================
+  enforced: 20 / 44
+  gate:     40 / 44
+  gap:      20
+
+================= WHAT EACH REMAINING FILE NEEDS ===============
+  Owner is the milestone that must build the analysis, from
+  compiler/pw-core/src/codes.rs::KNOWN_GAPS.
+
+  R-001  PW0300   network request inside view
+  R-006  PW0304   public log of secret value
+  R-008  PW0306   ambient null assumption
+  R-009  PW0307   unchecked external cast
+  R-010  PW0308   nonserializable handler capture
+  R-011  PW0309   open transaction not committed or rolled back
+  R-012  PW0310   affine resource leaked
+  R-016  PW0314   nondeterministic static render
+  R-017  PW0315   wall-clock read in shared deterministic materialization
+  R-022  PW0320   form handler type mismatch
+  R-023  PW0321   dead internal route
+  R-024  PW0322   raw unsafe HTML without capability
+  R-025  PW0323   browser-only API on origin
+  R-030  PW0328   private data in resume manifest
+  R-032  PW3001   synchronous geometry read in ordinary code
+  R-033  PW3002   geometry read during render
+  R-034  PW3003   layout read after layout-affecting write
+  R-035  PW3004   layout write during measure phase
+  R-037  PW3001   generic callback smuggles layout measure
+  R-038  PW3005   resize observer layout feedback cycle
+  R-040  PW3006   layout-affecting operation in compositor animation
+  R-041  PW3007   custom paint mutates document
+  R-042  PW3008   post-paint same-frame layout measure
+  R-043  PW3009   containment with cross-boundary layout dependency
+
+================= THE ARITHMETIC, HONESTLY =====================
+
+  The architect's correction was right: E2D is not the only thing
+  between here and 40/44. Grouping the 24 remaining by what they
+  actually need:
+
+    10  geometry read as a PROPERTY, not a call
+        R-032 R-033 R-034 R-035 R-037 R-038 R-040 R-041 R-042 R-043
+        Needs E2B member lookup so `Element.offsetWidth` can be
+        DECLARED with `!{ layout.measure }`. Then E2D reaches them.
+        This is the single largest group and the cheapest per file.
+
+     4  effect inference over a declaration that does not exist yet
+        R-001 (fetch_store), R-016, R-017 (deterministic contexts),
+        R-006 (a secret reaching log.public — the flow exists, the
+        sink is not modelled as forbidden)
+
+     3  type checking                      R-008 R-009 R-022   E9
+     2  affine / linear resources          R-011 R-012         E9C
+     2  serialization and resume manifest  R-010 R-030         E7
+     2  capability at a boundary           R-024 R-025         E5
+     1  whole-program reachability         R-023               E6
+
+  So: 20 now, plus ~14 reachable by finishing E2B member lookup and
+  extending E2D, is about 34/44 — which is what the architect
+  predicted and is NOT 40.
+
+  Reaching 40 additionally requires at least type checking (E9) and
+  one of affine resources (E9C) or serialization (E7).
+
+================= THEREFORE ====================================
+
+  P0 IS NOT PUBLISHABLE, and the gap is not a matter of finishing
+  one more milestone. docs/EVIDENCE_LEDGER.md governs every public
+  claim; no landing page may imply otherwise.
+
+  The next cheapest real progress, in order:
+    1. E2B member lookup            -> unlocks ~10 layout files
+    2. E2D forbidden sinks + the
+       remaining declarations        -> ~4 more
+    3. Recompute this file. Then decide whether E9 comes next.
