@@ -18,7 +18,8 @@ use std::collections::BTreeMap;
 
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::exhaust::{self, Arm, Pattern as EPat};
-use crate::hir::{self, Body, DeclKind, Expr, ExprId, Hir, Pattern as HPat};
+use crate::hir::{self, Body, Decl, DeclKind, Expr, ExprId, Hir, Pattern as HPat};
+use crate::scope::{HandleKind, Op, ScopeGraph, ScopeKind, ScopeViolation};
 use crate::types::{Ctor, Program, Type};
 
 /// One source file that has been parsed and lowered.
@@ -154,6 +155,7 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
                 exhaustiveness(env, unit, body, id, *scrutinee, arms, &locals, &mut out);
             }
         }
+        scopes(decl, body, &mut out);
     }
     out.sort_by_key(|d| d.primary_span.start);
     out
@@ -292,4 +294,207 @@ pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>
 /// Declarations that define a type, for callers that need the environment.
 pub fn declares_a_type(kind: DeclKind) -> bool {
     matches!(kind, DeclKind::Type | DeclKind::Opaque)
+}
+
+// --- structured concurrency (E2A-S) --------------------------------------
+
+/// The ambient scope a declaration's body runs in.
+///
+/// A `view` and a `component` live for as long as their component; a `page` for
+/// a route; a `query` or `command` for one request. Getting this wrong in the
+/// permissive direction would silently accept an escape, so anything
+/// unrecognised is treated as the *narrowest* scope.
+fn ambient_scope(decl: &Decl) -> ScopeKind {
+    match decl.kind {
+        DeclKind::View | DeclKind::Component => ScopeKind::Component,
+        DeclKind::Page => ScopeKind::Route,
+        DeclKind::Query | DeclKind::Command => ScopeKind::Request,
+        DeclKind::Subscription => ScopeKind::Session,
+        _ => ScopeKind::Block,
+    }
+}
+
+fn named_scope(name: &str) -> Option<ScopeKind> {
+    Some(match name {
+        "application" => ScopeKind::Application,
+        "session" => ScopeKind::Session,
+        "route" => ScopeKind::Route,
+        "request" => ScopeKind::Request,
+        "component" => ScopeKind::Component,
+        _ => return None,
+    })
+}
+
+/// Feed `crate::scope`'s graph from a real body (`docs/NEXT.md` item 7).
+///
+/// The graph and its rules were written and tested against hand-built inputs in
+/// E2A-S. Nothing here re-implements them: this only builds the graph and
+/// converts what comes back.
+fn scopes(decl: &Decl, body: &Body, out: &mut Vec<Diagnostic>) {
+    let mut g = ScopeGraph::new();
+    // The lifetime hierarchy every declaration sits inside. Built in full each
+    // time so `outlives` has real parent links to walk.
+    let app = g.scope("application", ScopeKind::Application, None);
+    let session = g.scope("session", ScopeKind::Session, Some(app));
+    let route = g.scope("route", ScopeKind::Route, Some(session));
+    let request = g.scope("request", ScopeKind::Request, Some(route));
+    let component = g.scope("component", ScopeKind::Component, Some(route));
+    let here = match ambient_scope(decl) {
+        ScopeKind::Application => app,
+        ScopeKind::Session => session,
+        ScopeKind::Route => route,
+        ScopeKind::Request => request,
+        ScopeKind::Component | ScopeKind::Block => component,
+    };
+    let by_kind = move |k: ScopeKind| match k {
+        ScopeKind::Application => app,
+        ScopeKind::Session => session,
+        ScopeKind::Route => route,
+        ScopeKind::Request => request,
+        ScopeKind::Component | ScopeKind::Block => component,
+    };
+
+    let mut declared: Vec<(usize, usize, crate::hir::Span)> = Vec::new();
+
+    for id in body.walk() {
+        match body.expr(id) {
+            // `task.spawn(detached) { .. }` — a detach with no durable
+            // capability. `durable.spawn` is the legal path and is not this.
+            Expr::Call { callee, args } => {
+                let path = path_of(body, *callee);
+                if path != "task.spawn" {
+                    continue;
+                }
+                // The `detached` argument is the violation; the call is where
+                // the handle came from. Charter §16.3 wants both, and they must
+                // be different spans or the second underline says nothing.
+                let Some(at) = args
+                    .iter()
+                    .find(|a| matches!(body.expr(a.value), Expr::Name(n) if n == "detached"))
+                    .map(|a| body.expr_span(a.value))
+                else {
+                    continue;
+                };
+                let h = g.spawn("task.spawn", HandleKind::Task, here, body.expr_span(id));
+                g.op(Op::Detach {
+                    handle: h,
+                    span: at,
+                });
+            }
+
+            // `observe intersection(self) -> Bool { scope application }` — a
+            // subscription declaring a scope that outlives the one it is
+            // created in.
+            Expr::Keyword {
+                keyword,
+                modifiers,
+                block,
+                ..
+            } if keyword == "observe" => {
+                let Some(block) = block else { continue };
+                let Some((scope_name, at)) = block_scope(body, *block) else {
+                    continue;
+                };
+                let Some(kind) = named_scope(&scope_name) else {
+                    continue;
+                };
+                let label = match modifiers.first() {
+                    Some(m) => format!("observe.{m}"),
+                    None => "observe".to_string(),
+                };
+                let h = g.spawn(&label, HandleKind::Subscription, here, body.expr_span(id));
+                declared.push((h, by_kind(kind), at));
+            }
+
+            _ => {}
+        }
+    }
+
+    let mut found = g.check();
+    for (h, scope, span) in declared {
+        found.extend(g.check_declared_scope(h, scope, span));
+    }
+    out.extend(found.into_iter().map(to_diagnostic));
+}
+
+/// `scope application` inside a block: the scope's name, and the span covering
+/// the pair so a diagnostic can underline the clause rather than the statement.
+fn block_scope(body: &Body, block: ExprId) -> Option<(String, crate::hir::Span)> {
+    let Expr::Block { stmts } = body.expr(block) else {
+        return None;
+    };
+    let mut it = stmts.iter().peekable();
+    while let Some(s) = it.next() {
+        if !matches!(body.expr(*s), Expr::Name(n) if n == "scope") {
+            continue;
+        }
+        let Some(next) = it.peek() else { continue };
+        if let Expr::Name(v) = body.expr(**next) {
+            let span = body.expr_span(*s).start..body.expr_span(**next).end;
+            return Some((v.clone(), span));
+        }
+    }
+    None
+}
+
+/// A callee's dotted path as written: `task.spawn`, `Analytics.record_view`.
+fn path_of(body: &Body, id: ExprId) -> String {
+    match body.expr(id) {
+        Expr::Name(n) => n.clone(),
+        Expr::Field { base, name } => format!("{}.{}", path_of(body, *base), name),
+        _ => String::new(),
+    }
+}
+
+fn to_diagnostic(v: ScopeViolation) -> Diagnostic {
+    Diagnostic {
+        code: match v.code {
+            "PW2001" => "PW2001",
+            "PW2002" => "PW2002",
+            "PW2003" => "PW2003",
+            _ => "PW2004",
+        },
+        invariant: match v.code {
+            "PW2001" => "a handle cannot outlive the scope that owns it",
+            "PW2002" => "an ordinary task cannot be detached from its scope",
+            "PW2003" => "a handle cannot be used after its owning scope has exited",
+            _ => "a subscription cannot declare a scope that outlives its owner",
+        },
+        reason: match v.code {
+            "PW2001" => "handle_escape",
+            "PW2002" => "ordinary_task_detached",
+            "PW2003" => "use_after_scope",
+            _ => "declared_scope_outlives_owner",
+        },
+        detector: Detector::ScopeGraph,
+        severity: Severity::Error,
+        message: v.message,
+        primary_span: v.span,
+        related: vec![Related {
+            span: v.origin_span,
+            label: "the handle is created here".to_string(),
+        }],
+        // The explanation says WHY the invariant exists; the repair says what
+        // to do instead. Emitting the same sentence twice reads as a bug.
+        explanation: Some(match v.code {
+            "PW2001" => "A handle is cancelled when its owning scope ends. One that has \
+                         escaped is a reference to work that may already be gone."
+                .to_string(),
+            "PW2002" => "Structured concurrency has no fire-and-forget: every ordinary task \
+                         belongs to a scope and is cancelled with it. Work that must survive \
+                         the scope is a different kind of work, and says so."
+                .to_string(),
+            "PW2003" => "A result arriving after its owning scope has exited must not be \
+                         committed — there is nothing left to commit it to."
+                .to_string(),
+            _ => "A subscription keeps pushing updates for as long as its declared scope \
+                  lives. Declaring a longer scope than the owner means pushing into \
+                  something that no longer exists."
+                .to_string(),
+        }),
+        repairs: vec![Repair {
+            description: v.help,
+            replacement: None,
+        }],
+    }
 }

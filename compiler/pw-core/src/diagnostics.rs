@@ -162,6 +162,7 @@ impl Diagnostic {
 const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // (alias as written in the corpus, canonical invariant code)
     ("PW0326", "PW2004"), // a resource cannot outlive the scope that owns it
+    ("PW0311", "PW2002"), // an ordinary task cannot be detached from its scope
 ];
 
 /// Resolve a corpus-declared code to the canonical invariant code.

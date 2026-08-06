@@ -44,7 +44,7 @@ fn unit(name: &str, src: &str) -> Unit {
 }
 
 #[test]
-fn no_accepted_corpus_file_reports_an_exhaustiveness_error() {
+fn no_accepted_corpus_file_reports_a_body_level_error() {
     // Checked first and on its own. A false positive on an accepted file means
     // the checker is wrong about the language, which is a worse failure than
     // missing a rejected case.
@@ -346,7 +346,7 @@ fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
         "expected the full rejected corpus, saw {total}"
     );
     assert!(
-        caught.len() >= 5,
+        caught.len() >= 7,
         "semantic coverage regressed: {}/{total} caught — {caught:?}",
         caught.len()
     );
@@ -381,4 +381,60 @@ fn every_body_level_rejection_matches_its_declared_rule() {
 
     assert!(checked > 0, "no rejected file was caught by a body check");
     assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+}
+
+#[test]
+fn the_structured_concurrency_rules_run_on_real_bodies() {
+    // docs/NEXT.md item 7 for `scope.rs`: the E2A-S graph and its rules were
+    // written and tested against hand-built inputs. Nothing is re-implemented
+    // here — the bridge builds the graph from HIR and converts what comes back.
+    let sources: std::collections::HashMap<_, _> = whole_corpus().into_iter().collect();
+    let results: std::collections::HashMap<_, _> =
+        check_sources(&whole_corpus()).into_iter().collect();
+
+    // R-013: `task.spawn(detached)` with no durable capability. The file
+    // declares PW0311, which aliases to the invariant's canonical code.
+    let d = results
+        .iter()
+        .find(|(p, _)| p.starts_with("R-013"))
+        .and_then(|(_, d)| d.iter().find(|d| d.code == "PW2002"))
+        .expect("R-013 must be caught");
+    let src = &sources[results.keys().find(|p| p.starts_with("R-013")).unwrap()];
+    // The primary span is the offending argument, the related span is where the
+    // handle came from — charter §16.3 wants both, and they must differ.
+    assert_eq!(&src[d.primary_span.clone()], "detached");
+    assert!(src[d.related[0].span.clone()].starts_with("task.spawn"));
+    assert_ne!(d.primary_span, d.related[0].span);
+    assert_ne!(
+        d.explanation.as_deref(),
+        Some(d.repairs[0].description.as_str()),
+        "the note and the help must not be the same sentence"
+    );
+
+    // R-039: a subscription declaring a scope that outlives its component.
+    let d = results
+        .iter()
+        .find(|(p, _)| p.starts_with("R-039"))
+        .and_then(|(_, d)| d.iter().find(|d| d.code == "PW2004"))
+        .expect("R-039 must be caught");
+    let src = &sources[results.keys().find(|p| p.starts_with("R-039")).unwrap()];
+    assert_eq!(&src[d.primary_span.clone()], "scope application");
+
+    // Control: the same subscription scoped to its component is legal, and a
+    // `durable.spawn` is the sanctioned way to outlive a scope.
+    let ok = "module m\ncomponent C() {\n    let v = observe intersection(self) -> Bool { scope component }\n    view { <p /> }\n}\n";
+    assert!(
+        check_sources(&[("ok.pw".into(), ok.into())])[0]
+            .1
+            .is_empty(),
+        "a component-scoped observation must be accepted: {:?}",
+        check_sources(&[("ok.pw".into(), ok.into())])[0].1
+    );
+    let plain = "module m\nview V() !{} {\n    task.spawn(work) { g() }\n}\n";
+    assert!(
+        check_sources(&[("p.pw".into(), plain.into())])[0]
+            .1
+            .is_empty(),
+        "an ordinary scoped spawn must be accepted"
+    );
 }

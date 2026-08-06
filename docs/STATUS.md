@@ -26,7 +26,7 @@ E2 gate items are lowering to Koka (item 4) and the rejected-corpus count
 | RQ-1 | Marko resumption, Chrome + Safari | **done** — passed its pre-registered rule |
 | RQ-2 | Koka higher-order effect propagation | **done** — Outcome 1, clean pass |
 | RQ-3 | `pw` exhaustiveness + typed ABI | **partial** — checker done; no parser until E2 |
-| RQ-4 | structured concurrency | **partial** — E2A-S done; E2A-R not started |
+| RQ-4 | structured concurrency | **partial** — E2A-S done **and running on source**; E2A-R not started |
 | RQ-5 | artifact capability audit | **partial** — rule done; not wired to a build |
 | RQ-6 | effect-family rejection coverage | **partial** — layout/DOM families done |
 | RQ-7 | E→P evidence ledger | **done** |
@@ -35,13 +35,14 @@ E2 gate items are lowering to Koka (item 4) and the rejected-corpus count
 files and they all parse, with precise spans and error recovery. The
 specification is executable in CI rather than merely well-formed.
 
-**Five rejected corpus files now fail to compile**, each caught by the rule its
+**Seven rejected corpus files now fail to compile**, each caught by the rule its
 `@rule` header declares, with a primary span, an origin span, a note and a legal
 alternative. `just rejections` shows the current state. Four are declaration
-rules; **R-007 is the first caught by an algorithm** — the exhaustiveness
-checker, running on HIR lowered from source, naming every missing variant.
+rules; **three are caught by algorithms running on HIR lowered from source** —
+R-007 by the exhaustiveness checker, which names every missing variant, and
+R-013 and R-039 by the E2A-S scope graph.
 
-The other 39 need effect checking (E1) or privacy/placement (E5). Coverage is
+The other 37 need effect checking (E1) or privacy/placement (E5). Coverage is
 ratcheted by a test so it cannot silently regress.
 
 **The front end is complete through HIR.** Rowan is adopted (ADR-0012); the
