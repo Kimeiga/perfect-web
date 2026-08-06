@@ -91,8 +91,11 @@ evidence-corpus:
     @echo
     @head -4 docs/evidence/E2D/corpus-enforcement.txt
 
+# Superseded by `just evidence-corpus`. Checking all 44 fixtures as ONE program
+# asks a question nobody meant — five of them reuse module names with each other
+# — so the duplicate-declaration errors drown the real ones (E2B).
 rejections:
-    -@cargo run --quiet -p pw-cli -- check examples/rejected/*.pw
+    @echo "use `just evidence-corpus` — the rejected fixtures are not one program"; exit 1
 
 # `pw explain` over an example — the semantic facts a developer would otherwise
 # have to infer by reading the whole file.

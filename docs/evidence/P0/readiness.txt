@@ -1,84 +1,108 @@
-P0 readiness — recomputed from the ownership map
-recorded: 2026-08-06T13:17:08Z
-commit:   b99389652a8da0b81cecd65304556c7586a67ab6
-command:  pw check <library> <one rejected fixture>   (each fixture is its own program)
+P0 readiness — recomputed after E2B, E2C and E2D
+recorded: 2026-08-06T14:31:00Z
+commit:   936f2d1
+measured: docs/evidence/E2D/corpus-enforcement.txt, from `just evidence-corpus`
+          (written by the same test the ratchet asserts on, so the published
+          number cannot drift from the enforced one)
 
 ================= THE GATE ======================================
   At least 40 of 44 rejected corpus programs are source-level
   compile errors, each failing for its declared invariant.
 
 ================= WHERE IT STANDS ==============================
-  enforced: 20 / 44
-  gate:     40 / 44
-  gap:      20
+  enforced:      33 / 44
+  wrong reason:   0
+  gate:          40 / 44
+  gap:            7
 
-================= WHAT EACH REMAINING FILE NEEDS ===============
-  Owner is the milestone that must build the analysis, from
-  compiler/pw-core/src/codes.rs::KNOWN_GAPS.
+  The previous recomputation (b993896) predicted ~34 after finishing
+  E2B member lookup and extending E2D. The actual figure is 33. The
+  one it over-counted was R-006, which needs privacy flow, not
+  effect inference.
 
-  R-001  PW0300   network request inside view
-  R-006  PW0304   public log of secret value
-  R-008  PW0306   ambient null assumption
-  R-009  PW0307   unchecked external cast
-  R-010  PW0308   nonserializable handler capture
-  R-011  PW0309   open transaction not committed or rolled back
-  R-012  PW0310   affine resource leaked
-  R-016  PW0314   nondeterministic static render
-  R-017  PW0315   wall-clock read in shared deterministic materialization
-  R-022  PW0320   form handler type mismatch
-  R-023  PW0321   dead internal route
-  R-024  PW0322   raw unsafe HTML without capability
-  R-025  PW0323   browser-only API on origin
-  R-030  PW0328   private data in resume manifest
-  R-032  PW3001   synchronous geometry read in ordinary code
-  R-033  PW3002   geometry read during render
-  R-034  PW3003   layout read after layout-affecting write
-  R-035  PW3004   layout write during measure phase
-  R-037  PW3001   generic callback smuggles layout measure
-  R-038  PW3005   resize observer layout feedback cycle
-  R-040  PW3006   layout-affecting operation in compositor animation
-  R-041  PW3007   custom paint mutates document
-  R-042  PW3008   post-paint same-frame layout measure
-  R-043  PW3009   containment with cross-boundary layout dependency
+================= WHAT THE REMAINING 11 NEED ===================
+
+  E5 — privacy sinks and capability at a boundary          3
+    R-006  a `Secret<Payments>` value reaching `log<Public>`.
+           E2D infers the effect and the label algebra exists;
+           `log<Public>` is not modelled as a sink the label may
+           not cross into.
+    R-024  raw HTML without the capability that permits it.
+    R-025  `device.current_location()` under `placement origin`.
+           NOT a missing analysis. The rule exists and is
+           registered (PW5005, rules.rs); it reads the DECLARED
+           effect row, and R-025's query declares none. It needs
+           two connections, both already-open E2B/E2C items:
+             1. a `device` platform module, so the call resolves;
+             2. the placement rule consuming INFERRED effects
+                rather than only declared ones.
+
+  E9 — type checking                                       3
+    R-008  an ambient null assumption (`Option<Store>` vs `null`)
+    R-009  an unchecked external cast
+    R-022  a form handler whose type does not match its form
+
+  E9C — affine and linear resources                        2
+    R-011  a transaction still open on one return path
+    R-012  a `use`-bound handle escaping into module state
+
+  E7 — serialization and the resume manifest               2
+    R-010  a handler capturing something not serializable
+    R-030  private data crossing into the public resume manifest
+
+  E6 — whole-program reachability                          1
+    R-023  a route nothing can reach
 
 ================= THE ARITHMETIC, HONESTLY =====================
 
-  The architect's correction was right: E2D is not the only thing
-  between here and 40/44. Grouping the 24 remaining by what they
-  actually need:
+  33 now. The gate needs 7 more.
 
-    10  geometry read as a PROPERTY, not a call
-        R-032 R-033 R-034 R-035 R-037 R-038 R-040 R-041 R-042 R-043
-        Needs E2B member lookup so `Element.offsetWidth` can be
-        DECLARED with `!{ layout.measure }`. Then E2D reaches them.
-        This is the single largest group and the cheapest per file.
+    E5 alone            -> 36
+    E5 + E9             -> 39     still short
+    E5 + E9 + any one of E9C / E7 / E6  -> 40, 41 or 42
 
-     4  effect inference over a declaration that does not exist yet
-        R-001 (fetch_store), R-016, R-017 (deterministic contexts),
-        R-006 (a secret reaching log.public — the flow exists, the
-        sink is not modelled as forbidden)
+  So reaching the P0 gate requires AT LEAST THREE more milestones,
+  and no two of them suffice. This has not changed in character
+  since the last recomputation — only in size, from 20 to 7.
 
-     3  type checking                      R-008 R-009 R-022   E9
-     2  affine / linear resources          R-011 R-012         E9C
-     2  serialization and resume manifest  R-010 R-030         E7
-     2  capability at a boundary           R-024 R-025         E5
-     1  whole-program reachability         R-023               E6
+================= WHAT E2B/E2C/E2D ACTUALLY BOUGHT =============
 
-  So: 20 now, plus ~14 reachable by finishing E2B member lookup and
-  extending E2D, is about 34/44 — which is what the architect
-  predicted and is NOT 40.
+  20 -> 33 enforced, and zero wrong-reason catches at every step.
 
-  Reaching 40 additionally requires at least type checking (E9) and
-  one of affine resources (E9C) or serialization (E7).
+  The three numbers moved together throughout: at no point did the
+  count rise without the diagnostics also naming the declared
+  invariant. Two occasions where they diverged were treated as
+  regressions and fixed rather than banked:
+
+    25 -> 27  when effect identity kept its type argument,
+              `secret<Payments>` stopped covering `secret.read` and
+              two fixtures were reported for effects they HAD
+              declared. Corrected back to 25.
+    R-012     was caught, but for a second defect that masked its
+              declared invariant. The fixture was repaired, not the
+              count.
+
+  Four fixtures were uncaught because a call resolved to nothing
+  rather than because a rule was missing: R-001 (`fetch_store`),
+  R-041 (`document`), and R-004/R-012 (missing imports). Each was
+  repaired by giving the fixture the declaration it calls. R-025 is
+  the same shape and is NOT repaired, because its second half is a
+  real E5 connection rather than a missing import.
 
 ================= THEREFORE ====================================
 
-  P0 IS NOT PUBLISHABLE, and the gap is not a matter of finishing
-  one more milestone. docs/EVIDENCE_LEDGER.md governs every public
-  claim; no landing page may imply otherwise.
+  P0 IS NOT PUBLISHABLE. docs/EVIDENCE_LEDGER.md governs every
+  public claim; no landing page may imply otherwise.
 
-  The next cheapest real progress, in order:
-    1. E2B member lookup            -> unlocks ~10 layout files
-    2. E2D forbidden sinks + the
-       remaining declarations        -> ~4 more
-    3. Recompute this file. Then decide whether E9 comes next.
+  What may be said today, and is measured:
+    - 33 of 44 rejected corpus programs are compile errors in real
+      `.pw` source, each failing for the invariant it declares.
+    - All 24 accepted programs check clean.
+
+  What may NOT be said:
+    - that the corpus is enforced, or broadly enforced;
+    - any figure above 33/44;
+    - that effect inference is complete — it is complete for the
+      cases the corpus specifies, and the placement solver and the
+      privacy flow still read declared rows rather than inferred
+      ones.

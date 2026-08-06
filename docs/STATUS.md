@@ -13,15 +13,14 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E6 — materialized resource graph**, with one task carried
-forward: **effect inference**. Most of the remaining 33 rejected corpus files
-need a callee's effects to be knowable — a network call inside a pure view
-cannot be detected otherwise. E9 owns it; whether it is pulled forward is the
-open question.
+**next milestone:** **E5 — capability and privacy at a boundary**, which owns
+three of the eleven remaining rejected fixtures and is the cheapest step toward
+the P0 gate. See `docs/evidence/P0/readiness.txt` for the arithmetic: reaching
+40/44 requires at least three more milestones, and no two of them suffice.
 
-E0, E2A and **E3** are complete; E1 closed on RQ-2's Outcome 1. E2 is 5/6,
-E4 5/7, E5 3/5. E4's and E5's open items need a store demo and a much larger
-set of compile-fail cases; E2's needs effect inference.
+E0, E2A, **E3**, and the inserted **E2B / E2C / E2D** are complete; E1 closed on
+RQ-2's Outcome 1. E2 is 5/6, E4 5/7, E5 3/5. E2's open item is the
+rejected-corpus count.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -44,23 +43,28 @@ single figure hides the difference between a red diagnostic, the *right* red
 diagnostic, and the whole declared invariant being checked):
 
 ```text
-19 / 44  rejected fixtures produce a compile error
-19 / 44  emit their declared canonical code
-19 / 44  fully enforce the complete declared invariant
+33 / 44  rejected fixtures produce a compile error
+33 / 44  emit their declared canonical code
+33 / 44  fully enforce the complete declared invariant
 ```
 
 Up from four when E2 began, each with a primary span, an origin span, a note and
-a legal alternative. `just rejections` shows
-the current state. Four are declaration rules; **fifteen are caught by
-algorithms running on HIR lowered from source**: the exhaustiveness checker, the
-E2A-S scope graph, E5's placement solver and label algebra, and E5's markup
-rules.
+a legal alternative. `just evidence-corpus` regenerates
+`docs/evidence/E2D/corpus-enforcement.txt`, the per-fixture table — written by
+the same test the ratchet asserts on, so the published number cannot drift from
+the enforced one.
 
-Zero false positives across the 24 accepted files. The remaining 25 mostly need
-**effect inference**, which does not exist: a network call inside a pure view
-cannot be detected without the callee's effects, and the whole layout family
-needs it. E9 owns that. Coverage is ratcheted by a test so it cannot silently
-regress.
+The three numbers have stayed equal at every step, which is the point of
+reporting three. Twice they diverged and both times it was treated as a
+regression rather than banked: once when a count rose to 27 by reporting two
+fixtures for effects they had declared, and once when `R-012` was caught for a
+second defect that masked its declared invariant.
+
+Zero false positives across the 24 accepted files, four of which (`A-018`,
+`A-020`, `A-021`, `A-023`) exist specifically as negative controls for the
+layout rules — each differs from its rejected twin in exactly the one way the
+rule is about. The remaining **eleven** need E5 (3), E9 (3), E9C (2), E7 (2) and
+E6 (1). Coverage is ratcheted by a test so it cannot silently regress.
 
 **The front end is complete through HIR.** Rowan is adopted (ADR-0012); the
 body grammar parses all 68 corpus files and they round-trip byte-for-byte;
@@ -95,8 +99,9 @@ decorative. **E2 gate: five of six items pass.** The open one is the
 rejected-corpus count, which E1 and E5 own.
 
 **public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 still cannot be
-published — several claims it needs are unstarted, and of 44 rejected corpus
-files **5 are rejected by the compiler**, not the ≥40 the charter asks for.
+published — of 44 rejected corpus files **33 are rejected by the compiler**, not
+the ≥40 the charter asks for, and the gap needs at least three more milestones.
+`docs/evidence/P0/readiness.txt` states what may and may not be said today.
 
 **last passing commit:** `7630593` — Linux CI and supply-chain scanning.
 `just ci` passes at that commit on macOS 26.5.2 / arm64, with 207 tests.

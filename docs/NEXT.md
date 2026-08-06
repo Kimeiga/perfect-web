@@ -20,8 +20,8 @@ Fixed by the project architect after reviewing E2's results. Items 1–3 are don
 | 4 | Implement the durable core body grammar | **done** — 68/68 corpus files parse and round-trip; see `docs/milestones/E2.md` |
 | 5 | Lower bodies into HIR | **done** — ADR-0014; id-indexed arenas, span on every node, 11 tests |
 | 6 | Move declaration rules from `pw-cli` into `pw-core` | **done** |
-| 7 | Connect the tested `pw-core` algorithms to `.pw` source | **partial** — exhaustiveness and the E2A-S scope graph run on source; ABI and capability still unconnected |
-| 8 | Ratchet semantic corpus enforcement upward from 4/44 | **7/44** — R-007 (exhaustiveness), R-013 and R-039 (scope graph); ratcheted in `checking_source.rs` |
+| 7 | Connect the tested `pw-core` algorithms to `.pw` source | **partial** — exhaustiveness, the E2A-S scope graph, privacy, placement, markup rules, effect inference and the layout relations all run on source; ABI and capability still unconnected, and the placement solver still reads *declared* effect rows rather than inferred ones |
+| 8 | Ratchet semantic corpus enforcement upward from 4/44 | **33/44**, ratcheted in `checking_source.rs`; per-fixture table at `docs/evidence/E2D/corpus-enforcement.txt` via `just evidence-corpus` |
 | 9 | Implement `pw fmt` after the syntax/HIR boundary stabilises | **done** — gate in the ADR-0013 amendment; 23 of 68 corpus files reformatted |
 | 10 | Begin E2A-R only once body-level task operations can be represented | **unblocked** — `Expr::Keyword` represents them |
 
@@ -97,28 +97,52 @@ R11 as retired until a real run is green.
 
 ---
 
-## The next milestone: E4
+## The next executable task: E5's three fixtures
 
-**E4 — typed resource model and the first complete store page.** It is next in
-charter order, and it also unblocks the two items E2 and E3 could not close:
+E2B, E2C and E2D are complete and the corpus stands at **33/44 with zero
+wrong-reason catches**. `docs/evidence/P0/readiness.txt` has the full
+arithmetic; the short version is that reaching the 40/44 gate needs at least
+three more milestones and no two of them suffice, so the order is by cost.
 
-| blocked item | what E4 gives it |
-|---|---|
-| E3 gate 3 — a delayed region streams without blocking the shell | a value that is not ready yet, so there is something to await |
-| E2 gate 2 — ≥40 rejected corpus files | `query`/`command` policy rules with real bodies behind them |
+**E5 is cheapest and owns three fixtures.** In the order they should be done:
 
-Charter §14 M4 asks for `query`, `command`, `subscription`, `resource` and
-structured `task` as first-class compiler concepts. The declaration syntax for
-all five already parses and lowers; what does not exist is their **meaning**.
+1. **`R-025` — a declared placement that cannot grant what the body needs.**
+   The rule already exists and is registered (`PW5005`, `rules.rs`). It cannot
+   fire because it reads the **declared** effect row and R-025's query declares
+   none. Two connections, both already-open E2B/E2C items:
+     - a `device` platform module, so `device.current_location()` resolves;
+     - the placement rule consuming `Inference`'s result rather than only
+       `decl.declared_effects`.
+   This is the single highest-value item in the whole remaining list, because
+   the second half unblocks every future placement rule at once.
+
+2. **`R-024` — raw HTML without the capability that permits it.**
+   `capability.rs` exists with 7 tests and is called from tests only.
+
+3. **`R-006` — a `Secret<Payments>` value reaching `log<Public>`.**
+   E2D infers the effect and the label algebra exists; what is missing is
+   modelling a sink whose label the value may not cross into.
+
+**Acceptance for each:** the fixture emits its declared canonical code, the
+diagnostic contains every backticked payload its `@expect-error` lines declare,
+all 24 accepted files stay clean, and the ratchet floor rises in the same
+commit. Then regenerate `docs/evidence/E2D/corpus-enforcement.txt` and
+`docs/evidence/P0/readiness.txt`.
+
+### After E5
+
+E9 (type checking) owns `R-008`, `R-009` and `R-022` — three more, reaching 39.
+The fortieth must come from E9C (`R-011`, `R-012`), E7 (`R-010`, `R-030`) or E6
+(`R-023`). None is cheap; that is the honest position and no landing page may
+imply otherwise.
 
 ---
 
 ## E2's last open gate item
 
 Item 2 — *≥40 rejected examples report errors at original `.pw` spans* — stands
-at **5 of 44**. It is the only E2 gate item still open, and it is not E2's to
-close: the remaining 39 need effect checking (E1) or privacy and placement
-solving (E5). `docs/milestones/E2.md` lists which file needs which.
+at **33 of 44**. It is the only E2 gate item still open and it is not E2's to
+close; the remaining eleven belong to E5, E9, E9C, E7 and E6 as listed above.
 
 Items 4 (Koka execution) and 3 (formatting) are closed; 1, 5 and 6 were already.
 

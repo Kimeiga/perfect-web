@@ -205,9 +205,9 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Nine measurements in this project produced plausible, favourable results while
-measuring nothing. The count is kept accurate deliberately: it is the argument
-for the admissibility rule above.
+Seventeen measurements in this project produced plausible, favourable results
+while measuring nothing. The count is kept accurate deliberately: it is the
+argument for the admissibility rule above.
 
 | where | what it reported | what was actually happening |
 |---|---|---|
@@ -223,15 +223,37 @@ for the admissibility rule above.
 | E3 adapter | the generated template looked correct | **Marko strips whitespace between elements**, so `<span>a</span> <span>b</span>` rendered as `ab`. The template-level test asserted the template, and the template was fine — only a browser saw the DOM |
 | E5 placement | corpus coverage rose from 7 to 9 files | an effect family absent from the capability table was granted by **no** world, so two files were reported as unplaceable for a reason that had nothing to do with their actual defect. Right file, wrong rule, and the number went up while nothing was detected |
 | E5 markup | corpus coverage read 20 files | `<form>` was missing from the list of interactive elements, so `<form on:submit={..}>` — the normal way to submit a form — was reported as an accessibility defect. It made R-022, a handler *type* mismatch, look caught. The real number was 19 |
+| E2D | `R-012` was caught, and its code matched | it was caught for a **second** defect — its `setup` declared neither `dom.mutate` nor `layout.measure` — which masked the affine-resource leak the fixture was written for. A fixture that fails for the wrong reason is not enforced, so the fixture was repaired rather than the count banked |
+| E2D | corpus coverage rose from 25 to 27 | giving an effect's type argument its place in the effect's *identity* was correct, but `covered()` split the family on `.` before stripping arguments — and `secret<Payments>` has no dot. Two fixtures were reported for an effect their own row declared. The 27 was worse than the 25 |
+| registry | `PW0323` looked owned and consistent | it meant three things at once: the registry called it "a resource must declare how it is released" (nothing enforced that), `rules.rs` emitted it for a placement failure, and the corpus fixture declaring it is about placement. Had the rule and the fixture ever met, the ratchet would have counted a correct catch under a description of a different rule — and `declared_code == errored` **cannot see that**, because the code genuinely matches |
+| registry | four gap entries read as open work | `PW3001`, `PW3002`, `PW3004` and `PW3008` were aliased onto `PW0401`/`PW0402` when the layout family landed, so nothing could ever resolve to the gap entries. They described work that was already done as unowned |
 | E2 grammar | an audited `unsafe` was reported as unjustified | the newline rule that ends a statement also ended `unsafe capability … because "…"` before its `because` clause, so the justification became a separate statement and never reached the declaration. **`pw fmt` then baked the misparse into the source**, which is the part worth remembering: a formatter faithfully renders a wrong parse |
 
-The last four share one shape: **the diagnostic pointed at the line after the
-defect.** A parser that recovers silently moves the blame downstream, which is
-why the errors read as "exotic corpus syntax" rather than as parser bugs. The
-countermeasure is in the E2 tests — every construct asserts its tree *shape*,
-so a wrong parse fails where it happens instead of somewhere plausible.
+Four of the grammar rows share one shape: **the diagnostic pointed at the line
+after the defect.** A parser that recovers silently moves the blame downstream,
+which is why the errors read as "exotic corpus syntax" rather than as parser
+bugs. The countermeasure is in the E2 tests — every construct asserts its tree
+*shape*, so a wrong parse fails where it happens instead of somewhere plausible.
 
-All five were caught by looking at a raw number and asking whether it was
+Five share a different and more dangerous shape — the two `E5` rows, `R-012`,
+the 25-to-27 rise, and `PW0323`: **the number went up.** Coverage rising is the
+signal everyone is watching for, and in each case it rose, or would have risen,
+while detection got worse or stayed the same. Two countermeasures now exist:
+
+- **three numbers, not one** — produces an error / emits the declared code /
+  fully enforces the declared invariant — with `declared_code == errored`
+  asserted as an *equality* rather than a floor, so a catch that is merely red
+  is a regression even when the count rises;
+- **registry tests that fail closed** —
+  `every_registered_code_is_one_a_checker_can_emit` rejects a code the registry
+  claims and no checker emits, and the known-gap test now rejects an entry the
+  alias table has made unreachable.
+
+Neither countermeasure would have caught the `PW0323` case, which is worth
+stating: the code matched, the fixture was uncaught, and only reading the
+registry against the corpus by hand found it. That is the residual risk.
+
+Almost all were caught by looking at a raw number and asking whether it was
 plausible — never by a test going red.
 
 **Rule adopted**, promoted by the project architect into a general
