@@ -53,6 +53,11 @@ wit-bindgen = "0.60.0"
 # the version is the crate's rather than the host's — `tools/versions.lock`
 # exists to stop a measurement being a measurement of one machine's macOS.
 rusqlite = { version = "0.40.1", features = ["bundled"] }
+# E7-R's instance-token PRF (architect ruling, 2026-08-06: a keyed
+# cryptographic derivation, not FNV). Verified on crates.io 2026-08-06: 1.8.6,
+# CC0-1.0 OR Apache-2.0. `keyed_hash` IS the PRF, so nothing here composes a
+# construction by hand.
+blake3 = "1.8.6"
 
 [profile.release]
 lto = "thin"

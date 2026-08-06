@@ -141,22 +141,46 @@ test. 12 oracle cases pass in Chromium, Firefox and WebKit; 1 case is the
 project's own target with no oracle, recorded as *not holding* for Marko because
 RQ-1 falsified it there.
 
-**E7-R's vertical slice runs.** The store page renders through the own
-renderer, `decide()` authorises the handler before it attaches, and a click
-updates only the cart's part. What remains in E7-R:
+**E7-R is closed.** The store page renders through the own renderer, `decide()`
+authorises before attachment, and a click updates only the cart's part because
+its declared resource changed.
 
-- **Instance identity inside a loop.** A template-scoped `ElementId` names a
-  position in the template, and inside `{#each}` the document has one instance
-  per item. Attaching behaviour to all of them is right; UPDATING one of them
-  needs the loop's declared key, which the IR already carries and the runtime
-  does not yet use.
-- **Keyed list operations** — insert, remove, reorder — which is where that key
-  earns its place.
-- **A real resource subscription**, rather than a command endpoint returning the
-  new value.
+### 2. E7-P — the own streamed patch mechanism
 
-**Then E7-P**, the streamed patch mechanism, and **E7-L**, where Marko is the
-negative oracle rather than the positive one.
+The foundation E7-R leaves it:
+
+```text
+IdentityDomain            E6 decides who shares one
+        ↓
+InstancePath              a frame per repeatable scope
+        ↓
+PartAddress               what a patch targets
+        ↑
+Patch { basis, target, op }
+        ↑
+server stream
+        ↑
+E6 resource graph + materializer
+```
+
+Three things to build against it:
+
+- **Keyed list operations** — insert, remove, reorder, update one instance,
+  replace a whole range. The `InstancePath` model is the address space they
+  need; E7-R renders keyed lists and does not yet mutate them.
+- **One multiplexed server→browser stream** carrying `ResourceChanged`,
+  `Patch` and `Recovery`. Resource subscription and patch transport stay
+  logically separate: a subscription changes, the server *may derive* a patch,
+  and the transport sends it. Long-poll becomes the fallback adapter rather
+  than the mechanism.
+- **A causal basis per patch**, as a list of `(ResourceEntryId, Version)` even
+  while every patch has one entry. A part can eventually be derived from a
+  cart, a promotion and a store's pricing at once, and a field that starts as a
+  collection does not need a breaking redesign to hold three.
+
+**Then E7-L**, where Marko is the negative oracle: RQ-1 measured that its
+interaction module loads during initial page load, so the implementation has to
+demonstrably do something the scaffolding does not.
 
 Two smaller pieces are E6's and are deliberately not claimed there:
 

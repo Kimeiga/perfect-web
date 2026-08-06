@@ -20,10 +20,19 @@ version; the subscriber is told. 120 browser assertions across Chromium,
 Firefox and WebKit (`just spike-own-renderer`), and `just golden-both` runs the
 shared case set against Marko and the own renderer as separate processes.
 
-Live parts are addressed as `TemplateSchemaId + InstancePath + LocalPartId`. A
+Live parts are addressed as `IdentityDomain + InstancePath + LocalPartId`. A
 template part *definition* is not a document part *instance*: the store page's
-three Add buttons share `data-pw="0"` and have three distinct addresses, keyed
-by an opaque document-scoped token that does not reveal the item's id.
+three Add buttons share `data-pw="0"` and have three distinct addresses.
+
+**E6 decides who shares an identity domain and E7-R decides how things inside
+it are addressed** — there is no independent E7 notion of who shares. A public
+materialization has one domain, so every reader of that cached entry gets the
+same bytes; two session partitions derive unrelated tokens for identical
+application keys.
+
+The token is a keyed BLAKE3 derivation truncated to 96 bits, base64url, 16
+characters — an opaque address and never a capability. A collision within a
+domain **refuses the render**: correctness does not rest on probability.
 
 "No component replay" is proved structurally — the client artifact contains no
 template renderer, with a poisoned artifact as the negative control — and then

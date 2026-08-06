@@ -284,7 +284,7 @@ test.describe("instance identity — the three Add buttons", () => {
     }
     // The control: the tokens ARE there, so the assertion is about their
     // content rather than about their absence.
-    expect(html).toMatch(/<!--pw:s1@[0-9a-f]{8}-->/);
+    expect(html).toMatch(/<!--pw:s1@[A-Za-z0-9_-]{16}-->/);
   });
 
   test("the same document renders the same tokens twice", async ({ page, request }) => {
@@ -292,7 +292,7 @@ test.describe("instance identity — the three Add buttons", () => {
     // agree, or an address means nothing across a reload.
     const a = await (await request.get("/StorePage.html")).text();
     const b = await (await request.get("/StorePage.html")).text();
-    const tokens = (html) => [...html.matchAll(/pw:s1@([0-9a-f]{8})/g)].map((m) => m[1]);
+    const tokens = (html) => [...html.matchAll(/pw:s1@([A-Za-z0-9_-]{16})/g)].map((m) => m[1]);
     expect(tokens(a)).toEqual(tokens(b));
     expect(tokens(a)).toHaveLength(3);
     void page;

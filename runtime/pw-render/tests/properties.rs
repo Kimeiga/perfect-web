@@ -287,8 +287,14 @@ fn identical_ir_and_values_produce_identical_bytes() {
         .set(
             "items",
             Value::List(vec![
-                record(&[("name", Value::Text("x".into()))]),
-                record(&[("name", Value::Text("y".into()))]),
+                record(&[
+                    ("id", Value::Text("a".into())),
+                    ("name", Value::Text("x".into())),
+                ]),
+                record(&[
+                    ("id", Value::Text("b".into())),
+                    ("name", Value::Text("y".into())),
+                ]),
             ]),
         );
 
@@ -530,5 +536,121 @@ fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
     assert_eq!(
         render(&tpl, &Env::new(), &[]).unwrap(),
         "<button data-pw=\"3\">Add</button>"
+    );
+}
+
+// --- E7-R: identity domains and instance tokens --------------------------
+
+#[test]
+fn a_keyed_loop_refuses_two_items_with_one_key() {
+    // A key that does not identify is not a key. Refused rather than rendered,
+    // because two instances with one address is exactly the ambiguity the
+    // address model exists to remove.
+    let tpl = t(vec![Chunk::Dynamic(Part::Each {
+        id: PartId(0),
+        collection: "items".into(),
+        binding: "item".into(),
+        key: Some("id".into()),
+        body: vec![Chunk::Static("<li>x</li>".into())],
+    })]);
+    let env = Env::new().set(
+        "items",
+        Value::List(vec![
+            record(&[("id", Value::Text("same".into()))]),
+            record(&[("id", Value::Text("same".into()))]),
+        ]),
+    );
+    assert_eq!(
+        render(&tpl, &env, &[]),
+        Err(Blocked::DuplicateLoopKey {
+            each: PartId(0),
+            key: "same".into()
+        })
+    );
+}
+
+#[test]
+fn a_keyed_loop_refuses_an_item_with_no_key_value() {
+    // Distinct from a duplicate: an item with no identity cannot be addressed,
+    // and the repair is to the data rather than to the key field's name.
+    let tpl = t(vec![Chunk::Dynamic(Part::Each {
+        id: PartId(0),
+        collection: "items".into(),
+        binding: "item".into(),
+        key: Some("id".into()),
+        body: vec![Chunk::Static("<li>x</li>".into())],
+    })]);
+    let env = Env::new().set(
+        "items",
+        Value::List(vec![record(&[("name", Value::Text("no id here".into()))])]),
+    );
+    assert_eq!(
+        render(&tpl, &env, &[]),
+        Err(Blocked::MissingLoopKey {
+            each: PartId(0),
+            field: "id".into()
+        })
+    );
+}
+
+#[test]
+fn an_unkeyed_loop_emits_no_instance_boundaries() {
+    // An identity that is really a position looks addressable and moves when
+    // the list does, which is worse than having none. So an unkeyed loop gets
+    // its own range and nothing per item.
+    let tpl = t(vec![Chunk::Dynamic(Part::Each {
+        id: PartId(3),
+        collection: "items".into(),
+        binding: "item".into(),
+        key: None,
+        body: vec![Chunk::Static("<li>x</li>".into())],
+    })]);
+    let env = Env::new().set("items", Value::List(vec![Value::Int(1), Value::Int(2)]));
+    let out = render(&tpl, &env, &[]).unwrap();
+    assert_eq!(out, "<!--pw:s3--><li>x</li><li>x</li><!--pw:e3-->");
+    assert!(!out.contains('@'), "no instance token: {out}");
+}
+
+#[test]
+fn a_public_domain_and_a_session_domain_render_different_tokens() {
+    // E6 decides who shares an identity domain; E7 reads that answer. The same
+    // fragment in two session partitions must not correlate, and the same
+    // fragment in one public partition must agree — a shared cache entry has to
+    // be byte-identical for every reader.
+    let tpl = t(vec![Chunk::Dynamic(Part::Each {
+        id: PartId(1),
+        collection: "items".into(),
+        binding: "item".into(),
+        key: Some("id".into()),
+        body: vec![Chunk::Static("<li>x</li>".into())],
+    })]);
+    let items = Value::List(vec![record(&[("id", Value::Text("line-1".into()))])]);
+    let render_in = |d: IdentityDomain| {
+        render(
+            &tpl,
+            &Env::new().set("items", items.clone()).in_domain(d),
+            &[],
+        )
+        .unwrap()
+    };
+
+    let public = |_: ()| IdentityDomain::materialization("F", Partition::Public, "B1");
+    assert_eq!(
+        render_in(public(())),
+        render_in(public(())),
+        "one public entry is one set of bytes, for every reader"
+    );
+    assert_ne!(
+        render_in(IdentityDomain::materialization(
+            "F",
+            Partition::Session { id: "A".into() },
+            "B1"
+        )),
+        render_in(IdentityDomain::materialization(
+            "F",
+            Partition::Session { id: "B".into() },
+            "B1"
+        )),
+        "two sessions do not correlate"
     );
 }

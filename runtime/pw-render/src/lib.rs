@@ -33,8 +33,10 @@
 //! it.
 
 pub mod escape;
+pub mod identity;
 pub mod ir;
 
+pub use identity::{IdentityDomain, InstanceToken, Partition};
 pub use ir::{Anchor, Chunk, Context, ElementId, Part, PartEntry, PartId, Template};
 
 use std::collections::BTreeMap;
@@ -54,6 +56,31 @@ pub enum Blocked {
     UnauthorisedRawHtml { capability: String },
     /// A template naming another that is not in the set given.
     UnknownComponent { path: String },
+    /// Two different loop keys derived the same instance token.
+    ///
+    /// Vanishingly unlikely with a 96-bit keyed derivation, and refused rather
+    /// than trusted anyway. Architect ruling, 2026-08-06: *"Do not make
+    /// correctness depend purely on probability."* Emitting ambiguous markup
+    /// would give two document instances one `PartAddress`, and a patch aimed
+    /// at either would reach whichever the runtime indexed last.
+    InstanceTokenCollision {
+        token: String,
+        first: String,
+        second: String,
+    },
+    /// An item has no value for the key its loop declares.
+    ///
+    /// Its own case, because the repair differs: a duplicate key is two items
+    /// claiming one identity, and a missing key is an item with none. Reported
+    /// as an empty duplicate would have been the same message for two
+    /// different defects.
+    MissingLoopKey { each: PartId, field: String },
+    /// One `{#each}` rendered two items with the same declared key.
+    ///
+    /// Diagnosed separately from a token collision, because it is a defect in
+    /// the DATA rather than in the derivation and the repair is different: a
+    /// key that does not identify is not a key.
+    DuplicateLoopKey { each: PartId, key: String },
 }
 
 impl std::fmt::Display for Blocked {
@@ -67,6 +94,24 @@ impl std::fmt::Display for Blocked {
                 write!(f, "raw HTML requires the `{capability}` capability")
             }
             Blocked::UnknownComponent { path } => write!(f, "no template named `{path}`"),
+            Blocked::InstanceTokenCollision {
+                token,
+                first,
+                second,
+            } => write!(
+                f,
+                "two loop keys derived the instance token `{token}`: `{first}` and `{second}`"
+            ),
+            Blocked::MissingLoopKey { each, field } => write!(
+                f,
+                "loop part {each} declares the key `{field}` and an item has no value \
+                 for it; an item with no identity cannot be addressed"
+            ),
+            Blocked::DuplicateLoopKey { each, key } => write!(
+                f,
+                "loop part {each} rendered two items with the key `{key}`; a key that \
+                 does not identify is not a key"
+            ),
         }
     }
 }
@@ -121,18 +166,14 @@ pub struct Env {
     values: BTreeMap<String, Value>,
     /// Capabilities the caller presented, for `RawHtml` parts.
     granted: Vec<String>,
-    /// What makes this document's instance tokens its own.
+    /// Who shares an identity with whom.
     ///
-    /// Architect ruling, 2026-08-06: an instance token "must not reveal the
-    /// source key and should not correlate instances across unrelated
-    /// documents". The second half needs something document-specific in the
-    /// derivation, and the server is what knows it — store 47, session s-1.
-    ///
-    /// It is an INPUT rather than a random value, because determinism is a gate
-    /// (E7-2 gate 5): identical IR plus identical values must produce identical
-    /// bytes. A salt drawn from a generator would break content addressing,
-    /// caching and materialization keys all at once.
-    document: String,
+    /// A TYPE, not a free-form salt. It used to be `document: String`, and a
+    /// caller could pass a session identifier as the domain of a public
+    /// fragment — which would give two readers of one shared cache entry
+    /// different bytes. `IdentityDomain` makes that composition unrepresentable
+    /// rather than documented; see [`identity`].
+    domain: IdentityDomain,
     /// The loop instances enclosing what is being rendered, outermost first.
     ///
     /// Generic on purpose. A frame comes from a repeatable scope, and today
@@ -157,9 +198,9 @@ impl Env {
         self
     }
 
-    /// Identify this document instance, for instance-token derivation.
-    pub fn document(mut self, id: &str) -> Env {
-        self.document = id.to_string();
+    /// Set the identity domain: who shares an identity with whom.
+    pub fn in_domain(mut self, domain: IdentityDomain) -> Env {
+        self.domain = domain;
         self
     }
 
@@ -187,45 +228,6 @@ impl Env {
         next.path.push((each.0, token.to_string()));
         next
     }
-}
-
-/// An opaque, document-scoped identifier for one instance of a repeatable
-/// scope.
-///
-/// Architect ruling, 2026-08-06:
-///
-/// > Same declared loop key under the same parent instance within the same
-/// > document generation → same `InstanceToken`. Different key or parent →
-/// > different token. Token must not reveal the source key and should not
-/// > correlate instances across unrelated documents.
-///
-/// So the derivation takes the document, the enclosing path, the loop, and the
-/// key — and returns none of them. Putting the raw key in the markup would be
-/// the same exposure whether it went in an attribute or a comment: both are
-/// read by anything that can read the document, and a cart's item id is a
-/// domain identifier.
-///
-/// FNV-1a truncated to 32 bits. Not a secret and not claimed to be one: it
-/// hides a key from a reader of the markup, and a party who already knows the
-/// document and the candidate keys can confirm a guess. What it prevents is the
-/// key being *published*, which is the thing that happens by accident.
-fn instance_token(document: &str, path: &[(u32, String)], each: PartId, key: &str) -> String {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    let mut feed = |bytes: &[u8]| {
-        for b in bytes {
-            h ^= *b as u64;
-            h = h.wrapping_mul(0x0000_0100_0000_01b3);
-        }
-    };
-    feed(document.as_bytes());
-    for (p, t) in path {
-        feed(&p.to_le_bytes());
-        feed(t.as_bytes());
-    }
-    feed(&each.0.to_le_bytes());
-    feed(b"\x1f");
-    feed(key.as_bytes());
-    format!("{:08x}", (h ^ (h >> 32)) as u32)
 }
 
 /// Render one template to HTML bytes.
@@ -351,6 +353,11 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                     path: collection.clone(),
                 });
             };
+            // Per-loop, per-render: two different keys deriving one token, and
+            // two items declaring one key, are both refused here.
+            let mut tokens: BTreeMap<String, String> = BTreeMap::new();
+            let mut seen: BTreeMap<String, String> = BTreeMap::new();
+
             // The loop's own range, so the whole list is addressable — an
             // unkeyed list is replaced wholesale, and that is where.
             out.push_str(&format!("<!--pw:s{id}-->"));
@@ -368,9 +375,38 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                                 .unwrap_or_default(),
                             other => other.as_str().unwrap_or_default(),
                         };
-                        let token = instance_token(&env.document, &env.path, *id, &raw);
+                        // A declared key that does not identify is not a key.
+                        // Both defects are in the DATA rather than in the
+                        // derivation, and they are separate because their
+                        // repairs are.
+                        if raw.is_empty() {
+                            return Err(Blocked::MissingLoopKey {
+                                each: *id,
+                                field: field.clone(),
+                            });
+                        }
+                        if seen.insert(raw.clone(), raw.clone()).is_some() {
+                            return Err(Blocked::DuplicateLoopKey {
+                                each: *id,
+                                key: raw,
+                            });
+                        }
+                        let token = env.domain.instance_token(&env.path, *id, &raw);
+                        // Correctness does not rest on probability. A 96-bit
+                        // keyed derivation makes this unreachable; refusing
+                        // rather than trusting is what makes that a fact about
+                        // the renderer instead of about the odds.
+                        if let Some(first) = tokens.insert(token.to_string(), raw.clone())
+                            && first != raw
+                        {
+                            return Err(Blocked::InstanceTokenCollision {
+                                token: token.to_string(),
+                                first,
+                                second: raw,
+                            });
+                        }
                         out.push_str(&format!("<!--pw:s{id}@{token}-->"));
-                        emit(body, &scoped.within(*id, &token), others, out)?;
+                        emit(body, &scoped.within(*id, token.as_str()), others, out)?;
                         out.push_str(&format!("<!--pw:e{id}@{token}-->"));
                     }
                     // An UNKEYED list renders and promises nothing about

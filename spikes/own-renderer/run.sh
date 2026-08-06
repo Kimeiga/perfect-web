@@ -54,7 +54,9 @@ cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
   emit-template "${STORE[@]}" > "$SPIKE/store-ir.json"
 cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
   --out "$OUT" --values "$SPIKE/store-values.json" --resume "$SPIKE/store-resume.json" \
-  --document "store/47" --runtime /pw-runtime.mjs < "$SPIKE/store-ir.json"
+  --document "StorePage(47)" --partition public --compatibility B1 \
+  --identity-key "own-renderer-spike-key" \
+  --runtime /pw-runtime.mjs < "$SPIKE/store-ir.json"
 cp "$SPIKE/public/pw-runtime.mjs" "$OUT/"
 cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" \
   -p pw-resume-wasm --target wasm32-unknown-unknown --release
@@ -129,7 +131,15 @@ PORT="$PORT" pnpm exec playwright test --reporter=list 2>&1 | sed 's/\x1b\[[0-9;
   echo "    handler bytes are still eager — the E7-L gap, recorded"
   echo
   echo "LIVE PART IDENTITY"
-  echo "  TemplateSchemaId + InstancePath + LocalPartId."
+  echo "  IdentityDomain + InstancePath + LocalPartId."
+  echo "  E6 decides who shares a domain; E7-R decides how things inside it"
+  echo "  are addressed. There is no independent E7 notion of who shares."
+  echo
+  echo "  InstanceToken = keyed BLAKE3(identity_key,"
+  echo "                    domain | parent path | each part | key)[0..96 bits]"
+  echo "                  base64url, 16 characters"
+  echo "  and a collision within a domain REFUSES the render — correctness"
+  echo "  does not rest on probability."
   echo "  A template part DEFINITION is not a document part INSTANCE: three Add"
   echo "  buttons share data-pw=0 and have three distinct addresses."
   echo "    each loop instance has a distinct address"

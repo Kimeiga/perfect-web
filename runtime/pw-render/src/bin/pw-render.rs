@@ -14,7 +14,7 @@
 use std::collections::BTreeMap;
 use std::io::Read;
 
-use pw_render::{Env, Template, Value, render};
+use pw_render::{Env, IdentityDomain, Partition, Template, Value, render};
 
 fn main() -> std::process::ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -27,7 +27,9 @@ fn main() -> std::process::ExitCode {
     let Some(out_dir) = flag("--out") else {
         eprintln!(
             "usage: pw-render --out DIR [--values FILE] [--resume FILE] \
-             [--runtime SRC] [--document ID] [--wrap TITLE] < template-ir.json"
+             [--runtime SRC] [--document KEY] [--partition P] \
+             [--compatibility GEN] [--identity-key K] [--wrap TITLE] \
+             < template-ir.json"
         );
         return std::process::ExitCode::from(2);
     };
@@ -45,16 +47,38 @@ fn main() -> std::process::ExitCode {
         }
     };
 
-    // What makes this document's instance tokens its own. The server knows it
-    // — store 47, session s-1 — and the renderer must not invent it: a
-    // generated value would make two renders of one document differ, and
-    // determinism is a gate.
-    let document_id = flag("--document").unwrap_or_else(|| "document".to_string());
+    // Who shares an identity with whom. E6 already decided it — the
+    // materialization's physical key, or the document's route identity and its
+    // partition — so this reads that answer rather than inventing one.
+    //
+    // `--partition public|session:ID|user:ID`. A caller cannot pass a session
+    // as the domain of a public fragment by accident, because the partition is
+    // its own field and a public one names no principal.
+    let domain = IdentityDomain::document(
+        &flag("--document").unwrap_or_else(|| "document".to_string()),
+        match flag("--partition").as_deref() {
+            Some(p) if p.starts_with("session:") => Partition::Session {
+                id: p[8..].to_string(),
+            },
+            Some(p) if p.starts_with("user:") => Partition::User {
+                id: p[5..].to_string(),
+            },
+            _ => Partition::Public,
+        },
+        &flag("--compatibility").unwrap_or_else(|| "dev".to_string()),
+    );
+    let domain = match flag("--identity-key") {
+        Some(k) => domain.keyed(&k),
+        // Left at the development key, and the token contract says what that
+        // costs: tokens are enumerable by anyone who knows the document and can
+        // guess the application keys.
+        None => domain,
+    };
 
     let env = match flag("--values") {
         Some(path) => match std::fs::read_to_string(&path) {
             Ok(s) => match values_from_json(&s) {
-                Ok(env) => env.document(&document_id),
+                Ok(env) => env.in_domain(domain.clone()),
                 Err(e) => {
                     eprintln!("pw-render: {path}: {e}");
                     return std::process::ExitCode::from(2);
@@ -65,7 +89,7 @@ fn main() -> std::process::ExitCode {
                 return std::process::ExitCode::from(2);
             }
         },
-        None => Env::new().document(&document_id),
+        None => Env::new().in_domain(domain.clone()),
     };
 
     if let Err(e) = std::fs::create_dir_all(&out_dir) {

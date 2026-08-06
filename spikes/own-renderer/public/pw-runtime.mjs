@@ -69,7 +69,7 @@ function buildIndex() {
     const data = node.data ?? "";
     if (!data.startsWith("pw:")) continue;
 
-    const m = /^pw:([se])(\d+)(?:@([0-9a-f]+))?$/.exec(data);
+    const m = /^pw:([se])(\d+)(?:@([A-Za-z0-9_-]+))?$/.exec(data);
     if (!m) continue;
     const [, side, id, token] = m;
 
