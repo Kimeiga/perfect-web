@@ -49,6 +49,7 @@ name = "pw-cli"
 version = "0.0.0"
 dependencies = [
  "annotate-snippets",
+ "pw-core",
  "pw-syntax",
 ]
 
@@ -57,6 +58,7 @@ name = "pw-core"
 version = "0.0.0"
 dependencies = [
  "annotate-snippets",
+ "pw-syntax",
  "serde",
  "serde_json",
 ]

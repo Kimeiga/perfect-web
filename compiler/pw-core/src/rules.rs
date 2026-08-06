@@ -17,52 +17,28 @@
 use pw_syntax::ast::{Decl, DeclKind, EffectRow, Policy, SourceFile, Visibility};
 use pw_syntax::lexer::Span;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Finding {
-    pub code: &'static str,
-    pub message: String,
-    pub span: Span,
-    /// Where the conflicting property was introduced. Charter §16.3's "where the
-    /// value originated".
-    pub origin: Option<Span>,
-    pub origin_label: Option<String>,
-    pub note: Option<String>,
-    pub help: Option<String>,
-    pub is_error: bool,
+use crate::diagnostics::{Detector, Diagnostic};
+
+/// Declaration-level rules build `Diagnostic` values directly. The local
+/// builder below only exists to keep each rule readable.
+type Finding = Diagnostic;
+
+fn err(
+    code: &'static str,
+    invariant: &'static str,
+    message: impl Into<String>,
+    span: Span,
+) -> Diagnostic {
+    Diagnostic::error(code, invariant, Detector::DeclarationRule, message, span)
 }
 
-impl Finding {
-    fn error(code: &'static str, message: impl Into<String>, span: Span) -> Self {
-        Self {
-            code,
-            message: message.into(),
-            span,
-            origin: None,
-            origin_label: None,
-            note: None,
-            help: None,
-            is_error: true,
-        }
-    }
-    fn warning(code: &'static str, message: impl Into<String>, span: Span) -> Self {
-        Self {
-            is_error: false,
-            ..Self::error(code, message, span)
-        }
-    }
-    fn origin(mut self, span: Span, label: impl Into<String>) -> Self {
-        self.origin = Some(span);
-        self.origin_label = Some(label.into());
-        self
-    }
-    fn note(mut self, n: impl Into<String>) -> Self {
-        self.note = Some(n.into());
-        self
-    }
-    fn help(mut self, h: impl Into<String>) -> Self {
-        self.help = Some(h.into());
-        self
-    }
+fn warn(
+    code: &'static str,
+    invariant: &'static str,
+    message: impl Into<String>,
+    span: Span,
+) -> Diagnostic {
+    Diagnostic::warning(code, invariant, Detector::DeclarationRule, message, span)
 }
 
 fn policy<'a>(policies: &'a [Policy], name: &str) -> Option<&'a Policy> {
@@ -123,20 +99,21 @@ fn check_effects_against_placement(
     for e in &row.effects {
         if let Some((why, help)) = placement_conflict(target, &e.name) {
             out.push(
-                Finding::error(
+                err(
                     "PW0323",
+                    "a placement must be able to grant every effect it requires",
                     format!(
                         "effect `{}` is not available at placement `{target}`",
                         e.name
                     ),
                     e.span.clone(),
                 )
-                .origin(
+                .related(
                     placement.span.clone(),
                     format!("placement `{target}` declared here"),
                 )
-                .note(why)
-                .help(help),
+                .explain(why)
+                .repair(help),
             );
         }
     }
@@ -164,19 +141,22 @@ fn check_resource(
         && matches!(visibility, Visibility::Session | Visibility::Private)
     {
         out.push(
-            Finding::error(
+            err(
                 "PW0100",
+                "a shared cache may contain only Public values",
                 format!("cannot materialize `{name}` in a shared public cache"),
                 cache.span.clone(),
             )
-            .origin(
+            .related(
                 name_span.clone(),
                 format!("`{name}` is declared here, so its result is labeled `{label}`"),
             )
-            .note(format!(
+            .explain(format!(
                 "a shared cache may contain only `Public` values; this {noun}'s result is `{label}`"
             ))
-            .help("change this to `cache private`, or move the value into a private streamed slot"),
+            .repair(
+                "change this to `cache private`, or move the value into a private streamed slot",
+            ),
         );
     }
 
@@ -186,16 +166,17 @@ fn check_resource(
         && visibility == Visibility::Public
     {
         out.push(
-            Finding::error(
+            err(
                 "PW0101",
+                "read-your-writes requires a session-scoped read",
                 "`read_your_writes` requires a session-scoped query",
                 c.span.clone(),
             )
-            .origin(
+            .related(
                 name_span.clone(),
                 "declared `public` here, so there is no session to read the writes of",
             )
-            .help("use `consistency snapshot` for public data, or declare the query `session`"),
+            .repair("use `consistency snapshot` for public data, or declare the query `session`"),
         );
     }
 
@@ -205,13 +186,14 @@ fn check_resource(
         && !f.value.starts_with('0')
     {
         out.push(
-            Finding::error(
+            err(
                 "PW0102",
+                "session-owned state may not be served stale",
                 format!("session {noun} `{name}` declares a {} staleness window", f.value),
                 f.span.clone(),
             )
-            .origin(name_span.clone(), "declared `session` here")
-            .help("use `freshness 0.seconds` with `consistency read_your_writes` for session-owned state"),
+            .related(name_span.clone(), "declared `session` here")
+            .repair("use `freshness 0.seconds` with `consistency read_your_writes` for session-owned state"),
         );
     }
 
@@ -222,14 +204,15 @@ fn check_resource(
         && !r.value.starts_with("transport_only")
     {
         out.push(
-            Finding::error(
+            err(
                 "PW0312",
+                "a retryable mutation must be idempotent",
                 format!("`{name}` declares a retry policy but is not idempotent"),
                 r.span.clone(),
             )
-            .origin(name_span.clone(), "declared here with no `idempotent_by` key")
-            .note("retrying a non-idempotent mutation can apply it more than once")
-            .help("add `idempotent_by InteractionId`, or restrict the policy to `retry transport_only(..)`"),
+            .related(name_span.clone(), "declared here with no `idempotent_by` key")
+            .explain("retrying a non-idempotent mutation can apply it more than once")
+            .repair("add `idempotent_by InteractionId`, or restrict the policy to `retry transport_only(..)`"),
         );
     }
 
@@ -238,9 +221,9 @@ fn check_resource(
         && (r.value.contains("forever") || r.value.contains("unbounded"))
     {
         out.push(
-            Finding::error("PW0313", "`retry forever` is not a permitted policy", r.span.clone())
-                .note("an unbounded retry is a self-inflicted denial of service")
-                .help("declare a finite bound with jitter, e.g. `bounded_exponential(max = 3, jitter = true)`"),
+            err("PW0313", "a retry policy must be bounded", "`retry forever` is not a permitted policy", r.span.clone())
+                .explain("an unbounded retry is a self-inflicted denial of service")
+                .repair("declare a finite bound with jitter, e.g. `bounded_exponential(max = 3, jitter = true)`"),
         );
     }
 
@@ -249,13 +232,16 @@ fn check_resource(
         && policy(policies, "rollback").is_none()
     {
         out.push(
-            Finding::error(
+            err(
                 "PW0327",
+                "an optimistic transition must declare its rollback",
                 format!("`{name}` declares an optimistic transition with no rollback path"),
                 o.span.clone(),
             )
-            .note("a rejected mutation would leave the UI permanently inconsistent with the server")
-            .help("add a `rollback` clause describing how the optimistic change is reversed"),
+            .explain(
+                "a rejected mutation would leave the UI permanently inconsistent with the server",
+            )
+            .repair("add a `rollback` clause describing how the optimistic change is reversed"),
         );
     }
 
@@ -267,16 +253,17 @@ fn check_resource(
     {
         let span = policy(policies, "concurrency").unwrap().span.clone();
         out.push(
-            Finding::error(
+            err(
                 "PW0325",
+                "a keyed query must declare a stale-work policy",
                 format!("`{name}` declares no policy for superseded keys"),
                 span,
             )
-            .origin(
+            .related(
                 name_span.clone(),
                 "this query is keyed, so its key can change",
             )
-            .help("declare `on_key_change cancel | supersede | keep`"),
+            .repair("declare `on_key_change cancel | supersede | keep`"),
         );
     }
 
@@ -286,16 +273,25 @@ fn check_resource(
         && (s.value.starts_with("application") || s.value.starts_with("session"))
     {
         out.push(
-            // PW0326 is the declaration-level form; pw-core's PW2004 is the
-            // same defect found by the static scope checker on a task graph.
-            Finding::error(
-                "PW0326",
+            // ONE code per invariant (architect ruling). `PW2004` is canonical:
+            // "a resource cannot outlive the scope that owns it". This detector
+            // finds it from the declaration header; `pw-core`'s scope graph finds
+            // the same invariant from handle flow. `PW0326` is a DEPRECATED ALIAS
+            // kept only until the corpus migrates — see `canonical_code`.
+            err(
+                "PW2004",
+                "a resource cannot outlive the scope that owns it",
                 format!("{noun} `{name}` declares `{}` scope", s.value),
                 s.span.clone(),
             )
-            .origin(name_span.clone(), "created inside a component")
-            .note("the subscription would outlive the component and push updates into a dead scope")
-            .help("use `scope component`, or hoist the declaration to the scope you actually want"),
+            .reason("declared_scope_exceeds_owner")
+            .related(name_span.clone(), "created inside a component")
+            .explain(
+                "the subscription would outlive the component and push updates into a dead scope",
+            )
+            .repair(
+                "use `scope component`, or hoist the declaration to the scope you actually want",
+            ),
         );
     }
 
@@ -308,13 +304,14 @@ fn check_resource(
         && policy(policies, "invalidates").is_none()
     {
         out.push(
-            Finding::warning(
+            warn(
                 "PW0200",
+                "a shared materialization needs a freshness or invalidation source",
                 format!("shared materialization of `{name}` declares no freshness policy"),
                 cache.span.clone(),
             )
-            .note("with neither a freshness window nor an invalidation source, a shared entry is unbounded")
-            .help("add `freshness <n>.seconds`, or an `invalidates_on <Event>` clause"),
+            .explain("with neither a freshness window nor an invalidation source, a shared entry is unbounded")
+            .repair("add `freshness <n>.seconds`, or an `invalidates_on <Event>` clause"),
         );
     }
 }
@@ -383,13 +380,19 @@ mod tests {
         let f = findings(src);
         let pw0100 = f.iter().find(|f| f.code == "PW0100").expect("PW0100");
         assert!(
-            pw0100.origin.is_some(),
+            !pw0100.related.is_empty(),
             "charter §16.3 requires an origin span"
         );
-        assert!(pw0100.note.as_ref().unwrap().contains("Session<SessionId>"));
-        assert!(pw0100.help.as_ref().unwrap().contains("cache private"));
+        assert!(
+            pw0100
+                .explanation
+                .as_ref()
+                .unwrap()
+                .contains("Session<SessionId>")
+        );
+        assert!(pw0100.repairs[0].description.contains("cache private"));
         // The spans must point at real text.
-        assert_eq!(&src[pw0100.span.clone()], "cache shared");
+        assert_eq!(&src[pw0100.primary_span.clone()], "cache shared");
     }
 
     #[test]
@@ -439,9 +442,12 @@ mod tests {
     #[test]
     fn a_subscription_declaring_application_scope_is_rejected() {
         let src = "module o\nsubscription Tracking(o: OrderId) -> Stream\n    scope application\n{\n    0\n}\n";
-        assert!(codes(src).contains(&"PW0326"));
+        assert!(
+            codes(src).contains(&"PW2004"),
+            "PW2004 is the canonical invariant code"
+        );
         let ok = "module o\nsubscription Tracking(o: OrderId) -> Stream\n    scope component\n{\n    0\n}\n";
-        assert!(!codes(ok).contains(&"PW0326"));
+        assert!(!codes(ok).contains(&"PW2004"));
     }
 
     #[test]
@@ -451,11 +457,11 @@ mod tests {
         let e = f.iter().find(|f| f.code == "PW0323").expect("PW0323");
         assert!(e.message.contains("secret"), "{}", e.message);
         assert!(
-            e.origin.is_some(),
+            !e.related.is_empty(),
             "must name where the placement was declared"
         );
         assert!(
-            e.note
+            e.explanation
                 .as_ref()
                 .unwrap()
                 .contains("edge world grants no secret")
@@ -474,7 +480,18 @@ mod tests {
             "module s\npublic query Store(id: StoreId) -> Store\n    cache shared\n{\n    0\n}\n";
         let f = findings(src);
         let w = f.iter().find(|f| f.code == "PW0200").expect("PW0200");
-        assert!(!w.is_error, "this is advisory until E6");
+        assert!(!w.is_error(), "this is advisory until E6");
+    }
+
+    #[test]
+    fn a_finding_records_its_detector_and_reason_as_metadata() {
+        // The developer learns the invariant; tooling learns which pass found
+        // it and which repair applies.
+        let src = "module o\nsubscription Tracking(o: OrderId) -> Stream\n    scope application\n{\n    0\n}\n";
+        let f = findings(src);
+        let v = f.iter().find(|f| f.code == "PW2004").expect("PW2004");
+        assert_eq!(v.reason, "declared_scope_exceeds_owner");
+        assert_eq!(v.detector, Detector::DeclarationRule);
     }
 
     #[test]
@@ -489,6 +506,7 @@ mod tests {
 #[cfg(test)]
 mod corpus_tests {
     use super::*;
+    use crate::diagnostics::canonical_code;
     use pw_syntax::parser::parse;
     use std::path::{Path, PathBuf};
 
@@ -517,7 +535,7 @@ mod corpus_tests {
             let src = std::fs::read_to_string(&path).expect("read");
             let p = parse(&src);
             assert!(p.ok(), "{} failed to parse: {:?}", path.display(), p.errors);
-            for f in check(&p.file).into_iter().filter(|f| f.is_error) {
+            for f in check(&p.file).into_iter().filter(|f| f.is_error()) {
                 offenders.push(format!(
                     "{}: [{}] {}",
                     path.file_name().unwrap().to_string_lossy(),
@@ -547,13 +565,14 @@ mod corpus_tests {
             };
             let found: Vec<&str> = check(&p.file)
                 .into_iter()
-                .filter(|f| f.is_error)
+                .filter(|f| f.is_error())
                 .map(|f| f.code)
                 .collect();
             if found.is_empty() {
                 continue; // needs body parsing or type checking; see below
             }
             caught += 1;
+            let expected = canonical_code(expected);
             if !found.contains(&expected) {
                 mismatches.push(format!(
                     "{}: declares @rule {expected}, got {found:?}",
@@ -582,7 +601,7 @@ mod corpus_tests {
             total += 1;
             let src = std::fs::read_to_string(&path).expect("read");
             let p = parse(&src);
-            if check(&p.file).iter().any(|f| f.is_error) {
+            if check(&p.file).iter().any(|f| f.is_error()) {
                 caught += 1;
             }
         }

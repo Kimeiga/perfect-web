@@ -14,12 +14,12 @@
 //! Charter §14 M2 gate: "the compiler can print an effect summary without
 //! exposing generated-file paths to the user". `explain` asserts that in tests.
 
-mod rules;
-
 use std::path::Path;
 use std::process::ExitCode;
 
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
+use pw_core::diagnostics::{Diagnostic, Severity};
+use pw_core::rules;
 use pw_syntax::ast::{DeclKind, SourceFile, Visibility};
 use pw_syntax::parser::{ParseError, parse};
 
@@ -48,7 +48,7 @@ fn render(source: &str, path: &str, errors: &[ParseError], styled: bool) -> Stri
     out
 }
 
-fn render_findings(source: &str, path: &str, found: &[rules::Finding], styled: bool) -> String {
+fn render_findings(source: &str, path: &str, found: &[Diagnostic], styled: bool) -> String {
     let renderer = if styled {
         Renderer::styled()
     } else {
@@ -56,29 +56,30 @@ fn render_findings(source: &str, path: &str, found: &[rules::Finding], styled: b
     };
     let mut out = String::new();
     for f in found {
-        let level = if f.is_error {
+        let level = if f.severity == Severity::Error {
             Level::ERROR
         } else {
             Level::WARNING
         };
         let mut snippet = Snippet::source(source).path(path).line_start(1).annotation(
             AnnotationKind::Primary
-                .span(f.span.clone())
+                .span(f.primary_span.clone())
                 .label(&f.message),
         );
         // Charter §16.3: name where the conflicting property originated, not
         // only where the rule fired.
-        if let (Some(o), Some(label)) = (&f.origin, &f.origin_label) {
-            snippet = snippet.annotation(AnnotationKind::Context.span(o.clone()).label(label));
+        for r in &f.related {
+            snippet =
+                snippet.annotation(AnnotationKind::Context.span(r.span.clone()).label(&r.label));
         }
         let mut group = level
             .primary_title(format!("[{}] {}", f.code, f.message))
             .element(snippet);
-        if let Some(n) = &f.note {
+        if let Some(n) = &f.explanation {
             group = group.element(Level::NOTE.message(n.as_str()));
         }
-        if let Some(h) = &f.help {
-            group = group.element(Level::HELP.message(h.as_str()));
+        for r in &f.repairs {
+            group = group.element(Level::HELP.message(r.description.as_str()));
         }
         out.push_str(&renderer.render(&[group]));
         out.push('\n');
@@ -323,8 +324,8 @@ fn main() -> ExitCode {
             let found = rules::check(&parsed.file);
             if !found.is_empty() {
                 print!("{}", render_findings(&src, &display, &found, !plain));
-                errors += found.iter().filter(|f| f.is_error).count();
-                warnings += found.iter().filter(|f| !f.is_error).count();
+                errors += found.iter().filter(|f| f.is_error()).count();
+                warnings += found.iter().filter(|f| !f.is_error()).count();
             }
         }
         if cmd == "explain" && parsed.errors.is_empty() {

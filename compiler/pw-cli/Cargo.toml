@@ -13,5 +13,6 @@ name = "pw"
 path = "src/main.rs"
 
 [dependencies]
+pw-core = { path = "../pw-core" }
 pw-syntax = { path = "../pw-syntax" }
 annotate-snippets.workspace = true
