@@ -1,0 +1,17 @@
+// @status: NEIGHBOUR
+// @invariant: private_in_shared_cache
+// @dimension: valid neighbour — public value, shared cache
+//
+// The same shared cache, with a value that is not private. A rule that
+// reacted to `cache shared` alone would catch it.
+module generality.cache_public_ok
+
+import store.queries
+
+page StorePage(id: StoreId) {
+    cache shared
+
+    let store = query Store(id)
+
+    view { <main><h1>{store.name}</h1></main> }
+}

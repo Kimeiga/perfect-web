@@ -46,6 +46,18 @@ fn library() -> Vec<(String, String)> {
             ));
         }
     }
+    // The accepted modules too, as `rejected_program()` does: a witness may
+    // import a query declared in the accepted corpus, and the label that makes
+    // it a violation lives in that declaration.
+    for e in std::fs::read_dir(root.join("examples/accepted")).expect("accepted") {
+        let p = e.expect("entry").path();
+        if p.extension().is_some_and(|x| x == "pw") {
+            out.push((
+                p.file_name().unwrap().to_string_lossy().to_string(),
+                std::fs::read_to_string(&p).expect("read"),
+            ));
+        }
+    }
     out.push((
         "domain.pw".to_string(),
         std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain.pw"),

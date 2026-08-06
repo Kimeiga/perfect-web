@@ -74,6 +74,15 @@ const UI_NOUNS: &[&str] = &["view", "component", "page"];
 /// syntactically here; their *meaning* is staged (E4 for resources, E7 for the
 /// frame phases), which is exactly the split the architect asked for.
 const STMT_KEYWORDS: &[&str] = &[
+    // `let cart = query Cart(session)` is ONE expression. Without this the
+    // parser stopped after `query`, leaving the call as a sibling statement —
+    // so a page that DECLARED a dependency on a query looked like a page that
+    // CALLED into the database, and every such page was reported for reaching
+    // the database while rendering. The corpus never showed it because the one
+    // fixture with that shape was rejected for another reason anyway.
+    "query",
+    "command",
+    "subscription",
     "use",
     "observe",
     "animate",

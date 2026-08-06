@@ -149,6 +149,25 @@ impl<'a> Labels<'a> {
         me
     }
 
+    /// A declaration by its bare name, across every module.
+    ///
+    /// `query Cart(session)` names `Cart`, not `cart.queries.Cart` — the
+    /// dependency is on the declaration, and the module it lives in is what
+    /// the import resolved. Ambiguity here resolves to nothing rather than to
+    /// a guess.
+    fn declaration_named(&self, name: &str) -> Option<&crate::signatures::Signature> {
+        let mut found = None;
+        for (path, sig) in self.sigs.iter() {
+            if path.rsplit('.').next() == Some(name) {
+                if found.is_some() {
+                    return None;
+                }
+                found = Some(sig);
+            }
+        }
+        found
+    }
+
     /// Where a binding acquired its label, for the diagnostic's origin span.
     pub fn origin(&self, name: &str) -> Option<&(Label, Span)> {
         self.bindings.get(name)
@@ -235,6 +254,19 @@ impl<'a> Labels<'a> {
                 .unwrap_or_else(Label::public),
 
             Expr::Cast { value, .. } => self.label(body, *value),
+
+            // `query Cart(session)` DECLARES a dependency. The query runs at
+            // its own placement, so its effects are not this body's — but its
+            // result is this body's value, so its LABEL is. Splitting those
+            // two is the whole point of the declaration: a page may depend on
+            // a session-scoped query without itself reaching the database.
+            Expr::Keyword {
+                keyword, modifiers, ..
+            } if matches!(keyword.as_str(), "query" | "command" | "subscription") => modifiers
+                .first()
+                .and_then(|name| self.declaration_named(name))
+                .map(|s| s.label.clone())
+                .unwrap_or_else(Label::public),
 
             _ => Label::public(),
         }

@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: private_in_shared_cache
+// @dimension: valid neighbour — private value, private cache
+//
+// The same session-scoped value, in a page whose cache is private. This is
+// what the feature is FOR. A rule that reacted to the label alone would catch
+// it.
+module generality.cache_private_ok
+
+import cart.queries
+
+page CartPage() {
+    cache private
+
+    let cart = query Cart(session)
+
+    view { <main><p>Items: {cart.line_count}</p></main> }
+}
