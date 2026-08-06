@@ -1,105 +1,135 @@
-P0 readiness — four gates
-recorded: 2026-08-06T19:20:00Z
-commit:   1cf92df
+P0 readiness — recomputed claim by claim
+recorded: 2026-08-06T21:40:00Z
+commit:   9aec43a
 corpus:   C1 (docs/CORPUS.md, frozen)
 measured: `just ci` `just generality` `just robustness` `just platform`
           `cargo test -p pw-core --test corpus_history`
 
-================= WHERE IT STANDS ==============================
+================= FIVE GATES ===================================
 
-  CORPUS GATE                                  CLOSED at C1
+  CORPUS CONFORMANCE                           CLOSED at C1
     24 / 24  accepted clean
     44 / 44  rejected, each for its declared invariant
+    44 / 44  single-defect isolation — no unexplained extra
      0       wrong-reason catches
 
-  GENERALITY GATE                              OPEN
-    11 / 29  invariants generality-tested
-     0 / 29  known narrow witness
-    18 / 29  generality untested
-     2 / 8   headline invariants with a challenge matrix
+  GENERALITY                                   CLOSED
+    29 / 29  invariants challenge-tested
+     8 / 8   headline invariants with a full matrix
+     0       known narrow witnesses
 
-  ROBUSTNESS GATE                              CLOSED, and kept
-     5 suites, 0 panics
-     1 regression retained with a minimized reproducer
+  ROBUSTNESS                                   CLOSED, and kept
+     9 targeted suites, 0 panics
+     2 regressions retained with minimized reproducers
+
+  PLATFORM CONTRACT                            CLOSED
+     parses, resolves, checks clean, internally consistent,
+     every rule-read declaration exercised, contract hashed
 
   HISTORICAL COMPATIBILITY                     9 / 10
-     R-023 classified FixtureDidNotExpressIt, not rounded away
+     R-023 classified FixtureDidNotExpressIt
 
-  356 tests.
-
-  "Generality-tested" and not "generally enforced": no finite suite
-  establishes general enforcement. What an invariant in that count
-  has survived is its fixture, a counterexample that defeated the
-  previous implementation, and the required neighbours.
-
-================= WHAT THE CHALLENGE WORK KEEPS FINDING ========
-
-  Six defects so far, none reachable from the 44 fixtures:
-
-  1. A COMPILER PANIC. A constructor pattern whose arity disagreed
-     with its declaration desynchronized the pattern row from the
-     type list. Every rule in the invocation reported nothing.
-  2. Privacy depended on the SPELLING PATH: `let same = token` lost
-     the label. Replaced with value/dataflow propagation.
-  3. A wrong library contract: `Stores.find` returned `Result`,
-     which is `get`'s type — and R-008's own annotation was what
-     established the return type the rule read.
-  4. A correctness check that went SILENT, not wrong, when member
-     identity was ambiguous. The by-name fallback is deleted.
-  5. My own bad witness: a "gap" in the exhaustiveness checker that
-     did not exist. The witness used constructor names its type did
-     not have, so it tested the compiler on a program that did not
-     typecheck. Found by the arity rule added the same hour.
-  6. A LATENT FALSE POSITIVE. `let cart = query Cart(session)` did
-     not parse as one expression, so every page declaring a query
-     dependency was reported for reaching the database while
-     rendering. R-004 carried it the whole time — it is caught for
-     its declared invariant, so the extra diagnostic sat in the
-     output unexamined. It took a file whose job is to be VALID to
-     make it visible.
-
-  Note what 5 and 6 have in common with each other and not with the
-  rest: they were found by writing programs that must be ACCEPTED.
-  A suite of things that must be rejected cannot find them.
+  366 tests.
 
 ================= WHAT MAY BE SAID =============================
 
-  - "All 44 rejected programs in charter §16 corpus C1 are compile
-    errors at their own spans, each failing for the invariant it
-    declares. All 24 accepted programs check clean."
-  - "Eleven invariants have been challenge-tested against programs
-    the fixtures did not anticipate."
-  - "The pre-change text of nine of the ten modified fixtures is
-    still caught, for the same invariant."
-  - "No program in any suite panics the compiler, and an unexpected
-    panic is reported as a marked internal error rather than a
-    silent exit."
+  1. "All 44 rejected programs in charter §16 corpus C1 are compile
+     errors at their own spans, each failing for the invariant it
+     declares AND emitting no unexplained extra semantic
+     diagnostic. All 24 accepted programs check clean."
+
+  2. "Every invariant the corpus exercises has been challenge-
+     tested: a violation written in a shape the fixture does not
+     have is caught, and a valid near-neighbour that differs only
+     in the thing the rule is about still compiles."
+
+  3. "The eight invariants a headline claim rests on have a full
+     matrix — direct, indirect, neighbour, and semantic-preserving
+     transformations — documented with which dimensions are
+     relevant and which are not."
+
+  4. "No program in any suite panics the compiler, and an
+     unexpected panic is reported as a marked internal error with a
+     reproduction line rather than a silent exit."
+
+  5. "The pre-change text of nine of the ten modified fixtures is
+     still caught, for the same invariant, without the declaration
+     that was added."
 
 ================= WHAT MAY *NOT* BE SAID =======================
 
-  1. NOT "the analyses generalize". Eleven of twenty-nine have been
-     tested. Two of eight headline invariants have a matrix.
-  2. NOT "the compiler cannot crash". Five generators found no
-     panic; a coverage-guided fuzzer has never been run.
-  3. NOT "the language is sound".
+  1. NOT "the analyses are general". 29/29 means each survived a
+     program its fixture did not anticipate. That is the strongest
+     thing a finite suite can say and it is not generality.
+
+  2. NOT "the compiler cannot crash". Nine generator families found
+     no panic. A coverage-guided fuzzer has never been run, and the
+     receipt for why that matters is in this repository: reverting
+     the arity fix left corpus-mutation and byte-soup green while
+     only the generator aimed at that seam went red.
+
+  3. NOT "the language is sound". Nothing here is a proof.
+
   4. NOT "no compiler knowledge is hardcoded". Four frame-phase
      keywords, the phase permission matrix, and one module name for
      `on:` attributes.
+
   5. NOT "the corpus was met without touching the corpus". Ten
-     fixtures changed; docs/CORPUS.md has a row for each.
-  6. NOT "P0 is publishable". Per the architect's readiness
-     conditions, every invariant a headline claim demonstrates must
-     be challenge-tested. Six of the eight are not yet.
+     fixtures changed; docs/CORPUS.md has a row for each and
+     corpus_history.rs runs their old text.
+
+  6. NOT "resumption is checked". Two of its three questions are —
+     serializability and privacy. The third, whether a value can be
+     resumed under THIS CODE VERSION, is not addressed at all.
+     PW3011 is its reserved code and the one remaining KNOWN_GAP.
+
+  7. NOT "P0 is publishable". Corpus conformance and generality are
+     two of P0's claims. Several others rest on Marko and Koka
+     behind adapters, and several are unstarted. The ledger governs.
+
+================= EVERY DEFECT THE CHALLENGE WORK FOUND ========
+
+  Ten, none reachable from the 44 fixtures.
+
+  Crashes (2)
+    1. Constructor arity mismatch desynchronized the pattern row
+       from the type list. Every rule reported nothing.
+    2. `a | b | c` lowers right-nested; `expand` removed one level,
+       so `is_useful` reached an `unreachable!`. Same module, same
+       cause: one phase assuming an earlier phase normalised
+       something.
+
+  False positives (3) — all found by programs that must be ACCEPTED
+    3. `query Cart(session)` parsed as two expressions, so every
+       page declaring a query dependency was reported for reaching
+       the database while rendering. R-004 carried it unexamined.
+    4. An origin-placed page reading a secret was told a page may
+       not — it may; the defect is the secret reaching the markup.
+    5. A row declaring `secret<Payments>` did not appear to cover
+       `secret.read`, so one defect arrived twice.
+
+  False negatives (5)
+    6. Labels did not survive rebinding.
+    7. Option checking needed the annotation.
+    8. String holes were read as characters, so `{token.value}` was
+       invisible.
+    9. Casts did not survive rebinding.
+   10. The feedback rule did not follow a write through a helper —
+       and behind it, `Types` could not resolve a helper in its own
+       file, and record fields were not in the signature table.
+
+  And one non-defect: an exhaustiveness "gap" that did not exist.
+  The witness used constructor names its type did not have.
 
 ================= NEXT ==========================================
 
-  1. Matrices for the six remaining headline invariants, in the
-     order P0 leans on them: placement, hidden effects through
-     helpers and callbacks, exhaustive domain states, scoped
-     tasks and resources.
-  2. Then the other 18, one at a time. Each is a promotion or a
-     discovery.
-  3. resume.rs still reads a capture's type from the enclosing
-     declaration's parameter list only. No witness written.
-  4. E4 (5/7) and E5 (3/5): a store demo and the resource
-     generator. Product work.
+  The score cannot go higher. What is left is not more counting:
+
+  1. Resumption's third question — code-version compatibility.
+     PW3011. It is the only KNOWN_GAP and the only part of a
+     headline construct with no analysis at all.
+  2. A coverage-guided fuzzer, to retire item 2 above.
+  3. E4 (5/7) and E5 (3/5): a store demo and the resource
+     generator. Product work, not checker work.
+  4. Claim-by-claim P0 review against the ledger, for the claims
+     that rest on Marko and Koka.
