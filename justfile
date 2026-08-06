@@ -101,6 +101,15 @@ resume-matrix:
 platform:
     @cargo test --quiet -p pw-core --test platform_contracts -- --nocapture 2>&1 | grep -E 'platform contract|test result'
 
+# Coverage-guided fuzzing. Distinct from `just robustness`, which is structured
+# generation: this one has instrumentation, coverage feedback and an evolving
+# corpus. Reported separately and never merged into one "fuzzed" figure.
+fuzz:
+    @cargo run --quiet -p pw-fuzz --bin pw-fuzz -- --iterations 600
+
+fuzz-long:
+    @cargo run --quiet -p pw-fuzz --bin pw-fuzz -- --iterations 5000
+
 # The THIRD gate: for every syntactically representable program the compiler
 # must produce output, ordinary diagnostics, or a marked internal error — never
 # terminate without a report. A panic takes every other rule down with it, so a

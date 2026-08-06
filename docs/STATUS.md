@@ -10,7 +10,7 @@ See `docs/ASSUMPTIONS.md` A-008.
 experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
 **current milestone:** **E6 — materialized resource graph.** Everything before it
-is closed: M0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and the inserted E7V.
+is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and the inserted E7V.
 
 **next milestone:** **E6**, then E7's own renderer (E7-R/E7-P/E7-L), E8's Wasm
 capability host, and E9's permanent type checker. Those are the large ones and
@@ -21,7 +21,7 @@ branch-aware affine analysis, Option inference that does not need the
 annotation, and string holes lowered as expressions. Each replacement is proved
 by a program the narrow rule would have passed.
 
-M0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and E7V are complete. E1 closed on
+E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and E7V are complete. E1 closed on
 RQ-2's Outcome 1. E6 onward are not started.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):

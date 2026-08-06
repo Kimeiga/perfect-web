@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Seventeen measurements in this project produced plausible, favourable results
+Eighteen measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -227,6 +227,7 @@ argument for the admissibility rule above.
 | E2D | corpus coverage rose from 25 to 27 | giving an effect's type argument its place in the effect's *identity* was correct, but `covered()` split the family on `.` before stripping arguments — and `secret<Payments>` has no dot. Two fixtures were reported for an effect their own row declared. The 27 was worse than the 25 |
 | registry | `PW0323` looked owned and consistent | it meant three things at once: the registry called it "a resource must declare how it is released" (nothing enforced that), `rules.rs` emitted it for a placement failure, and the corpus fixture declaring it is about placement. Had the rule and the fixture ever met, the ratchet would have counted a correct catch under a description of a different rule — and `declared_code == errored` **cannot see that**, because the code genuinely matches |
 | registry | four gap entries read as open work | `PW3001`, `PW3002`, `PW3004` and `PW3008` were aliased onto `PW0401`/`PW0402` when the layout family landed, so nothing could ever resolve to the gap entries. They described work that was already done as unowned |
+| E9C fuzzer | 69 covered regions for the whole compiler | the profile parser looked for `Function name: `, which `llvm-profdata` does not emit, so it matched nothing in the dependencies and measured only the harness. The real figure is 1,200-2,300 per target. Caught by the number being implausible for a parser plus fourteen analyses — not by a test |
 | E2 grammar | an audited `unsafe` was reported as unjustified | the newline rule that ends a statement also ended `unsafe capability … because "…"` before its `because` clause, so the justification became a separate statement and never reached the declaration. **`pw fmt` then baked the misparse into the source**, which is the part worth remembering: a formatter faithfully renders a wrong parse |
 
 Four of the grammar rows share one shape: **the diagnostic pointed at the line

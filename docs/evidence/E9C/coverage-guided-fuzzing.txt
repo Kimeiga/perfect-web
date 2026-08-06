@@ -1,0 +1,46 @@
+building the instrumented harness...
+coverage-guided fuzzing
+  toolchain: rustc 1.97.1 stable, -C instrument-coverage, llvm-profdata
+  NOT libFuzzer: a process per input, so executions/second are low
+
+  parser-to-hir                    600 execs    1249 covered regions  0 finding(s)
+  resolution-to-typing             600 execs    2262 covered regions  0 finding(s)
+  labels-and-effects               600 execs    1638 covered regions  0 finding(s)
+  exhaustiveness                   600 execs    1377 covered regions  0 finding(s)
+  manifest-decoding                600 execs      48 covered regions  0 finding(s)
+  resume-compatibility             600 execs      58 covered regions  0 finding(s)
+
+  6 targets, 3600 executions, 0 findings
+
+Reproduce: just fuzz          (600 iterations per target)
+           just fuzz-long     (5000, for a real campaign)
+
+HOW IT IS COVERAGE-GUIDED
+  -C instrument-coverage (stable) + llvm-profdata (a component of the pinned
+  rustc 1.97.1, so no version in tools/versions.lock changes). Each input runs
+  under an instrumented harness; the covered-region set is compared against
+  what the corpus has already reached; an input that grows it is kept and
+  mutated. That is coverage feedback with an evolving corpus.
+
+WHAT IT IS NOT
+  Not libFuzzer. A process per input rather than an in-process loop, so
+  executions per second are low and a campaign is thousands of inputs rather
+  than millions. `cargo-fuzz` needs nightly and a new dependency; the project
+  pins both.
+
+  Not a replacement for the structured generators. Those encode what a CORRECT
+  answer looks like; this finds inputs neither the author nor the architect
+  thought of. The two are reported separately on purpose — merging them into
+  one "fuzzed" badge would hide that the structured suites are the ones
+  carrying properties.
+
+A NOTE ON THE FIRST RUN
+  It reported ~69 covered regions for the whole compiler. That is implausible
+  for a parser plus fourteen analyses, and the implausibility is what exposed
+  the bug: the profile parser looked for `Function name: `, which
+  llvm-profdata does not emit. It matched nothing in the dependencies. The
+  real figure is 1,200-2,300 regions per target.
+
+  Recorded because it is the same failure this project keeps having: a
+  measurement that returns a plausible-looking number while measuring almost
+  nothing. RISK_QUEUE.md counts it.

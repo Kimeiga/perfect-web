@@ -1,0 +1,23 @@
+[package]
+name = "pw-fuzz"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "pw-fuzz"
+path = "src/main.rs"
+
+# The instrumented harness: runs ONE input for ONE target and exits. Separate
+# binary so the driver itself is not instrumented and its own coverage does not
+# pollute the signal.
+[[bin]]
+name = "pw-fuzz-harness"
+path = "src/bin/harness.rs"
+
+[dependencies]
+pw-core = { path = "../../compiler/pw-core" }
+pw-syntax = { path = "../../compiler/pw-syntax" }
+pw-resume = { path = "../../runtime/pw-resume" }

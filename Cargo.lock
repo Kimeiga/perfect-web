@@ -92,6 +92,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-fuzz"
+version = "0.0.0"
+dependencies = [
+ "pw-core",
+ "pw-resume",
+ "pw-syntax",
+]
+
+[[package]]
 name = "pw-resource"
 version = "0.0.0"
 dependencies = [

@@ -102,4 +102,8 @@ demonstrations.
 Everything committed before 2026-08-05 used `M0`…`M15` for engineering
 milestones. `docs/milestones/M0.md` and `docs/evidence/M0/` keep their filenames
 so that commit history and evidence paths stay stable; read `M0` there as `E0`.
-New work uses the `E`/`P`/`RQ` prefixes.
+
+**Prose always says `E0`.** The filename is a path-stability decision and not a
+second numbering scheme — writing `M0` in a status report is exactly the drift
+the `E`/`P`/`RQ` split was introduced to remove, and it happened once
+(2026-08-06) and was corrected.

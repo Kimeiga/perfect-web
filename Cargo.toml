@@ -9,6 +9,7 @@ members = [
     "runtime/pw-tasks",
     "spikes/compiler-diagnostic",
     "tools/corpus-check",
+    "tools/fuzz",
 ]
 # spikes/wasmtime-component/{host,guest} are intentionally NOT workspace members:
 # the guest targets wasm32-wasip2 and must not be pulled into a host-target
