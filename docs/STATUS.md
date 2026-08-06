@@ -88,17 +88,13 @@ All seven charter §14 M0 gate items:
 
 ## failing gate items
 
-**None outstanding.** One partial:
+**None.** The E0 gate is fully closed as of 2026-08-06.
 
-- **Gate item 7 is still macOS-only, but no longer unaddressed.**
-  `.github/workflows/ci.yml` now runs `just ci` on ubuntu-24.04 x64 and arm64,
-  `scripts/bootstrap.sh` has Linux branches with checksums computed from the
-  downloaded artifacts, `just case-check` guards charter §13.5, and `just audit`
-  runs `cargo deny` plus a Node advisory gate for §3.6 — all four green locally.
-  **The workflow has never executed**: pushing needs authorization this session
-  does not have. Risk R11 is *reduced, not retired*; see
-  `docs/KNOWN_LIMITATIONS.md` for which rows are verified and which are only
-  written.
+- **None.** Gate item 7 closed on 2026-08-06: `.github/workflows/ci.yml` ran on
+  `ubuntu-24.04` and `ubuntu-24.04-arm` and passed on the first attempt, along
+  with the supply-chain job. Charter §13.5 case checking and §3.6 license and
+  vulnerability scanning both run in CI. **Risk R11 is retired**; evidence in
+  `docs/evidence/E0/linux-ci.txt`.
 
 ---
 

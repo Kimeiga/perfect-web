@@ -4,10 +4,9 @@
 # that case sensitivity and path handling differ on Linux, and §3.6 requires
 # license and vulnerability scanning that no local run performed until now.
 #
-# NOTE ON EVIDENCE: this file has never executed. It is written from the same
-# commands `just ci` runs locally, but "the workflow exists" is not "CI is green
-# on Linux", and `docs/STATUS.md` says so. The first push is what turns one into
-# the other.
+# First green run: 2026-08-06, x64 + arm64 + supply-chain, all three jobs.
+# Evidence: docs/evidence/E0/linux-ci.txt. That run is what retired risk R11;
+# before it, this file was written but unverified, and STATUS said so.
 name: ci
 
 on:
@@ -36,7 +35,7 @@ jobs:
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # `rust-toolchain.toml` pins the version; this action honours it.
       - name: Install Rust
@@ -49,7 +48,7 @@ jobs:
       - uses: extractions/setup-just@v2
 
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -74,12 +73,12 @@ jobs:
     name: licenses and advisories
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v2
       - uses: taiki-e/install-action@cargo-deny
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: pnpm

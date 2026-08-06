@@ -1,0 +1,75 @@
+evidence: Linux CI — the last E0 gate shortfall (risk R11)
+recorded: 2026-08-06T04:27:17Z
+command:  gh run view 31071206038
+run:      https://github.com/Kimeiga/perfect-web/actions/runs/31071206038
+commit:   fd69d1c2842951f8291fdacdffbac16b2a923acd
+
+First execution of .github/workflows/ci.yml, on the initial push.
+Until this run, N-0 was written but unverified — docs/KNOWN_LIMITATIONS.md
+recorded R11 as 'reduced, not retired' for exactly this reason.
+
+conclusion: success
+
+job: licenses and advisories  ->  success
+    success   Set up job
+    success   Run actions/checkout@v4
+    success   Run dtolnay/rust-toolchain@stable
+    success   Run extractions/setup-just@v2
+    success   Run taiki-e/install-action@cargo-deny
+    success   Run pnpm/action-setup@v4
+    success   Run actions/setup-node@v4
+    success   Run pnpm install --frozen-lockfile
+    success   Licenses and advisories
+    success   Post Run actions/setup-node@v4
+    success   Post Run pnpm/action-setup@v4
+    success   Post Run actions/checkout@v4
+    success   Complete job
+
+job: ubuntu-24.04-arm  ->  success
+    success   Set up job
+    success   Run actions/checkout@v4
+    success   Install Rust
+    success   Run Swatinem/rust-cache@v2
+    success   Run extractions/setup-just@v2
+    success   Run pnpm/action-setup@v4
+    success   Run actions/setup-node@v4
+    success   Bootstrap pinned toolchain
+    success   CI
+    success   Koka backend end-to-end
+    success   Post Run actions/setup-node@v4
+    success   Post Run pnpm/action-setup@v4
+    success   Post Run Swatinem/rust-cache@v2
+    success   Post Run actions/checkout@v4
+    success   Complete job
+
+job: ubuntu-24.04  ->  success
+    success   Set up job
+    success   Run actions/checkout@v4
+    success   Install Rust
+    success   Run Swatinem/rust-cache@v2
+    success   Run extractions/setup-just@v2
+    success   Run pnpm/action-setup@v4
+    success   Run actions/setup-node@v4
+    success   Bootstrap pinned toolchain
+    success   CI
+    success   Koka backend end-to-end
+    success   Post Run actions/setup-node@v4
+    success   Post Run pnpm/action-setup@v4
+    success   Post Run Swatinem/rust-cache@v2
+    success   Post Run actions/checkout@v4
+    success   Complete job
+
+What this retires:
+  - charter §13.5 case sensitivity: 'just case-check' ran on a case-SENSITIVE
+    filesystem for the first time and found no collisions.
+  - charter §3.6 scanning: 'cargo deny check' and the Node advisory gate both
+    green in the 'licenses and advisories' job.
+  - scripts/bootstrap.sh Linux branches: executed on x64 and arm64, with the
+    SHA-256 checks passing against artifacts fetched by CI rather than by me.
+  - E2 gate item 4: 'just spike-pw-to-koka' compiled and ran generated Koka
+    on Linux, not only on macOS.
+
+Not retired by this run:
+  - nothing about Windows; the charter does not require it.
+  - the deprecation annotation on Node-20-based actions (cosmetic; fixed
+    separately).
