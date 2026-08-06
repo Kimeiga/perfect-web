@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "compiler/pw-core",
+    "compiler/pw-syntax",
     "spikes/compiler-diagnostic",
     "tools/corpus-check",
 ]

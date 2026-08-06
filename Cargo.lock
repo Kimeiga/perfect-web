@@ -54,6 +54,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-syntax"
+version = "0.0.0"
+dependencies = [
+ "annotate-snippets",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"

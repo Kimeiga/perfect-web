@@ -1,0 +1,17 @@
+[package]
+name = "pw-syntax"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# E2 — the lossless front end.
+#
+# Charter §14 M2 task 2: "Implement a lossless parser in Rust with precise
+# source spans and error recovery. Evaluate a hand-written parser plus a
+# lossless tree library; use Tree-sitter for editor support later rather than
+# forcing it to be the authoritative compiler parser."
+
+[dependencies]
+annotate-snippets.workspace = true
