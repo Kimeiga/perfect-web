@@ -23,6 +23,7 @@ fn one_hole(context: Context) -> Template {
         Context::Text => (
             "<p>".to_string(),
             Part::Text {
+                id: PartId(0),
                 value: "v".into(),
                 context,
             },
@@ -31,6 +32,8 @@ fn one_hole(context: Context) -> Template {
         Context::Attribute => (
             "<div ".to_string(),
             Part::Attribute {
+                id: PartId(0),
+                owner: ElementId(0),
                 name: "title".into(),
                 value: "v".into(),
                 context,
@@ -40,6 +43,8 @@ fn one_hole(context: Context) -> Template {
         Context::Url => (
             "<a ".to_string(),
             Part::Attribute {
+                id: PartId(0),
+                owner: ElementId(0),
                 name: "href".into(),
                 value: "v".into(),
                 context,
@@ -49,6 +54,8 @@ fn one_hole(context: Context) -> Template {
         Context::Style => (
             "<div ".to_string(),
             Part::Attribute {
+                id: PartId(0),
+                owner: ElementId(0),
                 name: "style".into(),
                 value: "v".into(),
                 context,
@@ -58,6 +65,7 @@ fn one_hole(context: Context) -> Template {
         Context::RawHtml => (
             "<div>".to_string(),
             Part::RawHtml {
+                id: PartId(0),
                 value: "v".into(),
                 capability: "unsafe.raw_html".into(),
             },
@@ -68,6 +76,7 @@ fn one_hole(context: Context) -> Template {
         path: "t.T".into(),
         name: "T".into(),
         params: vec!["v".into()],
+        schema: "test".into(),
         chunks: vec![
             Chunk::Static(before),
             Chunk::Dynamic(part),
@@ -76,10 +85,29 @@ fn one_hole(context: Context) -> Template {
     }
 }
 
+/// The document with its part anchors removed.
+///
+/// The security matrix is about ESCAPING, and an anchor is neither escaped nor
+/// escapable — it is bytes the renderer wrote. Leaving them in would make every
+/// injection expectation change whenever an identity did.
+fn visible(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(i) = rest.find("<!--pw:") {
+        out.push_str(&rest[..i]);
+        let Some(j) = rest[i..].find("-->") else {
+            break;
+        };
+        rest = &rest[i + j + 3..];
+    }
+    out.push_str(rest);
+    out
+}
+
 fn render_hostile(context: Context, value: &str) -> String {
     let t = one_hole(context);
     let env = Env::new().set("v", Value::Text(value.to_string()));
-    render(&t, &env, &[]).expect("renders")
+    visible(&render(&t, &env, &[]).expect("renders"))
 }
 
 // --- the matrix ----------------------------------------------------------
@@ -213,12 +241,16 @@ fn raw_html_requires_the_capability_and_is_not_a_flag_on_a_string() {
 
     // With the grant, and only with it, the bytes are emitted.
     let granted = plain.clone().grant("unsafe.raw_html");
-    assert_eq!(render(&t, &granted, &[]).unwrap(), "<div><b>bold</b></div>");
+    assert_eq!(
+        visible(&render(&t, &granted, &[]).unwrap()),
+        "<div><b>bold</b></div>"
+    );
 
     // A `Raw` VALUE in ordinary text position still needs its capability: the
     // authorisation belongs to the value, not to the position it lands in.
     let text = Template {
         chunks: vec![Chunk::Dynamic(Part::Text {
+            id: PartId(0),
             value: "v".into(),
             context: Context::Text,
         })],
@@ -236,7 +268,7 @@ fn raw_html_requires_the_capability_and_is_not_a_flag_on_a_string() {
         Err(Blocked::UnauthorisedRawHtml { .. })
     ));
     assert_eq!(
-        render(&text, &raw.grant("unsafe.raw_html"), &[]).unwrap(),
+        visible(&render(&text, &raw.grant("unsafe.raw_html"), &[]).unwrap()),
         "<b>x</b>"
     );
 }
@@ -320,6 +352,8 @@ fn a_record_field_in_a_hostile_position_is_escaped_the_same_way() {
         chunks: vec![
             Chunk::Static("<div ".into()),
             Chunk::Dynamic(Part::Attribute {
+                id: PartId(0),
+                owner: ElementId(0),
                 name: "title".into(),
                 value: "item.title".into(),
                 context: Context::Attribute,
@@ -328,6 +362,6 @@ fn a_record_field_in_a_hostile_position_is_escaped_the_same_way() {
         ],
         ..t
     };
-    let out = render(&t, &env, &[]).unwrap();
+    let out = visible(&render(&t, &env, &[]).unwrap());
     assert!(!out.contains("onclick=\""), "{out}");
 }

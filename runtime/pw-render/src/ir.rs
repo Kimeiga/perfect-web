@@ -63,12 +63,77 @@ impl Context {
     }
 }
 
+/// A part's identity within its template.
+///
+/// **Template-scoped and ordinal**, namespaced by [`Template::schema`].
+/// Architect ruling, 2026-08-06:
+///
+/// > semantic identity of entire template + cheap structural identity inside
+/// > that template
+///
+/// not a content hash per part. Two `<span>{price}</span>` parts have identical
+/// IR and are different places in the document, so content identity cannot say
+/// which to patch; adding enough parent context to disambiguate reinvents
+/// structural position at a higher price.
+///
+/// Positional identity is safe here **because E7V already refuses across
+/// schemas**. Local part 3 is never interpreted as local part 3 of an
+/// incompatible template, so a source edit may renumber freely: it also changes
+/// the schema, and a cross-version patch is rejected or migrated.
+///
+/// Assigned by deterministic traversal of the IR, never from source offsets. A
+/// comment or a reflow must not perturb an id unless it changed the structure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct PartId(pub u32);
+
+impl std::fmt::Display for PartId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// An element that owns at least one element-local part.
+///
+/// Separate from `PartId` because one element can own several parts — two
+/// dynamic attributes and a handler — and giving each its own comment pair
+/// would cost six nodes to say one thing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ElementId(pub u32);
+
+impl std::fmt::Display for ElementId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// How a part is anchored in the document.
+///
+/// Architect ruling: a `PartId` is a renderer concept and these are two wire
+/// encodings of it, chosen per part KIND rather than one forced onto all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Anchor {
+    /// Comment boundaries: `<!--pw:s3-->` … `<!--pw:e3-->`.
+    ///
+    /// A range can be zero nodes, one text node, twenty `<li>`s or a component
+    /// subtree. An attribute on an element cannot represent any of those, which
+    /// is why conditionals, loops, components and text ranges use comments even
+    /// though they cost two nodes.
+    Range,
+    /// The owning element carries `data-pw`.
+    ///
+    /// For attributes, boolean attributes and handlers, where the thing being
+    /// updated belongs to an element that already exists.
+    Element,
+}
+
 /// One dynamic hole in a template.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "part")]
 pub enum Part {
     /// `{expr}` between tags.
     Text {
+        id: PartId,
         /// The value's identity — a path the renderer looks up, never an
         /// expression it evaluates. Evaluation is the program's job and it has
         /// already happened by the time bytes are produced.
@@ -77,6 +142,8 @@ pub enum Part {
     },
     /// `class={expr}` — the whole value.
     Attribute {
+        id: PartId,
+        owner: ElementId,
         name: String,
         value: String,
         context: Context,
@@ -86,9 +153,30 @@ pub enum Part {
     /// Separate from `Attribute` because the rendering rule is different in
     /// kind: a false boolean attribute is ABSENT, not empty. `disabled=""` is
     /// disabled.
-    BooleanAttribute { name: String, value: String },
+    BooleanAttribute {
+        id: PartId,
+        owner: ElementId,
+        name: String,
+        value: String,
+    },
+    /// `on:press={handler}` — behaviour the browser runtime attaches.
+    ///
+    /// Represented rather than `Blocked`, which is what E7-2 did: a renderer
+    /// with no runtime had nothing to emit and refusing was the honest answer.
+    /// E7-R has one, so the part carries what it needs — which element, which
+    /// event, and which handler identity to authorise and attach.
+    Event {
+        id: PartId,
+        owner: ElementId,
+        /// `press`, from `on:press`. The semantic event, not a DOM event name:
+        /// translating it is the runtime's job and it differs per element.
+        event: String,
+        /// The handler's identity, as the resume manifest names it.
+        handler: String,
+    },
     /// A region rendered only when a condition holds.
     Conditional {
+        id: PartId,
         value: String,
         then: Vec<Chunk>,
         /// Empty when there is no `else`.
@@ -96,6 +184,7 @@ pub enum Part {
     },
     /// A region rendered once per element of a collection.
     Each {
+        id: PartId,
         collection: String,
         /// The name each element is bound to inside `body`.
         binding: String,
@@ -107,6 +196,7 @@ pub enum Part {
     },
     /// Another template, rendered in place.
     Component {
+        id: PartId,
         /// The resolved path, not the name as written.
         path: String,
         args: Vec<(String, String)>,
@@ -117,7 +207,11 @@ pub enum Part {
     /// The `capability` field records which, so the artifact says on its face
     /// what authorised the bypass — an "it was fine when I wrote it" is not
     /// checkable and this is.
-    RawHtml { value: String, capability: String },
+    RawHtml {
+        id: PartId,
+        value: String,
+        capability: String,
+    },
     /// A construct this IR does not represent, or one an earlier analysis
     /// rejected.
     ///
@@ -125,6 +219,63 @@ pub enum Part {
     /// is not proof, and a renderer that silently omits what it did not
     /// understand produces a page that looks correct and is missing something.
     Blocked { reason: String, at: String },
+}
+
+impl Part {
+    /// This part's identity, or `None` for a `Blocked` one — which has no
+    /// identity because it is never rendered.
+    pub fn id(&self) -> Option<PartId> {
+        Some(match self {
+            Part::Text { id, .. }
+            | Part::Attribute { id, .. }
+            | Part::BooleanAttribute { id, .. }
+            | Part::Event { id, .. }
+            | Part::Conditional { id, .. }
+            | Part::Each { id, .. }
+            | Part::Component { id, .. }
+            | Part::RawHtml { id, .. } => *id,
+            Part::Blocked { .. } => return None,
+        })
+    }
+
+    /// The element this part belongs to, for the element-anchored kinds.
+    pub fn owner(&self) -> Option<ElementId> {
+        match self {
+            Part::Attribute { owner, .. }
+            | Part::BooleanAttribute { owner, .. }
+            | Part::Event { owner, .. } => Some(*owner),
+            _ => None,
+        }
+    }
+
+    /// How this kind of part is anchored.
+    pub fn anchor(&self) -> Option<Anchor> {
+        Some(match self {
+            Part::Attribute { .. } | Part::BooleanAttribute { .. } | Part::Event { .. } => {
+                Anchor::Element
+            }
+            Part::Text { .. }
+            | Part::Conditional { .. }
+            | Part::Each { .. }
+            | Part::Component { .. }
+            | Part::RawHtml { .. } => Anchor::Range,
+            Part::Blocked { .. } => return None,
+        })
+    }
+
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Part::Text { .. } => "text",
+            Part::Attribute { .. } => "attribute",
+            Part::BooleanAttribute { .. } => "boolean_attribute",
+            Part::Event { .. } => "event",
+            Part::Conditional { .. } => "conditional",
+            Part::Each { .. } => "each",
+            Part::Component { .. } => "component",
+            Part::RawHtml { .. } => "raw_html",
+            Part::Blocked { .. } => "blocked",
+        }
+    }
 }
 
 /// A piece of a template: literal bytes, or a hole.
@@ -148,6 +299,16 @@ pub struct Template {
     pub name: String,
     /// Parameters, in declaration order — the renderer's inputs.
     pub params: Vec<String>,
+    /// The template's **semantic** identity: what makes local part 3 mean
+    /// something.
+    ///
+    /// Over the IR's structure — kinds, names, contexts, nesting, order — and
+    /// not over source bytes, so a comment or a reflow does not change it and
+    /// a reordered attribute does. E7V's scheme-2 reasoning, one layer up: a
+    /// digest cannot say what made it, so the parts it namespaces are only
+    /// comparable within one schema, and E7V's decision already refuses across
+    /// schemas.
+    pub schema: String,
     pub chunks: Vec<Chunk>,
 }
 

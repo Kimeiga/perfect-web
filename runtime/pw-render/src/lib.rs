@@ -35,7 +35,7 @@
 pub mod escape;
 pub mod ir;
 
-pub use ir::{Chunk, Context, Part, Template};
+pub use ir::{Anchor, Chunk, Context, ElementId, Part, PartId, Template};
 
 use std::collections::BTreeMap;
 
@@ -185,7 +185,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             at: at.clone(),
         }),
 
-        Part::Text { value, context } => {
+        Part::Text { id, value, context } => {
             let v = env.get(value).ok_or(Blocked::MissingValue {
                 path: value.clone(),
             })?;
@@ -204,7 +204,12 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             let s = v.as_str().ok_or(Blocked::MissingValue {
                 path: value.clone(),
             })?;
+            // A range anchor, because a text part can be empty and an empty
+            // range still needs a place to reappear. An element attribute
+            // cannot express "nothing, here".
+            out.push_str(&format!("<!--pw:s{id}-->"));
             out.push_str(&escaped(&s, *context));
+            out.push_str(&format!("<!--pw:e{id}-->"));
             Ok(())
         }
 
@@ -212,6 +217,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             name,
             value,
             context,
+            ..
         } => {
             let v = env.get(value).ok_or(Blocked::MissingValue {
                 path: value.clone(),
@@ -224,7 +230,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
         }
 
         // False means ABSENT, not empty: `disabled=""` is disabled.
-        Part::BooleanAttribute { name, value } => {
+        Part::BooleanAttribute { name, value, .. } => {
             let v = env.get(value).ok_or(Blocked::MissingValue {
                 path: value.clone(),
             })?;
@@ -239,7 +245,13 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             Ok(())
         }
 
+        // Behaviour, not markup. The browser runtime attaches it after
+        // `decide`; the server emits nothing, because the element already
+        // carries the `data-pw` that says which element it is.
+        Part::Event { .. } => Ok(()),
+
         Part::Conditional {
+            id,
             value,
             then,
             otherwise,
@@ -248,10 +260,14 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                 path: value.clone(),
             })?;
             let branch = if v.truthy() { then } else { otherwise };
-            emit(branch, env, others, out)
+            out.push_str(&format!("<!--pw:s{id}-->"));
+            emit(branch, env, others, out)?;
+            out.push_str(&format!("<!--pw:e{id}-->"));
+            Ok(())
         }
 
         Part::Each {
+            id,
             collection,
             binding,
             body,
@@ -265,14 +281,16 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                     path: collection.clone(),
                 });
             };
+            out.push_str(&format!("<!--pw:s{id}-->"));
             for item in items {
                 let scoped = env.with(binding, item.clone());
                 emit(body, &scoped, others, out)?;
             }
+            out.push_str(&format!("<!--pw:e{id}-->"));
             Ok(())
         }
 
-        Part::Component { path, args } => {
+        Part::Component { id, path, args } => {
             let t = others
                 .iter()
                 .find(|t| t.path == *path)
@@ -286,11 +304,17 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                 child = child.set(param, v.clone());
             }
             let rendered = render(t, &child, others)?;
+            out.push_str(&format!("<!--pw:s{id}-->"));
             out.push_str(&rendered);
+            out.push_str(&format!("<!--pw:e{id}-->"));
             Ok(())
         }
 
-        Part::RawHtml { value, capability } => {
+        Part::RawHtml {
+            id,
+            value,
+            capability,
+        } => {
             if !env.granted.iter().any(|g| g == capability) {
                 return Err(Blocked::UnauthorisedRawHtml {
                     capability: capability.clone(),
@@ -299,6 +323,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             let v = env.get(value).ok_or(Blocked::MissingValue {
                 path: value.clone(),
             })?;
+            out.push_str(&format!("<!--pw:s{id}-->"));
             match v {
                 Value::Raw { html, .. } => out.push_str(html),
                 other => {
@@ -308,6 +333,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                     out.push_str(&s);
                 }
             }
+            out.push_str(&format!("<!--pw:e{id}-->"));
             Ok(())
         }
     }

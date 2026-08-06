@@ -9,6 +9,25 @@
 use pw_render::*;
 use std::collections::BTreeMap;
 
+/// The document with its part anchors removed.
+///
+/// Used where the assertion is about CONTENT. The anchors have their own
+/// tests: mixing the two would make every content expectation change whenever
+/// an identity did, and then nobody would read them.
+fn visible(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(i) = rest.find("<!--pw:") {
+        out.push_str(&rest[..i]);
+        let Some(j) = rest[i..].find("-->") else {
+            break;
+        };
+        rest = &rest[i + j + 3..];
+    }
+    out.push_str(rest);
+    out
+}
+
 fn record(fields: &[(&str, Value)]) -> Value {
     let mut m = BTreeMap::new();
     for (k, v) in fields {
@@ -22,6 +41,7 @@ fn t(chunks: Vec<Chunk>) -> Template {
         path: "t.T".into(),
         name: "T".into(),
         params: vec![],
+        schema: "test".into(),
         chunks,
     }
 }
@@ -33,13 +53,17 @@ fn a_text_expression_renders_its_value() {
     let tpl = t(vec![
         Chunk::Static("<h1>".into()),
         Chunk::Dynamic(Part::Text {
+            id: PartId(0),
             value: "name".into(),
             context: Context::Text,
         }),
         Chunk::Static("</h1>".into()),
     ]);
     let env = Env::new().set("name", Value::Text("Blue Bottle".into()));
-    assert_eq!(render(&tpl, &env, &[]).unwrap(), "<h1>Blue Bottle</h1>");
+    assert_eq!(
+        visible(&render(&tpl, &env, &[]).unwrap()),
+        "<h1>Blue Bottle</h1>"
+    );
 }
 
 #[test]
@@ -47,6 +71,8 @@ fn an_attribute_renders_as_a_quoted_value() {
     let tpl = t(vec![
         Chunk::Static("<div ".into()),
         Chunk::Dynamic(Part::Attribute {
+            id: PartId(0),
+            owner: ElementId(0),
             name: "class".into(),
             value: "kind".into(),
             context: Context::Attribute,
@@ -55,7 +81,7 @@ fn an_attribute_renders_as_a_quoted_value() {
     ]);
     let env = Env::new().set("kind", Value::Text("card wide".into()));
     assert_eq!(
-        render(&tpl, &env, &[]).unwrap(),
+        visible(&render(&tpl, &env, &[]).unwrap()),
         "<div class=\"card wide\"></div>"
     );
 }
@@ -68,40 +94,47 @@ fn a_false_boolean_attribute_is_absent_not_empty() {
     let tpl = t(vec![
         Chunk::Static("<input ".into()),
         Chunk::Dynamic(Part::BooleanAttribute {
+            id: PartId(0),
+            owner: ElementId(0),
             name: "disabled".into(),
             value: "locked".into(),
         }),
         Chunk::Static(">".into()),
     ]);
     let off = Env::new().set("locked", Value::Bool(false));
-    assert_eq!(render(&tpl, &off, &[]).unwrap(), "<input>");
+    assert_eq!(visible(&render(&tpl, &off, &[]).unwrap()), "<input>");
 
     let on = Env::new().set("locked", Value::Bool(true));
-    assert_eq!(render(&tpl, &on, &[]).unwrap(), "<input disabled>");
+    assert_eq!(
+        visible(&render(&tpl, &on, &[]).unwrap()),
+        "<input disabled>"
+    );
 }
 
 #[test]
 fn a_conditional_region_renders_one_branch() {
     let tpl = t(vec![Chunk::Dynamic(Part::Conditional {
+        id: PartId(0),
         value: "signed_in".into(),
         then: vec![Chunk::Static("<p>welcome</p>".into())],
         otherwise: vec![Chunk::Static("<p>sign in</p>".into())],
     })]);
     let yes = Env::new().set("signed_in", Value::Bool(true));
     let no = Env::new().set("signed_in", Value::Bool(false));
-    assert_eq!(render(&tpl, &yes, &[]).unwrap(), "<p>welcome</p>");
-    assert_eq!(render(&tpl, &no, &[]).unwrap(), "<p>sign in</p>");
+    assert_eq!(visible(&render(&tpl, &yes, &[]).unwrap()), "<p>welcome</p>");
+    assert_eq!(visible(&render(&tpl, &no, &[]).unwrap()), "<p>sign in</p>");
 }
 
 #[test]
 fn a_missing_else_renders_nothing_rather_than_failing() {
     let tpl = t(vec![Chunk::Dynamic(Part::Conditional {
+        id: PartId(0),
         value: "show".into(),
         then: vec![Chunk::Static("<p>x</p>".into())],
         otherwise: vec![],
     })]);
     let no = Env::new().set("show", Value::Bool(false));
-    assert_eq!(render(&tpl, &no, &[]).unwrap(), "");
+    assert_eq!(visible(&render(&tpl, &no, &[]).unwrap()), "");
 }
 
 #[test]
@@ -109,12 +142,14 @@ fn an_each_region_renders_once_per_element_with_the_binding_in_scope() {
     let tpl = t(vec![
         Chunk::Static("<ul>".into()),
         Chunk::Dynamic(Part::Each {
+            id: PartId(0),
             collection: "items".into(),
             binding: "item".into(),
             key: Some("id".into()),
             body: vec![
                 Chunk::Static("<li>".into()),
                 Chunk::Dynamic(Part::Text {
+                    id: PartId(0),
                     value: "item.name".into(),
                     context: Context::Text,
                 }),
@@ -137,7 +172,7 @@ fn an_each_region_renders_once_per_element_with_the_binding_in_scope() {
         ]),
     );
     assert_eq!(
-        render(&tpl, &env, &[]).unwrap(),
+        visible(&render(&tpl, &env, &[]).unwrap()),
         "<ul><li>Espresso</li><li>Cortado</li></ul>"
     );
 }
@@ -147,6 +182,7 @@ fn an_empty_collection_renders_the_surrounding_markup_and_no_items() {
     let tpl = t(vec![
         Chunk::Static("<ul>".into()),
         Chunk::Dynamic(Part::Each {
+            id: PartId(0),
             collection: "items".into(),
             binding: "item".into(),
             key: None,
@@ -155,7 +191,7 @@ fn an_empty_collection_renders_the_surrounding_markup_and_no_items() {
         Chunk::Static("</ul>".into()),
     ]);
     let env = Env::new().set("items", Value::List(vec![]));
-    assert_eq!(render(&tpl, &env, &[]).unwrap(), "<ul></ul>");
+    assert_eq!(visible(&render(&tpl, &env, &[]).unwrap()), "<ul></ul>");
 }
 
 #[test]
@@ -164,9 +200,11 @@ fn a_nested_template_renders_in_place_with_its_own_arguments() {
         path: "t.Card".into(),
         name: "Card".into(),
         params: vec!["label".into()],
+        schema: "test".into(),
         chunks: vec![
             Chunk::Static("<span>".into()),
             Chunk::Dynamic(Part::Text {
+                id: PartId(0),
                 value: "label".into(),
                 context: Context::Text,
             }),
@@ -176,6 +214,7 @@ fn a_nested_template_renders_in_place_with_its_own_arguments() {
     let parent = t(vec![
         Chunk::Static("<div>".into()),
         Chunk::Dynamic(Part::Component {
+            id: PartId(0),
             path: "t.Card".into(),
             args: vec![("label".into(), "title".into())],
         }),
@@ -183,7 +222,7 @@ fn a_nested_template_renders_in_place_with_its_own_arguments() {
     ]);
     let env = Env::new().set("title", Value::Text("Menu".into()));
     assert_eq!(
-        render(&parent, &env, std::slice::from_ref(&child)).unwrap(),
+        visible(&render(&parent, &env, std::slice::from_ref(&child)).unwrap()),
         "<div><span>Menu</span></div>"
     );
 
@@ -193,6 +232,7 @@ fn a_nested_template_renders_in_place_with_its_own_arguments() {
     // checkable.
     let leaky = Template {
         chunks: vec![Chunk::Dynamic(Part::Text {
+            id: PartId(0),
             value: "title".into(),
             context: Context::Text,
         })],
@@ -213,22 +253,28 @@ fn identical_ir_and_values_produce_identical_bytes() {
     let tpl = t(vec![
         Chunk::Static("<article ".into()),
         Chunk::Dynamic(Part::Attribute {
+            id: PartId(0),
+            owner: ElementId(0),
             name: "id".into(),
             value: "id".into(),
             context: Context::Attribute,
         }),
         Chunk::Static(" ".into()),
         Chunk::Dynamic(Part::Attribute {
+            id: PartId(0),
+            owner: ElementId(0),
             name: "class".into(),
             value: "kind".into(),
             context: Context::Attribute,
         }),
         Chunk::Static(">".into()),
         Chunk::Dynamic(Part::Each {
+            id: PartId(0),
             collection: "items".into(),
             binding: "item".into(),
             key: Some("id".into()),
             body: vec![Chunk::Dynamic(Part::Text {
+                id: PartId(0),
                 value: "item.name".into(),
                 context: Context::Text,
             })],
@@ -250,7 +296,10 @@ fn identical_ir_and_values_produce_identical_bytes() {
     for _ in 0..64 {
         assert_eq!(render(&tpl, &env, &[]).unwrap(), first);
     }
-    assert_eq!(first, "<article id=\"a\" class=\"card\">xy</article>");
+    assert_eq!(
+        visible(&first),
+        "<article id=\"a\" class=\"card\">xy</article>"
+    );
 }
 
 #[test]
@@ -263,12 +312,16 @@ fn the_determinism_check_can_fail() {
         t(vec![
             Chunk::Static("<div ".into()),
             Chunk::Dynamic(Part::Attribute {
+                id: PartId(0),
+                owner: ElementId(0),
                 name: first.into(),
                 value: "v".into(),
                 context: Context::Attribute,
             }),
             Chunk::Static(" ".into()),
             Chunk::Dynamic(Part::Attribute {
+                id: PartId(0),
+                owner: ElementId(0),
                 name: second.into(),
                 value: "v".into(),
                 context: Context::Attribute,
@@ -343,6 +396,7 @@ fn the_blocked_check_can_fail() {
 #[test]
 fn a_missing_value_is_an_error_not_an_empty_string() {
     let tpl = t(vec![Chunk::Dynamic(Part::Text {
+        id: PartId(0),
         value: "absent".into(),
         context: Context::Text,
     })]);
@@ -359,6 +413,7 @@ fn a_value_with_no_text_form_is_refused_rather_than_stringified() {
     // A list in text position has no rendering. `[object Object]` is what a
     // renderer produces when it decides to have an answer for everything.
     let tpl = t(vec![Chunk::Dynamic(Part::Text {
+        id: PartId(0),
         value: "items".into(),
         context: Context::Text,
     })]);
@@ -369,6 +424,7 @@ fn a_value_with_no_text_form_is_refused_rather_than_stringified() {
 #[test]
 fn an_unknown_component_is_refused_rather_than_skipped() {
     let tpl = t(vec![Chunk::Dynamic(Part::Component {
+        id: PartId(0),
         path: "t.Missing".into(),
         args: vec![],
     })]);
@@ -377,5 +433,102 @@ fn an_unknown_component_is_refused_rather_than_skipped() {
         Err(Blocked::UnknownComponent {
             path: "t.Missing".into()
         })
+    );
+}
+
+// --- E7-R: part identity in the document ---------------------------------
+
+#[test]
+fn a_range_part_is_delimited_by_its_own_anchors() {
+    // The encoding a range needs and an attribute cannot give it: a part that
+    // renders NOTHING still has a place to reappear.
+    let tpl = t(vec![
+        Chunk::Static("<ul>".into()),
+        Chunk::Dynamic(Part::Each {
+            id: PartId(4),
+            collection: "items".into(),
+            binding: "item".into(),
+            key: None,
+            body: vec![Chunk::Static("<li>x</li>".into())],
+        }),
+        Chunk::Static("</ul>".into()),
+    ]);
+    let empty = Env::new().set("items", Value::List(vec![]));
+    assert_eq!(
+        render(&tpl, &empty, &[]).unwrap(),
+        "<ul><!--pw:s4--><!--pw:e4--></ul>",
+        "an empty range keeps its boundaries, or the runtime has nowhere to \
+         insert the first item"
+    );
+}
+
+#[test]
+fn a_static_region_carries_no_identity_markup() {
+    // The invariant that makes "without making static HTML noisy" mean
+    // something: only dynamic and resumable regions pay identity overhead.
+    let tpl = t(vec![Chunk::Static(
+        "<h1>Store</h1><p>Open until 10</p>".into(),
+    )]);
+    let out = render(&tpl, &Env::new(), &[]).unwrap();
+    assert_eq!(out, "<h1>Store</h1><p>Open until 10</p>");
+    assert!(!out.contains("pw:"), "{out}");
+    assert!(!out.contains("data-pw"), "{out}");
+}
+
+#[test]
+fn an_element_local_part_anchors_on_the_element_not_on_a_comment() {
+    // Three dynamic things on one element cost ONE identity, not three comment
+    // pairs. `data-pw` is written by the IR's static chunk, so the renderer
+    // emits nothing extra for the parts themselves.
+    let tpl = t(vec![
+        Chunk::Static("<button data-pw=\"7\" ".into()),
+        Chunk::Dynamic(Part::Attribute {
+            id: PartId(1),
+            owner: ElementId(7),
+            name: "title".into(),
+            value: "label".into(),
+            context: Context::Attribute,
+        }),
+        Chunk::Static(" ".into()),
+        Chunk::Dynamic(Part::BooleanAttribute {
+            id: PartId(2),
+            owner: ElementId(7),
+            name: "disabled".into(),
+            value: "locked".into(),
+        }),
+        Chunk::Static(">Add</button>".into()),
+    ]);
+    let env = Env::new()
+        .set("label", Value::Text("Add to cart".into()))
+        .set("locked", Value::Bool(true));
+    let out = render(&tpl, &env, &[]).unwrap();
+    assert_eq!(
+        out,
+        "<button data-pw=\"7\" title=\"Add to cart\" disabled>Add</button>"
+    );
+    assert!(
+        !out.contains("pw:s"),
+        "no comment anchors for element parts: {out}"
+    );
+}
+
+#[test]
+fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
+    // The element already carries `data-pw`, which is what the runtime needs to
+    // find it. Emitting anything more would be inventing a second encoding of
+    // the same fact.
+    let tpl = t(vec![
+        Chunk::Static("<button data-pw=\"3\">".into()),
+        Chunk::Dynamic(Part::Event {
+            id: PartId(9),
+            owner: ElementId(3),
+            event: "press".into(),
+            handler: "add_to_cart".into(),
+        }),
+        Chunk::Static("Add</button>".into()),
+    ]);
+    assert_eq!(
+        render(&tpl, &Env::new(), &[]).unwrap(),
+        "<button data-pw=\"3\">Add</button>"
     );
 }

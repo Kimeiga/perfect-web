@@ -603,7 +603,18 @@ fn emit_template_command(paths: &[&String], plain: bool) -> ExitCode {
 
     if plain {
         for t in &templates {
-            println!("{}  ({})", t.path, t.params.join(", "));
+            println!("{}  ({})  schema {}", t.path, t.params.join(", "), t.schema);
+            let manifest = t.manifest();
+            if !manifest.is_empty() {
+                println!("  parts manifest — dynamic regions only:");
+                for e in &manifest {
+                    let owner = e.owner.map(|o| format!(" element {o}")).unwrap_or_default();
+                    println!(
+                        "    {:>3}  {:<18} {:?}{owner}  {}",
+                        e.id.0, e.kind, e.anchor, e.value
+                    );
+                }
+            }
             for c in &t.chunks {
                 match c {
                     pw_core::template_ir::Chunk::Static(s) => {

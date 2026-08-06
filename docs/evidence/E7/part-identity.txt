@@ -1,0 +1,58 @@
+E7-R foundation — part identity, anchors, and the parts manifest
+
+  A PartId is a renderer concept. `data-pw` and comment anchors are two
+  wire encodings of it, chosen per part KIND rather than one forced onto
+  all of them.
+
+    ranges  Conditional, Each, Component, Text, RawHtml → comments
+    element Attribute, BooleanAttribute, Event          → data-pw
+
+=== ONE INDEXING PASS ====================================================
+
+  Identity is assigned during construction, in document order, and the
+  server renderer, the parts manifest, and later the patch generator all
+  read the same numbers. The alternative — three traversals numbering
+  parts three ways — is the shape this project has found dangerous four
+  times.
+
+$ pw emit-template --plain examples/counter/app.pw
+  store.counter.Counter  ()  schema 0d5ebac8facb8cab
+    parts manifest — dynamic regions only:
+        0  text               Range  count
+        1  event              Element element 0  
+
+=== IDENTITY IS TEMPLATE-SCOPED AND ORDINAL ==============================
+
+  namespaced by the template's SEMANTIC schema, hashed over the IR's
+  shape and not over source bytes. Positional identity is safe because
+  E7V already refuses across schemas: local part 3 is never read as
+  local part 3 of an incompatible template.
+
+=== THE OVERHEAD, MEASURED ===============================================
+
+  examples/counter/app.pw — 28 elements, one dynamic text, one handler
+
+    document bytes        975
+    elements              28
+    pw anchor nodes       2
+    anchored elements     1
+    identity markup bytes 36   (3.69% of the document)
+
+  The five static menu items, the headings and the description carry no
+  identity markup at all. That is the invariant, not a byte target:
+  only dynamic and resumable regions pay.
+
+=== TESTS ================================================================
+
+  test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+  a range part keeps its boundaries when it renders NOTHING — an empty
+    range is where the first item reappears, and an attribute cannot
+    express 'nothing, here'
+  a static region carries no identity markup
+  three dynamic things on one element cost ONE identity
+  an event part emits nothing: behaviour is not markup
