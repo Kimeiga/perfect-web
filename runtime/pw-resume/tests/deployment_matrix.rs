@@ -31,8 +31,21 @@ fn schema_v2() -> SchemaHash {
     SchemaHash::of_fields(&[("store_id", "StoreId"), ("locale", "String")])
 }
 
+fn deps(names: &[&str]) -> DependencySet {
+    let refs: Vec<[&str; 5]> = names
+        .iter()
+        .map(|n| ["app", "store", "Term", n, "r1"])
+        .collect();
+    DependencySet::of(&refs)
+}
+
 fn handler(implementation: &str, schema: &SchemaHash) -> HandlerId {
-    HandlerId::derive(implementation, &["Stores.get"], schema, &ABI)
+    HandlerId::derive(
+        &ImplementationHash::of(implementation),
+        &deps(&["Stores.get"]),
+        schema,
+        &ABI,
+    )
 }
 
 fn entry(h: &HandlerId, schema: &SchemaHash, build: &str, scope: PrivacyScope) -> ResumeEntry {
@@ -380,10 +393,34 @@ fn reference_order_is_not_a_behavioural_difference() {
     // Two builds that resolved the same references in a different order must
     // produce the same identity, or an unrelated reordering rejects every
     // resume in the application.
+    assert_eq!(
+        deps(&["Stores.get", "Carts.add"]),
+        deps(&["Carts.add", "Stores.get"])
+    );
+    // And a repeated reference is the same SET. How many times it is used is a
+    // property of the implementation, which is hashed separately and in order.
+    assert_eq!(deps(&["Stores.get", "Stores.get"]), deps(&["Stores.get"]));
+}
+
+#[test]
+fn statement_order_is_a_behavioural_difference() {
+    // The other half, and the reason the two hashes are separate types.
+    // `charge(); send_receipt()` is not `send_receipt(); charge()`.
+    assert_ne!(
+        ImplementationHash::of("charge(); send_receipt()"),
+        ImplementationHash::of("send_receipt(); charge()")
+    );
+}
+
+#[test]
+fn a_dependency_set_difference_changes_identity() {
     let s = schema_v1();
-    let a = HandlerId::derive("body", &["Stores.get", "Carts.add"], &s, &ABI);
-    let b = HandlerId::derive("body", &["Carts.add", "Stores.get"], &s, &ABI);
-    assert_eq!(a, b);
+    let body = ImplementationHash::of("same body");
+    assert_ne!(
+        HandlerId::derive(&body, &deps(&["Stores.get"]), &s, &ABI),
+        HandlerId::derive(&body, &deps(&["Stores.get", "Carts.add"]), &s, &ABI),
+        "a handler that reaches one more declaration is a different handler"
+    );
 }
 
 #[test]
@@ -550,5 +587,47 @@ fn a_pending_command_is_never_replayed_automatically() {
             ),
             "{r:?} would replay a mutation the user did not re-request"
         );
+    }
+}
+
+/// R3, as a matrix row now that the fuzzer found it.
+///
+/// The construct and the scope DISAGREE — a public region carrying session
+/// state. No hand-written scenario pairs them, because the pairing is a
+/// contradiction; the generator produced it by taking the cross product.
+#[test]
+fn a_private_manifest_in_a_public_region_never_gets_a_public_refetch() {
+    let s = schema_v1();
+    let present = handler("render", &s);
+    let absent = handler("gone", &s);
+    let d = decide(
+        &entry(&absent, &s, "B1", PrivacyScope::Session("s-1".into())),
+        &runtime(&[(&present, &s)], PrivacyScope::Session("s-1".into())),
+        Construct::PublicRegion,
+    );
+    match d {
+        Decision::Refuse { recovery, .. } => assert_eq!(
+            recovery,
+            Recovery::RerenderPrivateSlot,
+            "private state must not be recovered by re-rendering a public region"
+        ),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+}
+
+/// And the control: public state in a public region still refetches.
+#[test]
+fn a_public_manifest_in_a_public_region_still_refetches() {
+    let s = schema_v1();
+    let present = handler("render", &s);
+    let absent = handler("gone", &s);
+    let d = decide(
+        &entry(&absent, &s, "B1", PrivacyScope::Public),
+        &runtime(&[(&present, &s)], PrivacyScope::Public),
+        Construct::PublicRegion,
+    );
+    match d {
+        Decision::Refuse { recovery, .. } => assert_eq!(recovery, Recovery::RefetchRegion),
+        other => panic!("expected a refusal, got {other:?}"),
     }
 }

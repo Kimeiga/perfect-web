@@ -196,8 +196,14 @@ codes! {
         "the resume manifest ships with the public shell and may hold only public values";
     UNSERIALIZABLE_CAPTURE = "PW5008" / unserializable_capture / 1, Privacy,
         "a resumable handler may capture only what can be written to its manifest";
-    CAPTURE_SCHEMA_DISAGREES = "PW5016" / capture_schema_disagrees / 1, Privacy,
-        "a handler and its manifest must agree about what it captures";
+    // Named narrowly, on the architect's correction. This is NOT
+    // manifest-versus-handler artifact agreement — that comparison needs E7's
+    // generator to exist so there are two artifacts to disagree, and it will
+    // get its own registry entry when it does. This proves the narrower thing
+    // it actually proves: a capture must have a stable type identity from
+    // which this build can derive a schema.
+    RESUME_CAPTURE_SCHEMA_UNNAMEABLE = "PW5016" / resume_capture_schema_unnameable / 1, Privacy,
+        "a resumable capture must have a type this build can derive a schema from";
     DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,

@@ -1,5 +1,5 @@
 // @status: GENERAL
-// @invariant: capture_schema_disagrees
+// @invariant: resume_capture_schema_unnameable
 // @dimension: direct invalid — a capture whose type this build cannot name
 //
 // `helper` has no declared return type, so nothing says what `derived` is. The

@@ -94,28 +94,67 @@ pub struct BuildId(pub String);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HandlerId(pub Hash);
 
+/// The set of declarations a handler depends on.
+///
+/// **Order-insensitive**, and that is the whole reason it is a separate type.
+/// `{Stores.get, Carts.add}` is the same dependency set however source
+/// traversal happened to discover it, and hashing the discovery order would
+/// make an unrelated edit reject every resume in the application.
+///
+/// Deduplicated, because repeated *use* is a property of the implementation
+/// and is carried by [`ImplementationHash`] — which is order-SENSITIVE, since
+/// `charge(); send_receipt()` is not `send_receipt(); charge()`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencySet(Hash);
+
+impl DependencySet {
+    /// Each reference given as its canonical tuple:
+    /// `(package, module, namespace, declaration, revision)`.
+    pub fn of(references: &[[&str; 5]]) -> DependencySet {
+        let mut canonical: Vec<String> = references.iter().map(|r| r.join("\u{3}")).collect();
+        canonical.sort_unstable();
+        canonical.dedup();
+        DependencySet(Hash::of(&canonical.join("\u{2}")))
+    }
+}
+
+/// What the handler's body does, in order.
+///
+/// **Order-sensitive** wherever order changes behaviour. Version one hashes the
+/// normalized text, which is conservative: a formatting-only change rejects a
+/// resume that would in fact have been safe. That is the correct trade — it
+/// never accepts behaviourally changed code, and the reverse mistake is the one
+/// that hands last week's captures to code that reads them differently.
+///
+/// When typed-IR canonicalization is stable this should derive from that
+/// instead, preserving operation order, control flow, constants, captures,
+/// referenced identities and effectful sequencing — at which point formatting
+/// and comments can be ignored without weakening identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImplementationHash(Hash);
+
+impl ImplementationHash {
+    pub fn of(normalized_body: &str) -> ImplementationHash {
+        ImplementationHash(Hash::of(normalized_body))
+    }
+}
+
 impl HandlerId {
     /// Derive identity from what actually determines behaviour.
     ///
-    /// The capture schema is included because a handler that reads its captures
-    /// differently is a different handler, even with identical source text.
+    /// Four inputs, and each is a separate type because each answers a
+    /// different question. The capture schema is included because a handler
+    /// that reads its captures differently is a different handler, even with
+    /// identical source text.
     pub fn derive(
-        normalized_implementation: &str,
-        resolved_references: &[&str],
+        implementation: &ImplementationHash,
+        dependencies: &DependencySet,
         capture_schema: &SchemaHash,
         abi: &PlatformAbi,
     ) -> HandlerId {
-        let mut refs: Vec<&str> = resolved_references.to_vec();
-        // Sorted: the order two references happen to appear in is not a
-        // behavioural difference, and leaving it in would make an unrelated
-        // edit reject every resume.
-        refs.sort_unstable();
         HandlerId(Hash::of(&format!(
             "{}\u{1}{}\u{1}{}\u{1}{}",
-            normalized_implementation,
-            refs.join("\u{2}"),
-            capture_schema.0,
-            abi.0
+            implementation.0, dependencies.0, capture_schema.0, abi.0
         )))
     }
 }
@@ -134,10 +173,23 @@ impl SchemaHash {
 
 /// How widely a manifest's contents may be read.
 ///
-/// Ordered from widest to narrowest so "equal or stricter" is expressible, but
-/// deliberately NOT `Ord` — see [`PrivacyScope::admits`]. Charter §7.8 says
-/// labels are a set of restrictions and not a total order, and an ordering here
-/// would quietly reintroduce one.
+/// Deliberately **not** `Ord`, and not as a temporary limitation to be fixed
+/// later — as a refusal to encode security semantics as a sortable order.
+/// Charter §7.8 says labels are a set of restrictions and not a total order,
+/// and two sessions are incomparable:
+///
+/// ```text
+/// Session<A> is not below Session<B>
+/// Session<B> is not below Session<A>
+/// ```
+///
+/// A total ordering would encode an arbitrary relationship between them that
+/// someone later reads as permission to flow. The semantic operations are
+/// named instead — see [`PrivacyScope::can_flow_to`].
+///
+/// When labels become combinations of restrictions this becomes a partial
+/// order by set inclusion (`{Session<A>} ⊆ {Session<A>, Secret<C>}`), probably
+/// a semilattice. Still not `Ord`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrivacyScope {
     /// Served with the public shell; anything cacheable may read it.
@@ -151,22 +203,32 @@ pub enum PrivacyScope {
 }
 
 impl PrivacyScope {
-    /// May a manifest written for `self` be resumed into `into`?
+    /// May a value scoped to `self` flow into a region scoped to `destination`?
     ///
-    /// Only when `into` is the same scope or a narrower one. Widening is the
-    /// case this exists to reject: a session-scoped manifest resumed into a
-    /// public scope is the resume-manifest privacy defect happening at
-    /// deployment time instead of at compile time.
-    pub fn admits(&self, into: &PrivacyScope) -> bool {
-        match (self, into) {
-            (a, b) if a == b => true,
-            // Public state may be resumed anywhere; it restricts nothing.
-            (PrivacyScope::Public, _) => true,
-            // Everything else must match exactly. Two different sessions are
-            // not "the same or stricter" — they are different principals, and
-            // treating one as admitting the other is the cross-tenant defect.
-            _ => false,
-        }
+    /// ```text
+    /// Public     -> Session<A>   allowed   adds a restriction
+    /// Session<A> -> Public       forbidden removes one
+    /// Session<A> -> Session<A>   allowed
+    /// Session<A> -> Session<B>   forbidden different principals
+    /// ```
+    ///
+    /// `Public` is the EMPTY set of restrictions, so it is a subset of every
+    /// destination — that is why the one widening-adjacent case is allowed, and
+    /// it is allowed in the direction that adds rather than removes.
+    ///
+    /// **This authorises the DATA, not the CODE.** A public capture resumed
+    /// into a session page may still invoke a handler that needs
+    /// `session.read`, and that remains subject to capability, placement and
+    /// handler-identity checks. "The captured data is public" never means "the
+    /// code may run anywhere".
+    pub fn can_flow_to(&self, destination: &PrivacyScope) -> bool {
+        matches!(self, PrivacyScope::Public) || self == destination
+    }
+
+    /// Is this the same scope? Named rather than derived, so a caller reads
+    /// what it is asking.
+    pub fn is_equivalent_to(&self, other: &PrivacyScope) -> bool {
+        self == other
     }
 }
 
@@ -318,6 +380,9 @@ impl Construct {
     /// A `PendingCommand` never contains an automatic replay: re-running a
     /// mutation the user did not re-request is how a version mismatch becomes a
     /// double charge. It asks for a fresh interaction instead.
+    ///
+    /// **This is the construct's list, not the answer.** The scope of the
+    /// manifest narrows it further — see [`Construct::recovery_for`].
     pub fn recoveries(self) -> &'static [Recovery] {
         match self {
             Construct::PublicRegion => &[Recovery::RefetchRegion, Recovery::ReloadDocument],
@@ -334,6 +399,33 @@ impl Construct {
             // A handle is not a description of a resource, it IS the resource.
             // Nothing on the other side can be reconnected to it.
             Construct::OpenResource => &[Recovery::RejectIrrecoverable],
+        }
+    }
+
+    /// The recovery for this construct holding a manifest of this scope.
+    ///
+    /// The construct alone is not enough, and the first fuzz run proved it:
+    /// a `PublicRegion` carrying a `Session`-scoped manifest was given
+    /// `RefetchRegion`, which re-renders a PUBLIC region to recover PRIVATE
+    /// state. 611 of 4000 generated cases hit it.
+    ///
+    /// The pairing is itself a contradiction — a public region should never
+    /// hold session state, and if one does the artifact is malformed or forged
+    /// — but "should never happen" is not a recovery policy. The scope wins,
+    /// because it is the half that says who may see the result.
+    pub fn recovery_for(self, scope: &PrivacyScope) -> Recovery {
+        let preferred = *self
+            .recoveries()
+            .first()
+            .unwrap_or(&Recovery::RejectIrrecoverable);
+        if matches!(scope, PrivacyScope::Public) {
+            return preferred;
+        }
+        match preferred {
+            // Refetching a public region cannot restore private state, and
+            // asking for it would render the region for whoever asks.
+            Recovery::RefetchRegion => Recovery::RerenderPrivateSlot,
+            other => other,
         }
     }
 }
@@ -368,10 +460,7 @@ impl Decision {
 pub fn decide(entry: &ResumeEntry, rt: &Runtime, construct: Construct) -> Decision {
     let mut trace = Vec::new();
     let refuse = |why: Refusal, trace: Vec<String>| Decision::Refuse {
-        recovery: *construct
-            .recoveries()
-            .first()
-            .unwrap_or(&Recovery::RejectIrrecoverable),
+        recovery: construct.recovery_for(&entry.privacy_scope),
         why,
         trace,
     };
@@ -402,7 +491,7 @@ pub fn decide(entry: &ResumeEntry, rt: &Runtime, construct: Construct) -> Decisi
     // 3. Privacy, BEFORE any decoding. A widened scope must not reach the
     //    point where bytes are interpreted, even to fail.
     if let Some(into) = &rt.scope
-        && !entry.privacy_scope.admits(into)
+        && !entry.privacy_scope.can_flow_to(into)
     {
         trace.push(format!(
             "{:?} does not admit {:?}",

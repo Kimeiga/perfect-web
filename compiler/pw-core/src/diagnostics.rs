@@ -195,12 +195,15 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     ("PW0302", "PW5003"),
     // The resume manifest: one about what a value IS, one about who may read it.
     ("PW0308", "PW5008"),
-    // E7V. The corpus reserved `PW3011` for "private data crossing into the
-    // resume manifest at BUILD time"; that is artifact disagreement within one
-    // build, which is a compiler error. The RUNTIME half — independently
-    // cached artifacts from different releases — is not a source diagnostic at
-    // all and lives in `runtime/pw-resume` as a typed decision.
-    ("PW3011", "PW5016"),
+    // `PW3011` was registered as "resumption manifest — private data crossing
+    // into it". That is `private_in_resume_manifest`, which `PW5007` already
+    // enforces — NOT the capture-schema check, and not general code-version
+    // incompatibility.
+    //
+    // It was briefly aliased to `PW5016`, which would have made the alias imply
+    // coverage that does not exist. Corrected on the architect's audit: an
+    // alias must preserve the meaning, and `PW3011` meant this one.
+    ("PW3011", "PW5007"),
     ("PW0328", "PW5007"),
     // R-006: a secret reaching a sink declared `Public`.
     ("PW0304", "PW5006"), // a secret cannot be rendered to the browser

@@ -132,8 +132,8 @@ pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Di
                     continue;
                 }
                 out.push(Diagnostic {
-                    code: codes::CAPTURE_SCHEMA_DISAGREES.id,
-                    invariant: codes::CAPTURE_SCHEMA_DISAGREES.invariant,
+                    code: codes::RESUME_CAPTURE_SCHEMA_UNNAMEABLE.id,
+                    invariant: codes::RESUME_CAPTURE_SCHEMA_UNNAMEABLE.invariant,
                     reason: "capture_has_no_nameable_type",
                     detector: Detector::PatternMatrix,
                     severity: Severity::Error,

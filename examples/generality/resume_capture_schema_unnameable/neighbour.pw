@@ -1,5 +1,5 @@
 // @status: NEIGHBOUR
-// @invariant: capture_schema_disagrees
+// @invariant: resume_capture_schema_unnameable
 // @dimension: valid neighbour — the same shape, with a nameable type
 //
 // A rule reacting to "a capture that is not a bare parameter" would catch
