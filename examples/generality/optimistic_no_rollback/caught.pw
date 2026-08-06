@@ -4,6 +4,7 @@
 module generality.optimistic_remove
 
 import Carts
+import Resources.{ Cart }
 
 command remove_from_cart(item: MenuItemId)
     -> Result<Cart, CartError>

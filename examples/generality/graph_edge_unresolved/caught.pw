@@ -1,0 +1,25 @@
+// @status: GENERAL
+// @invariant: graph_edge_unresolved
+// @dimension: the target EXISTS but is not visible here — declared in another
+//             module and never imported, which is the realistic version of
+//             this defect and the one a global name search would miss
+module generality.materialize_unimported_event
+
+import domain.{ StoreId }
+import Resources.{ Menu }
+import Events.{ MenuChanged }
+
+materialize AlmostRight(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
+    // `InventoryChanged` is a real event. `Events` declares it and this file
+    // imports two of its neighbours. It is still not visible here, and an
+    // invalidation that never arrives is the same silence whether the name is
+    // a typo or a missing import.
+    invalidates_on MenuChanged(id), InventoryChanged(id, item)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+}

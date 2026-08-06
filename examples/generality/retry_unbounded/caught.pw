@@ -9,8 +9,8 @@ module generality.retry_forever
 import Payments
 
 command sync(order: OrderId) -> Result<Int, PaymentError>
-    requires SignedIn
-    retry    forever
+    requires      SignedIn
+    retry         forever
     idempotent_by InteractionId
 {
     Payments.charge(order, 1)

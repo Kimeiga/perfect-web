@@ -32,9 +32,9 @@ Generality at freeze:      7/29 invariants generality-tested
 Reproduce: `just ci` for the gate, `just evidence-corpus` for the per-fixture
 table, `just generality` for the second score.
 
-**C1 is frozen.** A change to any file under `examples/accepted` or
-`examples/rejected` opens C2 and requires a row in the table below plus a
-recorded reason. The rule exists because the path to 44/44 changed ten
+**C1 is frozen, and C2 opened on 2026-08-06** — see below. A change to any file
+under `examples/accepted` or `examples/rejected` opens the next version and
+requires a row in its table plus a recorded reason. The rule exists because the path to 44/44 changed ten
 fixtures, and a reader who does not know that will read the number as stronger
 than it is.
 
@@ -154,9 +154,82 @@ fix, and a negative control showing the old implementation fails.
 
 ---
 
-## Opening C2
+## C2 — opened 2026-08-06 (E6)
 
-C2 opens when the *specification* changes — a new charter category, a corrected
+```text
+Corpus version:            C2
+Accepted programs:         24
+Rejected programs:         44
+Charter categories:        24/24 accepted, 44/44 rejected
+Result:                    24/24 accepted clean, 44/44 rejected enforced
+Wrong-reason catches:      0
+Modified since C1:         7 fixtures (below)
+Generality at open:        29/29 invariants generality-tested
+```
+
+Reproduce: `just ci` for the gate, `just evidence-corpus` for the per-fixture
+table, `just generality` for the second score.
+
+### Why it opened
+
+**E6 resolved policy clauses for the first time.** `depends_on`,
+`invalidates_on`, `emits` and `invalidates` name declarations, and until this
+milestone nothing checked that the declarations existed. Seven fixtures named
+resources and events that no file in their program declared.
+
+That is the same shape as the C0 → C1 repair — *the fixture referred to
+something that existed nowhere* — arriving in a second place, and it went
+unnoticed for the same reason: a clause nobody resolved cannot be reported as
+unresolved. Nine of ten C1 changes were calls that resolved to nothing. These
+are edges that resolved to nothing.
+
+It matters more here than it looks. An edge to nothing is not an error at run
+time, it is **silence**: the fragment never regenerates, the page it produces
+stays valid, well-formed and permanently out of date, and no test of the page
+can tell that apart from a fragment whose inputs never changed.
+
+### C1 → C2: every changed fixture
+
+| fixture | change | kind | before | after |
+|---|---|---|---|---|
+| A-003 | `import Events.{ StoreChanged }` | missing context | `invalidates_on StoreChanged(id)` named nothing | resolves; `PW5100` clean |
+| A-005 | `import Resources.{ Cart }` | missing context | `invalidates Cart(..)` named nothing | resolves |
+| A-008 | `import Events.{ MenuChanged }` | missing context | `invalidates_on MenuChanged(id)` named nothing | resolves |
+| A-009 | `import Resources.{ Store, Menu }`, `import Events.{ MenuChanged, InventoryChanged }` | missing context | **all four** graph edges named nothing — the fixture for edge materialization described a graph with no edges | resolves |
+| A-010 | `import Resources.{ Order }` | missing context | `invalidates Order(order)` named nothing | resolves |
+| R-017 | the same imports, plus `code_version included_in_key` | missing context + **second defect removed** | caught for `PW0401`, and would now also emit `PW5102` | `PW0401` alone |
+| R-029 | `import Resources.{ Cart }` | missing context | `invalidates Cart(..)` named nothing | `PW0327` alone |
+
+Six of the seven are imports. The two that are not:
+
+- **R-017** gained `code_version included_in_key`, which removes a *second*
+  defect the fixture did not declare. Same repair as R-012 in C1, and it
+  narrows what the fixture proves: it is about the wall clock, so it must be
+  caught for the wall clock.
+- **A-009** is the one worth looking at hardest. Its category is "edge
+  materialized menu" and every edge it declared pointed at nothing, so the
+  fixture demonstrated the SYNTAX of a dependency graph and none of its
+  semantics. It passed C1 because no analysis had ever read those clauses.
+
+**No change weakened an invariant.** Every `@expect-error` line in C2 is the one
+C1 had.
+
+### New: `examples/lib/Resources.pw`
+
+The library gained the four resources the corpus's policy clauses name —
+`Store`, `Menu`, `Cart`, `Order`. Library files are not corpus fixtures and do
+not change the 24/44 counts; they are the world the fixtures refer to, the same
+role `Stores.pw` and `Carts.pw` have had since C1.
+
+`A-003` and `A-004` keep their own `Store` and `Cart`. They are the fixtures
+that demonstrate how such a query is *written*, and a fixture referring to
+itself would prove nothing about resolution across files.
+
+---
+
+## Opening a corpus version
+
+A new version opens when the *specification* changes — a new charter category, a corrected
 `@expect-error`, a fixture that was wrong about the language. It does not open
 because a checker got better; that is what `examples/generality/` is for.
 

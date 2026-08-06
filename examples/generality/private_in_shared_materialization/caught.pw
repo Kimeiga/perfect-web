@@ -1,0 +1,36 @@
+// @status: GENERAL
+// @invariant: private_in_shared_materialization
+// @dimension: indirect — the private dependency arrives through a SECOND
+//             fragment rather than directly, so a rule that only read one
+//             declaration's own `depends_on` list would miss it
+module generality.materialize_indirect_private
+
+import domain.{ SessionId }
+import Resources.{ Cart }
+import Events.{ CartChanged }
+
+// Honest about itself: private data, private entry. Nothing wrong here.
+materialize CartSummary(session: SessionId) {
+    placement      origin
+    partition      private
+    depends_on     Cart(session)
+    invalidates_on CartChanged(session)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+}
+
+// And this one pulls the same session-scoped resource into a SHARED entry.
+// The corpus shape is a fragment beside a page; this is a fragment beside a
+// fragment, in the same file, where the private one looks like precedent.
+materialize PublicSummary(session: SessionId) {
+    placement      edge
+    partition      public
+    depends_on     Cart(session)
+    invalidates_on CartChanged(session)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+}

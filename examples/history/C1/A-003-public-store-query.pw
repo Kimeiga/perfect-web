@@ -13,10 +13,6 @@ module store.queries
 import domain.{ StoreId, Store, StoreError }
 
 import Stores
-// E6: `invalidates_on` names a declaration, and until E6 nothing checked
-// that the name existed. An event nobody declares means a query nobody
-// invalidates — silence, not an error.
-import Events.{ StoreChanged }
 
 public query Store(id: StoreId) -> Result<Store, StoreError>
     freshness      30.seconds

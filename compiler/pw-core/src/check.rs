@@ -153,6 +153,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // E6: every route the program declares, so a link can be checked against
     // what exists rather than against a naming convention.
     let routes = crate::routes::table(&hirs);
+    // E6: the resource dependency graph, over every unit at once. A fragment
+    // in one module depends on a query in another, so a per-file graph would
+    // report a dangling edge for exactly the case the milestone is about.
+    let graph = crate::graph::Graph::build(&hirs, &workspace);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -185,7 +189,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
             out.extend(check_unit_with(
-                &env, &labels, &sigs, &inference, &manifest, &routes, u,
+                &env, &labels, &sigs, &inference, &manifest, &routes, &graph, u,
             ));
             out.sort_by_key(|d| d.primary_span.start);
             (u.path.clone(), out)
@@ -347,6 +351,12 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     let inference = crate::effects::Inference::new(&sigs);
     let manifest = crate::resume::Manifest::default();
     let routes = std::collections::BTreeSet::new();
+    // One unit's own graph. Enough for a single-file caller, and honestly
+    // narrower than the whole-program one: an edge to another file's query is
+    // dangling here, which is why `check_units` is the entry point every real
+    // caller uses.
+    let ws = crate::resolve::Workspace::build(&[&unit.hir]);
+    let graph = crate::graph::Graph::build(&[&unit.hir], &ws);
     check_unit_with(
         env,
         &BTreeMap::new(),
@@ -354,6 +364,7 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         &inference,
         &manifest,
         &routes,
+        &graph,
         unit,
     )
 }
@@ -366,6 +377,7 @@ fn check_unit_with(
     inference: &crate::effects::Inference<'_>,
     manifest: &crate::resume::Manifest,
     routes: &std::collections::BTreeSet<String>,
+    graph: &crate::graph::Graph,
     unit: &Unit,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
@@ -415,6 +427,7 @@ fn check_unit_with(
 
     // Charter §8.2: an internal link names a route the program declares.
     crate::routes::check(&unit.hir, routes, &mut out);
+    crate::graph::check(&unit.hir, graph, &mut out);
 
     for (id, decl) in unit.hir.all_decls() {
         privacy_and_placement(

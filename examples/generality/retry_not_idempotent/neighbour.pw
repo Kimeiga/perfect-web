@@ -11,8 +11,8 @@ import Payments
 
 command refund(order: OrderId, amount: Money<USD>)
     -> Result<PaymentReceipt, PaymentError>
-    requires SignedIn
-    retry    fixed(max = 3)
+    requires      SignedIn
+    retry         fixed(max = 3)
     idempotent_by InteractionId
 {
     Payments.charge(order, amount)

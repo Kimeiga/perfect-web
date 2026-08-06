@@ -1,0 +1,24 @@
+// @expect: clean
+// The control all three materialization rules need. Same construct, same
+// shared partition, same event-driven invalidation — every dependency is
+// public, every named target exists, and the key separates the build.
+//
+// A rule that reported every shared materialization, or every `depends_on`,
+// or every fragment without an exhaustive key, would catch this one too.
+
+module rules.materialization_good
+
+import domain.{ StoreId }
+import Resources.{ Store, Menu }
+import Events.{ MenuChanged, StoreChanged }
+
+materialize GoodFragment(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Store(id), Menu(id)
+    invalidates_on MenuChanged(id), StoreChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+}

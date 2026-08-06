@@ -11,12 +11,6 @@
 module store.menu_materialization
 
 import domain.{ StoreId, MenuItemId }
-// E6: what this fragment depends on and what invalidates it are now
-// resolved against declarations. Before, both lists were names nobody
-// checked, and a graph of edges to nothing looks exactly like a graph of
-// dependencies that never change.
-import Resources.{ Store, Menu }
-import Events.{ MenuChanged, InventoryChanged }
 
 materialize MenuFragment(id: StoreId) {
     placement      edge

@@ -1,0 +1,22 @@
+// @status: NEIGHBOUR
+// @invariant: shared_key_omits_code_version
+// @dimension: valid neighbour — the same careful key, with the build in it
+module generality.materialize_complete_key
+
+import domain.{ StoreId }
+import Resources.{ Menu }
+import Events.{ MenuChanged }
+
+materialize Complete(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
+    invalidates_on MenuChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+    locale         included_in_key
+    tenant         included_in_key
+    policy_version included_in_key
+}

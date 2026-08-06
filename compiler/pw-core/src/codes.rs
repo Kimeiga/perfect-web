@@ -62,6 +62,9 @@ pub enum Owner {
     /// Charter §7.5A relations that are not effect-row violations: an
     /// ordering, a cycle, a declared assertion that does not hold.
     Layout,
+    /// E6: the resource dependency graph. What a materialization depends on,
+    /// what invalidates it, and what its cache key must separate.
+    ResourceGraph,
 }
 
 impl fmt::Display for Code {
@@ -226,6 +229,19 @@ codes! {
         "interactive behaviour belongs on an element that can receive it";
     CONTROL_WITHOUT_LABEL = "PW5014" / control_without_label / 1, Markup,
         "a form control must have something that names it";
+
+    // --- the resource dependency graph (PW51xx, E6) -----------------------
+    //
+    // Separate from `PW5001` (private data in a shared CACHE), which is about
+    // a query's own partition. These are about the GRAPH: what a
+    // materialization pulls in, what it listens for, and what its key
+    // separates. A page can be correct on its own and wrong as a node.
+    GRAPH_EDGE_UNRESOLVED = "PW5100" / graph_edge_unresolved / 1, ResourceGraph,
+        "a dependency, event or invalidation target must name something the program declares";
+    PRIVATE_IN_SHARED_MATERIALIZATION = "PW5101" / private_in_shared_materialization / 1, ResourceGraph,
+        "a shared materialization may only depend on data every reader of its cache entry may see";
+    SHARED_KEY_OMITS_CODE_VERSION = "PW5102" / shared_key_omits_code_version / 1, ResourceGraph,
+        "a shared materialization's cache key must separate the build that produced it";
 }
 
 /// Look a code up by its public string.
@@ -288,6 +304,7 @@ impl Owner {
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
+            Owner::ResourceGraph => "PW51",
             _ => "",
         }
     }

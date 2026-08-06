@@ -495,7 +495,8 @@ fn emit_graph_command(paths: &[&String], plain: bool) -> ExitCode {
         hirs.push(pw_core::lower::lower_file(&src, &parsed.green));
     }
     let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
-    let g = pw_core::graph::Graph::build(&refs);
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let g = pw_core::graph::Graph::build(&refs, &ws);
 
     if plain {
         for n in &g.nodes {

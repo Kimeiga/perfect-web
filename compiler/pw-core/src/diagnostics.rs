@@ -34,6 +34,8 @@ pub enum Detector {
     CapabilityAudit,
     /// The type-directed boundary decoder.
     AbiDecoder,
+    /// E6's resource dependency graph, over the whole program.
+    ResourceGraph,
 }
 
 impl Detector {
@@ -44,6 +46,7 @@ impl Detector {
             Detector::PatternMatrix => "pattern_matrix",
             Detector::CapabilityAudit => "capability_audit",
             Detector::AbiDecoder => "abi_decoder",
+            Detector::ResourceGraph => "resource_graph",
         }
     }
 }

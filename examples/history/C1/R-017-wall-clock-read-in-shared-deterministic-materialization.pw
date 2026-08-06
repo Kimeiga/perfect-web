@@ -14,19 +14,12 @@
 module store.menu_materialization
 
 import clock
-import domain.{ StoreId }
-import Resources.{ Menu }
-import Events.{ MenuChanged }
 
 materialize MenuFragment(id: StoreId) {
     placement      edge
     partition      public
     depends_on     Menu(id)
     invalidates_on MenuChanged(id)
-    // E6 `PW5102`. Present so this fixture has exactly ONE defect: without it
-    // the file is also a shared entry whose key does not separate the build,
-    // and a fixture caught for two reasons cannot show which rule caught it.
-    code_version   included_in_key
 
     view {
         // ERROR: wall-clock read inside shared materialization.

@@ -1,0 +1,26 @@
+// @expect: PW5100
+// The failure that looks like success.
+//
+// `PriceChanged` is not an event this program declares — a typo, a rename, or
+// an event somebody meant to add. Nothing goes wrong at run time: the
+// materializer is never told to regenerate, the fragment keeps serving what it
+// last computed, and the page stays valid, well-formed and permanently out of
+// date. No test of the page finds it, because the content is correct content
+// from before.
+
+module rules.materialization_dangling
+
+import domain.{ StoreId }
+import Resources.{ Menu }
+import Events.{ MenuChanged }
+
+materialize StaleFragment(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
+    invalidates_on MenuChanged(id), PriceChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+}

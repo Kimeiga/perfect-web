@@ -14,8 +14,6 @@ import domain.{ MenuItemId, PositiveInt, InteractionId, CartError }
 
 import Carts
 import Menu
-// E6: the cache entry this command drops has to be a resource that exists.
-import Resources.{ Cart }
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>

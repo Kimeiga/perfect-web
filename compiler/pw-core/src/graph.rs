@@ -180,8 +180,21 @@ impl Graph {
     /// Every unit at once, because a materialization in one module depends on
     /// a query in another and a graph built per file would have an edge to
     /// nothing in exactly the case the milestone is about.
-    pub fn build(hirs: &[&Hir]) -> Graph {
+    pub fn build(hirs: &[&Hir], ws: &crate::resolve::Workspace) -> Graph {
         let mut g = Graph::default();
+
+        // `DefId` -> the node path, so a resolution can name a node. Built from
+        // the workspace rather than by matching spellings: E2C deleted by-name
+        // resolution from member lookup, and an edge is exactly the same
+        // question — whether a dependency exists must not depend on which
+        // spellings happen to be unique across the program.
+        let mut by_def: std::collections::BTreeMap<crate::resolve::DefId, String> =
+            std::collections::BTreeMap::new();
+        for m in &ws.modules {
+            for ((_, name), def) in &m.defines {
+                by_def.insert(*def, qualified(&m.name, name));
+            }
+        }
 
         // Pass one: nodes. Every edge target must exist before any edge is
         // resolved, so a forward reference is not a dangling one.
@@ -201,13 +214,26 @@ impl Graph {
         }
 
         // Pass two: edges.
-        for hir in hirs {
+        for (unit, hir) in hirs.iter().enumerate() {
             for (id, decl) in hir.all_decls() {
                 if node_kind(decl).is_none() {
                     continue;
                 }
                 let module = hir.module_of(id).unwrap_or_default();
                 let from = qualified(module, &decl.name);
+                let resolve = |name: &str| -> Option<String> {
+                    match ws.resolve(unit, name) {
+                        crate::resolve::Resolution::Local(d)
+                        | crate::resolve::Resolution::Imported { def: d, .. } => {
+                            by_def.get(&d).cloned()
+                        }
+                        // Ambiguous is NOT resolved to one of the candidates.
+                        // Two imports offering the same name means the program
+                        // does not say which, and picking either would decide
+                        // an invalidation boundary by accident.
+                        _ => None,
+                    }
+                };
 
                 for (policy, kind) in [
                     ("depends_on", EdgeKind::Reads),
@@ -219,7 +245,7 @@ impl Graph {
                         continue;
                     };
                     for (name, key) in calls(&p.value) {
-                        g.push_edge(&from, &name, kind, key, module);
+                        g.push_edge(&from, &name, kind, key, resolve(&name));
                     }
                 }
 
@@ -232,7 +258,7 @@ impl Graph {
                     && let Some(body_id) = decl.body
                 {
                     for (name, key) in queried(hir.body(body_id)) {
-                        g.push_edge(&from, &name, EdgeKind::Reads, key, module);
+                        g.push_edge(&from, &name, EdgeKind::Reads, key, resolve(&name));
                     }
                 }
             }
@@ -255,9 +281,9 @@ impl Graph {
         name: &str,
         kind: EdgeKind,
         key: Vec<String>,
-        module: &str,
+        target: Option<String>,
     ) {
-        match self.resolve(name, module) {
+        match target {
             Some(to) => self.edges.push(Edge {
                 from: from.to_string(),
                 to,
@@ -270,30 +296,6 @@ impl Graph {
                 kind,
             }),
         }
-    }
-
-    /// A node by the name an edge wrote, preferring the writer's own module.
-    ///
-    /// No unique-name fallback. If two modules declare `Menu` and the writing
-    /// module declares neither, the edge is dangling — reported — rather than
-    /// resolved to whichever one happens to exist. E2C deleted that fallback
-    /// from member resolution for the reason that applies here too: whether an
-    /// edge exists must not depend on a global accident.
-    fn resolve(&self, name: &str, module: &str) -> Option<String> {
-        let own = qualified(module, name);
-        if self.nodes.iter().any(|n| n.path == own) {
-            return Some(own);
-        }
-        let mut found = None;
-        for n in &self.nodes {
-            if n.name == name {
-                if found.is_some() {
-                    return None;
-                }
-                found = Some(n.path.clone());
-            }
-        }
-        found
     }
 
     pub fn node(&self, path: &str) -> Option<&Node> {
@@ -514,4 +516,210 @@ fn queried(body: &crate::hir::Body) -> Vec<(String, Vec<String>)> {
         out.push((name.clone(), key));
     }
     out
+}
+
+// --- rules ---------------------------------------------------------------
+
+use crate::codes;
+use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
+
+/// E6's checks over one unit, against the whole program's graph.
+///
+/// Whole-program by construction: a fragment in one module depends on a query
+/// in another, and every one of these rules is about the pair. The diagnostics
+/// are attributed to the unit that *wrote the clause*, because that is the file
+/// whose author can fix it.
+///
+/// Spans come from the declaration rather than from the graph. The graph is a
+/// serialized artifact spanning many files, so a byte offset in it would be a
+/// number with no file attached — and a diagnostic that points confidently at
+/// the wrong place is worse than one that points at the clause.
+pub fn check(hir: &Hir, g: &Graph, out: &mut Vec<Diagnostic>) {
+    for (id, decl) in hir.all_decls() {
+        if node_kind(decl).is_none() {
+            continue;
+        }
+        let module = hir.module_of(id).unwrap_or_default();
+        let path = qualified(module, &decl.name);
+        let at = hir.decl_span(id);
+
+        // 1. A clause that names nothing.
+        //
+        // The E6 failure that looks like success: a fragment listening for an
+        // event nobody declares simply never regenerates. The page is not
+        // wrong, only permanently stale, and no test of the page finds it —
+        // the content is valid, it is just the content from before.
+        for (policy, kind, what) in [
+            ("depends_on", EdgeKind::Reads, "depends on"),
+            (
+                "invalidates_on",
+                EdgeKind::InvalidatedBy,
+                "is invalidated by",
+            ),
+            ("emits", EdgeKind::Emits, "emits"),
+            ("invalidates", EdgeKind::Invalidates, "invalidates"),
+        ] {
+            let Some(p) = decl.policy(policy) else {
+                continue;
+            };
+            for d in &g.dangling {
+                if d.from != path || d.kind != kind {
+                    continue;
+                }
+                if !calls(&p.value).iter().any(|(n, _)| *n == d.name) {
+                    continue;
+                }
+                out.push(Diagnostic {
+                    code: codes::GRAPH_EDGE_UNRESOLVED.id,
+                    invariant: codes::GRAPH_EDGE_UNRESOLVED.invariant,
+                    reason: "graph_target_undeclared",
+                    detector: Detector::ResourceGraph,
+                    severity: Severity::Error,
+                    message: format!(
+                        "`{}` {what} `{}`, which nothing declares",
+                        decl.name, d.name
+                    ),
+                    primary_span: p.span.clone(),
+                    related: vec![Related {
+                        span: at.clone(),
+                        label: format!("`{}` is the node with the edge", decl.name),
+                    }],
+                    explanation: Some(format!(
+                        "Invalidation is driven by this graph, so an edge to nothing is not \
+                         an error at run time — it is silence. `{}` would never regenerate on \
+                         `{}`, and the page it produces would stay valid, correct-looking and \
+                         permanently out of date. Nothing downstream can distinguish that from \
+                         a fragment whose inputs never changed.",
+                        decl.name, d.name
+                    )),
+                    repairs: vec![Repair {
+                        description: format!(
+                            "declare `{}`, or import the module that does",
+                            d.name
+                        ),
+                        replacement: None,
+                    }],
+                });
+            }
+        }
+
+        // 2 and 3 are about materializations whose entry is SHARED.
+        let Some(Node {
+            kind:
+                NodeKind::Materialization {
+                    partition: Some(partition),
+                    varies_by,
+                    ..
+                },
+            ..
+        }) = g.node(&path)
+        else {
+            continue;
+        };
+        if partition.trim() != "public" {
+            continue;
+        }
+
+        // 2. Charter §14 M6 gate item 4, at the graph rather than the cache.
+        //
+        // `PW5001` asks whether a QUERY's own partition admits its data. This
+        // asks whether a FRAGMENT pulls private data into an entry that one
+        // reader's request fills and every other reader is served from. The
+        // two are independent: each resource here can be perfectly configured
+        // and the fragment still wrong.
+        for e in &g.edges {
+            if e.from != path || e.kind != EdgeKind::Reads {
+                continue;
+            }
+            let Some(Node {
+                kind:
+                    NodeKind::Resource {
+                        partition: rp,
+                        privacy,
+                    },
+                name: dep,
+                ..
+            }) = g.node(&e.to)
+            else {
+                continue;
+            };
+            let restricted = privacy.as_deref().is_some_and(|v| v != "public")
+                || rp.as_deref().is_some_and(|v| v.starts_with("private"));
+            if !restricted {
+                continue;
+            }
+            let why = privacy
+                .as_deref()
+                .filter(|v| *v != "public")
+                .map(|v| format!("declared `{v}`"))
+                .unwrap_or_else(|| "cached `private`".to_string());
+            out.push(Diagnostic {
+                code: codes::PRIVATE_IN_SHARED_MATERIALIZATION.id,
+                invariant: codes::PRIVATE_IN_SHARED_MATERIALIZATION.invariant,
+                reason: "restricted_dependency_of_shared_fragment",
+                detector: Detector::ResourceGraph,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` is materialized into a shared entry and depends on `{dep}`, which is {why}",
+                    decl.name
+                ),
+                primary_span: decl
+                    .policy("depends_on")
+                    .map(|p| p.span.clone())
+                    .unwrap_or_else(|| at.clone()),
+                related: vec![Related {
+                    span: at.clone(),
+                    label: "`partition public` makes one entry serve every reader".to_string(),
+                }],
+                explanation: Some(format!(
+                    "A shared materialization is computed for whoever asks first and served \
+                     to everyone after. `{dep}` is {why}, so the first reader's data would be \
+                     written into storage the rest of them read. Charter §14 M6 gate item 4 \
+                     states this as a property of the STORAGE; it is decided here, where the \
+                     dependency is written."
+                )),
+                repairs: vec![Repair {
+                    description: format!(
+                        "materialize `{}` with `partition private`, or drop the dependency on `{dep}` and read it per reader",
+                        decl.name
+                    ),
+                    replacement: None,
+                }],
+            });
+        }
+
+        // 3. Charter §14 M6 task 1: code version is a key dimension.
+        //
+        // A shared entry outlives the deployment that produced it. Its markup
+        // was generated by one build and is hydrated by whatever build the
+        // client loaded, which is the E7V mismatch arriving through the cache
+        // instead of through a resume manifest — and there, unlike there, no
+        // manifest is compared and nothing refuses.
+        if !varies_by.contains(&Dimension::CodeVersion) {
+            out.push(Diagnostic {
+                code: codes::SHARED_KEY_OMITS_CODE_VERSION.id,
+                invariant: codes::SHARED_KEY_OMITS_CODE_VERSION.invariant,
+                reason: "shared_key_omits_code_version",
+                detector: Detector::ResourceGraph,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` is materialized into a shared entry whose key does not separate the build",
+                    decl.name
+                ),
+                primary_span: at.clone(),
+                related: vec![],
+                explanation: Some(
+                    "A cache entry outlives the deployment that wrote it. Without the build \
+                     in the key, markup generated by one release is served to a client running \
+                     another, and the mismatch is the one E7V refuses in a resume manifest — \
+                     except that here no manifest is compared, so nothing refuses."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "add `code_version included_in_key`".to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
 }

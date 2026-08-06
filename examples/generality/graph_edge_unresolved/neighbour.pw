@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: graph_edge_unresolved
+// @dimension: valid neighbour — the same two events, imported
+module generality.materialize_imported_event
+
+import domain.{ StoreId }
+import Resources.{ Menu }
+import Events.{ MenuChanged, InventoryChanged }
+
+materialize AllRight(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
+    invalidates_on MenuChanged(id), InventoryChanged(id, item)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+}

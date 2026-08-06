@@ -1,0 +1,79 @@
+// @corpus: fixture
+// @id: LIB-Resources
+// @category: the resources corpus policy clauses name
+// @charter: §14 M6, §16
+// @milestone: E6
+//
+// E6 resolved policy clauses for the first time — `depends_on`,
+// `invalidates_on`, `emits` and `invalidates` name declarations, and until this
+// milestone nothing checked that the declarations existed. Eight fixtures named
+// resources and events that no file in their program declared, and the graph
+// they described had edges to nothing.
+//
+// That is not a cosmetic gap. An edge to nothing is silence at run time: the
+// fragment never regenerates, the page stays valid and correct-looking and
+// permanently out of date, and nothing downstream can tell that apart from a
+// fragment whose inputs never changed.
+//
+// So the world the corpus refers to is declared here, once. `A-003` and `A-004`
+// keep their own `Store` and `Cart` — they are the fixtures that demonstrate
+// how such a query is WRITTEN, and a fixture referring to itself would prove
+// nothing about resolution across files.
+//
+// The bodies are `todo`, like every other library declaration: what a resource
+// does is somebody's implementation, and what it PROMISES is the signature.
+
+module Resources
+
+import domain.{ StoreId, Store, StoreError, SessionId, Cart, CartError,
+    MenuItem, OrderId, OrderProgress, OrderFailure }
+import Events.{ StoreChanged, MenuChanged }
+
+public query Store(id: StoreId) -> Result<Store, StoreError>
+    freshness      30.seconds
+    consistency    snapshot
+    cache          shared
+    key            id
+    invalidates_on StoreChanged(id)
+    concurrency    one_per_key
+    on_key_change  cancel
+{
+    todo
+}
+
+public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+    freshness      5.minutes
+    consistency    snapshot
+    cache          shared
+    key            id
+    invalidates_on MenuChanged(id)
+    concurrency    one_per_key
+    on_key_change  cancel
+{
+    todo
+}
+
+// Session-scoped, and that is what makes it usable as a control: a shared
+// materialization depending on this is `PW5101`, and the accepted neighbour
+// depending on `Menu` is not.
+session query Cart(session: SessionId) -> Result<Cart, CartError>
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session
+    concurrency   one_per_key
+    on_key_change cancel
+{
+    todo
+}
+
+public query Order(id: OrderId) -> Result<OrderProgress, OrderFailure>
+    freshness     2.seconds
+    consistency   strong
+    cache         shared
+    key           id
+    concurrency   one_per_key
+    on_key_change cancel
+{
+    todo
+}

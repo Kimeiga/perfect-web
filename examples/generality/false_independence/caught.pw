@@ -3,7 +3,6 @@
 // @dimension: indirect invalid — the var() is nested two elements deep
 module generality.independence_nested
 
-
 component Table() {
     placement browser
     subtree independent { intrinsic_height 24.px }

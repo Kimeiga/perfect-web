@@ -1,0 +1,26 @@
+// @expect: PW5101
+// Charter §14 M6 gate item 4, decided where the dependency is written rather
+// than where the bytes are stored.
+//
+// `Cart` is `session`. This fragment is `partition public`, so one reader's
+// request fills an entry every other reader is served from — the first
+// session's cart, handed to everyone. Each declaration here is individually
+// correct: `Cart` asks for a private cache and gets one, and the fragment asks
+// for a shared entry and is entitled to one. The defect is the EDGE.
+
+module rules.materialization_private_dep
+
+import domain.{ StoreId }
+import Resources.{ Menu, Cart }
+import Events.{ MenuChanged }
+
+materialize LeakyFragment(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id), Cart(id)
+    invalidates_on MenuChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+}
