@@ -94,7 +94,7 @@ try {
     process.exit(0);
   }
 
-  for (const route of ["/static", "/counter"]) {
+  for (const route of ["/static", "/counter", "/streamed"]) {
     const res = await fetch(`${BASE}${route}`);
     const html = await res.text();
     const htmlBuf = Buffer.from(html, "utf8");
@@ -116,10 +116,52 @@ try {
 
     // The content the page must show is present in the FIRST response, which is
     // what "usable with JavaScript disabled" means for a static route.
-    const marker = route === "/static" ? "Blue Bottle" : "In cart:";
+    const marker =
+      route === "/static" ? "Blue Bottle" : route === "/counter" ? "In cart:" : "SHELL_READY";
     console.log(`  contains ${JSON.stringify(marker)}  ${html.includes(marker)}`);
     console.log();
   }
+
+  // Charter §14 M3 gate 3: "Delayed content streams without blocking the shell."
+  //
+  // Byte counts cannot answer this — a page that buffers everything and sends
+  // it at the end has identical bytes. The only evidence is WHEN each marker
+  // arrives in the response stream, so the stream is read chunk by chunk.
+  console.log("streaming profile of /streamed");
+  const t0 = performance.now();
+  const res = await fetch(`${BASE}/streamed`);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let acc = "";
+  let chunks = 0;
+  const at = Object.create(null);
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks++;
+    acc += decoder.decode(value, { stream: true });
+    for (const m of ["SHELL_READY", "Finding recommendations", "Affogato"]) {
+      if (at[m] === undefined && acc.includes(m)) at[m] = performance.now() - t0;
+    }
+  }
+  console.log(`  transfer-encoding      ${res.headers.get("transfer-encoding")}`);
+  console.log(`  chunks                 ${chunks}`);
+  for (const [m, ms] of Object.entries(at)) {
+    console.log(`  ${pad(JSON.stringify(m), 26)} ${ms.toFixed(0)} ms`);
+  }
+  const shell = at["SHELL_READY"];
+  const recs = at["Affogato"];
+  if (shell === undefined || recs === undefined) {
+    console.log("  VERDICT: markers missing — the region did not arrive");
+  } else if (chunks > 1 && recs - shell > 500) {
+    console.log(
+      `  VERDICT: the shell was usable ${(recs - shell).toFixed(0)} ms before the`,
+    );
+    console.log("           1200 ms region arrived, in separate chunks.");
+  } else {
+    console.log("  VERDICT: the response did NOT stream — the shell waited");
+  }
+  console.log();
 
   console.log("Read these numbers against charter §14 M3's gate:");
   console.log("  - the static route must be usable with JavaScript disabled;");

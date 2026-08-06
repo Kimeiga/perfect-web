@@ -759,6 +759,8 @@ impl<'a> P<'a> {
         // built by starting a node on `<tag` and finishing it on `</tag`.
         // `open` counts how many `Element` nodes are waiting to be finished.
         let mut open = 0usize;
+        // ...and how many `{#..}` blocks are waiting for their `{/..}`.
+        let mut blocks = 0usize;
         while !self.at_eof() {
             guard += 1;
             if guard > 50_000 {
@@ -804,23 +806,39 @@ impl<'a> P<'a> {
                         break;
                     }
                 }
-                Kind::LBrace => {
-                    // `{#each}` opens and `{/each}` closes, exactly like a tag.
-                    // A region entered at `{#each` would otherwise end at the
-                    // first self-closing child inside it.
-                    depth += self.interpolation();
+                // `{/each}` closes the block it belongs to.
+                Kind::LBrace if self.nth_is(1, Kind::Slash) => {
+                    depth -= 1;
+                    self.interpolation();
+                    if blocks > 0 {
+                        blocks -= 1;
+                        self.finish(); // MarkupBlock
+                    }
                     if depth <= 0 {
                         break;
                     }
+                }
+                // `{#each ..}` opens one. Nesting it — rather than leaving the
+                // marker and its contents as siblings — is what lets a renderer
+                // emit the children *inside* the loop.
+                Kind::LBrace if self.nth_is(1, Kind::Hash) => {
+                    depth += 1;
+                    self.start_keeping_trivia(K::MarkupBlock);
+                    self.interpolation();
+                    blocks += 1;
+                }
+                Kind::LBrace => {
+                    self.interpolation();
                 }
                 // A `}` at depth 0 belongs to the enclosing block, not to us.
                 Kind::RBrace if depth <= 0 => break,
                 _ => self.text_run(),
             }
         }
-        // An unclosed element must still produce a well-formed tree. Recovery
-        // that leaves nodes open would corrupt every ancestor's text range.
-        for _ in 0..open {
+        // An unclosed element or block must still produce a well-formed tree.
+        // Recovery that leaves nodes open would corrupt every ancestor's text
+        // range, and the losslessness suite would then fail far from the cause.
+        for _ in 0..(open + blocks) {
             self.finish();
         }
         self.finish(); // TemplateRegion

@@ -31,23 +31,30 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
 
     echo "===================== 1. GENERATE FROM .pw ========================="
     # Deleted first: a stale template from a previous run would be measured as
-    # if it were current output.
+    # if it were current output. `resources.mjs` is hand-written host code and
+    # lives outside routes/, so it survives.
     rm -rf "$SPIKE/src/routes"
-    mkdir -p "$SPIKE/src/routes/static" "$SPIKE/src/routes/counter"
+    mkdir -p "$SPIKE/src/routes/static" "$SPIKE/src/routes/counter" \
+             "$SPIKE/src/routes/streamed"
     cd "$REPO_ROOT"
     cargo run --quiet -p pw-cli -- emit-marko examples/hello-static/app.pw \
         --out "$SPIKE/src/routes/static"
     cargo run --quiet -p pw-cli -- emit-marko examples/counter/app.pw \
         --out "$SPIKE/src/routes/counter"
+    cargo run --quiet -p pw-cli -- emit-marko examples/streamed/app.pw \
+        --out "$SPIKE/src/routes/streamed"
 
     # @marko/run routes are `+page.marko`; the adapter emits one file per view.
     mv "$SPIKE/src/routes/static/HelloStatic.marko" "$SPIKE/src/routes/static/+page.marko"
     mv "$SPIKE/src/routes/counter/Counter.marko" "$SPIKE/src/routes/counter/+page.marko"
+    mv "$SPIKE/src/routes/streamed/StreamedPage.marko" "$SPIKE/src/routes/streamed/+page.marko"
     echo
     echo "--- generated: static ---"
     cat "$SPIKE/src/routes/static/+page.marko"
     echo "--- generated: counter ---"
     cat "$SPIKE/src/routes/counter/+page.marko"
+    echo "--- generated: streamed ---"
+    cat "$SPIKE/src/routes/streamed/+page.marko"
     echo
 
     echo "===================== 2. BUILD ====================================="

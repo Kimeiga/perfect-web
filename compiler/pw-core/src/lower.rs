@@ -790,10 +790,34 @@ impl Lowerer<'_> {
                 let t = text(self.src, node);
                 b.node(Node::Text(t), span)
             }
+            K::MarkupBlock => {
+                // The opening marker is the block's first interpolation; its
+                // children are everything between it and the closing one.
+                let directive = node
+                    .children()
+                    .find(|c| c.kind() == K::Interpolation)
+                    .map(|i| text(self.src, &i))
+                    .unwrap_or_default();
+                // The block's own markers are children of it too — the opening
+                // one first and the closing one last. Filtering by what they
+                // ARE rather than by position also drops a `{:else}` in the
+                // middle, which a positional skip would have kept as content.
+                let children = node
+                    .children()
+                    .filter(|c| is_markup(c.kind()) && !is_block_marker(self.src, c))
+                    .map(|c| self.markup(b, &c))
+                    .collect();
+                b.node(
+                    Node::Block {
+                        directive,
+                        children,
+                    },
+                    span,
+                )
+            }
             K::Interpolation => {
-                // `{#each ..}` is a directive, not an expression. Its structure
-                // is E4's to model; keeping it verbatim is honest, and
-                // inventing one now would be guessing.
+                // A bare `{/each}` or `{:else}` outside a block: keep it, so
+                // recovery still yields something walkable.
                 let raw = text(self.src, node);
                 if raw.starts_with("{#") || raw.starts_with("{/") || raw.starts_with("{:") {
                     return b.node(
@@ -967,9 +991,18 @@ fn is_expr(k: K) -> bool {
     )
 }
 
+/// Is this node one of a block's own `{#..}` / `{/..}` / `{:..}` markers?
+fn is_block_marker(src: &str, n: &SyntaxNode) -> bool {
+    n.kind() == K::Interpolation && {
+        let t = text(src, n);
+        let t = t.trim_start();
+        t.starts_with("{#") || t.starts_with("{/") || t.starts_with("{:")
+    }
+}
+
 /// One markup node and everything under it.
 fn is_markup(k: K) -> bool {
-    matches!(k, K::Element | K::Text | K::Interpolation)
+    matches!(k, K::Element | K::Text | K::Interpolation | K::MarkupBlock)
 }
 
 /// Can this node stand in a lambda's parameter position as a binding?

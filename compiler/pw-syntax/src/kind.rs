@@ -139,6 +139,10 @@ pub enum SyntaxKind {
     AttrValue,
     /// Literal character data between tags.
     Text,
+    /// `{#each ..} .. {/each}` — a directive and everything it encloses.
+    /// Nested like an element, because it is one: a renderer has to emit its
+    /// children inside the loop, not beside it.
+    MarkupBlock,
 
     // ---- patterns -------------------------------------------------------- 300..
     WildcardPat = 300,
@@ -341,6 +345,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         AttrName,
         AttrValue,
         Text,
+        MarkupBlock,
     ]
 };
 

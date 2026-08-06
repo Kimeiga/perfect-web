@@ -146,16 +146,73 @@ fn whitespace_on_one_line_is_content_and_a_newline_is_formatting() {
 }
 
 #[test]
+fn a_keyed_each_block_becomes_a_marko_for_loop() {
+    let out = render(
+        "module m\nview V(items: List<Item>) !{} {\n    <ul>{#each items as item (item.id)}<li>{item.name}</li>{/each}</ul>\n}\n",
+    );
+    assert!(out.skipped.is_empty(), "{:?}", out.skipped);
+    let (_, text) = &out.files[0];
+
+    // Marko's `by` takes a property NAME for objects. `by=item.id` would be an
+    // undefined variable — the loop parameter is not in scope inside `by=` —
+    // and it compiles, silently re-keying the list on every render.
+    assert!(
+        text.contains(r#"<for|item| of=input.items by="id">"#),
+        "{text}"
+    );
+    assert!(
+        text.contains("<li>${item.name}</li>"),
+        "the body goes INSIDE:\n{text}"
+    );
+    assert!(text.contains("</for>"), "{text}");
+
+    // A primitive key takes a FUNCTION instead, because there is no property.
+    let prim = render(
+        "module m\nview V(xs: List<String>) !{} {\n    <ul>{#each xs as x (x)}<li>{x}</li>{/each}</ul>\n}\n",
+    );
+    let (_, t) = &prim.files[0];
+    assert!(t.contains("by=(x) => x"), "{t}");
+}
+
+#[test]
+fn a_stream_region_becomes_try_await_with_the_parts_in_the_right_places() {
+    let out = render(
+        "module m\n         view V(id: StoreId) !{} {\n         \x20   <stream query={Recs(id)}>\n         \x20       <placeholder><p>wait</p></placeholder>\n         \x20       <ready as={items}><ul>{items}</ul></ready>\n         \x20       <failed as={e}><p>{e}</p></failed>\n         \x20   </stream>\n         }\n",
+    );
+    assert!(out.skipped.is_empty(), "{:?}", out.skipped);
+    let (_, text) = &out.files[0];
+
+    // `@placeholder` and `@catch` go on the `<try>`, never on the `<await>` —
+    // E0 finding F-5, learned when the build rejected the other arrangement.
+    let try_at = text.find("<try>").expect("a try");
+    let await_at = text
+        .find("<await|items|=Recs(input.id)>")
+        .expect("an await");
+    let ph_at = text.find("<@placeholder>").expect("a placeholder");
+    let catch_at = text.find("<@catch|e|>").expect("a catch");
+    let await_end = text.find("</await>").expect("await close");
+    assert!(try_at < await_at, "{text}");
+    assert!(
+        await_end < ph_at && ph_at < catch_at,
+        "@placeholder must follow </await>:\n{text}"
+    );
+
+    // The template calls the query, so it must import an implementation.
+    assert!(
+        text.contains(r#"import { Recs } from "../../resources.mjs";"#),
+        "{text}"
+    );
+}
+
+#[test]
 fn an_unmodelled_construct_is_skipped_with_a_reason() {
     // ADR-0017 property 4. An approximation renders, which is worse than not
     // rendering: the page looks right and is wrong.
-    let out = render(
-        "module m\nview V() !{} {\n    {#each items as i (i.id)}<li>{i.name}</li>{/each}\n}\n",
-    );
+    let out = render("module m\nview V() !{} {\n    <ul>{#unless x}<li>a</li>{/unless}</ul>\n}\n");
     assert!(out.files.is_empty(), "nothing may be emitted");
     assert_eq!(out.skipped.len(), 1);
     assert!(
-        out.skipped[0].reason.contains("directive"),
+        out.skipped[0].reason.contains("not modelled"),
         "{:?}",
         out.skipped
     );

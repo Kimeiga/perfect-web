@@ -99,3 +99,42 @@ test.describe("accessibility baseline", () => {
     });
   }
 });
+
+test.describe("streamed route", () => {
+  test("the shell is usable while the slow region is still pending", async ({ page }) => {
+    // Charter §14 M3 gate 3. Asserted as the browser sees it: the shell must be
+    // interactive-ready before the 1200 ms region resolves, not merely present
+    // in the final HTML. A buffered response would satisfy the second and fail
+    // the first.
+    await page.goto("/streamed", { waitUntil: "commit" });
+
+    await expect(page.locator("#shell-marker")).toHaveText("SHELL_READY", { timeout: 1000 });
+    await expect(page.locator("#pending")).toBeVisible();
+    await expect(page.locator("#recs-marker")).toHaveCount(0);
+
+    // ...and it arrives afterwards, replacing the placeholder.
+    await expect(page.locator("#recs-marker")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("#recs-marker")).toContainText("Affogato");
+    await expect(page.locator("#pending")).toHaveCount(0);
+  });
+
+  test("ships no client JavaScript of its own", async ({ page }) => {
+    const requested = [];
+    page.on("response", (r) => requested.push(r.url()));
+    await page.goto("/streamed");
+    await expect(page.locator("#recs-marker")).toBeVisible({ timeout: 5000 });
+    expect(
+      requested.filter((u) => u.endsWith(".js")),
+      "streaming must not require a downloaded bundle",
+    ).toEqual([]);
+  });
+
+  test("the keyed list renders one item per record", async ({ page }) => {
+    // `{#each items as item (item.id)}` becomes `<for|item| of=items by="id">`.
+    // Marko's `by` takes a property NAME, and `by=item.id` would be an
+    // undefined variable that compiles and silently re-keys every render.
+    await page.goto("/streamed");
+    await expect(page.locator("#recs-marker li")).toHaveCount(2, { timeout: 5000 });
+    await expect(page.locator("#recs-marker li").first()).toHaveText("Affogato");
+  });
+});

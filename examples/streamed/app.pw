@@ -1,0 +1,46 @@
+// @corpus: fixture
+// @id: E3-streamed
+// @category: a delayed region that streams without blocking the shell
+// @charter: §14 M3 gate 3, §9.5, §15.5
+// @milestone: E3
+//
+// The shell — heading and menu — must be usable immediately while the slow
+// region is still pending. Charter §15.5 specifies the delays this models: a
+// delivery estimate at 400 ms and recommendations at 1200 ms.
+
+module store.streamed
+
+public query Recommendations(id: StoreId) -> Result<List<Item>, RecommendationError>
+    freshness   10.minutes
+    consistency eventual
+    cache       shared
+    delivery    streamed
+    timeout     3.seconds
+{
+    Recommender.for_store(id)
+}
+
+view StreamedPage(id: StoreId) !{} {
+    <main>
+        <h1>Blue Bottle</h1>
+        <p id="shell-marker">SHELL_READY</p>
+        <h2>Menu</h2>
+        <ul aria-label="Menu">
+            <li>Espresso</li>
+            <li>Cortado</li>
+        </ul>
+        <section aria-label="Recommendations">
+            <stream query={Recommendations(id)}>
+                <placeholder><p id="pending">Finding recommendations</p></placeholder>
+                <ready as={items}>
+                    <ul id="recs-marker">
+                        {#each items as item (item.id)}
+                            <li>{item.name}</li>
+                        {/each}
+                    </ul>
+                </ready>
+                <failed as={_error}><p>No recommendations right now</p></failed>
+            </stream>
+        </section>
+    </main>
+}
