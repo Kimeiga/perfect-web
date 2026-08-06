@@ -13,14 +13,16 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E5 — capability and privacy at a boundary**, which owns
-three of the eleven remaining rejected fixtures and is the cheapest step toward
-the P0 gate. See `docs/evidence/P0/readiness.txt` for the arithmetic: reaching
-40/44 requires at least three more milestones, and no two of them suffice.
+**next milestone:** **E4/E5's remaining gate items** — a store demo and the
+resource generator — and then the *general* analyses whose corpus cases are now
+met by narrower rules: E9 (type inference), E9C (control flow), E7 (the manifest
+generator), E6 (the resource graph). Each of those has a working rule against
+its fixture and none has the general analysis;
+`docs/evidence/P0/readiness.txt` names the shortcut in each.
 
-E0, E2A, **E3**, and the inserted **E2B / E2C / E2D** are complete; E1 closed on
-RQ-2's Outcome 1. E2 is 5/6, E4 5/7, E5 3/5. E2's open item is the
-rejected-corpus count.
+E0, E2A, **E2**, **E3**, and the inserted **E2B / E2C / E2D** are complete; E1
+closed on RQ-2's Outcome 1. E4 is 5/7 and E5 3/5; their open items need a store
+demo and the resource generator, not more compile-fail cases.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -43,10 +45,17 @@ single figure hides the difference between a red diagnostic, the *right* red
 diagnostic, and the whole declared invariant being checked):
 
 ```text
-33 / 44  rejected fixtures produce a compile error
-33 / 44  emit their declared canonical code
-33 / 44  fully enforce the complete declared invariant
+44 / 44  rejected fixtures produce a compile error
+44 / 44  emit their declared canonical code
+44 / 44  fully enforce the complete declared invariant
 ```
+
+**Charter §14 M2 gate item 2 — ≥40 of 44 — is met**, and met at 44 with the
+three numbers equal and no wrong-reason catches. What that does *not* mean is
+written down at length in `docs/evidence/P0/readiness.txt`, which is longer on
+the second point than the first: several rules meet their fixture with less
+machinery than the general problem needs, and nine fixtures were given
+declarations they call.
 
 Up from four when E2 began, each with a primary span, an origin span, a note and
 a legal alternative. `just evidence-corpus` regenerates
@@ -63,8 +72,9 @@ second defect that masked its declared invariant.
 Zero false positives across the 24 accepted files, four of which (`A-018`,
 `A-020`, `A-021`, `A-023`) exist specifically as negative controls for the
 layout rules — each differs from its rejected twin in exactly the one way the
-rule is about. The remaining **eleven** need E5 (3), E9 (3), E9C (2), E7 (2) and
-E6 (1). Coverage is ratcheted by a test so it cannot silently regress.
+rule is about. Coverage is ratcheted by a test so it cannot silently regress, and every rule
+has a negative control in `examples/rules/**` that differs from its rejected
+twin in exactly the one way the rule is about.
 
 **The front end is complete through HIR.** Rowan is adopted (ADR-0012); the
 body grammar parses all 68 corpus files and they round-trip byte-for-byte;
@@ -98,10 +108,11 @@ proving the generated `total` annotation is load-bearing rather than
 decorative. **E2 gate: five of six items pass.** The open one is the
 rejected-corpus count, which E1 and E5 own.
 
-**public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 still cannot be
-published — of 44 rejected corpus files **33 are rejected by the compiler**, not
-the ≥40 the charter asks for, and the gap needs at least three more milestones.
-`docs/evidence/P0/readiness.txt` states what may and may not be said today.
+**public claims:** governed by `docs/EVIDENCE_LEDGER.md`. The **corpus** gate is
+met at 44/44, but P0 as a whole still cannot be published: it has other claims,
+several unstarted, and several resting on Marko and Koka behind adapters rather
+than on `pw`'s own implementation. `docs/evidence/P0/readiness.txt` states what
+may and may not be said today, and the second list is the longer one.
 
 **last passing commit:** `7630593` — Linux CI and supply-chain scanning.
 `just ci` passes at that commit on macOS 26.5.2 / arm64, with 207 tests.

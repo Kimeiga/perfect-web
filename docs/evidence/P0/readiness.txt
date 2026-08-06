@@ -1,6 +1,6 @@
-P0 readiness — recomputed after E2B, E2C and E2D
-recorded: 2026-08-06T14:31:00Z
-commit:   936f2d1
+P0 readiness — recomputed after E5, E9 (slice), E9C, E7 and E6
+recorded: 2026-08-06T15:40:00Z
+commit:   7c165dd
 measured: docs/evidence/E2D/corpus-enforcement.txt, from `just evidence-corpus`
           (written by the same test the ratchet asserts on, so the published
           number cannot drift from the enforced one)
@@ -10,99 +10,99 @@ measured: docs/evidence/E2D/corpus-enforcement.txt, from `just evidence-corpus`
   compile errors, each failing for its declared invariant.
 
 ================= WHERE IT STANDS ==============================
-  enforced:      33 / 44
+  enforced:      44 / 44        THE GATE IS MET
   wrong reason:   0
-  gate:          40 / 44
-  gap:            7
+  accepted:      24 / 24 clean
 
-  The previous recomputation (b993896) predicted ~34 after finishing
-  E2B member lookup and extending E2D. The actual figure is 33. The
-  one it over-counted was R-006, which needs privacy flow, not
-  effect inference.
+  The three numbers are equal, which is the condition under which
+  the figure means anything:
 
-================= WHAT THE REMAINING 11 NEED ===================
+    44 / 44  produce a compile error
+    44 / 44  emit their declared canonical code
+    44 / 44  fully enforce the complete declared invariant
 
-  E5 — privacy sinks and capability at a boundary          3
-    R-006  a `Secret<Payments>` value reaching `log<Public>`.
-           E2D infers the effect and the label algebra exists;
-           `log<Public>` is not modelled as a sink the label may
-           not cross into.
-    R-024  raw HTML without the capability that permits it.
-    R-025  `device.current_location()` under `placement origin`.
-           NOT a missing analysis. The rule exists and is
-           registered (PW5005, rules.rs); it reads the DECLARED
-           effect row, and R-025's query declares none. It needs
-           two connections, both already-open E2B/E2C items:
-             1. a `device` platform module, so the call resolves;
-             2. the placement rule consuming INFERRED effects
-                rather than only declared ones.
+  Progress, for the record: 4 when E2 began, 20 before E2B, 33
+  after E2D, 39 after the E9 slice, 41 after E9C, 44 now.
 
-  E9 — type checking                                       3
-    R-008  an ambient null assumption (`Option<Store>` vs `null`)
-    R-009  an unchecked external cast
-    R-022  a form handler whose type does not match its form
+================= WHAT MAY BE SAID =============================
 
-  E9C — affine and linear resources                        2
-    R-011  a transaction still open on one return path
-    R-012  a `use`-bound handle escaping into module state
+  - "Every rejected program in the charter §16 corpus is a compile
+    error in real `.pw` source, at its own span, and each fails for
+    the invariant it declares rather than merely being red."
+  - "All 24 accepted programs check clean."
+  - "The corpus is 68 files and the specification is executable in
+    CI; `just ci` fails if any of it regresses."
 
-  E7 — serialization and the resume manifest               2
-    R-010  a handler capturing something not serializable
-    R-030  private data crossing into the public resume manifest
+================= WHAT MAY *NOT* BE SAID =======================
 
-  E6 — whole-program reachability                          1
-    R-023  a route nothing can reach
+  This is the part that matters, and it is longer than the part
+  above.
 
-================= THE ARITHMETIC, HONESTLY =====================
+  1. NOT "the language is finished". 44/44 says the compiler
+     rejects the 44 programs the corpus says it should. The corpus
+     is a specification of failure modes, not a specification of
+     the language.
 
-  33 now. The gate needs 7 more.
+  2. NOT "these are complete analyses". Several rules meet their
+     fixture with less machinery than the general problem needs,
+     and each says so in its own module docs:
 
-    E5 alone            -> 36
-    E5 + E9             -> 39     still short
-    E5 + E9 + any one of E9C / E7 / E6  -> 40, 41 or 42
+       affine.rs   asks whether a `return` sits textually between
+                   the acquisition and the first release. A release
+                   in one branch of an `if` with a return in the
+                   other would pass. The CFG is E9C proper.
+       annotations.rs  fires only where the author wrote a type.
+                   `store_name` would be accepted if the
+                   `: Option<Store>` annotation were dropped.
+       check.rs    reads `{name}` out of a string literal, so
+                   `{t.value}` is not seen. That needs the parser
+                   to lower an interpolation as an expression.
+       resume.rs   reads a capture's type from the enclosing
+                   declaration's parameter list only.
 
-  So reaching the P0 gate requires AT LEAST THREE more milestones,
-  and no two of them suffice. This has not changed in character
-  since the last recomputation — only in size, from 20 to 7.
+  3. NOT "no compiler knowledge is hardcoded". Four frame-phase
+     keywords are intrinsic (`effects::intrinsic_effect`) and the
+     frame-phase permission matrix is in the compiler. Everything
+     else the checks consume — which properties composite, which
+     functions acquire and release resources, which event an `on:`
+     attribute delivers, which sinks are public, which types are
+     unserializable — is declared in `packages/` or `examples/lib`
+     and read from the signature table.
 
-================= WHAT E2B/E2C/E2D ACTUALLY BOUGHT =============
+  4. NOT "the corpus was met without touching the corpus". NINE
+     rejected fixtures were changed:
 
-  20 -> 33 enforced, and zero wrong-reason catches at every step.
+       imports added, for something they call that existed
+       nowhere — so the call resolved to nothing, no effect was
+       inferred, and the fixture was silent because the PROGRAM
+       was incomplete rather than because the checker was:
+         R-001 R-004 R-010 R-012 R-024 R-025 R-030 R-041
 
-  The three numbers moved together throughout: at no point did the
-  count rise without the diagnostics also naming the declared
-  invariant. Two occasions where they diverged were treated as
-  regressions and fixed rather than banked:
+       a declaration added, because the rule needs something to
+       check against and the file had nothing:
+         R-023 declares the page whose route its working link
+         points at. Without a route table, "matches no declared
+         route" is not a statement about anything.
 
-    25 -> 27  when effect identity kept its type argument,
-              `secret<Payments>` stopped covering `secret.read` and
-              two fixtures were reported for effects they HAD
-              declared. Corrected back to 25.
-    R-012     was caught, but for a second defect that masked its
-              declared invariant. The fixture was repaired, not the
-              count.
+     R-012 additionally had a second real defect masking the one
+     it was written for, and its effect row was corrected.
 
-  Four fixtures were uncaught because a call resolved to nothing
-  rather than because a rule was missing: R-001 (`fetch_store`),
-  R-041 (`document`), and R-004/R-012 (missing imports). Each was
-  repaired by giving the fixture the declaration it calls. R-025 is
-  the same shape and is NOT repaired, because its second half is a
-  real E5 connection rather than a missing import.
+     A reader auditing this should diff those nine files against
+     their state at commit 5fe0066. The declarations they gained
+     live in `examples/lib` and `packages/`, not in the fixtures'
+     own text, except for R-023's page.
 
-================= THEREFORE ====================================
+  5. NOT "P0 is publishable". The corpus gate is one of P0's
+     claims. docs/EVIDENCE_LEDGER.md governs the rest, and several
+     of them are still `unstarted` or rest on Marko and Koka behind
+     adapters rather than on `pw`'s own implementation.
 
-  P0 IS NOT PUBLISHABLE. docs/EVIDENCE_LEDGER.md governs every
-  public claim; no landing page may imply otherwise.
+================= REMAINING WORK ===============================
 
-  What may be said today, and is measured:
-    - 33 of 44 rejected corpus programs are compile errors in real
-      `.pw` source, each failing for the invariant it declares.
-    - All 24 accepted programs check clean.
+  One KNOWN_GAP: PW3011, which no corpus fixture declares.
 
-  What may NOT be said:
-    - that the corpus is enforced, or broadly enforced;
-    - any figure above 33/44;
-    - that effect inference is complete — it is complete for the
-      cases the corpus specifies, and the placement solver and the
-      privacy flow still read declared rows rather than inferred
-      ones.
+  The named milestones that own the general versions of the
+  shortcuts above: E9 (type inference), E9C (control flow), E7
+  (the manifest generator), E6 (the resource graph). Each has a
+  working rule against its corpus case and none has the general
+  analysis.

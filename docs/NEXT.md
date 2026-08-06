@@ -21,7 +21,7 @@ Fixed by the project architect after reviewing E2's results. Items 1–3 are don
 | 5 | Lower bodies into HIR | **done** — ADR-0014; id-indexed arenas, span on every node, 11 tests |
 | 6 | Move declaration rules from `pw-cli` into `pw-core` | **done** |
 | 7 | Connect the tested `pw-core` algorithms to `.pw` source | **partial** — exhaustiveness, the E2A-S scope graph, privacy, placement, markup rules, effect inference and the layout relations all run on source; ABI and capability still unconnected, and the placement solver still reads *declared* effect rows rather than inferred ones |
-| 8 | Ratchet semantic corpus enforcement upward from 4/44 | **33/44**, ratcheted in `checking_source.rs`; per-fixture table at `docs/evidence/E2D/corpus-enforcement.txt` via `just evidence-corpus` |
+| 8 | Ratchet semantic corpus enforcement upward from 4/44 | **done — 44/44**, ratcheted in `checking_source.rs`; per-fixture table at `docs/evidence/E2D/corpus-enforcement.txt` via `just evidence-corpus` |
 | 9 | Implement `pw fmt` after the syntax/HIR boundary stabilises | **done** — gate in the ADR-0013 amendment; 23 of 68 corpus files reformatted |
 | 10 | Begin E2A-R only once body-level task operations can be represented | **unblocked** — `Expr::Keyword` represents them |
 
@@ -97,44 +97,45 @@ R11 as retired until a real run is green.
 
 ---
 
-## The next executable task: E5's three fixtures
+## The next executable task
 
-E2B, E2C and E2D are complete and the corpus stands at **33/44 with zero
-wrong-reason catches**. `docs/evidence/P0/readiness.txt` has the full
-arithmetic; the short version is that reaching the 40/44 gate needs at least
-three more milestones and no two of them suffice, so the order is by cost.
+The corpus gate is met at 44/44. What is left is **not** more compile-fail
+cases — it is replacing the narrow rules that met those cases with the general
+analyses their milestones actually name. `docs/evidence/P0/readiness.txt` lists
+each shortcut; they are, in the order a reader would notice them:
 
-**E5 is cheapest and owns three fixtures.** In the order they should be done:
+1. **E9C — control flow.** `affine.rs` asks whether a `return` sits textually
+   between an acquisition and the first release. A release in one branch of an
+   `if` with a return in the other passes today. A real CFG replaces the
+   `early_return` function and nothing else; the acquire/release model, the
+   diagnostic and the controls all stay.
 
-1. **`R-025` — a declared placement that cannot grant what the body needs.**
-   The rule already exists and is registered (`PW5005`, `rules.rs`). It cannot
-   fire because it reads the **declared** effect row and R-025's query declares
-   none. Two connections, both already-open E2B/E2C items:
-     - a `device` platform module, so `device.current_location()` resolves;
-     - the placement rule consuming `Inference`'s result rather than only
-       `decl.declared_effects`.
-   This is the single highest-value item in the whole remaining list, because
-   the second half unblocks every future placement rule at once.
+2. **E9 — type inference.** `annotations.rs` fires only where the author wrote
+   a type. Dropping `: Option<Store>` from R-008 makes it compile. Inference
+   would reach the same three fixtures without the annotation, and the existing
+   rules become the reporting layer over it.
 
-2. **`R-024` — raw HTML without the capability that permits it.**
-   `capability.rs` exists with 7 tests and is called from tests only.
+3. **Interpolation as an expression.** `check.rs::carried_names` reads `{name}`
+   out of a string literal's text, so `{token.value}` is invisible to the
+   privacy-sink rule. This is a parser change — lower an interpolation as an
+   expression — and it is the smallest of the four.
 
-3. **`R-006` — a `Secret<Payments>` value reaching `log<Public>`.**
-   E2D infers the effect and the label algebra exists; what is missing is
-   modelling a sink whose label the value may not cross into.
+4. **E7 — the manifest generator.** `resume.rs` decides what a capture *is*
+   from the enclosing declaration's parameter list. Generating the manifest
+   would settle it from the real value.
 
-**Acceptance for each:** the fixture emits its declared canonical code, the
-diagnostic contains every backticked payload its `@expect-error` lines declare,
-all 24 accepted files stay clean, and the ratchet floor rises in the same
-commit. Then regenerate `docs/evidence/E2D/corpus-enforcement.txt` and
-`docs/evidence/P0/readiness.txt`.
+**Acceptance for each:** the corpus stays at 44/44 with the three numbers
+equal, every existing control stays green, and at least one NEW control is
+added that the narrow rule would have passed and the general one catches.
+That last clause is the point — replacing a shortcut with a real analysis
+should be *visible* in the test suite, or there is no evidence it happened.
 
-### After E5
+### Also open
 
-E9 (type checking) owns `R-008`, `R-009` and `R-022` — three more, reaching 39.
-The fortieth must come from E9C (`R-011`, `R-012`), E7 (`R-010`, `R-030`) or E6
-(`R-023`). None is cheap; that is the honest position and no landing page may
-imply otherwise.
+E4 (5/7) and E5 (3/5) have gate items that need a store demo and the resource
+generator. Those are product work, not checker work.
+
+One KNOWN_GAP remains: `PW3011`, which no corpus fixture declares.
 
 ---
 
