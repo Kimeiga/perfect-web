@@ -22,23 +22,55 @@ KOKA_VERSION="3.2.3"
 WASMTIME_VERSION="47.0.3"
 
 # SHA-256 of the exact artifacts this repository was validated against.
-KOKA_SHA256="ffe84e8c679876894ac67da23066ceae1fd433e244038a7c884a4ca8b4698eb8"
-WASMTIME_SHA256="c2684249e5d9ef9351942cf2d315982cf201fe0300f05d63bc1527446f0cd37f"
-
+# Every value below was computed from the downloaded artifact on 2026-08-06, not
+# copied from a release page: a checksum taken from the same server that serves
+# the file verifies nothing (charter §3.6).
 arch="$(uname -m)"
 os="$(uname -s)"
-if [ "$os" != "Darwin" ] || [ "$arch" != "arm64" ]; then
-    echo "bootstrap: this script currently only pins macOS/arm64 artifacts." >&2
-    echo "  detected: $os/$arch" >&2
-    echo "  Linux CI installs these from the same upstream releases; see .github/workflows/ci.yml" >&2
-    exit 1
-fi
+
+case "$os/$arch" in
+    Darwin/arm64)
+        KOKA_ASSET="koka-v${KOKA_VERSION}-macos-arm64.tar.gz"
+        KOKA_SHA256="ffe84e8c679876894ac67da23066ceae1fd433e244038a7c884a4ca8b4698eb8"
+        WASMTIME_DIR="wasmtime-v${WASMTIME_VERSION}-aarch64-macos"
+        WASMTIME_SHA256="c2684249e5d9ef9351942cf2d315982cf201fe0300f05d63bc1527446f0cd37f"
+        ;;
+    Linux/x86_64)
+        KOKA_ASSET="koka-v${KOKA_VERSION}-linux-x64.tar.gz"
+        KOKA_SHA256="e82a4b497f1f8791ee171d06c45293ba16432e485d645ddd9688bafa6ccde5a5"
+        WASMTIME_DIR="wasmtime-v${WASMTIME_VERSION}-x86_64-linux"
+        WASMTIME_SHA256="ca1fc56d1afc40c8782e96c297fd182a0da162f9a8f52a1e7b094e1dd648e178"
+        ;;
+    Linux/aarch64 | Linux/arm64)
+        KOKA_ASSET="koka-v${KOKA_VERSION}-linux-arm64.tar.gz"
+        KOKA_SHA256="ce0cf566ce2bd1dd3b4fbcc1d07f92d54ff57fb3cc6d6fa0728d4a72df464c02"
+        WASMTIME_DIR="wasmtime-v${WASMTIME_VERSION}-aarch64-linux"
+        WASMTIME_SHA256="497b518db00ae585f04390758eaa99ad555bee50612dce7d102602778fb46ff0"
+        ;;
+    *)
+        echo "bootstrap: no pinned artifacts for $os/$arch." >&2
+        echo "  supported: Darwin/arm64, Linux/x86_64, Linux/aarch64" >&2
+        echo "  Add the platform with a checksum computed from the downloaded file." >&2
+        exit 1
+        ;;
+esac
+WASMTIME_ASSET="${WASMTIME_DIR}.tar.xz"
 
 mkdir -p "$DIST" "$PREFIX/bin"
 
+# `shasum` on macOS, `sha256sum` on most Linux images. Both print the digest
+# first, so the parse is the same.
+sha256_of() {
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    else
+        sha256sum "$1" | cut -d' ' -f1
+    fi
+}
+
 verify() {  # verify <file> <expected-sha256>
     local actual
-    actual="$(shasum -a 256 "$1" | cut -d' ' -f1)"
+    actual="$(sha256_of "$1")"
     if [ "$actual" != "$2" ]; then
         echo "bootstrap: CHECKSUM MISMATCH for $1" >&2
         echo "  expected $2" >&2
@@ -54,8 +86,8 @@ verify() {  # verify <file> <expected-sha256>
 if [ -x "$PREFIX/bin/koka" ] && "$PREFIX/bin/koka" --version 2>/dev/null | grep -q "$KOKA_VERSION"; then
     echo "koka $KOKA_VERSION already present"
 else
-    tarball="$DIST/koka-v${KOKA_VERSION}-macos-arm64.tar.gz"
-    url="https://github.com/koka-lang/koka/releases/download/v${KOKA_VERSION}/koka-v${KOKA_VERSION}-macos-arm64.tar.gz"
+    tarball="$DIST/$KOKA_ASSET"
+    url="https://github.com/koka-lang/koka/releases/download/v${KOKA_VERSION}/${KOKA_ASSET}"
     echo "fetching koka $KOKA_VERSION"
     [ -f "$tarball" ] || curl -sSL --fail --max-time 300 -o "$tarball" "$url"
     verify "$tarball" "$KOKA_SHA256"
@@ -67,14 +99,14 @@ fi
 if [ -x "$PREFIX/bin/wasmtime" ] && "$PREFIX/bin/wasmtime" --version 2>/dev/null | grep -q "$WASMTIME_VERSION"; then
     echo "wasmtime $WASMTIME_VERSION already present"
 else
-    tarball="$DIST/wasmtime-v${WASMTIME_VERSION}-aarch64-macos.tar.xz"
-    url="https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/wasmtime-v${WASMTIME_VERSION}-aarch64-macos.tar.xz"
+    tarball="$DIST/$WASMTIME_ASSET"
+    url="https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/${WASMTIME_ASSET}"
     echo "fetching wasmtime $WASMTIME_VERSION"
     [ -f "$tarball" ] || curl -sSL --fail --max-time 300 -o "$tarball" "$url"
     verify "$tarball" "$WASMTIME_SHA256"
     tar xJf "$tarball" -C "$DIST"
-    cp "$DIST/wasmtime-v${WASMTIME_VERSION}-aarch64-macos/wasmtime" "$PREFIX/bin/wasmtime"
-    cp "$DIST/wasmtime-v${WASMTIME_VERSION}-aarch64-macos/LICENSE" "$PREFIX/WASMTIME-LICENSE"
+    cp "$DIST/$WASMTIME_DIR/wasmtime" "$PREFIX/bin/wasmtime"
+    cp "$DIST/$WASMTIME_DIR/LICENSE" "$PREFIX/WASMTIME-LICENSE"
     echo "  installed: $("$PREFIX/bin/wasmtime" --version)"
 fi
 

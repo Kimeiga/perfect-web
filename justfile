@@ -42,6 +42,17 @@ fmt-check:
 lint:
     cargo clippy --workspace --all-targets -- -D warnings
 
+# Two tracked paths differing only by case are one file on macOS and two on
+# Linux. Charter §13.5; a Mac cannot construct the collision to prove it.
+case-check:
+    @bash scripts/case-check.sh
+
+# Charter §3.6 supply-chain scanning. `deny.toml` and
+# `tools/node-audit-allow.txt` both require a written reason per exception.
+audit:
+    cargo deny check
+    @bash scripts/audit-node.sh
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -153,6 +164,6 @@ rq-row-polymorphism:
 # ---------------------------------------------------------------------------
 
 # The one command that must pass for the current milestone's gate.
-ci: fmt-check lint test-unit test-compile
+ci: fmt-check lint case-check test-unit test-compile
     @echo ""
     @echo "ci: OK"

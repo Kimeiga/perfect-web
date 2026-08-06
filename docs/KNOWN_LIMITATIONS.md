@@ -179,3 +179,36 @@ declared engine range. Assumption A-002.
 `docs/research/technology-matrix.md` marks each row **measured** or *read*. Only
 seven rows were actually exercised here. The rest come from primary documentation
 and must not be cited as if we had run them.
+
+## Linux CI exists but has never run (2026-08-06)
+
+`.github/workflows/ci.yml` is written and its YAML parses, but **no push has
+happened**, so it has never executed. Charter §3.7 forbids pushing without
+explicit human authorization, and that authorization has not been given.
+
+"The workflow exists" is not "CI is green on Linux". Risk R11 — that something
+platform-specific has gone unnoticed on a macOS-only history — is **reduced but
+not retired**. What has actually been verified locally, on macOS:
+
+| part | verified |
+|---|---|
+| `scripts/bootstrap.sh` Linux branch | **partially** — the four Linux artifact URLs resolve and their SHA-256s were computed from the downloaded files; the macOS path still works after the refactor. The Linux path itself has not been executed. |
+| case-collision check | **yes** — `just case-check` passes on 236 tracked paths, and a synthetic colliding pair is rejected. macOS cannot create a real collision, which is why the check reads the git index rather than the filesystem. |
+| `cargo deny check` | **yes** — advisories, bans, licenses and sources all clean |
+| Node advisory gate | **yes** — `scripts/audit-node.sh` passes, and rejects a synthetic unlisted advisory |
+
+The first push is what converts this row from "written" to "measured".
+
+## An esbuild advisory is accepted, not fixed (2026-08-06)
+
+`GHSA-g7r4-m6w7-qqqr` (low) affects esbuild `<0.28.1`. It cannot be fixed
+without moving the `@marko/run@0.11.8` pin that E0's measurements depend on:
+the chain is `@marko/run` → `esbuild-plugin-browserslist@2.0.0`, whose peer
+range `~0.27.0` does not admit 0.28.x. A pnpm override was attempted and does
+not take, for that reason.
+
+The exposure is esbuild's development server. Nothing here runs `vite dev` —
+the spike builds and serves the built output — and no production artifact
+contains esbuild. Full reasoning and the revisit condition are in
+`tools/node-audit-allow.txt`, which is the file `just audit` reads; anything
+not listed there fails the build.

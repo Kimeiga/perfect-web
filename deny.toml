@@ -1,0 +1,49 @@
+# cargo-deny — charter §3.6 requires license and vulnerability scanning in CI.
+#
+# Run with `just deny`. The licenses recorded in
+# `docs/research/technology-matrix.md` are the source of truth for the allow
+# list below; a dependency whose license is not there must be added to both or
+# not used.
+
+[graph]
+# Only what actually gets built. Checking every target would flag advisories in
+# code this project never compiles, and a scanner that cries wolf gets muted.
+targets = [
+    { triple = "aarch64-apple-darwin" },
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+]
+all-features = true
+
+[advisories]
+version = 2
+# Deny by default. An accepted advisory belongs here with a written reason and
+# a revisit condition, not silently in a developer's shell.
+ignore = []
+
+[licenses]
+version = 2
+# Permissive only, and only what the current graph actually uses. A dependency
+# arriving under a license that is not here stops the build, which is the point:
+# adding one is a decision, recorded in docs/research/technology-matrix.md as
+# well as here. Copyleft in particular should need an ADR, not a silent pass.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+# A wildcard version from a registry is a supply-chain hazard. A `path = ".."`
+# dependency inside this workspace is not — it resolves to a directory in this
+# repository, so it cannot be substituted by a publisher.
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

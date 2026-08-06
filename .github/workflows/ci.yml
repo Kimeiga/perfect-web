@@ -1,0 +1,88 @@
+# Linux CI — the last unmet part of the E0 gate (risk R11).
+#
+# The repository has only ever been built on macOS/arm64. Charter §13.5 warns
+# that case sensitivity and path handling differ on Linux, and §3.6 requires
+# license and vulnerability scanning that no local run performed until now.
+#
+# NOTE ON EVIDENCE: this file has never executed. It is written from the same
+# commands `just ci` runs locally, but "the workflow exists" is not "CI is green
+# on Linux", and `docs/STATUS.md` says so. The first push is what turns one into
+# the other.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # The main matrix. arm64 is not a formality: the project is developed on
+  # Apple Silicon, so an x64-only CI would let an arch-specific assumption
+  # through in either direction.
+  build:
+    name: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v4
+
+      # `rust-toolchain.toml` pins the version; this action honours it.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: extractions/setup-just@v2
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # Fetches Koka and Wasmtime with SHA-256 verification. The Linux branch
+      # and its checksums were added on 2026-08-06; the checksums were computed
+      # from the downloaded artifacts, not read off the release page.
+      - name: Bootstrap pinned toolchain
+        run: just bootstrap
+
+      - name: CI
+        run: just ci
+
+      # Needs the toolchain, so it is not part of `just ci`. This is E2 gate
+      # item 4: a domain function executing through generated Koka.
+      - name: Koka backend end-to-end
+        run: just spike-pw-to-koka
+
+  # Split out because it needs a network-fetched advisory database, and a
+  # transient outage there should not be reported as a broken build.
+  supply-chain:
+    name: licenses and advisories
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v2
+      - uses: taiki-e/install-action@cargo-deny
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Licenses and advisories
+        run: just audit
