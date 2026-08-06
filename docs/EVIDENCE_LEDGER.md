@@ -24,7 +24,7 @@ Absolute numbers are **not** comparable to the M3 Max the charter assumes.
 |---|---|---|---|---|---|---|
 | P1 | "A fully static route ships **no** JavaScript at all — no script tag, nothing downloaded." | E0 | `spike-marko-stream-resume.txt` §1 | marko 6.3.32, vite 8.2.0, node 22.21.1 | **measured** | that this holds for *streamed* routes — those carry 849 B of inline patch shim |
 | P1 | "Interaction code does not grow with the size of the page: a 9.6× larger document produced 1.03× the client JavaScript." | E0 | `spike-marko-stream-resume.txt` §4 | as above | **measured** | "zero hydration cost"; the shared 3,745 B runtime chunk is still downloaded |
-| P1 | "The browser resumes interaction without replaying the component tree — verified by real clicks in Chrome and Safari." | E0, RQ-1 | `spike-browser-resumption.txt` | Chrome 150, Safari 26.5.2, marko 6.3.32 | **measured** | "interaction code loads on demand" — it does **not**; it loads eagerly at 40–55 ms |
+| P1 | "The browser resumes interaction without replaying the component tree — verified by real clicks in Chrome and Safari." | E0, RQ-1 | `spike-browser-resumption.txt` | Chrome 150, Safari 26.5.2, marko 6.3.32 | **measured** | "Marko is the E7 oracle" — it is the oracle for **E7-R only**. See the oracle matrix below. |
 | P1 | "Slow regions stream independently; the shell is usable at 3 ms while a 1,200 ms region is still pending." | E0 | `spike-marko-stream-resume.txt` §2 | as above | **measured** | anything about Safari *timing* — RQ-1's Safari path measures end state only |
 | P0 | "Effects are inferred and machine-readable: a pure function shows an empty row, a database read shows `database.read`." | E0, RQ-2 | `spike-koka-js-interop.txt` §4 | koka 3.2.3 | **measured** | that this is `pw`'s own checker — it is Koka's, behind an adapter |
 | P0 | "An effect cannot hide behind a generic helper: it propagates through unannotated higher-order code, and selective handling preserves the rest of the row." | RQ-2 | `spike-koka-row-polymorphism.txt` | koka 3.2.3 | **measured** | that it holds for `task.spawn` — Koka does not model tasks at all |
@@ -37,6 +37,34 @@ Absolute numbers are **not** comparable to the M3 Max the charter assumes.
 | P0 | "A task handle cannot escape the scope that owns it, and an ordinary task cannot be detached without a durable capability." | E2A-S | `compiler/pw-core/src/scope.rs` (10 tests) | rust 1.97.1 | **measured** | that cancellation, cleanup ordering or leak-freedom hold — those are E2A-R and are **not started** |
 | P3 | "A build fails when the compiled component requests a capability it never declared." | E1A, RQ-5 | `compiler/pw-core/src/capability.rs` (7 tests, against E0's measured import lists) | rust 1.97.1 | **measured** | that this runs in the build — it is called from tests only so far |
 | P0 | "Compiler errors name the rule, where the offending value came from, and which boundary rejected it." | E0 | `spike-compiler-diagnostic.txt` | rust 1.97.1, annotate-snippets 0.12.16 | **measured** | that the language exists — this is one rule in a toy parser |
+
+## The E7 oracle matrix
+
+**Do not use the undifferentiated sentence "Marko is the E7 oracle."** Check 4 —
+interaction code absent until needed — was a pre-registered property and it
+**failed in both engines**, which directly falsifies the interaction-lazy claim.
+E7 is therefore subdivided:
+
+| E7 property | sub-milestone | Marko status |
+|---|---|---|
+| No client replay of inert content | E7-R | **accepted oracle**, Chrome + Safari |
+| DOM node identity preserved | E7-R | **accepted oracle**, Chrome + Safari |
+| Focus and local state survive | E7-R | **accepted oracle**, Chrome + Safari |
+| Second interaction avoids reinitialization | E7-R | **accepted oracle**, Chrome + Safari |
+| Out-of-order patch placement and replacement | E7-P | **accepted in Chrome** |
+| Safari final streamed structure | E7-P | **accepted** |
+| Safari streamed arrival **timing** | E7-P | **unmeasured** |
+| Interaction code loads only on demand | E7-L | **FAILED — Marko is not the oracle** |
+| Handler-load failure behaviour | E7-R | accepted, via the corrected capture-phase test only |
+
+The approved sentence is:
+
+> **Marko is the behavioural oracle for resumption, DOM preservation, and
+> patch-placement semantics. It is not the oracle for interaction-lazy code
+> delivery.**
+
+The Safari autorun method is acceptable for the properties it can observe. It
+**must not** be described as equivalent to the Chrome stream-timing harness.
 
 ## Not yet proven — the claims P0 actually needs
 

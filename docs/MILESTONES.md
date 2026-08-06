@@ -27,15 +27,17 @@ evidence; see ADR-0011.
 | id | name | status |
 |---|---|---|
 | **E0** | Repository bootstrap, research matrix, specification corpus, feasibility spikes | **complete** |
-| **E1** | Koka **effect-system** feasibility (narrowed — effects and handlers only) | in progress |
-| **E1A** | `pw` value semantics and boundary ABI *(inserted, ADR-0011)* | **in progress** — exhaustiveness, opaque nominal types, platform `Option`/`List`/`Result`, type-directed ABI decoder all landed in `compiler/pw-core` |
-| **E2** | Source language parser, modules, lowering to Koka | **partial** — lexer, parser, `pw check`/`pw explain` done; all 68 corpus files parse. Lowering and `fmt` not started. `docs/milestones/E2.md` |
+| **E1** | Koka **effect-system** feasibility (narrowed — effects and handlers only) | **CLOSED** — RQ-2 Outcome 1: open-row inference, higher-order propagation, selective handling, `.kki` observability |
+| **E1A** | `pw` value semantics and boundary ABI *(inserted, ADR-0011)* | **algorithmically implemented, source integration pending** — 42 tests on constructed data. May not support public source-language claims yet. |
+| **E2** | Source front end **and semantic integration** — lossless syntax, core body parsing, HIR, source-to-checker wiring, the ≥40 rejected gate | **in progress** — lexer, declaration parser, `pw check`/`pw explain`, 9 declaration rules. Body parsing, HIR and Rowan pending. |
 | **E2A** | Structured concurrency = **E2A-R** (runtime) + **E2A-S** (static scope checker) *(inserted)* | **E2A-S done**, E2A-R not started |
 | **E3** | Marko rendering adapter, streaming SSR, first resumption | not started |
 | **E4** | Typed resource model and the first complete store page | not started |
 | **E5** | Privacy-flow, cache-safety, and placement checker | not started |
 | **E6** | Materialized resource graph — the ISR successor | not started |
-| **E7** | Own document-parts compiler and browser runtime | not started |
+| **E7-R** | Own renderer: resumption and DOM preservation | not started — **Marko is the accepted oracle** |
+| **E7-P** | Own renderer: streamed patch semantics | not started — Marko accepted in Chrome; Safari *timing* unmeasured |
+| **E7-L** | Own renderer: interaction-lazy code loading | not started — **no oracle**; Marko fails this property |
 | **E8** | Rust capability host, WIT worlds, Wasmtime execution | not started |
 | **E9** | Permanent value type checker and algebraic effect compiler (9A–9D) | not started |
 | **E10** | Own backends and automatic memory strategy | not started |

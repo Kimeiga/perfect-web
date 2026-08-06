@@ -14,7 +14,7 @@ Order was fixed by the project architect after reviewing E0's evidence.
 
 | id | question | status | ruling |
 |---|---|---|---|
-| **RQ-1** | Is Marko's resumption real, in Chrome **and** Safari? | **done** | 11/12 pre-registered checks pass in both engines → Marko accepted as the behavioural oracle for E7 |
+| **RQ-1** | Is Marko's resumption real, in Chrome **and** Safari? | **done** | 11/12 in both engines → oracle for **E7-R** (resumption, DOM preservation) and partially **E7-P**. **Not** the oracle for **E7-L**: check 4 failed. |
 | **RQ-2** | Does Koka propagate effects through higher-order abstraction? | **done** | Outcome 1, clean pass → Koka remains the effects oracle; `pw` effect checker not pulled forward |
 | **RQ-3** | `pw`-owned exhaustiveness and canonical typed ABI decoding | **partial** | exhaustiveness + type-directed ABI land in `compiler/pw-core`; 30 tests. Remaining: wire to a real parser (E2) so corpus files can drive it |
 | **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | **partial** | E2A-S landed: `compiler/pw-core/src/scope.rs`, PW2001-PW2004, 10 tests. E2A-R (runtime) not started |
@@ -33,9 +33,19 @@ Marko resumable for our purposes. Only payload scaling passes → report payload
 scaling and nothing more.
 
 **Result.** Core properties (no replay, first click works, node identity, focus,
-second interaction) passed in **Chrome 150 and Safari 26.5.2**. One check failed
-in both: the interaction artifact loads eagerly at 40–55 ms, not on demand — so
-charter §1.11 "interaction-lazy code" is **not** satisfied by this configuration.
+second interaction) passed in **Chrome 150 and Safari 26.5.2**.
+
+**Check 4 failed in both engines** — the interaction artifact loads eagerly at
+40–55 ms. That was a *pre-registered property*, so it is not a footnote: it
+falsifies charter §1.11's "interaction-lazy code" for this configuration, and
+E7 is subdivided accordingly (`docs/MILESTONES.md`).
+
+> Marko is the behavioural oracle for resumption, DOM preservation and
+> patch-placement semantics. **It is not the oracle for interaction-lazy code
+> delivery.**
+
+Safari's autorun path is acceptable for what it can observe and **must not** be
+described as equivalent to the Chrome stream-timing harness.
 
 Evidence: `docs/evidence/M0/spike-browser-resumption.txt` ·
 `spikes/browser-resumption/README.md`

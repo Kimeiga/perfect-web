@@ -85,10 +85,16 @@ placeholders replaced, not appended          pass     pass
 handler failure observable                   pass     pass
 ```
 
-**Ruling under the pre-registered rule: all core properties passed in both
-engines, so Marko is accepted as the behavioural oracle for E7** — with the
-check-4 exception recorded below, which is about *loading strategy*, not
-resumption.
+**Ruling under the pre-registered rule**, as corrected by the project architect:
+
+> Marko is the behavioural oracle for **resumption, DOM preservation and
+> patch-placement semantics**. It is **not** the oracle for interaction-lazy
+> code delivery.
+
+Check 4 was a pre-registered property, not a footnote. Its failure in both
+engines falsifies the interaction-lazy claim, so E7 is subdivided into **E7-R**
+(resumption/DOM — Marko accepted), **E7-P** (patch semantics — accepted in
+Chrome, Safari *timing* unmeasured) and **E7-L** (lazy loading — **no oracle**).
 
 ## Findings
 
