@@ -1,149 +1,105 @@
-P0 readiness — re-evaluated under the generalized implementations
-recorded: 2026-08-06T17:10:00Z
-commit:   79db7ab
-corpus:   C1 (docs/CORPUS.md)
-measured: docs/evidence/E2D/corpus-enforcement.txt   `just evidence-corpus`
-          `just generality` for the second score
-          `cargo test -p pw-core --test corpus_history` for the third
+P0 readiness — four gates
+recorded: 2026-08-06T19:20:00Z
+commit:   1cf92df
+corpus:   C1 (docs/CORPUS.md, frozen)
+measured: `just ci` `just generality` `just robustness` `just platform`
+          `cargo test -p pw-core --test corpus_history`
 
-================= TWO GATES, ONE CLOSED ========================
+================= WHERE IT STANDS ==============================
 
-CORPUS GATE — CLOSED at corpus version C1.
-
-    24 / 24  accepted programs clean
-    44 / 44  rejected at source spans
-    44 / 44  emit their declared canonical code
-    44 / 44  fully enforce the complete declared invariant
+  CORPUS GATE                                  CLOSED at C1
+    24 / 24  accepted clean
+    44 / 44  rejected, each for its declared invariant
      0       wrong-reason catches
 
-  Charter §14 M2 gate item 2 asks for at least 40 of 44.
+  GENERALITY GATE                              OPEN
+    11 / 29  invariants generality-tested
+     0 / 29  known narrow witness
+    18 / 29  generality untested
+     2 / 8   headline invariants with a challenge matrix
 
-GENERALITY GATE — OPEN.
+  ROBUSTNESS GATE                              CLOSED, and kept
+     5 suites, 0 panics
+     1 regression retained with a minimized reproducer
 
-    9 / 29  invariants generality-tested
-    1 / 29  known narrow, with an executable witness
-   19 / 29  generality untested
+  HISTORICAL COMPATIBILITY                     9 / 10
+     R-023 classified FixtureDidNotExpressIt, not rounded away
 
-  An invariant is GENERALLY_ENFORCED only when a program the fixture
-  did not anticipate — different control flow, different depth,
-  different construct — is caught, and no `slips-through.pw` witness
-  exists for it. `examples/generality/` holds both kinds of file and
-  `just generality` scores them.
+  356 tests.
 
-  This number should be read as the honest one. It was 7 this
-  morning and the corpus number has not moved since.
+  "Generality-tested" and not "generally enforced": no finite suite
+  establishes general enforcement. What an invariant in that count
+  has survived is its fixture, a counterexample that defeated the
+  previous implementation, and the required neighbours.
 
-================= THE FOUR SHORTCUTS, RE-EVALUATED =============
+================= WHAT THE CHALLENGE WORK KEEPS FINDING ========
 
-  The previous version of this file named four rules that met their
-  fixture with less machinery than the general problem needs. Three
-  are now gone; each was replaced and each replacement is proved by
-  a program the narrow rule would have passed.
+  Six defects so far, none reachable from the 44 fixtures:
 
-  1. affine.rs — CLOSED.
-     Was: "is there a `return` textually between the acquisition and
-     the first release". Missed `if empty { rollback(tx) } else {
-     return Ok(()) }`, where the release comes first in the text.
-     Now: `flow_of` walks the statement tree, asking per construct
-     whether ALL paths release and which paths leave without
-     releasing. An `if` releases only if both branches do.
-     Proved by: caught.pw (else-branch exit), caught-match.pw (one
-     arm of five).
-     Still not: a basic-block graph. Sufficient because `pw` has no
-     `goto`, no labelled break and no loop that carries a resource
-     out — stated in the module so it reads as a decision.
+  1. A COMPILER PANIC. A constructor pattern whose arity disagreed
+     with its declaration desynchronized the pattern row from the
+     type list. Every rule in the invocation reported nothing.
+  2. Privacy depended on the SPELLING PATH: `let same = token` lost
+     the label. Replaced with value/dataflow propagation.
+  3. A wrong library contract: `Stores.find` returned `Result`,
+     which is `get`'s type — and R-008's own annotation was what
+     established the return type the rule read.
+  4. A correctness check that went SILENT, not wrong, when member
+     identity was ambiguous. The by-name fallback is deleted.
+  5. My own bad witness: a "gap" in the exhaustiveness checker that
+     did not exist. The witness used constructor names its type did
+     not have, so it tested the compiler on a program that did not
+     typecheck. Found by the arity rule added the same hour.
+  6. A LATENT FALSE POSITIVE. `let cart = query Cart(session)` did
+     not parse as one expression, so every page declaring a query
+     dependency was reported for reaching the database while
+     rendering. R-004 carried it the whole time — it is caught for
+     its declared invariant, so the extra diagnostic sat in the
+     output unexamined. It took a file whose job is to be VALID to
+     make it visible.
 
-  2. annotations.rs Option rule — CLOSED.
-     Was: fired only where the author wrote `: Option<Store>`.
-     Deleting the annotation deleted the defect.
-     Now: falls back to the initialiser's declared return type.
-     Proved by: caught.pw, which is R-008 with the annotation
-     removed.
-     Side effect worth recording: this exposed a wrong signature in
-     the library. `Stores.find` returned `Result<Store, StoreError>`,
-     which is `get`'s type, so R-008's own annotation had been
-     asserting a type its initialiser did not have.
-
-  3. String interpolation — CLOSED.
-     Was: `carried_names` read `{name}` out of a literal's
-     characters, so `{token.value}` was a hole the privacy-sink rule
-     could not see into.
-     Now: `Expr::Interpolated` carries holes as expressions, parsed
-     by the real grammar via an offset-padded synthetic wrapper.
-     Proved by: caught-nested-hole.pw.
-
-  4. resume.rs — STILL NARROW, and untested.
-     Reads a capture's type from the enclosing declaration's
-     parameter list only. No witness written yet, so it sits in the
-     19 rather than the 1.
-
-  One shortcut was found rather than inherited:
-
-  5. exhaust.rs — NARROW, with a witness.
-     Does not descend into a match appearing as another match's arm.
-     `slips-through.pw` demonstrates it.
+  Note what 5 and 6 have in common with each other and not with the
+  rest: they were found by writing programs that must be ACCEPTED.
+  A suite of things that must be rejected cannot find them.
 
 ================= WHAT MAY BE SAID =============================
 
   - "All 44 rejected programs in charter §16 corpus C1 are compile
-    errors in real `.pw` source, at their own spans, each failing
-    for the invariant it declares. All 24 accepted programs check
-    clean."
-  - "Nine invariants are enforced against programs the corpus
-    fixtures did not anticipate, and the count is measured."
-  - "The pre-change text of nine of the ten fixtures that were
-    modified is still caught, for the same invariant, without the
-    import that was added."
+    errors at their own spans, each failing for the invariant it
+    declares. All 24 accepted programs check clean."
+  - "Eleven invariants have been challenge-tested against programs
+    the fixtures did not anticipate."
+  - "The pre-change text of nine of the ten modified fixtures is
+    still caught, for the same invariant."
+  - "No program in any suite panics the compiler, and an unexpected
+    panic is reported as a marked internal error rather than a
+    silent exit."
 
 ================= WHAT MAY *NOT* BE SAID =======================
 
-  1. NOT "the analyses generalize". Nine of twenty-nine are proved
-     to. Nineteen are untested and one is known narrow.
-
-  2. NOT "the language is sound". The corpus specifies failure
-     modes. Nothing here is a proof about the language.
-
-  3. NOT "no compiler knowledge is hardcoded". Four frame-phase
-     keywords are intrinsic, the frame-phase permission matrix is in
-     the compiler, and `on:` attributes resolve in a module named by
-     one const. Everything else the checks consume is declared in
-     `packages/` or `examples/lib` and read from the signature
-     table.
-
-  4. NOT "the corpus was met without touching the corpus". Ten
-     fixtures changed; `docs/CORPUS.md` has a row for each and
-     `corpus_history.rs` runs their old text.
-
-  5. NOT "P0 is publishable". The corpus gate is one of P0's claims.
-     docs/EVIDENCE_LEDGER.md governs the rest, and several rest on
-     Marko and Koka behind adapters or are unstarted.
-
-================= WHAT THIS PHASE FOUND ========================
-
-  Writing counterexamples, rather than reasoning about the checkers,
-  found three defects in one afternoon:
-
-  - A COMPILER PANIC. `exhaust.rs` crashed on a constructor pattern
-    whose arity disagreed with its declared field count — three
-    `expect`s, reached by a real `.pw` program. Every rule in the
-    invocation reported nothing. None of 44 fixtures reached it.
-  - A real narrowness in privacy flow: `let same = token` lost the
-    label, making the rule about how a value was SPELLED at the sink
-    rather than about the value.
-  - A wrong library signature, above.
-
-  And removing the by-name member fallback found a fourth class:
-  a correctness check that goes SILENT rather than wrong when
-  identity is ambiguous. That is the harder failure to notice,
-  because nothing turns red and no count moves.
+  1. NOT "the analyses generalize". Eleven of twenty-nine have been
+     tested. Two of eight headline invariants have a matrix.
+  2. NOT "the compiler cannot crash". Five generators found no
+     panic; a coverage-guided fuzzer has never been run.
+  3. NOT "the language is sound".
+  4. NOT "no compiler knowledge is hardcoded". Four frame-phase
+     keywords, the phase permission matrix, and one module name for
+     `on:` attributes.
+  5. NOT "the corpus was met without touching the corpus". Ten
+     fixtures changed; docs/CORPUS.md has a row for each.
+  6. NOT "P0 is publishable". Per the architect's readiness
+     conditions, every invariant a headline claim demonstrates must
+     be challenge-tested. Six of the eight are not yet.
 
 ================= NEXT ==========================================
 
-  Not "make the first number larger" — it cannot be.
-
-  1. Witnesses for the 19 untested invariants, one at a time. Each
-     is either a promotion or a discovery, and both are progress.
-  2. resume.rs generality (item 4 above).
-  3. exhaust.rs nested matches (item 5).
-  4. E4 (5/7) and E5 (3/5) gate items: a store demo and the resource
-     generator. Product work, not checker work.
+  1. Matrices for the six remaining headline invariants, in the
+     order P0 leans on them: placement, hidden effects through
+     helpers and callbacks, exhaustive domain states, scoped
+     tasks and resources.
+  2. Then the other 18, one at a time. Each is a promotion or a
+     discovery.
+  3. resume.rs still reads a capture's type from the enclosing
+     declaration's parameter list only. No witness written.
+  4. E4 (5/7) and E5 (3/5): a store demo and the resource
+     generator. Product work.
