@@ -13,17 +13,15 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E6 — materialized resource graph**, with two tasks
-carried forward:
+**next milestone:** **E6 — materialized resource graph**, with one task carried
+forward: **effect inference**. Most of the remaining 33 rejected corpus files
+need a callee's effects to be knowable — a network call inside a pure view
+cannot be detected otherwise. E9 owns it; whether it is pulled forward is the
+open question.
 
-1. A **generator** connecting a `query`/`command` declaration to
-   `runtime/pw-resource`. E4 gate 1 and E3 gate 3 both wait on it, and it is the
-   same shape as the Koka and Marko backends that already exist.
-2. **Effect inference** (E9's, pulled forward or not): most of the remaining
-   33 rejected corpus files need a callee's effects to be knowable.
-
-E0 and E2A are complete; E1 closed on RQ-2's Outcome 1. E2 is 5/6, E3 4/6,
-E4 5/7, E5 3/5 — and every open item traces back to one of those two.
+E0, E2A and **E3** are complete; E1 closed on RQ-2's Outcome 1. E2 is 5/6,
+E4 5/7, E5 3/5. E4's and E5's open items need a store demo and a much larger
+set of compile-fail cases; E2's needs effect inference.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -71,12 +69,13 @@ cleanup, refusal to commit into a dead scope, and no leaked tasks. 12 tests,
 0 failures in 25 consecutive runs. They are **behaviour** results and RQ-4's
 rule holds — neither half may be described as covering the other.
 
-**`pw` renders in a browser.** Two applications written in `.pw` generate Marko
-(ADR-0017), build, and pass 21 tests across Chromium, Firefox and WebKit. The
-static route ships **zero JavaScript** — no script tag, no request — and is
-usable with JS disabled; the counter resumes without re-rendering the inert
-part of the page. Those are Marko's behaviours measured through `pw`, and the
-evidence ledger says so.
+**`pw` renders, streams and resumes in a browser. E3 is complete.** Three
+applications written in `.pw` generate Marko (ADR-0017), build, and pass 30
+tests across Chromium, Firefox and WebKit. The static and streamed routes ship
+**zero JavaScript** — no script tag, no request; the streamed page's shell was
+usable **1,201 ms before** its 1,200 ms region arrived, in two chunks; the
+counter resumes without re-rendering the inert part of the page. Those are
+Marko's behaviours measured through `pw`, and the evidence ledger says so.
 
 **`pw` code executes.** `pw emit-koka` lowers the pure subset (ADR-0015) and
 `just spike-pw-to-koka` compiles and runs it under the pinned Koka 3.2.3,
