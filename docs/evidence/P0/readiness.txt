@@ -79,9 +79,11 @@ measured: `just ci` `just generality` `just robustness` `just platform`
      corpus_history.rs runs their old text.
 
   6. NOT "resumption is safe across deployments". All three of its
-     questions are now answered — serializability, privacy, and
-     version compatibility (E7V) — but the compatibility decision is
-     NOT WIRED into a running browser. It is a decision function
+     questions are answered, the bypass is closed by construction
+     (`Authorised` has a private field, so `attach` is unreachable
+     without a decision), and build-time artifact agreement is
+     checked with mutation controls. What is missing is a running
+     browser that calls any of it. It is a decision function
      with a tested contract, like pw-tasks and pw-resource
      (ADR-0016). Marko still implements resumption itself.
      The available sentence is "accepted only under exact
@@ -93,7 +95,7 @@ measured: `just ci` `just generality` `just robustness` `just platform`
 
 ================= EVERY DEFECT THE CHALLENGE WORK FOUND ========
 
-  Ten, none reachable from the 44 fixtures.
+  Thirteen, none reachable from the 44 fixtures.
 
   Crashes (2)
     1. Constructor arity mismatch desynchronized the pattern row
@@ -122,6 +124,19 @@ measured: `just ci` `just generality` `just robustness` `just platform`
        and behind it, `Types` could not resolve a helper in its own
        file, and record fields were not in the signature table.
 
+  Since then, three more:
+
+  11. A POLICY-PARSER BUG that disabled a whole rule. `key store,
+      session` ended after the comma because `session` starts a
+      declaration, so `cache shared` stopped being a policy and the
+      shared-cache rule never ran. Not wrongly — it never saw a
+      cache policy at all.
+  12. `privacy_flow` had never been migrated to value labels when
+      its sibling was, so a secret reaching MARKUP through a branch
+      was invisible.
+  13. R3, found by E7V's first adversary in its first run: private
+      state offered a public recovery region, 611/4000 cases.
+
   And one non-defect: an exhaustiveness "gap" that did not exist.
   The witness used constructor names its type did not have.
 
@@ -129,14 +144,15 @@ measured: `just ci` `just generality` `just robustness` `just platform`
 
   The score cannot go higher. What is left is not more counting:
 
-  1. A coverage-guided fuzzer against manifest decoding,
-     compatibility decisions, migration selection, recovery
-     planning and mixed-build patch handling. Its property: no
-     input may cause a panic, unverified deserialization,
-     incompatible handler attachment, or privacy-scope weakening.
-     E7V gives it semantics to test, which is why it comes second.
-  2. Wiring the compatibility decision into E7's generator, which
-     is what would let item 6 above be said differently.
+  1. A REAL coverage-guided fuzzer. What exists is structured
+     generation seeded from the deployment matrix — no
+     instrumentation, no corpus evolution, no branch guidance. It
+     found R3 in its first run, which is evidence it works, not
+     evidence it is sufficient.
+  2. A browser that calls `decide`. The bypass is closed by
+     construction and the build-time half is done; what is missing
+     is a runtime that invokes it. That is what would let item 6
+     above be said differently.
   3. E4 (5/7) and E5 (3/5): a store demo and the resource
      generator. Product work, not checker work.
   4. Claim-by-claim P0 review against the ledger, for the claims

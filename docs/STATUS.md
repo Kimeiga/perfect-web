@@ -63,8 +63,8 @@ corpus conformance        44 / 44   closed at C1
 single-defect isolation   44 / 44
 generality-tested         29 / 29
 headline matrices          8 / 8
-resume compatibility      E7V closed, 27 matrix tests
-robustness                11 suites, 0 panics
+resume compatibility      E7V closed — 34 matrix rows, 6 fuzz targets
+robustness                11 suites, 0 panics, 3 regressions retained
 historical compatibility   9 / 10   the miss classified
 KNOWN_GAPs                 0
 ```
