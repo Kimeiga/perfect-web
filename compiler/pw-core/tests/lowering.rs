@@ -418,3 +418,84 @@ fn the_whole_corpus_lowers_without_panicking() {
         "expected a substantial HIR, got {exprs} expressions"
     );
 }
+
+#[test]
+fn markup_lowers_to_a_nested_node_tree_with_its_attributes() {
+    // E3 lowers this to a renderer and E5 reads its attributes, so the tree
+    // has to survive lowering as a tree — not as the flat list of interpolated
+    // expressions that was all HIR carried before.
+    let src = "view V() !{} {\n    <main class=\"page\"><button on:press={add(item)}>Add {label}</button></main>\n}\n";
+    let hir = lower(src);
+    let (_, d) = hir.all_decls().next().unwrap();
+    let b = hir.body(d.body.unwrap());
+
+    let (parts, roots) = b
+        .walk()
+        .into_iter()
+        .find_map(|id| match b.expr(id) {
+            Expr::Template { parts, roots } => Some((parts.clone(), roots.clone())),
+            _ => None,
+        })
+        .expect("a template");
+
+    assert_eq!(roots.len(), 1, "one root element");
+    let Node::Element {
+        tag,
+        attrs,
+        children,
+        ..
+    } = b.node(roots[0])
+    else {
+        panic!("expected an element, got {:?}", b.node(roots[0]))
+    };
+    assert_eq!(tag, "main");
+    assert!(matches!(&attrs[0].value, AttrValue::Static(v) if v == "\"page\""));
+
+    // The button must be a CHILD of main, and its handler a real expression.
+    let Node::Element { tag, attrs, .. } = b.node(children[0]) else {
+        panic!("expected the button")
+    };
+    assert_eq!(tag, "button");
+    assert_eq!(attrs[0].name, "on:press");
+    assert_eq!(attrs[0].namespace(), Some(("on", "press")));
+    let AttrValue::Expr(handler) = attrs[0].value else {
+        panic!("the handler must be an expression, not text")
+    };
+    assert!(matches!(b.expr(handler), Expr::Call { .. }));
+
+    // Both interpolations reach `parts`, in source order, exactly once each.
+    assert_eq!(parts.len(), 2, "the handler and {{label}}, no duplicates");
+    assert_eq!(parts[0], handler, "source order: the attribute comes first");
+
+    // Every markup node is reachable from the roots.
+    assert!(b.walk_markup(&roots).len() >= 4);
+}
+
+#[test]
+fn two_template_regions_in_one_body_do_not_duplicate_each_others_parts() {
+    // The first version collected `parts` by scanning the whole node arena, so
+    // a second region re-collected the first's expressions and `walk()` visited
+    // them twice — which is how one defect gets reported twice.
+    let src = "component C() {\n    view { <p>{a}</p> }\n    view { <p>{b}</p> }\n}\n";
+    let hir = lower(src);
+    let (_, d) = hir.all_decls().next().unwrap();
+    let b = hir.body(d.body.unwrap());
+
+    let templates: Vec<usize> = b
+        .walk()
+        .into_iter()
+        .filter_map(|id| match b.expr(id) {
+            Expr::Template { parts, .. } => Some(parts.len()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(templates, [1, 1], "each region owns exactly its own part");
+
+    let walked = b.walk();
+    let unique: std::collections::HashSet<_> = walked.iter().collect();
+    assert_eq!(
+        walked.len(),
+        unique.len(),
+        "walk() must not repeat an expression"
+    );
+}

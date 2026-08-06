@@ -50,6 +50,10 @@ id!(
     /// A type reference, scoped to one [`Body`].
     TypeRefId
 );
+id!(
+    /// A markup node, scoped to one [`Body`].
+    NodeId
+);
 
 /// An id-indexed arena that keeps a span beside every node.
 ///
@@ -199,6 +203,9 @@ pub struct Body {
     pub exprs: Arena<Expr>,
     pub pats: Arena<Pattern>,
     pub types: Arena<TypeRef>,
+    /// Markup nodes. Separate from `exprs` because a renderer walks markup and
+    /// an effect checker walks expressions, and neither wants the other's tree.
+    pub nodes: Arena<Node>,
     /// The block expression the body consists of.
     pub root: ExprId,
 }
@@ -221,6 +228,34 @@ impl Body {
         self.pats
             .get(id.index())
             .expect("PatternId from another body")
+    }
+
+    pub fn node(&self, id: NodeId) -> &Node {
+        self.nodes
+            .get(id.index())
+            .expect("NodeId from another body")
+    }
+
+    pub fn node_span(&self, id: NodeId) -> Span {
+        self.nodes
+            .span_at(id.index())
+            .expect("NodeId from another body")
+            .clone()
+    }
+
+    /// Every markup node under `id`, parents before children.
+    pub fn walk_markup(&self, roots: &[NodeId]) -> Vec<NodeId> {
+        let mut out = Vec::new();
+        let mut stack: Vec<NodeId> = roots.iter().rev().copied().collect();
+        while let Some(id) = stack.pop() {
+            out.push(id);
+            let kids = match self.node(id) {
+                Node::Element { children, .. } | Node::Block { children, .. } => children.clone(),
+                _ => vec![],
+            };
+            stack.extend(kids.into_iter().rev());
+        }
+        out
     }
 
     pub fn pat_span(&self, id: PatternId) -> Span {
@@ -275,7 +310,7 @@ impl Body {
                 v.extend(block.iter().copied());
                 v
             }
-            Expr::Template { parts } => parts.clone(),
+            Expr::Template { parts, .. } => parts.clone(),
         }
     }
 
@@ -420,15 +455,68 @@ pub enum Expr {
         args: Vec<ExprId>,
         block: Option<ExprId>,
     },
-    /// A markup region. `parts` are its interpolated expressions, in source
-    /// order; the literal markup between them lives in the syntax tree, which
-    /// is where a formatter wants it.
+    /// A markup region: the roots of its element tree.
+    ///
+    /// `parts` keeps the interpolated expressions in source order so an effect
+    /// or privacy walk can reach them without descending the markup, which is
+    /// what every analysis before E3 actually wanted.
     Template {
         parts: Vec<ExprId>,
+        roots: Vec<NodeId>,
     },
     /// Syntax that could not be lowered. Carries its span so a checker can
     /// still report position, and keeps lowering total (ADR-0014).
     Error,
+}
+
+// --- markup ---------------------------------------------------------------
+
+/// An attribute's value.
+#[derive(Debug, Clone)]
+pub enum AttrValue {
+    /// `class="card"`
+    Static(String),
+    /// `on:press={handler}` — a real expression, so a checker can look inside.
+    Expr(ExprId),
+    /// `disabled` — present with no value.
+    None,
+}
+
+#[derive(Debug, Clone)]
+pub struct Attr {
+    /// The name as written, namespace included: `on:press`, `aria-label`.
+    pub name: String,
+    pub value: AttrValue,
+    pub span: Span,
+}
+
+impl Attr {
+    /// `on:press` -> `Some(("on", "press"))`.
+    pub fn namespace(&self) -> Option<(&str, &str)> {
+        self.name.split_once(':')
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Node {
+    Element {
+        /// `p`, or `store.Card` for a component.
+        tag: String,
+        attrs: Vec<Attr>,
+        children: Vec<NodeId>,
+        self_closing: bool,
+    },
+    /// Character data, as written.
+    Text(String),
+    /// `{expr}` between tags.
+    Interpolation(ExprId),
+    /// `{#each items as x (x.id)} .. {/each}`. The directive is kept verbatim
+    /// because E3 does not yet own its semantics and inventing a structure for
+    /// it now would be guessing.
+    Block {
+        directive: String,
+        children: Vec<NodeId>,
+    },
 }
 
 #[derive(Debug, Clone)]

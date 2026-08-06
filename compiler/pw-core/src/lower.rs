@@ -53,6 +53,7 @@ struct BodyBuilder {
     exprs: Arena<Expr>,
     pats: Arena<Pattern>,
     types: Arena<TypeRef>,
+    nodes: Arena<Node>,
 }
 
 impl BodyBuilder {
@@ -64,6 +65,9 @@ impl BodyBuilder {
     }
     fn ty(&mut self, t: TypeRef, span: Span) -> TypeRefId {
         TypeRefId(self.types.alloc(t, span))
+    }
+    fn node(&mut self, n: Node, span: Span) -> NodeId {
+        NodeId(self.nodes.alloc(n, span))
     }
 }
 
@@ -298,6 +302,7 @@ impl Lowerer<'_> {
             exprs: b.exprs,
             pats: b.pats,
             types: b.types,
+            nodes: b.nodes,
             root,
         };
         (
@@ -506,18 +511,46 @@ impl Lowerer<'_> {
             K::LetStmt => self.let_or_keyword(b, node, span),
 
             K::TemplateRegion => {
-                let parts = node
-                    .descendants()
-                    .filter(|c| c.kind() == K::Interpolation)
-                    .filter_map(|i| i.children().find(|c| is_expr(c.kind())))
-                    .map(|e| self.expr(b, &e))
+                // The element tree, plus a flat list of interpolated
+                // expressions. Both are needed: a renderer walks the tree, and
+                // an effect or privacy walk wants the expressions without
+                // having to descend markup it does not understand.
+                // Only the nodes THIS region allocates. Scanning the whole
+                // arena would re-collect an earlier region's expressions in a
+                // body that has two, and `walk()` would then visit them twice —
+                // which is how a checker ends up reporting one defect twice.
+                let first = b.nodes.len();
+                let roots: Vec<NodeId> = node
+                    .children()
+                    .filter(|c| is_markup(c.kind()))
+                    .map(|c| self.markup(b, &c))
                     .collect();
-                b.expr(Expr::Template { parts }, span)
+                let mut parts: Vec<ExprId> = Vec::new();
+                for (_, n, _) in b.nodes.iter().skip(first) {
+                    match n {
+                        Node::Interpolation(e) => parts.push(*e),
+                        Node::Element { attrs, .. } => {
+                            parts.extend(attrs.iter().filter_map(|a| match a.value {
+                                AttrValue::Expr(e) => Some(e),
+                                _ => None,
+                            }));
+                        }
+                        _ => {}
+                    }
+                }
+                parts.sort_by_key(|e| b.exprs.span_at(e.index()).map(|s| s.start).unwrap_or(0));
+                b.expr(Expr::Template { parts, roots }, span)
             }
 
             K::Interpolation => match node.children().find(|c| is_expr(c.kind())) {
                 Some(e) => self.expr(b, &e),
-                None => b.expr(Expr::Template { parts: vec![] }, span),
+                None => b.expr(
+                    Expr::Template {
+                        parts: vec![],
+                        roots: vec![],
+                    },
+                    span,
+                ),
             },
 
             _ => b.expr(Expr::Error, span),
@@ -674,6 +707,91 @@ impl Lowerer<'_> {
         }
     }
 
+    /// Lower one markup node.
+    fn markup(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> NodeId {
+        let span = span_of(node);
+        match node.kind() {
+            K::Element => {
+                let open = node.children().find(|c| c.kind() == K::OpenTag);
+                let tag = open.as_ref().and_then(first_name).unwrap_or_default();
+                let attrs = open
+                    .as_ref()
+                    .map(|o| {
+                        o.children()
+                            .filter(|c| c.kind() == K::Attr)
+                            .map(|a| self.attr(b, &a))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let children: Vec<NodeId> = node
+                    .children()
+                    .filter(|c| is_markup(c.kind()))
+                    .map(|c| self.markup(b, &c))
+                    .collect();
+                let self_closing = node.children().all(|c| c.kind() != K::CloseTag);
+                b.node(
+                    Node::Element {
+                        tag,
+                        attrs,
+                        children,
+                        self_closing,
+                    },
+                    span,
+                )
+            }
+            K::Text => {
+                let t = text(self.src, node);
+                b.node(Node::Text(t), span)
+            }
+            K::Interpolation => {
+                // `{#each ..}` is a directive, not an expression. Its structure
+                // is E4's to model; keeping it verbatim is honest, and
+                // inventing one now would be guessing.
+                let raw = text(self.src, node);
+                if raw.starts_with("{#") || raw.starts_with("{/") || raw.starts_with("{:") {
+                    return b.node(
+                        Node::Block {
+                            directive: raw,
+                            children: vec![],
+                        },
+                        span,
+                    );
+                }
+                match node.children().find(|c| is_expr(c.kind())) {
+                    Some(e) => {
+                        let id = self.expr(b, &e);
+                        b.node(Node::Interpolation(id), span)
+                    }
+                    None => b.node(Node::Text(raw), span),
+                }
+            }
+            _ => b.node(Node::Text(text(self.src, node)), span),
+        }
+    }
+
+    fn attr(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> Attr {
+        let name = node
+            .children()
+            .find(|c| c.kind() == K::AttrName)
+            .map(|n| n.text().to_string())
+            .unwrap_or_default();
+        let value = match node.children().find(|c| c.kind() == K::AttrValue) {
+            None => AttrValue::None,
+            Some(v) => match v.children().find(|c| c.kind() == K::Interpolation) {
+                Some(i) => match i.children().find(|c| is_expr(c.kind())) {
+                    Some(e) => AttrValue::Expr(self.expr(b, &e)),
+                    None => AttrValue::None,
+                },
+                None => AttrValue::Static(v.text().to_string()),
+            },
+        };
+        Attr {
+            name,
+            value,
+            span: span_of(node),
+        }
+    }
+
     fn pattern(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> PatternId {
         let span = span_of(node);
         match node.kind() {
@@ -791,6 +909,11 @@ fn is_expr(k: K) -> bool {
             | K::TemplateRegion
             | K::Field
     )
+}
+
+/// One markup node and everything under it.
+fn is_markup(k: K) -> bool {
+    matches!(k, K::Element | K::Text | K::Interpolation)
 }
 
 /// Can this node stand in a lambda's parameter position as a binding?
