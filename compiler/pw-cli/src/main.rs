@@ -299,6 +299,15 @@ fn main() -> ExitCode {
     let mut warnings = 0usize;
     let mut files = 0usize;
 
+    // Two passes. Body-level checks need a whole-program type environment: a
+    // `match` in one file can be on a type declared in another, so a per-file
+    // loop cannot check it at all (assumption A-009).
+    struct Input {
+        display: String,
+        src: String,
+        parsed: pw_syntax::Parsed,
+    }
+    let mut inputs = Vec::new();
     for path in paths {
         let src = match std::fs::read_to_string(path) {
             Ok(s) => s,
@@ -308,29 +317,53 @@ fn main() -> ExitCode {
             }
         };
         files += 1;
-        let parsed = parse(&src);
         let display = Path::new(path)
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| path.clone());
+        let parsed = parse(&src);
+        inputs.push(Input {
+            display,
+            src,
+            parsed,
+        });
+    }
+
+    // Only files that parse cleanly enter the program. Recovery invents
+    // plausible-looking declarations, and lowering those would put fictional
+    // types in the environment for every other file (E0 finding F-4).
+    let clean: Vec<(String, String)> = inputs
+        .iter()
+        .filter(|i| i.parsed.errors.is_empty())
+        .map(|i| (i.display.clone(), i.src.clone()))
+        .collect();
+    let body_diags: std::collections::HashMap<String, Vec<Diagnostic>> =
+        pw_core::check::check_sources(&clean).into_iter().collect();
+
+    for input in &inputs {
+        let Input {
+            display,
+            src,
+            parsed,
+        } = input;
 
         if !parsed.errors.is_empty() {
-            print!("{}", render(&src, &display, &parsed.errors, !plain));
+            print!("{}", render(src, display, &parsed.errors, !plain));
             errors += parsed.errors.len();
         } else {
-            // Semantic rules only run on a clean parse — recovery invents
-            // plausible-looking declarations, and checking those reports on the
-            // recovery rather than on the user's code (E0 finding F-4).
-            let found = rules::check(&parsed.file);
+            // Semantic rules only run on a clean parse, for the same reason.
+            let mut found = rules::check(&parsed.file);
+            found.extend(body_diags.get(display).cloned().unwrap_or_default());
+            found.sort_by_key(|d| d.primary_span.start);
             if !found.is_empty() {
-                print!("{}", render_findings(&src, &display, &found, !plain));
+                print!("{}", render_findings(src, display, &found, !plain));
                 errors += found.iter().filter(|f| f.is_error()).count();
                 warnings += found.iter().filter(|f| !f.is_error()).count();
             }
         }
         if cmd == "explain" && parsed.errors.is_empty() {
             println!("── {display}");
-            print!("{}", explain(&parsed.file, &src));
+            print!("{}", explain(&parsed.file, src));
         }
     }
 

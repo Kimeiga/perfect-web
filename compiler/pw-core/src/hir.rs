@@ -143,10 +143,34 @@ pub struct Module {
     pub decls: Vec<DeclId>,
 }
 
+/// A declaration parameter. The type is the name **as written**: resolving it
+/// is a later layer's job, and a signature has no body arena to hold a
+/// `TypeRefId`.
+#[derive(Debug, Clone)]
+pub struct Param {
+    pub name: String,
+    pub ty: Option<String>,
+    pub span: Span,
+}
+
+/// One constructor of a `type T = | A | B(X)` declaration.
+#[derive(Debug, Clone)]
+pub struct VariantDef {
+    pub name: String,
+    /// Field type names as written.
+    pub fields: Vec<String>,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone)]
 pub struct Decl {
     pub name: String,
     pub kind: DeclKind,
+    pub params: Vec<Param>,
+    /// The variants, when this declaration defines an algebraic data type.
+    pub variants: Option<Vec<VariantDef>>,
+    /// `opaque type StoreId = String` — the representation, as written.
+    pub opaque_of: Option<String>,
     /// The declared effect row, as written: `!{ database.read<Stores> }` yields
     /// `["database.read"]`. Empty for `!{}`; `None` when no row was written.
     pub declared_effects: Option<Vec<EffectRef>>,

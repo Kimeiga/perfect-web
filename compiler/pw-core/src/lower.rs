@@ -162,6 +162,9 @@ impl Lowerer<'_> {
             Decl {
                 name,
                 kind,
+                params: self.params(node),
+                variants: self.variants(node),
+                opaque_of: self.opaque_of(node),
                 declared_effects,
                 body: None,
                 children: Vec::new(),
@@ -177,6 +180,52 @@ impl Lowerer<'_> {
         d.body = body;
         d.children = children;
         Some(id)
+    }
+
+    fn params(&self, node: &SyntaxNode) -> Vec<Param> {
+        node.children()
+            .find(|c| c.kind() == K::ParamList)
+            .map(|l| {
+                l.children()
+                    .filter(|c| c.kind() == K::Param)
+                    .map(|p| Param {
+                        name: first_name(&p).unwrap_or_default(),
+                        ty: p
+                            .children()
+                            .find(|c| c.kind() == K::TypeRef)
+                            .map(|t| type_path(&t)),
+                        span: span_of(&p),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn variants(&self, node: &SyntaxNode) -> Option<Vec<VariantDef>> {
+        let list = node.children().find(|c| c.kind() == K::VariantList)?;
+        Some(
+            list.children()
+                .filter(|c| c.kind() == K::Variant)
+                .map(|v| VariantDef {
+                    name: first_name(&v).unwrap_or_default(),
+                    fields: v
+                        .children()
+                        .filter(|c| c.kind() == K::TypeRef)
+                        .map(|t| type_path(&t))
+                        .collect(),
+                    span: span_of(&v),
+                })
+                .collect(),
+        )
+    }
+
+    fn opaque_of(&self, node: &SyntaxNode) -> Option<String> {
+        if node.kind() != K::OpaqueDecl {
+            return None;
+        }
+        node.children()
+            .find(|c| c.kind() == K::TypeRef)
+            .map(|t| type_path(&t))
     }
 
     fn effect_row(&self, row: &SyntaxNode) -> Vec<EffectRef> {
@@ -665,6 +714,14 @@ impl Lowerer<'_> {
             .unwrap_or_default();
         b.ty(TypeRef { path, args }, span)
     }
+}
+
+/// A type reference's name, without its type arguments.
+fn type_path(t: &SyntaxNode) -> String {
+    t.children()
+        .find(|c| c.kind() == K::Name)
+        .map(|n| n.text().to_string())
+        .unwrap_or_else(|| t.text().to_string().trim().to_string())
 }
 
 fn bin_op(kind: K, text: &str) -> BinOp {

@@ -193,3 +193,34 @@ The OCaml toolchain **did** install on Apple Silicon, so the charter's
 This has **not** been exhaustively verified against editor/language registries.
 Milestone 2 task 1 owns the real decision; changing it before Milestone 2 costs
 a rename of corpus files only.
+
+---
+
+## A-009 — one `pw check` invocation is one program
+
+**Status:** `open` — narrowed by name resolution, which does not exist yet.
+
+Body-level checks need a type environment: `R-007` matches on `OrderState`,
+which is declared in `A-002`. `compiler/pw-core/src/check.rs` therefore builds
+one `Program` from **every file passed to the invocation** and checks each file
+against it.
+
+**What this assumes.** That the files given together belong together. It is how
+a real compiler treats a package, and the corpus is written as excerpts of one
+application, so it holds for every use the project has today.
+
+**Where it is wrong.** Import-based visibility is not enforced. A file can
+currently match on a type it never imported, and `R-007` in fact does. Two
+files in different programs declaring the same type name would collide.
+
+**Why it is safe to hold now.** The failure mode is *permissiveness*, not false
+reports: the environment can only make a type visible that should not be, and
+the only consequence is that a match gets checked which would otherwise be
+skipped. It cannot invent a variant, so it cannot invent a diagnostic. The
+narrower direction — refusing to check anything until name resolution exists —
+would leave the tested exhaustiveness algorithm unreachable from source.
+
+**Retire when** name resolution lands and the environment is built from a
+module's imports rather than from the invocation's file list. The test
+`the_environment_spans_every_file_checked_together` pins the current behaviour
+in both directions, so the change will be visible.

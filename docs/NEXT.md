@@ -18,12 +18,12 @@ Fixed by the project architect after reviewing E2's results. Items 1–3 are don
 | 2 | Adopt Rowan | **done** — green tree, `SyntaxKind`, invariants carried over, 68/68 corpus files round-trip |
 | 3 | Write the formatter ADR, do not implement | **done** (ADR-0013) |
 | 4 | Implement the durable core body grammar | **done** — 68/68 corpus files parse and round-trip; see `docs/milestones/E2.md` |
-| 5 | Lower bodies into HIR | **next** — the single missing link between the corpus and the tested checkers |
+| 5 | Lower bodies into HIR | **done** — ADR-0014; id-indexed arenas, span on every node, 11 tests |
 | 6 | Move declaration rules from `pw-cli` into `pw-core` | **done** |
-| 7 | Connect the tested `pw-core` algorithms to `.pw` source | after 5 |
-| 8 | Ratchet semantic corpus enforcement upward from 4/44 | continuous |
-| 9 | Implement `pw fmt` after the syntax/HIR boundary stabilises | after 5 |
-| 10 | Begin E2A-R only once body-level task operations can be represented | after 5 |
+| 7 | Connect the tested `pw-core` algorithms to `.pw` source | **partial** — exhaustiveness runs on source and `pw check` reports it; scope/ABI/capability still unconnected |
+| 8 | Ratchet semantic corpus enforcement upward from 4/44 | **5/44** — R-007 added by the exhaustiveness bridge; ratcheted in `checking_source.rs` |
+| 9 | Implement `pw fmt` after the syntax/HIR boundary stabilises | **next** — the boundary is now stable |
+| 10 | Begin E2A-R only once body-level task operations can be represented | **unblocked** — `Expr::Keyword` represents them |
 
 ### The single biggest architectural decision
 
