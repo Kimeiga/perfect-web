@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-036
+// @category: measure helper hides forbidden geometry read
+// @rule: PW3001
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `layout.measure` reaches this view through `tooltip_width`
+// @expect-error: effect path: TooltipView -> tooltip_width -> ElementRef.offsetWidth
+//
+// The FIRST of the two hidden cases the architect required. The forbidden read
+// is one call away behind an innocuous helper. A checker that only inspects
+// the component body misses this entirely.
+
+module store.tooltip
+
+// Looks pure from the call site. It is not.
+fn tooltip_width(anchor: ElementRef) -> Float !{ layout.measure } {
+    anchor.offsetWidth
+}
+
+view TooltipView(anchor: ElementRef) !{} {
+    // ERROR: the effect propagates out of the helper into this pure view.
+    <div role="tooltip" style:width={tooltip_width(anchor)} />
+}

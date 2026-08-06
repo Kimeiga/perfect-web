@@ -1,0 +1,23 @@
+// @corpus: accepted
+// @id: A-017
+// @category: batched layout-affecting mutations
+// @charter: §7.5A
+// @milestone: 7
+//
+// Every layout-invalidating write lands in one commit. No read is interleaved,
+// so the browser performs one style/layout pass rather than one per element.
+
+module cart.badge_sizing
+
+component BadgeRow(badges: List<BadgeId>) {
+    placement browser
+
+    frame {
+        let unit: LayoutSnapshot<Float> = measure { self.content_width() / badges.length() }
+        mutate {
+            for badge in badges {
+                badge.style.set_width(unit)
+            }
+        }
+    }
+}

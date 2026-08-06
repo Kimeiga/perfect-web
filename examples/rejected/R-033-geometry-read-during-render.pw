@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-033
+// @category: geometry read during render
+// @rule: PW3002
+// @charter: §7.4, §7.5A
+// @milestone: 7
+// @expect-error: a `view` may not use effect `layout.measure`
+// @expect-error: rendering is pure; measure in a frame transaction and pass the snapshot in
+//
+// A view is pure. Measuring during render both breaks purity and forces layout
+// in the middle of producing the tree that layout depends on.
+
+module store.menu_view
+
+view MenuView(items: List<MenuItem>) !{} {
+    // ERROR: layout.measure inside a pure view.
+    let available = measure { self.content_width() }
+    <ul aria-label="Menu">
+        {#each items as item (item.id)}
+            <li style:width={available / items.length()}>{item.name}</li>
+        {/each}
+    </ul>
+}

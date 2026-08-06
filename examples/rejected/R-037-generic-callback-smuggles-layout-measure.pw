@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-037
+// @category: generic callback smuggles layout measure
+// @rule: PW3001
+// @charter: §7.5A, §7.2
+// @milestone: 7
+// @expect-error: `layout.measure` propagates through `List.map`'s callback
+// @expect-error: a generic helper preserves its callback's effects; it cannot launder them
+//
+// The SECOND hidden case, and the one that matters most. The effect travels
+// through a generic higher-order function. RQ-2 proved the backend propagates
+// effects this way; the pw checker must too, or it is worth approximately
+// nothing.
+
+module store.menu_view
+
+view MenuView(items: List<ElementRef>) !{} {
+    // ERROR: the callback measures layout, so `List.map` is not pure here and
+    // neither is this view. Effect rows are row-polymorphic: the helper
+    // preserves whatever its callback requires.
+    let widths = items |> List.map(fn(el) el.getBoundingClientRect().width)
+    <ul aria-label="Menu">
+        {#each widths as w (w)}<li style:width={w} />{/each}
+    </ul>
+}

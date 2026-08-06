@@ -19,7 +19,7 @@ Order was fixed by the project architect after reviewing E0's evidence.
 | **RQ-3** | `pw`-owned exhaustiveness and canonical typed ABI decoding | **partial** | exhaustiveness + type-directed ABI land in `compiler/pw-core`; 30 tests. Remaining: wire to a real parser (E2) so corpus files can drive it |
 | **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | **partial** | E2A-S landed: `compiler/pw-core/src/scope.rs`, PW2001-PW2004, 10 tests. E2A-R (runtime) not started |
 | **RQ-5** | Final-artifact declared-vs-actual component import verification | **partial** | rule + `PW4007` in `compiler/pw-core/src/capability.rs`, tested against E0's real 15-vs-1 import lists. Remaining: call it from the build, not just from tests |
-| **RQ-6** | Backfill direct / helper-hidden / generic-callback rejection cases for **every** effect family | next | — |
+| **RQ-6** | Backfill direct / helper-hidden / generic-callback rejection cases for **every** effect family | **partial** | layout/DOM families done: 10 accepted + 13 rejected, including both hidden cases. Remaining: backfill the other families |
 | **RQ-7** | Generate and adopt the E→P claim/evidence table before publishing P0 | **done** (first draft) | `docs/EVIDENCE_LEDGER.md` |
 
 ---

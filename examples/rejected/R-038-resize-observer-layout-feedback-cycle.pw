@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-038
+// @category: resize observer layout feedback cycle
+// @rule: PW3005
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `observe.resize` handler writes a layout-affecting property of the observed element
+// @expect-error: this is a feedback cycle; the browser reports an undelivered-notification loop
+//
+// Charter §7.5A requires warning on feedback loops where a resize observation
+// immediately changes the observed size. E0 confirmed the browser emits a
+// detectable error for exactly this.
+
+module store.responsive_menu
+
+component ResponsiveMenu() {
+    placement browser
+    let width = observe resize(self) -> Float
+
+    frame {
+        // ERROR: writing a layout-affecting property of the element whose size
+        // is being observed. Each write retriggers the observation.
+        mutate { self.style.set_width(width + 1.px) }
+    }
+}

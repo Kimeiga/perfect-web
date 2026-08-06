@@ -1,0 +1,23 @@
+// @corpus: accepted
+// @id: A-022
+// @category: post-paint non-layout work
+// @charter: §7.5A
+// @milestone: 7
+//
+// Work deliberately deferred until after presentation. `post_paint` may not
+// measure layout in the same frame, which is what keeps it from re-entering
+// the transaction it was deferred out of.
+
+module store.analytics
+
+component StorePage(id: StoreId) {
+    placement browser
+
+    // Runs after the frame is presented. Its effect row excludes `layout.measure`,
+    // so it cannot force a synchronous layout after paint.
+    post_paint !{ post_paint, trace } {
+        Telemetry.record_visible(id)
+    }
+
+    view { <main><h1>Store</h1></main> }
+}

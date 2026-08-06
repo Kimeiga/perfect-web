@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-042
+// @category: post-paint same-frame layout measure
+// @rule: PW3008
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `post_paint` may not use `layout.measure` in the same frame
+// @expect-error: measure in the next frame transaction, or use an observer
+//
+// Post-paint work exists to happen after presentation. Measuring layout there
+// forces the browser back into style and layout in a frame that had already
+// finished.
+
+module store.analytics
+
+component StorePage(id: StoreId) {
+    placement browser
+    post_paint {
+        // ERROR: forcing layout after paint, in the same frame.
+        let h = measure { self.height() }
+        Telemetry.record_height(id, h)
+    }
+    view { <main><h1>Store</h1></main> }
+}

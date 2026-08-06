@@ -1,0 +1,27 @@
+// @corpus: rejected
+// @id: R-035
+// @category: layout write during measure phase
+// @rule: PW3004
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `style.mutate<LayoutAffect>` is not permitted inside a `measure` block
+// @expect-error: the measure phase may only read
+//
+// The mirror image of R-034. A write inside the measure phase invalidates the
+// layout that later measurements in the same batch depend on.
+
+module store.menu_align
+
+component MenuAligner(items: List<ElementRef>) {
+    placement browser
+    frame {
+        let widths = measure {
+            items |> List.map(fn(it) {
+                // ERROR: mutating inside the measure phase.
+                it.style.set_padding(4.px)
+                it.width()
+            })
+        }
+        mutate { self.style.set_width(widths |> List.maximum()) }
+    }
+}

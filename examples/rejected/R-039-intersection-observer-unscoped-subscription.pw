@@ -1,0 +1,21 @@
+// @corpus: rejected
+// @id: R-039
+// @category: intersection observer unscoped subscription
+// @rule: PW2004
+// @charter: §7.5A, §7.6
+// @milestone: 7
+// @expect-error: `observe.intersection` declares `application` scope inside a component
+// @expect-error: the observation would outlive the element it observes
+//
+// An observer that outlives its element keeps a reference to a detached node
+// and pushes updates into a dead scope. The layout-phase instance of the
+// general scope-escape rule (PW2004).
+
+module store.lazy_map
+
+component LazyMap() {
+    placement browser
+    // ERROR: application scope requested from within a component.
+    let visible = observe intersection(self) -> Bool { scope application }
+    view { <section aria-label="Store location" /> }
+}

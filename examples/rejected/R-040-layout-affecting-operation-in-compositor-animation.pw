@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-040
+// @category: layout-affecting operation in compositor animation
+// @rule: PW3006
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `width` is not a compositor-only property
+// @expect-error: `animation.composite` permits only transform and opacity
+//
+// An animation declared compositor-only that animates a layout-affecting
+// property runs layout every frame, which is the defect the phase distinction
+// exists to prevent.
+
+module store.add_feedback
+
+component AddedPulse() {
+    placement browser
+    animate pulse {
+        // ERROR: animating width forces layout every frame.
+        width:    100.px -> 120.px -> 100.px
+        duration: 180.milliseconds
+    }
+    view { <span class="badge" animation={pulse} /> }
+}

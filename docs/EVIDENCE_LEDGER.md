@@ -51,7 +51,7 @@ Absolute numbers are **not** comparable to the M3 Max the charter assumes.
 | P0 | "A non-idempotent command cannot declare a retry policy." | E4 | **unstarted** | corpus R-014 exists; no checker |
 | P0 | "A network request in a view does not compile." | E1, E2 | **unstarted** | corpus R-001 exists; no `pw` front end |
 
-**45 corpus files exist and 0 of them compile.** They are a specification, not a
+**68 corpus files exist and 0 of them compile.** They are a specification, not a
 demonstration. Any public wording implying otherwise is forbidden until E2.
 
 ## Invalidated — claims the charter made that measurement removed

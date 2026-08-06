@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-034
+// @category: layout read after layout-affecting write
+// @rule: PW3003
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `layout.measure` after `style.mutate<LayoutAffect>` in the same transaction
+// @expect-error: this forces a synchronous layout; move the measurement to a later frame
+//
+// The thrashing pattern itself, measured at 264x-848x. The frame transaction
+// orders all reads before all writes, so a read after a write in one
+// transaction is a phase violation.
+
+module cart.badge_sizing
+
+component BadgeRow(badges: List<BadgeId>) {
+    placement browser
+    frame {
+        mutate { self.style.set_padding(8.px) }
+        // ERROR: measuring after a layout-affecting write in the same transaction.
+        let h = measure { self.height() }
+        mutate { self.style.set_height(h * 2.0) }
+    }
+}

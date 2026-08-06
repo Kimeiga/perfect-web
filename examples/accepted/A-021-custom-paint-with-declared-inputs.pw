@@ -1,0 +1,24 @@
+// @corpus: accepted
+// @id: A-021
+// @category: custom paint with declared inputs
+// @charter: §7.5A
+// @milestone: 7
+//
+// A canvas escape hatch whose inputs are declared, so the painter is a pure
+// function of them and cannot read layout or mutate the document.
+
+module store.rating_spark
+
+paint RatingSpark(values: List<Float>, width: Float, height: Float) !{ paint.custom } {
+    // Declared inputs only. No document access, no geometry reads: the painter
+    // receives its size rather than measuring it.
+    inputs   values, width, height
+    isolated true
+
+    draw(ctx) {
+        let step = width / values.length()
+        for (i, v) in values.enumerate() {
+            ctx.rect(i * step, height * (1.0 - v), step - 1.0, height * v)
+        }
+    }
+}

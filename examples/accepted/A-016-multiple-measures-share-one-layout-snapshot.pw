@@ -1,0 +1,29 @@
+// @corpus: accepted
+// @id: A-016
+// @category: multiple measures share one layout snapshot
+// @charter: §7.5A
+// @milestone: 7
+//
+// Charter §7.5A requires deduplicating measurements of the same element and
+// property within one frame. Three reads of the same box cost one layout.
+
+module store.menu_align
+
+component MenuAligner(items: List<ElementRef>) {
+    placement browser
+
+    frame {
+        // All three reads are satisfied from a single flush. The compiler
+        // deduplicates by (element, property) within the frame.
+        let widths: List<LayoutSnapshot<Float>> = measure {
+            items |> List.map(fn(it) it.width())
+        }
+        let total = derived widths |> List.sum()
+        let max   = derived widths |> List.maximum()
+
+        mutate {
+            self.style.set_width(max)
+            self.style.set_custom("--total", total)
+        }
+    }
+}

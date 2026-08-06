@@ -1,0 +1,25 @@
+// @corpus: accepted
+// @id: A-020
+// @category: compositor-only animation
+// @charter: §7.5A
+// @milestone: 7
+//
+// `animation.composite` is restricted to transform and opacity, which do not
+// invalidate layout, so a high-frequency animation cannot cause a layout pass.
+
+module store.add_feedback
+
+component AddedPulse() {
+    placement browser
+
+    // The effect row admits `animation.composite` but NOT `style.mutate<LayoutAffect>`,
+    // so writing `width` or `top` here is a compile error rather than a jank bug.
+    animate pulse {
+        transform: scale(1.0) -> scale(1.08) -> scale(1.0)
+        opacity:   1.0 -> 0.85 -> 1.0
+        duration:  180.milliseconds
+        respects   prefers_reduced_motion
+    }
+
+    view { <span class="badge" animation={pulse} /> }
+}

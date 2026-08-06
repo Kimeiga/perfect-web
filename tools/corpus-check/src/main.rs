@@ -33,6 +33,19 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "decoder handling malformed JSON",
     "build-time deterministic page",
     "content-addressed resumable handler",
+    // Charter v2 §7.5A layout/DOM phase families. Added because v2 introduced
+    // eight effect families without extending §16's category lists, which
+    // contradicted §16's own "add examples before features" rule.
+    "phase-scheduled measure then mutate",
+    "multiple measures share one layout snapshot",
+    "batched layout-affecting mutations",
+    "resize observation updates derived state",
+    "intersection observation controls resource lifetime",
+    "compositor-only animation",
+    "custom paint with declared inputs",
+    "post-paint non-layout work",
+    "semantically independent contained subtree",
+    "audited imperative widget escape",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -68,6 +81,24 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "optimistic state with no rollback path",
     "private data in resume manifest",
     "unsafe escape hatch without justification",
+    // Charter v2 §7.5A. Note the three-way discipline the architect required:
+    // every effect family needs one accepted use, one DIRECT rejected use, and
+    // one rejected use HIDDEN behind a helper or generic callback. The last is
+    // the one that matters — a checker that only catches direct calls is worth
+    // approximately nothing.
+    "synchronous geometry read in ordinary code",
+    "geometry read during render",
+    "layout read after layout-affecting write",
+    "layout write during measure phase",
+    "measure helper hides forbidden geometry read",
+    "generic callback smuggles layout measure",
+    "resize observer layout feedback cycle",
+    "intersection observer unscoped subscription",
+    "layout-affecting operation in compositor animation",
+    "custom paint mutates document",
+    "post-paint same-frame layout measure",
+    "containment with cross-boundary layout dependency",
+    "unaudited imperative dom escape",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

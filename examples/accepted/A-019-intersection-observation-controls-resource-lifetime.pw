@@ -1,0 +1,26 @@
+// @corpus: accepted
+// @id: A-019
+// @category: intersection observation controls resource lifetime
+// @charter: §7.5A, §7.6
+// @milestone: 7
+//
+// A resource is acquired when its subtree becomes visible and released when it
+// leaves, with the subscription owned by the component scope so it cannot
+// outlive it.
+
+module store.lazy_map
+
+component LazyMap(center: LatLng) {
+    placement browser
+
+    let visible = observe intersection(self, threshold = 0.1) -> Bool
+
+    // Scope-owned: leaving the component releases the handle. No manual teardown.
+    resource map when visible {
+        scope   component
+        acquire { Maps.create(self, center) }
+        release(handle) { Maps.destroy(handle) }
+    }
+
+    view { <section aria-label="Store location" /> }
+}

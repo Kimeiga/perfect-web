@@ -39,7 +39,7 @@ All seven charter §14 M0 gate items:
 1. **`just doctor` works on the Mac** — exits 0, read-only, warns on the 16 GiB host deviation.
 2. **All six spikes run from documented commands** — `just spikes`, six evidence files in `docs/evidence/M0/`. Charter v2 allows recording a blocker instead; none was needed.
 3. **Versions and licenses pinned** — `tools/versions.lock`, `rust-toolchain.toml`, `pnpm-lock.yaml`, SHA-256-verified release tarballs, license column in the technology matrix.
-4. **≥10 accepted / ≥20 rejected examples** — **14 and 31**, covering **14/14** and **31/31** charter §16 categories. Enforced by `tools/corpus-check` in `just ci`.
+4. **≥10 accepted / ≥20 rejected examples** — now **24 and 44**, covering **24/24** and **44/44** charter §16 categories including v2's layout/DOM families. Enforced by `tools/corpus-check` in `just ci`.
 5. **Reuse/fork/tape/build matrix complete** — `docs/research/technology-matrix.md`, with *measured* vs *read* clearly distinguished.
 6. **Known failures documented honestly** — `docs/KNOWN_LIMITATIONS.md`.
 7. **One clean `just ci`** — passes on macOS.

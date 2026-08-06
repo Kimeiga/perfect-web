@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-032
+// @category: synchronous geometry read in ordinary code
+// @rule: PW3001
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `offsetWidth` is not available in ordinary application code
+// @expect-error: reading geometry synchronously requires the `layout.measure` phase
+//
+// The direct case. Charter §7.5A: ordinary code must not call synchronous
+// geometry APIs; typed primitives return a scheduled LayoutSnapshot instead.
+
+module store.tooltip
+
+component Tooltip(anchor: ElementRef) {
+    placement browser
+    view {
+        // ERROR: synchronous geometry read outside a measure phase.
+        let w = anchor.offsetWidth
+        <div role="tooltip" style:width={w} />
+    }
+}

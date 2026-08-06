@@ -1,0 +1,30 @@
+// @corpus: rejected
+// @id: R-043
+// @category: containment with cross-boundary layout dependency
+// @rule: PW3009
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: subtree declared `independent` but its layout depends on `--page-gutter` from an ancestor
+// @expect-error: containment would change the rendered result, not merely its cost
+//
+// The dangerous case. Containment asserts a semantic property; asserting it
+// falsely changes what the user sees. Measurement also showed containment can
+// be slower where it does not belong, so it must never be inferred.
+
+module store.inventory_table
+
+component InventoryTable(rows: List<InventoryRow>) {
+    placement browser
+
+    // ERROR: the subtree claims independence but reads an ancestor-provided
+    // custom property that participates in its own layout.
+    subtree independent {
+        intrinsic_height 24.px
+    }
+
+    view {
+        <table style:margin-inline={var("--page-gutter")}>
+            <tbody>{#each rows as row (row.id)}<tr><td>{row.name}</td></tr>{/each}</tbody>
+        </table>
+    }
+}

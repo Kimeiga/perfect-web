@@ -1,0 +1,26 @@
+// @corpus: rejected
+// @id: R-044
+// @category: unaudited imperative dom escape
+// @rule: PW3010
+// @charter: §7.5A, §7.5
+// @milestone: 7
+// @expect-error: `unsafe.imperative` requires a `because` justification and an attribution target
+// @expect-error: every unsafe escape hatch must be named, justified, and visible in the semantic diff
+//
+// Escape hatches are permitted but never anonymous. Without justification and
+// attribution, forced-layout cost is untraceable and the diff cannot show that
+// authority was added.
+
+module store.third_party_map
+
+component VendorMap(center: LatLng) {
+    placement browser
+    resource widget {
+        scope   component
+        // ERROR: unsafe imperative access with no justification, no named
+        // capability, and no forced-layout attribution target.
+        acquire { unsafe.imperative { VendorSdk.mount(self, center) } }
+        release(h) { unsafe.imperative { VendorSdk.destroy(h) } }
+    }
+    view { <section aria-label="Map" /> }
+}
