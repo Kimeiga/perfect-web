@@ -420,6 +420,54 @@ fn emit_marko_command(paths: &[&String], out_dir: Option<String>) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// `pw emit-manifest` — the artifact that connects a declaration to the runtime.
+///
+/// Policies the schema could not interpret go to stderr and set a failing exit
+/// code. A manifest with a silently defaulted freshness is worse than none: the
+/// runtime would serve stale data and nothing would say why.
+fn emit_manifest_command(paths: &[&String]) -> ExitCode {
+    let mut all = Vec::new();
+    let mut unparsed = 0usize;
+
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        let built = pw_core::manifest::build(&hir);
+        for u in &built.unparsed {
+            eprintln!(
+                "{path}: `{}` declares `{} {}` which is {}",
+                u.declaration, u.policy, u.value, u.reason
+            );
+            unparsed += 1;
+        }
+        all.extend(built.manifests);
+    }
+
+    match serde_json::to_string_pretty(&all) {
+        Ok(json) => println!("{json}"),
+        Err(e) => {
+            eprintln!("pw: cannot serialize manifests: {e}");
+            return ExitCode::from(2);
+        }
+    }
+    if unparsed > 0 {
+        eprintln!("pw emit-manifest: {unparsed} policy value(s) not understood");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let plain = args.iter().any(|a| a == "--plain");
@@ -447,17 +495,25 @@ fn main() -> ExitCode {
 
     if !matches!(
         cmd,
-        "check" | "explain" | "fmt" | "emit-koka" | "emit-marko"
+        "check" | "explain" | "fmt" | "emit-koka" | "emit-marko" | "emit-manifest"
     ) || paths.is_empty()
     {
-        eprintln!("usage: pw <check|explain|fmt|emit-koka|emit-marko> <path.pw>... [--plain]");
+        eprintln!(
+            "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest> <path.pw>... \
+             [--plain]"
+        );
         eprintln!();
-        eprintln!("  check       parse and report diagnostics");
-        eprintln!("  explain     print types, effects, privacy and derived placement");
-        eprintln!("  fmt         rewrite files canonically; --check reports instead");
-        eprintln!("  emit-koka   print Koka for the pure subset (ADR-0015)");
-        eprintln!("  emit-marko  write Marko templates to --out DIR (ADR-0017)");
+        eprintln!("  check          parse and report diagnostics");
+        eprintln!("  explain        print types, effects, privacy and derived placement");
+        eprintln!("  fmt            rewrite files canonically; --check reports instead");
+        eprintln!("  emit-koka      print Koka for the pure subset (ADR-0015)");
+        eprintln!("  emit-marko     write Marko templates to --out DIR (ADR-0017)");
+        eprintln!("  emit-manifest  print the resource manifests as JSON");
         return ExitCode::from(2);
+    }
+
+    if cmd == "emit-manifest" {
+        return emit_manifest_command(&paths);
     }
 
     if cmd == "emit-koka" {

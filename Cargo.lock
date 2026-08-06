@@ -78,6 +78,7 @@ dependencies = [
  "annotate-snippets",
  "pw-core",
  "pw-syntax",
+ "serde_json",
 ]
 
 [[package]]
@@ -93,6 +94,10 @@ dependencies = [
 [[package]]
 name = "pw-resource"
 version = "0.0.0"
+dependencies = [
+ "pw-core",
+ "pw-syntax",
+]
 
 [[package]]
 name = "pw-syntax"

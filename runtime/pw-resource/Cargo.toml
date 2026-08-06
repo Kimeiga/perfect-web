@@ -12,3 +12,10 @@ publish = false
 # manifest in `pw-core::hir`.
 
 [dependencies]
+
+# The runtime does NOT depend on the compiler. These are dev-only, so the
+# manifest correspondence can be tested without either crate importing the
+# other — the schema is what they share (ADR-0018).
+[dev-dependencies]
+pw-core = { path = "../../compiler/pw-core" }
+pw-syntax = { path = "../../compiler/pw-syntax" }

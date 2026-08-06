@@ -28,6 +28,7 @@ pub mod exhaust;
 pub mod hir;
 pub mod koka;
 pub mod lower;
+pub mod manifest;
 pub mod marko;
 pub mod placement;
 pub mod privacy;

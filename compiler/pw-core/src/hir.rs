@@ -186,8 +186,12 @@ pub struct Decl {
     pub name: String,
     pub kind: DeclKind,
     pub params: Vec<Param>,
-    /// The declared return type, as written.
+    /// The declared return type's head, without arguments: `Result`.
     pub ret: Option<String>,
+    /// Its type arguments, in order: `["Store", "StoreError"]`. Kept separately
+    /// because `Result<T, E>`'s error side is a distinct manifest field, and a
+    /// name with the arguments stripped cannot supply it.
+    pub ret_args: Vec<String>,
     /// The variants, when this declaration defines an algebraic data type.
     pub variants: Option<Vec<VariantDef>>,
     /// The fields, when this declaration defines a record.

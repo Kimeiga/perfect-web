@@ -168,6 +168,7 @@ impl Lowerer<'_> {
                 kind,
                 params: self.params(node),
                 ret: self.return_type(node),
+                ret_args: self.return_type_args(node),
                 variants: self.variants(node),
                 fields: self.record_fields(node),
                 policies: self.policies(node),
@@ -216,6 +217,20 @@ impl Lowerer<'_> {
         node.children()
             .find(|c| c.kind() == K::TypeRef)
             .map(|t| type_path(&t))
+    }
+
+    /// The return type's arguments, as written.
+    fn return_type_args(&self, node: &SyntaxNode) -> Vec<String> {
+        node.children()
+            .find(|c| c.kind() == K::TypeRef)
+            .and_then(|t| t.children().find(|c| c.kind() == K::TypeArgList))
+            .map(|l| {
+                l.children()
+                    .filter(|c| c.kind() == K::TypeRef)
+                    .map(|t| type_path(&t))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn record_fields(&self, node: &SyntaxNode) -> Option<Vec<Param>> {
