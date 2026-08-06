@@ -117,6 +117,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-resume-wasm"
+version = "0.0.0"
+dependencies = [
+ "pw-resume",
+]
+
+[[package]]
 name = "pw-syntax"
 version = "0.0.0"
 dependencies = [

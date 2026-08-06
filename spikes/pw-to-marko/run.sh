@@ -37,6 +37,12 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
     mkdir -p "$SPIKE/src/routes/static" "$SPIKE/src/routes/counter" \
              "$SPIKE/src/routes/streamed" "$SPIKE/src/routes/store"
     cd "$REPO_ROOT"
+    # E7V: the compatibility decision, compiled to wasm so the browser runs the
+    # SAME code the deployment matrix tests rather than a JavaScript port.
+    cargo build --quiet -p pw-resume-wasm --target wasm32-unknown-unknown --release
+    mkdir -p "$SPIKE/public"
+    cp "$REPO_ROOT/target/wasm32-unknown-unknown/release/pw_resume_wasm.wasm" \
+       "$SPIKE/public/pw-resume.wasm"
     cargo run --quiet -p pw-cli -- emit-marko examples/hello-static/app.pw \
         --out "$SPIKE/src/routes/static"
     cargo run --quiet -p pw-cli -- emit-marko examples/counter/app.pw \

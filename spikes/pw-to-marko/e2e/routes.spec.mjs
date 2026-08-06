@@ -197,3 +197,103 @@ test.describe("store route — E4 gate 1, E5 gate 2", () => {
     expect(await response.text()).not.toContain("session-1");
   });
 });
+
+test.describe("E7V in the browser — the compatibility decision governs attachment", () => {
+  // The wasm module is fetched and instantiated inside the click handler, and
+  // three engines run in parallel, so the default 5 s assertion window is not
+  // enough. Raised rather than papered over with a sleep: the assertion still
+  // fails if the decision never arrives.
+  // The same Rust that the 38-row deployment matrix tests, compiled to wasm and
+  // running in the page. Not a JavaScript port: a second implementation of a
+  // security decision is two things that can disagree, silently.
+
+  // The decision must be loaded before a click, or the gate fails closed —
+  // which is correct behaviour and not what these tests are about.
+  const ready = (page) =>
+    expect(page.locator("body")).toHaveAttribute("data-resume-ready", "1", {
+      timeout: 20000,
+    });
+
+  test("a compatible manifest attaches and the mutation runs", async ({ page }) => {
+    await page.goto("/store");
+    await ready(page);
+    const before = await page.locator("#cart-count").textContent();
+    await page.getByRole("button", { name: "Add" }).first().click();
+
+    await expect(page.locator("body")).toHaveAttribute("data-resume-decision", "resume", {
+      timeout: 20000,
+    });
+    await expect(page.locator("#cart-count")).not.toHaveText(before);
+  });
+
+  test("an incompatible manifest is refused and the mutation does NOT run", async ({
+    page,
+  }) => {
+    // The crucial case. A manifest from hash scheme 1 — the superseded
+    // algorithm — is incomparable, not merely different.
+    await page.goto("/store");
+    await ready(page);
+    await page.evaluate(() => {
+      document.body.dataset.resumeManifest =
+        "1|1|B1|add_to_cart|cart|cart-doc|public|x|region";
+    });
+
+    const before = await page.locator("#cart-count").textContent();
+    await page.getByRole("button", { name: "Add" }).first().click();
+
+    await expect(page.locator("body")).toHaveAttribute(
+      "data-resume-decision",
+      "refused:unsupported hash scheme",
+      { timeout: 20000 },
+    );
+    // No handler attached, so no mutation.
+    await expect(page.locator("#cart-count")).toHaveText(before);
+    await expect(page.locator("body")).toHaveAttribute(
+      "data-resume-recovery",
+      "refetch-region",
+      { timeout: 20000 },
+    );
+  });
+
+  test("a private manifest resumed into a public scope is refused", async ({ page }) => {
+    await page.goto("/store");
+    await ready(page);
+    await page.evaluate(() => {
+      document.body.dataset.resumeManifest =
+        "2|1|B1|add_to_cart|cart|cart-doc|session:s-1|x|private";
+    });
+
+    const before = await page.locator("#cart-count").textContent();
+    await page.getByRole("button", { name: "Add" }).first().click();
+
+    await expect(page.locator("body")).toHaveAttribute(
+      "data-resume-decision",
+      "refused:privacy widened",
+      { timeout: 20000 },
+    );
+    await expect(page.locator("#cart-count")).toHaveText(before);
+    // R3: private state never falls back into a public region refetch.
+    await expect(page.locator("body")).toHaveAttribute(
+      "data-resume-recovery",
+      "rerender-private-slot",
+      { timeout: 20000 },
+    );
+  });
+
+  test("a changed handler identity is refused", async ({ page }) => {
+    await page.goto("/store");
+    await ready(page);
+    await page.evaluate(() => {
+      document.body.dataset.resumeManifest =
+        "2|1|B1|add_to_cart_v2|cart|cart-doc|public|x|region";
+    });
+    const before = await page.locator("#cart-count").textContent();
+    await page.getByRole("button", { name: "Add" }).first().click();
+    await expect(page.locator("body")).toHaveAttribute(
+      "data-resume-decision",
+      "refused:unknown handler",
+      { timeout: 20000 },
+    );
+    await expect(page.locator("#cart-count")).toHaveText(before);
+  });
+});

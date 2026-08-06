@@ -201,25 +201,44 @@ narrowly.
 - the resumption *mechanism*. Marko resumes documents (ADR-0002, ADR-0017), and
   E0/RQ-1 measured that behaviour in Chrome and Safari. Nothing in E7V changes
   who implements resumption.
-- **wiring into a browser.** `decide` cannot be *bypassed* — `Authorised` has
-  a private field, so `attach` is unreachable without a decision — but nothing
-  in a running browser calls either. It is a decision function with a tested
-  contract, exactly as `pw-tasks` and `pw-resource` are (ADR-0016). No deployed
-  application has ever refused a manifest through this code.
+- the resumption *mechanism* itself. Marko resumes documents; `decide` sits in
+  front of it and says whether a manifest may attach at all.
 
-So the strongest sentence available is:
+## In the browser
 
-> Resume artifacts are accepted only under exact compatible identities or
-> explicit checked migrations; incompatible mixed-version artifacts fail closed
-> through tested recovery paths.
+`runtime/pw-resume-wasm` compiles the decision to `wasm32-unknown-unknown` —
+73 kB, no `wasm-bindgen`, a four-function ABI — and the store page's Add button
+calls it before mutating. **Not a JavaScript port**: a second implementation of
+a security decision is two things that can disagree, and the disagreement is
+silent because both return a boolean and only one is right.
 
-And not:
+Four browser tests in Chromium, Firefox and WebKit:
+
+| manifest | result |
+|---|---|
+| compatible | attaches, the mutation runs |
+| hash scheme 1 | `refused: unsupported hash scheme`, no mutation, `refetch-region` |
+| session scope into public | `refused: privacy widened`, no mutation, `rerender-private-slot` |
+| changed handler identity | `refused: unknown handler`, no mutation |
+
+The third is R3 in a real browser: private state is not offered a public region
+refetch.
+
+The gate **fails closed**. If the decision has not loaded, the handler refuses
+rather than running — a handler that ran because the gate was still loading
+would be the bypass this design exists to prevent.
+
+So the sentence available is:
+
+> The compatibility policy governs the actual handler-attachment path used by
+> the application, in all three browser-engine families.
+
+And still not:
 
 > Resumption is safe across deployments.
 
-The second requires the decision to be in the **runtime** path. The build-time
-half is done and the bypass is closed by construction; what is missing is a
-browser that calls it.
+Marko owns the resumption mechanism (ADR-0002, ADR-0017); this decides whether
+a manifest may reach it.
 
 ## Build-time artifact agreement
 
