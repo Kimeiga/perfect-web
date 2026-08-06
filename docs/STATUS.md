@@ -13,8 +13,21 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 E7-R's vertical slice runs: the **real store page** is rendered by the own
 renderer, its handler is authorised by `decide()` before it attaches, and a
 click updates only the cart's part while every menu node keeps its identity.
-72 browser assertions across Chromium, Firefox and WebKit
-(`just spike-own-renderer`).
+A click changes the browser because the **declared resource dependency
+changed** — the command commits and returns nothing about the cart; the event's
+arguments select which entries invalidate; the resource refreshes with a
+version; the subscriber is told. 120 browser assertions across Chromium,
+Firefox and WebKit (`just spike-own-renderer`), and `just golden-both` runs the
+shared case set against Marko and the own renderer as separate processes.
+
+Live parts are addressed as `TemplateSchemaId + InstancePath + LocalPartId`. A
+template part *definition* is not a document part *instance*: the store page's
+three Add buttons share `data-pw="0"` and have three distinct addresses, keyed
+by an opaque document-scoped token that does not reveal the item's id.
+
+"No component replay" is proved structurally — the client artifact contains no
+template renderer, with a poisoned artifact as the negative control — and then
+observed, by a MutationObserver that sees mutations only inside the cart part.
 
 Handler bytes are still fetched eagerly. That is E7-L's work and it is recorded
 as a measured fact rather than a note.
@@ -105,7 +118,7 @@ robustness                11 suites, 0 panics, 3 regressions retained
 coverage-guided fuzzing    6 targets, 3600 execs, 0 findings
 resource graph            E6 closed — 6 gate items, 24 materializer tests
 one parser                E6F closed — 5 tests, 0 second trees
-own renderer              E7-2 closed, E7-R slice — 72 browser + 37 unit
+own renderer              E7-2 closed, E7-R slice — 120 browser + 37 unit
 historical compatibility   9 / 10   the miss classified
 KNOWN_GAPs                 0
 ```

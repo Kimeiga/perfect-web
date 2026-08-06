@@ -25,7 +25,10 @@ fn main() -> std::process::ExitCode {
             .cloned()
     };
     let Some(out_dir) = flag("--out") else {
-        eprintln!("usage: pw-render --out DIR [--values FILE] [--wrap TITLE] < template-ir.json");
+        eprintln!(
+            "usage: pw-render --out DIR [--values FILE] [--resume FILE] \
+             [--runtime SRC] [--document ID] [--wrap TITLE] < template-ir.json"
+        );
         return std::process::ExitCode::from(2);
     };
 
@@ -42,10 +45,16 @@ fn main() -> std::process::ExitCode {
         }
     };
 
+    // What makes this document's instance tokens its own. The server knows it
+    // — store 47, session s-1 — and the renderer must not invent it: a
+    // generated value would make two renders of one document differ, and
+    // determinism is a gate.
+    let document_id = flag("--document").unwrap_or_else(|| "document".to_string());
+
     let env = match flag("--values") {
         Some(path) => match std::fs::read_to_string(&path) {
             Ok(s) => match values_from_json(&s) {
-                Ok(env) => env,
+                Ok(env) => env.document(&document_id),
                 Err(e) => {
                     eprintln!("pw-render: {path}: {e}");
                     return std::process::ExitCode::from(2);
@@ -56,7 +65,7 @@ fn main() -> std::process::ExitCode {
                 return std::process::ExitCode::from(2);
             }
         },
-        None => Env::new(),
+        None => Env::new().document(&document_id),
     };
 
     if let Err(e) = std::fs::create_dir_all(&out_dir) {

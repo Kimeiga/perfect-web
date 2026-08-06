@@ -55,10 +55,9 @@ test.describe("the document the server produced", () => {
         totalElements: document.querySelectorAll("*").length,
       };
     });
-    // Four range parts (store name, the each, the item name inside it, cart
-    // count) — the item-name range repeats per item, so three items give
-    // 2 + 2 + 3*2 + 2 = 12 anchor nodes.
-    expect(shape.anchors).toBe(12);
+    // store name 2, the loop's own range 2, three loop INSTANCE boundaries 6,
+    // the item name inside each instance 6, the cart count 2 = 18.
+    expect(shape.anchors).toBe(18);
     expect(shape.anchoredElements, "only the Add buttons").toBe(3);
     expect(shape.totalElements).toBeGreaterThan(20);
   });
@@ -79,7 +78,7 @@ test.describe("the document the server produced", () => {
 test.describe("decide() governs attachment", () => {
   test("a compatible manifest is authorised and the handler attaches", async ({ page }) => {
     const pw = await ready(page);
-    expect(pw.log.join("\n")).toMatch(/attached \d+ to 3 element\(s\) with id 0/);
+    expect(pw.log.join("\n")).toMatch(/attached \d+ to 3 instance\(s\)/);
   });
 
   test("clicking Add changes the cart", async ({ page }) => {
@@ -133,7 +132,9 @@ test.describe("the update touches only what changed", () => {
 
     const pw = await page.evaluate(() => window.__pw);
     const cart = pw.parts.parts.find((p) => p.value === "cart.line_count");
-    expect(pw.updated, "exactly the cart's part").toEqual([cart.id]);
+    // One ADDRESS, not one id: the cart part is outside every loop, so its
+    // instance path is empty and it has exactly one live instance.
+    expect(pw.updated, "exactly the cart's part").toEqual([`|${cart.id}`]);
   });
 
   test("the menu's nodes keep their identity across the update", async ({ page }) => {
@@ -241,5 +242,59 @@ test.describe("the remaining E7-L gap, recorded", () => {
       eager.length,
       "the runtime and the decision are loaded eagerly today — this is E7-L's work",
     ).toBeGreaterThan(0);
+  });
+});
+
+test.describe("instance identity — the three Add buttons", () => {
+  test("each loop instance has a distinct address", async ({ page }) => {
+    // RISK_QUEUE 25. All three buttons carry `data-pw="0"` because a
+    // template-scoped id names a position in the TEMPLATE. What distinguishes
+    // them is the instance path, and a runtime that keyed by id alone kept the
+    // last one — so the third button worked and the first two were inert.
+    const pw = await ready(page);
+    const attached = pw.log.find((l) => l.startsWith("attached"));
+    const addresses = attached.split(": ")[1].split(" ");
+    expect(addresses).toHaveLength(3);
+    expect(new Set(addresses).size, "three DISTINCT addresses").toBe(3);
+  });
+
+  test("every Add button works, not only the last one", async ({ page }) => {
+    // The regression this exists for, stated as behaviour: each button in turn.
+    await ready(page);
+    const buttons = page.locator("#menu button");
+    for (let i = 0; i < 3; i += 1) {
+      await buttons.nth(i).click();
+      await expect(page.locator("#cart-count")).toHaveText(String(i + 1));
+    }
+  });
+
+  test("the instance token does not reveal the item key", async ({ page }) => {
+    // Architect ruling: "Never put raw domain keys into identity markup merely
+    // for renderer convenience." A comment is no more private than an
+    // attribute — both are read by anything that can read the document.
+    await ready(page);
+    const html = await page.content();
+    const keys = ["espresso", "cortado", "cold-brew"];
+    for (const key of keys) {
+      expect(
+        html,
+        `\`${key}\` must not appear in identity markup`,
+      ).not.toMatch(new RegExp(`pw:[se]\\d+@[^-]*${key}`));
+      expect(html).not.toMatch(new RegExp(`data-pw[^=]*="[^"]*${key}`));
+    }
+    // The control: the tokens ARE there, so the assertion is about their
+    // content rather than about their absence.
+    expect(html).toMatch(/<!--pw:s1@[0-9a-f]{8}-->/);
+  });
+
+  test("the same document renders the same tokens twice", async ({ page, request }) => {
+    // Determinism, at the identity layer. Two fetches of one document must
+    // agree, or an address means nothing across a reload.
+    const a = await (await request.get("/StorePage.html")).text();
+    const b = await (await request.get("/StorePage.html")).text();
+    const tokens = (html) => [...html.matchAll(/pw:s1@([0-9a-f]{8})/g)].map((m) => m[1]);
+    expect(tokens(a)).toEqual(tokens(b));
+    expect(tokens(a)).toHaveLength(3);
+    void page;
   });
 });

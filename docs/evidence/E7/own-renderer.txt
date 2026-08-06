@@ -14,7 +14,7 @@ THE STORE PAGE — E7-R's vertical slice
   → parts manifest → decide() → Authorised → handler attaches
   → click Add → command → only cart-related PartIds update
 
-  12 assertions, 3 engine families:
+  40 assertions, 3 engine families:
     no Marko participates in this route
     only dynamic regions carry identity markup
     the page is readable with JavaScript disabled
@@ -26,3 +26,29 @@ THE STORE PAGE — E7-R's vertical slice
     only the cart part id updates
     replacing a menu node makes the identity assertion RED
     handler bytes are still eager — the E7-L gap, recorded
+
+LIVE PART IDENTITY
+  TemplateSchemaId + InstancePath + LocalPartId.
+  A template part DEFINITION is not a document part INSTANCE: three Add
+  buttons share data-pw=0 and have three distinct addresses.
+    each loop instance has a distinct address
+    every Add button works, not only the last one
+    the instance token does not reveal the item key
+    the same document renders the same tokens twice
+
+NO COMPONENT REPLAY — structurally, then observed
+  the client artifact contains no template renderer, and a poisoned
+    artifact makes that check go red
+  the client never fetches the server renderer
+  a MutationObserver over the whole document sees mutations ONLY inside
+    the cart part, and a menu mutation makes that check go red
+
+THE REAL RESOURCE PATH — E6 and E7 composed
+  the command returns { committed: true } and no cart value
+  the browser learns the value from the RESOURCE, at a version
+    rolled-back command      → no browser update
+    CartChanged(session A)   → session B unchanged
+    duplicate event          → no second transition
+    unrelated MenuChanged    → cart unchanged
+    stale version arriving   → does not overwrite newer state
+                               (and a newer one IS applied)

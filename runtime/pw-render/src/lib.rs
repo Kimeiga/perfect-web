@@ -121,6 +121,24 @@ pub struct Env {
     values: BTreeMap<String, Value>,
     /// Capabilities the caller presented, for `RawHtml` parts.
     granted: Vec<String>,
+    /// What makes this document's instance tokens its own.
+    ///
+    /// Architect ruling, 2026-08-06: an instance token "must not reveal the
+    /// source key and should not correlate instances across unrelated
+    /// documents". The second half needs something document-specific in the
+    /// derivation, and the server is what knows it — store 47, session s-1.
+    ///
+    /// It is an INPUT rather than a random value, because determinism is a gate
+    /// (E7-2 gate 5): identical IR plus identical values must produce identical
+    /// bytes. A salt drawn from a generator would break content addressing,
+    /// caching and materialization keys all at once.
+    document: String,
+    /// The loop instances enclosing what is being rendered, outermost first.
+    ///
+    /// Generic on purpose. A frame comes from a repeatable scope, and today
+    /// that is a keyed `Each`; later it can be a component instance or a
+    /// streamed one without changing the address model.
+    path: Vec<(u32, String)>,
 }
 
 impl Env {
@@ -136,6 +154,12 @@ impl Env {
     /// Present a capability. Without it, a `RawHtml` part is refused.
     pub fn grant(mut self, capability: &str) -> Env {
         self.granted.push(capability.to_string());
+        self
+    }
+
+    /// Identify this document instance, for instance-token derivation.
+    pub fn document(mut self, id: &str) -> Env {
+        self.document = id.to_string();
         self
     }
 
@@ -156,6 +180,52 @@ impl Env {
         next.values.insert(name.to_string(), value);
         next
     }
+
+    /// Enter a loop instance.
+    fn within(&self, each: PartId, token: &str) -> Env {
+        let mut next = self.clone();
+        next.path.push((each.0, token.to_string()));
+        next
+    }
+}
+
+/// An opaque, document-scoped identifier for one instance of a repeatable
+/// scope.
+///
+/// Architect ruling, 2026-08-06:
+///
+/// > Same declared loop key under the same parent instance within the same
+/// > document generation → same `InstanceToken`. Different key or parent →
+/// > different token. Token must not reveal the source key and should not
+/// > correlate instances across unrelated documents.
+///
+/// So the derivation takes the document, the enclosing path, the loop, and the
+/// key — and returns none of them. Putting the raw key in the markup would be
+/// the same exposure whether it went in an attribute or a comment: both are
+/// read by anything that can read the document, and a cart's item id is a
+/// domain identifier.
+///
+/// FNV-1a truncated to 32 bits. Not a secret and not claimed to be one: it
+/// hides a key from a reader of the markup, and a party who already knows the
+/// document and the candidate keys can confirm a guess. What it prevents is the
+/// key being *published*, which is the thing that happens by accident.
+fn instance_token(document: &str, path: &[(u32, String)], each: PartId, key: &str) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut feed = |bytes: &[u8]| {
+        for b in bytes {
+            h ^= *b as u64;
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    feed(document.as_bytes());
+    for (p, t) in path {
+        feed(&p.to_le_bytes());
+        feed(t.as_bytes());
+    }
+    feed(&each.0.to_le_bytes());
+    feed(b"\x1f");
+    feed(key.as_bytes());
+    format!("{:08x}", (h ^ (h >> 32)) as u32)
 }
 
 /// Render one template to HTML bytes.
@@ -270,8 +340,8 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             id,
             collection,
             binding,
+            key,
             body,
-            ..
         } => {
             let v = env.get(collection).ok_or(Blocked::MissingValue {
                 path: collection.clone(),
@@ -281,10 +351,37 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                     path: collection.clone(),
                 });
             };
+            // The loop's own range, so the whole list is addressable — an
+            // unkeyed list is replaced wholesale, and that is where.
             out.push_str(&format!("<!--pw:s{id}-->"));
-            for item in items {
+            for (i, item) in items.iter().enumerate() {
                 let scoped = env.with(binding, item.clone());
-                emit(body, &scoped, others, out)?;
+                match key {
+                    // A KEYED list: each instance gets its own boundaries and
+                    // an opaque token, so one instance can be addressed,
+                    // reordered or removed without touching its neighbours.
+                    Some(field) => {
+                        let raw = match item {
+                            Value::Record(fields) => fields
+                                .get(field)
+                                .and_then(|v| v.as_str())
+                                .unwrap_or_default(),
+                            other => other.as_str().unwrap_or_default(),
+                        };
+                        let token = instance_token(&env.document, &env.path, *id, &raw);
+                        out.push_str(&format!("<!--pw:s{id}@{token}-->"));
+                        emit(body, &scoped.within(*id, &token), others, out)?;
+                        out.push_str(&format!("<!--pw:e{id}@{token}-->"));
+                    }
+                    // An UNKEYED list renders and promises nothing about
+                    // per-item identity. No instance boundaries, because an
+                    // identity that is really a position is worse than none:
+                    // it looks addressable and moves when the list does.
+                    None => {
+                        let _ = i;
+                        emit(body, &scoped, others, out)?;
+                    }
+                }
             }
             out.push_str(&format!("<!--pw:e{id}-->"));
             Ok(())

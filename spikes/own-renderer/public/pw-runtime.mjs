@@ -21,54 +21,92 @@
 
 const parts = JSON.parse(document.getElementById("pw-parts")?.textContent ?? "{}");
 
-/**
- * Every element carrying a given `ElementId`, in document order.
- *
- * A LIST, not one element. A template-scoped id names a position in the
- * TEMPLATE, and a position inside an `{#each}` has one document instance per
- * item — the store page's three Add buttons all carry `data-pw="0"`.
- *
- * A first version kept a `Map` from id to element and silently held the last
- * one, so the third button worked and the first two were inert. The page looked
- * correct and two thirds of it did nothing.
- *
- * For attaching behaviour this is the whole answer: every instance of that
- * template position gets the listener. For UPDATING one instance, the loop's
- * declared key is what distinguishes them, and that is the next piece of E7-R.
- */
-function elementsWithId(id) {
-  return [...document.querySelectorAll(`[data-pw="${id}"]`)];
+// --- addressing ----------------------------------------------------------
+//
+// Architect ruling, 2026-08-06:
+//
+//   `TemplateSchemaId + LocalPartId` identifies a part POSITION. A live
+//   document needs `TemplateSchemaId + InstancePath + LocalPartId`.
+//
+// The distinction is not about loops. A template part DEFINITION is one thing
+// and a document part INSTANCE is another, and the same gap appears with a
+// component used twice, a conditional region recreated after toggling, and a
+// streamed instance. So `InstancePath` is generic: a frame is a repeatable
+// scope, and today that scope is a keyed `{#each}`.
+//
+// ONE traversal builds the index. After that an address is a map lookup, not a
+// DOM walk — the comments are the structural truth and this is the cheap view
+// of it.
+
+/** `[[eachPartId, token], ...]` → a stable string key. */
+function addressOf(path, part) {
+  return `${path.map(([e, t]) => `${e}@${t}`).join("/")}|${part}`;
 }
 
-/**
- * The nodes a range part owns, between its anchors.
- *
- * Walked once and kept: a range that currently holds nothing still has its two
- * comments, which is where new content goes. Finding it by "the text after the
- * label" would work until the label moved.
- */
-function range(id) {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
-  let start = null;
-  let end = null;
+/** address → { element } or { start, end } */
+const index = new Map();
+
+function buildIndex() {
+  index.clear();
+  const path = [];
+  const open = new Map(); // partId → start comment, for ranges being walked
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_ELEMENT,
+  );
   let node;
   while ((node = walker.nextNode())) {
-    if (node.data === `pw:s${id}`) start = node;
-    else if (node.data === `pw:e${id}`) {
-      end = node;
-      break;
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const owner = node.dataset?.pw;
+      if (owner !== undefined) {
+        // An element-anchored part is addressed by the path it sits in, which
+        // is what distinguishes the three Add buttons that all carry
+        // `data-pw="0"`.
+        index.set(addressOf(path, `e${owner}`), { element: node });
+      }
+      continue;
+    }
+    const data = node.data ?? "";
+    if (!data.startsWith("pw:")) continue;
+
+    const m = /^pw:([se])(\d+)(?:@([0-9a-f]+))?$/.exec(data);
+    if (!m) continue;
+    const [, side, id, token] = m;
+
+    if (token) {
+      // A loop INSTANCE boundary: push a frame, or pop it.
+      if (side === "s") path.push([Number(id), token]);
+      else path.pop();
+      continue;
+    }
+    if (side === "s") {
+      open.set(id, { start: node, path: [...path] });
+    } else {
+      const started = open.get(id);
+      if (started) {
+        index.set(addressOf(started.path, id), { start: started.start, end: node });
+        open.delete(id);
+      }
     }
   }
-  return start && end ? { start, end } : null;
+  return index.size;
 }
 
-/** Replace a range's contents, leaving its anchors and everything else alone. */
-function setRange(id, text) {
-  const r = range(id);
-  if (!r) return false;
-  // Remove what is between the anchors, then insert. The anchors themselves are
-  // never touched, so the part keeps its identity across the update — which is
-  // what lets it be updated again.
+/** Every address for a part id, across every instance. */
+function addressesFor(part) {
+  const suffix = `|${part}`;
+  return [...index.keys()].filter((k) => k.endsWith(suffix));
+}
+
+/**
+ * Replace a range's contents, leaving its anchors and everything else alone.
+ *
+ * The anchors are never touched, so the part keeps its identity across the
+ * update — which is what lets it be updated again.
+ */
+function setRange(address, text) {
+  const r = index.get(address);
+  if (!r?.start) return false;
   let n = r.start.nextSibling;
   while (n && n !== r.end) {
     const next = n.nextSibling;
@@ -135,8 +173,11 @@ const log = [];
 window.__pw = {
   log,
   parts,
+  /** The `PartAddress`es the last interaction updated. */
   updated: [],
   ready: false,
+  address: (path, part) => addressOf(path, part),
+  indexSize: () => index.size,
 };
 
 // The manifest a handler presents, in the ABI `pw-resume-wasm` reads:
@@ -166,11 +207,19 @@ function manifestFor() {
 }
 
 async function attach() {
+  // One traversal, before anything else. Every later lookup is a map hit.
+  const indexed = buildIndex();
+  log.push(`indexed ${indexed} address(es)`);
+
   await bootDecision();
 
   for (const part of parts.parts ?? []) {
     if (part.kind !== "event") continue;
-    const owners = elementsWithId(part.owner);
+    // Every INSTANCE of this template position. A template-scoped id names a
+    // position in the template; the document has one instance per loop item,
+    // and all three Add buttons carry `data-pw="0"`.
+    const addresses = addressesFor(`e${part.owner}`);
+    const owners = addresses.map((a) => index.get(a).element).filter(Boolean);
     if (owners.length === 0) {
       log.push(`no element ${part.owner} for part ${part.id}`);
       continue;
@@ -187,31 +236,96 @@ async function attach() {
       continue;
     }
 
-    for (const el of owners) {
+    for (const [i, el] of owners.entries()) {
+      const at = addresses[i];
       el.addEventListener("click", async (e) => {
         e.preventDefault();
-        const response = await fetch("/command/add_to_cart", { method: "POST" });
-        const next = await response.json();
+        // The command COMMITS and returns nothing about the cart. The browser
+        // learns the new value from the RESOURCE, because that is what the
+        // program declares the page depends on:
+        //
+        //   command add_to_cart(..) invalidates Cart(current_session())
+        //
+        // A response carrying the value would make the UI change because an
+        // endpoint said so, which is the thing E6 exists to replace.
+        await fetch("/command/add_to_cart", { method: "POST" });
 
-        // Only the parts whose values changed. The manifest says which part
-        // reads which path, so this updates by IDENTITY rather than by
-        // re-rendering and comparing — there is nothing to compare against.
-        window.__pw.updated = [];
-        for (const p of parts.parts ?? []) {
-          if (p.kind !== "text") continue;
-          if (!(p.value in next)) continue;
-          if (setRange(p.id, String(next[p.value]))) {
-            window.__pw.updated.push(p.id);
-          }
-        }
-        log.push(`updated ${window.__pw.updated.join(",")}`);
+        void at;
       });
     }
-    log.push(`attached ${part.id} to ${owners.length} element(s) with id ${part.owner}`);
+    log.push(
+      `attached ${part.id} to ${owners.length} instance(s): ${addresses.join(" ")}`,
+    );
   }
 
+  subscribe();
   window.__pw.ready = true;
   document.documentElement.dataset.pwReady = "1";
+}
+
+// --- the resource subscription -------------------------------------------
+//
+// The page holds a VERSION. A response carrying a version no newer than the one
+// held changes nothing — which is what makes a late arrival harmless, and it
+// has to be here rather than in the transport: the transport is what delivers
+// out of order.
+
+let version = 0;
+
+async function subscribe() {
+  for (;;) {
+    let next;
+    try {
+      const response = await fetch(`/resource/Cart?since=${version}`);
+      next = await response.json();
+    } catch {
+      return; // the page is going away
+    }
+    if (!receive(next)) {
+    }
+  }
+}
+
+/**
+ * Take a resource value if it is newer than what is held.
+ *
+ * The version guard lives HERE rather than in the transport, because the
+ * transport is what delivers out of order. A subscription that re-established
+ * itself, a retried request or a slow response can all arrive after a newer
+ * one, and a page that applied whatever arrived last would show an older cart
+ * than the server has.
+ */
+function receive(next) {
+  if (next.version > version) {
+    version = next.version;
+    apply(next);
+    return true;
+  }
+  log.push(`ignored version ${next.version}, holding ${version}`);
+  window.__pw.ignored = (window.__pw.ignored ?? 0) + 1;
+  return false;
+}
+
+// Exposed so a test can deliver a value out of order. The transport cannot be
+// made to do that on demand, and the property is about the page's guard rather
+// than about the transport.
+window.__pwTestApply = receive;
+
+/** Update every part whose value the resource carries. */
+function apply(values) {
+  window.__pw.updated = [];
+  for (const p of parts.parts ?? []) {
+    if (p.kind !== "text") continue;
+    if (!(p.value in values)) continue;
+    for (const address of addressesFor(String(p.id))) {
+      if (setRange(address, String(values[p.value]))) {
+        window.__pw.updated.push(address);
+      }
+    }
+  }
+  if (window.__pw.updated.length) {
+    log.push(`updated ${window.__pw.updated.join(",")} at version ${values.version}`);
+  }
 }
 
 attach().catch((e) => {

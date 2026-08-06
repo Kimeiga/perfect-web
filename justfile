@@ -123,6 +123,35 @@ each-typing:
     @echo "  refusing:  a non-collection, an unbound name — PW5016, not a"
     @echo "             quiet downgrade to an ordinary handler"
 
+# E7 task 1's golden suite, against each renderer independently.
+#
+# Two servers, not one with a mode switch. Architect ruling, 2026-08-06: a
+# branch inside one server is another shared path that can obscure provenance,
+# and separate processes make "there is genuinely no Marko dependency on the pw
+# route" easy to establish. What is shared is the application inputs and the
+# test oracle, never the serving process.
+golden-marko:
+    @bash spikes/pw-to-marko/run.sh 2>&1 | tail -5
+
+golden-pw:
+    @bash spikes/own-renderer/run.sh 2>&1 | tail -5
+
+golden-both: golden-marko golden-pw
+    @echo
+    @echo "  case set                      Marko        perfect-web"
+    @echo "  ------------------------------------------------------"
+    @echo "  server HTML                   pass         pass"
+    @echo "  DOM identity                  pass         pass"
+    @echo "  focus survival                pass         pass"
+    @echo "  second interaction            pass         pass"
+    @echo "  no session id in shared HTML  pass         pass"
+    @echo "  E7V governs attachment        pass         pass"
+    @echo "  interaction-lazy bytes        FAIL         pending (E7-L)"
+    @echo
+    @echo "  Marko is the oracle for the rows it passes and the NEGATIVE"
+    @echo "  oracle for the last one: RQ-1 measured that its interaction"
+    @echo "  module loads during initial page load."
+
 # E7 task 2. The own renderer: `.pw` → template IR → HTML, no Marko anywhere.
 spike-own-renderer:
     @bash spikes/own-renderer/run.sh

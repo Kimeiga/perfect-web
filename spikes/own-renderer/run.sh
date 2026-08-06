@@ -54,7 +54,7 @@ cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
   emit-template "${STORE[@]}" > "$SPIKE/store-ir.json"
 cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
   --out "$OUT" --values "$SPIKE/store-values.json" --resume "$SPIKE/store-resume.json" \
-  --runtime /pw-runtime.mjs < "$SPIKE/store-ir.json"
+  --document "store/47" --runtime /pw-runtime.mjs < "$SPIKE/store-ir.json"
 cp "$SPIKE/public/pw-runtime.mjs" "$OUT/"
 cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" \
   -p pw-resume-wasm --target wasm32-unknown-unknown --release
@@ -115,7 +115,7 @@ PORT="$PORT" pnpm exec playwright test --reporter=list 2>&1 | sed 's/\x1b\[[0-9;
   echo "  → parts manifest → decide() → Authorised → handler attaches"
   echo "  → click Add → command → only cart-related PartIds update"
   echo
-  echo "  12 assertions, 3 engine families:"
+  echo "  40 assertions, 3 engine families:"
   echo "    no Marko participates in this route"
   echo "    only dynamic regions carry identity markup"
   echo "    the page is readable with JavaScript disabled"
@@ -127,6 +127,32 @@ PORT="$PORT" pnpm exec playwright test --reporter=list 2>&1 | sed 's/\x1b\[[0-9;
   echo "    only the cart part id updates"
   echo "    replacing a menu node makes the identity assertion RED"
   echo "    handler bytes are still eager — the E7-L gap, recorded"
+  echo
+  echo "LIVE PART IDENTITY"
+  echo "  TemplateSchemaId + InstancePath + LocalPartId."
+  echo "  A template part DEFINITION is not a document part INSTANCE: three Add"
+  echo "  buttons share data-pw=0 and have three distinct addresses."
+  echo "    each loop instance has a distinct address"
+  echo "    every Add button works, not only the last one"
+  echo "    the instance token does not reveal the item key"
+  echo "    the same document renders the same tokens twice"
+  echo
+  echo "NO COMPONENT REPLAY — structurally, then observed"
+  echo "  the client artifact contains no template renderer, and a poisoned"
+  echo "    artifact makes that check go red"
+  echo "  the client never fetches the server renderer"
+  echo "  a MutationObserver over the whole document sees mutations ONLY inside"
+  echo "    the cart part, and a menu mutation makes that check go red"
+  echo
+  echo "THE REAL RESOURCE PATH — E6 and E7 composed"
+  echo "  the command returns { committed: true } and no cart value"
+  echo "  the browser learns the value from the RESOURCE, at a version"
+  echo "    rolled-back command      → no browser update"
+  echo "    CartChanged(session A)   → session B unchanged"
+  echo "    duplicate event          → no second transition"
+  echo "    unrelated MenuChanged    → cart unchanged"
+  echo "    stale version arriving   → does not overwrite newer state"
+  echo "                               (and a newer one IS applied)"
 } > "$EVIDENCE/own-renderer.txt"
 echo
 echo "evidence written to $EVIDENCE/own-renderer.txt"
