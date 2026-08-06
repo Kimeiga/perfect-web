@@ -1,7 +1,7 @@
 corpus enforcement — every rejected fixture, checked as its own program
 (the shared library, the accepted modules it imports, and the fixture)
 
-35/44 enforce their declared invariant
+36/44 enforce their declared invariant
 
 R-001  enforced                  PW0401 (declared PW0300)
        network request inside view
@@ -13,7 +13,7 @@ R-004  enforced                  PW5001 (declared PW0100)
        private cart in shared cache
 R-005  enforced                  PW5004 (declared PW0303)
        cross-tenant cache key missing tenant
-R-006  UNCAUGHT                  PW0304
+R-006  enforced                  PW5006 (declared PW0304)
        public log of secret value
 R-007  enforced                  PW0305
        unhandled ADT variant

@@ -1,0 +1,15 @@
+// @expect: clean
+// The control. Identical shape — a binding, an interpolation, the same sink —
+// differing only in that the value is not secret. A rule that banned
+// interpolation into `log.public`, or banned `log.public` outright, would
+// catch the fixture beside this one and fail here.
+
+module rules.sink_good
+
+import log
+import Stores
+
+fn trace(id: StoreId) -> () !{ log<Public>, database.read } {
+    let store = Stores.get(id)
+    log.public("loaded {store}")
+}

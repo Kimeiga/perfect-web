@@ -166,6 +166,8 @@ codes! {
     // browser, pinned to the origin, is wrong without being unplaceable.
     DECLARED_PLACEMENT_CANNOT_GRANT = "PW5005", Placement,
         "a declared placement must be able to grant every effect it requires";
+    VALUE_EXCEEDS_SINK_LEVEL = "PW5006", Privacy,
+        "a sink accepts only values its declared privacy level admits";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010", DeclarationRules,
         "an unsafe escape hatch must carry a complete audit record";
     // The architect proposed PW5011 for this. That number was already the
@@ -214,13 +216,6 @@ pub enum RuleStatus {
 /// milestones land; it grows only when a new specification fixture is added.
 pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     // (code, intended owner, missing analysis)
-    (
-        "PW0304",
-        "E5",
-        "privacy flow — a secret reaching a sink declared public. E2D infers \
-         the effect; what is missing is modelling `log<Public>` as a sink the \
-         label algebra must not cross into",
-    ),
     ("PW0306", "E9", "type checking — an ambient null assumption"),
     ("PW0307", "E9", "type checking — an unchecked external cast"),
     (

@@ -12,6 +12,14 @@ module capability
 // declaration, three consumers — which is the point of E2C.
 opaque type Secret<C> = String
 
+// The privacy LEVELS, as declared types. A sink's level is written as a type
+// argument in its effect row — `log<Public>` — so `Public` has to be something
+// a signature can name. A checker that recognised the string "Public" would be
+// inventing the vocabulary it then enforces.
+type Public = Public {}
+
+type Private = Private {}
+
 // The capability tags a `Secret<C>` can carry. Declared, so a privacy label
 // naming one is checkable rather than a string a checker invented.
 type Payments = Payments { name: String }

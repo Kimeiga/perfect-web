@@ -4,13 +4,15 @@
 // @charter: §7.8, §10
 // @milestone: E2C
 //
-// `log.public` writes somewhere a human will read. Its parameter is `String`,
-// not `Unknown`: a value only reaches it after something has decided it is
-// safe to show, which is what makes a secret reaching it (corpus R-006) a flow
-// violation rather than a formatting question.
+// Logging is an effect PARAMETERIZED BY PRIVACY LEVEL, which is the whole
+// mechanism: `log<Public>` names a sink whose contents may be read by anyone,
+// so a `Secret<Payments>` reaching it (corpus R-006) is a flow violation the
+// compiler can see rather than an incident someone reports later. The level
+// lives in the row and not in the function's name, so a checker reads it from
+// the signature instead of recognising `public`.
 
 module log
 
-fn public(message: String) -> () !{ log.write } { () }
+fn public(message: String) -> () !{ log<Public> } { () }
 
-fn private(message: String) -> () !{ log.write } { () }
+fn private(message: String) -> () !{ log<Private> } { () }
