@@ -539,6 +539,16 @@ impl<'a> Parser<'a> {
             let name = self.ident("a type name");
             let mut representation = None;
             let mut end = name.as_ref().map(|n| n.span.end).unwrap_or(start);
+            // Type parameters, as `type` already accepts. `opaque type
+            // Secret<C>` is what lets a capability-carrying secret be
+            // *declared* rather than invented by a checker.
+            if self.peek().kind == Kind::LAngle {
+                self.bump();
+                self.skip_to_close(Kind::LAngle, Kind::RAngle);
+                if let Some(t) = self.eat(Kind::RAngle) {
+                    end = t.span.end;
+                }
+            }
             if self.eat(Kind::Eq).is_some() {
                 representation = self.type_ref();
                 if let Some(r) = &representation {

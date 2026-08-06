@@ -467,6 +467,35 @@ impl<'a> P<'a> {
         self.finish();
     }
 
+    /// `<C>` on a declaration. Wrapped in a `TypeArgList` node rather than
+    /// skipped as a balanced range, so the formatter knows the angle brackets
+    /// delimit types and does not space them like comparisons —
+    /// `opaque type Secret<C>`, not `opaque type Secret < C >`.
+    fn type_params(&mut self) {
+        if !self.at(Kind::LAngle) {
+            return;
+        }
+        self.start(K::TypeArgList);
+        self.bump();
+        loop {
+            if self.at(Kind::RAngle) || self.at_eof() {
+                break;
+            }
+            if self.at(Kind::Ident) {
+                self.start(K::TypeRef);
+                self.name("a type parameter");
+                self.finish();
+            } else {
+                self.bump();
+            }
+            if !self.eat(Kind::Comma) {
+                break;
+            }
+        }
+        self.eat(Kind::RAngle);
+        self.finish();
+    }
+
     fn param_list(&mut self) {
         if !self.at(Kind::LParen) {
             return;
@@ -1346,6 +1375,11 @@ impl<'a> P<'a> {
             self.bump();
             self.eat_kw("type");
             self.name("a type name");
+            // Type parameters, as `type` already accepts: `opaque type
+            // Secret<C>`. Without them `Secret<Payments>` could not be
+            // *declared*, only written — so a privacy label naming a capability
+            // had to be invented by a checker instead of read from a signature.
+            self.type_params();
             if self.eat(Kind::Eq) {
                 self.type_ref();
             }

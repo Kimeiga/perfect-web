@@ -10,4 +10,10 @@ module capability
 // restriction that never leaves the origin; the placement solver reads the
 // capability family from the effect row of whatever produced it. One
 // declaration, three consumers — which is the point of E2C.
-opaque type Secret = String
+opaque type Secret<C> = String
+
+// The capability tags a `Secret<C>` can carry. Declared, so a privacy label
+// naming one is checkable rather than a string a checker invented.
+type Payments = Payments { name: String }
+
+type Signing = Signing { name: String }
