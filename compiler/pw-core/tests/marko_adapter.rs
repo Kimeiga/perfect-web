@@ -122,16 +122,27 @@ fn whitespace_between_inline_content_survives() {
 }
 
 #[test]
-fn elements_only_children_get_block_layout() {
-    // Whitespace-only text must NOT force inline layout, or a whole page ends
-    // up on one line. HTML collapses the newline back to the same space.
+fn whitespace_on_one_line_is_content_and_a_newline_is_formatting() {
+    // Marko strips whitespace between elements in a template, so block layout
+    // does NOT round-trip a space the author wrote — the page rendered
+    // "Espresso$3.50". Written from the browser failure, not from the template.
     let out = render(
         "module m\nview V() !{} {\n    <ul><li><span>a</span> <span>b</span></li></ul>\n}\n",
     );
     let (_, text) = &out.files[0];
+    assert!(
+        text.contains("<li><span>a</span> <span>b</span></li>"),
+        "a space the author wrote on one line must survive verbatim:\n{text}"
+    );
+
+    // Control: children separated by a newline are formatting, and must NOT be
+    // flattened onto one line — that would put a whole page on one line.
+    let out = render(
+        "module m\nview V() !{} {\n    <ul>\n        <li>a</li>\n        <li>b</li>\n    </ul>\n}\n",
+    );
+    let (_, text) = &out.files[0];
     assert!(text.contains("<ul>\n"), "block layout expected:\n{text}");
-    assert!(text.contains("  <li>\n"), "{text}");
-    assert!(text.contains("<span>a</span>"), "{text}");
+    assert!(text.contains("  <li>a</li>\n"), "{text}");
 }
 
 #[test]

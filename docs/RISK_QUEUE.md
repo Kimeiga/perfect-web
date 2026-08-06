@@ -220,6 +220,7 @@ for the admissibility rule above.
 | E2 grammar | `a >= b` parsed without complaint | it lexed as `>` then `=` and parsed as `a > (= b)` |
 | E2 grammar | an error on `</main>` | the real fault was two lines earlier: `expr` crossed a newline into `<` and parsed markup as a comparison |
 | E2 grammar | a statement parsed, the next one failed | a modifier loop crossed the newline and ate the next statement's first token |
+| E3 adapter | the generated template looked correct | **Marko strips whitespace between elements**, so `<span>a</span> <span>b</span>` rendered as `ab`. The template-level test asserted the template, and the template was fine — only a browser saw the DOM |
 
 The last four share one shape: **the diagnostic pointed at the line after the
 defect.** A parser that recovers silently moves the blame downstream, which is

@@ -2,3 +2,5 @@ src/routes/
 dist/
 node_modules/
 .marko-run/
+test-results/
+playwright-report/

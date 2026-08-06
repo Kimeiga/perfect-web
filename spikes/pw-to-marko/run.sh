@@ -26,6 +26,7 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
     echo "  pw emit-marko examples/{hello-static,counter}/app.pw --out spikes/pw-to-marko/src/routes/<route>"
     echo "  pnpm --filter spike-pw-to-marko build"
     echo "  node spikes/pw-to-marko/measure.mjs"
+    echo "  pnpm --filter spike-pw-to-marko exec playwright test"
     echo
 
     echo "===================== 1. GENERATE FROM .pw ========================="
@@ -56,6 +57,19 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
 
     echo "===================== 3. MEASURE ==================================="
     node measure.mjs
+    echo
+
+    echo "===================== 4. BROWSERS =================================="
+    echo "Charter §14 M3 task 11: Chromium, Firefox and WebKit must all pass."
+    echo "Run against the BUILT output, not a dev server — a dev server measures"
+    echo "Vite's behaviour rather than what a user receives."
+    echo
+    if pnpm exec playwright --version >/dev/null 2>&1; then
+        pnpm exec playwright test --reporter=list 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+    else
+        echo "SKIPPED — playwright not installed. Run:"
+        echo "  pnpm --filter spike-pw-to-marko exec playwright install chromium firefox webkit"
+    fi
 } 2>&1 | tee "$OUT"
 
 echo

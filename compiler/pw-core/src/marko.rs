@@ -180,16 +180,18 @@ fn emit_node(
                 return Ok(());
             }
 
-            // Mixed content — real text or an interpolation beside an element —
-            // is emitted INLINE with whitespace preserved, because putting text
-            // on its own line changes the element's textContent.
+            // Whitespace with a newline in it is formatting; whitespace without
+            // one is content. That is exactly the distinction the author made by
+            // writing `<span>a</span> <span>b</span>` on one line, and it decides
+            // the layout here.
             //
-            // Whitespace-*only* text does not force inline layout: block layout
-            // puts a newline between the children, and HTML collapses that to
-            // the same single space the source had. Treating it as mixed
-            // content instead would flatten a whole page onto one line.
+            // The first version assumed block layout was safe because "HTML
+            // collapses the newline back to a space". It does not: **Marko
+            // strips whitespace between elements in the template**, so the page
+            // rendered "Espresso$3.50". A template-level test could not see
+            // that — the template was fine. The browser test caught it.
             let inline = children.iter().any(|c| match body.node(*c) {
-                Node::Text(t) => !t.trim().is_empty(),
+                Node::Text(t) => !t.contains('\n'),
                 Node::Interpolation(_) => true,
                 _ => false,
             });
