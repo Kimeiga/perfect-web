@@ -1,0 +1,13 @@
+// @status: GENERAL
+// @invariant: unserializable_capture
+// @dimension: direct invalid
+module generality.resume_direct
+
+import domain.{ DatabaseConnection }
+import Database
+
+view AdminPanel(connection: DatabaseConnection) !{} {
+    <button on:press={resumable(captures = { connection }) => connection.flush()}>
+        Flush
+    </button>
+}

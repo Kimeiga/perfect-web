@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: private_in_resume_manifest
+// @dimension: indirect invalid — the same value, renamed first
+//
+// A rule reading the PARAMETER list would see `cart: Cart` and miss that what
+// is captured is `held`.
+module generality.resume_private_rebound
+
+import domain.{ Cart }
+import cart.queries
+
+view CartSummary(cart: Cart) !{} {
+    let held = cart
+    <section aria-label="Cart">
+        <button on:press={resumable(captures = { held }) => checkout(held.id)}>
+            Checkout
+        </button>
+    </section>
+}

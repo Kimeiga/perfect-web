@@ -487,7 +487,7 @@ fn generality_is_reported_separately_from_conformance() {
 
     // Recorded, and ratcheted so it cannot fall.
     assert!(
-        general.len() >= 12,
+        general.len() >= 14,
         "generality-tested regressed: {} / {}",
         general.len(),
         exercised.len()

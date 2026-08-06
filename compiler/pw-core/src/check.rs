@@ -399,7 +399,7 @@ fn check_unit_with(
     crate::affine::check(&unit.hir, sigs, &mut out);
 
     // Charter §8.5: the resume manifest ships with the document.
-    crate::resume::check(&unit.hir, manifest, &mut out);
+    crate::resume::check(&unit.hir, sigs, manifest, &mut out);
 
     // Charter §8.2: an internal link names a route the program declares.
     crate::routes::check(&unit.hir, routes, &mut out);

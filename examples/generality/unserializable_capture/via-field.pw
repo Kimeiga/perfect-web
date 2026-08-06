@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: unserializable_capture
+// @dimension: indirect invalid — the resource reached as a field
+//
+// What is captured is `session.connection`, not a bare parameter. A rule
+// reading the declaration's parameter list sees `session: AdminSession` and
+// has no reason to object.
+module generality.resume_field
+
+import domain.{ DatabaseConnection }
+import Database
+
+type AdminSession = AdminSession { connection: DatabaseConnection }
+
+view AdminPanel(session: AdminSession) !{} {
+    <button on:press={resumable(captures = { session.connection }) => flush()}>
+        Flush
+    </button>
+}

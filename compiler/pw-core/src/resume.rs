@@ -77,19 +77,26 @@ impl Manifest {
     }
 }
 
-pub fn check(hir: &Hir, manifest: &Manifest, out: &mut Vec<Diagnostic>) {
+pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
 
-        // Each parameter's written type. A capture names a binding, and the
-        // only thing that says what a binding IS here is its annotation.
-        let types: BTreeMap<&str, &str> = decl
-            .params
-            .iter()
-            .filter_map(|p| Some((p.name.as_str(), p.ty.as_deref()?)))
-            .collect();
+        // The two questions are answered by two different machines, because
+        // they are different questions and a value can pass one and fail the
+        // other:
+        //
+        //   can this value be serialized?      -> its TYPE (is it a resource)
+        //   may it cross this boundary?        -> its LABEL (is it private)
+        //
+        // Reading a capture's type from the declaration's parameter list was
+        // the narrow version: it saw `connection: DatabaseConnection` and
+        // nothing else. `Types` follows a chain and `Labels` follows a value,
+        // so a capture that is a field, a rebinding or a branch is answered
+        // the same way as a bare parameter.
+        let types = crate::infer::Types::of_body(sigs, decl, body);
+        let labels = crate::labels::Labels::of_body(sigs, decl, body);
 
         for lambda in body.walk() {
             let Expr::Lambda {
@@ -99,36 +106,68 @@ pub fn check(hir: &Hir, manifest: &Manifest, out: &mut Vec<Diagnostic>) {
             else {
                 continue;
             };
-            for (name, span) in captures(body, *d) {
-                let Some(ty) = types.get(name.as_str()) else {
+            for (name, span, expr) in captures(body, *d) {
+                // Serializability, from the type.
+                let resource = types
+                    .of(body, expr)
+                    .and_then(|t| manifest.resources.get(&t).map(|p| (t, p.clone())));
+                if let Some((ty, producer)) = resource {
+                    out.push(unserializable(decl, &name, &ty, &producer, span, &at));
                     continue;
-                };
-                if let Some(producer) = manifest.resources.get(*ty) {
-                    out.push(unserializable(decl, &name, ty, producer, span, &at));
-                } else if let Some(r) = manifest.scoped.get(*ty) {
-                    out.push(private_value(decl, &name, r, span, &at));
+                }
+                // Privacy, independently — a serializable value may still be
+                // one the manifest may not carry.
+                //
+                // Two sources, unioned. The LABEL covers a value that says so
+                // in its own type (`Secret<Payments>`) and everything the
+                // dataflow carries it through. The manifest's `scoped` map
+                // covers a type that is private because of the DECLARATION
+                // THAT PRODUCES IT — `Cart` is an ordinary record and is
+                // session-scoped because only a `session query` makes one.
+                // Neither subsumes the other, and using only the first
+                // silently stopped catching R-030.
+                let by_label = labels.label(body, expr).restrictions().next().cloned();
+                let by_producer = types
+                    .of(body, expr)
+                    .and_then(|t| manifest.scoped.get(&t).cloned());
+                if let Some(r) = by_label.or(by_producer) {
+                    out.push(private_value(decl, &name, &r, span, &at));
                 }
             }
         }
     }
 }
 
-/// The names inside `resumable(captures = { a, b })`.
-fn captures(body: &crate::hir::Body, descriptor: ExprId) -> Vec<(String, Span)> {
+/// The values inside `resumable(captures = { a, b.c })`.
+///
+/// Returns the expression as well as its name, because what is captured may be
+/// a chain — and it is the chain's type and label that decide, not the root
+/// binding's.
+fn captures(body: &crate::hir::Body, descriptor: ExprId) -> Vec<(String, Span, ExprId)> {
     let Expr::Call { callee, args } = body.expr(descriptor) else {
         return Vec::new();
     };
     if !matches!(body.expr(*callee), Expr::Name(n) if n == "resumable") {
         return Vec::new();
     }
-    args.iter()
+    let mut out = Vec::new();
+    for a in args
+        .iter()
         .filter(|a| a.name.as_deref() == Some("captures"))
-        .flat_map(|a| body.walk_from(a.value))
-        .filter_map(|e| match body.expr(e) {
-            Expr::Name(n) => Some((n.clone(), body.expr_span(e))),
-            _ => None,
-        })
-        .collect()
+    {
+        let Expr::Block { stmts } = body.expr(a.value) else {
+            continue;
+        };
+        for s in stmts {
+            let name = match body.expr(*s) {
+                Expr::Name(n) => n.clone(),
+                Expr::Field { .. } => crate::infer::path_of(body, *s),
+                _ => continue,
+            };
+            out.push((name, body.expr_span(*s), *s));
+        }
+    }
+    out
 }
 
 fn unserializable(

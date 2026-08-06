@@ -83,6 +83,28 @@ impl Signatures {
                 continue;
             };
             for (id, decl) in hir.all_decls() {
+                // A record's FIELDS are members, so a type declaration
+                // contributes to the table even though it is not callable.
+                // Without this a field access could never be typed, and a
+                // resume capture reached through one was invisible.
+                if decl.kind == DeclKind::Type
+                    && let Some(fields) = &decl.fields
+                {
+                    for f in fields {
+                        let Some(ty) = &f.ty else { continue };
+                        out.by_member.insert(
+                            (decl.name.clone(), f.name.clone()),
+                            Signature {
+                                path: format!("{}.{}", decl.name, f.name),
+                                effects: vec![],
+                                label: label_from_return(Some(ty), &[]),
+                                returns: Some(ty.clone()),
+                                returns_args: vec![],
+                                params: vec![Some(decl.name.clone())],
+                            },
+                        );
+                    }
+                }
                 if !matches!(
                     decl.kind,
                     DeclKind::Fn

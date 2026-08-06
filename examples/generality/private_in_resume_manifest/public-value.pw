@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: private_in_resume_manifest
+// @dimension: valid neighbour — a public value in the same manifest
+//
+// The identical construct with a value nothing restricts. A rule reacting to
+// `resumable(captures = ..)`, or to a record being captured, would catch this.
+module generality.resume_public_ok
+
+import domain.{ Store }
+import store.queries
+
+view StoreCard(store: Store) !{} {
+    <section aria-label="Store">
+        <button on:press={resumable(captures = { store }) => open(store.id)}>
+            Open
+        </button>
+    </section>
+}

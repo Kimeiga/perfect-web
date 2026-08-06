@@ -1,0 +1,15 @@
+// @status: GENERAL
+// @invariant: private_in_resume_manifest
+// @dimension: direct invalid — session-scoped value in the manifest
+module generality.resume_private_direct
+
+import domain.{ Cart }
+import cart.queries
+
+view CartSummary(cart: Cart) !{} {
+    <section aria-label="Cart">
+        <button on:press={resumable(captures = { cart }) => checkout(cart.id)}>
+            Checkout
+        </button>
+    </section>
+}

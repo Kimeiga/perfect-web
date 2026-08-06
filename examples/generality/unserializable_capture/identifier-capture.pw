@@ -1,0 +1,15 @@
+// @status: NEIGHBOUR
+// @invariant: unserializable_capture
+// @dimension: valid neighbour — capture the key, not the thing
+//
+// The repair the diagnostic recommends, as a program. A rule that reported
+// every `resumable(captures = ..)` would catch this.
+module generality.resume_ok
+
+import domain.{ StoreId }
+
+view Panel(store_id: StoreId) !{} {
+    <button on:press={resumable(captures = { store_id }) => refresh(store_id)}>
+        Refresh
+    </button>
+}
