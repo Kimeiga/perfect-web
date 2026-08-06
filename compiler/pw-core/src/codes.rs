@@ -32,6 +32,10 @@ pub struct Code {
     pub invariant: &'static str,
     /// Which analysis owns it. Metadata — never part of the public code.
     pub owner: Owner,
+    /// The Rust constant's own name, so a test can ask whether any checker
+    /// refers to this code — by constant or by literal — without a second
+    /// hand-maintained list.
+    pub konst: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +67,7 @@ macro_rules! codes {
                 id: $id,
                 invariant: $invariant,
                 owner: Owner::$owner,
+                konst: stringify!($konst),
             };
         )*
 
@@ -110,8 +115,7 @@ codes! {
         "a command that retries must be idempotent";
     RETRY_UNBOUNDED = "PW0313", DeclarationRules,
         "a retry policy must be bounded";
-    RESOURCE_NO_RELEASE = "PW0323", DeclarationRules,
-        "a resource must declare how it is released";
+
     STALE_KEY_POLICY = "PW0325", DeclarationRules,
         "a keyed query must say what happens when its key changes";
     OPTIMISTIC_NO_ROLLBACK = "PW0327", DeclarationRules,
@@ -156,6 +160,12 @@ codes! {
         "a secret cannot be rendered to the browser";
     CACHE_KEY_OMITS_PARTITION = "PW5004", Privacy,
         "a shared cache key must carry every partition its value depends on";
+    // Distinct from PW5002 on purpose. PW5002 is the solver finding NO world
+    // that can run a declaration; this is a world the author NAMED that cannot
+    // grant what the declaration needs. A body that would run fine in the
+    // browser, pinned to the origin, is wrong without being unplaceable.
+    DECLARED_PLACEMENT_CANNOT_GRANT = "PW5005", Placement,
+        "a declared placement must be able to grant every effect it requires";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010", DeclarationRules,
         "an unsafe escape hatch must carry a complete audit record";
     // The architect proposed PW5011 for this. That number was already the
@@ -206,8 +216,10 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     // (code, intended owner, missing analysis)
     (
         "PW0304",
-        "E2D",
-        "effect inference — a secret reaching a public log",
+        "E5",
+        "privacy flow — a secret reaching a sink declared public. E2D infers \
+         the effect; what is missing is modelling `log<Public>` as a sink the \
+         label algebra must not cross into",
     ),
     ("PW0306", "E9", "type checking — an ambient null assumption"),
     ("PW0307", "E9", "type checking — an unchecked external cast"),
@@ -243,28 +255,8 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     ),
     (
         "PW0328",
-        "E5",
-        "placement — a browser-only API on the origin",
-    ),
-    (
-        "PW3001",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
-        "PW3002",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
-        "PW3004",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
-    ),
-    (
-        "PW3008",
-        "E2D",
-        "effect inference — the layout and frame-phase family",
+        "E7",
+        "resumption manifest — private data crossing into the public shell",
     ),
     (
         "PW3011",
@@ -418,6 +410,16 @@ mod tests {
                 lookup(code).is_none(),
                 "{code} is registered AND listed as a gap"
             );
+            // A gap the alias table already redirects is unreachable: nothing
+            // can ever resolve to it, so it is a work item that will never be
+            // picked up and a number that reads as unowned when it is not.
+            assert_eq!(
+                crate::diagnostics::canonical_code(code),
+                *code,
+                "{code} is listed as a gap but aliased to \
+                 {} — the gap entry is dead",
+                crate::diagnostics::canonical_code(code)
+            );
             assert!(
                 owner.starts_with('E') || owner.starts_with('P'),
                 "{code}'s owner {owner:?} is not a milestone"
@@ -427,6 +429,57 @@ mod tests {
                 "{code}'s missing analysis is not described: {analysis:?}"
             );
         }
+    }
+
+    /// A registered code must be a code some checker can actually emit.
+    ///
+    /// `PW0323` was registered as `RESOURCE_NO_RELEASE` — "a resource must
+    /// declare how it is released" — while the only thing that ever emitted
+    /// `PW0323` was the placement rule, and the corpus fixture declaring it
+    /// (R-025) is about placement too. Nothing enforced resource-release, so
+    /// the registry asserted an invariant the compiler did not have, on a
+    /// number that already meant something else. Had the placement rule and
+    /// the fixture met, the ratchet would have counted a correct catch under a
+    /// description of a different rule.
+    #[test]
+    fn every_registered_code_is_one_a_checker_can_emit() {
+        // The whole compiler: `pw-syntax` emits the PW00xx codes, `pw-core`
+        // the rest. Scanning one crate would call the other's codes dead.
+        let compiler = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .canonicalize()
+            .expect("compiler/");
+        let mut sources = String::new();
+        let mut stack = vec![compiler];
+        while let Some(dir) = stack.pop() {
+            for e in std::fs::read_dir(&dir).expect("src") {
+                let p = e.expect("entry").path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if p.file_name().is_some_and(|n| n == "codes.rs") {
+                    continue;
+                }
+                if p.extension().is_some_and(|x| x == "rs") {
+                    sources.push_str(&std::fs::read_to_string(&p).expect("read"));
+                }
+            }
+        }
+        let mut dead = Vec::new();
+        for c in ALL {
+            // Either by constant (`codes::UNDECLARED_EFFECT.id`) or by the
+            // literal, which `rules.rs` still uses.
+            if !sources.contains(c.id) && !sources.contains(c.konst) {
+                dead.push(format!("{} ({})", c.id, c.invariant));
+            }
+        }
+        assert!(
+            dead.is_empty(),
+            "registered but unreachable — the registry claims an invariant \
+             nothing enforces:\n  {}",
+            dead.join("\n  ")
+        );
     }
 
     #[test]

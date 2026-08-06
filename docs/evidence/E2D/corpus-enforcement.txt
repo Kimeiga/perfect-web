@@ -51,7 +51,7 @@ R-023  UNCAUGHT                  PW0321
        dead internal route
 R-024  UNCAUGHT                  PW0322
        raw unsafe HTML without capability
-R-025  UNCAUGHT                  PW0323
+R-025  UNCAUGHT                  PW5005 (declared PW0323)
        browser-only API on origin
 R-026  enforced                  PW5002 (declared PW0324)
        server secret referenced by edge artifact

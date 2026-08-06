@@ -100,8 +100,8 @@ fn check_effects_against_placement(
         if let Some((why, help)) = placement_conflict(target, &e.name) {
             out.push(
                 err(
-                    "PW0323",
-                    "a placement must be able to grant every effect it requires",
+                    crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.id,
+                    crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.invariant,
                     format!(
                         "effect `{}` is not available at placement `{target}`",
                         e.name
@@ -454,7 +454,7 @@ mod tests {
     fn an_effect_the_placement_cannot_grant_is_rejected() {
         let src = "module e\nview Receipt(o: OrderId) !{ secret<Payments> }\n    placement edge\n{\n    0\n}\n";
         let f = findings(src);
-        let e = f.iter().find(|f| f.code == "PW0323").expect("PW0323");
+        let e = f.iter().find(|f| f.code == "PW5005").expect("PW0323");
         assert!(e.message.contains("secret"), "{}", e.message);
         assert!(
             !e.related.is_empty(),
@@ -471,7 +471,7 @@ mod tests {
     #[test]
     fn a_browser_only_effect_at_origin_is_rejected() {
         let src = "module d\nview Estimate(s: SessionId) !{ device.location }\n    placement origin\n{\n    0\n}\n";
-        assert!(codes(src).contains(&"PW0323"));
+        assert!(codes(src).contains(&"PW5005"));
     }
 
     #[test]

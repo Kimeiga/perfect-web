@@ -169,6 +169,8 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // gets one code, not one per instance.
     ("PW0301", "PW5002"),
     ("PW0324", "PW5002"),
+    // The corpus's number for "the placement you named cannot grant this".
+    ("PW0323", "PW5005"),
     ("PW0302", "PW5003"), // a secret cannot be rendered to the browser
     ("PW0303", "PW5004"), // a shared cache key must carry every partition
     // R-004 declares PW0100, which `rules.rs` also uses for this invariant —
