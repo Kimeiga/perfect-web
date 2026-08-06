@@ -249,6 +249,142 @@ fn arbitrary_source_bytes_do_not_panic_the_compiler() {
 /// `a | b | c` lowers right-nested, so the interesting parameter is the NUMBER
 /// of alternatives — one and two both work with a non-recursive expansion, and
 /// three is the first that nests.
+/// Boundary: **resolution → typing**.
+///
+/// A name that does not resolve must not be able to masquerade as a valid
+/// constructor or member downstream, and two candidates must produce ambiguity
+/// rather than a choice. The by-name member fallback was removed for exactly
+/// this reason; these are the shapes that would tempt it back.
+#[test]
+fn unresolved_and_ambiguous_names_do_not_panic_the_compiler() {
+    let mut failures = Vec::new();
+    for (label, src) in [
+        (
+            "unresolved module",
+            "module m\n\nimport nowhere\n\nfn f() -> Int !{} { g() }\n",
+        ),
+        (
+            "unresolved member",
+            "module m\n\nfn f(x: Int) -> Int !{} { x.nothing() }\n",
+        ),
+        (
+            "member on an unresolved type",
+            "module m\n\nfn f(x: Missing) -> Int !{} { x.anything() }\n",
+        ),
+        (
+            "duplicate declarations",
+            "module m\n\nfn f() -> Int !{} { 0 }\nfn f() -> Int !{} { 1 }\n",
+        ),
+        (
+            "a constructor that is not one",
+            "module m\n\ntype S = | A\n\nfn f(s: S) -> Int !{} { match s { NotAVariant => 0 } }\n",
+        ),
+        (
+            "a module used as a value",
+            "module m\n\nimport domain\n\nfn f() -> Int !{} { domain }\n",
+        ),
+    ] {
+        if let Err(msg) = survives("resolve.pw", src) {
+            failures.push(format!("{label}: {msg}"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n  "));
+}
+
+/// Boundary: **HIR → effects and labels**.
+///
+/// A label must survive every construct that carries a value, and a construct
+/// the dataflow has not seen before must not crash it. Recursion is the
+/// interesting case — a label lattice that iterated without a bound would hang
+/// rather than panic, which is worse.
+#[test]
+fn label_and_effect_dataflow_does_not_panic_or_hang() {
+    let mut failures = Vec::new();
+    for (label, src) in [
+        (
+            "self-referential binding",
+            "module m\n\nfn f() -> Int !{} { let a = a\n a }\n",
+        ),
+        (
+            "mutually referential bindings",
+            "module m\n\nfn f() -> Int !{} { let a = b\n let b = a\n a }\n",
+        ),
+        (
+            "deeply nested branches",
+            "module m\n\nfn f(c: Bool) -> Int !{} { if c { if c { if c { if c { 1 } else { 2 } } else { 3 } } else { 4 } } else { 5 } }\n",
+        ),
+        (
+            "a hole inside a hole",
+            "module m\n\nfn f() -> String !{} { \"{ \\\"{x}\\\" }\" }\n",
+        ),
+        (
+            "an empty capture list",
+            "module m\n\nview V() !{} { <button on:press={resumable(captures = { }) => f()}>x</button> }\n",
+        ),
+        (
+            "a record built from itself",
+            "module m\n\ntype R = R { v: Int }\n\nfn f() -> R !{} { let r = R { v: r }\n r }\n",
+        ),
+    ] {
+        if let Err(msg) = survives("dataflow.pw", src) {
+            failures.push(format!("{label}: {msg}"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n  "));
+}
+
+/// Boundary: **parser → HIR**.
+///
+/// One semantic construct must not silently become two statements. That is not
+/// a crash — it is worse, because it produces a plausible tree that means
+/// something else, and it is what made every page declaring a query dependency
+/// look like a page reaching the database.
+#[test]
+fn one_construct_does_not_lower_as_two_statements() {
+    use pw_core::hir::Expr;
+    use pw_core::lower::lower_file;
+    use pw_syntax::parse_tree;
+
+    // `let x = <keyword> Y(z)` must produce a Let whose init IS the construct.
+    for (label, src, keyword) in [
+        (
+            "query",
+            "module m\n\npage P() {\n    let c = query Cart(s)\n    view { <main /> }\n}\n",
+            "query",
+        ),
+        (
+            "command",
+            "module m\n\npage P() {\n    let c = command Clear(s)\n    view { <main /> }\n}\n",
+            "command",
+        ),
+    ] {
+        let hir = lower_file(src, &parse_tree(src).green);
+        let (_, decl) = hir.all_decls().next().expect("a declaration");
+        let body = hir.body(decl.body.expect("body"));
+        let Expr::Block { stmts } = body.expr(body.root) else {
+            panic!("{label}: no block");
+        };
+        let init_is_the_construct = stmts.iter().any(|s| {
+            let Expr::Let { init: Some(i), .. } = body.expr(*s) else {
+                return false;
+            };
+            matches!(body.expr(*i), Expr::Keyword { keyword: k, .. } if k == keyword)
+        });
+        assert!(
+            init_is_the_construct,
+            "{label}: `let x = {keyword} Y(z)` did not lower as one expression — the \
+             call became a sibling statement, so its effects are attributed to the \
+             enclosing body"
+        );
+        // And no bare `Call` sibling left behind.
+        let stray = stmts
+            .iter()
+            .filter(|s| matches!(body.expr(**s), Expr::Call { .. }))
+            .count();
+        assert_eq!(stray, 0, "{label}: a stray call statement remains");
+    }
+}
+
 #[test]
 fn or_patterns_of_any_length_do_not_panic_the_compiler() {
     let domain = "module domain\n\n\

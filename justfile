@@ -95,7 +95,13 @@ platform:
 # terminate without a report. A panic takes every other rule down with it, so a
 # compiler that reports nothing looks like one that found nothing.
 robustness:
-    @cargo test --quiet -p pw-core --test robustness 2>&1 | tail -4
+    @cargo test --quiet -p pw-core --test robustness 2>&1 | tail -3
+    @echo "  generator families: corpus, corpus-mutation, byte-soup,"
+    @echo "                      constructor-arity, or-pattern, resolution,"
+    @echo "                      label-dataflow, parser-to-HIR contract"
+    @echo "  '0 panics' means 0 under THESE. No coverage-guided fuzzer has run,"
+    @echo "  and the arity panic proves broad generation is not a substitute"
+    @echo "  for a generator aimed at a known-fragile seam."
 
 # The SECOND score. Corpus conformance says today's specification passes;
 # generality says the same guarantees survive programs the fixtures did not
