@@ -42,11 +42,45 @@ deduplicated — the order two references were discovered in is not behavioural,
 and hashing it would make an unrelated edit reject every resume in the
 application), `SchemaHash`, and `PlatformAbi`.
 
-Version one hashes normalized implementation text, which is conservative: a
-formatting-only change rejects a resume that would have been safe. That is the
-correct trade — it never accepts behaviourally changed code, and the reverse
-mistake is the one that hands last week's captures to code that reads them
-differently. Typed-IR canonicalization replaces it later.
+## The implementation hash is versioned
+
+```text
+1  normalized source text                        SUPERSEDED
+2  semantic tokens + resolved reference identities
+3  canonical typed IR                            not implemented
+```
+
+Scheme 1 was correct while E7V was an isolated decision model — it never
+accepts behaviourally changed code — and became a product defect the moment
+real tabs would depend on resuming, because a formatter run invalidates every
+one of them.
+
+**Scheme 2** hashes token kinds, identifier spellings, operators, literal
+values, control-flow syntax and statement order, plus the **resolved identity**
+of every reference. Whitespace, indentation, comments and source offsets do not
+participate. Spans were the other candidate and are worse: one comment near the
+top of a file shifts every span below it while changing no behaviour.
+
+Resolved identities are included because `foo()` can name a different
+declaration after an import change with identical tokens. E2B's module graph is
+what makes that answerable — the same infrastructure that removed by-name
+lookups.
+
+Still invalidating, deliberately: local renames, an `if` rewritten as an
+equivalent `match`, two reordered independent pure expressions. Those are false
+rejections and they are tolerable. Proving them equivalent is an optimizer, and
+an optimizer inside an identity system is a worse hazard than an occasional
+reload.
+
+**The scheme is carried in the manifest**, because a digest cannot say what
+made it and manifests outlive deployments. A manifest from another scheme is
+refused as `UnsupportedHashScheme` — *incomparable*, not different — and the
+check runs before everything it governs, because an ABI comparison under an
+unknown scheme is meaningless.
+
+`the_scheme_2_identity_matrix_holds` is its falsifiable contract: four changes
+that must not alter identity, four that must. Without it, "normalized" is a
+word rather than a specification.
 
 **Code identity and capture-schema identity are separate.** Two handlers can
 compile to identical behaviour while taking different captures; one handler can

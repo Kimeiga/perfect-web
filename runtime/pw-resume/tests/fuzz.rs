@@ -91,6 +91,15 @@ fn scopes() -> Vec<PrivacyScope> {
     ]
 }
 
+fn impl_hash(body: &str) -> ImplementationHash {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in body.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    ImplementationHash::new(CURRENT_SCHEME, &format!("{h:016x}"))
+}
+
 fn deps(n: usize) -> DependencySet {
     let names = [
         "Stores.get",
@@ -110,12 +119,7 @@ fn handlers() -> Vec<(HandlerId, SchemaHash)> {
     for (i, body) in ["a", "b", "charge(); notify()"].iter().enumerate() {
         for s in schemas() {
             out.push((
-                HandlerId::derive(
-                    &ImplementationHash::of(body),
-                    &deps(i + 1),
-                    &s,
-                    &PlatformAbi(1),
-                ),
+                HandlerId::derive(&impl_hash(body), &deps(i + 1), &s, &PlatformAbi(1)),
                 s,
             ));
         }
@@ -251,6 +255,7 @@ fn fuzz_manifest_shapes() {
     run("manifest shapes", 3000, |rng| {
         let (h, _) = rng.pick(&hs).clone();
         let entry = ResumeEntry {
+            hash_scheme: CURRENT_SCHEME,
             platform_abi: rng.pick(&ab).clone(),
             application_build: BuildId(format!("B{}", rng.below(3))),
             handler: h,
@@ -292,6 +297,7 @@ fn fuzz_compatibility_decisions() {
             vec![(h.clone(), hs_schema)]
         };
         let entry = ResumeEntry {
+            hash_scheme: CURRENT_SCHEME,
             platform_abi: rng.pick(&ab).clone(),
             application_build: BuildId(format!("B{}", rng.below(3))),
             handler: h,
@@ -357,6 +363,7 @@ fn fuzz_migration_selection() {
             .any(|m| m.from == have && m.to == want && (m.apply)(&[1]).is_ok());
 
         let entry = ResumeEntry {
+            hash_scheme: CURRENT_SCHEME,
             platform_abi: PlatformAbi(1),
             application_build: BuildId("B1".into()),
             handler: h.clone(),
@@ -399,6 +406,7 @@ fn fuzz_recovery_planning() {
     run("recovery planning", 4000, |rng| {
         let (h, _) = rng.pick(&hs).clone();
         let entry = ResumeEntry {
+            hash_scheme: CURRENT_SCHEME,
             platform_abi: PlatformAbi(1),
             application_build: BuildId("B1".into()),
             handler: h,
@@ -485,6 +493,7 @@ fn fuzz_the_attachment_path() {
             });
         }
         let entry = ResumeEntry {
+            hash_scheme: CURRENT_SCHEME,
             platform_abi: rng.pick(&ab).clone(),
             application_build: BuildId("B1".into()),
             handler: h.clone(),

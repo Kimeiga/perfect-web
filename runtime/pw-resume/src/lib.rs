@@ -118,24 +118,68 @@ impl DependencySet {
     }
 }
 
+/// Which algorithm produced an [`ImplementationHash`].
+///
+/// Manifests outlive deployments, so a manifest written under one scheme will
+/// meet a runtime using another. Two digests of the same length from different
+/// algorithms are not comparable, and comparing them anyway is how a
+/// coincidence becomes an attachment.
+///
+/// ```text
+/// 1  normalized source text        superseded
+/// 2  semantic tokens + resolved reference identities
+/// 3  canonical typed IR            not implemented
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HashScheme(pub u16);
+
+/// The scheme this build produces and understands.
+pub const CURRENT_SCHEME: HashScheme = HashScheme(2);
+
 /// What the handler's body does, in order.
 ///
-/// **Order-sensitive** wherever order changes behaviour. Version one hashes the
-/// normalized text, which is conservative: a formatting-only change rejects a
-/// resume that would in fact have been safe. That is the correct trade — it
-/// never accepts behaviourally changed code, and the reverse mistake is the one
-/// that hands last week's captures to code that reads them differently.
+/// **Order-sensitive** wherever order changes behaviour, and carrying the
+/// scheme that produced it.
 ///
-/// When typed-IR canonicalization is stable this should derive from that
-/// instead, preserving operation order, control flow, constants, captures,
-/// referenced identities and effectful sequencing — at which point formatting
-/// and comments can be ignored without weakening identity.
+/// Scheme 1 hashed normalized source text. That was the correct trade while
+/// E7V was an isolated decision model — it never accepts behaviourally changed
+/// code — but it invalidates every open tab when a formatter runs, which is a
+/// product defect the moment real tabs depend on resuming. Scheme 2 hashes
+/// semantic tokens plus resolved reference identities: whitespace, indentation,
+/// comments and source offsets do not participate; token kinds, identifier
+/// spellings, operators, literal values, control-flow syntax and statement
+/// order do.
+///
+/// Deliberately still invalidating on local renames, `if` versus an equivalent
+/// `match`, and reordered independent pure expressions. Proving those
+/// equivalent is an optimizer, and an optimizer inside an identity system is a
+/// worse hazard than an occasional reload. Scheme 3 (canonical typed IR) is
+/// where that becomes safe.
+///
+/// The digest is produced by the compiler, not here — this crate never sees
+/// source. See `pw-core::resume_artifacts`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ImplementationHash(Hash);
+pub struct ImplementationHash {
+    pub scheme: HashScheme,
+    digest: Hash,
+}
 
 impl ImplementationHash {
-    pub fn of(normalized_body: &str) -> ImplementationHash {
-        ImplementationHash(Hash::of(normalized_body))
+    /// A digest the compiler produced under a named scheme.
+    pub fn new(scheme: HashScheme, digest: &str) -> ImplementationHash {
+        ImplementationHash {
+            scheme,
+            digest: Hash(digest.to_string()),
+        }
+    }
+
+    /// Are these two comparable at all?
+    ///
+    /// Not the same as equal. Two hashes from different schemes are neither
+    /// equal nor unequal — the question does not have an answer, and the
+    /// caller must fail closed rather than pick one.
+    pub fn comparable_with(&self, other: &ImplementationHash) -> bool {
+        self.scheme == other.scheme
     }
 }
 
@@ -153,8 +197,8 @@ impl HandlerId {
         abi: &PlatformAbi,
     ) -> HandlerId {
         HandlerId(Hash::of(&format!(
-            "{}\u{1}{}\u{1}{}\u{1}{}",
-            implementation.0, dependencies.0, capture_schema.0, abi.0
+            "{}:{}\u{1}{}\u{1}{}\u{1}{}",
+            implementation.scheme.0, implementation.digest, dependencies.0, capture_schema.0, abi.0
         )))
     }
 }
@@ -235,6 +279,9 @@ impl PrivacyScope {
 /// One resumable unit, as it appears in the document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResumeEntry {
+    /// Which algorithm produced the identities in this manifest. Carried
+    /// separately from the digests, because a digest cannot say what made it.
+    pub hash_scheme: HashScheme,
     pub platform_abi: PlatformAbi,
     pub application_build: BuildId,
     pub handler: HandlerId,
@@ -280,6 +327,10 @@ pub struct Runtime {
 /// Why a manifest was refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Refusal {
+    /// The manifest's identities were produced by an algorithm this build does
+    /// not implement. NOT "the hashes differ" — they are incomparable, and
+    /// comparing them anyway is how a coincidence becomes an attachment.
+    UnsupportedHashScheme(HashScheme),
     UnsupportedAbi(PlatformAbi),
     UnknownHandler(HandlerId),
     CaptureSchemaMismatch {
@@ -306,6 +357,12 @@ pub enum Refusal {
 impl fmt::Display for Refusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Refusal::UnsupportedHashScheme(scheme) => write!(
+                f,
+                "the manifest's identities came from hash scheme {}, which this \
+                 build does not implement — they are incomparable, not different",
+                scheme.0
+            ),
             Refusal::UnsupportedAbi(a) => {
                 write!(f, "the manifest's platform ABI {} is not supported", a.0)
             }
@@ -474,7 +531,20 @@ pub fn decide(entry: &ResumeEntry, rt: &Runtime, construct: Construct) -> Decisi
         );
     }
 
-    // 1. ABI. An unsupported ABI means nothing below can even be interpreted.
+    // 1. The hash scheme, before the ABI, because it governs whether any
+    //    identity below can be compared at all. A V1 manifest meeting a V2
+    //    runtime is not "a different handler" — it is a question with no
+    //    answer, and it fails closed through the ordinary recovery path.
+    if entry.hash_scheme != CURRENT_SCHEME {
+        trace.push(format!(
+            "manifest hash scheme {} != this build's {}",
+            entry.hash_scheme.0, CURRENT_SCHEME.0
+        ));
+        return refuse(Refusal::UnsupportedHashScheme(entry.hash_scheme), trace);
+    }
+    trace.push(format!("hash scheme {} understood", entry.hash_scheme.0));
+
+    // 2. ABI. An unsupported ABI means nothing below can even be interpreted.
     if !rt.abi.contains(&entry.platform_abi) {
         trace.push(format!("abi {} not in {:?}", entry.platform_abi.0, rt.abi));
         return refuse(Refusal::UnsupportedAbi(entry.platform_abi.clone()), trace);
@@ -548,6 +618,26 @@ pub fn decide(entry: &ResumeEntry, rt: &Runtime, construct: Construct) -> Decisi
 }
 
 /// Proof that [`decide`] said yes.
+///
+/// # Nothing outside this module can construct one
+///
+/// The private field is the enforcement, and this doctest is the proof. It is
+/// compiled by `cargo test` and must FAIL to compile:
+///
+/// ```compile_fail
+/// use pw_resume::*;
+/// // No literal, because `_private` is not visible here.
+/// let forged = Authorised {
+///     handler: HandlerId(unimplemented!()),
+///     captures: vec![],
+///     _private: (),
+/// };
+/// ```
+///
+/// A grep for `attach(` would be a brittle duplicate of a property the type
+/// system already enforces. If somebody later builds a second attachment
+/// subsystem entirely, that is an architectural review problem and a grep
+/// would not have caught it either.
 ///
 /// The only way to obtain one is [`decide`], and the only thing that accepts
 /// one is [`attach`]. That is the whole design: a caller cannot attach a

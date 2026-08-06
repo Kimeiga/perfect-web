@@ -31,6 +31,16 @@ fn schema_v2() -> SchemaHash {
     SchemaHash::of_fields(&[("store_id", "StoreId"), ("locale", "String")])
 }
 
+/// A digest as the compiler would produce it. The runtime never hashes source.
+fn impl_hash(body: &str) -> ImplementationHash {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in body.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    ImplementationHash::new(CURRENT_SCHEME, &format!("{h:016x}"))
+}
+
 fn deps(names: &[&str]) -> DependencySet {
     let refs: Vec<[&str; 5]> = names
         .iter()
@@ -41,7 +51,7 @@ fn deps(names: &[&str]) -> DependencySet {
 
 fn handler(implementation: &str, schema: &SchemaHash) -> HandlerId {
     HandlerId::derive(
-        &ImplementationHash::of(implementation),
+        &impl_hash(implementation),
         &deps(&["Stores.get"]),
         schema,
         &ABI,
@@ -50,6 +60,7 @@ fn handler(implementation: &str, schema: &SchemaHash) -> HandlerId {
 
 fn entry(h: &HandlerId, schema: &SchemaHash, build: &str, scope: PrivacyScope) -> ResumeEntry {
     ResumeEntry {
+        hash_scheme: CURRENT_SCHEME,
         platform_abi: ABI,
         application_build: BuildId(build.into()),
         handler: h.clone(),
@@ -407,15 +418,15 @@ fn statement_order_is_a_behavioural_difference() {
     // The other half, and the reason the two hashes are separate types.
     // `charge(); send_receipt()` is not `send_receipt(); charge()`.
     assert_ne!(
-        ImplementationHash::of("charge(); send_receipt()"),
-        ImplementationHash::of("send_receipt(); charge()")
+        impl_hash("charge(); send_receipt()"),
+        impl_hash("send_receipt(); charge()")
     );
 }
 
 #[test]
 fn a_dependency_set_difference_changes_identity() {
     let s = schema_v1();
-    let body = ImplementationHash::of("same body");
+    let body = impl_hash("same body");
     assert_ne!(
         HandlerId::derive(&body, &deps(&["Stores.get"]), &s, &ABI),
         HandlerId::derive(&body, &deps(&["Stores.get", "Carts.add"]), &s, &ABI),
@@ -697,4 +708,79 @@ fn a_migration_authorises_what_it_produced_and_not_the_original() {
         &e.captures[..],
         "the ORIGINAL bytes must not reach the handler"
     );
+}
+
+// --- hash-scheme versioning --------------------------------------------------
+
+/// A manifest from an older scheme is incomparable, not different.
+///
+/// This is the row that matters once manifests outlive deployments. Two
+/// digests of the same length produced by different algorithms carry no
+/// relation to each other, and comparing them anyway is how a coincidence
+/// becomes an attachment. It fails closed through the ordinary recovery path.
+#[test]
+fn a_manifest_from_an_older_hash_scheme_is_refused() {
+    let s = schema_v1();
+    let h = handler("render", &s);
+    let mut e = entry(&h, &s, "B1", PrivacyScope::Public);
+    e.hash_scheme = HashScheme(1);
+    let d = decide(
+        &e,
+        &runtime(&[(&h, &s)], PrivacyScope::Public),
+        Construct::PublicRegion,
+    );
+    assert_refused(
+        &d,
+        Refusal::UnsupportedHashScheme(HashScheme(1)),
+        Recovery::RefetchRegion,
+    );
+}
+
+/// And a future one, which a deployed old runtime will meet.
+#[test]
+fn a_manifest_from_a_newer_hash_scheme_is_refused() {
+    let s = schema_v1();
+    let h = handler("render", &s);
+    let mut e = entry(&h, &s, "B1", PrivacyScope::Public);
+    e.hash_scheme = HashScheme(99);
+    assert!(
+        !decide(
+            &e,
+            &runtime(&[(&h, &s)], PrivacyScope::Public),
+            Construct::PublicRegion
+        )
+        .attaches()
+    );
+}
+
+/// The scheme is checked BEFORE the ABI, because it governs whether any
+/// identity below can be compared at all.
+#[test]
+fn the_hash_scheme_is_checked_before_anything_it_governs() {
+    let s = schema_v1();
+    let h = handler("render", &s);
+    let mut e = entry(&h, &s, "B1", PrivacyScope::Public);
+    e.hash_scheme = HashScheme(1);
+    e.platform_abi = PlatformAbi(99); // also wrong
+    match decide(
+        &e,
+        &runtime(&[(&h, &s)], PrivacyScope::Public),
+        Construct::PublicRegion,
+    ) {
+        Decision::Refuse { why, .. } => assert_eq!(
+            why,
+            Refusal::UnsupportedHashScheme(HashScheme(1)),
+            "the scheme must be reported first — an ABI comparison under an \
+             unknown scheme is meaningless"
+        ),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn hashes_from_different_schemes_are_not_comparable() {
+    let a = ImplementationHash::new(HashScheme(1), "abc");
+    let b = ImplementationHash::new(HashScheme(2), "abc");
+    assert!(!a.comparable_with(&b), "same digest, different algorithm");
+    assert_ne!(a, b);
 }

@@ -82,6 +82,7 @@ pub const BUILD: &str = "dev";
 /// Derive the manifest from the **attribute**: the capture list as written, and
 /// the markup node it is attached to.
 fn manifest_of(
+    src: &str,
     body: &crate::hir::Body,
     types: &Types<'_>,
     lambda: ExprId,
@@ -95,7 +96,7 @@ fn manifest_of(
     }
     let capture_schema = schema_of(&captures);
     Some(ResumeManifest {
-        handler: handler_id(body, lambda, &capture_schema),
+        handler: handler_id(src, body, types, lambda, &capture_schema),
         capture_schema,
         document_schema: document_schema.to_string(),
         platform_abi: PLATFORM_ABI,
@@ -110,6 +111,7 @@ fn manifest_of(
 /// names the body actually mentions, so a capture the attribute declares and
 /// the body never reads — or the reverse — makes the two disagree.
 fn artifact_of(
+    src: &str,
     body: &crate::hir::Body,
     types: &Types<'_>,
     lambda: ExprId,
@@ -148,7 +150,7 @@ fn artifact_of(
 
     let accepted_capture_schema = schema_of(&accepted);
     Some(HandlerArtifact {
-        handler: handler_id(body, lambda, &schema_of(&declared)),
+        handler: handler_id(src, body, types, lambda, &schema_of(&declared)),
         accepted_capture_schema,
         expected_document_schema: document_schema.to_string(),
         required_platform_abi: PLATFORM_ABI,
@@ -164,23 +166,108 @@ fn schema_of(captures: &[(String, Option<String>)]) -> String {
     hash(&text.join(","))
 }
 
+/// Which algorithm produced an implementation hash.
+///
+/// ```text
+/// 1  normalized source text        SUPERSEDED
+/// 2  semantic tokens + resolved reference identities
+/// 3  canonical typed IR            not implemented
+/// ```
+///
+/// Carried in the manifest, because a digest cannot say what made it and
+/// manifests outlive deployments.
+pub const HASH_SCHEME: u16 = 2;
+
+/// The handler's implementation identity — scheme 2.
+///
+/// # What participates
+///
+/// Token kinds, identifier spellings, operators, literal values, control-flow
+/// syntax, and statement order. Plus the **resolved identity** of every
+/// reference, because `foo()` can mean a different declaration after an import
+/// change with identical tokens — E2B's module graph is what makes that
+/// answerable.
+///
+/// # What does not
+///
+/// Whitespace, indentation, comments, and source offsets. Scheme 1 hashed
+/// source text, so a formatter run invalidated every open tab on every deploy.
+/// Spans were the other candidate and are worse: one comment near the top of a
+/// file shifts every span below it while changing no behaviour.
+///
+/// # What still invalidates, deliberately
+///
+/// A local rename, an `if` rewritten as an equivalent `match`, two reordered
+/// independent pure expressions. Those are false rejections and they are
+/// tolerable. Proving them equivalent is an optimizer, and an optimizer inside
+/// an identity system is a worse hazard than an occasional reload — scheme 3 is
+/// where that becomes safe.
+fn implementation_hash(src: &str, span: &Span, resolved: &[String]) -> String {
+    let tokens = pw_syntax::lexer::lex(src);
+    let mut stream = String::new();
+    for t in tokens {
+        // Offsets never participate; only whether a token is inside the body.
+        if t.span.start < span.start || t.span.end > span.end {
+            continue;
+        }
+        if t.kind.is_trivia() {
+            continue;
+        }
+        // Kind AND spelling: `1_000` and `1000` are different literals until a
+        // typed IR says otherwise, and two identifiers that differ are two
+        // different names.
+        stream.push_str(&format!("{:?}:{}\u{2}", t.kind, t.text(src)));
+    }
+    // Resolved identities, in the order they appear — a reference's MEANING is
+    // part of what the body does, and identical tokens can resolve elsewhere.
+    hash(&format!(
+        "v{HASH_SCHEME}\u{1}{stream}\u{1}{}",
+        resolved.join("\u{2}")
+    ))
+}
+
 /// The handler's content identity, matching the runtime's derivation shape:
 /// implementation, dependency set (sorted, deduplicated), capture schema, ABI.
-fn handler_id(body: &crate::hir::Body, lambda: ExprId, capture_schema: &str) -> String {
+fn handler_id(
+    src: &str,
+    body: &crate::hir::Body,
+    types: &Types<'_>,
+    lambda: ExprId,
+    capture_schema: &str,
+) -> String {
     let Expr::Lambda { body: inner, .. } = body.expr(lambda) else {
         return hash("<not a lambda>");
     };
     let span = body.expr_span(*inner);
-    let implementation = hash(&format!("{}..{}", span.start, span.end));
 
-    let mut deps: Vec<String> = body
+    // Every reference, with what it resolved to. `foo()` with identical tokens
+    // may name a different declaration after an import change, and the
+    // implementation hash must see that.
+    let resolved: Vec<String> = body
         .walk_from(*inner)
         .into_iter()
         .filter_map(|e| match body.expr(e) {
-            Expr::Call { callee, .. } => Some(crate::infer::path_of(body, *callee)),
+            Expr::Call { callee, .. } => {
+                let path = crate::infer::path_of(body, *callee);
+                let target = types
+                    .callee(body, *callee)
+                    .map(|s| s.path.clone())
+                    .unwrap_or_else(|| "<unresolved>".to_string());
+                Some(format!("{path}->{target}"))
+            }
             _ => None,
         })
-        .filter(|p| !p.is_empty())
+        .collect();
+
+    let implementation = implementation_hash(src, &span, &resolved);
+
+    // The dependency SET: order-insensitive and deduplicated, because the order
+    // two references were discovered in is not behavioural. Separate from the
+    // implementation hash, which is order-sensitive — one answers what this
+    // depends on, the other whether it still means the same executable thing.
+    let mut deps: Vec<String> = resolved
+        .iter()
+        .map(|r| r.split("->").last().unwrap_or(r).to_string())
         .collect();
     deps.sort_unstable();
     deps.dedup();
@@ -198,6 +285,7 @@ fn handler_id(body: &crate::hir::Body, lambda: ExprId, capture_schema: &str) -> 
 /// generation proves nothing — both records would agree even if the comparison
 /// were `|_, _| None`.
 pub fn generate(
+    src: &str,
     hir: &Hir,
     sigs: &Signatures,
     build: &str,
@@ -217,8 +305,8 @@ pub fn generate(
                 continue;
             };
             if let (Some(m), Some(a)) = (
-                manifest_of(body, &types, lambda, *d, &document_schema, build),
-                artifact_of(body, &types, lambda, *d, &document_schema, build),
+                manifest_of(src, body, &types, lambda, *d, &document_schema, build),
+                artifact_of(src, body, &types, lambda, *d, &document_schema, build),
             ) {
                 out.push((m, a));
             }
@@ -234,7 +322,7 @@ pub fn disagreement(m: &ResumeManifest, a: &HandlerArtifact) -> Option<&'static 
 
 /// Generate both records for every resumable handler in a declaration, and
 /// report any disagreement.
-pub fn check(hir: &Hir, sigs: &Signatures, build: &str, out: &mut Vec<Diagnostic>) {
+pub fn check(src: &str, hir: &Hir, sigs: &Signatures, build: &str, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
@@ -251,8 +339,8 @@ pub fn check(hir: &Hir, sigs: &Signatures, build: &str, out: &mut Vec<Diagnostic
                 continue;
             };
             let (Some(manifest), Some(artifact)) = (
-                manifest_of(body, &types, lambda, *d, &document_schema, build),
-                artifact_of(body, &types, lambda, *d, &document_schema, build),
+                manifest_of(src, body, &types, lambda, *d, &document_schema, build),
+                artifact_of(src, body, &types, lambda, *d, &document_schema, build),
             ) else {
                 continue;
             };
@@ -350,7 +438,7 @@ mod tests {
         let hir = lower_file(src, &parse_tree(src).green);
         let refs = vec![&hir];
         let sigs = Signatures::build(&Workspace::build(&refs), &refs);
-        generate(&hir, &sigs, BUILD)
+        generate(src, &hir, &sigs, BUILD)
             .into_iter()
             .next()
             .expect("one resumable handler")
@@ -414,6 +502,79 @@ mod tests {
                 disagreement(&m, &a),
                 Some(what),
                 "mutating {what} was not caught, or was reported as something else"
+            );
+        }
+    }
+
+    /// The identity matrix — the falsifiable contract for scheme 2.
+    ///
+    /// Without this, "normalized" is a word rather than a specification. Each
+    /// row states whether a change to the handler body must alter its
+    /// implementation identity.
+    #[test]
+    fn the_scheme_2_identity_matrix_holds() {
+        let base = "module m\n\n\
+            type Store = Store { id: Int }\n\n\
+            view Panel(store: Store) !{} {\n    \
+                <button on:press={resumable(captures = { store }) => refresh(store)}>x</button>\n\
+            }\n";
+        let id_of = |src: &str| pair(src).0.handler;
+        let base_id = id_of(base);
+
+        // MUST NOT change identity.
+        for (what, src) in [
+            (
+                "trailing whitespace",
+                base.replace("=> refresh(store)}", "=> refresh(store)   }"),
+            ),
+            (
+                "indentation",
+                base.replace("    <button", "        <button"),
+            ),
+            (
+                "a comment elsewhere in the file",
+                base.replace(
+                    "module m\n",
+                    "module m\n// a comment that shifts every span below it\n",
+                ),
+            ),
+            (
+                "a comment before the declaration",
+                base.replace("view Panel", "// explains the panel\nview Panel"),
+            ),
+        ] {
+            assert_eq!(
+                id_of(&src),
+                base_id,
+                "{what} must not change implementation identity"
+            );
+        }
+
+        // MUST change identity.
+        for (what, src) in [
+            (
+                "a literal",
+                base.replace("=> refresh(store)", "=> refresh(store, 2)"),
+            ),
+            (
+                "operation order",
+                base.replace("=> refresh(store)", "=> { notify(store); refresh(store) }"),
+            ),
+            (
+                "the called declaration",
+                base.replace("=> refresh(store)", "=> reload(store)"),
+            ),
+            (
+                "a local rename",
+                base.replace("store: Store", "s: Store")
+                    .replace("captures = { store }", "captures = { s }")
+                    .replace("refresh(store)", "refresh(s)"),
+            ),
+        ] {
+            assert_ne!(
+                id_of(&src),
+                base_id,
+                "{what} MUST change implementation identity"
             );
         }
     }
