@@ -1,0 +1,84 @@
+E7 task 1 — the renderer-independent golden suite, frozen
+
+  Charter §14 M7 task 1: freeze a renderer-independent golden test suite
+  using the Marko implementation as ONE oracle. Task 13 compares the own
+  renderer against it; task 14 keeps Marko as the fallback until parity.
+
+  The cases are DATA (e2e/golden.mjs). The runner (e2e/golden.spec.mjs)
+  is the only file that knows which renderer is under test, so running
+  the suite against the own renderer means pointing it at a different
+  server rather than editing a test.
+
+$ PW_RENDERER=marko npx playwright test golden.spec.mjs
+    ✓   4 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/no-script: a route with no interaction ships no browser runtime (900ms)
+    ✓   5 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/readable-before-js: the interactive route is readable before its JavaScript runs (901ms)
+    ✓   3 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/inline-whitespace: whitespace between inline elements survives to the DOM (900ms)
+    ✓   2 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/readable-without-js: the content is in the HTML, not assembled by script (908ms)
+    ✓   1 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/dom-identity: an update mutates the existing node rather than replacing it (1.0s)
+    ✓   6 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/no-replay: interaction works without re-executing the page (1.0s)
+    ✓   7 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/focus-preserved: focus survives an update (672ms)
+    ✓  10 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/public-and-private-together: public store data and private cart data render on one page (666ms)
+    ✓  11 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/no-session-in-shared-html: the served HTML carries no session identifier (594ms)
+    ✓  12 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/add-updates-only-the-cart: adding to the cart changes the cart and nothing else (654ms)
+    ✓  13 [chromium] › e2e/golden.spec.mjs:96:5 › the project's own targets (marko) — no oracle › lazy/handler-bytes-not-loaded-before-interaction: a handler's executable bytes are not loaded before interaction is possible (835ms)
+    ✓   9 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › streamed/keyed-list: a keyed list renders one node per record (1.8s)
+    ✓   8 [chromium] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › streamed/shell-first: the shell is usable while a slow region is still pending (2.0s)
+    ✓  14 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/no-script: a route with no interaction ships no browser runtime (1.5s)
+    ✓  16 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/inline-whitespace: whitespace between inline elements survives to the DOM (1.5s)
+    ✓  20 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/focus-preserved: focus survives an update (1.4s)
+    ✓  17 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/no-replay: interaction works without re-executing the page (2.1s)
+    ✓  18 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/readable-before-js: the interactive route is readable before its JavaScript runs (2.3s)
+    ✓  23 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/public-and-private-together: public store data and private cart data render on one page (1.2s)
+    ✓  15 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/readable-without-js: the content is in the HTML, not assembled by script (2.3s)
+    ✓  21 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › streamed/shell-first: the shell is usable while a slow region is still pending (2.5s)
+    ✓  24 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/no-session-in-shared-html: the served HTML carries no session identifier (983ms)
+    ✓  19 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/dom-identity: an update mutates the existing node rather than replacing it (2.3s)
+    ✓  25 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/add-updates-only-the-cart: adding to the cart changes the cart and nothing else (941ms)
+    ✓  22 [firefox] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › streamed/keyed-list: a keyed list renders one node per record (2.2s)
+    ✓  26 [firefox] › e2e/golden.spec.mjs:96:5 › the project's own targets (marko) — no oracle › lazy/handler-bytes-not-loaded-before-interaction: a handler's executable bytes are not loaded before interaction is possible (1.2s)
+    ✓  27 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/no-script: a route with no interaction ships no browser runtime (1.4s)
+    ✓  29 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/inline-whitespace: whitespace between inline elements survives to the DOM (1.3s)
+    ✓  28 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › static/readable-without-js: the content is in the HTML, not assembled by script (1.4s)
+    ✓  31 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/readable-before-js: the interactive route is readable before its JavaScript runs (1.0s)
+    ✓  30 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/no-replay: interaction works without re-executing the page (1.2s)
+    ✓  34 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/focus-preserved: focus survives an update (741ms)
+    ✓  32 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › counter/dom-identity: an update mutates the existing node rather than replacing it (992ms)
+    ✓  36 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/public-and-private-together: public store data and private cart data render on one page (690ms)
+    ✓  37 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/no-session-in-shared-html: the served HTML carries no session identifier (668ms)
+    ✓  38 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › store/add-updates-only-the-cart: adding to the cart changes the cart and nothing else (693ms)
+    ✓  39 [webkit] › e2e/golden.spec.mjs:96:5 › the project's own targets (marko) — no oracle › lazy/handler-bytes-not-loaded-before-interaction: a handler's executable bytes are not loaded before interaction is possible (962ms)
+    ✓  35 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › streamed/keyed-list: a keyed list renders one node per record (1.9s)
+    ✓  33 [webkit] › e2e/golden.spec.mjs:76:5 › golden suite (marko) — Marko is the oracle › streamed/shell-first: the shell is usable while a slow region is still pending (2.1s)
+    39 passed (13.7s)
+
+=== WHAT MARKO IS AN ORACLE FOR ==========================================
+
+  12 cases, all three engine families. RQ-1 measured resumption and DOM
+  preservation and Marko passed, so those properties are borrowed.
+
+=== WHAT IT IS NOT AN ORACLE FOR =========================================
+
+  1 case: lazy/handler-bytes-not-loaded-before-interaction.
+
+  RQ-1 FALSIFIED this for Marko — its interaction module loads during
+  initial page load rather than on first need. So the target is defined
+  here rather than borrowed, and the recorded result for Marko is
+  'does not hold'. It is reported separately, never folded into a pass
+  rate: a suite counting it as a failure would say the oracle is broken,
+  and a suite omitting it would let E7-L ship with no target.
+
+=== THREE DEFECTS IN THE HARNESS, FOUND BY WRITING IT ====================
+
+  1. The lazy detector filtered request URLs by /handler|interaction/ and
+     PASSED against Marko, which RQ-1 falsified. It was reading a naming
+     convention, so it measured nothing. It now asks whether interacting
+     fetches code that was not fetched before.
+
+  2. Reading the navigation response body unconditionally made the
+     streaming case wait for the slow region it exists to prove arrives
+     late — red for a reason entirely the harness's.
+
+  3. The session-identifier check matched /session-[0-9a-z]/i and fired
+     on the page's own prose in Firefox. routes.spec.mjs had already
+     recorded both this and the navigation-response engine difference;
+     the new suite reproduced them before adopting the fix.

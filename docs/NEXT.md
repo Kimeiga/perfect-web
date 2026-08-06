@@ -127,9 +127,17 @@ ADR-0017), and E7V's compatibility decision already governs the real handler
 path in Chromium, Firefox and WebKit. What is missing is a renderer, not a
 decision.
 
-E6 leaves it two things it can use: a fragment's regeneration produces a body,
-and today that body is a string. What a fragment's markup actually *is* belongs
-to the renderer.
+**Task 1 is done.** The renderer-independent golden suite is frozen —
+`spikes/pw-to-marko/e2e/golden.mjs` holds the cases as data and
+`golden.spec.mjs` is the only file that knows which renderer is under test, so
+running it against the own renderer is a different server rather than an edited
+test. 12 oracle cases pass in Chromium, Firefox and WebKit; 1 case is the
+project's own target with no oracle, recorded as *not holding* for Marko because
+RQ-1 falsified it there.
+
+E6 leaves the renderer two things it can use: a fragment's regeneration produces
+a body, and today that body is a string. What a fragment's markup actually *is*
+belongs to the renderer.
 
 Two smaller pieces are E6's and are deliberately not claimed there:
 
