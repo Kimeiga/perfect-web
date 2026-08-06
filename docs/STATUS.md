@@ -13,14 +13,17 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E5 — privacy-flow, cache-safety and placement checker**,
-with one task carried forward into it: a **generator** connecting a `query` or
-`command` declaration to `runtime/pw-resource`. That single missing piece is
-what E4 gate 1 and E3 gate 3 both wait on.
+**next milestone:** **E6 — materialized resource graph**, with two tasks
+carried forward:
 
-E0 and E2A are complete; E1 closed on RQ-2's Outcome 1. E2 is 5/6, E3 is 4/6,
-E4 is 5/7 — and every open item traces back either to that generator or to E5's
-privacy checker.
+1. A **generator** connecting a `query`/`command` declaration to
+   `runtime/pw-resource`. E4 gate 1 and E3 gate 3 both wait on it, and it is the
+   same shape as the Koka and Marko backends that already exist.
+2. **Effect inference** (E9's, pulled forward or not): most of the remaining
+   33 rejected corpus files need a callee's effects to be knowable.
+
+E0 and E2A are complete; E1 closed on RQ-2's Outcome 1. E2 is 5/6, E3 4/6,
+E4 5/7, E5 3/5 — and every open item traces back to one of those two.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -38,14 +41,17 @@ privacy checker.
 files and they all parse, with precise spans and error recovery. The
 specification is executable in CI rather than merely well-formed.
 
-**Seven rejected corpus files now fail to compile**, each caught by the rule its
-`@rule` header declares, with a primary span, an origin span, a note and a legal
-alternative. `just rejections` shows the current state. Four are declaration
-rules; **three are caught by algorithms running on HIR lowered from source** —
-R-007 by the exhaustiveness checker, which names every missing variant, and
-R-013 and R-039 by the E2A-S scope graph.
+**Eleven rejected corpus files now fail to compile** — up from four when E2
+began — each caught by the invariant its `@rule` header declares, with a primary
+span, an origin span, a note and a legal alternative. `just rejections` shows
+the current state. Four are declaration rules; **seven are caught by algorithms
+running on HIR lowered from source**: the exhaustiveness checker (R-007), the
+E2A-S scope graph (R-013, R-039), and E5's placement solver and label algebra
+(R-002, R-003, R-005, R-026).
 
-The other 37 need effect checking (E1) or privacy/placement (E5). Coverage is
+Zero false positives across the 24 accepted files. The remaining 33 mostly need
+**effect inference**, which does not exist: a network call inside a pure view
+cannot be detected without the callee's effects. E9 owns that. Coverage is
 ratcheted by a test so it cannot silently regress.
 
 **The front end is complete through HIR.** Rowan is adopted (ADR-0012); the
