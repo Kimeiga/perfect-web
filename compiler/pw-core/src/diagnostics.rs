@@ -175,6 +175,10 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // the charter §16.3 worked example. The scope graph and the label algebra
     // reach the same conclusion by different routes, so one code, not two.
     ("PW0100", "PW5001"),
+    // The layout family. `PW3001` is the corpus's code for an effect reaching a
+    // context that may not have it — which is one invariant, not one per
+    // effect family.
+    ("PW3001", "PW0401"),
     ("PW0316", "PW5011"), // a list over a mutable collection needs a stable key
     ("PW0317", "PW5012"), // an element may only contain the children HTML permits
     ("PW0318", "PW5013"), // interactive behaviour belongs on an interactive element

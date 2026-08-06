@@ -1105,6 +1105,13 @@ impl<'a> P<'a> {
         if self.at(Kind::Str) {
             self.bump(); // a `because "..."` justification
         }
+        // A statement may declare its own effect row: `post_paint !{ post_paint,
+        // trace } { .. }`. Without this the row terminated the statement and the
+        // block that followed became a sibling — so the work inside it looked
+        // like it happened during render.
+        if self.at(Kind::Bang) {
+            self.effect_row();
+        }
         if self.at(Kind::LParen) {
             self.start(K::ArgList);
             self.bump();

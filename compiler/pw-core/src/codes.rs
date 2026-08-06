@@ -38,6 +38,7 @@ pub struct Code {
 pub enum Owner {
     Syntax,
     Resolution,
+    Effects,
     DeclarationRules,
     Exhaustiveness,
     ScopeGraph,
@@ -114,6 +115,12 @@ codes! {
         "an optimistic transition must declare a rollback path";
     CACHE_NO_INVALIDATION = "PW0200", DeclarationRules,
         "a shared cache should declare how it is invalidated";
+
+    // --- effects (PW04xx) -------------------------------------------------
+    UNDECLARED_EFFECT = "PW0400", Effects,
+        "an effect row must name every effect the body performs";
+    FORBIDDEN_EFFECT = "PW0401", Effects,
+        "some effects are not permitted where a declaration runs, whatever it declares";
 
     // --- exhaustiveness ---------------------------------------------------
     NON_EXHAUSTIVE_MATCH = "PW0305", Exhaustiveness,

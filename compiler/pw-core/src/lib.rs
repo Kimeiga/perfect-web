@@ -25,6 +25,7 @@ pub mod check;
 pub mod codes;
 pub mod diag;
 pub mod diagnostics;
+pub mod effects;
 pub mod exhaust;
 pub mod hir;
 pub mod koka;

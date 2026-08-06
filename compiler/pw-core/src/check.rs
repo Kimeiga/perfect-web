@@ -14,7 +14,7 @@
 //! report more would be reporting fiction, and the corpus exists to catch
 //! exactly that.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::exhaust::{self, Arm, Pattern as EPat};
@@ -142,6 +142,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     let workspace = crate::resolve::Workspace::build(&hirs);
     // E2C: one set of resolved signatures, shared by every analysis.
     let sigs = Signatures::build(&workspace, &hirs);
+    // E2D: effects inferred over the whole program, so a helper declared in
+    // another module still contributes to its caller's row.
+    let mut inference = crate::effects::Inference::new(&sigs);
+    inference.run(&hirs);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -173,7 +177,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         .enumerate()
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
-            out.extend(check_unit_with(&env, &labels, &sigs, u));
+            out.extend(check_unit_with(&env, &labels, &sigs, &inference, u));
             out.sort_by_key(|d| d.primary_span.start);
             (u.path.clone(), out)
         })
@@ -330,13 +334,17 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
 }
 
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
-    check_unit_with(env, &BTreeMap::new(), &Signatures::default(), unit)
+    let sigs = Signatures::default();
+    let inference = crate::effects::Inference::new(&sigs);
+    check_unit_with(env, &BTreeMap::new(), &sigs, &inference, unit)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn check_unit_with(
     env: &Env,
     labels: &BTreeMap<String, Label>,
     sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
     unit: &Unit,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
@@ -366,6 +374,7 @@ fn check_unit_with(
             &mut out,
         );
         privacy_flow(&unit.hir, sigs, decl, &mut out);
+        effect_rows(&unit.hir, inference, decl, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
@@ -1574,5 +1583,130 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
 
             _ => {}
         }
+    }
+}
+
+// --- effect rows (E2D) ------------------------------------------------------
+
+/// Does a declaration do what its effect row says?
+///
+/// Two questions, two codes. An **undeclared** effect is a row that understates
+/// what the body does. A **forbidden** effect is one that no row could permit
+/// here — a `view` reaching the database is not fixed by declaring it.
+fn effect_rows(
+    hir: &Hir,
+    inference: &crate::effects::Inference<'_>,
+    decl: &Decl,
+    out: &mut Vec<Diagnostic>,
+) {
+    use crate::effects::{deferred_spans, forbidden_in};
+
+    let Some(body_id) = decl.body else { return };
+    let body = hir.body(body_id);
+    let found = inference.infer(body);
+    // Work inside an event handler, a streamed region or a later frame phase is
+    // not done *during render*, so the render-time restriction does not apply
+    // to it. Charter §7.5A.
+    let deferred = deferred_spans(body);
+    let at_render_time = |span: &crate::hir::Span| {
+        !deferred
+            .iter()
+            .any(|d| d.start <= span.start && span.end <= d.end)
+    };
+
+    // Forbidden first: it is the stronger statement, and reporting both for one
+    // call would say the same thing twice.
+    let mut reported: BTreeSet<String> = BTreeSet::new();
+    for source in &found.sources {
+        let Some(why) = forbidden_in(decl, &source.effect) else {
+            continue;
+        };
+        if !at_render_time(&source.span) {
+            continue;
+        }
+        if !reported.insert(source.effect.clone()) {
+            continue;
+        }
+        out.push(Diagnostic {
+            code: crate::codes::FORBIDDEN_EFFECT.id,
+            invariant: crate::codes::FORBIDDEN_EFFECT.invariant,
+            reason: "effect_forbidden_in_context",
+            detector: Detector::PatternMatrix,
+            severity: Severity::Error,
+            message: format!(
+                "`{}` performs `{}`, which a {} may not do",
+                decl.name,
+                source.effect,
+                kind_noun(decl.kind)
+            ),
+            primary_span: source.span.clone(),
+            related: vec![Related {
+                span: hir.decl_span(decl_id_of(hir, decl)),
+                label: format!("`{}` is a {}", decl.name, kind_noun(decl.kind)),
+            }],
+            explanation: Some(format!(
+                "{why}. The chain: {}. Declaring the effect would not help — the \
+                 restriction is about where this runs, not about what it admits to.",
+                source.via.describe()
+            )),
+            repairs: vec![Repair {
+                description: "move the work into a query or command and pass its \
+                              result in"
+                    .to_string(),
+                replacement: None,
+            }],
+        });
+    }
+
+    // The row as written, by path.
+    let declared: Option<Vec<String>> = decl
+        .declared_effects
+        .as_ref()
+        .map(|r| r.iter().map(|e| e.path.clone()).collect());
+    for source in found.undeclared(declared.as_deref()) {
+        // Same distinction: an event handler's effects and a streamed region's
+        // are not the enclosing view's row. The handler is a separate body that
+        // runs later, and charging its effects to the render is what reported
+        // three correct accepted programs as violations.
+        if reported.contains(&source.effect) || !at_render_time(&source.span) {
+            continue;
+        }
+        out.push(Diagnostic {
+            code: crate::codes::UNDECLARED_EFFECT.id,
+            invariant: crate::codes::UNDECLARED_EFFECT.invariant,
+            reason: "effect_not_in_row",
+            detector: Detector::PatternMatrix,
+            severity: Severity::Error,
+            message: format!(
+                "`{}` performs `{}` but does not declare it",
+                decl.name, source.effect
+            ),
+            primary_span: source.span.clone(),
+            related: vec![Related {
+                span: hir.decl_span(decl_id_of(hir, decl)),
+                label: format!("`{}` declares its effects here", decl.name),
+            }],
+            explanation: Some(format!(
+                "An effect row is a claim about what a body does, and a caller \
+                 relies on it. {}. An effect that reaches a caller through a \
+                 helper or a callback is still an effect the caller pays for.",
+                source.via.describe()
+            )),
+            repairs: vec![Repair {
+                description: format!("add `{}` to the row", source.effect),
+                replacement: None,
+            }],
+        });
+    }
+}
+
+fn kind_noun(kind: DeclKind) -> &'static str {
+    match kind {
+        DeclKind::View => "view",
+        DeclKind::Component => "component",
+        DeclKind::Page => "page",
+        DeclKind::Query => "query",
+        DeclKind::Command => "command",
+        _ => "declaration",
     }
 }
