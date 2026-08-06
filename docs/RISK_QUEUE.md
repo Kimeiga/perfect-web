@@ -17,8 +17,8 @@ Order was fixed by the project architect after reviewing E0's evidence.
 | **RQ-1** | Is Marko's resumption real, in Chrome **and** Safari? | **done** | 11/12 pre-registered checks pass in both engines → Marko accepted as the behavioural oracle for E7 |
 | **RQ-2** | Does Koka propagate effects through higher-order abstraction? | **done** | Outcome 1, clean pass → Koka remains the effects oracle; `pw` effect checker not pulled forward |
 | **RQ-3** | `pw`-owned exhaustiveness and canonical typed ABI decoding | **partial** | exhaustiveness + type-directed ABI land in `compiler/pw-core`; 30 tests. Remaining: wire to a real parser (E2) so corpus files can drive it |
-| **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | next | — |
-| **RQ-5** | Final-artifact declared-vs-actual component import verification | queued | — |
+| **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | **partial** | E2A-S landed: `compiler/pw-core/src/scope.rs`, PW2001-PW2004, 10 tests. E2A-R (runtime) not started |
+| **RQ-5** | Final-artifact declared-vs-actual component import verification | next | — |
 | **RQ-6** | Backfill direct / helper-hidden / generic-callback rejection cases for **every** effect family | queued | — |
 | **RQ-7** | Generate and adopt the E→P claim/evidence table before publishing P0 | **done** (first draft) | `docs/EVIDENCE_LEDGER.md` |
 
@@ -89,6 +89,25 @@ compile time:
 **E2A closes only when both halves pass.** Koka representing `task.spawn` in an
 effect row would be useful but insufficient — it does not prove scope
 non-escape, and `pw` owns that property.
+
+**E2A-S status: implemented** in `compiler/pw-core/src/scope.rs`. A scope tree
+plus handle-lifetime rules, with four diagnostics:
+
+| code | rule |
+|---|---|
+| `PW2001` | a handle escapes into a scope that outlives its owner |
+| `PW2002` | an ordinary task is detached without the `durable_job.enqueue` capability |
+| `PW2003` | a handle is used outside its owning scope — the late-result-into-dead-component case |
+| `PW2004` | a subscription declares a scope longer than the component that created it |
+
+Each carries an **origin span** as well as a violation span, per charter §16.3.
+Escaping into a *descendant* scope is allowed, because a descendant dies no
+later than the handle does. `durable.spawn` is the legal escape hatch and is
+exempt by capability, not by convention.
+
+**E2A-R status: not started.** Runtime cancellation, cleanup ordering, and leak
+detection remain unproven, and the static rules above must never be described as
+covering them.
 
 ## RQ-5 — artifact import verification
 

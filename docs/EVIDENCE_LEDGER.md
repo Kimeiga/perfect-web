@@ -34,6 +34,7 @@ Absolute numbers are **not** comparable to the M3 Max the charter assumes.
 | P5 | "An unrelated state change does not recompute an expensive derived value." | E0 | `spike-bonsai-incremental-model.txt` §1 | incremental v0.16.1 | **measured** | that this is *our* implementation — it is Jane Street Incremental, a design donor |
 | P0 | "An incomplete domain match is rejected even in a fallible function — the effect row cannot buy an exemption." | E1A | `docs/evidence/E1A/pw-core.txt`; `compiler/pw-core/tests/differential_vs_koka.rs` | rust 1.97.1 | **measured** | that a `.pw` *file* is rejected — there is no parser yet; the checker runs on a constructed pattern matrix |
 | P0 | "An empty `Option` and an empty `List` cannot be confused at a boundary, even where the backend represents both as `null`." | E1A | as above | rust 1.97.1 | **measured** | that this holds for Koka's raw output — it holds for the canonical `pw` ABI, which generated codecs must produce |
+| P0 | "A task handle cannot escape the scope that owns it, and an ordinary task cannot be detached without a durable capability." | E2A-S | `compiler/pw-core/src/scope.rs` (10 tests) | rust 1.97.1 | **measured** | that cancellation, cleanup ordering or leak-freedom hold — those are E2A-R and are **not started** |
 | P0 | "Compiler errors name the rule, where the offending value came from, and which boundary rejected it." | E0 | `spike-compiler-diagnostic.txt` | rust 1.97.1, annotate-snippets 0.12.16 | **measured** | that the language exists — this is one rule in a toy parser |
 
 ## Not yet proven — the claims P0 actually needs
@@ -45,7 +46,7 @@ Absolute numbers are **not** comparable to the M3 Max the charter assumes.
 |---|---|---|---|---|
 | P0 | "A private cart cannot enter a public materialization." | E5 | **unstarted** | corpus example R-004 exists; no checker |
 | P0 | "A secret cannot be serialized into a browser artifact." | E5 | **unstarted** | corpus R-003 exists; no checker |
-| P0 | "A task handle cannot escape its component scope." | E2A-S | **unstarted** | RQ-4. Runtime detection cannot support a compile-time claim. |
+
 | P0 | "A non-idempotent command cannot declare a retry policy." | E4 | **unstarted** | corpus R-014 exists; no checker |
 | P0 | "A network request in a view does not compile." | E1, E2 | **unstarted** | corpus R-001 exists; no `pw` front end |
 

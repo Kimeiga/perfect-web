@@ -30,7 +30,7 @@ evidence; see ADR-0011.
 | **E1** | Koka **effect-system** feasibility (narrowed — effects and handlers only) | in progress |
 | **E1A** | `pw` value semantics and boundary ABI *(inserted, ADR-0011)* | **in progress** — exhaustiveness, opaque nominal types, platform `Option`/`List`/`Result`, type-directed ABI decoder all landed in `compiler/pw-core` |
 | **E2** | Source language parser, modules, lowering to Koka | not started |
-| **E2A** | Structured concurrency = **E2A-R** (runtime) + **E2A-S** (static scope checker) *(inserted)* | not started |
+| **E2A** | Structured concurrency = **E2A-R** (runtime) + **E2A-S** (static scope checker) *(inserted)* | **E2A-S done**, E2A-R not started |
 | **E3** | Marko rendering adapter, streaming SSR, first resumption | not started |
 | **E4** | Typed resource model and the first complete store page | not started |
 | **E5** | Privacy-flow, cache-safety, and placement checker | not started |
