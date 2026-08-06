@@ -18,8 +18,8 @@ Order was fixed by the project architect after reviewing E0's evidence.
 | **RQ-2** | Does Koka propagate effects through higher-order abstraction? | **done** | Outcome 1, clean pass → Koka remains the effects oracle; `pw` effect checker not pulled forward |
 | **RQ-3** | `pw`-owned exhaustiveness and canonical typed ABI decoding | **partial** | exhaustiveness + type-directed ABI land in `compiler/pw-core`; 30 tests. Remaining: wire to a real parser (E2) so corpus files can drive it |
 | **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | **partial** | E2A-S landed: `compiler/pw-core/src/scope.rs`, PW2001-PW2004, 10 tests. E2A-R (runtime) not started |
-| **RQ-5** | Final-artifact declared-vs-actual component import verification | next | — |
-| **RQ-6** | Backfill direct / helper-hidden / generic-callback rejection cases for **every** effect family | queued | — |
+| **RQ-5** | Final-artifact declared-vs-actual component import verification | **partial** | rule + `PW4007` in `compiler/pw-core/src/capability.rs`, tested against E0's real 15-vs-1 import lists. Remaining: call it from the build, not just from tests |
+| **RQ-6** | Backfill direct / helper-hidden / generic-callback rejection cases for **every** effect family | next | — |
 | **RQ-7** | Generate and adopt the E→P claim/evidence table before publishing P0 | **done** (first draft) | `docs/EVIDENCE_LEDGER.md` |
 
 ---
@@ -109,11 +109,36 @@ exempt by capability, not by convention.
 detection remain unproven, and the static rules above must never be described as
 covering them.
 
-## RQ-5 — artifact import verification
+## RQ-5 — artifact import verification (partial)
 
 Every build emits declared capabilities, actual component imports, and the
-difference. Any undeclared import fails the build (`PW4007`). Prototype exists:
-the `ambient` check in `spikes/wasmtime-component/host`.
+difference. Any undeclared import fails the build (`PW4007`).
+
+**Implemented** in `compiler/pw-core/src/capability.rs`, deliberately free of any
+Wasm dependency so the rule is unit-testable without a runtime. Its tests use the
+**real import lists E0 measured** — 1 for the `no_std` guest, 15 for the `std`
+guest — rather than invented fixtures.
+
+Two runtime profiles, because charter §14 M8 task 4 requires denying ambient
+authority by default while still allowing a richer runtime *explicitly*:
+
+| profile | allowance |
+|---|---|
+| `minimal` | declared interfaces only; `no_std`-equivalent |
+| `wasi-cli` | additionally tolerates `wasi:cli/`, `clocks/`, `io/`, `random/`, `filesystem/` |
+
+Choosing `wasi-cli` does not hide the surface: the extra imports are still
+listed under `allowed_by_profile`. And an import outside the allowance —
+`wasi:sockets/tcp` — still fails.
+
+The `PW4007` text carries the architect's terminology correction, because it is
+the difference between a true and a false claim: these imports are a *requested
+authority surface*, not authority already held. The host still decides what to
+link.
+
+**Open:** the audit is called from tests, not from a build step. Wiring it into
+`spikes/wasmtime-component/host` (which already computes the actual list) and
+then into the E8 build is the remaining work.
 
 ## RQ-6 — effect-family rejection coverage
 

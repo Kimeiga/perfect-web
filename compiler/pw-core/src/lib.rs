@@ -9,17 +9,20 @@
 //! | nominal opaque types (§7.1) | erases single-field value structs | [`types::Opaque`] — a distinct type and a distinct ABI slot |
 //! | `Option`/`List` distinction (§7.10) | both are `null`, runtime-ambiguous | [`abi`] — decoding is type-directed, never shape-directed |
 //! | task-scope non-escape (§7.6) | not modelled at all | [`scope`] — E2A-S, the static half of structured concurrency |
+//! | artifact capability compliance (§10.2) | n/a — a Wasm property | [`capability`] — declared vs actually-imported, checked on the built artifact |
 //!
 //! Nothing here depends on Koka, on an effect row, or on a backend
 //! representation. That independence is the point.
 
 pub mod abi;
+pub mod capability;
 pub mod diag;
 pub mod exhaust;
 pub mod scope;
 pub mod types;
 
 pub use abi::{Decoder, Mode, Value};
+pub use capability::{CapabilityAudit, CapabilityManifest, RuntimeProfile, audit};
 pub use exhaust::{Arm, MatchReport, Pattern, check_match, render_witness};
 pub use scope::{HandleKind, Op, ScopeGraph, ScopeKind, ScopeViolation};
 pub use types::{Adt, Ctor, Program, Type};
