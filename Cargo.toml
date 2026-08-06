@@ -4,6 +4,7 @@ members = [
     "compiler/pw-core",
     "compiler/pw-cli",
     "compiler/pw-syntax",
+    "runtime/pw-tasks",
     "spikes/compiler-diagnostic",
     "tools/corpus-check",
 ]
@@ -16,9 +17,9 @@ exclude = [
     "spikes/wasmtime-component/guest-minimal",
 ]
 
-# The `compiler/` and `runtime/rust-host/` crate trees are created by later
-# milestones (PROJECT_CHARTER.md §12). Empty directories are deliberately not
-# created here: §12 says "Do not create empty directories merely to look complete".
+# `runtime/pw-tasks` is E2A-R (ADR-0016). The rest of the `runtime/` tree
+# arrives with the milestone that needs it: charter §12 says "Do not create
+# empty directories merely to look complete".
 
 [workspace.package]
 version = "0.0.0"

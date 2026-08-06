@@ -1,0 +1,58 @@
+evidence: E2A-R — runtime structured concurrency
+recorded: 2026-08-06T04:33:12Z
+commit:   41e892af3562a17fdb9e7b576690f3dae77c1915
+host:     Darwin arm64, rustc 1.97.1 (8bab26f4f 2026-07-14)
+commands:
+  cargo test -p pw-tasks
+  for i in $(seq 1 25); do cargo test -p pw-tasks; done   # flakiness check
+
+ADR-0016 scopes this: it is a THREAD-scoped runtime, and its results are
+BEHAVIOUR, never static guarantees. docs/RISK_QUEUE.md RQ-4 is explicit
+that the E2A-S rules must never be described as covering these, and the
+converse holds too.
+
+==================== TEST RUN ====================================
+test tests::a_child_created_after_cancellation_starts_cancelled ... ok
+test tests::a_result_arriving_after_the_scope_died_is_refused ... ok
+test tests::cleanup_runs_children_before_parents_and_lifo_within_a_scope ... ok
+test tests::cleanup_says_whether_the_scope_was_cancelled ... ok
+test tests::a_panicking_task_does_not_corrupt_the_leak_counter ... ok
+test tests::many_tasks_across_nested_scopes_all_stop ... ok
+test tests::the_process_wide_counter_observes_running_work ... ok
+test tests::cancellation_reaches_a_task_that_is_already_running ... ok
+test tests::cancellation_propagates_to_a_child_scope ... ok
+test tests::the_leak_counter_can_detect_a_running_task ... ok
+test tests::cleanup_runs_after_every_task_has_stopped ... ok
+test tests::a_task_cannot_outlive_its_scope ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+==================== FLAKINESS ==================================
+A concurrency suite that passes once has measured almost nothing.
+25 consecutive runs, failures: 0
+
+==================== PROPERTY MAP ===============================
+RQ-4 lists five properties for E2A-R. Each maps to a named test:
+
+  owner scopes / no leak    a_task_cannot_outlive_its_scope
+                            many_tasks_across_nested_scopes_all_stop
+  cancellation propagation  cancellation_reaches_a_task_that_is_already_running
+                            cancellation_propagates_to_a_child_scope
+                            a_child_created_after_cancellation_starts_cancelled
+  cleanup ordering          cleanup_runs_children_before_parents_and_lifo_within_a_scope
+                            cleanup_runs_after_every_task_has_stopped
+                            cleanup_says_whether_the_scope_was_cancelled
+  no commit into a dead     a_result_arriving_after_the_scope_died_is_refused
+    scope
+  leak detection is real    the_leak_counter_can_detect_a_running_task
+                            a_panicking_task_does_not_corrupt_the_leak_counter
+
+==================== LIMITS =====================================
+  - Not async. E8 chooses the host execution model; these semantics must
+    be re-proved there (ADR-0016 deletion condition).
+  - Cancellation is cooperative. The runtime guarantees the signal
+    ARRIVES and that a late result is REFUSED; it cannot preempt
+    arbitrary code, and claiming otherwise would be an overclaim.
+  - No performance claim is made or measured.
+  - Nothing here is driven by .pw source: E2A-S already checks bodies,
+    and there is no code generator to drive a runtime yet.

@@ -13,11 +13,10 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E2 — source language front end. In progress.** Four of its
-six gate items pass. E1 is closed on RQ-2's measured Outcome 1; E1A is
-algorithmically implemented and now partly reachable from source. The two open
-E2 gate items are lowering to Koka (item 4) and the rejected-corpus count
-(item 2), which E1 and E5 own.
+**next milestone:** **E3 — Marko rendering adapter, streaming SSR, first
+resumption.** E0 and E2A are complete; E1 closed on RQ-2's Outcome 1; E2 has
+five of six gate items, and its sixth (the ≥40 rejected corpus count, at 7/44)
+is owned by E1 and E5 rather than by E2.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -26,7 +25,7 @@ E2 gate items are lowering to Koka (item 4) and the rejected-corpus count
 | RQ-1 | Marko resumption, Chrome + Safari | **done** — passed its pre-registered rule |
 | RQ-2 | Koka higher-order effect propagation | **done** — Outcome 1, clean pass |
 | RQ-3 | `pw` exhaustiveness + typed ABI | **partial** — checker done; no parser until E2 |
-| RQ-4 | structured concurrency | **partial** — E2A-S done **and running on source**; E2A-R not started |
+| RQ-4 | structured concurrency | **done** — E2A-S runs on source; E2A-R is `runtime/pw-tasks` |
 | RQ-5 | artifact capability audit | **partial** — rule done; not wired to a build |
 | RQ-6 | effect-family rejection coverage | **partial** — layout/DOM families done |
 | RQ-7 | E→P evidence ledger | **done** |
@@ -54,6 +53,13 @@ enforced by a test, not by convention.
 **`pw fmt` ships** (ADR-0013 amendment). Idempotent, token- and
 comment-preserving on all 68 files, `--check` wired into `just ci`. It is a
 canonical *spacing*, not yet canonical line breaking, and the ADR says so.
+
+**E2A is complete — both halves.** The static checker rejects `.pw` programs
+(R-013, R-039) and `runtime/pw-tasks` (ADR-0016) proves the same semantics
+behave as specified under real concurrency: cancellation propagation, ordered
+cleanup, refusal to commit into a dead scope, and no leaked tasks. 12 tests,
+0 failures in 25 consecutive runs. They are **behaviour** results and RQ-4's
+rule holds — neither half may be described as covering the other.
 
 **`pw` code executes.** `pw emit-koka` lowers the pure subset (ADR-0015) and
 `just spike-pw-to-koka` compiles and runs it under the pinned Koka 3.2.3,

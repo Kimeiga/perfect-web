@@ -29,8 +29,8 @@ evidence; see ADR-0011.
 | **E0** | Repository bootstrap, research matrix, specification corpus, feasibility spikes | **complete** |
 | **E1** | Koka **effect-system** feasibility (narrowed — effects and handlers only) | **CLOSED** — RQ-2 Outcome 1: open-row inference, higher-order propagation, selective handling, `.kki` observability |
 | **E1A** | `pw` value semantics and boundary ABI *(inserted, ADR-0011)* | **algorithmically implemented, source integration pending** — 42 tests on constructed data. May not support public source-language claims yet. |
-| **E2** | Source front end **and semantic integration** — lossless syntax, core body parsing, HIR, source-to-checker wiring, the ≥40 rejected gate | **in progress** — lexer, declaration parser, `pw check`/`pw explain`, 9 declaration rules. Body parsing, HIR and Rowan pending. |
-| **E2A** | Structured concurrency = **E2A-R** (runtime) + **E2A-S** (static scope checker) *(inserted)* | **E2A-S done**, E2A-R not started |
+| **E2** | Source front end **and semantic integration** — lossless syntax, core body parsing, HIR, source-to-checker wiring, the ≥40 rejected gate | **5 of 6 gate items pass** — Rowan tree, body grammar (68/68 files), HIR (ADR-0014), `pw fmt` (ADR-0013), Koka execution (ADR-0015), exhaustiveness and the scope graph running on source. Open: the ≥40 rejected gate, at 7/44, which needs E1 and E5. |
+| **E2A** | Structured concurrency = **E2A-R** (runtime) + **E2A-S** (static scope checker) *(inserted)* | **COMPLETE** — both halves. E2A-S in `compiler/pw-core/src/scope.rs`, rejecting R-013 and R-039 from source; E2A-R in `runtime/pw-tasks` (ADR-0016), 12 behaviour tests, 0/25 flaky |
 | **E3** | Marko rendering adapter, streaming SSR, first resumption | not started |
 | **E4** | Typed resource model and the first complete store page | not started |
 | **E5** | Privacy-flow, cache-safety, and placement checker | not started |

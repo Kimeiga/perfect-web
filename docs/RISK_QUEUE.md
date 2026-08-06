@@ -17,7 +17,7 @@ Order was fixed by the project architect after reviewing E0's evidence.
 | **RQ-1** | Is Marko's resumption real, in Chrome **and** Safari? | **done** | 11/12 in both engines → oracle for **E7-R** (resumption, DOM preservation) and partially **E7-P**. **Not** the oracle for **E7-L**: check 4 failed. |
 | **RQ-2** | Does Koka propagate effects through higher-order abstraction? | **done** | Outcome 1, clean pass → Koka remains the effects oracle; `pw` effect checker not pulled forward |
 | **RQ-3** | `pw`-owned exhaustiveness and canonical typed ABI decoding | **partial** | exhaustiveness + type-directed ABI land in `compiler/pw-core`; 30 tests. **Exhaustiveness now runs on `.pw` source** and rejects R-007 with named witnesses. Remaining: the ABI half has no source path |
-| **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | **partial** | E2A-S landed: `compiler/pw-core/src/scope.rs`, PW2001-PW2004, 10 tests, **now fed from real `.pw` bodies** — R-013 and R-039 are compile failures. E2A-R (runtime) not started |
+| **RQ-4** | Minimal static task-scope checker (E2A-S) + runtime structured concurrency (E2A-R) | **done** | Both halves. E2A-S: `compiler/pw-core/src/scope.rs`, PW2001-PW2004, fed from real `.pw` bodies — R-013 and R-039 are compile failures. E2A-R: `runtime/pw-tasks` (ADR-0016), 12 behaviour tests, 0 failures in 25 consecutive runs |
 | **RQ-5** | Final-artifact declared-vs-actual component import verification | **partial** | rule + `PW4007` in `compiler/pw-core/src/capability.rs`, tested against E0's real 15-vs-1 import lists. Remaining: call it from the build, not just from tests |
 | **RQ-6** | Backfill direct / helper-hidden / generic-callback rejection cases for **every** effect family | **partial** | layout/DOM families done: 10 accepted + 13 rejected, including both hidden cases. Remaining: backfill the other families |
 | **RQ-7** | Generate and adopt the E→P claim/evidence table before publishing P0 | **done** (first draft) | `docs/EVIDENCE_LEDGER.md` |
@@ -115,9 +115,21 @@ Escaping into a *descendant* scope is allowed, because a descendant dies no
 later than the handle does. `durable.spawn` is the legal escape hatch and is
 exempt by capability, not by convention.
 
-**E2A-R status: not started.** Runtime cancellation, cleanup ordering, and leak
-detection remain unproven, and the static rules above must never be described as
-covering them.
+**E2A-R status: done** — `runtime/pw-tasks`, ADR-0016. A thread-scoped runtime
+built on `std::thread::scope`, adding cancellation propagation, ordered cleanup,
+and the dead-scope commit rule. Twelve behaviour tests, each mapped to one of
+RQ-4's five properties in `docs/evidence/E2A/e2a-r-runtime.txt`, with **0
+failures across 25 consecutive runs** — a concurrency suite that passes once has
+measured almost nothing.
+
+The separation still holds in both directions: these are **behaviour** results
+and do not make any misuse a compile error, and E2A-S's static rules do not
+cover runtime cancellation. Two cases genuinely need both — a task that finishes
+*after* its scope was torn down has no escaping handle for the static checker to
+see, and `Scope::commit` refusing it is the only thing that catches it.
+
+Deliberately not proven: anything async. E8 chooses the host execution model and
+these semantics must be re-proved there.
 
 ## RQ-5 — artifact import verification (partial)
 
