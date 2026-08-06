@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: undeclared_effect
+//
+// Structurally different from R-036: three helpers deep, across two modules,
+// with the effect reached through a lambda passed to a generic. Nothing here
+// resembles the fixture's shape except the invariant.
+
+module generality.effect_depth
+
+import Stores
+import List
+
+fn inner(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+    Stores.get(id)
+}
+
+fn middle(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+    inner(id)
+}
+
+fn outer(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{} {
+    List.map(ids, id => middle(id))
+}

@@ -82,6 +82,13 @@ test-compile:
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
+# The SECOND score. Corpus conformance says today's specification passes;
+# generality says the same guarantees survive programs the fixtures did not
+# anticipate. `slips-through.pw` files are known gaps, executable so they
+# cannot drift out of date.
+generality:
+    @cargo test --quiet -p pw-core --test generality -- --nocapture 2>&1 | grep -E '^  (corpus|generally|narrowly|generality)'
+
 # The per-fixture enforcement table. Each rejected fixture is checked as its
 # own program — the shared library, the accepted modules it imports, and the
 # fixture — because five of them reuse module names with each other (E2B).

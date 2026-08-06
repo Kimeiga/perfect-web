@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+//
+// Structurally different from R-006: the secret is passed as a bare argument
+// rather than interpolated into a string, and it is rebound once on the way.
+
+module generality.sink_rebound
+
+import log
+import secrets
+
+fn audit(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
+    let token = secrets.payments()
+    let same = token
+    log.public(same)
+}

@@ -1,0 +1,24 @@
+// @status: GENERAL
+// @invariant: unkeyed_list
+//
+// Structurally different from R-018: the unkeyed loop is nested two elements
+// deep inside a KEYED outer loop, so the file contains a correct use of the
+// same construct in the same markup tree.
+
+module generality.list_nested
+
+import domain.{ StoreId }
+
+view Grid(groups: List<StoreId>) !{} {
+    <ul>
+        {#each groups as g (g)}
+            <li>
+                <ul>
+                    {#each g.items as item}
+                        <li>{item.name}</li>
+                    {/each}
+                </ul>
+            </li>
+        {/each}
+    </ul>
+}

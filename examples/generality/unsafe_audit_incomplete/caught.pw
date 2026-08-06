@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: unsafe_audit_incomplete
+//
+// Structurally different from R-024: a DIFFERENT escape hatch
+// (`raw_attribute`, not `raw_html`), reached through a helper rather than
+// called in the markup. The rule reads the row, so a hatch it has never seen
+// is covered by that hatch declaring one.
+
+module generality.unsafe_other_hatch
+
+import html.{ raw_attribute }
+
+fn styled(value: String) -> Attr !{ unsafe.raw_attribute } {
+    raw_attribute("style", value)
+}
+
+view Card(value: String) !{} {
+    <section>{styled(value)}</section>
+}

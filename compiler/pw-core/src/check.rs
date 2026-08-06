@@ -1121,7 +1121,27 @@ fn labelled_bindings(
     body: &Body,
     sigs: &Signatures,
 ) -> BTreeMap<String, (Restriction, crate::hir::Span)> {
-    let mut out = BTreeMap::new();
+    let mut out: BTreeMap<String, (Restriction, crate::hir::Span)> = BTreeMap::new();
+    // Iterated, because a label survives being rebound. `let same = token` is
+    // still the secret, and a rule that lost it there would be a rule about
+    // *how the value was spelled at the sink* rather than about the value.
+    // A counterexample found this: the same secret, passed bare instead of
+    // interpolated, with one rebinding on the way.
+    for _ in 0..4 {
+        let before = out.len();
+        gather_labels(body, sigs, &mut out);
+        if out.len() == before {
+            break;
+        }
+    }
+    out
+}
+
+fn gather_labels(
+    body: &Body,
+    sigs: &Signatures,
+    out: &mut BTreeMap<String, (Restriction, crate::hir::Span)>,
+) {
     for id in body.walk() {
         let Expr::Let { pat, init, ty } = body.expr(id) else {
             continue;
@@ -1148,13 +1168,14 @@ fn labelled_bindings(
             Expr::Call { callee, .. } => sigs
                 .by_path(&path_of(body, *callee))
                 .and_then(|s| s.label.restrictions().next().cloned()),
+            // A rebinding carries the label with it.
+            Expr::Name(from) => out.get(from).map(|(r, _)| r.clone()),
             _ => None,
         });
         if let Some(r) = restriction {
-            out.insert(name.clone(), (r, body.expr_span(id)));
+            out.entry(name.clone()).or_insert((r, body.expr_span(id)));
         }
     }
-    out
 }
 
 /// E5 rules that need the body's label, not only the declaration header.

@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: forbidden_effect
+//
+// Structurally different from R-001: the network call is not in the view's own
+// body but two helpers away, and the view declares the effect rather than
+// hiding it. Declaring it is exactly what must not help.
+
+module generality.view_fetch_depth
+
+import Estimates
+import domain.{ Location }
+
+fn nearby(at: Location) -> Result<String, StoreError> !{ network.fetch } {
+    Estimates.for_location(at)
+}
+
+fn label(at: Location) -> Result<String, StoreError> !{ network.fetch } {
+    nearby(at)
+}
+
+view Nearby(at: Location) !{ network.fetch } {
+    <p>{label(at)}</p>
+}

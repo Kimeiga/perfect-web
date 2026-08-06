@@ -1,0 +1,21 @@
+// @status: GENERAL
+// @invariant: dead_internal_link
+//
+// Structurally different from R-023: the route exists but the link has the
+// wrong ARITY — one segment too few, rather than one too many — and the
+// declaring page is in the same file but after the view rather than before it.
+
+module generality.link_arity
+
+import domain.{ StoreId }
+
+view Links(id: StoreId) !{} {
+    <nav aria-label="Store">
+        <a href="/stores">All</a>
+    </nav>
+}
+
+page Detail(id: StoreId) !{} {
+    route "/stores/{id}/menu"
+    view { <main><h1>Menu</h1></main> }
+}

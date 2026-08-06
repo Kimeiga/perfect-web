@@ -105,7 +105,12 @@ fn expand(row: &Row) -> Vec<Row> {
 fn specialize(matrix: &[Row], ctor: usize, arity: usize) -> Vec<Row> {
     let mut out = Vec::new();
     for row in matrix {
-        let (head, rest) = row.split_first().expect("specialize on empty row");
+        // A row with nothing left in it constrains nothing, so it drops out.
+        // See `is_useful` for why these are `else { continue }` and not
+        // `expect`: a `.pw` program reached them and panicked the compiler.
+        let Some((head, rest)) = row.split_first() else {
+            continue;
+        };
         match head {
             Pattern::Wildcard => {
                 let mut r = vec![Pattern::Wildcard; arity];
@@ -113,7 +118,12 @@ fn specialize(matrix: &[Row], ctor: usize, arity: usize) -> Vec<Row> {
                 out.push(r);
             }
             Pattern::Ctor { ctor: c, args } if *c == ctor => {
+                // Padded to the arity the caller is specializing at, for the
+                // same reason: the row and the type list must stay aligned
+                // even when the program's pattern does not match the
+                // constructor's declared shape.
                 let mut r = args.clone();
+                r.resize(arity, Pattern::Wildcard);
                 r.extend_from_slice(rest);
                 out.push(r);
             }
@@ -128,7 +138,9 @@ fn specialize(matrix: &[Row], ctor: usize, arity: usize) -> Vec<Row> {
 fn default_matrix(matrix: &[Row]) -> Vec<Row> {
     let mut out = Vec::new();
     for row in matrix {
-        let (head, rest) = row.split_first().expect("default on empty row");
+        let Some((head, rest)) = row.split_first() else {
+            continue;
+        };
         if matches!(head, Pattern::Wildcard) {
             out.push(rest.to_vec());
         }
@@ -250,18 +262,33 @@ fn is_useful(program: &Program, matrix: &[Row], row: &Row, types: &[Type]) -> bo
     }
     let head_ty = &types[0];
     let rest_ty = &types[1..];
-    let (head, tail) = row.split_first().expect("useful on empty row");
+    // A row shorter than the type list matches nothing, so it is not useful.
+    // This used to be `.expect("useful on empty row")`, and a generality
+    // counterexample reached it — the compiler PANICKED on a `.pw` program.
+    // A crash is a worse failure than a missed diagnostic: it takes every
+    // other rule down with it and reports nothing at all.
+    let Some((head, tail)) = row.split_first() else {
+        return false;
+    };
 
     match head {
         Pattern::Ctor { ctor, args } => {
-            let arity = args.len();
-            let sub = specialize(matrix, *ctor, arity);
             let ctors = program.ctors_of(head_ty).unwrap_or_default();
             let field_types = ctors
                 .get(*ctor)
                 .map(|c| c.fields.clone())
-                .unwrap_or_else(|| vec![Type::Bool; arity]);
-            let mut sub_row = args.clone();
+                .unwrap_or_else(|| vec![Type::Bool; args.len()]);
+            // The pattern's arity and the constructor's declared field count
+            // can disagree — `Cancelled` written without its argument, or a
+            // constructor resolved to the wrong index. The row and the type
+            // list must stay the same length whatever the program says, so
+            // the pattern is padded with wildcards or truncated to fit.
+            let arity = field_types.len();
+            let mut args = args.clone();
+            args.resize(arity, Pattern::Wildcard);
+
+            let sub = specialize(matrix, *ctor, arity);
+            let mut sub_row = args;
             sub_row.extend_from_slice(tail);
             let mut sub_types = field_types;
             sub_types.extend_from_slice(rest_ty);
@@ -444,6 +471,64 @@ mod tests {
         let r = check_match(&p, &ty, &arms);
         assert!(r.is_exhaustive(), "{:?}", r.missing);
         assert!(r.unreachable.is_empty());
+    }
+
+    #[test]
+    fn a_pattern_whose_arity_disagrees_with_its_constructor_does_not_crash() {
+        // Found by a generality counterexample, which panicked the whole
+        // compiler rather than reporting anything. `Cancelled` is declared
+        // with one field and written here with none; the row and the type
+        // list must stay the same length whatever the program says.
+        let mut p = Program::new();
+        let reason = p.declare_adt(
+            "Reason",
+            vec![Ctor {
+                name: "Late".into(),
+                fields: vec![],
+            }],
+        );
+        let state = p.declare_adt(
+            "State",
+            vec![
+                Ctor {
+                    name: "Placed".into(),
+                    fields: vec![],
+                },
+                Ctor {
+                    name: "Cancelled".into(),
+                    fields: vec![Type::Adt(reason)],
+                },
+            ],
+        );
+        let report = check_match(
+            &p,
+            &Type::Adt(state),
+            &[
+                arm(Pattern::Ctor {
+                    ctor: 0,
+                    args: vec![],
+                }),
+                // One field declared, none written.
+                arm(Pattern::Ctor {
+                    ctor: 1,
+                    args: vec![],
+                }),
+            ],
+        );
+        // The point is that this returns at all. Both constructors are
+        // mentioned, so nothing is missing.
+        assert!(report.missing.is_empty(), "{:?}", report.missing);
+
+        // And the opposite mismatch — more arguments than fields.
+        let report = check_match(
+            &p,
+            &Type::Adt(state),
+            &[arm(Pattern::Ctor {
+                ctor: 0,
+                args: vec![Pattern::Wildcard, Pattern::Wildcard],
+            })],
+        );
+        assert!(!report.missing.is_empty(), "`Cancelled` is still missing");
     }
 
     #[test]

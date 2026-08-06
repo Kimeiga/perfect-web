@@ -1,0 +1,21 @@
+// @status: GENERAL
+// @invariant: declared_placement_cannot_grant
+//
+// Structurally different from R-025: a different world (edge, not origin), a
+// different capability family (secret, not device), and the effect arrives
+// through a helper rather than a direct call.
+
+module generality.placement_edge_secret
+
+import Payments
+
+fn charge_now(order: OrderId) -> Result<Int, PaymentError> !{ secret.read, network.fetch } {
+    Payments.charge(order, 100)
+}
+
+query EdgePrice(order: OrderId) -> Result<Int, PaymentError>
+    placement edge
+    cache     private
+{
+    charge_now(order)
+}

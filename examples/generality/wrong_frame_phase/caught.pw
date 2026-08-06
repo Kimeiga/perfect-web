@@ -1,0 +1,25 @@
+// @status: GENERAL
+// @invariant: wrong_frame_phase
+//
+// Structurally different from R-035: the write is not in the measure block's
+// own text but inside a helper the measure block calls, and the receiver is a
+// bound local rather than `self`.
+
+module generality.phase_via_helper
+
+import style
+import browser.{ ElementRef }
+
+fn widen(target: ElementRef) -> () !{ style.mutate<LayoutAffect> } {
+    target.style.set_width(10.px)
+}
+
+component Row() {
+    placement browser
+    frame {
+        measure {
+            let el = self
+            widen(el)
+        }
+    }
+}

@@ -1,0 +1,20 @@
+// @status: NARROW
+// @invariant: option_used_as_value
+//
+// The gap in `annotations.rs`, as an executable program.
+//
+// Identical to R-008 except that the annotation is absent. `Stores.find`
+// returns `Option<Store>` and its signature says so, so the type is knowable —
+// but the rule fires only where the author WROTE the type, and here nobody did.
+//
+// This file must compile clean today. When inference reaches the initialiser's
+// return type it must stop compiling, and this file moves to `caught.pw`.
+
+module generality.option_unannotated
+
+import Stores
+
+fn store_name(id: StoreId) -> String !{ database.read<Stores> } {
+    let store = Stores.find(id)
+    store.name
+}
