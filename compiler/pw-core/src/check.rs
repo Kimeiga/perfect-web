@@ -1756,6 +1756,60 @@ fn effect_rows(
         });
     }
 
+    // Charter §8.2, §17.5: an escape hatch needs an audit record, and a
+    // declaration that has none is the most incomplete record there is.
+    //
+    // The rule in `markup_rules` checks a record the author WROTE for
+    // completeness. This is the other half: `raw_html` is not a name the
+    // compiler recognises, it is a function whose row says `unsafe.raw_html`,
+    // so declaring a new escape hatch in a platform package brings its own
+    // audit requirement with it.
+    if !has_audit_record(body) {
+        for source in &found.sources {
+            if crate::effects::family_of(&source.effect) != "unsafe"
+                || !reported.insert(source.effect.clone())
+            {
+                continue;
+            }
+            out.push(Diagnostic {
+                code: crate::codes::UNSAFE_AUDIT_INCOMPLETE.id,
+                invariant: crate::codes::UNSAFE_AUDIT_INCOMPLETE.invariant,
+                reason: "unsafe_effect_without_audit_record",
+                detector: Detector::PatternMatrix,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` requires the `{}` capability and a justification",
+                    source.via.callee(),
+                    source.effect
+                ),
+                primary_span: source.span.clone(),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id_of(hir, decl)),
+                    label: format!("`{}` declares no capability", decl.name),
+                }],
+                explanation: Some(format!(
+                    "Escaping is the default, so reaching `{}` is a decision rather \
+                     than a detail — untrusted input reaching `{}` is an XSS sink. \
+                     {}. Adding the effect to the row would not help: the row says \
+                     what happens, and the capability says who decided it was \
+                     necessary and why.",
+                    source.via.callee(),
+                    source.via.callee(),
+                    source.via.describe()
+                )),
+                repairs: vec![Repair {
+                    description: format!(
+                        "write `unsafe capability {} because \"…\" \
+                         attributes_forced_layout_to Owner`, or escape the value with \
+                         `html.text`",
+                        source.effect
+                    ),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+
     // The row as written, by path.
     let declared: Option<Vec<String>> = decl
         .declared_effects
@@ -1864,6 +1918,23 @@ fn effect_rows(
             }],
         });
     }
+}
+
+/// Does this declaration carry an audit record for an escape hatch?
+///
+/// Deliberately not "does it declare the matching capability by name". The
+/// record's job is to say that a human decided the compiler's rule is wrong
+/// here and why; `markup_rules` then checks that record is complete. Requiring
+/// a name match as well would report the same missing record twice, in two
+/// vocabularies.
+fn has_audit_record(body: &Body) -> bool {
+    body.walk().into_iter().any(|id| {
+        matches!(
+            body.expr(id),
+            Expr::Keyword { keyword, justification, .. }
+                if keyword.starts_with("unsafe") && justification.is_some()
+        )
+    })
 }
 
 /// Is this declaration's output computed once and reused, or recomputed for

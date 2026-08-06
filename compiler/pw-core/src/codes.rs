@@ -249,11 +249,6 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
         "route reachability — a route nothing can reach",
     ),
     (
-        "PW0322",
-        "E5",
-        "capability checking — raw HTML without the capability",
-    ),
-    (
         "PW0328",
         "E7",
         "resumption manifest — private data crossing into the public shell",

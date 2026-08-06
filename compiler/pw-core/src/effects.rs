@@ -66,9 +66,25 @@ pub enum Via {
 }
 
 impl Via {
+    /// The thing that actually performs the effect, whatever route it took to
+    /// get here. A diagnostic about an escape hatch has to name the hatch.
+    pub fn callee(&self) -> &str {
+        match self {
+            Via::Direct { callee } | Via::Helper { callee, .. } | Via::Callback { callee, .. } => {
+                callee
+            }
+        }
+    }
+
     pub fn describe(&self) -> String {
         match self {
             Via::Direct { callee } => format!("`{callee}` performs it"),
+            // A helper that IS the callee is a direct call that arrived by the
+            // helper route. "`raw_html` calls `raw_html`" reads as a bug in the
+            // compiler rather than a fact about the program.
+            Via::Helper { helper, callee } if helper == callee => {
+                format!("`{callee}` performs it")
+            }
             Via::Helper { helper, callee } => {
                 format!("`{helper}` calls `{callee}`, which performs it")
             }
@@ -128,7 +144,7 @@ fn covered(declared: &BTreeSet<&str>, effect: &str) -> bool {
 /// `secret<Payments>` has no dot at all — comparing families without stripping
 /// made a row declaring `secret<Payments>` fail to cover `secret.read`, and two
 /// corpus fixtures were reported for an effect they had declared.
-fn family_of(effect: &str) -> &str {
+pub fn family_of(effect: &str) -> &str {
     let base = effect.split('<').next().unwrap_or(effect);
     base.split('.').next().unwrap_or(base)
 }

@@ -12,6 +12,8 @@
 
 module store.description_view
 
+import html.{ raw_html }
+
 view StoreDescription(description: String) !{} {
     <section>
         // ERROR: raw HTML injection without capability or justification.

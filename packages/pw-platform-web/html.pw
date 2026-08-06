@@ -1,0 +1,29 @@
+// @corpus: platform
+// @id: PLATFORM-html
+// @category: platform — markup escaping
+// @charter: §8.2, §17.5
+// @milestone: E5
+//
+// Escaping is the default, so the only thing that needs declaring is the
+// escape hatch. `raw_html` carries `!{ unsafe.raw_html }` rather than being a
+// name a checker recognises: the audit rule then asks "does this declaration
+// perform an unsafe effect", and every future escape hatch is covered by
+// declaring its own row instead of by editing the compiler.
+
+module html
+
+// The rendered fragment types. Opaque: a value only becomes one by going
+// through a function here, so there is no way to construct markup that has
+// not passed either the escaper or an audited escape hatch.
+opaque type Html = String
+
+opaque type Attr = String
+
+// Escapes its input. The ordinary path, and it needs no capability.
+fn text(value: String) -> Html !{} { todo }
+
+// Does NOT escape. An XSS sink by construction, which is why it is an effect.
+fn raw_html(markup: String) -> Html !{ unsafe.raw_html } { todo }
+
+// Bypasses the sanitiser for an attribute value.
+fn raw_attribute(name: String, value: String) -> Attr !{ unsafe.raw_attribute } { todo }

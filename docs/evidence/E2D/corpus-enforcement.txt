@@ -1,7 +1,7 @@
 corpus enforcement — every rejected fixture, checked as its own program
 (the shared library, the accepted modules it imports, and the fixture)
 
-34/44 enforce their declared invariant
+35/44 enforce their declared invariant
 
 R-001  enforced                  PW0401 (declared PW0300)
        network request inside view
@@ -49,7 +49,7 @@ R-022  UNCAUGHT                  PW0320
        form handler type mismatch
 R-023  UNCAUGHT                  PW0321
        dead internal route
-R-024  UNCAUGHT                  PW0322
+R-024  enforced                  PW5010 (declared PW0322)
        raw unsafe HTML without capability
 R-025  enforced                  PW5005 (declared PW0323)
        browser-only API on origin

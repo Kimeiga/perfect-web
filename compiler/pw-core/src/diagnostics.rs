@@ -215,6 +215,8 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // Both are "an unsafe escape hatch must record why it is necessary": one
     // written with no justification at all, one with an unaudited use.
     ("PW0329", "PW5010"),
+    // R-024 has no audit record at all, which is the most incomplete one.
+    ("PW0322", "PW5010"),
     ("PW3010", "PW5010"),
 ];
 
