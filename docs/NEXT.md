@@ -84,17 +84,16 @@ The only unmet part of the E0 gate. Risk R11 remains the highest-likelihood open
 risk. Deferred by operator decision to before **E3**; it is cheap now and
 expensive once generated file paths and asset casing start to matter.
 
-1. `.github/workflows/ci.yml`: run `just ci` on `ubuntu-latest` (x64 and arm64).
-2. Give `scripts/bootstrap.sh` a Linux branch — the same upstream releases ship
-   `koka-v3.2.3-linux-{arm64,x64}.tar.gz` and
-   `wasmtime-v47.0.3-{aarch64,x86_64}-linux.tar.xz`. Keep the SHA-256 verification.
-3. Add a case-collision check; macOS will not catch it.
-4. Add `cargo-deny` (licenses + advisories) and `pnpm audit`. Charter §3.6
-   requires both in CI and neither runs.
+| # | part | state |
+|---|---|---|
+| 1 | `.github/workflows/ci.yml` on ubuntu-24.04 x64 **and** arm64 | written; YAML parses; **never executed** |
+| 2 | `scripts/bootstrap.sh` Linux branches, SHA-256 verified | written; checksums computed from the downloaded artifacts; macOS path re-verified; Linux path not executed |
+| 3 | case-collision check | **done** — `just case-check` in `just ci`, with a synthetic collision as its control |
+| 4 | `cargo deny` + Node advisory gate | **done** — `just audit`, both clean; one esbuild advisory accepted with a written reason |
 
-**Acceptance:** `just ci` green on Linux; a deliberately case-colliding path
-fails the build; `cargo-deny check` passes against the licenses recorded in
-`docs/research/technology-matrix.md`.
+**Acceptance, restated honestly:** items 3 and 4 are met. Items 1 and 2 are met
+only in the sense that the code exists; neither has run on Linux. Do not record
+R11 as retired until a real run is green.
 
 ---
 

@@ -66,8 +66,9 @@ rejected-corpus count, which E1 and E5 own.
 published — several claims it needs are unstarted, and of 44 rejected corpus
 files **5 are rejected by the compiler**, not the ≥40 the charter asks for.
 
-**last passing commit:** `04d41fa` — the Koka backend.
-`just ci` passes at that commit on macOS 26.5.2 / arm64, with 206 tests.
+**last passing commit:** `7630593` — Linux CI and supply-chain scanning.
+`just ci` passes at that commit on macOS 26.5.2 / arm64, with 207 tests.
+`just audit` is clean; `just spike-pw-to-koka` executes generated Koka.
 
 ---
 
@@ -89,11 +90,15 @@ All seven charter §14 M0 gate items:
 
 **None outstanding.** One partial:
 
-- **Gate item 7 is macOS-only.** Linux CI is not wired up (`.github/workflows/`
-  is empty), so charter §13.5 case-sensitivity checks and §3.6 license/vulnerability
-  scanning do not run. Does not block Milestone 1 (nothing in it is
-  platform-sensitive); **deferred by operator decision to before Milestone 3**.
-  Risk R11.
+- **Gate item 7 is still macOS-only, but no longer unaddressed.**
+  `.github/workflows/ci.yml` now runs `just ci` on ubuntu-24.04 x64 and arm64,
+  `scripts/bootstrap.sh` has Linux branches with checksums computed from the
+  downloaded artifacts, `just case-check` guards charter §13.5, and `just audit`
+  runs `cargo deny` plus a Node advisory gate for §3.6 — all four green locally.
+  **The workflow has never executed**: pushing needs authorization this session
+  does not have. Risk R11 is *reduced, not retired*; see
+  `docs/KNOWN_LIMITATIONS.md` for which rows are verified and which are only
+  written.
 
 ---
 
