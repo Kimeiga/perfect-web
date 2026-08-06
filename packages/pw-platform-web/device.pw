@@ -1,0 +1,18 @@
+// @corpus: platform
+// @id: PLATFORM-device
+// @category: platform — the device
+// @charter: §7.3, §7.9
+// @milestone: E5
+//
+// The device exists where the user is. `device.*` is granted by the browser
+// world and by no other, which is what makes a geolocation read inside an
+// origin-placed query a placement error (corpus R-025) rather than a runtime
+// failure in production.
+
+module device
+
+import domain.{ Location }
+
+fn current_location() -> Location !{ device.location } { todo }
+
+fn permission_state(name: String) -> String !{ device.query } { "" }

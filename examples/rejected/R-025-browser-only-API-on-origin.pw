@@ -13,6 +13,7 @@
 module delivery.estimate
 
 import Estimates
+import device
 
 query DeliveryEstimate(session: SessionId) -> Result<DeliveryEstimate, EstimateError>
     placement origin

@@ -483,6 +483,45 @@ pub fn deferred_spans(body: &Body) -> Vec<Span> {
     out
 }
 
+/// Spans that **name** another declaration rather than calling it.
+///
+/// `depends_on Store(id), Menu(id)` looks exactly like two calls, and it is
+/// not: charter §9.4 makes it a declaration that this materialization is
+/// derived from those two, which run at their own placement and hand their
+/// result over. Attributing their effects here reported `A-009` — an edge
+/// materialization of an origin-backed query, which is the whole point of the
+/// feature — as an edge world that cannot reach the database.
+///
+/// The shape in the body is a clause keyword followed by the declarations it
+/// names, until the next clause begins:
+///
+/// ```text
+/// depends_on      <- Name
+/// Store(id)       <- Call, named not called
+/// Menu(id)        <- Call, named not called
+/// invalidates_on  <- Name, the clause ends
+/// ```
+pub fn delegated_spans(body: &Body) -> Vec<Span> {
+    const NAMING_CLAUSES: &[&str] = &["depends_on", "invalidates_on", "derives_from"];
+    let mut out = Vec::new();
+    for id in body.walk() {
+        let Expr::Block { stmts } = body.expr(id) else {
+            continue;
+        };
+        let mut naming = false;
+        for s in stmts {
+            match body.expr(*s) {
+                Expr::Name(n) => naming = NAMING_CLAUSES.contains(&n.as_str()),
+                Expr::Call { .. } if naming => out.push(body.expr_span(*s)),
+                // Anything else ends the clause. A clause's members are calls;
+                // the moment something else appears, the clause is over.
+                _ => naming = false,
+            }
+        }
+    }
+    out
+}
+
 /// The frame phase a span sits inside, innermost first.
 ///
 /// Charter §7.5A gives the frame a shape: measure, then mutate, then paint,
@@ -815,6 +854,8 @@ mod tests {
             "an ordinary fn may read the database if it says so"
         );
 
+        // (see below for the delegation control)
+
         // Reuse, not the declaration kind, is what makes a clock read wrong.
         // The same page is fine when it is rendered for its reader.
         let page = crate::hir::Decl {
@@ -835,6 +876,48 @@ mod tests {
         assert!(
             forbidden_in(&page, Reuse::Build, "clock.read").is_none(),
             "a duration measurement does not make a build artifact irreproducible"
+        );
+    }
+
+    /// A suppressor is how a check quietly stops measuring, so this one gets a
+    /// control: naming a declaration is filtered, calling one is not, and the
+    /// two appear in the same body.
+    #[test]
+    fn naming_a_declaration_is_filtered_but_calling_one_is_not() {
+        let src = "module m\n\
+                   \n\
+                   materialize F(id: Int) {\n\
+                       placement edge\n\
+                       depends_on Store(id)\n\
+                       view { Store(id) }\n\
+                   }\n";
+        let hir = lower_file(src, &parse_tree(src).green);
+        let (_, decl) = hir.all_decls().next().expect("the materialization");
+        let body = hir.body(decl.body.expect("body"));
+        let spans = delegated_spans(body);
+
+        assert_eq!(
+            spans.len(),
+            1,
+            "exactly the `depends_on` member is delegated, not every `Store(id)`"
+        );
+        let text = |s: &Span| &src[s.start..s.end];
+        assert_eq!(text(&spans[0]), "Store(id)");
+
+        // The one inside `view` is the same text at a different place, and it
+        // IS this body calling it. Without this half, the filter could suppress
+        // every occurrence of a named declaration anywhere in the body and the
+        // corpus would not notice.
+        let in_view = body
+            .walk()
+            .into_iter()
+            .map(|e| body.expr_span(e))
+            .filter(|s| text(s) == "Store(id)")
+            .count();
+        assert!(in_view >= 2, "both occurrences should exist in the body");
+        assert!(
+            spans[0].start < src.find("view").expect("view clause"),
+            "the delegated span is the one in `depends_on`, not the one in `view`"
         );
     }
 }

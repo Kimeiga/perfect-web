@@ -1631,7 +1631,20 @@ fn effect_rows(
             types.insert(name.clone(), ty.path.clone());
         }
     }
-    let found = inference.infer_in(body, &types);
+    let mut found = inference.infer_in(body, &types);
+
+    // A clause that NAMES another declaration is not this body performing its
+    // effects. Filtered once, here, so every check below sees the same set —
+    // the placement check, the phase check, the context check and the row
+    // check would otherwise each need their own copy of the distinction.
+    let delegated = crate::effects::delegated_spans(body);
+    found.sources.retain(|s| {
+        !delegated
+            .iter()
+            .any(|d| d.start <= s.span.start && s.span.end <= d.end)
+    });
+    found.effects = found.sources.iter().map(|s| s.effect.clone()).collect();
+    let found = found;
     // Work inside an event handler, a streamed region or a later frame phase is
     // not done *during render*, so the render-time restriction does not apply
     // to it. Charter §7.5A.
@@ -1748,6 +1761,74 @@ fn effect_rows(
         .declared_effects
         .as_ref()
         .map(|r| r.iter().map(|e| e.written.clone()).collect());
+
+    // A placement the author NAMED must be able to grant what the body needs.
+    //
+    // `rules.rs` already checks this against the DECLARED row. That is not
+    // enough on its own, and R-025 is why: its query names `placement origin`
+    // and declares no row at all, so there was nothing to compare and a
+    // registered rule sat silent. The effects are inferred; the placement is
+    // declared; the check is the intersection.
+    if let Some(world) = declared_world(hir, decl) {
+        let declared_names: BTreeSet<&str> = declared
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let mut said: BTreeSet<String> = BTreeSet::new();
+        for source in &found.sources {
+            // Leave the declared ones to `rules.rs`, which reports them against
+            // the row the author wrote and at that row's span.
+            if declared_names.contains(source.effect.as_str())
+                || world.grants(&source.effect)
+                || !said.insert(source.effect.clone())
+            {
+                continue;
+            }
+            let family = source.effect.split('.').next().unwrap_or(&source.effect);
+            let elsewhere = World::worlds_for(family).unwrap_or(&[]);
+            let elsewhere = elsewhere
+                .iter()
+                .map(|w| format!("`{w:?}`"))
+                .collect::<Vec<_>>()
+                .join(" or ");
+            out.push(Diagnostic {
+                code: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.id,
+                invariant: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.invariant,
+                reason: "inferred_effect_outside_declared_placement",
+                detector: Detector::PatternMatrix,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` is not available at placement {world:?}",
+                    source.effect
+                ),
+                primary_span: source.span.clone(),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id_of(hir, decl)),
+                    label: format!("`{}` is placed in {world:?}", decl.name),
+                }],
+                explanation: Some(format!(
+                    "The {world} world grants no {family} capabilities; only {} can. \
+                     {}. The row does not name this effect, so nothing said so \
+                     until the body was read.",
+                    if elsewhere.is_empty() {
+                        "no world"
+                    } else {
+                        elsewhere.as_str()
+                    },
+                    source.via.describe()
+                )),
+                repairs: vec![Repair {
+                    description: format!(
+                        "move this into a declaration placed in {elsewhere}, and pass \
+                         its result in"
+                    ),
+                    replacement: None,
+                }],
+            });
+        }
+    }
     for source in found.undeclared(declared.as_deref()) {
         // Same distinction: an event handler's effects and a streamed region's
         // are not the enclosing view's row. The handler is a separate body that
