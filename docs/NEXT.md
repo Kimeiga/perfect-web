@@ -17,8 +17,8 @@ Fixed by the project architect after reviewing E2's results. Items 1–3 are don
 | 1 | Correct the E7 evidence wording — Marko is a resumption/DOM oracle, not a lazy-loading one | **done** |
 | 2 | Adopt Rowan | **done** — green tree, `SyntaxKind`, invariants carried over, 68/68 corpus files round-trip |
 | 3 | Write the formatter ADR, do not implement | **done** (ADR-0013) |
-| 4 | Implement the durable core body grammar | **next** — expression and pattern kinds are already reserved in `SyntaxKind` |
-| 5 | Lower bodies into HIR | after 4 |
+| 4 | Implement the durable core body grammar | **done** — 68/68 corpus files parse and round-trip; see `docs/milestones/E2.md` |
+| 5 | Lower bodies into HIR | **next** — the single missing link between the corpus and the tested checkers |
 | 6 | Move declaration rules from `pw-cli` into `pw-core` | **done** |
 | 7 | Connect the tested `pw-core` algorithms to `.pw` source | after 5 |
 | 8 | Ratchet semantic corpus enforcement upward from 4/44 | continuous |

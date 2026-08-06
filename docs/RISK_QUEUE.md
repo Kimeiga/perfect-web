@@ -193,8 +193,9 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Three measurements in this project produced plausible, favourable numbers while
-measuring nothing:
+Nine measurements in this project produced plausible, favourable results while
+measuring nothing. The count is kept accurate deliberately: it is the argument
+for the admissibility rule above.
 
 | where | what it reported | what was actually happening |
 |---|---|---|
@@ -203,6 +204,16 @@ measuring nothing:
 | RQ-1 F-4 | "silent failure, no error signal" | resource-load errors do not bubble; only a capture-phase listener sees them |
 | RQ-2 F-2 | a generic helper reported as **pure** | an effect-polymorphic row variable fell through to the "total" branch |
 | E2 | `pw check` green on 68 files | 13 of them were malformed and no tool had ever read their bodies |
+| E2 grammar | 56/68 files parsed; the other 12 were called "exotic forms" | a missing closer was consumed by a bare `eat` whose failure was discarded, so five files' lambdas never parsed at all. Making it an error found four real defects underneath |
+| E2 grammar | `a >= b` parsed without complaint | it lexed as `>` then `=` and parsed as `a > (= b)` |
+| E2 grammar | an error on `</main>` | the real fault was two lines earlier: `expr` crossed a newline into `<` and parsed markup as a comparison |
+| E2 grammar | a statement parsed, the next one failed | a modifier loop crossed the newline and ate the next statement's first token |
+
+The last four share one shape: **the diagnostic pointed at the line after the
+defect.** A parser that recovers silently moves the blame downstream, which is
+why the errors read as "exotic corpus syntax" rather than as parser bugs. The
+countermeasure is in the E2 tests — every construct asserts its tree *shape*,
+so a wrong parse fails where it happens instead of somewhere plausible.
 
 All five were caught by looking at a raw number and asking whether it was
 plausible — never by a test going red.

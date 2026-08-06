@@ -83,6 +83,27 @@ E7-R (resumption/DOM), E7-P (patch semantics), E7-L (lazy loading). Marko is the
 accepted oracle for E7-R only; it **fails** E7-L. The undifferentiated sentence
 "Marko is the E7 oracle" is forbidden.
 
+**2026-08-05 — four small syntax decisions forced by the body grammar.**
+None is large enough for an ADR; all four are load-bearing for the tree shape.
+*Compound comparisons* (`==` `!=` `<=` `>=`) lex as one token, while `<` and
+`>` stay separate because they also delimit type arguments — the joined forms
+are unambiguous since a type argument list is never followed directly by `=`.
+*An infix operator that can also begin an expression* (`<`, `-`, `!`) may not
+begin a line; without the rule, `let s = f(id)` followed by `<main>` parses as
+one comparison. *Dotted paths are not absorbed* in expression position: the
+parser cannot distinguish `Stores.get` from `store.name` and must not pretend
+to, so every `.ident` is a field access and name resolution folds the segments
+that turn out to be a module path. *Triple-quoted strings* carry wrapped
+`because "..."` justifications, leaving the single-quoted form ending at the
+newline, which is the error-recovery property worth keeping.
+
+**2026-08-05 — silent parser recovery is a defect, not a convenience.**
+Three closers were consumed with a bare `eat` whose `false` was discarded.
+Turning them into diagnostics moved coverage from 56/68 corpus files to 68/68,
+because the silence was hiding four real defects — each of which reported its
+error one line *after* the cause. Recovery must continue parsing; it must not
+continue quietly.
+
 **2026-08-05 — `just ci` runs `clippy -D warnings`.**
 Dead code is treated as a signal, not noise: the first `-D warnings` failure
 surfaced genuinely unused model surface, which was resolved by *using* it
