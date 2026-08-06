@@ -100,6 +100,15 @@ pub enum NodeKind {
         partition: Option<String>,
         /// `public`, `session` or `private`.
         privacy: Option<String>,
+        /// The `key` policy's components, in order. `key store, experiment`
+        /// gives `["store", "experiment"]`.
+        ///
+        /// What a resource's entries are separated BY, which is the question a
+        /// key audit asks of everything that reads it: a fragment keyed by
+        /// less than its dependency is a fragment two readers share when they
+        /// should not.
+        #[serde(default)]
+        key: Vec<String>,
     },
     /// A `materialize` declaration.
     Materialization {
@@ -392,24 +401,108 @@ impl Graph {
         out
     }
 
-    /// The dimensions this materialization's key does NOT include.
+    /// What a materialization's cache key separates, and what it does not.
     ///
-    /// Charter §14 M6 task 9 — cache-key auditing. Reported as what is absent,
-    /// because that is the direction that hurts: a key with an extra dimension
-    /// costs hit rate, and a key missing one serves the wrong reader.
-    pub fn key_gaps(&self, path: &str) -> Vec<Dimension> {
-        let Some(Node {
-            kind: NodeKind::Materialization { varies_by, .. },
+    /// Charter §14 M6 task 9 — cache-key auditing. Reported from `pw explain`,
+    /// as advice rather than as a diagnostic, because the compiler cannot
+    /// always tell a deliberate omission from a mistake: two readers sharing an
+    /// entry is sometimes exactly what a cache is for.
+    ///
+    /// The one case that is never deliberate — the build that produced the
+    /// artifact — is not here at all. `PW5102` used to ask the author for it and
+    /// was retired on the architect's ruling of 2026-08-06: injecting a
+    /// compatibility generation is platform mechanism, not application policy.
+    /// So this concerns the **application-semantic** dimensions the compiler
+    /// cannot safely supply on anyone's behalf.
+    pub fn key_audit(&self, path: &str) -> Option<KeyAudit> {
+        let node = self.node(path)?;
+        let NodeKind::Materialization {
+            varies_by,
+            partition,
             ..
-        }) = self.node(path)
+        } = &node.kind
         else {
-            return Vec::new();
+            return None;
         };
-        Dimension::ALL
-            .into_iter()
-            .filter(|d| !varies_by.contains(d))
-            .collect()
+
+        // A dependency's key component that the fragment does not supply and
+        // does not vary by. The fragment then has ONE entry for what the
+        // resource has several of, so two readers who would receive different
+        // data share a document.
+        let mut gaps = Vec::new();
+        for e in &self.edges {
+            if e.from != path || e.kind != EdgeKind::Reads {
+                continue;
+            }
+            let Some(Node {
+                kind: NodeKind::Resource { key, .. },
+                name: dep,
+                params,
+                ..
+            }) = self.node(&e.to)
+            else {
+                continue;
+            };
+            for component in key {
+                // Supplied positionally: `Menu(id)` gives the resource's first
+                // parameter, so a key component naming that parameter is
+                // covered by the fragment's own logical key.
+                let supplied = params
+                    .iter()
+                    .position(|p| p == component)
+                    .is_some_and(|i| i < e.key.len());
+                let varied = varies_by.iter().any(|d| d.keyword() == component.as_str());
+                if !supplied && !varied {
+                    gaps.push(KeyGap {
+                        resource: dep.clone(),
+                        component: component.clone(),
+                        why: format!(
+                            "`{dep}` separates its entries by `{component}`, and \
+                             `{}` neither passes it nor includes it in its key, so \
+                             one document serves every value of it",
+                            node.name
+                        ),
+                    });
+                }
+            }
+        }
+        gaps.sort_by(|a, b| (&a.resource, &a.component).cmp(&(&b.resource, &b.component)));
+        gaps.dedup();
+
+        Some(KeyAudit {
+            fragment: node.name.clone(),
+            logical_key: node.params.clone(),
+            partition: partition.clone(),
+            application: Dimension::ALL
+                .into_iter()
+                .filter(|d| *d != Dimension::PrivacyPartition)
+                .map(|d| (d, varies_by.contains(&d)))
+                .collect(),
+            gaps,
+        })
     }
+}
+
+/// What one materialization's key separates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyAudit {
+    pub fragment: String,
+    /// The application's own key: the declaration's parameters.
+    pub logical_key: Vec<String>,
+    /// `public` or `private`, which is the privacy partition.
+    pub partition: Option<String>,
+    /// The dimensions an application decides, and whether this key includes
+    /// each. The compatibility generation is not among them: it is injected.
+    pub application: Vec<(Dimension, bool)>,
+    pub gaps: Vec<KeyGap>,
+}
+
+/// A dependency that separates its entries by something this key does not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyGap {
+    pub resource: String,
+    pub component: String,
+    pub why: String,
 }
 
 fn qualified(module: &str, name: &str) -> String {
@@ -426,6 +519,14 @@ fn node_kind(decl: &Decl) -> Option<NodeKind> {
         DeclKind::Query | DeclKind::Subscription | DeclKind::Resource => NodeKind::Resource {
             partition: value("cache").or_else(|| value("partition")),
             privacy: decl.visibility.clone(),
+            key: value("key")
+                .map(|v| {
+                    v.split(',')
+                        .map(|k| k.trim().to_string())
+                        .filter(|k| !k.is_empty() && k != "()")
+                        .collect()
+                })
+                .unwrap_or_default(),
         },
         DeclKind::Materialize => NodeKind::Materialization {
             placement: value("placement"),
@@ -697,6 +798,7 @@ pub fn check(hir: &Hir, g: &Graph, out: &mut Vec<Diagnostic>) {
                     NodeKind::Resource {
                         partition: rp,
                         privacy,
+                        ..
                     },
                 name: dep,
                 ..

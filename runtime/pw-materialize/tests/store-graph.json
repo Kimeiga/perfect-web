@@ -48,6 +48,9 @@
       "node": "resource",
       "partition": "private",
       "privacy": "session",
+      "key": [
+        "session"
+      ],
       "params": [
         "session"
       ]
@@ -58,6 +61,9 @@
       "node": "resource",
       "partition": "shared",
       "privacy": "public",
+      "key": [
+        "id"
+      ],
       "params": [
         "id"
       ]
@@ -68,6 +74,9 @@
       "node": "resource",
       "partition": "shared",
       "privacy": "public",
+      "key": [
+        "id"
+      ],
       "params": [
         "id"
       ]
@@ -78,6 +87,9 @@
       "node": "resource",
       "partition": "shared",
       "privacy": "public",
+      "key": [
+        "id"
+      ],
       "params": [
         "id"
       ]
@@ -107,6 +119,7 @@
       "node": "resource",
       "partition": "private",
       "privacy": "session",
+      "key": [],
       "params": [
         "session"
       ]
@@ -117,6 +130,9 @@
       "node": "resource",
       "partition": "shared",
       "privacy": "public",
+      "key": [
+        "id"
+      ],
       "params": [
         "id"
       ]
@@ -127,6 +143,9 @@
       "node": "resource",
       "partition": "shared",
       "privacy": "public",
+      "key": [
+        "id"
+      ],
       "params": [
         "id"
       ]

@@ -96,7 +96,17 @@ fn render_findings(source: &str, path: &str, found: &[Diagnostic], styled: bool)
 /// parser, and E6 showed what two parsers cost — a `materialize` block had
 /// policies to one of them and none to the other, in the same build, for the
 /// same file. There is now one parser that decides what a `.pw` program means.
-fn explain(hir: &pw_core::hir::Hir, source: &str) -> String {
+/// `explain`, with the whole-program graph when the caller has one.
+///
+/// A materialization's key audit is a whole-program question — what a fragment
+/// separates depends on what its dependencies separate — so a single-file
+/// `explain` cannot answer it and says so rather than printing a smaller
+/// answer that looks complete.
+fn explain_with(
+    hir: &pw_core::hir::Hir,
+    source: &str,
+    graph: Option<&pw_core::graph::Graph>,
+) -> String {
     use pw_core::hir::DeclKind;
     use std::fmt::Write as _;
     let mut s = String::new();
@@ -223,6 +233,15 @@ fn explain(hir: &pw_core::hir::Hir, source: &str) -> String {
                         "             WARNING: a {label} value in a shared cache is rejected at E5"
                     );
                 }
+                if d.kind == DeclKind::Materialize {
+                    let module = hir.module_of(id).unwrap_or_default();
+                    let path = if module.is_empty() {
+                        name.to_string()
+                    } else {
+                        format!("{module}.{name}")
+                    };
+                    s.push_str(&key_audit(graph, &path));
+                }
             }
             DeclKind::View | DeclKind::Component | DeclKind::Page => {
                 let noun = noun_of(d.kind);
@@ -251,6 +270,73 @@ fn explain(hir: &pw_core::hir::Hir, source: &str) -> String {
             .max(1);
         let _ = writeln!(s, "             line {line}");
         let _ = writeln!(s);
+    }
+    s
+}
+
+/// Charter §14 M6 task 9 — cache-key auditing.
+///
+/// Reported as advice, not as a diagnostic. The compiler cannot always tell a
+/// deliberate omission from a mistake: two readers sharing an entry is
+/// sometimes exactly what a cache is for. What it CAN do is say which
+/// dimensions the key separates and which a dependency separates that this key
+/// does not, and let a reader decide.
+///
+/// The build that produced the artifact is deliberately absent from the
+/// application section. `PW5102` used to ask the author for it and was retired
+/// — injecting a compatibility generation is platform mechanism.
+fn key_audit(graph: Option<&pw_core::graph::Graph>, path: &str) -> String {
+    use std::fmt::Write as _;
+    let mut s = String::new();
+    let Some(g) = graph else {
+        // Said rather than omitted. A smaller answer that looks complete is
+        // the failure mode this whole milestone was about.
+        let _ = writeln!(
+            s,
+            "             key audit: needs the whole program; pass every file"
+        );
+        return s;
+    };
+    let Some(a) = g.key_audit(path) else {
+        return s;
+    };
+
+    let _ = writeln!(s, "             logical key");
+    if a.logical_key.is_empty() {
+        let _ = writeln!(s, "               (none — one entry for every reader)");
+    }
+    for k in &a.logical_key {
+        let _ = writeln!(s, "               {k}");
+    }
+
+    let _ = writeln!(s, "             automatic platform dimensions");
+    let _ = writeln!(s, "               build generation    included");
+    let _ = writeln!(
+        s,
+        "               privacy partition   {}",
+        a.partition.as_deref().unwrap_or("NOT DECLARED")
+    );
+
+    let _ = writeln!(s, "             application dimensions");
+    for (d, present) in &a.application {
+        let _ = writeln!(
+            s,
+            "               {:<19} {}",
+            d.keyword(),
+            if *present { "included" } else { "absent" }
+        );
+    }
+
+    if !a.gaps.is_empty() {
+        let _ = writeln!(s, "             POTENTIAL KEY GAP");
+        for gap in &a.gaps {
+            let _ = writeln!(
+                s,
+                "               `{}` separates by `{}`, this key does not",
+                gap.resource, gap.component
+            );
+            let _ = writeln!(s, "                 {}", gap.why);
+        }
     }
     s
 }
@@ -823,6 +909,15 @@ fn run() -> ExitCode {
     let body_diags: std::collections::HashMap<String, Vec<Diagnostic>> =
         pw_core::check::check_sources(&clean).into_iter().collect();
 
+    // One graph for every file given, so `explain`'s key audit is a
+    // whole-program answer. Built once rather than per file: a fragment's key
+    // is only auditable against the resources it reads, and those are usually
+    // in other files.
+    let program_hirs: Vec<&pw_core::hir::Hir> =
+        inputs.iter().filter_map(|i| i.hir.as_ref()).collect();
+    let program_ws = pw_core::resolve::Workspace::build(&program_hirs);
+    let program_graph = pw_core::graph::Graph::build(&program_hirs, &program_ws);
+
     for input in &inputs {
         let Input {
             display,
@@ -851,7 +946,7 @@ fn run() -> ExitCode {
         if cmd == "explain" && parsed.errors.is_empty() {
             println!("── {display}");
             if let Some(hir) = hir {
-                print!("{}", explain(hir, src));
+                print!("{}", explain_with(hir, src, Some(&program_graph)));
             }
         }
     }
@@ -887,7 +982,7 @@ mod tests {
         // Charter §14 M2 gate: the compiler prints an effect summary "without
         // exposing generated-file paths to the user".
         let src = "module store.pricing\n\npublic query Store(id: StoreId) -> Store\n    cache shared\n{\n    Stores.get(id)\n}\n\nfn subtotal(c: Cart) -> Money !{} { 0 }\n";
-        let text = explain(&hir_of(src), src);
+        let text = explain_with(&hir_of(src), src, None);
         for leak in [
             "koka",
             "Koka",
@@ -920,7 +1015,7 @@ mod tests {
             }
             let src = std::fs::read_to_string(&path).expect("read");
             let hir = hir_of(&src);
-            let text = explain(&hir, &src);
+            let text = explain_with(&hir, &src, None);
 
             for (_, decl) in hir.all_decls() {
                 for policy in &decl.policies {
@@ -1009,7 +1104,7 @@ mod tests {
         // The charter §7.8 rule, surfaced as a forward-looking warning until E5
         // makes it an error.
         let src = "module cart\n\nsession query Cart(s: SessionId) -> Cart\n    cache shared\n{\n    Carts.current(s)\n}\n";
-        let text = explain(&hir_of(src), src);
+        let text = explain_with(&hir_of(src), src, None);
         assert!(text.contains("Session<SessionId>"), "{text}");
         assert!(text.contains("rejected at E5"), "{text}");
     }
@@ -1017,7 +1112,7 @@ mod tests {
     #[test]
     fn explain_derives_placement_from_effects_alone() {
         let src = "module m\nfn f() -> () !{ secret<Payments> } { 0 }\nfn g() -> () !{ layout.measure } { 0 }\n";
-        let text = explain(&hir_of(src), src);
+        let text = explain_with(&hir_of(src), src, None);
         assert!(text.contains("Origin (secret"), "{text}");
         assert!(text.contains("Browser (browser-only"), "{text}");
     }
@@ -1038,7 +1133,7 @@ mod tests {
     #[test]
     fn unannotated_and_empty_effect_rows_read_differently() {
         let src = "module m\nfn a() -> Int { 0 }\nfn b() -> Int !{} { 0 }\n";
-        let text = explain(&hir_of(src), src);
+        let text = explain_with(&hir_of(src), src, None);
         assert!(text.contains("unannotated — claims nothing"), "{text}");
         assert!(text.contains("explicit purity claim"), "{text}");
     }

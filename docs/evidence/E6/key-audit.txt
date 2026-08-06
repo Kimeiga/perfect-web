@@ -1,0 +1,71 @@
+E6 follow-up — cache-key auditing in `pw explain` (charter §14 M6 task 9)
+
+  Advice, not a diagnostic. The compiler cannot tell a deliberate
+  omission from a mistake — two readers sharing an entry is sometimes
+  exactly what a cache is for — so it says what the key separates, what
+  a dependency separates that the key does not, and lets a reader decide.
+
+  The build generation is absent from the application section on
+  purpose: PW5102 asked the author for it and was retired, because
+  injecting a compatibility generation is platform mechanism.
+
+=== A KEY WITH A GAP =====================================================
+
+  materialize  Strip
+               privacy: (unspecified)
+               placement      edge
+               partition      public
+               depends_on     Recommendations(store)
+               regenerate     on_invalidation
+               locale         included_in_key
+               logical key
+                 store
+               automatic platform dimensions
+                 build generation    included
+                 privacy partition   public
+               application dimensions
+                 locale              included
+                 tenant              absent
+                 policy_version      absent
+               POTENTIAL KEY GAP
+                 `Recommendations` separates by `experiment`, this key does not
+                   `Recommendations` separates its entries by `experiment`, and `Strip` neither passes it nor includes it in its key, so one document serves every value of it
+               at bytes 47..222
+
+=== AND THE DEMO'S KEY, WHICH HAS NONE ===================================
+
+  materialize  MenuFragment
+               privacy: (unspecified)
+               placement      edge
+               partition      public
+               depends_on     Store(id), Menu(id)
+               invalidates_on MenuChanged(id), InventoryChanged(id, item), StoreChanged(id)
+               regenerate     on_invalidation
+               stampede       single_flight
+               fallback       last_known_good
+               locale         included_in_key
+               tenant         included_in_key
+               policy_version included_in_key
+               logical key
+                 id
+               automatic platform dimensions
+                 build generation    included
+                 privacy partition   public
+               application dimensions
+                 locale              included
+                 tenant              included
+                 policy_version      included
+               at bytes 1338..1757
+
+=== CONTROLS =============================================================
+
+$ cargo test -p pw-core --test key_audit
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+  a dependency the fragment fully supplies is NOT reported — without it
+  the rule is satisfied by reporting every dependency of every fragment
+  a declared dimension closes the gap, and removing the declaration
+  re-opens it — so the assertion is about the declaration rather than
+  about the word `locale`
+  the audit reports what the key DOES include, or it reads as a list of
+  complaints and a reader cannot tell an audited key from an unaudited one
