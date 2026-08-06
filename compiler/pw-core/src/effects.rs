@@ -172,6 +172,72 @@ impl<'a> Inference<'a> {
         }
     }
 
+    /// What one body performs, given the types its declaration makes known.
+    pub fn infer_in(&self, body: &Body, types: &BTreeMap<String, String>) -> Inferred {
+        let mut out = self.infer(body);
+        self.member_effects(body, types, &mut out);
+        out
+    }
+
+    /// Effects reached through a member: `anchor.offsetWidth`,
+    /// `el.getBoundingClientRect()`.
+    ///
+    /// Charter §7.5A bans reading geometry directly from ordinary code. That ban
+    /// lives in the accessors' declared rows (`packages/pw-platform-web/browser.pw`),
+    /// not in a list of property names here — which is what E2C's deletion gate
+    /// requires and what lets a new accessor be added without touching a checker.
+    fn member_effects(&self, body: &Body, types: &BTreeMap<String, String>, out: &mut Inferred) {
+        for id in body.walk() {
+            // Both shapes: a property read, and a method call on a value.
+            let (receiver, member, span) = match body.expr(id) {
+                Expr::Field { base, name } => {
+                    (receiver_name(body, *base), name.clone(), body.expr_span(id))
+                }
+                Expr::Call { callee, .. } => match body.expr(*callee) {
+                    Expr::Field { base, name } => {
+                        (receiver_name(body, *base), name.clone(), body.expr_span(id))
+                    }
+                    _ => continue,
+                },
+                _ => continue,
+            };
+            let Some(receiver) = receiver else { continue };
+
+            // A module path is not a member access — `Stores.get` is already
+            // handled by the call walk, and counting it twice would report the
+            // same effect from two places.
+            if self.sigs.by_path(&format!("{receiver}.{member}")).is_some() {
+                continue;
+            }
+
+            let declared = types.get(&receiver).map(String::as_str);
+            // The unique-member fallback applies only to a value whose type is
+            // not yet known — a lambda parameter. A CAPITALISED receiver names
+            // a type or module, and if it has no such member the answer is
+            // "unknown", not somebody else's member.
+            //
+            // Without this, `Money.add` borrowed `Carts.add`'s row and reported
+            // a pure calculation as writing to the database.
+            let receiver_is_a_name = receiver.chars().next().is_some_and(char::is_uppercase);
+            let sig = match declared {
+                Some(t) => self.sigs.member(Some(t), &member),
+                None if receiver_is_a_name => None,
+                None => self.sigs.member(None, &member),
+            };
+            let Some(sig) = sig else { continue };
+            for e in &sig.effects {
+                out.effects.insert(e.clone());
+                out.sources.push(Source {
+                    effect: e.clone(),
+                    span: span.clone(),
+                    via: Via::Direct {
+                        callee: format!("{receiver}.{member}"),
+                    },
+                });
+            }
+        }
+    }
+
     /// What one body performs, with a reason for each effect.
     pub fn infer(&self, body: &Body) -> Inferred {
         let mut out = Inferred::default();
@@ -190,6 +256,27 @@ impl<'a> Inference<'a> {
         }
 
         for id in body.walk() {
+            // A frame-phase keyword carries its own effect (see
+            // `intrinsic_effect`): `measure { .. }` reads geometry by
+            // definition, whatever it calls inside.
+            if let Some((phase, e)) = match body.expr(id) {
+                Expr::Keyword { keyword, .. } => {
+                    intrinsic_effect(keyword).map(|e| (keyword.clone(), e))
+                }
+                _ => None,
+            } {
+                {
+                    out.effects.insert(e.to_string());
+                    out.sources.push(Source {
+                        effect: e.to_string(),
+                        span: body.expr_span(id),
+                        via: Via::Direct {
+                            callee: format!("{phase} {{ .. }}"),
+                        },
+                    });
+                }
+            }
+
             let Expr::Call { callee, .. } = body.expr(id) else {
                 continue;
             };
@@ -268,6 +355,17 @@ fn enclosing_callback(
         .map(|(_, to)| to.clone())
 }
 
+/// The name a member access is reached through: `anchor` in `anchor.offsetWidth`.
+fn receiver_name(body: &Body, base: ExprId) -> Option<String> {
+    match body.expr(base) {
+        Expr::Name(n) => Some(n.clone()),
+        // `el.getBoundingClientRect().width` — the receiver of `.width` is the
+        // call, whose own effects were already counted. Not a member access to
+        // attribute again.
+        _ => None,
+    }
+}
+
 /// A callee's dotted path as written.
 fn path_of(body: &Body, id: ExprId) -> String {
     match body.expr(id) {
@@ -282,6 +380,27 @@ fn path_of(body: &Body, id: ExprId) -> String {
         }
         _ => String::new(),
     }
+}
+
+/// The minimal set of effects the **language** knows, as distinct from what a
+/// library declares.
+///
+/// E2C's deletion gate forbids a checker from knowing what `secrets.payments`
+/// does — that is a library fact and belongs in a signature. A frame phase is
+/// not a library fact: `measure { .. }` is charter §7.5A syntax whose whole
+/// meaning is *this is the phase where geometry may be read*. A language that
+/// did not know that would need a library function to explain its own keyword.
+///
+/// The architect's bound on this list: "keep it tiny and explicit". It is four
+/// entries, and each is a phase keyword the grammar already reserves.
+pub fn intrinsic_effect(keyword: &str) -> Option<&'static str> {
+    Some(match keyword {
+        "measure" => "layout.measure",
+        "mutate" => "style.mutate",
+        "post_paint" => "paint.post",
+        "animate" => "animation.composite",
+        _ => return None,
+    })
 }
 
 /// Spans in a body where work does **not** happen during render.

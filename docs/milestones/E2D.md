@@ -63,26 +63,37 @@ E2D caught it — correctly, but not for the invariant the fixture specifies. Th
 fixture now declares those effects, leaving only the affine-resource leak that
 E9C owns. A fixture that fails for the wrong reason is not enforced.
 
-## Corpus: 19/44 → 20/44
+## Corpus: 19/44 → 23/44
 
 `R-036` is the case E2D was built for — `layout.measure` reaching a pure view
-through a helper that looks pure at the call site.
+through a helper that looks pure at the call site. Then E2B's member lookup
+added `R-032` (`anchor.offsetWidth`) and `R-037` (a callback measuring layout
+inside `List.map`), and the frame-phase intrinsics added `R-033`.
+
+**Frame-phase keywords carry their own effect.** `measure { .. }` reads geometry
+by definition, whatever it calls inside. That is a *language* fact, not a
+library one — a language that did not know it would need a library function to
+explain its own keyword — so it sits in `effects::intrinsic_effect`, four
+entries, each a phase keyword the grammar already reserves.
 
 ## What the remaining layout family needs
 
-`R-032`, `R-033`, `R-034`, `R-035`, `R-037`, `R-038`, `R-040`–`R-043` all read
-geometry as a **property**, not a call:
+Member lookup landed, so the *reads* are now visible. What is left in the layout
+family is not about seeing an effect — it is about **ordering and phase**:
 
-```text
-anchor.offsetWidth
-el.getBoundingClientRect().width
-```
+| file | invariant |
+|---|---|
+| `R-034` | a layout read *after* a layout-affecting write, in one frame |
+| `R-035` | a layout write *during* the measure phase |
+| `R-038` | a resize observer whose handler invalidates what it observes |
+| `R-040` | a layout-affecting operation inside a compositor animation |
+| `R-041` | `dom.mutate` inside a painter |
+| `R-042` | forcing layout after paint, in the same frame |
+| `R-043` | containment with a cross-boundary layout dependency |
 
-Inference walks calls. A property read resolves to nothing, so no effect is
-found. The honest fix is E2B's open item — **member lookup against a type's
-declared accessors** — so `Element.offsetWidth` can be declared with
-`!{ layout.measure }` and read like anything else. Hard-coding a list of DOM
-property names in the checker is what E2C's deletion gate forbids.
+Each needs the effects *in order within a phase*, not merely the set of them.
+That is a different analysis from inference — a frame-transaction checker — and
+it is the natural next piece after this one.
 
-`R-001` needs its `fetch_store` declared; it currently calls a function that
-exists nowhere.
+`R-001` needs its `fetch_store` declared; it calls a function that exists
+nowhere.

@@ -19,3 +19,39 @@ opaque type MapHandle = String
 type MapError =
     | InitFailed(String)
     | Unsupported
+
+// A reference to a live element, as a view holds one.
+opaque type ElementRef = String
+
+type Rect = Rect {
+    width: Float,
+    height: Float,
+    top: Float,
+    left: Float,
+}
+
+// --- geometry -------------------------------------------------------------
+//
+// Charter §7.5A bans ordinary code from calling `offsetWidth` or
+// `getBoundingClientRect` directly. It is banned because it FORCES A
+// SYNCHRONOUS REFLOW, and that is a fact about these accessors — so it is
+// written here, in their rows, rather than as a list of property names inside
+// a checker. `pw` code reaches geometry through a scheduled measure phase; the
+// corpus's rejected files reach it directly, and these rows are what make that
+// visible.
+
+fn offsetWidth(el: ElementRef) -> Float !{ layout.measure } { 0.0 }
+
+fn offsetHeight(el: ElementRef) -> Float !{ layout.measure } { 0.0 }
+
+fn scrollTop(el: ElementRef) -> Float !{ layout.measure } { 0.0 }
+
+fn clientWidth(el: ElementRef) -> Float !{ layout.measure } { 0.0 }
+
+fn getBoundingClientRect(el: ElementRef) -> Rect !{ layout.measure } {
+    Rect(0.0, 0.0, 0.0, 0.0)
+}
+
+fn content_width(el: ElementRef) -> Float !{ layout.measure } { 0.0 }
+
+fn height(el: ElementRef) -> Float !{ layout.measure } { 0.0 }

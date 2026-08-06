@@ -485,7 +485,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     // than restored — the fix is R-004 importing what it uses, and E2B
     // resolving *uses* as well as imports.
     assert!(
-        errored >= 18,
+        errored >= 23,
         "regressed: {errored}/{total} produce an error"
     );
     assert_eq!(
@@ -493,7 +493,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
         "every catch must be for the declared invariant, not merely red"
     );
     assert!(
-        fully >= 18,
+        fully >= 23,
         "regressed: {fully}/{total} fully enforced, partial list = {PARTIALLY_ENFORCED:?}"
     );
 }
@@ -520,7 +520,7 @@ fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
         "expected the full rejected corpus, saw {total}"
     );
     assert!(
-        caught.len() >= 18,
+        caught.len() >= 23,
         "semantic coverage regressed: {}/{total} caught — {caught:?}",
         caught.len()
     );

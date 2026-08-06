@@ -56,6 +56,13 @@ impl Signature {
 pub struct Signatures {
     by_path: BTreeMap<String, Signature>,
     by_def: BTreeMap<DefId, Signature>,
+    /// `(receiver type, member)` → signature. A function whose first parameter
+    /// is a declared type is that type's member: `offsetWidth(el: ElementRef)`
+    /// is what `anchor.offsetWidth` means.
+    by_member: BTreeMap<(String, String), Signature>,
+    /// Member name → signature, when exactly one type declares it. A fallback
+    /// for a receiver whose type is not yet known — see [`Signatures::member`].
+    unique_member: BTreeMap<String, Option<Signature>>,
 }
 
 impl Signatures {
@@ -95,6 +102,18 @@ impl Signatures {
                     label: label_from_return(decl.ret.as_deref(), &decl.ret_args),
                     returns: decl.ret.clone(),
                 };
+                // A function whose first parameter is a declared type reads as
+                // that type's member. `offsetWidth(el: ElementRef)` is what
+                // `anchor.offsetWidth` resolves to, and its row — not a list of
+                // property names in a checker — is what says it measures layout.
+                if let Some(receiver) = decl.params.first().and_then(|p| p.ty.clone()) {
+                    out.by_member
+                        .insert((receiver, decl.name.clone()), sig.clone());
+                    out.unique_member
+                        .entry(decl.name.clone())
+                        .and_modify(|e| *e = None) // a second type claims it
+                        .or_insert_with(|| Some(sig.clone()));
+                }
                 out.by_path.insert(sig.path.clone(), sig.clone());
                 out.by_def.insert(
                     DefId {
@@ -114,6 +133,24 @@ impl Signatures {
 
     pub fn by_def(&self, def: DefId) -> Option<&Signature> {
         self.by_def.get(&def)
+    }
+
+    /// A member of `receiver`, or — when the receiver's type is not known — the
+    /// unique declaration of that member name.
+    ///
+    /// The fallback is deliberate and temporary. Until types are inferred, a
+    /// lambda parameter has no declared type, so `el.getBoundingClientRect()`
+    /// inside `List.map(items, el => ..)` cannot say what `el` is. Resolving by
+    /// a member name that **exactly one** type declares is conservative: if two
+    /// types declared it, the answer is ambiguous and nothing is returned.
+    /// A wrong answer here would attribute an effect to the wrong call.
+    pub fn member(&self, receiver: Option<&str>, name: &str) -> Option<&Signature> {
+        if let Some(s) =
+            receiver.and_then(|r| self.by_member.get(&(r.to_string(), name.to_string())))
+        {
+            return Some(s);
+        }
+        self.unique_member.get(name)?.as_ref()
     }
 
     pub fn len(&self) -> usize {
@@ -167,6 +204,28 @@ mod tests {
         let ws = Workspace::build(&refs);
         let sigs = Signatures::build(&ws, &refs);
         (owned, sigs)
+    }
+
+    #[test]
+    fn a_member_resolves_by_receiver_type_and_ambiguity_resolves_to_nothing() {
+        let (_, sigs) = build(&[
+            "module browser\n\n             opaque type ElementRef = String\n             fn offsetWidth(el: ElementRef) -> Float !{ layout.measure } { 0.0 }\n",
+            "module other\n\n             opaque type Widget = String\n             fn offsetWidth(w: Widget) -> Float !{} { 0.0 }\n             fn only_here(w: Widget) -> Float !{ network.fetch } { 0.0 }\n",
+        ]);
+
+        // Known receiver: the right one, with its own row.
+        let s = sigs
+            .member(Some("ElementRef"), "offsetWidth")
+            .expect("member");
+        assert_eq!(s.effects, ["layout.measure"]);
+
+        // Unknown receiver, and TWO types declare `offsetWidth` — so nothing.
+        // Guessing would attribute an effect to the wrong call.
+        assert!(sigs.member(None, "offsetWidth").is_none());
+
+        // Unknown receiver, but only one type declares it: safe to use.
+        let only = sigs.member(None, "only_here").expect("unique member");
+        assert_eq!(only.effects, ["network.fetch"]);
     }
 
     #[test]

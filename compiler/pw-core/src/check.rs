@@ -1603,7 +1603,29 @@ fn effect_rows(
 
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
-    let found = inference.infer(body);
+    // The types the declaration makes known: its parameters, plus any annotated
+    // binding. Enough for a member access on a declared value; a lambda
+    // parameter has no annotation and falls back to the unique-member rule.
+    let mut types: BTreeMap<String, String> = BTreeMap::new();
+    for p in &decl.params {
+        if let Some(t) = &p.ty {
+            types.insert(p.name.clone(), t.clone());
+        }
+    }
+    for id in body.walk() {
+        let Expr::Let {
+            pat: Some(pat),
+            ty: Some(t),
+            ..
+        } = body.expr(id)
+        else {
+            continue;
+        };
+        if let (HPat::Bind { name, .. }, Some(ty)) = (body.pat(*pat), body.types.get(t.index())) {
+            types.insert(name.clone(), ty.path.clone());
+        }
+    }
+    let found = inference.infer_in(body, &types);
     // Work inside an event handler, a streamed region or a later frame phase is
     // not done *during render*, so the render-time restriction does not apply
     // to it. Charter §7.5A.

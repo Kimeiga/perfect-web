@@ -142,6 +142,20 @@ than through an ambient union.
   has all six, each with its own code, plus a valid case so the suite can tell
   a resolver from something that rejects every import.
 - ~~Resolve uses, not only imports~~ — **done.**
+- ~~Member lookup~~ — **done.** A function whose first parameter is a declared
+  type is that type's member: `offsetWidth(el: ElementRef)` is what
+  `anchor.offsetWidth` resolves to. Charter §7.5A's ban on reading geometry
+  directly now lives in the accessors' declared rows
+  (`packages/pw-platform-web/browser.pw`), not in a list of property names
+  inside a checker — so a new accessor needs no compiler change.
+
+  A receiver whose type is not yet known (a lambda parameter) falls back to a
+  member name **exactly one** type declares; two claimants resolve to nothing,
+  because a wrong answer attributes an effect to the wrong call. A *capitalised*
+  receiver never uses the fallback: it names a type or module, and if that has
+  no such member the answer is "unknown", not somebody else's. Without that
+  restriction `Money.add` borrowed `Carts.add`'s row and reported a pure
+  calculation as writing to the database.
 - **Hand `DefId` to the semantic analyses.** `check.rs` still matches some
   names textually. The architectural invariant is not met until it does not:
 
