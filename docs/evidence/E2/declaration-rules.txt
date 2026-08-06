@@ -1,0 +1,54 @@
+milestone: E2 — declaration-level semantic rules
+generated: 2026-08-06T02:41:18Z
+commands: just ci ; just rejections ; cargo test -p pw-cli
+
+=========== ACCEPTED CORPUS MUST BE CLEAN ==================
+pw check: 24 file(s), no diagnostics
+
+=========== REJECTED CORPUS: WHAT pw CATCHES TODAY =========
+error: [PW0312] `charge_card` declares a retry policy but is not idempotent
+  --> R-014-retry-of-non-idempotent-command.pw:19:5
+   |
+15 | command charge_card(order: OrderId, amount: Money<USD>)
+   |         ----------- declared here with no `idempotent_by` key
+...
+19 |     retry    bounded_exponential(max = 5, jitter = true)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `charge_card` declares a retry policy but is not idempotent
+   |
+   = note: retrying a non-idempotent mutation can apply it more than once
+   = help: add `idempotent_by InteractionId`, or restrict the policy to `retry transport_only(..)`
+error: [PW0313] `retry forever` is not a permitted policy
+  --> R-015-unbounded-retry.pw:20:5
+   |
+20 |     retry       forever
+   |     ^^^^^^^^^^^^^^^^^^^ `retry forever` is not a permitted policy
+   |
+   = note: an unbounded retry is a self-inflicted denial of service
+   = help: declare a finite bound with jitter, e.g. `bounded_exponential(max = 3, jitter = true)`
+error: [PW0325] `Store` declares no policy for superseded keys
+  --> R-027-query-key-changes-without-stale-work-cancellation-policy.pw:19:5
+   |
+15 | public query Store(id: StoreId) -> Result<Store, StoreError>
+   |              ----- this query is keyed, so its key can change
+...
+19 |     concurrency one_per_key
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ `Store` declares no policy for superseded keys
+   |
+   = help: declare `on_key_change cancel | supersede | keep`
+error: [PW0327] `add_to_cart` declares an optimistic transition with no rollback path
+  --> R-029-optimistic-state-with-no-rollback-path.pw:19:5
+   |
+19 |     optimistic    cart.add(item, quantity)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `add_to_cart` declares an optimistic transition with no rollback path
+   |
+   = note: a rejected mutation would leave the UI permanently inconsistent with the server
+   = help: add a `rollback` clause describing how the optimistic change is reversed
+pw check: 44 file(s), 4 error(s), 0 warning(s)
+
+=========== COVERAGE =======================================
+  4 of 44 rejected files are caught by DECLARATION-LEVEL rules.
+  The rest need one of:
+    - body parsing        (R-001 network-in-view, R-004 cache in a page body)
+    - effect checking     (E1)
+    - privacy/placement   (E5)
+  Coverage is ratcheted by rules::corpus_tests so it cannot regress.

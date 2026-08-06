@@ -480,6 +480,7 @@ impl<'a> Parser<'a> {
             "isolated",
             "draw",
             "key",
+            "on_key_change",
             "on_conflict_unresolved",
             "on_version_mismatch",
             "intrinsic_height",

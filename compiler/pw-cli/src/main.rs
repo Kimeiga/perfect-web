@@ -14,6 +14,8 @@
 //! Charter §14 M2 gate: "the compiler can print an effect summary without
 //! exposing generated-file paths to the user". `explain` asserts that in tests.
 
+mod rules;
+
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -38,6 +40,44 @@ fn render(source: &str, path: &str, errors: &[ParseError], styled: bool) -> Stri
             .primary_title(format!("[{}] {}", e.code, e.message))
             .element(snippet);
         if let Some(h) = &e.help {
+            group = group.element(Level::HELP.message(h.as_str()));
+        }
+        out.push_str(&renderer.render(&[group]));
+        out.push('\n');
+    }
+    out
+}
+
+fn render_findings(source: &str, path: &str, found: &[rules::Finding], styled: bool) -> String {
+    let renderer = if styled {
+        Renderer::styled()
+    } else {
+        Renderer::plain()
+    };
+    let mut out = String::new();
+    for f in found {
+        let level = if f.is_error {
+            Level::ERROR
+        } else {
+            Level::WARNING
+        };
+        let mut snippet = Snippet::source(source).path(path).line_start(1).annotation(
+            AnnotationKind::Primary
+                .span(f.span.clone())
+                .label(&f.message),
+        );
+        // Charter §16.3: name where the conflicting property originated, not
+        // only where the rule fired.
+        if let (Some(o), Some(label)) = (&f.origin, &f.origin_label) {
+            snippet = snippet.annotation(AnnotationKind::Context.span(o.clone()).label(label));
+        }
+        let mut group = level
+            .primary_title(format!("[{}] {}", f.code, f.message))
+            .element(snippet);
+        if let Some(n) = &f.note {
+            group = group.element(Level::NOTE.message(n.as_str()));
+        }
+        if let Some(h) = &f.help {
             group = group.element(Level::HELP.message(h.as_str()));
         }
         out.push_str(&renderer.render(&[group]));
@@ -255,6 +295,7 @@ fn main() -> ExitCode {
     }
 
     let mut errors = 0usize;
+    let mut warnings = 0usize;
     let mut files = 0usize;
 
     for path in paths {
@@ -275,6 +316,16 @@ fn main() -> ExitCode {
         if !parsed.errors.is_empty() {
             print!("{}", render(&src, &display, &parsed.errors, !plain));
             errors += parsed.errors.len();
+        } else {
+            // Semantic rules only run on a clean parse — recovery invents
+            // plausible-looking declarations, and checking those reports on the
+            // recovery rather than on the user's code (E0 finding F-4).
+            let found = rules::check(&parsed.file);
+            if !found.is_empty() {
+                print!("{}", render_findings(&src, &display, &found, !plain));
+                errors += found.iter().filter(|f| f.is_error).count();
+                warnings += found.iter().filter(|f| !f.is_error).count();
+            }
         }
         if cmd == "explain" && parsed.errors.is_empty() {
             println!("── {display}");
@@ -283,10 +334,10 @@ fn main() -> ExitCode {
     }
 
     if cmd == "check" {
-        if errors == 0 {
+        if errors == 0 && warnings == 0 {
             println!("pw check: {files} file(s), no diagnostics");
         } else {
-            println!("pw check: {errors} diagnostic(s) across {files} file(s)");
+            println!("pw check: {files} file(s), {errors} error(s), {warnings} warning(s)");
         }
     }
 

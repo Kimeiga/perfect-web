@@ -17,6 +17,7 @@ session query Cart(session: SessionId) -> Result<Cart, CartError>
     consistency read_your_writes
     cache       private
     concurrency one_per_key
+    on_key_change cancel
     timeout     2.seconds
 {
     Carts.current(session)

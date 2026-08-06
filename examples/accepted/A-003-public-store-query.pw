@@ -20,6 +20,7 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
     fallback       last_known_good
     retry          bounded_exponential(max = 3, jitter = true)
     concurrency    one_per_key
+    on_key_change  cancel
     timeout        2.seconds
 {
     Stores.get(id)
