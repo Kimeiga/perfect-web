@@ -16,9 +16,9 @@ module store.menu_materialization
 import clock
 
 materialize MenuFragment(id: StoreId) {
-    placement edge
-    partition public
-    depends_on Menu(id)
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
     invalidates_on MenuChanged(id)
 
     view {

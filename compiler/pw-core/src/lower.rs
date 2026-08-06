@@ -124,6 +124,8 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 "command" => DeclKind::Command,
                 "subscription" => DeclKind::Subscription,
                 "resource" => DeclKind::Resource,
+                "materialize" => DeclKind::Materialize,
+                "event" => DeclKind::Event,
                 "task" => DeclKind::Task,
                 _ => {
                     let _ = src;
@@ -322,9 +324,26 @@ impl Lowerer<'_> {
     }
 
     /// A declaration's policy block, values kept as written.
+    /// A declaration's policy clauses.
+    ///
+    /// Two positions, because the language has two. Most declarations write
+    /// their policies between the signature and the body, where the list is a
+    /// direct child. A `materialize` block writes them INSIDE its braces —
+    /// corpus A-009 and R-017 are the specification — so the list is a
+    /// grandchild through `Body > BlockExpr`. Looking only at direct children
+    /// found none of a fragment's policies, and an empty policy list reads as
+    /// "declared nothing" rather than "not found".
     fn policies(&self, node: &SyntaxNode) -> Vec<Policy> {
         node.children()
             .find(|c| c.kind() == K::PolicyList)
+            .or_else(|| {
+                node.children()
+                    .find(|c| c.kind() == K::Body)?
+                    .children()
+                    .find(|c| c.kind() == K::BlockExpr)?
+                    .children()
+                    .find(|c| c.kind() == K::PolicyList)
+            })
             .map(|list| {
                 list.children()
                     .filter(|c| c.kind() == K::Policy)
@@ -337,7 +356,9 @@ impl Lowerer<'_> {
                         // because `freshness      30.seconds` and
                         // `freshness 30.seconds` declare the same policy.
                         let (name, value) = match trimmed.split_once(char::is_whitespace) {
-                            Some((n, v)) => (n.to_string(), v.trim().to_string()),
+                            Some((n, v)) => {
+                                (n.to_string(), pw_syntax::collapse_policy_whitespace(v))
+                            }
                             None => (trimmed.to_string(), String::new()),
                         };
                         Policy {

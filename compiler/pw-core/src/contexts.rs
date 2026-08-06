@@ -27,8 +27,18 @@
 //! post_paint     no  (later frame)      no
 //! frame phases   no  (later frame)      no
 //! painter        no  (paint pipeline)   no
-//! depends_on     no  (the named decl)   no — it is a declaration, not a use
 //! ```
+//!
+//! `depends_on` used to be a ninth row here, and it is not one any more. It
+//! looked like two calls because the grammar parsed a `materialize` block as an
+//! expression body, so `depends_on Store(id), Menu(id)` really did arrive as a
+//! bare name followed by two `CallExpr`s and something downstream had to
+//! un-read them. E6 made those clauses **policies**, which is what they are, so
+//! they never reach the expression arena and there is nothing to classify.
+//!
+//! Worth stating plainly: this classifier was a correct fix to the wrong layer.
+//! It worked, and it hid a parse defect that also emptied the dependency list
+//! every E6 rule reads.
 //!
 //! Answering "no" to the first is what stopped a page that declares a query
 //! dependency from being reported for reaching the database while rendering.
@@ -55,8 +65,6 @@ pub enum Context {
     Interaction,
     /// A later frame phase.
     FramePhase,
-    /// A named declaration, referred to rather than called.
-    NamedDeclaration,
 }
 
 impl Context {
@@ -74,7 +82,7 @@ impl Context {
     pub fn belongs_to_another_declaration(self) -> bool {
         matches!(
             self,
-            Context::Query | Context::Command | Context::Subscription | Context::NamedDeclaration
+            Context::Query | Context::Command | Context::Subscription
         )
     }
 
@@ -106,7 +114,6 @@ impl Context {
             Context::StreamTask => "a streamed region, after the shell is sent",
             Context::Interaction => "an event handler, when the user acts",
             Context::FramePhase => "a later frame phase",
-            Context::NamedDeclaration => "the declaration it names",
         }
     }
 }
@@ -120,7 +127,6 @@ pub struct Elsewhere {
 
 /// Every region of this body that executes in another context.
 pub fn elsewhere(body: &Body) -> Vec<Elsewhere> {
-    const NAMING_CLAUSES: &[&str] = &["depends_on", "invalidates_on", "derives_from"];
     let mut out = Vec::new();
 
     for id in body.walk() {
@@ -141,21 +147,6 @@ pub fn elsewhere(body: &Body) -> Vec<Elsewhere> {
                     span: body.expr_span(id),
                     context,
                 });
-            }
-            // A clause that NAMES declarations: `depends_on Store(id), Menu(id)`
-            // looks exactly like two calls and is not one.
-            Expr::Block { stmts } => {
-                let mut naming = false;
-                for s in stmts {
-                    match body.expr(*s) {
-                        Expr::Name(n) => naming = NAMING_CLAUSES.contains(&n.as_str()),
-                        Expr::Call { .. } if naming => out.push(Elsewhere {
-                            span: body.expr_span(*s),
-                            context: Context::NamedDeclaration,
-                        }),
-                        _ => naming = false,
-                    }
-                }
             }
             Expr::Template { roots, .. } => {
                 for n in body.walk_markup(roots) {
@@ -223,10 +214,13 @@ mod tests {
     }
 
     /// A suppressor is how a check quietly stops measuring, so it gets a
-    /// control: naming a declaration is foreign, calling one is not, and the
-    /// two appear in the same body with the same text.
+    /// control. This one used to be a classifier and is now a grammar
+    /// property: `depends_on Store(id)` is a POLICY, so it never becomes an
+    /// expression, while the `Store(id)` in the `view` block does.
+    ///
+    /// Same source, same text, twice, and only one of them is in the body.
     #[test]
-    fn naming_a_declaration_is_foreign_but_calling_one_is_not() {
+    fn a_dependency_clause_is_not_an_expression_and_a_view_call_is() {
         let src = "module m\n\
                    \n\
                    materialize F(id: Int) {\n\
@@ -236,17 +230,21 @@ mod tests {
                    }\n";
         let (hir, id) = body_of(src);
         let body = hir.body(id);
-        let regions = elsewhere(body);
-        let named: Vec<&Elsewhere> = regions
-            .iter()
-            .filter(|r| r.context == Context::NamedDeclaration)
+        let calls: Vec<Span> = body
+            .walk()
+            .into_iter()
+            .filter(|e| matches!(body.expr(*e), Expr::Call { .. }))
+            .map(|e| body.expr_span(e))
             .collect();
 
-        assert_eq!(named.len(), 1, "only the `depends_on` member");
-        assert_eq!(&src[named[0].span.start..named[0].span.end], "Store(id)");
+        assert_eq!(
+            calls.len(),
+            1,
+            "one `Store(id)` is a call, the other is not"
+        );
         assert!(
-            named[0].span.start < src.find("view").expect("view clause"),
-            "the foreign span is the one in `depends_on`, not the one in `view`"
+            calls[0].start > src.find("view").expect("view clause"),
+            "the surviving call is the one in the `view` block"
         );
     }
 
@@ -283,12 +281,7 @@ mod tests {
         ] {
             assert!(c.yields_value(), "{c:?} produces a value for this body");
         }
-        for c in [
-            Context::Render,
-            Context::Interaction,
-            Context::FramePhase,
-            Context::NamedDeclaration,
-        ] {
+        for c in [Context::Render, Context::Interaction, Context::FramePhase] {
             assert!(!c.yields_value(), "{c:?} does not");
         }
     }

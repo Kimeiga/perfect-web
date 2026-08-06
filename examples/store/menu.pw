@@ -1,0 +1,37 @@
+// @corpus: fixture
+// @id: E6-menu-fragment
+// @category: the materialized menu fragment — one store's menu, invalidated by
+//            an event about that store
+// @charter: §14 M6, §9.4
+// @milestone: E6
+//
+// The E6 demo. `MenuChanged(store_47)` must regenerate store 47's menu and
+// nothing else, and the reason it can is written here rather than configured
+// somewhere: this fragment says what it depends on and which events concern it,
+// and the graph is derived from those two lines.
+//
+// The dimensions are the other half, and the less obvious one. `depends_on`
+// decides WHEN to regenerate; `included_in_key` decides WHO shares an entry.
+// A fragment that regenerates correctly and keys incorrectly still serves the
+// wrong reader — one locale's copy to another, or last release's markup to this
+// release's code — and it does so with a cache HIT, which is why no
+// invalidation test finds it.
+
+module store.menu_fragment
+
+import domain.{ StoreId, MenuItemId }
+import Events.{ MenuChanged, InventoryChanged, StoreChanged }
+
+materialize MenuFragment(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Store(id), Menu(id)
+    invalidates_on MenuChanged(id), InventoryChanged(id, item), StoreChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+    code_version   included_in_key
+    locale         included_in_key
+    tenant         included_in_key
+    policy_version included_in_key
+}

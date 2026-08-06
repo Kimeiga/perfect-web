@@ -74,6 +74,13 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
     match decl.kind {
         DeclKind::Import | DeclKind::Let => Ok(None),
 
+        // E6. Neither is a computation Koka could check: a materialization is
+        // a scheduling decision the runtime makes and an event is a fact about
+        // the world. Skipped with a reason rather than silently, so the
+        // `emit-koka` skip list stays an accurate account of the gap.
+        DeclKind::Materialize => Err("a materialization — the runtime schedules it"),
+        DeclKind::Event => Err("an event declaration — no body to check"),
+
         DeclKind::Type => {
             // A record: `type CartLine = CartLine { item_id: .., .. }`.
             if let Some(fields) = &decl.fields {

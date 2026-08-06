@@ -468,6 +468,100 @@ fn emit_manifest_command(paths: &[&String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// `pw emit-graph` — the resource dependency graph (charter §14 M6 gate 6).
+///
+/// Every path at once, never per file. A materialization in one module depends
+/// on a query in another, and a graph built one file at a time would report a
+/// dangling edge for exactly the case E6 is about.
+///
+/// `--plain` prints the edges for a person; the default prints JSON. Both, and
+/// not one dressed as the other: the gate asks for inspectable AND
+/// serializable, and a blob is not inspectable.
+fn emit_graph_command(paths: &[&String], plain: bool) -> ExitCode {
+    let mut hirs = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        hirs.push(pw_core::lower::lower_file(&src, &parsed.green));
+    }
+    let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+    let g = pw_core::graph::Graph::build(&refs);
+
+    if plain {
+        for n in &g.nodes {
+            println!("{}  {}", node_label(&n.kind), n.path);
+        }
+        println!();
+        for e in &g.edges {
+            let key = if e.key.is_empty() {
+                String::new()
+            } else {
+                format!("({})", e.key.join(", "))
+            };
+            println!("{}  --{}-->  {}{key}", e.from, edge_label(e.kind), e.to);
+        }
+        if !g.dangling.is_empty() {
+            println!();
+            for d in &g.dangling {
+                println!(
+                    "DANGLING  {} --{}--> {} (nothing declares it)",
+                    d.from,
+                    edge_label(d.kind),
+                    d.name
+                );
+            }
+        }
+    } else {
+        match serde_json::to_string_pretty(&g) {
+            Ok(json) => println!("{json}"),
+            Err(e) => {
+                eprintln!("pw: cannot serialize the graph: {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    // A dangling edge is a failing exit code, not a note. A materialization
+    // listening for an event nobody declares never regenerates, and the page
+    // is not wrong — only permanently stale, which no test of the page finds.
+    if !g.dangling.is_empty() {
+        eprintln!("pw emit-graph: {} dangling edge(s)", g.dangling.len());
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
+fn node_label(k: &pw_core::graph::NodeKind) -> &'static str {
+    use pw_core::graph::NodeKind::*;
+    match k {
+        Resource { .. } => "resource     ",
+        Materialization { .. } => "materialize  ",
+        Event => "event        ",
+        Command => "command      ",
+        Page => "page         ",
+    }
+}
+
+fn edge_label(k: pw_core::graph::EdgeKind) -> &'static str {
+    use pw_core::graph::EdgeKind::*;
+    match k {
+        Reads => "reads",
+        InvalidatedBy => "invalidated-by",
+        Emits => "emits",
+        Invalidates => "invalidates",
+    }
+}
+
 /// Turn an internal panic into a conspicuous, reproducible report.
 ///
 /// Charter §3.1 and the architect's compiler-robustness gate: for every
@@ -537,12 +631,12 @@ fn run() -> ExitCode {
 
     if !matches!(
         cmd,
-        "check" | "explain" | "fmt" | "emit-koka" | "emit-marko" | "emit-manifest"
+        "check" | "explain" | "fmt" | "emit-koka" | "emit-marko" | "emit-manifest" | "emit-graph"
     ) || paths.is_empty()
     {
         eprintln!(
-            "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest> <path.pw>... \
-             [--plain]"
+            "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph> \
+             <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -551,11 +645,16 @@ fn run() -> ExitCode {
         eprintln!("  emit-koka      print Koka for the pure subset (ADR-0015)");
         eprintln!("  emit-marko     write Marko templates to --out DIR (ADR-0017)");
         eprintln!("  emit-manifest  print the resource manifests as JSON");
+        eprintln!("  emit-graph     print the resource dependency graph (--plain for text)");
         return ExitCode::from(2);
     }
 
     if cmd == "emit-manifest" {
         return emit_manifest_command(&paths);
+    }
+
+    if cmd == "emit-graph" {
+        return emit_graph_command(&paths, args.iter().any(|a| a == "--plain"));
     }
 
     if cmd == "emit-koka" {

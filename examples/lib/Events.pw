@@ -1,0 +1,35 @@
+// @corpus: fixture
+// @id: LIB-Events
+// @category: typed domain events — charter §14 M6 task 3
+// @charter: §14 M6, §9.4
+// @milestone: E6
+//
+// The events the charter names, declared rather than assumed. A materialization
+// writes `invalidates_on MenuChanged(id)`, and without a declaration that name
+// is a string: a typo, a renamed event or an event that was never emitted all
+// look identical to a materializer that simply never fires. Nothing about the
+// page would look wrong — it would just quietly serve stale content forever,
+// which is the failure mode ISR-by-timer exists to hide and this milestone
+// exists to remove.
+//
+// An event's parameters are its identity, and they are what makes
+// `MenuChanged(store_47)` narrower than `MenuChanged`. A graph that could only
+// say "the menu changed somewhere" would have to regenerate every store.
+
+module Events
+
+import domain.{ StoreId, MenuItemId, SessionId }
+
+event StoreChanged(store: StoreId)
+
+event MenuChanged(store: StoreId)
+
+event InventoryChanged(store: StoreId, item: MenuItemId)
+
+event PromotionChanged(store: StoreId)
+
+// Private by construction: a cart belongs to one session, so an event about it
+// carries a `SessionId` and can never be a reason to regenerate anything in a
+// shared partition. Charter §14 M6 gate item 4 is about the storage; this is
+// the same rule one step earlier, at the event.
+event CartChanged(session: SessionId)

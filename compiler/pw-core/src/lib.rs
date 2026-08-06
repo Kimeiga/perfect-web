@@ -32,6 +32,7 @@ pub mod diag;
 pub mod diagnostics;
 pub mod effects;
 pub mod exhaust;
+pub mod graph;
 pub mod hir;
 pub mod infer;
 pub mod koka;

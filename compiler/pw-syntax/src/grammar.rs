@@ -42,7 +42,13 @@ impl Parse {
 }
 
 /// Keywords that may begin a declaration; also the resynchronisation set.
-const DECL_STARTERS: &[&str] = &[
+///
+/// `pub(crate)` because `parser.rs` had its own copy of this list and they had
+/// to agree. They stopped agreeing the moment E6 added `event`: the tree
+/// grammar accepted the declaration and the declaration parser reported
+/// "expected a declaration", for the same file, in the same build. Two lists
+/// that must be identical are one list.
+pub(crate) const DECL_STARTERS: &[&str] = &[
     "module",
     "import",
     "opaque",
@@ -56,6 +62,7 @@ const DECL_STARTERS: &[&str] = &[
     "subscription",
     "resource",
     "materialize",
+    "event",
     "replicated",
     "paint",
     "handler_policy",
@@ -65,7 +72,7 @@ const DECL_STARTERS: &[&str] = &[
     "let",
 ];
 
-const UI_NOUNS: &[&str] = &["view", "component", "page"];
+pub(crate) const UI_NOUNS: &[&str] = &["view", "component", "page"];
 
 /// Statement keywords that may appear inside a body and take a
 /// `kw [name] [(args)] [-> Type] [{ block }]` shape.
@@ -95,12 +102,17 @@ const STMT_KEYWORDS: &[&str] = &[
     "subscribe",
     "unsafe",
 ];
-const RESOURCE_NOUNS: &[&str] = &[
+pub(crate) const RESOURCE_NOUNS: &[&str] = &[
     "query",
     "command",
     "subscription",
     "resource",
     "materialize",
+    // E6. A typed event is a declaration because `invalidates_on
+    // InventoryChanged(id, _item: MenuItemId)` has to be checkable against
+    // something — otherwise a materialization can name an event that does not
+    // exist and nothing notices until the materializer never fires.
+    "event",
     "replicated",
     "paint",
 ];
@@ -136,12 +148,17 @@ fn is_decl_kind(k: K) -> bool {
 const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
-const POLICY_KEYWORDS: &[&str] = &[
+pub(crate) const POLICY_KEYWORDS: &[&str] = &[
     "freshness",
     "consistency",
     "cache",
     "invalidates_on",
     "invalidates",
+    // E6 task 4: a command emits typed events in the same transaction as its
+    // state change. Distinct from `invalidates`, which names a RESOURCE — an
+    // event names a fact about the world, and which resources it affects is
+    // the graph's answer rather than the command's.
+    "emits",
     "fallback",
     "retry",
     "concurrency",
@@ -169,6 +186,13 @@ const POLICY_KEYWORDS: &[&str] = &[
     "stampede",
     "code_version",
     "locale",
+    // E6 cache-key dimensions (charter §14 M6 task 1). Without these in the
+    // table a policy value ran on past the newline and swallowed the next
+    // clause, so `locale included_in_key` and `tenant included_in_key` became
+    // one policy named `locale` — and the tenant dimension was simply absent
+    // from the key audit that exists to notice absences.
+    "tenant",
+    "policy_version",
     "affine",
     "acquire",
     "release",
@@ -1326,6 +1350,13 @@ impl<'a> P<'a> {
                 if depth == 0 && k == Kind::LBrace {
                     break;
                 }
+                // A policy list inside a `materialize` block ends at the
+                // block's own `}`. Without this the last clause's value
+                // swallowed the closing brace, so the declaration looked
+                // unclosed to everything downstream.
+                if depth == 0 && k == Kind::RBrace {
+                    break;
+                }
                 // A policy value must take at least one token. `cache private`
                 // and `scope component` would otherwise end immediately,
                 // because `private` and `component` also start declarations.
@@ -1373,6 +1404,50 @@ impl<'a> P<'a> {
         }
         self.start(K::Body);
         self.block_expr();
+        self.finish();
+    }
+
+    /// A `materialize` block: policy clauses, then whatever else the block has.
+    ///
+    /// `materialize` is the one declaration whose policies live INSIDE its
+    /// braces — corpus A-009 and R-017 both write them that way, and they are
+    /// the specification. Parsing the block as an ordinary expression body read
+    /// `placement` and `edge` as two unrelated bare names, so a fragment that
+    /// declared where it runs, what it depends on and which events concern it
+    /// produced a node with **no policy at all**. An empty dependency list is
+    /// indistinguishable from "depends on nothing", so the E6 graph would have
+    /// shown a fragment nothing invalidates and no rule would have objected.
+    ///
+    /// After the policies the rest of the block is parsed normally, because
+    /// R-017 puts a `view { .. }` there and its wall-clock read has to be
+    /// visible to the effect checker.
+    fn materialize_body(&mut self) {
+        if !self.at(Kind::LBrace) {
+            return;
+        }
+        self.start(K::Body);
+        self.start(K::BlockExpr);
+        self.bump(); // `{`
+        self.policies();
+        let mut guard = 0;
+        while !self.at(Kind::RBrace) && !self.at_eof() {
+            guard += 1;
+            if guard > 20_000 {
+                self.error("PW0099", "block made no progress");
+                break;
+            }
+            let before = self.pos;
+            self.expr(0);
+            self.eat(Kind::Comma);
+            self.eat(Kind::Semi);
+            if self.pos == before {
+                self.bump(); // never spin
+            }
+        }
+        if !self.eat(Kind::RBrace) {
+            self.error("PW0006", "unclosed block, expected `}`");
+        }
+        self.finish();
         self.finish();
     }
 
@@ -1568,6 +1643,7 @@ impl<'a> P<'a> {
         }
 
         if after_vis.kind == Kind::Ident && RESOURCE_NOUNS.contains(&after_vis_text) {
+            let materialize = after_vis_text == "materialize";
             self.start(K::ResourceDecl);
             if vis {
                 self.bump();
@@ -1582,7 +1658,11 @@ impl<'a> P<'a> {
                 self.effect_row();
             }
             self.policies();
-            self.body();
+            if materialize {
+                self.materialize_body();
+            } else {
+                self.body();
+            }
             self.finish();
             return true;
         }

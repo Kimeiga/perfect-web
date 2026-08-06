@@ -131,6 +131,10 @@ pub enum DeclKind {
     Command,
     Subscription,
     Resource,
+    /// E6 — a materialized page or fragment.
+    Materialize,
+    /// E6 — a typed event a command emits and a materialization listens for.
+    Event,
     Task,
     Type,
     Opaque,

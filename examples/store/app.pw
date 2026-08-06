@@ -28,6 +28,7 @@ import Carts
 import Menus
 import domain.{ StoreId, Store, StoreError, SessionId, Cart, CartError,
     MenuItem, MenuItemId, PositiveInt }
+import Events.{ CartChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store.
@@ -79,6 +80,7 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     optimistic    cart.add(item, quantity)
     rollback      cart.remove(item)
     invalidates   Cart(current_session())
+    emits         CartChanged(current_session())
 {
     Carts.add(current_session(), item, quantity)
 }

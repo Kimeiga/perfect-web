@@ -2150,6 +2150,16 @@ fn reuse_of(hir: &Hir, decl: &Decl) -> crate::effects::Reuse {
     if declared_world(hir, decl) == Some(World::Build) {
         return Reuse::Build;
     }
+    // The policy first, the body scan second — the same order as
+    // `declared_world` and `declared_cache`. A `materialize` block's clauses
+    // are policies; a `page` writes `cache private` among its statements and
+    // the scan is what reads those.
+    if decl
+        .policy("partition")
+        .is_some_and(|p| p.value.trim() == "public")
+    {
+        return Reuse::SharedPartition;
+    }
     if let Some(body_id) = decl.body {
         let body = hir.body(body_id);
         if let Some((v, _)) = name_pair(body, body.root, "partition")

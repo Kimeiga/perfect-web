@@ -40,28 +40,10 @@ impl Parsed {
 
 /// Keywords that may begin a declaration. Used both to dispatch and to
 /// resynchronise after an error.
-const DECL_STARTERS: &[&str] = &[
-    "module",
-    "import",
-    "opaque",
-    "type",
-    "fn",
-    "view",
-    "component",
-    "page",
-    "query",
-    "command",
-    "subscription",
-    "resource",
-    "materialize",
-    "replicated",
-    "paint",
-    "handler_policy",
-    "public",
-    "session",
-    "private",
-    "let",
-];
+///
+/// Owned by `grammar.rs`. This was a second copy until E6 added `event` to one
+/// of them; see the definition there.
+use crate::grammar::DECL_STARTERS;
 
 struct Parser<'a> {
     src: &'a str,
@@ -319,6 +301,32 @@ impl<'a> Parser<'a> {
 
     /// Consume a balanced `{ .. }` body, returning its span. Bodies are not
     /// parsed at this milestone.
+    /// Consume to the `}` that closes an already-opened block; the end offset.
+    ///
+    /// The tail of `materialize`, whose `{` is eaten before its policies are
+    /// read. `balanced_body` cannot be used there because it starts by eating
+    /// the opening brace.
+    fn balanced_to_close(&mut self) -> usize {
+        let mut depth = 1usize;
+        let mut end = self.peek().span.start;
+        while !self.at_eof() {
+            let t = self.bump();
+            end = t.span.end;
+            match t.kind {
+                Kind::LBrace => depth += 1,
+                Kind::RBrace => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return end;
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.error("PW0006", "unclosed block, expected `}`", end..end);
+        end
+    }
+
     fn balanced_body(&mut self) -> Option<Span> {
         let open = self.eat(Kind::LBrace)?;
         let mut depth = 1usize;
@@ -403,6 +411,11 @@ impl<'a> Parser<'a> {
                 if depth == 0 && k == Kind::LBrace {
                     break;
                 }
+                // A policy list inside a `materialize` block ends at that
+                // block's `}`, which the value must not swallow.
+                if depth == 0 && k == Kind::RBrace {
+                    break;
+                }
                 if depth == 0 && k == Kind::Ident && self.starts_new_policy() {
                     break;
                 }
@@ -418,10 +431,7 @@ impl<'a> Parser<'a> {
                 end = t.span.end;
             }
             let value = match value_start {
-                Some(vs) => self.src[vs..end]
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" "),
+                Some(vs) => crate::collapse_policy_whitespace(&self.src[vs..end]),
                 None => String::new(),
             };
             out.push(Policy {
@@ -435,59 +445,13 @@ impl<'a> Parser<'a> {
 
     /// A policy value ends when the next identifier is followed by something
     /// that looks like a fresh clause rather than a continuation.
+    /// Owned by `grammar.rs`. This was a third copy of the list, after
+    /// `DECL_STARTERS` and the noun tables — and a keyword added to one of
+    /// them and not the others makes the two parsers disagree about the same
+    /// file, which is how E6's dimension clauses were a policy to one parser
+    /// and a bare name to the other.
     fn starts_new_policy(&self) -> bool {
-        const POLICY_KEYWORDS: &[&str] = &[
-            "freshness",
-            "consistency",
-            "cache",
-            "invalidates_on",
-            "invalidates",
-            "fallback",
-            "retry",
-            "concurrency",
-            "timeout",
-            "requires",
-            "idempotent_by",
-            "transaction",
-            "optimistic",
-            "rollback",
-            "placement",
-            "privacy",
-            "storage",
-            "offline",
-            "sync",
-            "conflict",
-            "scope",
-            "transport",
-            "reconnect",
-            "dedupe_by",
-            "on_scope_exit",
-            "delivery",
-            "partition",
-            "depends_on",
-            "regenerate",
-            "stampede",
-            "code_version",
-            "locale",
-            "affine",
-            "acquire",
-            "release",
-            "identity",
-            "captures",
-            "load",
-            "revision",
-            "inputs",
-            "isolated",
-            "draw",
-            "key",
-            "on_key_change",
-            "on_conflict_unresolved",
-            "on_version_mismatch",
-            "intrinsic_height",
-            "attributes_forced_layout_to",
-            "because",
-        ];
-        POLICY_KEYWORDS.contains(&self.peek_text())
+        crate::grammar::POLICY_KEYWORDS.contains(&self.peek_text())
     }
 
     // --- declarations -------------------------------------------------------
@@ -718,16 +682,10 @@ impl<'a> Parser<'a> {
             });
         }
 
-        const UI: &[&str] = &["view", "component", "page"];
-        const RES: &[&str] = &[
-            "query",
-            "command",
-            "subscription",
-            "resource",
-            "materialize",
-            "replicated",
-            "paint",
-        ];
+        // Both owned by `grammar.rs`, for the reason recorded on
+        // `DECL_STARTERS`: a noun added to one table and not the other makes
+        // the two parsers disagree about the same file.
+        use crate::grammar::{RESOURCE_NOUNS as RES, UI_NOUNS as UI};
 
         if self.peek().kind == Kind::Ident && UI.contains(&self.peek_text()) {
             let kw = self.bump();
@@ -769,8 +727,20 @@ impl<'a> Parser<'a> {
             if self.peek().kind == Kind::Bang {
                 self.effect_row();
             }
-            let policies = self.policies();
-            let body = self.balanced_body();
+            let mut policies = self.policies();
+            // A `materialize` block writes its policies INSIDE its braces —
+            // corpus A-009 and R-017 are the specification. Read them there
+            // too, or a fragment's placement, partition, dependencies and
+            // cache-key dimensions are invisible to everything on this path,
+            // including `pw explain`.
+            let body = if noun == "materialize" && self.peek().kind == Kind::LBrace {
+                let open = self.bump();
+                policies.extend(self.policies());
+                let rest = self.balanced_to_close();
+                Some(open.span.start..rest)
+            } else {
+                self.balanced_body()
+            };
             let end = body
                 .as_ref()
                 .map(|b| b.end)

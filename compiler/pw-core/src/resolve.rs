@@ -53,11 +53,32 @@ pub enum Namespace {
     /// `fn`, `let`, and the data operations: query, command, subscription,
     /// resource, task. These are *called*.
     Term,
-    /// `view`, `component`, `page`. These are *rendered*, never called.
+    /// `view`, `component`, `page`, `materialize`. These are *rendered*, never
+    /// called. A materialization belongs here rather than with the data
+    /// operations because nothing in a program invokes one: the materializer
+    /// decides when it runs, from the graph.
     Ui,
+    /// `event`. Its own namespace, because an event name appears only in
+    /// `emits` and `invalidates_on` — never in an expression — and a
+    /// materialization that names an event must not silently resolve to a
+    /// query that happens to share the spelling.
+    Event,
 }
 
 impl Namespace {
+    /// Every namespace, in lookup order.
+    ///
+    /// A constant rather than a literal at each search site. There were two
+    /// such sites, both hand-written, and adding `Event` for E6 fixed one and
+    /// left the other — so an event was importable and unresolvable, or the
+    /// reverse, depending on which path asked.
+    pub const ALL: [Namespace; 4] = [
+        Namespace::Type,
+        Namespace::Term,
+        Namespace::Ui,
+        Namespace::Event,
+    ];
+
     pub fn of(kind: DeclKind) -> Option<Namespace> {
         Some(match kind {
             DeclKind::Type | DeclKind::Opaque => Namespace::Type,
@@ -68,7 +89,10 @@ impl Namespace {
             | DeclKind::Subscription
             | DeclKind::Resource
             | DeclKind::Task => Namespace::Term,
-            DeclKind::View | DeclKind::Component | DeclKind::Page => Namespace::Ui,
+            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Materialize => {
+                Namespace::Ui
+            }
+            DeclKind::Event => Namespace::Event,
             DeclKind::Import | DeclKind::Other => return None,
         })
     }
@@ -399,7 +423,7 @@ impl Workspace {
     /// that would be — that convenience was assumption A-009's ambient union,
     /// and it let a file match on a type it never imported.
     pub fn resolve(&self, unit: UnitId, name: &str) -> Resolution {
-        for ns in [Namespace::Type, Namespace::Term, Namespace::Ui] {
+        for ns in Namespace::ALL {
             match self.resolve_in(unit, ns, name) {
                 Resolution::Unresolved => continue,
                 other => return other,
@@ -452,7 +476,7 @@ impl Module {
     /// The first namespace that defines `name`. Used by imports, which name a
     /// symbol without saying which namespace they mean.
     pub fn lookup_any(&self, name: &str) -> Option<DefId> {
-        [Namespace::Type, Namespace::Term, Namespace::Ui]
+        Namespace::ALL
             .into_iter()
             .find_map(|ns| self.defines.get(&(ns, name.to_string())).copied())
     }
