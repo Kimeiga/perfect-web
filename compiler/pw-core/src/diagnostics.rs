@@ -163,6 +163,14 @@ const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // (alias as written in the corpus, canonical invariant code)
     ("PW0326", "PW2004"), // a resource cannot outlive the scope that owns it
     ("PW0311", "PW2002"), // an ordinary task cannot be detached from its scope
+    // Both are "a body requires a capability its world cannot grant" — one for
+    // a database in the browser, one for a secret at the edge. The corpus gave
+    // them separate codes before the placement algebra existed; one invariant
+    // gets one code, not one per instance.
+    ("PW0301", "PW5002"),
+    ("PW0324", "PW5002"),
+    ("PW0302", "PW5003"), // a secret cannot be rendered to the browser
+    ("PW0303", "PW5004"), // a shared cache key must carry every partition
 ];
 
 /// Resolve a corpus-declared code to the canonical invariant code.

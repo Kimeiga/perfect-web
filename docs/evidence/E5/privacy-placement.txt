@@ -1,0 +1,61 @@
+evidence: E5 — privacy-label algebra, placement solver, first rules
+recorded: 2026-08-06T05:08:14Z
+commit:   f23c89f203b30e740c0e9390fcedc448bad2c783
+commands:
+  cargo test -p pw-core --lib
+  cargo run -p pw-cli -- check examples/accepted/*.pw examples/rejected/*.pw
+
+================= LATTICE LAWS (charter §14 M5 task 8) =============
+Verified EXHAUSTIVELY over a bounded universe, not sampled: a random
+generator can miss the one pair that matters, and the pair that matters
+here is two sessions with different ids.
+  test privacy::tests::only_public_values_are_safe_in_a_shared_cache ... ok
+  test privacy::tests::violations_name_what_is_missing_not_merely_that_something_is ... ok
+  test privacy::tests::joining_two_tenants_is_stricter_than_either ... ok
+  test privacy::tests::a_cache_key_must_carry_every_partition_the_value_needs ... ok
+  test privacy::tests::public_is_the_identity_and_the_bottom ... ok
+  test privacy::tests::flows_into_is_a_partial_order_and_not_a_total_one ... ok
+  test privacy::tests::a_join_is_an_upper_bound_and_the_least_one ... ok
+  test privacy::tests::join_is_commutative_associative_and_idempotent ... ok
+
+================= PLACEMENT =======================================
+  test placement::tests::a_body_needing_both_the_dom_and_the_database_has_nowhere_to_run ... ok
+  test placement::tests::a_pure_body_can_run_anywhere ... ok
+  test placement::tests::a_device_value_exists_only_in_the_browser ... ok
+  test placement::tests::a_declared_placement_narrows_but_cannot_widen ... ok
+  test placement::tests::a_dom_effect_cannot_run_on_the_origin ... ok
+  test placement::tests::a_database_effect_cannot_run_in_the_browser ... ok
+  test placement::tests::build_time_has_no_user_to_be_private_to ... ok
+  test placement::tests::an_unknown_capability_family_rules_out_nothing ... ok
+  test placement::tests::every_world_grants_something_and_nothing_grants_everything ... ok
+  test placement::tests::a_secret_never_leaves_the_origin ... ok
+
+================= CORPUS ===========================================
+Rejected files the compiler now rejects, and by which rule:
+  R-002  declares PW0301   reports PW5002 
+  R-003  declares PW0302   reports PW5003 
+  R-005  declares PW0303   reports PW5004 
+  R-013  declares PW0311   reports PW2002 
+  R-014  declares PW0312   reports PW0312 
+  R-015  declares PW0313   reports PW0313 
+  R-026  declares PW0324   reports PW5002 
+  R-027  declares PW0325   reports PW0325 
+  R-029  declares PW0327   reports PW0327 
+  R-039  declares PW2004   reports PW2004 
+
+  R-007 needs the whole corpus in one invocation (assumption A-009)
+  and so is not listed above; it is caught by `pw check` over the set.
+
+  total: 11/44
+  false positives on the 24 accepted files: 0
+
+================= NOT PROVEN =======================================
+  - The gate asks for >= 50 placement/privacy compile-fail tests.
+    There are 4 corpus cases plus the unit tests, not 50.
+  - Effect INFERENCE does not exist. R-001 (a network call inside a
+    pure view) needs the callee's effects, which no table provides.
+  - The label-introducing accessor table in check.rs is a STAND-IN for
+    library signatures. It is the thing to delete when the library
+    lands, not the rule that uses it.
+  - Separate browser/edge/origin manifests (task 7) are not generated.
+  - The unsafe escape hatch (task 6) is parsed but not checked.

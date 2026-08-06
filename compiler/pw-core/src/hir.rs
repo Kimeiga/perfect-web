@@ -194,6 +194,9 @@ pub struct Decl {
     pub fields: Option<Vec<Param>>,
     /// The declaration's policy block, in source order.
     pub policies: Vec<Policy>,
+    /// `public`, `session`, `private` — the visibility keyword as written.
+    /// This is where a declaration's privacy label starts (charter §7.8).
+    pub visibility: Option<String>,
     /// `opaque type StoreId = String` — the representation, as written.
     pub opaque_of: Option<String>,
     /// The declared effect row, as written: `!{ database.read<Stores> }` yields

@@ -19,6 +19,8 @@ use std::collections::BTreeMap;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::exhaust::{self, Arm, Pattern as EPat};
 use crate::hir::{self, Body, Decl, DeclKind, Expr, ExprId, Hir, Pattern as HPat};
+use crate::placement::{ALL_WORLDS, Demand, World, solve};
+use crate::privacy::{Label, Restriction};
 use crate::scope::{HandleKind, Op, ScopeGraph, ScopeKind, ScopeViolation};
 use crate::types::{Ctor, Program, Type};
 
@@ -138,7 +140,31 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
 
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     let mut out = Vec::new();
-    for (_, decl) in unit.hir.all_decls() {
+
+    // Placement is inherited: a `fn` inside a `component placement browser`
+    // runs in the browser too. Checking each declaration in isolation misses
+    // exactly the case the charter opens with — a database read inside a
+    // browser-placed component — because the effect and the placement are on
+    // different declarations.
+    let mut inherited: BTreeMap<u32, World> = BTreeMap::new();
+    for (id, decl) in unit.hir.all_decls() {
+        if let Some(w) = declared_world(&unit.hir, decl) {
+            for child in &decl.children {
+                inherited.insert(child.0, w);
+            }
+            let _ = id;
+        }
+    }
+
+    for (id, decl) in unit.hir.all_decls() {
+        privacy_and_placement(
+            &unit.hir,
+            &unit.src,
+            decl,
+            inherited.get(&id.0).copied(),
+            &mut out,
+        );
+        privacy_flow(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
 
@@ -420,21 +446,7 @@ fn scopes(decl: &Decl, body: &Body, out: &mut Vec<Diagnostic>) {
 /// `scope application` inside a block: the scope's name, and the span covering
 /// the pair so a diagnostic can underline the clause rather than the statement.
 fn block_scope(body: &Body, block: ExprId) -> Option<(String, crate::hir::Span)> {
-    let Expr::Block { stmts } = body.expr(block) else {
-        return None;
-    };
-    let mut it = stmts.iter().peekable();
-    while let Some(s) = it.next() {
-        if !matches!(body.expr(*s), Expr::Name(n) if n == "scope") {
-            continue;
-        }
-        let Some(next) = it.peek() else { continue };
-        if let Expr::Name(v) = body.expr(**next) {
-            let span = body.expr_span(*s).start..body.expr_span(**next).end;
-            return Some((v.clone(), span));
-        }
-    }
-    None
+    name_pair(body, block, "scope")
 }
 
 /// A callee's dotted path as written: `task.spawn`, `Analytics.record_view`.
@@ -497,4 +509,419 @@ fn to_diagnostic(v: ScopeViolation) -> Diagnostic {
             replacement: None,
         }],
     }
+}
+
+// --- privacy, cache safety and placement (E5) ------------------------------
+
+/// A declaration's privacy label, from its visibility keyword.
+///
+/// Conservative on purpose: an unlabelled declaration is treated as public, so
+/// the checker can only *under*-restrict a value it was never told about. It
+/// cannot invent a restriction and reject a legal program.
+fn label_of(decl: &Decl) -> Label {
+    match decl.visibility.as_deref() {
+        Some("session") => Label::session(&decl.name),
+        Some("private") => Label::user(&decl.name),
+        _ => Label::public(),
+    }
+}
+
+/// The world a declaration pins, from either place it can be written.
+///
+/// A `query` puts `placement origin` in its policy block, before the brace. A
+/// `component` writes `placement browser` inside its body. Reading only the
+/// policy block missed every component — which is the charter's opening
+/// example, a database read inside a browser-placed component.
+fn declared_world(hir: &Hir, decl: &Decl) -> Option<World> {
+    if let Some(p) = decl.policy("placement") {
+        let v = p.value.trim();
+        if let Some(w) = ALL_WORLDS.iter().copied().find(|w| w.name() == v) {
+            return Some(w);
+        }
+    }
+    let body = hir.body(decl.body?);
+    let (name, _) = name_pair(body, body.root, "placement")?;
+    ALL_WORLDS.iter().copied().find(|w| w.name() == name)
+}
+
+/// `<keyword> <value>` as two adjacent name statements in a block, with the
+/// span covering the pair.
+fn name_pair(body: &Body, block: ExprId, keyword: &str) -> Option<(String, crate::hir::Span)> {
+    let Expr::Block { stmts } = body.expr(block) else {
+        return None;
+    };
+    let mut it = stmts.iter().peekable();
+    while let Some(s) = it.next() {
+        if !matches!(body.expr(*s), Expr::Name(n) if n == keyword) {
+            continue;
+        }
+        let Some(next) = it.peek() else { continue };
+        if let Expr::Name(v) = body.expr(**next) {
+            let span = body.expr_span(*s).start..body.expr_span(**next).end;
+            return Some((v.clone(), span));
+        }
+    }
+    None
+}
+
+/// E5's checks over one declaration.
+///
+/// Each is a *flow* question answered by the algebra in `crate::privacy` and
+/// `crate::placement`, not a pattern match on syntax. That is what lets a
+/// diagnostic name the value and the boundary rather than reporting that a
+/// keyword was in the wrong place (charter §14 M5 gate).
+fn privacy_and_placement(
+    hir: &Hir,
+    src: &str,
+    decl: &Decl,
+    inherited: Option<World>,
+    out: &mut Vec<Diagnostic>,
+) {
+    let label = label_of(decl);
+
+    // 1. A non-public value in a shared cache. Charter §7.8's canonical case.
+    if let Some(cache) = decl
+        .policy("cache")
+        .filter(|c| c.value.trim() == "shared" && !label.safe_in_shared_cache())
+    {
+        {
+            let needed = label.required_cache_partitions();
+            out.push(Diagnostic {
+                code: "PW5001",
+                invariant: "a value that is not public cannot live in a shared cache",
+                reason: "private_value_in_shared_cache",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!("`{}` is {label} and declares a shared cache", decl.name),
+                primary_span: cache.span.clone(),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id_of(hir, decl)),
+                    label: format!("`{}` is labelled {label} here", decl.name),
+                }],
+                explanation: Some(format!(
+                    "A shared cache is read by every user. {label} is not, so one \
+                     user's value would be served to another. The cause chain is \
+                     the whole point: `{}` is {label}, a shared cache is public, \
+                     and {label} does not flow into public.",
+                    decl.name
+                )),
+                repairs: vec![
+                    Repair {
+                        description: format!(
+                            "partition the cache by {} so each one gets its own entry",
+                            if needed.is_empty() {
+                                "the restriction".to_string()
+                            } else {
+                                needed.join(" and ")
+                            }
+                        ),
+                        replacement: None,
+                    },
+                    Repair {
+                        description: "or make the cache private, which stores per session"
+                            .to_string(),
+                        replacement: Some((cache.span.clone(), "cache private".to_string())),
+                    },
+                ],
+            });
+        }
+    }
+
+    // 2. Placement. The demand is the declared effect row plus the label; the
+    // solver answers which worlds can satisfy it.
+    let effects: Vec<String> = decl
+        .declared_effects
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .map(|e| e.path.clone())
+        .collect();
+    if effects.is_empty() && label.is_public() {
+        return;
+    }
+
+    let world = declared_world(hir, decl).or(inherited);
+    let demand = Demand {
+        effects: effects.clone(),
+        label: label.clone(),
+        declared: world,
+    };
+    let solution = solve(&demand);
+    if solution.is_satisfiable() {
+        return;
+    }
+
+    // The effect AS WRITTEN, type arguments included. `database.read` and
+    // `database.read<Stores>` are the same capability but not the same text,
+    // and the corpus declares which one the developer must be shown.
+    let written: Vec<String> = decl
+        .declared_effects
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .map(|e| {
+            src.get(e.span.clone())
+                .unwrap_or(&e.path)
+                .trim()
+                .to_string()
+        })
+        .collect();
+
+    // Nowhere can run this. Name every reason, for every world — that is the
+    // cause chain charter §14 M5 task 5 asks for.
+    let mut chain: Vec<String> = Vec::new();
+    for &w in ALL_WORLDS {
+        let reasons: Vec<String> = solution
+            .why_not(w)
+            .iter()
+            .map(|r| r.reason.to_string())
+            .collect();
+        if !reasons.is_empty() {
+            chain.push(format!("  {w}: {}", reasons.join("; ")));
+        }
+    }
+
+    // Point at the effect that cannot be granted, which is what the author has
+    // to change. The declaration's own span is the boundary, and goes in
+    // `related` — charter §16.3 wants both.
+    let span = decl
+        .declared_effects
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .find(|e| world.is_some_and(|w| !w.grants(&e.path)))
+        .map(|e| e.span.clone())
+        .or_else(|| decl.policy("placement").map(|p| p.span.clone()))
+        .unwrap_or_else(|| hir.decl_span(decl_id_of(hir, decl)));
+
+    out.push(Diagnostic {
+        code: "PW5002",
+        invariant: "every declaration must have somewhere it can run",
+        reason: "no_feasible_placement",
+        detector: Detector::CapabilityAudit,
+        severity: Severity::Error,
+        message: format!(
+            "`{}` cannot run in any world: it requires {}",
+            decl.name,
+            written.join(", ")
+        ),
+        primary_span: span,
+        related: vec![Related {
+            span: hir.decl_span(decl_id_of(hir, decl)),
+            label: if written.is_empty() {
+                format!("labelled {label}")
+            } else {
+                format!("requires {}", written.join(", "))
+            },
+        }],
+        explanation: Some(format!(
+            "Placement is derived from what a body does, not chosen. Each world \
+             was ruled out:\n{}",
+            chain.join("\n")
+        )),
+        repairs: vec![Repair {
+            description: "split the work: keep the privileged effect where it is \
+                          granted and pass a value across the boundary"
+                .to_string(),
+            replacement: None,
+        }],
+    });
+}
+
+/// The id of a declaration, by identity of its span.
+fn decl_id_of(hir: &Hir, decl: &Decl) -> crate::hir::DeclId {
+    hir.all_decls()
+        .find(|(_, d)| std::ptr::eq(*d, decl))
+        .map(|(id, _)| id)
+        .expect("the declaration came from this Hir")
+}
+
+/// Standard-library accessors that introduce a privacy label.
+///
+/// **A stand-in for signatures that do not exist yet.** With a real library the
+/// checker would read `current_organization()`'s declared return label instead
+/// of consulting a table. The table is here so the rule can be built and tested
+/// now; it is the thing to delete when the library lands, not the rule.
+fn introduced_restriction(path: &str) -> Option<Restriction> {
+    Some(match path {
+        // The parameters are the charter §7.8 type names, because that is what
+        // a developer sees and what the corpus declares it expects. With a real
+        // library these come from the accessor's return label.
+        "current_session" | "session.current" => Restriction::Session("SessionId".into()),
+        "current_user" | "user.current" => Restriction::User("UserId".into()),
+        "current_organization" | "organization.current" => {
+            Restriction::Organization("OrganizationId".into())
+        }
+        "device.id" => Restriction::Device,
+        p if p.starts_with("secrets.") => {
+            Restriction::Secret(capitalize(p.trim_start_matches("secrets.")))
+        }
+        _ => return None,
+    })
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        None => String::new(),
+    }
+}
+
+/// Every restriction a body picks up by calling a label-introducing accessor.
+fn body_label(body: &Body) -> Label {
+    let mut label = Label::public();
+    for id in body.walk() {
+        let Expr::Call { callee, .. } = body.expr(id) else {
+            continue;
+        };
+        if let Some(r) = introduced_restriction(&path_of(body, *callee)) {
+            label = label.join(&Label::of(r));
+        }
+    }
+    label
+}
+
+/// Names bound to a label-introducing call, so a later use can be traced back.
+fn labelled_bindings(body: &Body) -> BTreeMap<String, (Restriction, crate::hir::Span)> {
+    let mut out = BTreeMap::new();
+    for id in body.walk() {
+        let Expr::Let { pat, init, ty } = body.expr(id) else {
+            continue;
+        };
+        let (Some(pat), Some(init)) = (pat, init) else {
+            continue;
+        };
+        let HPat::Bind { name, .. } = body.pat(*pat) else {
+            continue;
+        };
+        // Either the initialiser calls an accessor, or the binding is annotated
+        // `Secret<..>` directly.
+        // A written annotation is the most precise source: `let key:
+        // Secret<Payments>` names the capability exactly, where the accessor's
+        // name only implies it.
+        let annotated = ty.and_then(|t| {
+            let t = body.types.get(t.index())?;
+            (t.path == "Secret")
+                .then(|| t.args.first().and_then(|a| body.types.get(a.index())))
+                .flatten()
+                .map(|arg| Restriction::Secret(arg.path.clone()))
+        });
+        let restriction = annotated.or_else(|| match body.expr(*init) {
+            Expr::Call { callee, .. } => introduced_restriction(&path_of(body, *callee)),
+            _ => None,
+        });
+        if let Some(r) = restriction {
+            out.insert(name.clone(), (r, body.expr_span(id)));
+        }
+    }
+    out
+}
+
+/// E5 rules that need the body's label, not only the declaration header.
+fn privacy_flow(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
+    let Some(body_id) = decl.body else { return };
+    let body = hir.body(body_id);
+    let label = body_label(body);
+    if label.is_public() {
+        return;
+    }
+
+    // 1. A secret reaching markup. Markup renders in the browser, and a secret
+    //    never leaves the origin (charter §7.8, corpus R-003).
+    let bound = labelled_bindings(body);
+    for id in body.walk() {
+        let Expr::Template { parts, .. } = body.expr(id) else {
+            continue;
+        };
+        for part in parts {
+            let name = match body.expr(*part) {
+                Expr::Name(n) => n.clone(),
+                _ => continue,
+            };
+            let Some((Restriction::Secret(cap), origin)) = bound.get(&name) else {
+                continue;
+            };
+            out.push(Diagnostic {
+                code: "PW5003",
+                invariant: "a secret cannot be rendered to the browser",
+                reason: "secret_crosses_to_browser",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!("`{name}` is Secret<{cap}> and is rendered into markup"),
+                primary_span: body.expr_span(*part),
+                related: vec![Related {
+                    span: origin.clone(),
+                    label: format!("`{name}` becomes Secret<{cap}> here"),
+                }],
+                explanation: Some(format!(
+                    "Markup is sent to the browser. Secret<{cap}> may exist only in \
+                     the origin world, so rendering it moves it across a boundary \
+                     it may not cross — the value is in the HTML whether or not \
+                     anything reads it."
+                )),
+                repairs: vec![Repair {
+                    description: "perform the privileged operation on the origin and \
+                                  render only its result"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+
+    // 2. A shared cache keyed without every partition the value needs
+    //    (charter §14 M5 task 4, corpus R-005).
+    let shared = decl
+        .policy("cache")
+        .is_some_and(|c| c.value.trim() == "shared");
+    if !shared {
+        return;
+    }
+    let key_policy = decl.policy("key");
+    let key_text = key_policy.map(|k| k.value.clone()).unwrap_or_default();
+    let missing: Vec<String> = label
+        .required_cache_partitions()
+        .into_iter()
+        .filter(|p| !key_text.contains(p.as_str()))
+        .collect();
+    if missing.is_empty() {
+        return;
+    }
+
+    let span = key_policy
+        .map(|k| k.span.clone())
+        .or_else(|| decl.policy("cache").map(|c| c.span.clone()))
+        .unwrap_or_else(|| hir.decl_span(decl_id_of(hir, decl)));
+
+    out.push(Diagnostic {
+        code: "PW5004",
+        invariant: "a shared cache key must carry every partition its value depends on",
+        reason: "cache_key_omits_partition",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!(
+            "`{}` is {label} but its shared cache key omits {}",
+            decl.name,
+            missing.join(" and ")
+        ),
+        primary_span: span,
+        related: vec![Related {
+            span: hir.decl_span(decl_id_of(hir, decl)),
+            label: format!("the result depends on {label}"),
+        }],
+        explanation: Some(format!(
+            "Two callers with different {} produce different results, and this key \
+             cannot tell them apart — so the first caller's value is served to the \
+             second. That is a cross-tenant leak, not a stale read.",
+            missing.join(" and ")
+        )),
+        repairs: vec![Repair {
+            description: format!(
+                "add {} to the key, or make the cache private",
+                missing.join(" and ")
+            ),
+            replacement: None,
+        }],
+    });
 }

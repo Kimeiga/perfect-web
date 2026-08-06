@@ -346,7 +346,7 @@ fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
         "expected the full rejected corpus, saw {total}"
     );
     assert!(
-        caught.len() >= 7,
+        caught.len() >= 11,
         "semantic coverage regressed: {}/{total} caught — {caught:?}",
         caught.len()
     );
@@ -436,5 +436,65 @@ fn the_structured_concurrency_rules_run_on_real_bodies() {
             .1
             .is_empty(),
         "an ordinary scoped spawn must be accepted"
+    );
+}
+
+#[test]
+fn the_privacy_and_placement_rules_catch_their_corpus_cases() {
+    // E5's first slice. Each case is a *flow* answered by the algebra in
+    // `pw_core::privacy` and `pw_core::placement`, not a syntax pattern.
+    let sources: std::collections::HashMap<_, _> = whole_corpus().into_iter().collect();
+    let results: std::collections::HashMap<_, _> =
+        check_sources(&whole_corpus()).into_iter().collect();
+
+    let want = [
+        ("R-002", "PW5002"), // database read inside a browser-placed component
+        ("R-003", "PW5003"), // a secret rendered into markup
+        ("R-005", "PW5004"), // shared cache keyed without the tenant
+        ("R-026", "PW5002"), // a secret capability at the edge
+    ];
+    for (file, code) in want {
+        let (name, diags) = results
+            .iter()
+            .find(|(p, _)| p.starts_with(file))
+            .unwrap_or_else(|| panic!("{file} is in the corpus"));
+        let d = diags
+            .iter()
+            .find(|d| d.code == code)
+            .unwrap_or_else(|| panic!("{file} must report {code}, got {diags:?}"));
+
+        // Charter §14 M5 gate: "Diagnostics name the source value and invalid
+        // boundary, not merely a type mismatch."
+        let src = &sources[name];
+        assert!(d.primary_span.end <= src.len());
+        assert!(!d.related.is_empty(), "{file}: no boundary span");
+        let note = d.explanation.as_deref().unwrap_or("");
+        assert!(
+            note.len() > 40,
+            "{file}: the note must explain the cause chain, got {note:?}"
+        );
+    }
+
+    // Control: the placement solver must not fire on the accepted corpus, where
+    // every declaration has somewhere legal to run.
+    let bad: Vec<&String> = results
+        .iter()
+        .filter(|(p, d)| p.starts_with("A-") && d.iter().any(|d| d.code.starts_with("PW50")))
+        .map(|(p, _)| p)
+        .collect();
+    assert!(bad.is_empty(), "false positives on accepted files: {bad:?}");
+}
+
+#[test]
+fn an_unmodelled_capability_family_never_manufactures_a_placement_error() {
+    // The failure this rule already had once: an effect family absent from the
+    // table ruled out every world, so two corpus files were reported for the
+    // wrong reason. A coverage number that goes up without a detection is worse
+    // than one that stays put.
+    let src = "module m\nfn f() -> Int !{ telemetry.emit, log<Public> } {\n    1\n}\n";
+    let diags = &check_sources(&[("t.pw".into(), src.into())])[0].1;
+    assert!(
+        diags.iter().all(|d| d.code != "PW5002"),
+        "an unmodelled family must not be unplaceable: {diags:?}"
     );
 }

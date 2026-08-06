@@ -221,6 +221,7 @@ for the admissibility rule above.
 | E2 grammar | an error on `</main>` | the real fault was two lines earlier: `expr` crossed a newline into `<` and parsed markup as a comparison |
 | E2 grammar | a statement parsed, the next one failed | a modifier loop crossed the newline and ate the next statement's first token |
 | E3 adapter | the generated template looked correct | **Marko strips whitespace between elements**, so `<span>a</span> <span>b</span>` rendered as `ab`. The template-level test asserted the template, and the template was fine — only a browser saw the DOM |
+| E5 placement | corpus coverage rose from 7 to 9 files | an effect family absent from the capability table was granted by **no** world, so two files were reported as unplaceable for a reason that had nothing to do with their actual defect. Right file, wrong rule, and the number went up while nothing was detected |
 
 The last four share one shape: **the diagnostic pointed at the line after the
 defect.** A parser that recovers silently moves the blame downstream, which is
