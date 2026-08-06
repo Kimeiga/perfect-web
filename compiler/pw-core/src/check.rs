@@ -374,6 +374,9 @@ fn check_unit_with(
     // answered from a type the author wrote down.
     crate::annotations::check(&unit.hir, sigs, &mut out);
 
+    // Affine resources: consumed exactly once, in the scope that acquired it.
+    crate::affine::check(&unit.hir, sigs, &mut out);
+
     for (id, decl) in unit.hir.all_decls() {
         privacy_and_placement(
             &unit.hir,

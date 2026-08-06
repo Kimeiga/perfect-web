@@ -162,7 +162,11 @@ impl Diagnostic {
 pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // (alias as written in the corpus, canonical invariant code)
     ("PW0326", "PW2004"), // a resource cannot outlive the scope that owns it
-    ("PW0311", "PW2002"), // an ordinary task cannot be detached from its scope
+    ("PW0311", "PW2002"),
+    // Not consumed on a path, and consumed somewhere the scope cannot see.
+    // One invariant from two sides: exactly once, here.
+    ("PW0309", "PW2005"),
+    ("PW0310", "PW2005"), // an ordinary task cannot be detached from its scope
     // Both are "a body requires a capability its world cannot grant" — one for
     // a database in the browser, one for a secret at the edge. The corpus gave
     // them separate codes before the placement algebra existed; one invariant

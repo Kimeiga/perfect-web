@@ -154,6 +154,8 @@ codes! {
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001", ScopeGraph,
         "a handle cannot outlive the scope that owns it";
+    AFFINE_NOT_CONSUMED_ONCE = "PW2005", ScopeGraph,
+        "an affine value must be consumed exactly once, in the scope that acquired it";
     TASK_DETACHED = "PW2002", ScopeGraph,
         "an ordinary task cannot be detached from its scope";
     HANDLE_USED_LATE = "PW2003", ScopeGraph,
@@ -230,16 +232,6 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
         "PW0308",
         "E7",
         "serialization analysis — a non-serializable capture",
-    ),
-    (
-        "PW0309",
-        "E9C",
-        "affine types — a transaction neither committed nor rolled back",
-    ),
-    (
-        "PW0310",
-        "E9C",
-        "affine types — a resource handle that escapes",
     ),
     (
         "PW0321",

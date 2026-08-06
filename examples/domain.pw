@@ -54,6 +54,10 @@ type Store = Store {
     hours: StoreHours,
 }
 
+// An open transaction. Affine: it must end exactly once, and the row of the
+// function that produced it says so.
+opaque type DatabaseTransaction = String
+
 // A point on the earth. Device-bound: it exists where the device is, which is
 // what makes reading it from an origin-placed query a placement error.
 type Location = Location {

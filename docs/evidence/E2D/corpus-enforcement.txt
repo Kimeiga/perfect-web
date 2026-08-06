@@ -1,7 +1,7 @@
 corpus enforcement — every rejected fixture, checked as its own program
 (the shared library, the accepted modules it imports, and the fixture)
 
-39/44 enforce their declared invariant
+41/44 enforce their declared invariant
 
 R-001  enforced                  PW0401 (declared PW0300)
        network request inside view
@@ -23,9 +23,9 @@ R-009  enforced                  PW0601 (declared PW0307)
        unchecked external cast
 R-010  UNCAUGHT                  PW0308
        nonserializable handler capture
-R-011  UNCAUGHT                  PW0309
+R-011  enforced                  PW2005 (declared PW0309)
        open transaction not committed or rolled back
-R-012  UNCAUGHT                  PW0310
+R-012  enforced                  PW2005 (declared PW0310)
        affine resource leaked
 R-013  enforced                  PW2002 (declared PW0311)
        detached ordinary task

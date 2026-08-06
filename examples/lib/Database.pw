@@ -10,9 +10,28 @@ module Database
 
 import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
     MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
-    RecommendationError, PaymentError, TrackingError }
+    RecommendationError, PaymentError, TrackingError, DatabaseTransaction }
 import browser.{ Element, MapHandle, MapError }
 
-fn begin() -> Int !{ database.transaction } {
+// `resource.acquire<T>` in the row is what makes the returned value affine.
+// The checker reads the row; it holds no list of functions that open things,
+// so a new resource is declared here rather than in the compiler.
+fn begin() -> DatabaseTransaction
+    !{ database.transaction, resource.acquire<DatabaseTransaction> }
+{
+    todo
+}
+
+// The two ways a transaction ends. Exactly one of them must happen on every
+// path, which is what `resource.release<T>` says.
+fn commit(tx: DatabaseTransaction) -> Result<(), CartError>
+    !{ database.transaction, resource.release<DatabaseTransaction> }
+{
+    todo
+}
+
+fn rollback(tx: DatabaseTransaction) -> ()
+    !{ database.transaction, resource.release<DatabaseTransaction> }
+{
     todo
 }

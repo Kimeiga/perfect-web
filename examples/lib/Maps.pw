@@ -13,10 +13,14 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
     RecommendationError, PaymentError, TrackingError }
 import browser.{ Element, MapHandle, MapError }
 
-fn create(container: Element, center: String) -> Result<MapHandle, MapError> !{ dom.mutate, layout.measure } {
+fn create(container: Element, center: String) -> Result<MapHandle, MapError>
+    !{ dom.mutate, layout.measure, resource.acquire<MapHandle> }
+{
     todo
 }
 
-fn destroy(handle: MapHandle) -> () !{ dom.mutate } {
+fn destroy(handle: MapHandle) -> ()
+    !{ dom.mutate, resource.release<MapHandle> }
+{
     todo
 }

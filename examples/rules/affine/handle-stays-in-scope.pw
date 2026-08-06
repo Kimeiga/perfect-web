@@ -1,0 +1,18 @@
+// @expect: clean
+// The control for the "escapes" half. The same `use` binding and the same
+// module state — what is stored is a value DERIVED from the handle, not the
+// handle. A rule that reported any assignment to module state inside a body
+// holding an affine value would catch this.
+
+module rules.affine_scope
+
+import Maps
+
+let mut last_center: Option<String> = None
+
+fn setup(container: Element) -> ()
+    !{ resource.acquire<MapHandle>, dom.mutate, layout.measure }
+{
+    use handle = Maps.create(container, default_center())
+    last_center = Some(default_center())
+}

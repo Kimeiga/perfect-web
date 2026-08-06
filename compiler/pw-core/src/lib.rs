@@ -20,6 +20,7 @@
 //! representation. That independence is the point.
 
 pub mod abi;
+pub mod affine;
 /// Charter §7.1, §7.10, §8.2 checks that read a type the author wrote.
 /// Distinct from `types`, which is the value-type model itself.
 pub mod annotations;
