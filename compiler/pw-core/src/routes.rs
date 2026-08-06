@@ -31,7 +31,7 @@ pub fn table(hirs: &[&Hir]) -> BTreeSet<String> {
                     continue;
                 }
                 let Some(next) = it.peek() else { continue };
-                if let Expr::Literal(crate::hir::Literal::Str(path)) = body.expr(**next) {
+                if let Some(path) = body.string_text(**next) {
                     out.insert(path.trim_matches('"').to_string());
                 }
             }

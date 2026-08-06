@@ -135,7 +135,65 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
     }
 }
 
+/// The first expression node inside a synthetic wrapper's function body.
+fn first_expr(root: &SyntaxNode) -> Option<SyntaxNode> {
+    root.descendants()
+        .find(|n| n.kind() == K::BlockExpr)?
+        .children()
+        .find(|c| is_expr(c.kind()))
+}
+
+/// The shortest synthetic program that puts an expression in expression
+/// position. Padded to the hole's own offset so every span the sub-parse
+/// produces already points into the real file.
+const HOLE_PREFIX: &str = "module h\nfn h()->(){";
+
 impl Lowerer<'_> {
+    /// The `{expr}` holes in a string literal, lowered with the REAL grammar.
+    ///
+    /// The alternative — a small parser for what may appear in a hole — is the
+    /// second-mini-language mistake `docs/NEXT.md` rejected for effect parsing,
+    /// and it fails the same way: the two grammars disagree about something and
+    /// the checker quietly analyses a different program from the one that runs.
+    ///
+    /// So the hole is handed to `pw_syntax::parse` inside a synthetic wrapper
+    /// whose prefix is space-padded to exactly the hole's offset in the real
+    /// source. Every span that comes back is therefore already correct, with no
+    /// arithmetic to get wrong.
+    fn interpolations(&mut self, b: &mut BodyBuilder, text: &str, at: usize) -> Vec<ExprId> {
+        let mut out = Vec::new();
+        let mut rest = text;
+        let mut base = at;
+        while let Some(open) = rest.find('{') {
+            let after = &rest[open + 1..];
+            let Some(close) = after.find('}') else { break };
+            let hole = &after[..close];
+            let hole_at = base + open + 1;
+            if !hole.trim().is_empty() && hole_at >= HOLE_PREFIX.len() {
+                let pad = hole_at - HOLE_PREFIX.len();
+                let mut synthetic = String::with_capacity(hole_at + hole.len() + 1);
+                synthetic.push_str(HOLE_PREFIX);
+                synthetic.push_str(&" ".repeat(pad));
+                synthetic.push_str(hole);
+                synthetic.push('}');
+
+                let parsed = pw_syntax::parse_tree(&synthetic);
+                let mut sub = Lowerer {
+                    hir: std::mem::take(&mut self.hir),
+                    src: &synthetic,
+                };
+                if let Some(e) = first_expr(&parsed.green) {
+                    let id = sub.expr(b, &e);
+                    out.push(id);
+                }
+                self.hir = sub.hir;
+            }
+            base = base + open + 1 + close + 1;
+            rest = &after[close + 1..];
+        }
+        out
+    }
+
     fn decl(&mut self, node: &SyntaxNode) -> Option<DeclId> {
         if !matches!(
             node.kind(),
@@ -381,7 +439,19 @@ impl Lowerer<'_> {
                 let lit = match t.first().map(|t| (t.kind(), t.text().to_string())) {
                     Some((K::Int, s)) => Literal::Int(s),
                     Some((K::Float, s)) => Literal::Float(s),
-                    Some((K::Str, s)) => Literal::Str(s),
+                    Some((K::Str, s)) => {
+                        // A string with `{..}` holes is not a literal: the holes
+                        // are expressions, and a checker that has to search the
+                        // characters for them cannot see into `{token.value}`.
+                        if s.contains('{') {
+                            let start = span.start;
+                            let parts = self.interpolations(b, &s, start);
+                            if !parts.is_empty() {
+                                return b.expr(Expr::Interpolated { text: s, parts }, span);
+                            }
+                        }
+                        Literal::Str(s)
+                    }
                     Some((K::UnterminatedStr, s)) => Literal::UnterminatedStr(s),
                     _ => return b.expr(Expr::Error, span),
                 };

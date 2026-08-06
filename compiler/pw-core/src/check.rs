@@ -1288,33 +1288,19 @@ fn sink_level(
 
 /// The names a value carries into a call.
 ///
-/// A name passed directly, and a name interpolated into a string. The second is
-/// read from the literal's text because that is where the parser leaves it —
-/// `"token {t}"` is one token. It therefore sees `{t}` and not `{t.value}`,
-/// which is a real limit rather than a decision: an interpolation holding an
-/// expression needs the parser to lower it as one.
+/// Just the walk. A string's `{expr}` holes are real expressions in the tree
+/// (`Expr::Interpolated`), so a name inside one is found the same way as a
+/// name passed directly, and `{token.value}` is found too. This used to read
+/// `{name}` out of the literal's characters, which meant a value could leave
+/// through a hole the analysis could not see into.
 fn carried_names(body: &Body, value: ExprId) -> Vec<(String, crate::hir::Span)> {
-    let mut out = Vec::new();
-    for id in body.walk_from(value) {
-        match body.expr(id) {
-            Expr::Name(n) => out.push((n.clone(), body.expr_span(id))),
-            Expr::Literal(crate::hir::Literal::Str(text)) => {
-                let span = body.expr_span(id);
-                let mut rest = text.as_str();
-                while let Some(open) = rest.find('{') {
-                    let after = &rest[open + 1..];
-                    let Some(close) = after.find('}') else { break };
-                    let inner = after[..close].trim();
-                    if !inner.is_empty() && inner.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                        out.push((inner.to_string(), span.clone()));
-                    }
-                    rest = &after[close + 1..];
-                }
-            }
-            _ => {}
-        }
-    }
-    out
+    body.walk_from(value)
+        .into_iter()
+        .filter_map(|id| match body.expr(id) {
+            Expr::Name(n) => Some((n.clone(), body.expr_span(id))),
+            _ => None,
+        })
+        .collect()
 }
 
 fn privacy_flow(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnostic>) {

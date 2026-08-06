@@ -285,6 +285,7 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
         // corpus says must go through a decoder — emitting one silently would
         // make the oracle agree with a program `pw` rejects.
         Expr::Cast { .. } => return Err("a cast"),
+        Expr::Interpolated { .. } => return Err("an interpolated string"),
         Expr::Error => return Err("an expression that did not parse"),
     })
 }

@@ -504,6 +504,8 @@ fn expr_text(body: &Body, id: ExprId, ctx: &Ctx<'_>) -> Result<String, String> {
     Ok(match body.expr(id) {
         Expr::Name(n) => ctx.name(n),
         Expr::Literal(Literal::Int(s) | Literal::Float(s) | Literal::Str(s)) => s.clone(),
+        // Rendered as written; the adapter emits the template's own syntax.
+        Expr::Interpolated { text, .. } => text.clone(),
         Expr::Literal(Literal::UnterminatedStr(_)) => {
             return Err("an unterminated string".to_string());
         }

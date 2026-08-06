@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+//
+// The counterexample `readiness.txt` named: the secret leaves through a hole
+// containing an EXPRESSION, not a bare name. The rule used to read `{name}`
+// out of the literal's characters, so `{token.value}` was a hole it could not
+// see into — a value could leave through it unobserved.
+
+module generality.sink_nested_hole
+
+import log
+import secrets
+
+fn audit(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
+    let token = secrets.payments()
+    log.public("charging with {token.value} now")
+}

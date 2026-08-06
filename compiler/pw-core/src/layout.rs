@@ -461,12 +461,9 @@ fn custom_property_arg(body: &Body, id: ExprId, callee: &str) -> Option<String> 
     if !named {
         return None;
     }
-    args.iter().find_map(|a| match body.expr(a.value) {
-        Expr::Literal(crate::hir::Literal::Str(s)) => {
-            let s = s.trim_matches('"');
-            s.starts_with("--").then(|| s.to_string())
-        }
-        _ => None,
+    args.iter().find_map(|a| {
+        let s = body.string_text(a.value)?.trim_matches('"');
+        s.starts_with("--").then(|| s.to_string())
     })
 }
 

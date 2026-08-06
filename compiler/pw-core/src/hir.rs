@@ -332,6 +332,7 @@ impl Body {
             }
             Expr::Binary { lhs, rhs, .. } => vec![*lhs, *rhs],
             Expr::Cast { value, .. } => vec![*value],
+            Expr::Interpolated { parts, .. } => parts.clone(),
             Expr::Unary { operand, .. } => vec![*operand],
             Expr::Block { stmts } => stmts.clone(),
             Expr::If { cond, then, els } => {
@@ -357,6 +358,20 @@ impl Body {
     }
 
     /// Every expression reachable from `root`, parents before children.
+    /// The source text of a string expression, whether or not it has holes.
+    ///
+    /// A route is written `route "/stores/{id}"`, which is a string WITH a
+    /// hole — so a consumer that matched only `Literal::Str` stopped seeing
+    /// routes the moment holes became expressions. Anything that wants the
+    /// characters should ask for them here rather than match one variant.
+    pub fn string_text(&self, id: ExprId) -> Option<&str> {
+        match self.expr(id) {
+            Expr::Literal(Literal::Str(s)) => Some(s),
+            Expr::Interpolated { text, .. } => Some(text),
+            _ => None,
+        }
+    }
+
     pub fn walk(&self) -> Vec<ExprId> {
         self.walk_from(self.root)
     }
@@ -466,6 +481,16 @@ pub enum Expr {
     Cast {
         value: ExprId,
         ty: TypeRefId,
+    },
+    /// A string with `{expr}` holes: `"charging {token} now"`.
+    ///
+    /// The holes are real expressions with real spans, not text a checker
+    /// searches. Before this existed, the privacy-sink rule read `{name}` out
+    /// of the literal's characters, so `{token.value}` was invisible to it —
+    /// a value could leave through a hole the analysis could not see into.
+    Interpolated {
+        text: String,
+        parts: Vec<ExprId>,
     },
     Unary {
         op: UnOp,
