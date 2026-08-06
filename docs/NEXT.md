@@ -104,8 +104,8 @@ C1 is frozen (`docs/CORPUS.md`). Progress is now measured by the second score.
 
 ```text
 corpus conformance:      44 / 44
-generally enforced:       9 / 29
-narrowly enforced:        1 / 29
+generality-tested:       9 / 29
+known narrow witness:        1 / 29
 generality untested:     19 / 29
 ```
 

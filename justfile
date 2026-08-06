@@ -82,6 +82,13 @@ test-compile:
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
+# The THIRD gate: for every syntactically representable program the compiler
+# must produce output, ordinary diagnostics, or a marked internal error — never
+# terminate without a report. A panic takes every other rule down with it, so a
+# compiler that reports nothing looks like one that found nothing.
+robustness:
+    @cargo test --quiet -p pw-core --test robustness 2>&1 | tail -4
+
 # The SECOND score. Corpus conformance says today's specification passes;
 # generality says the same guarantees survive programs the fixtures did not
 # anticipate. `slips-through.pw` files are known gaps, executable so they

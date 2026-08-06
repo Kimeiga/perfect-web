@@ -468,6 +468,65 @@ fn exhaustiveness(
         })
         .collect();
 
+    // Validate BEFORE analysing. A pattern whose arity disagrees with its
+    // constructor is a defect in its own right, and it is also what
+    // desynchronizes the pattern row from the type list inside the
+    // exhaustiveness algorithm. Reporting it here means the author is told
+    // what is actually wrong, rather than being told about a missing variant
+    // that follows from it.
+    //
+    // `exhaust.rs` defends against the mismatch anyway. Two layers, because
+    // "upstream validated it" is the assumption that produced the panic.
+    let program = env.program();
+    for (arm, lowered) in arms.iter().zip(&lowered) {
+        let exhaust::Pattern::Ctor { ctor, args } = &lowered.pattern else {
+            continue;
+        };
+        let Some(declared) = program
+            .ctors_of(&Type::Adt(adt_id))
+            .and_then(|cs| cs.get(*ctor).cloned())
+        else {
+            continue;
+        };
+        if args.len() == declared.fields.len() {
+            continue;
+        }
+        out.push(Diagnostic {
+            code: crate::codes::CONSTRUCTOR_ARITY.id,
+            invariant: crate::codes::CONSTRUCTOR_ARITY.invariant,
+            reason: "constructor_pattern_arity_mismatch",
+            detector: Detector::PatternMatrix,
+            severity: Severity::Error,
+            message: format!(
+                "`{}` binds {} field(s) but declares {}",
+                declared.name,
+                args.len(),
+                declared.fields.len()
+            ),
+            primary_span: body.pat_span(arm.pat),
+            related: vec![Related {
+                span: body.expr_span(match_id),
+                label: format!("matching on `{ty_name}`"),
+            }],
+            explanation: Some(format!(
+                "A constructor pattern binds its constructor's fields, so the count                  is not a style choice — `{}` carries {} of them. Writing a different                  number leaves the compiler with a pattern that does not describe any                  value of this type.",
+                declared.name,
+                declared.fields.len()
+            )),
+            repairs: vec![Repair {
+                description: if args.len() < declared.fields.len() {
+                    format!(
+                        "bind the remaining field(s), or write `{}(_)`-style wildcards",
+                        declared.name
+                    )
+                } else {
+                    format!("`{}` takes {}", declared.name, declared.fields.len())
+                },
+                replacement: None,
+            }],
+        });
+    }
+
     let report = exhaust::check_match(env.program(), &Type::Adt(adt_id), &lowered);
     if report.is_exhaustive() {
         return;

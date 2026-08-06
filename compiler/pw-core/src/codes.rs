@@ -160,6 +160,8 @@ codes! {
         "an external value must be decoded, not cast";
     HANDLER_SIGNATURE_MISMATCH = "PW0602" / handler_signature_mismatch / 1, Types,
         "a handler must accept the event its attribute delivers";
+    CONSTRUCTOR_ARITY = "PW0603" / constructor_arity / 1, Types,
+        "a constructor pattern must bind exactly the fields its constructor declares";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

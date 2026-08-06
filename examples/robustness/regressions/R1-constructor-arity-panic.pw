@@ -1,0 +1,39 @@
+// @regression: R1
+// @phase: exhaustiveness
+// @found: 2026-08-06, by a generality counterexample
+// @symptom: compiler panic — `useful on empty row`, and the same `expect` in
+//           `specialize` and `default_matrix`
+// @cause: a constructor pattern whose arity disagrees with its declared field
+//         count desynchronizes the pattern row from the type list, so a
+//         recursive call receives an empty row and a non-empty type list
+// @impact: every rule in the invocation reported nothing, for every file
+// @fix: rows are padded to the declared arity, and a short row matches nothing
+//
+// The MINIMIZED reproducer. The original was a nested match in
+// examples/generality/non_exhaustive_match/; this is the smallest program that
+// reaches the same code path.
+
+module robustness.arity
+
+import domain.{ OrderState, CancellationReason }
+
+fn describe(s: OrderState) -> String !{} {
+    match s {
+        Draft => "draft"
+        Pricing => "pricing"
+        AuthorizingPayment => "authorizing"
+        Submitting => "submitting"
+        SearchingForDasher => "searching"
+        Confirmed(c) => "confirmed"
+        InProgress(p) => "in progress"
+        Delivered(r) => "delivered"
+        // Declared with one field, written with none. This is the mismatch.
+        Cancelled => "cancelled"
+        Failed(f) => "failed"
+    }
+}
+
+// The negative control: reverting the fix makes
+// `inconsistent_constructor_arities_do_not_panic_the_compiler` fail, and
+// leaves the corpus-mutation and byte-fuzz tests green. Recorded in that
+// test's doc comment.

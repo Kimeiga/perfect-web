@@ -60,8 +60,8 @@ There is now a **second gate, and it is open**:
 
 ```text
 corpus conformance:      44 / 44
-generally enforced:       9 / 29
-narrowly enforced:        1 / 29   (with an executable witness)
+generality-tested:       9 / 29
+known narrow witness:        1 / 29   (with an executable witness)
 generality untested:     19 / 29
 ```
 

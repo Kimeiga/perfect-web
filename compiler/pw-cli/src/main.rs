@@ -468,7 +468,49 @@ fn emit_manifest_command(paths: &[&String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Turn an internal panic into a conspicuous, reproducible report.
+///
+/// Charter §3.1 and the architect's compiler-robustness gate: for every
+/// syntactically representable program the compiler must produce output,
+/// ordinary diagnostics, or a **clearly marked internal compiler error**. It
+/// must not terminate without a report.
+///
+/// The reason is not politeness. When `exhaust.rs` panicked on a constructor
+/// arity mismatch, every rule in that invocation reported nothing for every
+/// file — a compiler that reports nothing is indistinguishable from a compiler
+/// that found nothing, and the user's next move is to assume their code is
+/// fine.
+///
+/// Containment is for the user and for the evidence. It is NOT a way of
+/// tolerating the defect: the exit code is still a failure, the message says
+/// this is a bug in `pw`, and `just ci` runs the robustness suite which fails
+/// hard on any panic at all.
 fn main() -> ExitCode {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        eprintln!();
+        eprintln!("internal compiler error: this is a bug in `pw`, not in your code.");
+        eprintln!("  {info}");
+        eprintln!();
+        eprintln!("  what to do: the arguments below reproduce it. Please file them");
+        eprintln!("  with the source file. Nothing was checked, so the absence of");
+        eprintln!("  other diagnostics means nothing.");
+        eprintln!(
+            "  reproduce: pw {}",
+            std::env::args().skip(1).collect::<Vec<_>>().join(" ")
+        );
+        let _ = &previous;
+    }));
+
+    match std::panic::catch_unwind(run) {
+        Ok(code) => code,
+        // Distinct from an ordinary diagnostic failure, so a script can tell
+        // "your program is wrong" from "the compiler is wrong".
+        Err(_) => ExitCode::from(101),
+    }
+}
+
+fn run() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let plain = args.iter().any(|a| a == "--plain");
     let cmd = args.first().map(|s| s.as_str()).unwrap_or("");

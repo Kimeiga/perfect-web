@@ -1,9 +1,9 @@
 // @status: GENERAL
 // @invariant: affine_not_consumed_once
 //
-// A third control-flow shape: a `match` rather than an `if`, three arms, and
-// exactly one of them leaves without releasing. Neither the fixture nor the
-// other counterexample has a match in it.
+// A third control-flow shape: a `match` rather than an `if`, and exactly one
+// arm leaves without releasing. Neither the fixture nor the other
+// counterexample has a match in it.
 
 module generality.affine_match
 
@@ -16,11 +16,16 @@ command settle(state: OrderState) -> Result<(), CartError>
 {
     let tx = Database.begin()
     match state {
-        Placed => tx.commit()
-        Cancelled(r) => Database.rollback(tx)
+        Draft => tx.commit()
+        Pricing => Database.rollback(tx)
+        AuthorizingPayment => Database.rollback(tx)
+        Submitting => Database.rollback(tx)
+        SearchingForDasher => Database.rollback(tx)
+        Confirmed(c) => tx.commit()
+        InProgress(p) => tx.commit()
         // Leaves the transaction open.
-        Delivered => return Ok(())
-        Preparing => Database.rollback(tx)
-        Ready => tx.commit()
+        Delivered(r) => return Ok(())
+        Cancelled(reason) => Database.rollback(tx)
+        Failed(f) => Database.rollback(tx)
     }
 }

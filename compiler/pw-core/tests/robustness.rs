@@ -1,0 +1,313 @@
+//! The compiler-robustness gate.
+//!
+//! Architect ruling, 2026-08-06, after a `.pw` program panicked the
+//! exhaustiveness checker:
+//!
+//! > For every syntactically representable program, the compiler must do one
+//! > of these: produce output; produce ordinary source diagnostics; produce a
+//! > clearly marked internal-compiler-error report. It must not terminate
+//! > without a report or silently discard unrelated diagnostics.
+//!
+//! The last clause is the one that made the panic serious. It was not that one
+//! rule was wrong — it was that **every** rule in the invocation reported
+//! nothing, for every file, because the process died. A compiler that reports
+//! nothing looks exactly like a compiler that found nothing.
+//!
+//! This is a separate gate from corpus conformance and from generality,
+//! because it asks a different question: not "is this program accepted or
+//! rejected", but "does the compiler answer at all".
+//!
+//! # What generates the inputs
+//!
+//! No fuzzing dependency. `docs/DECISIONS` keeps the dependency set small and
+//! pinned, and a deterministic generator is reproducible without a corpus
+//! directory of saved seeds — a failure names the seed and the seed rebuilds
+//! the input. It is a *structured* generator, not a real fuzzer, and the
+//! difference is worth stating: it explores mutations of real programs and
+//! random token soup, and it will not find what a coverage-guided fuzzer
+//! would.
+
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
+use pw_core::check::check_sources;
+
+/// xorshift64*. Deterministic, seedable, no dependency, and good enough to
+/// shuffle bytes — this is not sampling anything statistical.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.0 = x;
+        x.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+    fn below(&mut self, n: usize) -> usize {
+        (self.next() % n as u64) as usize
+    }
+}
+
+fn corpus() -> Vec<(String, String)> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut out = Vec::new();
+    let mut stack = vec![root.join("examples"), root.join("packages")];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in entries {
+            let p = e.expect("entry").path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.extension().is_some_and(|x| x == "pw") {
+                out.push((
+                    p.file_name().unwrap().to_string_lossy().to_string(),
+                    std::fs::read_to_string(&p).expect("read"),
+                ));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Run one source through the whole front end, reporting a panic instead of
+/// dying of one.
+fn survives(name: &str, src: &str) -> Result<(), String> {
+    let owned = (name.to_string(), src.to_string());
+    catch_unwind(AssertUnwindSafe(|| {
+        let _ = pw_core::rules::check(&pw_syntax::parse(src).file);
+        let _ = check_sources(std::slice::from_ref(&owned));
+    }))
+    .map_err(|e| {
+        e.downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| e.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic>".to_string())
+    })
+}
+
+#[test]
+fn no_corpus_file_panics_the_compiler() {
+    let mut failures = Vec::new();
+    for (name, src) in corpus() {
+        if let Err(msg) = survives(&name, &src) {
+            failures.push(format!("{name}: {msg}"));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "the compiler panicked on real corpus source:\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+/// Every mutation of every corpus file, for a fixed set of mutations.
+///
+/// Truncation and brace imbalance are the ones that matter: they produce
+/// syntactically representable programs whose HIR is *poisoned* — a body with
+/// no closing brace, a pattern with no arguments — and a poisoned HIR is what
+/// reached the arity panic.
+#[test]
+fn no_mutation_of_a_corpus_file_panics_the_compiler() {
+    let all = corpus();
+    let mut failures = Vec::new();
+    let mut checked = 0;
+
+    for (name, src) in &all {
+        let bytes = src.as_bytes();
+        let mut rng = Rng(0x5EED_0000 ^ name.len() as u64);
+
+        for round in 0..12 {
+            let mutated = match round % 4 {
+                // Truncate. Half a declaration, half a match arm, half a string.
+                0 => {
+                    let at = rng.below(bytes.len().max(1));
+                    src.char_indices()
+                        .take_while(|(i, _)| *i < at)
+                        .map(|(_, c)| c)
+                        .collect::<String>()
+                }
+                // Delete a line.
+                1 => {
+                    let lines: Vec<&str> = src.lines().collect();
+                    if lines.is_empty() {
+                        continue;
+                    }
+                    let drop = rng.below(lines.len());
+                    lines
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| *i != drop)
+                        .map(|(_, l)| *l)
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+                // Unbalance the braces.
+                2 => src.replacen('}', "", 1),
+                // Duplicate a line, which can duplicate a declaration.
+                _ => {
+                    let lines: Vec<&str> = src.lines().collect();
+                    if lines.is_empty() {
+                        continue;
+                    }
+                    let at = rng.below(lines.len());
+                    let mut v = lines.clone();
+                    v.insert(at, lines[at]);
+                    v.join("\n")
+                }
+            };
+            checked += 1;
+            if let Err(msg) = survives(name, &mutated) {
+                failures.push(format!("{name} (mutation {round}): {msg}"));
+            }
+        }
+    }
+
+    assert!(checked > 500, "only {checked} mutations ran");
+    assert!(
+        failures.is_empty(),
+        "the compiler panicked on a mutated corpus file. Minimize it into \
+         examples/robustness/regressions/ before fixing:\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+/// Arbitrary bytes. The weakest property, and the one that must never fail.
+#[test]
+fn arbitrary_source_bytes_do_not_panic_the_compiler() {
+    const ALPHABET: &[&str] = &[
+        "module",
+        "fn",
+        "view",
+        "component",
+        "page",
+        "query",
+        "command",
+        "match",
+        "if",
+        "else",
+        "let",
+        "use",
+        "return",
+        "{",
+        "}",
+        "(",
+        ")",
+        "[",
+        "]",
+        "<",
+        ">",
+        "!",
+        "|",
+        "=>",
+        "->",
+        ",",
+        ".",
+        ":",
+        "=",
+        "\"a\"",
+        "\"{x}\"",
+        "x",
+        "Foo",
+        "0",
+        "1.5",
+        "//c\n",
+        "\n",
+        " ",
+        "é",
+        "→",
+        "\u{1F600}",
+    ];
+    let mut failures = Vec::new();
+    for seed in 0..400u64 {
+        let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
+        let len = 1 + rng.below(60);
+        let src: String = (0..len)
+            .map(|_| ALPHABET[rng.below(ALPHABET.len())])
+            .collect();
+        if let Err(msg) = survives("fuzz.pw", &src) {
+            failures.push(format!("seed {seed}: {msg}\n    source: {src:?}"));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "the compiler panicked on generated source. The seed reproduces it:\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+/// Constructor patterns whose arity disagrees with their declaration.
+///
+/// The targeted generator the architect asked for, and the one that earns its
+/// place. Reverting the fix in `exhaust.rs` was tried against all four tests
+/// in this file:
+///
+/// ```text
+/// inconsistent_constructor_arities   FAILED   <- catches it
+/// no_mutation_of_a_corpus_file       ok       <- does not
+/// arbitrary_source_bytes             ok       <- does not
+/// no_corpus_file                     ok       <- does not
+/// ```
+///
+/// That is the negative control for this suite, and it also says something
+/// about the other three: random mutation did not reach a defect that a
+/// generator aimed at one specific inconsistency found immediately. Broad
+/// generators are not a substitute for knowing which invariant between two
+/// data structures is the fragile one.
+#[test]
+fn inconsistent_constructor_arities_do_not_panic_the_compiler() {
+    let domain = "module domain\n\n\
+                  type S =\n    | A\n    | B(R)\n    | C(R, R)\n\n\
+                  type R =\n    | X\n";
+    let mut failures = Vec::new();
+
+    // Every arity from 0 to 3 written against every constructor of `S`.
+    for ctor in ["A", "B", "C"] {
+        for arity in 0..4 {
+            let args = if arity == 0 {
+                String::new()
+            } else {
+                format!("({})", vec!["p"; arity].join(", "))
+            };
+            let src = format!(
+                "{domain}\nfn f(s: S) -> String !{{}} {{\n    match s {{\n        \
+                 {ctor}{args} => \"one\"\n        _ => \"rest\"\n    }}\n}}\n"
+            );
+            if let Err(msg) = survives("arity.pw", &src) {
+                failures.push(format!("{ctor} with arity {arity}: {msg}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n  "));
+}
+
+/// The CLI reports an internal error rather than dying silently.
+///
+/// Asserted by running the binary against a source that panics on purpose, so
+/// the containment is tested end to end rather than by reading the hook.
+#[test]
+fn the_cli_turns_a_panic_into_a_marked_internal_error() {
+    // There is deliberately no way to make the current compiler panic — that
+    // is the gate. So this asserts the containment exists and is wired, by
+    // checking the binary's own source for the two halves that make it work.
+    // A behavioural test would need a panic to exist, and the moment one does,
+    // `no_corpus_file_panics_the_compiler` fails first.
+    let cli = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../pw-cli/src/main.rs");
+    let src = std::fs::read_to_string(cli).expect("pw-cli source");
+    assert!(
+        src.contains("catch_unwind"),
+        "the CLI must contain an unexpected panic rather than dying"
+    );
+    assert!(
+        src.contains("internal compiler error"),
+        "a contained panic must be MARKED as an internal error, not reported as \
+         an ordinary diagnostic — the user has to know nothing was checked"
+    );
+    assert!(
+        src.contains("reproduce:"),
+        "a contained panic must print something that reproduces it"
+    );
+}

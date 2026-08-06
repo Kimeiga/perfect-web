@@ -1,0 +1,41 @@
+// @status: GENERAL
+// @invariant: non_exhaustive_match
+//
+// Structurally different from R-007: the defect is in a match that appears as
+// another match's ARM RESULT, and the outer match is exhaustive. The
+// diagnostic points at the inner one.
+//
+// This file spent a few hours misfiled as `slips-through.pw`, recorded as a
+// gap in the exhaustiveness checker. It was not. The first version used
+// constructor names `OrderState` does not have — `Placed`, `Preparing`,
+// `Ready` — so the outer match's patterns lowered to nothing meaningful and
+// the inner match was never reached. The witness tested the checker's
+// behaviour on a program that did not typecheck, and reported the result as a
+// property of the checker.
+//
+// What found it: `PW0603`, the constructor-arity rule added in the same hour,
+// which is the first repair layer for the panic this whole file descends from.
+// A witness has to be a valid program in every respect except the one it is
+// about, and nothing had been checking that.
+
+module generality.match_nested
+
+import domain.{ OrderState }
+
+fn describe(a: OrderState, b: OrderState) -> String !{} {
+    match a {
+        Draft => match b {
+            Draft => "both draft"
+            Pricing => "one pricing"
+        }
+        Pricing => "pricing"
+        AuthorizingPayment => "authorizing"
+        Submitting => "submitting"
+        SearchingForDasher => "searching"
+        Confirmed(c) => "confirmed"
+        InProgress(p) => "in progress"
+        Delivered(r) => "delivered"
+        Cancelled(reason) => "cancelled"
+        Failed(f) => "failed"
+    }
+}

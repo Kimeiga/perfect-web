@@ -26,7 +26,7 @@ Compiler commit:           324148b
 Result:                    24/24 accepted clean, 44/44 rejected enforced
 Wrong-reason catches:      0
 Modified since C0:         10 fixtures (below)
-Generality at freeze:      7/29 invariants generally enforced
+Generality at freeze:      7/29 invariants generality-tested
 ```
 
 Reproduce: `just ci` for the gate, `just evidence-corpus` for the per-fixture

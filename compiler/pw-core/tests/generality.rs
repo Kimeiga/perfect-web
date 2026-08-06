@@ -142,6 +142,42 @@ fn every_witness_names_a_registered_invariant() {
     }
 }
 
+/// A witness must be a valid program in every respect except the one it is
+/// about.
+///
+/// The lesson from a witness that spent a few hours misfiled as a gap in the
+/// exhaustiveness checker. It used constructor names its type did not have, so
+/// its patterns lowered to nothing meaningful, the inner match was never
+/// reached, and the file's silence was recorded as a property of the checker
+/// rather than of the file. It was testing the compiler's behaviour on a
+/// program that did not typecheck.
+///
+/// A `slips-through.pw` is the dangerous case — it is *expected* to be silent,
+/// so an unrelated defect that makes it silent is invisible. But a `caught.pw`
+/// can lie the same way, by being caught for something other than its
+/// invariant.
+#[test]
+fn a_witness_is_valid_except_for_the_invariant_it_is_about() {
+    let mut wrong = Vec::new();
+    for w in witnesses() {
+        let got = symbols_for(&w);
+        let unrelated: Vec<&str> = got
+            .iter()
+            .copied()
+            .filter(|s| *s != w.invariant.as_str())
+            .collect();
+        if !unrelated.is_empty() {
+            wrong.push(format!(
+                "{}: also reports {unrelated:?}. A witness must be a valid program \
+                 except for `{}` — an unrelated defect makes its result a property \
+                 of the file rather than of the analysis.",
+                w.name, w.invariant
+            ));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 #[test]
 fn a_general_witness_is_caught_and_a_narrow_one_is_not() {
     let all = witnesses();
@@ -178,8 +214,19 @@ fn a_general_witness_is_caught_and_a_narrow_one_is_not() {
 }
 
 /// The second score, recorded next to the first.
+///
+/// Named **generality-tested** rather than "generally enforced" on the
+/// architect's correction: no finite test suite establishes general
+/// enforcement in the formal sense. What an invariant in this count has
+/// survived is precisely
+///
+/// > its original fixture, a known counterexample to the previous narrow
+/// > implementation, and the currently required neighbouring controls
+///
+/// which is stronger than corpus conformance and weaker than proof. The
+/// wording has to stay true when the number reaches 29/29.
 #[test]
-fn generalization_is_reported_separately_from_conformance() {
+fn generality_is_reported_separately_from_conformance() {
     let all = witnesses();
     let mut by_invariant: BTreeMap<&str, (bool, bool)> = BTreeMap::new();
     for w in &all {
@@ -224,13 +271,18 @@ fn generalization_is_reported_separately_from_conformance() {
         .map(String::as_str)
         .collect();
 
+    // "generality-tested", not "generally enforced". No finite suite
+    // establishes general enforcement in the formal sense; what nine of these
+    // have survived is their original fixture, a counterexample that defeated
+    // the previous implementation, and the neighbouring controls. That wording
+    // stays honest even at 29/29.
     eprintln!("  corpus conformance:     44 / 44 (checking_source.rs)");
     eprintln!(
-        "  generally enforced:     {} / {}",
+        "  generality-tested:      {} / {}",
         general.len(),
         exercised.len()
     );
-    eprintln!("  narrowly enforced:      {} — {narrow:?}", narrow.len());
+    eprintln!("  known narrow witness:   {} — {narrow:?}", narrow.len());
     eprintln!(
         "  generality untested:    {} — {untested:?}",
         untested.len()
@@ -239,7 +291,7 @@ fn generalization_is_reported_separately_from_conformance() {
     // Recorded, and ratcheted so it cannot fall.
     assert!(
         general.len() >= 9,
-        "generalization regressed: {} / {}",
+        "generality-tested regressed: {} / {}",
         general.len(),
         exercised.len()
     );

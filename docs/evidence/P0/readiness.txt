@@ -18,9 +18,9 @@ CORPUS GATE — CLOSED at corpus version C1.
 
   Charter §14 M2 gate item 2 asks for at least 40 of 44.
 
-ANALYSIS-GENERALIZATION GATE — OPEN.
+GENERALITY GATE — OPEN.
 
-    9 / 29  invariants generally enforced
+    9 / 29  invariants generality-tested
     1 / 29  known narrow, with an executable witness
    19 / 29  generality untested
 
