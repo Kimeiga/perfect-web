@@ -26,6 +26,7 @@ pub mod diag;
 pub mod diagnostics;
 pub mod exhaust;
 pub mod hir;
+pub mod koka;
 pub mod lower;
 pub mod rules;
 pub mod scope;

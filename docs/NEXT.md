@@ -98,6 +98,17 @@ fails the build; `cargo-deny check` passes against the licenses recorded in
 
 ---
 
+## E2's last open gate item
+
+Item 2 — *≥40 rejected examples report errors at original `.pw` spans* — stands
+at **5 of 44**. It is the only E2 gate item still open, and it is not E2's to
+close: the remaining 39 need effect checking (E1) or privacy and placement
+solving (E5). `docs/milestones/E2.md` lists which file needs which.
+
+Items 4 (Koka execution) and 3 (formatting) are closed; 1, 5 and 6 were already.
+
+---
+
 ## Standing obligations (every milestone)
 
 Charter §3.1, plus the admissibility rule now in `docs/RISK_QUEUE.md`:

@@ -1,0 +1,40 @@
+// @corpus: fixture
+// @id: K-001
+// @category: pure domain function lowered to Koka
+// @charter: §14 M2 gate item 4
+// @milestone: E2
+//
+// Self-contained on purpose: the corpus files import types from `domain.{..}`
+// that no file declares, and a program that does not resolve cannot execute.
+// ADR-0015 scopes what this proves — a pure subset reaching a third-party
+// compiler, and nothing about nominal types or effects.
+
+module store.pricing
+
+type CartLine = CartLine {
+    quantity: Int,
+    unit_price: Int,
+}
+
+type OrderState =
+    | Draft
+    | Pricing
+    | Confirmed(String)
+
+fn line_total(line: CartLine) -> Int !{} {
+    line.quantity * line.unit_price
+}
+
+fn with_delivery(subtotal: Int, distance_m: Int) -> Int !{} {
+    let base = 299
+    let surcharge = if distance_m > 5000 { 200 } else { 0 }
+    subtotal + base + surcharge
+}
+
+fn label(state: OrderState) -> String !{} {
+    match state {
+        Draft => "draft",
+        Pricing => "pricing",
+        Confirmed(reference) => reference,
+    }
+}

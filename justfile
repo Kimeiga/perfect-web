@@ -115,6 +115,11 @@ spike-compiler-diagnostic:
 spike-koka:
     @bash spikes/koka-js-interop/run.sh
 
+# E2 gate item 4: a domain function executes through GENERATED Koka.
+# Needs the pinned toolchain, so it is not part of `just ci`.
+spike-pw-to-koka:
+    @bash spikes/pw-to-koka/run.sh
+
 spike-wasmtime:
     @bash spikes/wasmtime-component/run.sh
 

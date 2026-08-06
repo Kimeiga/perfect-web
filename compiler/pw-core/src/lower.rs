@@ -163,7 +163,9 @@ impl Lowerer<'_> {
                 name,
                 kind,
                 params: self.params(node),
+                ret: self.return_type(node),
                 variants: self.variants(node),
+                fields: self.record_fields(node),
                 opaque_of: self.opaque_of(node),
                 declared_effects,
                 body: None,
@@ -199,6 +201,32 @@ impl Lowerer<'_> {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// The type after `->`. It is the `TypeRef` that is a direct child of the
+    /// declaration, so it cannot be confused with a parameter's type (those sit
+    /// inside `Param`) or a field's.
+    fn return_type(&self, node: &SyntaxNode) -> Option<String> {
+        node.children()
+            .find(|c| c.kind() == K::TypeRef)
+            .map(|t| type_path(&t))
+    }
+
+    fn record_fields(&self, node: &SyntaxNode) -> Option<Vec<Param>> {
+        let list = node.children().find(|c| c.kind() == K::FieldList)?;
+        Some(
+            list.children()
+                .filter(|c| c.kind() == K::Field)
+                .map(|f| Param {
+                    name: first_name(&f).unwrap_or_default(),
+                    ty: f
+                        .children()
+                        .find(|c| c.kind() == K::TypeRef)
+                        .map(|t| type_path(&t)),
+                    span: span_of(&f),
+                })
+                .collect(),
+        )
     }
 
     fn variants(&self, node: &SyntaxNode) -> Option<Vec<VariantDef>> {

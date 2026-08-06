@@ -167,8 +167,12 @@ pub struct Decl {
     pub name: String,
     pub kind: DeclKind,
     pub params: Vec<Param>,
+    /// The declared return type, as written.
+    pub ret: Option<String>,
     /// The variants, when this declaration defines an algebraic data type.
     pub variants: Option<Vec<VariantDef>>,
+    /// The fields, when this declaration defines a record.
+    pub fields: Option<Vec<Param>>,
     /// `opaque type StoreId = String` — the representation, as written.
     pub opaque_of: Option<String>,
     /// The declared effect row, as written: `!{ database.read<Stores> }` yields

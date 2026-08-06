@@ -325,6 +325,40 @@ fn fmt_command(paths: &[&String], check_only: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// `pw emit-koka` — print the generated Koka, and every skipped declaration.
+///
+/// Skips go to stderr rather than being dropped: a backend that covers a subset
+/// has to say which subset, or its output looks like a complete translation.
+fn emit_koka_command(paths: &[&String]) -> ExitCode {
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        let module = hir
+            .modules
+            .iter()
+            .next()
+            .map(|(_, m, _)| m.name.clone())
+            .unwrap_or_else(|| "main".to_string());
+        let out = pw_core::koka::lower_module(&hir, &module);
+        print!("{}", out.source);
+        for s in &out.skipped {
+            eprintln!("skipped {}: {}", s.name, s.reason);
+        }
+    }
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let plain = args.iter().any(|a| a == "--plain");
@@ -335,13 +369,18 @@ fn main() -> ExitCode {
         .filter(|a| !a.starts_with("--"))
         .collect();
 
-    if !matches!(cmd, "check" | "explain" | "fmt") || paths.is_empty() {
-        eprintln!("usage: pw <check|explain|fmt> <path.pw>... [--plain]");
+    if !matches!(cmd, "check" | "explain" | "fmt" | "emit-koka") || paths.is_empty() {
+        eprintln!("usage: pw <check|explain|fmt|emit-koka> <path.pw>... [--plain]");
         eprintln!();
-        eprintln!("  check    parse and report diagnostics");
-        eprintln!("  explain  print types, effects, privacy and derived placement");
-        eprintln!("  fmt      rewrite files canonically; --check reports instead");
+        eprintln!("  check      parse and report diagnostics");
+        eprintln!("  explain    print types, effects, privacy and derived placement");
+        eprintln!("  fmt        rewrite files canonically; --check reports instead");
+        eprintln!("  emit-koka  print Koka for the pure subset (ADR-0015)");
         return ExitCode::from(2);
+    }
+
+    if cmd == "emit-koka" {
+        return emit_koka_command(&paths);
     }
 
     if cmd == "fmt" {
