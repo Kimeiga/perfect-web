@@ -63,9 +63,10 @@ corpus conformance        44 / 44   closed at C1
 single-defect isolation   44 / 44
 generality-tested         29 / 29
 headline matrices          8 / 8
-known narrow witness       0 / 29
-robustness                 9 suites, 0 panics, 2 regressions retained
+resume compatibility      E7V closed, 27 matrix tests
+robustness                11 suites, 0 panics
 historical compatibility   9 / 10   the miss classified
+KNOWN_GAPs                 0
 ```
 
 An invariant counts as *generally* enforced only when a program its fixture did

@@ -78,10 +78,14 @@ measured: `just ci` `just generality` `just robustness` `just platform`
      fixtures changed; docs/CORPUS.md has a row for each and
      corpus_history.rs runs their old text.
 
-  6. NOT "resumption is checked". Two of its three questions are —
-     serializability and privacy. The third, whether a value can be
-     resumed under THIS CODE VERSION, is not addressed at all.
-     PW3011 is its reserved code and the one remaining KNOWN_GAP.
+  6. NOT "resumption is safe across deployments". All three of its
+     questions are now answered — serializability, privacy, and
+     version compatibility (E7V) — but the compatibility decision is
+     NOT WIRED into a running browser. It is a decision function
+     with a tested contract, like pw-tasks and pw-resource
+     (ADR-0016). Marko still implements resumption itself.
+     The available sentence is "accepted only under exact
+     compatible identities or explicit checked migrations".
 
   7. NOT "P0 is publishable". Corpus conformance and generality are
      two of P0's claims. Several others rest on Marko and Koka
@@ -125,10 +129,14 @@ measured: `just ci` `just generality` `just robustness` `just platform`
 
   The score cannot go higher. What is left is not more counting:
 
-  1. Resumption's third question — code-version compatibility.
-     PW3011. It is the only KNOWN_GAP and the only part of a
-     headline construct with no analysis at all.
-  2. A coverage-guided fuzzer, to retire item 2 above.
+  1. A coverage-guided fuzzer against manifest decoding,
+     compatibility decisions, migration selection, recovery
+     planning and mixed-build patch handling. Its property: no
+     input may cause a panic, unverified deserialization,
+     incompatible handler attachment, or privacy-scope weakening.
+     E7V gives it semantics to test, which is why it comes second.
+  2. Wiring the compatibility decision into E7's generator, which
+     is what would let item 6 above be said differently.
   3. E4 (5/7) and E5 (3/5): a store demo and the resource
      generator. Product work, not checker work.
   4. Claim-by-claim P0 review against the ledger, for the claims

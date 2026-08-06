@@ -111,30 +111,33 @@ known narrow witness       0 / 29
 robustness                 9 suites, 0 panics
 ```
 
-### 1. Resumption's third question
+### 1. A coverage-guided fuzzer
 
-Charter §8.5 asks three independent things of a resumable capture, and only
-two are checked:
+E7V now gives it semantics to test, which is why it comes after rather than
+before. Targets, and the property each must hold:
 
 ```text
-Can this value be serialized?              checked  (its type)
-May it cross this privacy boundary?        checked  (its label)
-Can it be resumed under THIS CODE VERSION? NOT CHECKED
+manifest decoding            no unverified deserialization
+compatibility decisions      no incompatible handler attaches
+migration selection          no migration applied to a schema it was not
+                             written for
+recovery planning            no construct offered a recovery it forbids
+mixed-build patch handling   no patch applied across generations
 ```
 
-A capture satisfying both of the first two can still be restored into a
-handler whose code has changed. `PW3011` is the reserved code, this is the
-only remaining `KNOWN_GAP`, and it is the only part of a headline construct
-with no analysis at all.
+Overall: no input may cause a panic, unverified deserialization, incompatible
+handler attachment, or privacy-scope weakening.
 
-### 2. A coverage-guided fuzzer
+`just robustness` reports eleven generator families rather than a bare zero,
+because reverting the constructor-arity fix left corpus-mutation and byte-soup
+green while only the targeted generator went red. A real fuzzer is what retires
+"NOT the compiler cannot crash" from `readiness.txt`.
 
-`just robustness` reports nine generator families rather than a bare zero,
-because this project has the receipt for why the distinction matters:
-reverting the constructor-arity fix left corpus-mutation and byte-soup green
-while only the generator aimed at that seam went red. Structured generation
-found both panics; breadth found neither. A real fuzzer is what retires "NOT
-the compiler cannot crash" from `readiness.txt`.
+### 2. Wire the compatibility decision into E7's generator
+
+`decide` has a tested contract and is not in the path. Until it is, the
+available sentence is "accepted only under exact compatible identities or
+explicit checked migrations" and not "resumption is safe across deployments".
 
 ### 3. E4 and E5's remaining gate items
 
