@@ -110,6 +110,15 @@ fuzz:
 fuzz-long:
     @cargo run --quiet -p pw-fuzz --bin pw-fuzz -- --iterations 5000
 
+# `{#each xs as x}` types `x`. An E9 slice, pulled forward because E7 cannot
+# emit a resumable handler inside a loop without it: the capture schema would
+# come from a guess, and a guessed hash matches nothing.
+each-typing:
+    @cargo test --quiet -p pw-core --test each_typing 2>&1 | tail -3
+    @echo "  accepting: List<T>, Result<List<T>, E>, Option<List<T>>"
+    @echo "  refusing:  a non-collection, an unbound name — PW5016, not a"
+    @echo "             quiet downgrade to an ordinary handler"
+
 # The THIRD gate: for every syntactically representable program the compiler
 # must produce output, ordinary diagnostics, or a marked internal error — never
 # terminate without a report. A panic takes every other rule down with it, so a
@@ -119,9 +128,10 @@ robustness:
     @echo "  generator families: corpus, corpus-mutation, byte-soup,"
     @echo "                      constructor-arity, or-pattern, resolution,"
     @echo "                      label-dataflow, parser-to-HIR contract"
-    @echo "  '0 panics' means 0 under THESE. No coverage-guided fuzzer has run,"
-    @echo "  and the arity panic proves broad generation is not a substitute"
-    @echo "  for a generator aimed at a known-fragile seam."
+    @echo "  '0 panics' means 0 under THESE. Coverage-guided fuzzing is a"
+    @echo "  separate figure — see \`just fuzz\` — and is never merged into"
+    @echo "  this one. The arity panic proves broad generation is not a"
+    @echo "  substitute for a generator aimed at a known-fragile seam."
 
 # The SECOND score. Corpus conformance says today's specification passes;
 # generality says the same guarantees survive programs the fixtures did not
@@ -178,7 +188,7 @@ lab-down:
 # Milestone 0 feasibility spikes (charter §14 M0 task 7)
 # ---------------------------------------------------------------------------
 
-# Run all six spikes and write evidence to docs/evidence/M0/.
+# Run all six spikes and write evidence to docs/evidence/E0/.
 spikes: spike-compiler-diagnostic spike-koka spike-wasmtime spike-marko spike-layout spike-bonsai
 
 # Every risk-retirement experiment.

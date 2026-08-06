@@ -47,3 +47,8 @@ lab/certs/rootCA*
 !.vscode/extensions.json
 # headless-chrome profile created by spikes/browser-resumption
 spikes/browser-resumption/.chrome-profile/
+
+# `-C instrument-coverage` writes these next to the process that ran. The
+# fuzzer cleans its own, but a harness killed mid-run leaves them here.
+*.profraw
+*.profdata

@@ -27,14 +27,14 @@ to find out whether the integration boundaries the plan depends on actually
 exist, *before* committing an architecture to them.
 
 Current state: **[`docs/STATUS.md`](docs/STATUS.md)** ·
-Gate assessment: **[`docs/milestones/M0.md`](docs/milestones/M0.md)** ·
+Gate assessment: **[`docs/milestones/E0.md`](docs/milestones/E0.md)** ·
 What does not work: **[`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md)**
 
 ### What Milestone 0 produced
 
 - **45 corpus files** (14 accepted, 31 rejected) covering **every** category in
   charter §16 — an executable specification written before the implementation.
-- **Four feasibility spikes**, each with measured evidence in `docs/evidence/M0/`.
+- **Four feasibility spikes**, each with measured evidence in `docs/evidence/E0/`.
 - **10 ADRs**, pinned toolchains, and a technology matrix that distinguishes what
   was *measured here* from what was only *read*.
 
@@ -70,7 +70,7 @@ Requires macOS on Apple Silicon (Linux support is the next task — see
 just doctor        # read-only: what's present, what's missing, how to get it
 just bootstrap     # fetch pinned Koka 3.2.3 + Wasmtime 47.0.3, pnpm install
 just ci            # fmt + clippy -D warnings + unit tests + corpus check
-just spikes        # run all four spikes, rewriting docs/evidence/M0/
+just spikes        # run all four spikes, rewriting docs/evidence/E0/
 ```
 
 `just doctor` never installs anything and never modifies the system.

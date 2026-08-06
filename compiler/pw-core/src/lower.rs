@@ -259,13 +259,14 @@ impl Lowerer<'_> {
             .map(|l| {
                 l.children()
                     .filter(|c| c.kind() == K::Param)
-                    .map(|p| Param {
-                        name: first_name(&p).unwrap_or_default(),
-                        ty: p
-                            .children()
-                            .find(|c| c.kind() == K::TypeRef)
-                            .map(|t| type_path(&t)),
-                        span: span_of(&p),
+                    .map(|p| {
+                        let t = p.children().find(|c| c.kind() == K::TypeRef);
+                        Param {
+                            name: first_name(&p).unwrap_or_default(),
+                            ty: t.as_ref().map(type_path),
+                            ty_args: t.as_ref().map(type_args).unwrap_or_default(),
+                            span: span_of(&p),
+                        }
                     })
                     .collect()
             })
@@ -282,6 +283,13 @@ impl Lowerer<'_> {
     }
 
     /// The return type's arguments, as written.
+    /// The return type's arguments **as written**, nesting included.
+    ///
+    /// `Result<List<MenuItemId>, StoreError>` gives `["List<MenuItemId>",
+    /// "StoreError"]`, not `["List", "StoreError"]`. Heads were enough while
+    /// every consumer wanted a carrier's name; they are not enough to answer
+    /// "what is one element of this", and a projection back to a head is one
+    /// `split('<')` away. The reverse is not recoverable.
     fn return_type_args(&self, node: &SyntaxNode) -> Vec<String> {
         node.children()
             .find(|c| c.kind() == K::TypeRef)
@@ -289,7 +297,7 @@ impl Lowerer<'_> {
             .map(|l| {
                 l.children()
                     .filter(|c| c.kind() == K::TypeRef)
-                    .map(|t| type_path(&t))
+                    .map(|t| t.text().to_string().trim().to_string())
                     .collect()
             })
             .unwrap_or_default()
@@ -300,13 +308,14 @@ impl Lowerer<'_> {
         Some(
             list.children()
                 .filter(|c| c.kind() == K::Field)
-                .map(|f| Param {
-                    name: first_name(&f).unwrap_or_default(),
-                    ty: f
-                        .children()
-                        .find(|c| c.kind() == K::TypeRef)
-                        .map(|t| type_path(&t)),
-                    span: span_of(&f),
+                .map(|f| {
+                    let t = f.children().find(|c| c.kind() == K::TypeRef);
+                    Param {
+                        name: first_name(&f).unwrap_or_default(),
+                        ty: t.as_ref().map(type_path),
+                        ty_args: t.as_ref().map(type_args).unwrap_or_default(),
+                        span: span_of(&f),
+                    }
                 })
                 .collect(),
         )
@@ -1088,6 +1097,25 @@ fn visibility_of(node: &SyntaxNode) -> Option<String> {
 }
 
 /// A type reference's name, without its type arguments.
+/// The type arguments of a `TypeRef`, **as written**: `Result<List<MenuItem>,
+/// E>` gives `["List<MenuItem>", "E"]`.
+///
+/// Written form rather than heads, because a head loses exactly what the
+/// element rule needs. `Menus.for_store` returns `Result<List<MenuItemId>, _>`
+/// and `{#each menu as item}` iterates what is inside BOTH wrappers — heads
+/// alone stop at `List` and the element is gone.
+fn type_args(t: &SyntaxNode) -> Vec<String> {
+    t.children()
+        .find(|c| c.kind() == K::TypeArgList)
+        .map(|l| {
+            l.children()
+                .filter(|c| c.kind() == K::TypeRef)
+                .map(|a| a.text().to_string().trim().to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn type_path(t: &SyntaxNode) -> String {
     t.children()
         .find(|c| c.kind() == K::Name)

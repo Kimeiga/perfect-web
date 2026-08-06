@@ -65,7 +65,13 @@ impl Manifest {
                 // `Cart`. The head is the carrier, so the produced type is its
                 // first argument.
                 let produced = match d.ret.as_deref() {
-                    Some("Result") | Some("Option") | Some("List") => d.ret_args.first().cloned(),
+                    // A scope attaches to a nominal type, so the head is what
+                    // this map is keyed by: `Result<List<X>, E>` scopes `List`,
+                    // the same as before `ret_args` began carrying nesting.
+                    Some("Result") | Some("Option") | Some("List") => d
+                        .ret_args
+                        .first()
+                        .map(|a| a.split('<').next().unwrap_or(a).trim().to_string()),
                     other => other.map(str::to_string),
                 };
                 if let Some(ty) = produced {
@@ -126,7 +132,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Di
         // nothing else. `Types` follows a chain and `Labels` follows a value,
         // so a capture that is a field, a rebinding or a branch is answered
         // the same way as a bare parameter.
-        let types = crate::infer::Types::of_body(sigs, decl, body);
+        let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
         let labels = crate::labels::Labels::of_body(sigs, decl, body);
 
         for lambda in body.walk() {

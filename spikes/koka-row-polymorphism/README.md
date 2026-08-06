@@ -15,7 +15,7 @@ experiment was written.**
 just rq-row-polymorphism
 ```
 
-Evidence: `docs/evidence/M0/spike-koka-row-polymorphism.txt`. Koka 3.2.3.
+Evidence: `docs/evidence/E0/spike-koka-row-polymorphism.txt`. Koka 3.2.3.
 
 ## Pre-registered decision table
 

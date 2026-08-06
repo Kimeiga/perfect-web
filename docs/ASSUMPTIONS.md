@@ -85,7 +85,7 @@ Node 22 end-of-maintenance date arriving before Milestone 3 completes.
 
 ## A-003 — Koka is usable as a *semantic oracle* through its JS backend
 
-**Status:** see `docs/milestones/M0.md` (measured by `spikes/koka-js-interop`)
+**Status:** see `docs/milestones/E0.md` (measured by `spikes/koka-js-interop`)
 
 Assumed: Koka 3.2.3's JavaScript backend emits modules that Node can load, and
 `maybe`/`result` values can cross the boundary with explicit decoding. The
@@ -99,7 +99,7 @@ type/effect checker (Milestone 9) earlier.
 
 ## A-004 — Marko 6 can emit a genuinely zero-JS static route
 
-**Status:** see `docs/milestones/M0.md` (measured by `spikes/marko-stream-resume`)
+**Status:** see `docs/milestones/E0.md` (measured by `spikes/marko-stream-resume`)
 
 The charter's §18.4 budget asserts "static page: 0 application JS and 0 runtime
 JS" as a *target to test, not a fact to fake*. Milestone 0 measures what Marko 6
@@ -109,7 +109,7 @@ actually emits rather than assuming the marketing claim.
 
 ## A-005 — WASI 0.3 may not be reliable; 0.2 is the safe path
 
-**Status:** see `docs/milestones/M0.md` (measured by `spikes/wasmtime-component`)
+**Status:** see `docs/milestones/E0.md` (measured by `spikes/wasmtime-component`)
 
 Charter §10.3 instructs preferring the newest stable WASI the toolchain supports
 *reliably*, and to fall back to 0.2 behind an adapter if 0.3 tooling is
@@ -159,7 +159,7 @@ while Milestone 0 was being executed. All Milestone 0 work was done against v1.
 | anti-patterns | — | **new**: *"Fine-grained updates are mistaken for layout safety"* |
 | **Milestone 0 spikes** | **4** | **6** — adds `bonsai-incremental-model`, `layout-phase-scheduler` |
 | **Milestone 0 gate** | "all four spikes run from documented commands" | "all **six** spikes run…, **or** a primary-source-backed blocker is recorded for any upstream toolchain that cannot currently run" |
-| M0 research list | — | adds browser rendering phases, forced synchronous layout, CSS containment, `content-visibility`, ResizeObserver, Long Animation Frame attribution |
+| E0 research list | — | adds browser rendering phases, forced synchronous layout, CSS containment, `content-visibility`, ResizeObserver, Long Animation Frame attribution |
 
 **Milestone 0's own task list and gate are otherwise byte-identical between the
 two versions**, so every artifact produced so far remains required under v2.
@@ -178,7 +178,7 @@ authoritative.
   Bonsai/Bonsai_web rows.
 - `spikes/layout-phase-scheduler` and `spikes/bonsai-incremental-model` built,
   run, and evidenced.
-- `docs/milestones/M0.md` re-evaluated against the six-spike gate.
+- `docs/milestones/E0.md` re-evaluated against the six-spike gate.
 
 The OCaml toolchain **did** install on Apple Silicon, so the charter's
 "record the blocker" escape clause was not needed.

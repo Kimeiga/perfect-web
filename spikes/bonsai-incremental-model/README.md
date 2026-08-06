@@ -21,7 +21,7 @@ recompute an expensive derived value", and where does that incrementality stop?
 just spike-bonsai
 ```
 
-Evidence: `docs/evidence/M0/spike-bonsai-incremental-model.txt`.
+Evidence: `docs/evidence/E0/spike-bonsai-incremental-model.txt`.
 
 ## Toolchain — installed successfully, but not on the first three attempts
 

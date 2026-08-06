@@ -1,5 +1,5 @@
 spike: wasmtime-component
-generated: 2026-08-05T22:58:02Z
+generated: 2026-08-06T19:57:16Z
 rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
 wasmtime cli: wasmtime 47.0.3 (5554cc1a6 2026-07-31)
 wasmtime crate: 47.0.3   wit-bindgen: 0.60.0
@@ -14,7 +14,7 @@ commands:
 =========================== 1. BUILD ===============================
     Finished `release` profile [optimized] target(s) in 0.06s
     Finished `release` profile [optimized] target(s) in 0.04s
-    Finished `release` profile [optimized] target(s) in 0.26s
+    Finished `release` profile [optimized] target(s) in 0.45s
 
 artifact sizes:
   guest               43837 bytes  (std, wasm32-wasip2)

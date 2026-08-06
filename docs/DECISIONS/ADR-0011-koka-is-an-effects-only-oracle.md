@@ -18,7 +18,7 @@ plan had assumed. All four came out negative:
 - the generated `is_*` predicates are **discriminators, not validators**
   (`is_just(42) === true`; `is_qok(null)` throws).
 
-Evidence: `docs/evidence/M0/spike-koka-js-interop.txt`.
+Evidence: `docs/evidence/E0/spike-koka-js-interop.txt`.
 
 The charter's original plan (§14 M1) leaned on Koka as the oracle for ADTs,
 opaque wrappers, `Money`, and exhaustiveness. Three of those four it does not

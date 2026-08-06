@@ -10,7 +10,7 @@
 //   - streaming arrival times of each marker, relative to the first byte
 //
 // Exit code 0 always: this is a measurement, and the gate decision is made from
-// the printed numbers by a human reading docs/milestones/M0.md.
+// the printed numbers by a human reading docs/milestones/E0.md.
 
 import { spawn } from "node:child_process";
 import { gzipSync } from "node:zlib";

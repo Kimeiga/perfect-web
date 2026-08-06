@@ -153,7 +153,16 @@ pub struct Module {
 #[derive(Debug, Clone)]
 pub struct Param {
     pub name: String,
+    /// The type's HEAD: `List` for `List<MenuItem>`.
     pub ty: Option<String>,
+    /// Its arguments: `["MenuItem"]`.
+    ///
+    /// Carried separately because the head alone cannot answer what an element
+    /// of a collection is, and `{#each xs as x}` needs exactly that. Without
+    /// it a loop binding has no type, which means a resumable handler inside a
+    /// loop has no capture schema — `PW5016` — so the store demo could not use
+    /// one.
+    pub ty_args: Vec<String>,
     pub span: Span,
 }
 
@@ -656,6 +665,17 @@ impl Hir {
 
     pub fn body(&self, id: BodyId) -> &Body {
         self.bodies.get(id.index()).expect("unknown BodyId")
+    }
+
+    /// The module a declaration belongs to.
+    ///
+    /// Inference needs this, so it is an input to inference rather than
+    /// something bolted on afterwards — see `Types::of_body`.
+    pub fn module_of(&self, decl: DeclId) -> Option<&str> {
+        self.modules
+            .iter()
+            .find(|(_, m, _)| m.decls.contains(&decl))
+            .map(|(_, m, _)| m.name.as_str())
     }
 
     /// Every declaration, nested ones included.

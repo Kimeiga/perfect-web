@@ -16,7 +16,7 @@
 just spike-marko
 ```
 
-Evidence: `docs/evidence/M0/spike-marko-stream-resume.txt`.
+Evidence: `docs/evidence/E0/spike-marko-stream-resume.txt`.
 Pinned: `marko` 6.3.32, `@marko/run` 0.11.8, `@marko/run-adapter-node` 2.0.6,
 `vite` 8.2.0, Node v22.21.1 (all verified on the npm registry 2026-08-05).
 

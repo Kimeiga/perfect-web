@@ -278,7 +278,13 @@ fn the_trusted_platform_contract_is_hashed() {
         names.insert(name);
     }
 
-    const EXPECTED: u64 = 0xc1c5_1255_d76a_2da3;
+    // Changed 2026-08-06: `examples/domain.pw` gained `MenuItem { id, name }`.
+    // `Menu` returned `List<MenuItemId>` while the store page rendered
+    // `item.name` — describing a list of ids and reading a list of items. That
+    // was invisible while nothing depended on the element's type and stopped
+    // being invisible when a resumable handler inside the loop began hashing
+    // it into a capture schema.
+    const EXPECTED: u64 = 0xa281_06af_28ba_31cc;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

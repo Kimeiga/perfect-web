@@ -1,0 +1,66 @@
+typed `{#each}` captures — an E9 slice, pulled forward for E7
+
+  `{#each xs as x}` gives `x` the element type of what `xs` holds. E7
+  cannot emit a resumable handler inside a loop without it: the capture
+  schema is hashed into the resume manifest and compared against the
+  schema the running build produced, so a guessed type yields a hash
+  that matches nothing.
+
+=== POSITIVE CONTROL — the rule accepts what it should ===================
+
+$ pw check <platform> examples/domain.pw examples/rules/resume/loop-capture-typed.pw
+pw check: 31 file(s), no diagnostics
+
+=== NEGATIVE CONTROL — and refuses, rather than downgrading ==============
+
+$ pw check <platform> examples/domain.pw examples/rules/resume/loop-capture-untyped.pw
+error: [PW5016] `item` has no type the resume manifest can name
+  --> loop-capture-untyped.pw:24:58
+   |
+20 | / view Broken(count: Int) !{} {
+21 | |     <ul>
+22 | |         {#each count as item (item.id)}
+23 | |             <li>
+24 | |                 <button on:press={resumable(captures = { item }) => pick(item.id)}>
+   | |                                                          ^^^^ `item` has no type the resume manifest can name
+...  |
+29 | |     </ul>
+30 | | }
+   | |_- `Broken` declares the handler
+   |
+   = note: A resume manifest carries a schema hash derived from what a handler captures, and the running code compares it against the schema its own build produced. A capture whose type this build cannot determine yields a hash derived from a guess, which matches nothing — so every resume of `Broken` would fail after deployment, for a reason nobody could diagnose from the deployment. Name the type here, where it is still a compile error.
+   = help: annotate `item`, or capture a value whose type is declared
+pw check: 31 file(s), 1 error(s), 0 warning(s)
+
+  One error, not one error plus unexplained neighbours. The refusal is
+  the behaviour under test: a quiet fall back to an ordinary handler
+  would make which handlers resume depend on where inference is blind.
+
+=== THE MATRIX ===========================================================
+
+$ just each-typing
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+  accepting: List<T>, Result<List<T>, E>, Option<List<T>>
+  refusing:  a non-collection, an unbound name — PW5016, not a
+             quiet downgrade to an ordinary handler
+
+=== THE DEMO =============================================================
+
+  examples/store/app.pw's Add button sits inside {#each menu as item}.
+  It was an ORDINARY handler with a comment recording why. It is now
+  resumable, and one resume manifest is generated for it — asserted
+  against the real file, not a fixture written to suit the rule.
+
+$ pw check <platform> examples/domain.pw examples/store/app.pw
+pw check: 31 file(s), no diagnostics
+
+$ just platform     # the trusted contract changed: domain.pw gained MenuItem
+  platform contract: 14 files, hash 0xa28106af28ba31cc
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+  Menu returned List<MenuItemId> while the page rendered item.name —
+  a list of ids read as a list of items. Invisible while nothing
+  depended on the element's type; not invisible once a resumable
+  handler in the loop hashes it into a capture schema.

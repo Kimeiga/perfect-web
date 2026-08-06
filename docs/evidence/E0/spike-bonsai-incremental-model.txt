@@ -1,5 +1,5 @@
 spike: bonsai-incremental-model
-generated: 2026-08-05T22:58:18Z
+generated: 2026-08-06T19:57:32Z
 host: Darwin arm64 / 26.5.2
 command: just spike-bonsai
 

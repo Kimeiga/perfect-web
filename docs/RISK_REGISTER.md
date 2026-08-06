@@ -5,7 +5,7 @@ state** against Milestone 0 evidence, plus risks the spikes discovered.
 
 Likelihood/impact are judgements; the "evidence" column is not.
 
-| # | risk | state after M0 | likelihood | impact | fallback / mitigation |
+| # | risk | state after E0 | likelihood | impact | fallback / mitigation |
 |---|---|---|---|---|---|
 | R1 | **Koka interoperability is insufficient** | **REDUCED** | low | high | Measured: `--target=js` emits plain `.mjs` ES modules importable from Node with no adapter; ADTs, handlers and `maybe`/`result` all cross. Charter fallback (keep Koka as an isolated oracle, pull M9 earlier) remains available. |
 | R2 | **Koka lacks structured metadata** | **CLOSED** | — | — | The `.kki` interface file carries full signatures *with inferred effect rows*, source spans and constructor tags. `node/kki.mjs` parses it in ~120 lines. **No fork needed** (ADR-0001). Residual: `.kki` is internal/unstable — mitigated by a version assertion that throws on any Koka other than 3.2.3. |

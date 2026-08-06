@@ -13,14 +13,13 @@
 // and the compiler has already refused to let the private half into the shared
 // half — that is `PW5001`, which corpus R-004 exercises with this exact shape.
 //
-// The Add buttons are ORDINARY handlers, not `resumable` ones, and that is a
-// limitation rather than a design choice. A resumable handler must capture a
-// value whose type the build can name (`PW5016`), and `{#each menu as item}`
-// gives `item` no type — `Param` carries a type's head and not its arguments,
-// so `List<MenuItem>` does not yield `MenuItem`. Recorded in
-// docs/evidence/P0/readiness.txt rather than worked around: a demo that
-// captured a loop binding would be claiming an inference this build does not
-// have.
+// The Add buttons ARE resumable, and that took a real type-propagation rule
+// rather than an adapter guess. `{#each menu as item}` gives `item` the
+// element type of what `menu` holds — `Menu` returns `List<MenuItem>`, so
+// `item` is a `MenuItem` — which is what lets the capture have a schema.
+// Without it `PW5016` refuses to generate a resumable handler at all, which is
+// the correct behaviour: serialization, nominal identity, privacy and handler
+// compatibility must not rest on a guess.
 
 module store.page
 
@@ -28,11 +27,11 @@ import Stores
 import Carts
 import Menus
 import domain.{ StoreId, Store, StoreError, SessionId, Cart, CartError,
-    MenuItemId, PositiveInt }
+    MenuItem, MenuItemId, PositiveInt }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store.
-public query Menu(id: StoreId) -> Result<List<MenuItemId>, StoreError>
+public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
     freshness   5.minutes
     consistency snapshot
     cache       shared
@@ -101,7 +100,10 @@ page StorePage(id: StoreId) {
                     {#each menu as item (item.id)}
                         <li>
                             <span>{item.name}</span>
-                            <button type="button" on:press={() => add_to_cart(item.id, PositiveInt(1))}>
+                            <button
+                                type="button"
+                                on:press={resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))}
+                            >
                                 Add
                             </button>
                         </li>

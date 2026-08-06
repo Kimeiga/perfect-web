@@ -22,7 +22,7 @@ koka --target=js --outputdir=build -o build/store kk/store.kk
 node --test spikes/koka-js-interop/node/test.mjs
 ```
 
-Evidence: `docs/evidence/M0/spike-koka-js-interop.txt`.
+Evidence: `docs/evidence/E0/spike-koka-js-interop.txt`.
 Pinned to **Koka 3.2.3** (macOS arm64). 16 Node tests, all passing.
 
 ## Results

@@ -1,0 +1,28 @@
+// @expect: clean
+// The accepting half of the `{#each}` capture rule. `items` is a
+// `List<MenuItem>`, so `item` is a `MenuItem`, so the capture has a type the
+// resume manifest can name and the handler is generated.
+//
+// The control for `loop-capture-untyped.pw`. A rule that refused every capture
+// inside a loop — which is what "resumable handlers do not work in lists"
+// would look like from the outside — would catch this one too.
+
+module rules.resume_loop_typed
+
+import domain.{ MenuItem, MenuItemId }
+
+view Menu(items: List<MenuItem>) !{} {
+    <ul>
+        {#each items as item (item.id)}
+            <li>
+                <button on:press={resumable(captures = { item }) => pick(item.id)}>
+                    {item.name}
+                </button>
+            </li>
+        {/each}
+    </ul>
+}
+
+fn pick(id: MenuItemId) -> () !{} {
+    ()
+}

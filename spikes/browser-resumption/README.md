@@ -22,7 +22,7 @@ establishes whether Marko is a valid behavioural oracle to build E7 against.
 just rq-resumption
 ```
 
-Evidence: `docs/evidence/M0/spike-browser-resumption.txt`.
+Evidence: `docs/evidence/E0/spike-browser-resumption.txt`.
 Drives **Chrome via CDP** and **Safari via WebDriver or a self-running fallback**,
 using only Node 22 built-ins — no Playwright, no Puppeteer, no WebDriver client.
 

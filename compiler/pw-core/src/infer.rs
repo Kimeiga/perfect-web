@@ -57,12 +57,36 @@ pub struct Types<'a> {
 
 impl<'a> Types<'a> {
     /// Gather what this declaration's own text says about its bindings.
-    pub fn of_body(sigs: &'a Signatures, decl: &Decl, body: &Body) -> Types<'a> {
+    /// The module is a **parameter**, not a builder step.
+    ///
+    /// It used to be `Types::of_body(..).in_module(m)`, and that made whether
+    /// a rule could resolve a sibling declaration depend on whether its caller
+    /// remembered a second method call. The `#each` rule below is the case
+    /// that exposed it: it resolves `query Menu(..)` during construction, so
+    /// with a post-hoc module it silently saw none and every loop binding came
+    /// out untyped. Four of the seven callers had never called `in_module`.
+    pub fn of_body(
+        sigs: &'a Signatures,
+        decl: &Decl,
+        body: &Body,
+        module: Option<&str>,
+    ) -> Types<'a> {
         let mut bindings: BTreeMap<String, String> = BTreeMap::new();
 
         for p in &decl.params {
             if let Some(t) = &p.ty {
                 bindings.insert(p.name.clone(), t.clone());
+            }
+        }
+
+        // `List<MenuItem>` for a parameter, so the `#each` rule below can ask
+        // what an element of it is.
+        let mut element_of: BTreeMap<String, String> = BTreeMap::new();
+        for p in &decl.params {
+            if let Some(head) = &p.ty
+                && let Some(elem) = element_of_written(head, &p.ty_args)
+            {
+                element_of.insert(p.name.clone(), elem);
             }
         }
 
@@ -98,8 +122,44 @@ impl<'a> Types<'a> {
         let mut types = Types {
             sigs,
             bindings,
-            module: None,
+            module: module.map(str::to_string),
         };
+
+        // A REAL type-propagation rule, not adapter knowledge:
+        //
+        //     List<MenuItem>
+        //         | each
+        //     item : MenuItem
+        //
+        // Without it a loop binding has no type, so a resumable handler inside
+        // a loop has no capture schema and `PW5016` refuses to generate one.
+        // The alternative — letting the adapter assume `item` "probably means
+        // MenuItem" — would make serialization, nominal identity, privacy and
+        // handler compatibility all rest on a guess.
+        //
+        // An E9 slice, pulled forward because E7 genuinely requires it:
+        // milestone numbering must not force knowingly unsound semantics.
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        for n in body.walk_markup(&roots) {
+            let crate::hir::Node::Block { directive, .. } = body.node(n) else {
+                continue;
+            };
+            let Some((binding, collection)) = each_binding(directive) else {
+                continue;
+            };
+            if let Some(elem) = element_of
+                .get(&collection)
+                .cloned()
+                .or_else(|| types.element_type(body, &collection))
+            {
+                types.bindings.insert(binding, elem);
+            }
+        }
 
         // A binding whose initialiser has a knowable type. Iterated, so
         // `let a = f()` then `let b = a.g()` both resolve; bounded because each
@@ -133,10 +193,40 @@ impl<'a> Types<'a> {
         types
     }
 
-    /// Resolve bare names against this module's own declarations.
-    pub fn in_module(mut self, module: Option<&str>) -> Self {
-        self.module = module.map(str::to_string);
-        self
+    /// The element type of a collection-valued binding or call.
+    ///
+    /// `menu` bound from `query Menu(..)` whose declaration returns
+    /// `List<MenuItemId>` gives `MenuItemId`.
+    fn element_type(&self, body: &Body, name: &str) -> Option<String> {
+        // A binding whose initialiser is a declaration returning `List<T>`.
+        for id in body.walk() {
+            let bound = match body.expr(id) {
+                Expr::Let {
+                    pat: Some(pat),
+                    init: Some(init),
+                    ..
+                } => match body.pat(*pat) {
+                    crate::hir::Pattern::Bind { name: n, .. } if n == name => Some(*init),
+                    _ => None,
+                },
+                _ => None,
+            };
+            let Some(init) = bound else { continue };
+            let sig = match body.expr(init) {
+                // `query Menu(..)` names a declaration.
+                Expr::Keyword {
+                    keyword, modifiers, ..
+                } if matches!(keyword.as_str(), "query" | "subscription") => {
+                    modifiers.first().and_then(|m| self.by_path(m))
+                }
+                Expr::Call { callee, .. } => self.callee(body, *callee),
+                _ => None,
+            };
+            if let Some(sig) = sig {
+                return element_of_written(sig.returns.as_deref()?, &sig.returns_args);
+            }
+        }
+        None
     }
 
     /// A declaration by path, trying this module first.
@@ -188,6 +278,78 @@ impl<'a> Types<'a> {
             _ => self.by_path(&path_of(body, callee)),
         }
     }
+}
+
+/// The element type of a written type, seeing through the carriers.
+///
+/// ```text
+/// List<MenuItem>                  -> MenuItem
+/// Result<List<MenuItem>, Error>   -> MenuItem
+/// Option<List<MenuItem>>          -> MenuItem
+/// MenuItem                        -> None, it is not a collection
+/// ```
+///
+/// `Result` and `Option` are seen through because a query returns one and the
+/// loop iterates what is inside. That is not the same as ignoring them: a
+/// `Result` still has to be handled, and `option_used_as_value` is the rule
+/// that says so. This answers a different question — what one element IS.
+fn element_of_written(head: &str, args: &[String]) -> Option<String> {
+    match head {
+        "List" => args.first().map(|a| strip_args(a)),
+        "Result" | "Option" => {
+            let inner = args.first()?;
+            let (h, rest) = split_written(inner);
+            element_of_written(&h, &rest)
+        }
+        _ => None,
+    }
+}
+
+/// `List<MenuItem>` -> `("List", ["MenuItem"])`.
+fn split_written(t: &str) -> (String, Vec<String>) {
+    let t = t.trim();
+    match t.split_once('<') {
+        Some((head, rest)) => {
+            let inner = rest.strip_suffix('>').unwrap_or(rest);
+            // One level of nesting: split on commas outside angle brackets.
+            let mut args = Vec::new();
+            let (mut depth, mut start) = (0i32, 0usize);
+            for (i, c) in inner.char_indices() {
+                match c {
+                    '<' => depth += 1,
+                    '>' => depth -= 1,
+                    ',' if depth == 0 => {
+                        args.push(inner[start..i].trim().to_string());
+                        start = i + 1;
+                    }
+                    _ => {}
+                }
+            }
+            args.push(inner[start..].trim().to_string());
+            (head.trim().to_string(), args)
+        }
+        None => (t.to_string(), Vec::new()),
+    }
+}
+
+fn strip_args(t: &str) -> String {
+    t.split('<').next().unwrap_or(t).trim().to_string()
+}
+
+/// `{#each menu as item (item.id)}` gives `("item", "menu")`.
+///
+/// Read from the directive's text because that is where the parser leaves it —
+/// a markup block keeps its directive verbatim. The shape is fixed by the
+/// grammar, so this is reading a known form rather than guessing at one.
+fn each_binding(directive: &str) -> Option<(String, String)> {
+    let d = directive.trim();
+    let inner = d.strip_prefix("{#each")?.strip_suffix('}')?;
+    let (collection, rest) = inner.trim().split_once(" as ")?;
+    let binding = rest
+        .trim()
+        .split(|c: char| c == '(' || c.is_whitespace())
+        .find(|s| !s.is_empty())?;
+    Some((binding.to_string(), collection.trim().to_string()))
 }
 
 pub fn path_of(body: &Body, id: ExprId) -> String {

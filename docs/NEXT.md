@@ -138,14 +138,29 @@ E10–E15         own backends, network lab, HTTP/3, Servo, tooling, hardening
 
 ### 3. Standing work that is never "done"
 
-- **A real coverage-guided fuzzer.** What exists is structured generation, and
-  `just robustness` says so. It found both compiler panics and R3, which is
-  evidence it works, not evidence it is sufficient.
-- **A browser that calls `decide`.** The bypass is closed by construction and
-  build-time agreement is checked; nothing in a running browser calls either.
-- **Loop-binding types.** `{#each xs as x}` gives `x` no type, because `Param`
-  carries a type's head and not its arguments. The store demo could not use a
-  resumable handler inside a loop for this reason.
+The three items the architect required before E6 are closed. They are kept
+here, with what closed them, because the standing obligation does not end when
+the first version lands.
+
+- **A real coverage-guided fuzzer.** `just fuzz` — stable `-C
+  instrument-coverage` plus `llvm-profdata`, an evolving corpus, six targets.
+  Reported separately from `just robustness` and never merged into one
+  "fuzzed" figure, because structured generation and coverage feedback fail in
+  different directions.
+- **A browser that calls `decide`.** `runtime/pw-resume-wasm` compiles the
+  decision to wasm and the store page's Add button goes through it, in
+  Chromium, Firefox and WebKit. Fails closed while the decision is loading.
+- **Loop-binding types.** `{#each xs as x}` now gives `x` the element type of
+  `xs`, seeing through `Result` and `Option`; `just each-typing`, evidence at
+  `docs/evidence/E9/each-typing.txt`. The store demo's Add button is resumable
+  because of it. An unresolved type is `PW5016`, never a quiet downgrade to an
+  ordinary handler — which would make which handlers resume depend on where
+  inference happens to be blind.
+
+Each is a first version, not a finished one. The fuzzer runs 600 iterations per
+target in CI; the browser path exercises four manifests; the type rule knows
+three carriers. What matters is that none of the three is now a *claim* with
+nothing behind it.
 
 ### How to add work here
 

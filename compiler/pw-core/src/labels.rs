@@ -190,7 +190,7 @@ impl<'a> Labels<'a> {
             // the floor; a field with its own declared label joins on top.
             Expr::Field { base, name } => {
                 let mut l = self.label(body, *base);
-                if let Some(sig) = crate::infer::Types::of_body(self.sigs, &dummy(), body)
+                if let Some(sig) = crate::infer::Types::of_body(self.sigs, &dummy(), body, None)
                     .of(body, *base)
                     .and_then(|t| self.sigs.member_of(&t, name))
                 {

@@ -23,7 +23,7 @@ cargo run  -p spike-compiler-diagnostic -- --demo --plain --explain
 cargo run  -p spike-compiler-diagnostic -- path/to/file.pw
 ```
 
-Evidence: `docs/evidence/M0/spike-compiler-diagnostic.txt`.
+Evidence: `docs/evidence/E0/spike-compiler-diagnostic.txt`.
 
 ## Scope
 

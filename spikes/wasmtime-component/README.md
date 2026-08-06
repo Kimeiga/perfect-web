@@ -17,7 +17,7 @@ convention? And which WASI version does the current toolchain actually deliver?
 just spike-wasmtime
 ```
 
-Evidence: `docs/evidence/M0/spike-wasmtime-component.txt`.
+Evidence: `docs/evidence/E0/spike-wasmtime-component.txt`.
 
 Pinned: `wasmtime` 47.0.3, `wit-bindgen` 0.60.0, Rust 1.97.1, target
 `wasm32-wasip2`.

@@ -291,10 +291,10 @@ pub fn generate(
     build: &str,
 ) -> Vec<(ResumeManifest, HandlerArtifact)> {
     let mut out = Vec::new();
-    for (_, decl) in hir.all_decls() {
+    for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        let types = Types::of_body(sigs, decl, body);
+        let types = Types::of_body(sigs, decl, body, hir.module_of(id));
         let document_schema = document_schema_of(body);
         for lambda in body.walk() {
             let Expr::Lambda {
@@ -326,7 +326,7 @@ pub fn check(src: &str, hir: &Hir, sigs: &Signatures, build: &str, out: &mut Vec
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        let types = Types::of_body(sigs, decl, body);
+        let types = Types::of_body(sigs, decl, body, hir.module_of(id));
         let at = hir.decl_span(id);
         let document_schema = document_schema_of(body);
 

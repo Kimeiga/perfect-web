@@ -1,5 +1,5 @@
 spike: pw-to-marko
-generated: 2026-08-06T19:40:17Z
+generated: 2026-08-06T19:55:19Z
 host: Darwin arm64
 node: v22.21.1
 commands:
@@ -149,9 +149,9 @@ route /static
 
 route /counter
   status               200
-  HTML bytes           1174 (701 gzipped)
+  HTML bytes           1180 (701 gzipped)
   <script src> tags    1
-  inline <script>      1 (389 bytes)
+  inline <script>      1 (393 bytes)
   client JS bytes      4540 (2484 gzipped)
       entry   /assets/counter-BhS6UJwK.js              190 B
       import  /assets/_nVE8t9YK.js                     4350 B
@@ -159,7 +159,7 @@ route /counter
 
 route /streamed
   status               200
-  HTML bytes           1372 (834 gzipped)
+  HTML bytes           1372 (833 gzipped)
   <script src> tags    0
   inline <script>      2 (889 bytes)
   client JS bytes      0 (0 gzipped)
@@ -168,10 +168,10 @@ route /streamed
 streaming profile of /streamed
   transfer-encoding      chunked
   chunks                 2
-  "SHELL_READY"              4 ms
-  "Finding recommendations"  4 ms
-  "Affogato"                 1204 ms
-  VERDICT: the shell was usable 1200 ms before the
+  "SHELL_READY"              6 ms
+  "Finding recommendations"  6 ms
+  "Affogato"                 1207 ms
+  VERDICT: the shell was usable 1201 ms before the
            1200 ms region arrived, in separate chunks.
 
 Read these numbers against charter §14 M3's gate:
@@ -187,59 +187,59 @@ Vite's behaviour rather than what a user receives.
 
 Running 54 tests using 6 workers
 
-  ✓   6 [chromium] › e2e/routes.spec.mjs:34:3 › static route › keeps the whitespace between inline elements (544ms)
-  ✓   3 [chromium] › e2e/routes.spec.mjs:72:3 › counter route › is readable before its JavaScript runs (541ms)
-  ✓   1 [chromium] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /static keeps its semantic structure (543ms)
-  ✓   2 [chromium] › e2e/routes.spec.mjs:8:3 › static route › is usable with JavaScript disabled (554ms)
-  ✓   5 [chromium] › e2e/routes.spec.mjs:45:3 › counter route › interaction works without re-executing the page (661ms)
-  ✓   8 [chromium] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /counter keeps its semantic structure (158ms)
-  ✓  11 [chromium] › e2e/routes.spec.mjs:147:3 › store route — E4 gate 1, E5 gate 2 › renders public store data and private cart data together (95ms)
-  ✓  12 [chromium] › e2e/routes.spec.mjs:155:3 › store route — E4 gate 1, E5 gate 2 › the public half works with JavaScript disabled (78ms)
-  ✓  14 [chromium] › e2e/routes.spec.mjs:187:3 › store route — E4 gate 1, E5 gate 2 › the served HTML contains no session identifier (12ms)
-  ✓  13 [chromium] › e2e/routes.spec.mjs:166:3 › store route — E4 gate 1, E5 gate 2 › adding to the cart updates only the cart (126ms)
-  ✓   4 [chromium] › e2e/routes.spec.mjs:23:3 › static route › ships no script at all (968ms)
-  ✓  15 [chromium] › e2e/routes.spec.mjs:217:3 › E7V in the browser — the compatibility decision governs attachment › a compatible manifest attaches and the mutation runs (151ms)
-  ✓  16 [chromium] › e2e/routes.spec.mjs:229:3 › E7V in the browser — the compatibility decision governs attachment › an incompatible manifest is refused and the mutation does NOT run (96ms)
-  ✓  18 [chromium] › e2e/routes.spec.mjs:283:3 › E7V in the browser — the compatibility decision governs attachment › a changed handler identity is refused (109ms)
-  ✓  17 [chromium] › e2e/routes.spec.mjs:258:3 › E7V in the browser — the compatibility decision governs attachment › a private manifest resumed into a public scope is refused (142ms)
-  ✓  10 [chromium] › e2e/routes.spec.mjs:121:3 › streamed route › ships no client JavaScript of its own (1.3s)
+  ✓   2 [chromium] › e2e/routes.spec.mjs:72:3 › counter route › is readable before its JavaScript runs (489ms)
+  ✓   5 [chromium] › e2e/routes.spec.mjs:34:3 › static route › keeps the whitespace between inline elements (483ms)
+  ✓   6 [chromium] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /static keeps its semantic structure (485ms)
+  ✓   3 [chromium] › e2e/routes.spec.mjs:8:3 › static route › is usable with JavaScript disabled (492ms)
+  ✓   4 [chromium] › e2e/routes.spec.mjs:45:3 › counter route › interaction works without re-executing the page (604ms)
+  ✓   7 [chromium] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /counter keeps its semantic structure (146ms)
+  ✓  11 [chromium] › e2e/routes.spec.mjs:147:3 › store route — E4 gate 1, E5 gate 2 › renders public store data and private cart data together (93ms)
+  ✓  12 [chromium] › e2e/routes.spec.mjs:155:3 › store route — E4 gate 1, E5 gate 2 › the public half works with JavaScript disabled (71ms)
+  ✓  14 [chromium] › e2e/routes.spec.mjs:187:3 › store route — E4 gate 1, E5 gate 2 › the served HTML contains no session identifier (10ms)
+  ✓  13 [chromium] › e2e/routes.spec.mjs:166:3 › store route — E4 gate 1, E5 gate 2 › adding to the cart updates only the cart (128ms)
+  ✓  15 [chromium] › e2e/routes.spec.mjs:217:3 › E7V in the browser — the compatibility decision governs attachment › a compatible manifest attaches and the mutation runs (136ms)
+  ✓   1 [chromium] › e2e/routes.spec.mjs:23:3 › static route › ships no script at all (896ms)
+  ✓  16 [chromium] › e2e/routes.spec.mjs:229:3 › E7V in the browser — the compatibility decision governs attachment › an incompatible manifest is refused and the mutation does NOT run (92ms)
+  ✓  17 [chromium] › e2e/routes.spec.mjs:258:3 › E7V in the browser — the compatibility decision governs attachment › a private manifest resumed into a public scope is refused (119ms)
+  ✓  18 [chromium] › e2e/routes.spec.mjs:283:3 › E7V in the browser — the compatibility decision governs attachment › a changed handler identity is refused (108ms)
   ✓   9 [chromium] › e2e/routes.spec.mjs:132:3 › streamed route › the keyed list renders one item per record (1.3s)
-  ✓   7 [chromium] › e2e/routes.spec.mjs:104:3 › streamed route › the shell is usable while the slow region is still pending (2.0s)
-  ✓  21 [firefox] › e2e/routes.spec.mjs:34:3 › static route › keeps the whitespace between inline elements (1.2s)
-  ✓  25 [firefox] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /counter keeps its semantic structure (536ms)
-  ✓  20 [firefox] › e2e/routes.spec.mjs:23:3 › static route › ships no script at all (1.6s)
+  ✓   8 [chromium] › e2e/routes.spec.mjs:121:3 › streamed route › ships no client JavaScript of its own (1.3s)
+  ✓  10 [chromium] › e2e/routes.spec.mjs:104:3 › streamed route › the shell is usable while the slow region is still pending (2.0s)
+  ✓  19 [firefox] › e2e/routes.spec.mjs:8:3 › static route › is usable with JavaScript disabled (1.3s)
+  ✓  21 [firefox] › e2e/routes.spec.mjs:23:3 › static route › ships no script at all (1.5s)
+  ✓  25 [firefox] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /counter keeps its semantic structure (479ms)
+  ✓  20 [firefox] › e2e/routes.spec.mjs:34:3 › static route › keeps the whitespace between inline elements (1.1s)
+  ✓  24 [firefox] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /static keeps its semantic structure (1.5s)
+  ✓  29 [firefox] › e2e/routes.spec.mjs:147:3 › store route — E4 gate 1, E5 gate 2 › renders public store data and private cart data together (380ms)
   ✓  23 [firefox] › e2e/routes.spec.mjs:72:3 › counter route › is readable before its JavaScript runs (1.3s)
-  ✓  19 [firefox] › e2e/routes.spec.mjs:8:3 › static route › is usable with JavaScript disabled (1.4s)
-  ✓  29 [firefox] › e2e/routes.spec.mjs:147:3 › store route — E4 gate 1, E5 gate 2 › renders public store data and private cart data together (346ms)
-  ✓  24 [firefox] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /static keeps its semantic structure (1.1s)
-  ✓  30 [firefox] › e2e/routes.spec.mjs:155:3 › store route — E4 gate 1, E5 gate 2 › the public half works with JavaScript disabled (302ms)
-  ✓  32 [firefox] › e2e/routes.spec.mjs:187:3 › store route — E4 gate 1, E5 gate 2 › the served HTML contains no session identifier (15ms)
-  ✓  31 [firefox] › e2e/routes.spec.mjs:166:3 › store route — E4 gate 1, E5 gate 2 › adding to the cart updates only the cart (420ms)
+  ✓  30 [firefox] › e2e/routes.spec.mjs:155:3 › store route — E4 gate 1, E5 gate 2 › the public half works with JavaScript disabled (363ms)
+  ✓  32 [firefox] › e2e/routes.spec.mjs:187:3 › store route — E4 gate 1, E5 gate 2 › the served HTML contains no session identifier (43ms)
   ✓  27 [firefox] › e2e/routes.spec.mjs:121:3 › streamed route › ships no client JavaScript of its own (1.7s)
-  ✓  22 [firefox] › e2e/routes.spec.mjs:45:3 › counter route › interaction works without re-executing the page (1.2s)
   ✓  28 [firefox] › e2e/routes.spec.mjs:132:3 › streamed route › the keyed list renders one item per record (1.7s)
-  ✓  33 [firefox] › e2e/routes.spec.mjs:217:3 › E7V in the browser — the compatibility decision governs attachment › a compatible manifest attaches and the mutation runs (527ms)
-  ✓  26 [firefox] › e2e/routes.spec.mjs:104:3 › streamed route › the shell is usable while the slow region is still pending (2.5s)
-  ✓  34 [firefox] › e2e/routes.spec.mjs:229:3 › E7V in the browser — the compatibility decision governs attachment › an incompatible manifest is refused and the mutation does NOT run (617ms)
-  ✓  35 [firefox] › e2e/routes.spec.mjs:258:3 › E7V in the browser — the compatibility decision governs attachment › a private manifest resumed into a public scope is refused (626ms)
-  ✓  36 [firefox] › e2e/routes.spec.mjs:283:3 › E7V in the browser — the compatibility decision governs attachment › a changed handler identity is refused (598ms)
-  ✓  40 [webkit] › e2e/routes.spec.mjs:34:3 › static route › keeps the whitespace between inline elements (1.6s)
-  ✓  42 [webkit] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /static keeps its semantic structure (1.6s)
-  ✓  41 [webkit] › e2e/routes.spec.mjs:72:3 › counter route › is readable before its JavaScript runs (1.7s)
-  ✓  37 [webkit] › e2e/routes.spec.mjs:8:3 › static route › is usable with JavaScript disabled (1.7s)
-  ✓  39 [webkit] › e2e/routes.spec.mjs:45:3 › counter route › interaction works without re-executing the page (2.0s)
-  ✓  43 [webkit] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /counter keeps its semantic structure (370ms)
-  ✓  38 [webkit] › e2e/routes.spec.mjs:23:3 › static route › ships no script at all (2.1s)
-  ✓  47 [webkit] › e2e/routes.spec.mjs:147:3 › store route — E4 gate 1, E5 gate 2 › renders public store data and private cart data together (220ms)
-  ✓  48 [webkit] › e2e/routes.spec.mjs:155:3 › store route — E4 gate 1, E5 gate 2 › the public half works with JavaScript disabled (175ms)
-  ✓  50 [webkit] › e2e/routes.spec.mjs:187:3 › store route — E4 gate 1, E5 gate 2 › the served HTML contains no session identifier (14ms)
-  ✓  49 [webkit] › e2e/routes.spec.mjs:166:3 › store route — E4 gate 1, E5 gate 2 › adding to the cart updates only the cart (239ms)
-  ✓  51 [webkit] › e2e/routes.spec.mjs:217:3 › E7V in the browser — the compatibility decision governs attachment › a compatible manifest attaches and the mutation runs (234ms)
-  ✓  52 [webkit] › e2e/routes.spec.mjs:229:3 › E7V in the browser — the compatibility decision governs attachment › an incompatible manifest is refused and the mutation does NOT run (253ms)
-  ✓  53 [webkit] › e2e/routes.spec.mjs:258:3 › E7V in the browser — the compatibility decision governs attachment › a private manifest resumed into a public scope is refused (271ms)
-  ✓  54 [webkit] › e2e/routes.spec.mjs:283:3 › E7V in the browser — the compatibility decision governs attachment › a changed handler identity is refused (235ms)
-  ✓  45 [webkit] › e2e/routes.spec.mjs:121:3 › streamed route › ships no client JavaScript of its own (1.5s)
-  ✓  46 [webkit] › e2e/routes.spec.mjs:132:3 › streamed route › the keyed list renders one item per record (1.5s)
-  ✓  44 [webkit] › e2e/routes.spec.mjs:104:3 › streamed route › the shell is usable while the slow region is still pending (2.2s)
+  ✓  31 [firefox] › e2e/routes.spec.mjs:166:3 › store route — E4 gate 1, E5 gate 2 › adding to the cart updates only the cart (566ms)
+  ✓  22 [firefox] › e2e/routes.spec.mjs:45:3 › counter route › interaction works without re-executing the page (1.4s)
+  ✓  33 [firefox] › e2e/routes.spec.mjs:217:3 › E7V in the browser — the compatibility decision governs attachment › a compatible manifest attaches and the mutation runs (497ms)
+  ✓  34 [firefox] › e2e/routes.spec.mjs:229:3 › E7V in the browser — the compatibility decision governs attachment › an incompatible manifest is refused and the mutation does NOT run (490ms)
+  ✓  35 [firefox] › e2e/routes.spec.mjs:258:3 › E7V in the browser — the compatibility decision governs attachment › a private manifest resumed into a public scope is refused (494ms)
+  ✓  36 [firefox] › e2e/routes.spec.mjs:283:3 › E7V in the browser — the compatibility decision governs attachment › a changed handler identity is refused (435ms)
+  ✓  26 [firefox] › e2e/routes.spec.mjs:104:3 › streamed route › the shell is usable while the slow region is still pending (2.4s)
+  ✓  39 [webkit] › e2e/routes.spec.mjs:34:3 › static route › keeps the whitespace between inline elements (1.8s)
+  ✓  42 [webkit] › e2e/routes.spec.mjs:72:3 › counter route › is readable before its JavaScript runs (1.8s)
+  ✓  41 [webkit] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /static keeps its semantic structure (1.8s)
+  ✓  37 [webkit] › e2e/routes.spec.mjs:8:3 › static route › is usable with JavaScript disabled (1.8s)
+  ✓  40 [webkit] › e2e/routes.spec.mjs:45:3 › counter route › interaction works without re-executing the page (2.0s)
+  ✓  43 [webkit] › e2e/routes.spec.mjs:88:5 › accessibility baseline › /counter keeps its semantic structure (390ms)
+  ✓  38 [webkit] › e2e/routes.spec.mjs:23:3 › static route › ships no script at all (2.2s)
+  ✓  47 [webkit] › e2e/routes.spec.mjs:147:3 › store route — E4 gate 1, E5 gate 2 › renders public store data and private cart data together (254ms)
+  ✓  50 [webkit] › e2e/routes.spec.mjs:187:3 › store route — E4 gate 1, E5 gate 2 › the served HTML contains no session identifier (13ms)
+  ✓  48 [webkit] › e2e/routes.spec.mjs:155:3 › store route — E4 gate 1, E5 gate 2 › the public half works with JavaScript disabled (185ms)
+  ✓  49 [webkit] › e2e/routes.spec.mjs:166:3 › store route — E4 gate 1, E5 gate 2 › adding to the cart updates only the cart (249ms)
+  ✓  51 [webkit] › e2e/routes.spec.mjs:217:3 › E7V in the browser — the compatibility decision governs attachment › a compatible manifest attaches and the mutation runs (226ms)
+  ✓  52 [webkit] › e2e/routes.spec.mjs:229:3 › E7V in the browser — the compatibility decision governs attachment › an incompatible manifest is refused and the mutation does NOT run (213ms)
+  ✓  54 [webkit] › e2e/routes.spec.mjs:283:3 › E7V in the browser — the compatibility decision governs attachment › a changed handler identity is refused (213ms)
+  ✓  53 [webkit] › e2e/routes.spec.mjs:258:3 › E7V in the browser — the compatibility decision governs attachment › a private manifest resumed into a public scope is refused (217ms)
+  ✓  44 [webkit] › e2e/routes.spec.mjs:121:3 › streamed route › ships no client JavaScript of its own (1.5s)
+  ✓  46 [webkit] › e2e/routes.spec.mjs:132:3 › streamed route › the keyed list renders one item per record (1.6s)
+  ✓  45 [webkit] › e2e/routes.spec.mjs:104:3 › streamed route › the shell is usable while the slow region is still pending (2.3s)
 
-  54 passed (14.1s)
+  54 passed (15.1s)

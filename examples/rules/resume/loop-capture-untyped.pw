@@ -1,0 +1,34 @@
+// @expect: PW5016
+// The refusing half. `count` is an `Int`, so `{#each count as item}` gives
+// `item` no type — an `Int` is not a collection and nothing in the program
+// says what one element of it would be.
+//
+// The behaviour being pinned is which way it fails. A capture schema is hashed
+// into the resume manifest and compared against the schema the running build
+// produced, so a type this build had to guess yields a hash that matches
+// nothing, and every resume fails after deployment for a reason the deployment
+// cannot explain. Refusing here is a worse-looking build and a better system.
+//
+// The alternative — quietly emitting an ordinary handler instead — would make
+// which handlers are resumable depend on where the compiler happens to be
+// blind, so performance and compatibility would move when inference improved.
+
+module rules.resume_loop_untyped
+
+import domain.{ MenuItemId }
+
+view Broken(count: Int) !{} {
+    <ul>
+        {#each count as item (item.id)}
+            <li>
+                <button on:press={resumable(captures = { item }) => pick(item.id)}>
+                    x
+                </button>
+            </li>
+        {/each}
+    </ul>
+}
+
+fn pick(id: MenuItemId) -> () !{} {
+    ()
+}

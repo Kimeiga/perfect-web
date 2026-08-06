@@ -100,10 +100,12 @@ demonstrations.
 ## Historical note
 
 Everything committed before 2026-08-05 used `M0`…`M15` for engineering
-milestones. `docs/milestones/M0.md` and `docs/evidence/M0/` keep their filenames
-so that commit history and evidence paths stay stable; read `M0` there as `E0`.
+milestones. The first correction (2026-08-06) fixed the prose and left the
+paths — which produced the worse state of both: `docs/evidence/E0/` and
+`docs/evidence/M0/` existed side by side, holding evidence for one milestone
+under two names. Path stability was the reason, and it was not worth splitting
+a milestone's evidence in half. Both are now `E0`, in prose and on disk.
 
-**Prose always says `E0`.** The filename is a path-stability decision and not a
-second numbering scheme — writing `M0` in a status report is exactly the drift
-the `E`/`P`/`RQ` split was introduced to remove, and it happened once
-(2026-08-06) and was corrected.
+`M0`…`M15` still appear where a line **cites the charter**, because charter §14
+numbers its own milestones that way and a citation must be checkable against
+the document it cites. Everywhere else the name is `E0`.

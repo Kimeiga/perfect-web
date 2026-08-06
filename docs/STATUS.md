@@ -11,6 +11,9 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
 **current milestone:** **E6 — materialized resource graph.** Everything before it
 is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and the inserted E7V.
+The three items the architect required before E6 could start are also closed —
+coverage-guided fuzzing (`just fuzz`), the compatibility decision on the real
+browser handler path, and typed `{#each}` captures (`just each-typing`).
 
 **next milestone:** **E6**, then E7's own renderer (E7-R/E7-P/E7-L), E8's Wasm
 capability host, and E9's permanent type checker. Those are the large ones and
@@ -62,9 +65,14 @@ generality-tested         29 / 29
 headline matrices          8 / 8
 resume compatibility      E7V closed — 34 matrix rows, 6 fuzz targets
 robustness                11 suites, 0 panics, 3 regressions retained
+coverage-guided fuzzing    6 targets, 3600 execs, 0 findings
 historical compatibility   9 / 10   the miss classified
 KNOWN_GAPs                 0
 ```
+
+Fuzzing is reported on its own line and never folded into the robustness one.
+Structured generation and coverage feedback fail in different directions, and a
+single "fuzzed" figure would let one cover for the other.
 
 An invariant counts as *generally* enforced only when a program its fixture did
 not anticipate is caught. `examples/generality/` holds those programs — and
@@ -143,7 +151,7 @@ may and may not be said today, and the second list is the longer one.
 All seven charter §14 M0 gate items:
 
 1. **`just doctor` works on the Mac** — exits 0, read-only, warns on the 16 GiB host deviation.
-2. **All six spikes run from documented commands** — `just spikes`, six evidence files in `docs/evidence/M0/`. Charter v2 allows recording a blocker instead; none was needed.
+2. **All six spikes run from documented commands** — `just spikes`, six evidence files in `docs/evidence/E0/`. Charter v2 allows recording a blocker instead; none was needed.
 3. **Versions and licenses pinned** — `tools/versions.lock`, `rust-toolchain.toml`, `pnpm-lock.yaml`, SHA-256-verified release tarballs, license column in the technology matrix.
 4. **≥10 accepted / ≥20 rejected examples** — now **24 and 44**, covering **24/24** and **44/44** charter §16 categories including v2's layout/DOM families. Enforced by `tools/corpus-check` in `just ci`.
 5. **Reuse/fork/tape/build matrix complete** — `docs/research/technology-matrix.md`, with *measured* vs *read* clearly distinguished.
@@ -167,10 +175,10 @@ All seven charter §14 M0 gate items:
 ## exact commands to reproduce
 
 ```bash
-just doctor        # read-only environment check; exits 0 when M0 tools are present
+just doctor        # read-only environment check; exits 0 when E0 tools are present
 just bootstrap     # fetch pinned Koka 3.2.3 + Wasmtime 47.0.3 into .toolchain/, pnpm install
 just ci            # fmt-check + clippy -D warnings + 18 unit tests + corpus check  -> "ci: OK"
-just spikes        # all six spikes; rewrites docs/evidence/M0/*.txt
+just spikes        # all six spikes; rewrites docs/evidence/E0/*.txt
 
 # individually
 just spike-compiler-diagnostic

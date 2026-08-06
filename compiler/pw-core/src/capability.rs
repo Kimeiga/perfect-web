@@ -188,7 +188,7 @@ mod tests {
     }
 
     /// The exact import list E0 measured from the `std` guest — 15 instances for
-    /// a world declaring one. `docs/evidence/M0/spike-wasmtime-component.txt`.
+    /// a world declaring one. `docs/evidence/E0/spike-wasmtime-component.txt`.
     fn std_actual() -> Vec<String> {
         [
             "perfect-web:store/stores@0.1.0",

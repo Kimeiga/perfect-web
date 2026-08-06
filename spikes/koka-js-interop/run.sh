@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SPIKE="$REPO_ROOT/spikes/koka-js-interop"
-EVIDENCE="$REPO_ROOT/docs/evidence/M0"
+EVIDENCE="$REPO_ROOT/docs/evidence/E0"
 export PATH="$REPO_ROOT/.toolchain/prefix/bin:$PATH"
 mkdir -p "$EVIDENCE"
 cd "$SPIKE"

@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SPIKE="$REPO_ROOT/spikes/layout-phase-scheduler"
-EVIDENCE="$REPO_ROOT/docs/evidence/M0"
+EVIDENCE="$REPO_ROOT/docs/evidence/E0"
 mkdir -p "$EVIDENCE"
 cd "$SPIKE"
 

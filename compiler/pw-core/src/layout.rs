@@ -36,14 +36,6 @@ use crate::signatures::Signatures;
 /// effects, so a checker can tell a padding change from a colour change.
 const LAYOUT_AFFECTING: &str = "style.mutate<LayoutAffect>";
 
-/// The module a declaration belongs to.
-fn module_of(hir: &Hir, decl: crate::hir::DeclId) -> Option<&str> {
-    hir.modules
-        .iter()
-        .find(|(_, m, _)| m.decls.contains(&decl))
-        .map(|(_, m, _)| m.name.as_str())
-}
-
 pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -52,7 +44,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         // Resolved by receiver TYPE. `self.style.set_padding(..)` is
         // `ElementRef` -> `Style` -> a member of `Style`; no step asks whether
         // `set_padding` happens to be unique in the program.
-        let types = Types::of_body(sigs, decl, body).in_module(module_of(hir, id));
+        let types = Types::of_body(sigs, decl, body, hir.module_of(id));
         frame_transaction_order(body, &types, decl, &at, out);
         observation_feedback(body, &types, decl, &at, out);
         compositor_animation(body, sigs, decl, &at, out);

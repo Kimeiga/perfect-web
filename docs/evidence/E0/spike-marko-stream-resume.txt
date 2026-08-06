@@ -1,5 +1,5 @@
 spike: marko-stream-resume
-generated: 2026-08-05T22:58:03Z
+generated: 2026-08-06T19:57:18Z
 node: v22.21.1   pnpm: 10.15.1
 marko: 6.3.32   @marko/run: 0.11.8   @marko/run-adapter-node: 2.0.6   vite: 8.2.0
 host: Darwin arm64
@@ -46,18 +46,18 @@ route      html       html.gz   scripts              clientJS   clientJS.gz
 =================== 2. STREAMING BEHAVIOR =========================
   transfer-encoding : chunked
   response chunks   : 3
-  time to first byte: 2.8 ms
-  SHELL_READY       : 2.8 ms
-  ESTIMATE_READY    : 405.7 ms
-  RECS_READY        : 1205.7 ms
-  response complete : 1206.6 ms
+  time to first byte: 3.0 ms
+  SHELL_READY       : 3.0 ms
+  ESTIMATE_READY    : 407.1 ms
+  RECS_READY        : 1203.9 ms
+  response complete : 1204.2 ms
 
   expected (charter §15.5): estimate ~400 ms, recommendations ~1200 ms,
   shell well before both, and the shell must NOT wait on either.
 
-  check:shell-not-blocked=pass (shell at 2.8 ms)
-  check:estimate-streamed=pass (at 405.7 ms)
-  check:recs-streamed=pass (at 1205.7 ms)
+  check:shell-not-blocked=pass (shell at 3.0 ms)
+  check:estimate-streamed=pass (at 407.1 ms)
+  check:recs-streamed=pass (at 1203.9 ms)
   check:out-of-order-ok=pass (faster subtree arrived first)
 
 =================== 3. ZERO-JS CLAIM =============================

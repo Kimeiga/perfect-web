@@ -22,7 +22,7 @@ just spike-layout
 node spikes/layout-phase-scheduler/measure.mjs
 ```
 
-Evidence: `docs/evidence/M0/spike-layout-phase-scheduler.txt`.
+Evidence: `docs/evidence/E0/spike-layout-phase-scheduler.txt`.
 
 The harness drives **headless Chrome over the DevTools Protocol** using Node 22's
 built-in `WebSocket` and `fetch` — no Playwright, no Puppeteer, no dependency at

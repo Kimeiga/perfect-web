@@ -47,7 +47,7 @@ Count **downloaded** and **inline** JS separately: they cost differently
 ## Milestone 0 spike measurements — NOT benchmarks
 
 Single runs, one machine, localhost, no shaping, no distribution. Recorded as
-evidence for the Milestone 0 gate only. Raw output: `docs/evidence/M0/`.
+evidence for the Milestone 0 gate only. Raw output: `docs/evidence/E0/`.
 
 ```text
 marko 6.3.32 / @marko/run 0.11.8 / vite 8.2.0 / node v22.21.1

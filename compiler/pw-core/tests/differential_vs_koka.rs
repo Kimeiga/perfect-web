@@ -1,6 +1,6 @@
 //! The differential test that justifies E1A's existence.
 //!
-//! E0 measured (`docs/evidence/M0/spike-koka-js-interop.txt` §2) that Koka
+//! E0 measured (`docs/evidence/E0/spike-koka-js-interop.txt` §2) that Koka
 //! **compiles** this program:
 //!
 //! ```koka

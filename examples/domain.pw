@@ -33,6 +33,18 @@ opaque type ConsumerId = String
 opaque type OrderId = String
 opaque type InteractionId = String
 
+// --- menu -----------------------------------------------------------------
+
+// What a menu holds. `List<MenuItemId>` was what `Menu` used to return, and a
+// page that renders `item.name` from a list of ids is describing one thing and
+// reading another — harmless while nothing depended on the element's type, and
+// not harmless now that a resumable handler inside the loop hashes it into a
+// capture schema.
+type MenuItem = MenuItem {
+    id: MenuItemId,
+    name: String,
+}
+
 // --- quantities -----------------------------------------------------------
 
 opaque type PositiveInt = Int

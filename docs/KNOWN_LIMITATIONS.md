@@ -28,7 +28,7 @@ fails at runtime with `pattern match failure`. It is rejected only in functions
 whose effect row excludes `exn`.
 → `pw` must implement exhaustiveness itself (Milestone 9A). Milestone 1's
 compile-fail cases must use **total** effect rows or they pass vacuously.
-Evidence: `docs/evidence/M0/spike-koka-js-interop.txt` §2.
+Evidence: `docs/evidence/E0/spike-koka-js-interop.txt` §2.
 
 **Koka erases single-field value structs.**
 `Money_usd(350)` returns `350`; `Store_id("store_47")` returns `"store_47"`.
@@ -129,7 +129,7 @@ No evidence exists in either direction. Do not assume these work.
 Charter §13.5 and §20 require Linux CI to catch macOS case-insensitivity
 assumptions, and §3.6 requires license and vulnerability checks in CI. Neither
 runs. `just ci` is macOS-local only. **This is the most concrete Milestone 0
-shortfall** — recorded in the M0 gate assessment as a partial pass.
+shortfall** — recorded in the E0 gate assessment as a partial pass.
 
 **`just bootstrap` is macOS/arm64 only.** It refuses to run elsewhere with a
 clear message rather than silently doing the wrong thing, but there is no Linux
@@ -160,7 +160,7 @@ declared engine range. Assumption A-002.
 
 ## Measurement caveats
 
-- Every number in `docs/evidence/M0/` is a **single run on one machine over
+- Every number in `docs/evidence/E0/` is a **single run on one machine over
   localhost**, with no network shaping and no sample distribution. Charter §18.5
   requires sample counts, medians and distributions before anything is published
   as a benchmark. These are spike evidence, not benchmark results.

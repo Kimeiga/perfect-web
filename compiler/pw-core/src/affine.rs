@@ -55,7 +55,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
-        let types = crate::infer::Types::of_body(sigs, decl, body);
+        let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
         for a in acquisitions(body, sigs, &types) {
             let releases = releases_of(body, sigs, &types, &a);
             if let Some(escape) = escape_of(body, &a, &module_state) {
