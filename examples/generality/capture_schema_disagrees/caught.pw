@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: capture_schema_disagrees
+// @dimension: direct invalid — a capture whose type this build cannot name
+//
+// `helper` has no declared return type, so nothing says what `derived` is. The
+// manifest's schema hash would be derived from a guess, and a guessed hash
+// matches nothing — every resume of this handler would fail after deployment,
+// for a reason unreadable from the deployment.
+
+module generality.schema_unnameable
+
+import domain.{ StoreId }
+
+view Panel(store_id: StoreId) !{} {
+    let derived = helper(store_id)
+    <button on:press={resumable(captures = { derived }) => refresh(derived)}>
+        Refresh
+    </button>
+}

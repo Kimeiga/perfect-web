@@ -452,6 +452,9 @@ fn generality_is_reported_separately_from_conformance() {
         }
     }
 
+    // `capture_schema_disagrees` has witnesses but no corpus fixture — E7V is
+    // newer than C1, which is frozen. Counted in the numerator only when the
+    // corpus exercises it, so the ratio stays honest.
     let general: Vec<&str> = exercised
         .iter()
         .filter(|s| by_invariant.get(s.as_str()).is_some_and(|(g, n)| *g && !*n))

@@ -82,6 +82,13 @@ test-compile:
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
+# E7V — the resume-version deployment matrix. Every row of the architect's
+# table plus the accepted neighbours that stop the checker collapsing into
+# "any build difference means reload".
+resume-matrix:
+    @cargo test --quiet -p pw-resume 2>&1 | grep -E 'test result' | head -2
+    @echo "  see docs/milestones/E7V.md for what is pw's and what is Marko's"
+
 # The platform library is compiler INPUT and is checked like it: it parses,
 # resolves, checks clean, its signatures are internally consistent, the
 # declarations the rules read are exercised by a program, and the trusted

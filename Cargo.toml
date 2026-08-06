@@ -5,6 +5,7 @@ members = [
     "compiler/pw-cli",
     "compiler/pw-syntax",
     "runtime/pw-resource",
+    "runtime/pw-resume",
     "runtime/pw-tasks",
     "spikes/compiler-diagnostic",
     "tools/corpus-check",

@@ -196,6 +196,8 @@ codes! {
         "the resume manifest ships with the public shell and may hold only public values";
     UNSERIALIZABLE_CAPTURE = "PW5008" / unserializable_capture / 1, Privacy,
         "a resumable handler may capture only what can be written to its manifest";
+    CAPTURE_SCHEMA_DISAGREES = "PW5016" / capture_schema_disagrees / 1, Privacy,
+        "a handler and its manifest must agree about what it captures";
     DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,
@@ -246,11 +248,6 @@ pub enum RuleStatus {
 /// milestones land; it grows only when a new specification fixture is added.
 pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     // (code, intended owner, missing analysis)
-    (
-        "PW3011",
-        "E7",
-        "resumption manifest — private data crossing into it",
-    ),
 ];
 
 /// Classify a corpus `@rule`, after alias resolution.

@@ -195,6 +195,12 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     ("PW0302", "PW5003"),
     // The resume manifest: one about what a value IS, one about who may read it.
     ("PW0308", "PW5008"),
+    // E7V. The corpus reserved `PW3011` for "private data crossing into the
+    // resume manifest at BUILD time"; that is artifact disagreement within one
+    // build, which is a compiler error. The RUNTIME half — independently
+    // cached artifacts from different releases — is not a source diagnostic at
+    // all and lives in `runtime/pw-resume` as a typed decision.
+    ("PW3011", "PW5016"),
     ("PW0328", "PW5007"),
     // R-006: a secret reaching a sink declared `Public`.
     ("PW0304", "PW5006"), // a secret cannot be rendered to the browser

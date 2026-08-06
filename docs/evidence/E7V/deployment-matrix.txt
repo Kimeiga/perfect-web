@@ -1,0 +1,22 @@
+test weakening_a_private_scope_to_public_is_refused ... ok
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Reproduce: just resume-matrix
+
+Every row of the E7V deployment matrix, plus the accepted neighbours. For each
+rejected row the test asserts four things, because "it returned Refuse" is not
+the same as "nothing bad happened":
+
+  no incompatible capture is decoded
+  no handler attaches
+  no private value crosses into a broader scope
+  the declared recovery action occurs
+
+The first is structural: `decide` receives captures as opaque bytes and this
+crate has no decoder, so decoding cannot precede the decision that authorises
+it. The privacy check runs BEFORE the schema check for the same reason.
+
+NOT demonstrated: that this decision runs in a browser. It is a decision
+function with a tested contract, like pw-tasks and pw-resource (ADR-0016). No
+deployed application has refused a manifest through this code.

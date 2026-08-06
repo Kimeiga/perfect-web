@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: capture_schema_disagrees
+// @dimension: valid neighbour — the same shape, with a nameable type
+//
+// A rule reacting to "a capture that is not a bare parameter" would catch
+// this. What matters is whether the type is knowable, not how it was reached:
+// `held` is a rebinding and `store.id` is a field, and both have types this
+// build can name.
+
+module generality.schema_nameable
+
+import domain.{ Store, StoreId }
+
+view Panel(store: Store) !{} {
+    let held = store
+    <button on:press={resumable(captures = { held, store.id }) => refresh(held)}>
+        Refresh
+    </button>
+}

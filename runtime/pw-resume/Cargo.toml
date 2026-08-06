@@ -1,0 +1,16 @@
+[package]
+name = "pw-resume"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+
+# Like `pw-resource`, the runtime does NOT depend on the compiler. The manifest
+# schema is what they share (ADR-0018), and E7V's build-time half lives in
+# `pw-core` while the decision half lives here.
+[dev-dependencies]
+pw-core = { path = "../../compiler/pw-core" }
+pw-syntax = { path = "../../compiler/pw-syntax" }

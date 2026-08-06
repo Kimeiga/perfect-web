@@ -77,6 +77,25 @@ impl Manifest {
     }
 }
 
+/// The capture schema a handler declares: (name, type) per capture.
+///
+/// E7V's build-time half. The runtime compares content hashes ACROSS
+/// deployments; within one build there is no version skew, so the question is
+/// narrower — does every capture have a type the manifest can name? A capture
+/// whose type this build cannot determine yields a schema hash derived from a
+/// guess, and a guessed hash matches nothing, so every resume would fail after
+/// deployment for a reason nobody could diagnose from the deployment.
+fn capture_schema(
+    body: &crate::hir::Body,
+    types: &crate::infer::Types<'_>,
+    descriptor: ExprId,
+) -> Vec<(String, Span, Option<String>)> {
+    captures(body, descriptor)
+        .into_iter()
+        .map(|(name, span, expr)| (name, span, types.of(body, expr)))
+        .collect()
+}
+
 pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -106,6 +125,44 @@ pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Di
             else {
                 continue;
             };
+            // Build-time artifact agreement: every capture must have a type
+            // the manifest can name.
+            for (name, span, ty) in capture_schema(body, &types, *d) {
+                if ty.is_some() {
+                    continue;
+                }
+                out.push(Diagnostic {
+                    code: codes::CAPTURE_SCHEMA_DISAGREES.id,
+                    invariant: codes::CAPTURE_SCHEMA_DISAGREES.invariant,
+                    reason: "capture_has_no_nameable_type",
+                    detector: Detector::PatternMatrix,
+                    severity: Severity::Error,
+                    message: format!("`{name}` has no type the resume manifest can name"),
+                    primary_span: span,
+                    related: vec![Related {
+                        span: at.clone(),
+                        label: format!("`{}` declares the handler", decl.name),
+                    }],
+                    explanation: Some(format!(
+                        "A resume manifest carries a schema hash derived from what a \
+                         handler captures, and the running code compares it against \
+                         the schema its own build produced. A capture whose type this \
+                         build cannot determine yields a hash derived from a guess, \
+                         which matches nothing — so every resume of `{}` would fail \
+                         after deployment, for a reason nobody could diagnose from the \
+                         deployment. Name the type here, where it is still a compile \
+                         error.",
+                        decl.name
+                    )),
+                    repairs: vec![Repair {
+                        description: format!(
+                            "annotate `{name}`, or capture a value whose type is declared"
+                        ),
+                        replacement: None,
+                    }],
+                });
+            }
+
             for (name, span, expr) in captures(body, *d) {
                 // Serializability, from the type.
                 let resource = types
