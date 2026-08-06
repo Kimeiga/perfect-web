@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: forbidden_effect
+// @dimension: indirect invalid — a painter, identified by its row
+module generality.forbid_painter
+
+import document
+
+paint Spark(values: List<Float>) !{ paint.custom } {
+    inputs values
+    draw(ctx) {
+        document.query("#legend").set_text("painted")
+        ctx.rect(0.0, 0.0, 10.0, 10.0)
+    }
+}

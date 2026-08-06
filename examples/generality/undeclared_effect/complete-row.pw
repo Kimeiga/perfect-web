@@ -1,0 +1,20 @@
+// @status: NEIGHBOUR
+// @invariant: undeclared_effect
+// @dimension: valid neighbour — the same chain, declared
+//
+// The identical call graph with a row that names both. A rule reacting to the
+// depth of the chain, or to a lambda being present, would catch this.
+module generality.effect_complete
+
+import Stores
+import Analytics
+import List
+
+fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read, network.fetch } {
+    Analytics.record_view(id)
+    Stores.get(id)
+}
+
+fn labels(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{ database.read } {
+    List.map(ids, id => Stores.get(id))
+}

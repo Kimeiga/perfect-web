@@ -1,0 +1,17 @@
+// @status: NEIGHBOUR
+// @invariant: forbidden_effect
+// @dimension: valid neighbour — the same effect, deferred
+//
+// A view may not fetch WHILE RENDERING. An event handler runs when the user
+// acts, so the same call in the same file is legitimate. A rule keyed on the
+// declaration kind alone would catch this.
+module generality.forbid_handler_ok
+
+import Analytics
+import domain.{ MenuItemId }
+
+view ProductCard(item: MenuItemId) !{} {
+    <article>
+        <button on:press={() => Analytics.record_view(item)}>View</button>
+    </article>
+}

@@ -1,0 +1,10 @@
+// @status: GENERAL
+// @invariant: scope_outlives_owner
+// @dimension: direct invalid
+module generality.scope_direct
+
+component LazyMap() {
+    placement browser
+    let visible = observe intersection(self) -> Bool { scope application }
+    view { <section aria-label="Store location" /> }
+}

@@ -82,10 +82,19 @@ fn expand(row: &Row) -> Vec<Row> {
             Pattern::Or(alts) => {
                 let mut next = Vec::new();
                 for base in &out {
+                    // RECURSIVELY. `a | b | c` lowers right-nested as
+                    // `Or([a, Or([b, c])])`, so expanding one level left an
+                    // `Or` at the head of a row and `is_useful` reached an
+                    // `unreachable!` — a `.pw` program panicked the compiler
+                    // for the second time, in the same module, by the same
+                    // assumption that an earlier phase had normalised
+                    // something.
                     for a in alts {
-                        let mut r = base.clone();
-                        r.push(a.clone());
-                        next.push(r);
+                        for tail in expand(&vec![a.clone()]) {
+                            let mut r = base.clone();
+                            r.extend(tail);
+                            next.push(r);
+                        }
                     }
                 }
                 out = next;
@@ -315,7 +324,12 @@ fn is_useful(program: &Program, matrix: &[Row], row: &Row, types: &[Type]) -> bo
                 _ => is_useful(program, &default_matrix(matrix), &tail.to_vec(), rest_ty),
             }
         }
-        Pattern::Or(_) => unreachable!("or-patterns are expanded before this point"),
+        // Defensively, not `unreachable!`. `expand` removes these, and an
+        // assumption that an earlier phase did its job is exactly what put a
+        // panic here twice. A row still headed by an alternation is treated as
+        // the wildcard it is a special case of: conservative, so it can only
+        // make the analysis report LESS, never wrongly report more.
+        Pattern::Or(_) => is_useful(program, &default_matrix(matrix), &tail.to_vec(), rest_ty),
     }
 }
 
@@ -597,6 +611,36 @@ mod tests {
         let r = check_match(&p, &ty, &arms);
         assert!(r.is_exhaustive());
         assert_eq!(r.unreachable, vec![1]);
+    }
+
+    #[test]
+    fn a_right_nested_or_chain_expands_completely() {
+        // `a | b | c` lowers as `Or([a, Or([b, c])])`. Expanding one level
+        // left an `Or` at a row's head and panicked `is_useful`.
+        let p = Pattern::Or(vec![
+            Pattern::Ctor {
+                ctor: 0,
+                args: vec![],
+            },
+            Pattern::Or(vec![
+                Pattern::Ctor {
+                    ctor: 1,
+                    args: vec![],
+                },
+                Pattern::Ctor {
+                    ctor: 2,
+                    args: vec![],
+                },
+            ]),
+        ]);
+        let rows = expand(&vec![p]);
+        assert_eq!(rows.len(), 3, "three alternatives, three rows: {rows:?}");
+        for r in &rows {
+            assert!(
+                !matches!(r.first(), Some(Pattern::Or(_))),
+                "a row is still headed by an alternation: {r:?}"
+            );
+        }
     }
 
     #[test]

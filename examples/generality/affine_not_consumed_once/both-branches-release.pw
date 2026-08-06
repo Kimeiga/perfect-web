@@ -1,0 +1,21 @@
+// @status: NEIGHBOUR
+// @invariant: affine_not_consumed_once
+// @dimension: valid neighbour — every path releases, no trailing call
+//
+// There is no commit after the `if`, because both branches already ended the
+// transaction. A rule requiring a release textually LAST would catch this.
+module generality.affine_both
+
+import Carts
+import Database
+
+command settle() -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    if Carts.is_empty(current_session()) {
+        Database.rollback(tx)
+    } else {
+        tx.commit()
+    }
+}

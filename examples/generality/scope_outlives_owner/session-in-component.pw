@@ -1,0 +1,10 @@
+// @status: GENERAL
+// @invariant: scope_outlives_owner
+// @dimension: indirect invalid — a different scope pairing
+module generality.scope_session
+
+component Ticker() {
+    placement browser
+    let tick = observe resize(self) -> Float { scope session }
+    view { <section aria-label="Ticker" /> }
+}

@@ -1,0 +1,15 @@
+// @status: NEIGHBOUR
+// @invariant: undeclared_effect
+// @dimension: valid neighbour — no row at all
+//
+// A declaration that writes no row is not making a claim, so there is nothing
+// to be wrong about. Inferring one and checking against it would reject
+// working programs; `Inferred::undeclared` returns nothing for `None` and this
+// is the file that says so.
+module generality.effect_open
+
+import Stores
+
+fn get(id: StoreId) -> Result<Store, StoreError> {
+    Stores.get(id)
+}

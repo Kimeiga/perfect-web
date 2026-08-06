@@ -239,6 +239,44 @@ fn arbitrary_source_bytes_do_not_panic_the_compiler() {
     );
 }
 
+/// Or-patterns of every length, in every position.
+///
+/// The second targeted generator, and it exists for the same reason as the
+/// first: a panic was found by a counterexample rather than by fuzzing, and
+/// the shape that produced it deserves a generator rather than a hope that a
+/// mutation lands on it.
+///
+/// `a | b | c` lowers right-nested, so the interesting parameter is the NUMBER
+/// of alternatives — one and two both work with a non-recursive expansion, and
+/// three is the first that nests.
+#[test]
+fn or_patterns_of_any_length_do_not_panic_the_compiler() {
+    let domain = "module domain\n\n\
+                  type S =\n    | A\n    | B\n    | C\n    | D(R)\n\n\
+                  type R =\n    | X\n";
+    let ctors = ["A", "B", "C"];
+    let mut failures = Vec::new();
+
+    for n in 1..=3 {
+        for wildcard in [true, false] {
+            let alts = ctors[..n].join(" | ");
+            let rest = if wildcard {
+                "        _ => \"rest\"\n"
+            } else {
+                ""
+            };
+            let src = format!(
+                "{domain}\nfn f(s: S) -> String !{{}} {{\n    match s {{\n        \
+                 {alts} => \"one\"\n{rest}    }}\n}}\n"
+            );
+            if let Err(msg) = survives("or.pw", &src) {
+                failures.push(format!("{n} alternatives, wildcard={wildcard}: {msg}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n  "));
+}
+
 /// Constructor patterns whose arity disagrees with their declaration.
 ///
 /// The targeted generator the architect asked for, and the one that earns its

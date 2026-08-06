@@ -1,0 +1,15 @@
+// @status: GENERAL
+// @invariant: scope_outlives_owner
+// @dimension: indirect invalid — not at the top of the body
+//
+// The scope request is inside a `frame`, so a rule reading only the
+// declaration's own top-level statements would not see it.
+module generality.scope_nested
+
+component Ticker() {
+    placement browser
+    frame {
+        let tick = observe resize(self) -> Float { scope application }
+    }
+    view { <section aria-label="Ticker" /> }
+}

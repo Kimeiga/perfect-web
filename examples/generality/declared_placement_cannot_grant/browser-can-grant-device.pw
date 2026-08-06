@@ -1,0 +1,16 @@
+// @status: NEIGHBOUR
+// @invariant: declared_placement_cannot_grant
+// @dimension: valid neighbour — the same capability, where it exists
+//
+// The same device read, in the browser. A rule that banned `device.location`
+// rather than checking it against the named world would catch this.
+module generality.place_browser_ok
+
+import device
+import domain.{ Location }
+
+component Locator() {
+    placement browser
+    let here = device.current_location()
+    view { <p>Here</p> }
+}

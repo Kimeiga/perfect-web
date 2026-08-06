@@ -1,0 +1,22 @@
+// @status: GENERAL
+// @invariant: declared_placement_cannot_grant
+// @dimension: semantic preservation — two helpers deep
+//
+// Moving the offending call into a helper, and that helper into another, must
+// not change the verdict. If it did, the rule would be about how the code is
+// arranged rather than about what it needs.
+module generality.place_helper_chain
+
+import device
+import domain.{ Location }
+
+fn inner() -> Location !{ device.location } { device.current_location() }
+
+fn outer() -> Location !{ device.location } { inner() }
+
+query Where(session: SessionId) -> Location
+    placement origin
+    cache     private
+{
+    outer()
+}

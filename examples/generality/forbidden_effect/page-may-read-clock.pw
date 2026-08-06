@@ -1,0 +1,15 @@
+// @status: NEIGHBOUR
+// @invariant: forbidden_effect
+// @dimension: valid neighbour — the same effect, recomputed per reader
+//
+// A page may read the wall clock. A page GENERATED ONCE may not. What makes
+// the neighbour file wrong is the reuse, not the kind of declaration.
+module generality.forbid_clock_ok
+
+import clock
+
+page Now() !{ clock.wall } {
+    placement origin
+    cache private
+    view { <main><p>Now: {clock.now_wall()}</p></main> }
+}

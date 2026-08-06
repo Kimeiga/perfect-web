@@ -1,0 +1,21 @@
+// @status: GENERAL
+// @invariant: non_exhaustive_match
+// @dimension: indirect invalid — an or-pattern that still leaves a hole
+//
+// `a | b` covers both, so or-patterns are not holes — and the arm here covers
+// four variants at once, which is exactly the shape that makes a counting
+// approximation (arms vs constructors) get the answer right by accident on
+// some programs and wrong here.
+module generality.match_or
+
+import domain.{ OrderState }
+
+fn describe(s: OrderState) -> String !{} {
+    match s {
+        Draft | Pricing | AuthorizingPayment | Submitting => "early"
+        SearchingForDasher => "searching"
+        Confirmed(c) => "confirmed"
+        InProgress(p) => "in progress"
+        Delivered(r) => "delivered"
+    }
+}

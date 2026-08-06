@@ -1,0 +1,21 @@
+// @status: NEIGHBOUR
+// @invariant: non_exhaustive_match
+// @dimension: valid neighbour — every variant, none redundant
+module generality.match_all
+
+import domain.{ OrderState }
+
+fn describe(s: OrderState) -> String !{} {
+    match s {
+        Draft => "draft"
+        Pricing => "pricing"
+        AuthorizingPayment => "authorizing"
+        Submitting => "submitting"
+        SearchingForDasher => "searching"
+        Confirmed(c) => "confirmed"
+        InProgress(p) => "in progress"
+        Delivered(r) => "delivered"
+        Cancelled(reason) => "cancelled"
+        Failed(f) => "failed"
+    }
+}

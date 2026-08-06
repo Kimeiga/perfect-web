@@ -1,0 +1,11 @@
+// @status: GENERAL
+// @invariant: forbidden_effect
+// @dimension: indirect invalid — reuse makes it wrong, not the kind
+module generality.forbid_build_clock
+
+import clock
+
+page Landing() !{ clock.wall } {
+    placement build
+    view { <main><p>Generated at {clock.now_wall()}</p></main> }
+}

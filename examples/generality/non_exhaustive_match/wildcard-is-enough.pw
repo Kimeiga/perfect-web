@@ -1,0 +1,13 @@
+// @status: NEIGHBOUR
+// @invariant: non_exhaustive_match
+// @dimension: valid neighbour — a wildcard closes it
+module generality.match_wildcard
+
+import domain.{ OrderState }
+
+fn describe(s: OrderState) -> String !{} {
+    match s {
+        Draft => "draft"
+        _ => "later"
+    }
+}

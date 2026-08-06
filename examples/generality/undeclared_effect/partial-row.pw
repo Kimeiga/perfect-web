@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: undeclared_effect
+// @dimension: indirect invalid — a row that is right about one effect
+//
+// The row is not empty and not wrong; it is INCOMPLETE. A rule comparing "did
+// the author write a row" rather than "does the row cover what happens" would
+// pass this.
+module generality.effect_partial
+
+import Stores
+import Analytics
+
+fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+    Analytics.record_view(id)
+    Stores.get(id)
+}

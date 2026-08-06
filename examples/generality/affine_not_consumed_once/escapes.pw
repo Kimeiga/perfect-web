@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — consumed out of scope
+module generality.affine_escape
+
+import Maps
+import browser.{ Element, MapHandle }
+
+let mut cached: Option<MapHandle> = None
+
+fn setup(container: Element) -> ()
+    !{ resource.acquire<MapHandle>, dom.mutate, layout.measure }
+{
+    use handle = Maps.create(container, default_center())
+    cached = Some(handle)
+}

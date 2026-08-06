@@ -1,0 +1,15 @@
+// @status: GENERAL
+// @invariant: undeclared_effect
+// @dimension: indirect invalid — effect only inside a callback
+//
+// The effect appears nowhere in the body's own statements. It is inside a
+// lambda handed to a generic function, which is the shape RQ-2 named as the
+// one an approximation gets wrong.
+module generality.effect_callback
+
+import Stores
+import List
+
+fn labels(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{} {
+    List.map(ids, id => Stores.get(id))
+}

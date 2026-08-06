@@ -1,0 +1,14 @@
+// @status: NEIGHBOUR
+// @invariant: undeclared_effect
+// @dimension: semantic preservation — a family covers its members
+//
+// Declaring `database` accepts `database.read`. The reverse must not hold, and
+// the corpus tests that separately; here the point is that the broader
+// declaration is enough and does not have to be spelled member by member.
+module generality.effect_family
+
+import Stores
+
+fn get(id: StoreId) -> Result<Store, StoreError> !{ database } {
+    Stores.get(id)
+}

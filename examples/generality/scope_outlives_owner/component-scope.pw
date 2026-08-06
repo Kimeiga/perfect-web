@@ -1,0 +1,13 @@
+// @status: NEIGHBOUR
+// @invariant: scope_outlives_owner
+// @dimension: valid neighbour — scoped to its owner
+//
+// The same observation, scoped to the component that owns it. A rule that
+// banned a `scope` clause on an observation would catch this.
+module generality.scope_ok
+
+component LazyMap() {
+    placement browser
+    let visible = observe intersection(self) -> Bool { scope component }
+    view { <section aria-label="Store location" /> }
+}

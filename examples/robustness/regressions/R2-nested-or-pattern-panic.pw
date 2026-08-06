@@ -1,0 +1,27 @@
+// @regression: R2
+// @phase: exhaustiveness
+// @found: 2026-08-06, by a generality counterexample for `non_exhaustive_match`
+// @symptom: compiler panic — `unreachable!("or-patterns are expanded before
+//           this point")`
+// @cause: `a | b | c` lowers RIGHT-NESTED as `Or([a, Or([b, c])])`, and
+//         `expand` removed only one level, so a row could still be headed by
+//         an alternation when `is_useful` matched on it
+// @impact: every rule in the invocation reported nothing, for every file
+// @fix: `expand` recurses; the `unreachable!` became a conservative wildcard
+// @note: the SECOND panic in this module, and the second caused by one phase
+//        assuming an earlier phase had normalised something. The first was a
+//        constructor arity mismatch (R1). That is the pattern worth
+//        remembering, not either individual bug.
+//
+// The minimized reproducer: three alternatives is the fewest that nests.
+
+module robustness.nested_or
+
+import domain.{ OrderState }
+
+fn describe(s: OrderState) -> String !{} {
+    match s {
+        Draft | Pricing | Submitting => "early"
+        _ => "later"
+    }
+}

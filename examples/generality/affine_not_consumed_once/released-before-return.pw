@@ -1,0 +1,24 @@
+// @status: NEIGHBOUR
+// @invariant: affine_not_consumed_once
+// @dimension: valid neighbour — released, then returned
+// The control for the "not consumed" half. Same acquisition, same early exit —
+// the transaction ends before the return. A rule that reported every `return`
+// after an acquisition, or banned early returns in a body holding one, would
+// catch this.
+
+module generality.affine_paths_ok
+
+import Carts
+import Database
+
+command clear_cart() -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    if Carts.is_empty(current_session()) {
+        Database.rollback(tx)
+        return Ok(())
+    }
+    Carts.clear(tx, current_session())
+    tx.commit()
+}

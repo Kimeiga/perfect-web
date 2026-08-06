@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: non_exhaustive_match
+// @dimension: indirect invalid — off by one
+module generality.match_one_missing
+
+import domain.{ OrderState }
+
+fn describe(s: OrderState) -> String !{} {
+    match s {
+        Draft => "draft"
+        Pricing => "pricing"
+        AuthorizingPayment => "authorizing"
+        Submitting => "submitting"
+        SearchingForDasher => "searching"
+        Confirmed(c) => "confirmed"
+        InProgress(p) => "in progress"
+        Delivered(r) => "delivered"
+        Cancelled(reason) => "cancelled"
+    }
+}
