@@ -240,9 +240,28 @@ codes! {
         "a dependency, event or invalidation target must name something the program declares";
     PRIVATE_IN_SHARED_MATERIALIZATION = "PW5101" / private_in_shared_materialization / 1, ResourceGraph,
         "a shared materialization may only depend on data every reader of its cache entry may see";
-    SHARED_KEY_OMITS_CODE_VERSION = "PW5102" / shared_key_omits_code_version / 1, ResourceGraph,
-        "a shared materialization's cache key must separate the build that produced it";
 }
+
+/// Codes that were registered, are no longer emitted, and whose numbers must
+/// never be reused.
+///
+/// Distinct from [`crate::diagnostics::DEPRECATED_ALIASES`], which redirect an
+/// old number to a live invariant. A retired code has no successor: the
+/// invariant it named is now guaranteed by construction, so there is nothing
+/// for an author to repair and nothing to redirect to.
+///
+/// The numbers are held because a code is a public identifier. Reusing
+/// `PW5102` for something else would make every historical mention of it —
+/// a commit message, a corpus fixture, somebody's notes — silently describe a
+/// different rule.
+pub const RETIRED: &[(&str, &str)] = &[(
+    "PW5102",
+    "a shared materialization's cache key must separate the build that produced \
+     it. Retired 2026-08-06: the compatibility generation is now injected by the \
+     compiler for every materialized entry, so the key cannot omit it. If a \
+     generated storage key ever lacks its compatibility namespace that is an \
+     internal compiler invariant, not an error an application author can repair.",
+)];
 
 /// Look a code up by its public string.
 pub fn lookup(id: &str) -> Option<Code> {
@@ -494,6 +513,45 @@ mod tests {
              nothing enforces:\n  {}",
             dead.join("\n  ")
         );
+    }
+
+    /// A retired number must never come back as something else.
+    ///
+    /// A code is a public identifier. If `PW5102` were reused, every historical
+    /// mention of it — a commit message, a corpus fixture, somebody's notes —
+    /// would silently start describing a different rule.
+    #[test]
+    fn a_retired_code_is_never_reused() {
+        for (id, why) in RETIRED {
+            assert!(
+                lookup(id).is_none(),
+                "`{id}` is retired and registered again. It was: {why}"
+            );
+            assert!(
+                !crate::diagnostics::DEPRECATED_ALIASES
+                    .iter()
+                    .any(|(alias, _)| alias == id),
+                "`{id}` is retired, so it has no successor to alias to"
+            );
+        }
+    }
+
+    /// Retirement is not a way to make the registry-closure test pass.
+    ///
+    /// Without this, a code that becomes inconvenient can be moved to `RETIRED`
+    /// with an empty reason and the dashboard gets greener.
+    #[test]
+    fn every_retired_code_says_why_and_what_replaced_it() {
+        for (id, why) in RETIRED {
+            assert!(
+                why.len() > 80,
+                "`{id}` is retired with no account of what now guarantees it"
+            );
+            assert!(
+                why.contains("Retired"),
+                "`{id}`'s reason must record when and why"
+            );
+        }
     }
 
     #[test]

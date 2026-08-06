@@ -76,9 +76,12 @@ fn the_declared_key_dimensions_survive_the_boundary() {
     // The gap this closes: an entry key built by hand that omits a dimension
     // the declaration requires produces a cache HIT for the wrong reader, and
     // no invalidation test finds a hit.
+    //
+    // `code_version` is deliberately NOT here. It stopped being a dimension an
+    // author declares when it became a namespace the platform injects — see
+    // `the_compatibility_generation_is_not_a_dimension_a_caller_supplies`.
     let g = store_graph();
     let dims = g.dimensions_of("store.menu_fragment.MenuFragment");
-    assert!(dims.contains(&Dimension::CodeVersion), "got {dims:?}");
     assert!(dims.contains(&Dimension::Locale), "got {dims:?}");
     assert!(dims.contains(&Dimension::Tenant), "got {dims:?}");
     assert!(dims.contains(&Dimension::PolicyVersion), "got {dims:?}");
@@ -97,7 +100,6 @@ fn an_entry_key_built_from_the_graph_separates_every_declared_dimension() {
         for d in g.dimensions_of(fragment) {
             let v = match d {
                 Dimension::Locale => locale,
-                Dimension::CodeVersion => "build-1",
                 Dimension::Tenant => "acme",
                 Dimension::PrivacyPartition => "public",
                 Dimension::PolicyVersion => "v3",
@@ -108,7 +110,7 @@ fn an_entry_key_built_from_the_graph_separates_every_declared_dimension() {
     };
 
     let clock = Clock::new();
-    let m = Materializer::new(clock.clone());
+    let m = Materializer::new(clock.clone(), "build-1");
     m.declare(fragment, FragmentPolicy::default());
     clock.advance(1);
     m.regenerate(&build("en"), None, || Ok("English menu".to_string()));
@@ -122,4 +124,46 @@ fn an_entry_key_built_from_the_graph_separates_every_declared_dimension() {
         m.read(&build("en")),
         Read::Fresh("English menu".to_string())
     );
+}
+
+#[test]
+fn the_compatibility_generation_is_not_a_dimension_a_caller_supplies() {
+    // Ruling of 2026-08-06, checked from the consuming side: the generation
+    // arrives with the graph and goes to the materializer's constructor. There
+    // is no `EntryKey` method that adds it and no policy that declares it, so a
+    // caller cannot get it wrong by forgetting.
+    let g = store_graph();
+    assert!(
+        !g.compatibility.is_empty(),
+        "the compiler stamps every graph with the generation that produced it"
+    );
+
+    let key = EntryKey::new("store.menu_fragment.MenuFragment", &["47"]);
+    let now = Materializer::new(Clock::new(), &g.compatibility);
+    let later = Materializer::new(Clock::new(), "some-later-build");
+    now.declare(
+        "store.menu_fragment.MenuFragment",
+        FragmentPolicy::default(),
+    );
+    later.declare(
+        "store.menu_fragment.MenuFragment",
+        FragmentPolicy::default(),
+    );
+
+    now.regenerate(&key, None, || Ok("markup".to_string()));
+    assert_eq!(
+        later.read(&key),
+        Read::Missing,
+        "a later build must not be served the previous generation's markup"
+    );
+
+    // And no declared dimension is named `code_version`, or the author would
+    // still be being asked for it in a second place.
+    for d in g.dimensions_of("store.menu_fragment.MenuFragment") {
+        assert_ne!(
+            d.key_name(),
+            "code_version",
+            "the generation is platform mechanism, not application policy"
+        );
+    }
 }

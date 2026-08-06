@@ -33,25 +33,25 @@ import Events.{ CartChanged }
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store.
 public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
-    freshness   5.minutes
-    consistency snapshot
-    cache       shared
-    key         id
-    concurrency one_per_key
+    freshness     5.minutes
+    consistency   snapshot
+    cache         shared
+    key           id
+    concurrency   one_per_key
     on_key_change cancel
-    timeout     2.seconds
+    timeout       2.seconds
 {
     Menus.for_store(id)
 }
 
 public query Store(id: StoreId) -> Result<Store, StoreError>
-    freshness   30.seconds
-    consistency snapshot
-    cache       shared
-    key         id
-    concurrency one_per_key
+    freshness     30.seconds
+    consistency   snapshot
+    cache         shared
+    key           id
+    concurrency   one_per_key
     on_key_change cancel
-    timeout     2.seconds
+    timeout       2.seconds
 {
     Stores.get(id)
 }
@@ -87,7 +87,7 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
 
 page StorePage(id: StoreId) {
     placement origin
-    cache     private
+    cache private
 
     let store = query Store(id)
     let menu = query Menu(id)

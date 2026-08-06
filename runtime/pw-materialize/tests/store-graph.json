@@ -1,4 +1,5 @@
 {
+  "compatibility": "dev",
   "nodes": [
     {
       "path": "Events.CartChanged",
@@ -91,7 +92,6 @@
       "stampede": "single_flight",
       "fallback": "last_known_good",
       "varies_by": [
-        "code_version",
         "locale",
         "tenant",
         "privacy_partition",

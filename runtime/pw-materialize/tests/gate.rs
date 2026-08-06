@@ -40,11 +40,11 @@ fn graph() -> Graph {
         { "path": "store.MenuFragment", "name": "MenuFragment", "node": "materialization",
           "placement": "edge", "partition": "public", "regenerate": "on_invalidation",
           "stampede": "single_flight", "fallback": "last_known_good",
-          "varies_by": ["code_version", "locale", "privacy_partition"], "params": ["id"] },
+          "varies_by": ["locale", "privacy_partition"], "params": ["id"] },
         { "path": "store.CartBadge", "name": "CartBadge", "node": "materialization",
           "placement": "origin", "partition": "private", "regenerate": "on_invalidation",
           "stampede": "single_flight", "fallback": "last_known_good",
-          "varies_by": ["code_version", "privacy_partition"], "params": ["session"] }
+          "varies_by": ["privacy_partition"], "params": ["session"] }
       ],
       "edges": [
         { "from": "store.MenuFragment", "to": "Resources.Menu", "kind": "reads", "key": ["id"] },
@@ -63,7 +63,6 @@ fn graph() -> Graph {
 /// One entry per store, keyed the way the fragment declares.
 fn menu_entry(store: &str) -> EntryKey {
     EntryKey::new("store.MenuFragment", &[store])
-        .with("code_version", "build-1")
         .with("locale", "en")
         .with("partition", "public")
 }
@@ -71,7 +70,7 @@ fn menu_entry(store: &str) -> EntryKey {
 /// A materializer with the demo's fragments and three stores materialized.
 fn with_three_stores() -> (Materializer, Clock, Vec<EntryKey>) {
     let clock = Clock::new();
-    let m = Materializer::new(clock.clone());
+    let m = Materializer::new(clock.clone(), "build-1");
     m.declare("store.MenuFragment", FragmentPolicy::default());
     m.declare("store.CartBadge", FragmentPolicy::default());
     let keys: Vec<EntryKey> = ["47", "48", "49"].iter().map(|s| menu_entry(s)).collect();
@@ -266,7 +265,7 @@ fn out_of_order_events_reach_the_same_state() {
 #[test]
 fn last_known_good_is_served_only_where_the_policy_declares_it() {
     let clock = Clock::new();
-    let m = Materializer::new(clock.clone());
+    let m = Materializer::new(clock.clone(), "build-1");
     m.declare(
         "store.MenuFragment",
         FragmentPolicy {
@@ -283,7 +282,7 @@ fn last_known_good_is_served_only_where_the_policy_declares_it() {
     );
 
     let lenient = menu_entry("47");
-    let strict = EntryKey::new("store.StrictFragment", &["47"]).with("code_version", "build-1");
+    let strict = EntryKey::new("store.StrictFragment", &["47"]);
     clock.advance(5);
     m.regenerate(&lenient, None, || Ok("good".to_string()));
     m.regenerate(&strict, None, || Ok("good".to_string()));
@@ -311,7 +310,7 @@ fn a_failed_regeneration_leaves_the_last_good_entry_in_place() {
     // prevented: a failed regeneration that clears the entry turns a servable
     // stale page into a missing one, so an origin blip becomes an outage.
     let clock = Clock::new();
-    let m = Materializer::new(clock.clone());
+    let m = Materializer::new(clock.clone(), "build-1");
     m.declare("store.MenuFragment", FragmentPolicy::default());
     let key = menu_entry("47");
     clock.advance(5);
@@ -341,15 +340,11 @@ fn a_private_fragment_never_shares_an_entry_between_sessions() {
     // (`PW5101`). This is the other half: a fragment that IS private must give
     // two sessions two entries, or the compiler's rule protects nothing.
     let clock = Clock::new();
-    let m = Materializer::new(clock.clone());
+    let m = Materializer::new(clock.clone(), "build-1");
     m.declare("store.CartBadge", FragmentPolicy::default());
 
-    let a = EntryKey::new("store.CartBadge", &["session-a"])
-        .with("code_version", "build-1")
-        .with("partition", "private");
-    let b = EntryKey::new("store.CartBadge", &["session-b"])
-        .with("code_version", "build-1")
-        .with("partition", "private");
+    let a = EntryKey::new("store.CartBadge", &["session-a"]).with("partition", "private");
+    let b = EntryKey::new("store.CartBadge", &["session-b"]).with("partition", "private");
 
     clock.advance(1);
     m.regenerate(&a, None, || Ok("3 items".to_string()));
@@ -368,16 +363,12 @@ fn a_private_fragment_never_shares_an_entry_between_sessions() {
 #[test]
 fn a_cart_event_reaches_one_session_only() {
     let clock = Clock::new();
-    let m = Materializer::new(clock.clone());
+    let m = Materializer::new(clock.clone(), "build-1");
     m.declare("store.CartBadge", FragmentPolicy::default());
     let g = graph();
     let keys: Vec<EntryKey> = ["session-a", "session-b"]
         .iter()
-        .map(|s| {
-            EntryKey::new("store.CartBadge", &[s])
-                .with("code_version", "build-1")
-                .with("partition", "private")
-        })
+        .map(|s| EntryKey::new("store.CartBadge", &[s]).with("partition", "private"))
         .collect();
     for k in &keys {
         clock.advance(1);
@@ -401,7 +392,7 @@ fn concurrent_readers_of_one_missing_entry_regenerate_it_once() {
     // moment; `stampede single_flight` admits one and the other seven take its
     // answer.
     let clock = Clock::new();
-    let m = Arc::new(Materializer::new(clock.clone()));
+    let m = Arc::new(Materializer::new(clock.clone(), "build-1"));
     m.declare("store.MenuFragment", FragmentPolicy::default());
     let key = menu_entry("47");
     let produced = Arc::new(AtomicUsize::new(0));
@@ -479,7 +470,7 @@ fn without_single_flight_the_same_work_is_done_more_than_once() {
     // shows the unbounded case is asserting that a number is 1 without
     // establishing it could have been anything else.
     let clock = Clock::new();
-    let m = Arc::new(Materializer::new(clock.clone()));
+    let m = Arc::new(Materializer::new(clock.clone(), "build-1"));
     m.declare(
         "store.Unbounded",
         FragmentPolicy {
@@ -521,7 +512,7 @@ fn a_rolled_back_command_emits_nothing() {
     // The property ADR-0019 exists for. If the state change does not happen,
     // the event must not exist — otherwise a fragment regenerates from state
     // that was never committed.
-    let m = Materializer::new(Clock::new());
+    let m = Materializer::new(Clock::new(), "build-1");
     let r: Result<Vec<i64>, &str> = m.command(|tx| {
         tx.execute(
             "INSERT INTO state (name, value) VALUES ('menu:47', 'new')",
@@ -540,7 +531,7 @@ fn a_rolled_back_command_emits_nothing() {
 fn a_command_that_panics_leaves_neither_the_state_nor_the_event() {
     // Charter §14 M6 task 8, "materializer crash" — the crash placed exactly
     // where it hurts, between the state write and the commit.
-    let m = Materializer::new(Clock::new());
+    let m = Materializer::new(Clock::new(), "build-1");
     let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         m.command::<()>(|tx| {
             tx.execute(
@@ -561,7 +552,7 @@ fn a_command_that_panics_leaves_neither_the_state_nor_the_event() {
 fn a_committed_command_leaves_both() {
     // The positive control. Without it the two tests above pass on a
     // `command` that never writes anything at all.
-    let m = Materializer::new(Clock::new());
+    let m = Materializer::new(Clock::new(), "build-1");
     let ids = m
         .command::<()>(|tx| {
             tx.execute(
@@ -581,7 +572,7 @@ fn a_committed_command_leaves_both() {
 
 #[test]
 fn an_event_nothing_listens_for_is_recorded_rather_than_dropped() {
-    let m = Materializer::new(Clock::new());
+    let m = Materializer::new(Clock::new(), "build-1");
     let g = graph();
     m.command::<()>(|_tx| Ok(vec![Event::new("Events.PromotionChanged", &["47"])]))
         .expect("command");

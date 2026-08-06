@@ -18,7 +18,6 @@ materialize CartSummary(session: SessionId) {
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good
-    code_version   included_in_key
 }
 
 // And this one pulls the same session-scoped resource into a SHARED entry.
@@ -32,5 +31,4 @@ materialize PublicSummary(session: SessionId) {
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good
-    code_version   included_in_key
 }

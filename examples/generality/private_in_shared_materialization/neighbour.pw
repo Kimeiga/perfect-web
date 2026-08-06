@@ -16,7 +16,6 @@ materialize CartSummary(session: SessionId) {
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good
-    code_version   included_in_key
 }
 
 materialize CartBadge(session: SessionId) {
@@ -27,5 +26,4 @@ materialize CartBadge(session: SessionId) {
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good
-    code_version   included_in_key
 }

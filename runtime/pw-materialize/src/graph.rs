@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Dimension {
-    CodeVersion,
     Locale,
     Tenant,
     PrivacyPartition,
@@ -27,7 +26,6 @@ impl Dimension {
     /// The name this dimension has in an [`crate::EntryKey`].
     pub fn key_name(self) -> &'static str {
         match self {
-            Dimension::CodeVersion => "code_version",
             Dimension::Locale => "locale",
             Dimension::Tenant => "tenant",
             Dimension::PrivacyPartition => "partition",
@@ -78,6 +76,10 @@ pub struct Node {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Graph {
+    /// The compatibility generation the compiler stamped this graph with.
+    /// Hand it to `Materializer::new`; it is not a dimension a caller chooses.
+    #[serde(default)]
+    pub compatibility: String,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     #[serde(default)]

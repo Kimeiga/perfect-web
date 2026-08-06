@@ -28,7 +28,7 @@ fn graph() -> Graph {
         { "path": "Events.MenuChanged", "name": "MenuChanged", "node": "event", "params": ["store"] },
         { "path": "store.MenuFragment", "name": "MenuFragment", "node": "materialization",
           "partition": "public", "fallback": "last_known_good",
-          "varies_by": ["code_version"], "params": ["id"] }
+          "varies_by": [], "params": ["id"] }
       ],
       "edges": [
         { "from": "store.MenuFragment", "to": "Events.MenuChanged",
@@ -41,13 +41,13 @@ fn graph() -> Graph {
 }
 
 fn key(store: usize) -> EntryKey {
-    EntryKey::new("store.MenuFragment", &[&store.to_string()]).with("code_version", "build-1")
+    EntryKey::new("store.MenuFragment", &[&store.to_string()])
 }
 
 /// A thousand materialized stores, one event, and the counts on both sides.
 fn run(event: Event) -> (usize, usize) {
     let clock = Clock::new();
-    let m = Materializer::new(clock.clone());
+    let m = Materializer::new(clock.clone(), "build-1");
     m.declare("store.MenuFragment", FragmentPolicy::default());
 
     let keys: Vec<EntryKey> = (0..STORES).map(key).collect();

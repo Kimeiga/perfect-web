@@ -120,7 +120,12 @@ impl EntryKey {
         self
     }
 
-    fn id(&self) -> String {
+    /// The **logical** key: what the application decided.
+    ///
+    /// Not a storage identity. `Materializer::physical` adds the compatibility
+    /// generation, which is the platform's, and this type deliberately cannot
+    /// produce one on its own — see the note there.
+    fn logical(&self) -> String {
         let dims: Vec<String> = self
             .dimensions
             .iter()
@@ -252,6 +257,8 @@ pub enum Trace {
 pub struct Materializer {
     db: Mutex<Connection>,
     clock: Clock,
+    /// The compatibility generation every entry is namespaced by.
+    compatibility: String,
     entries: Mutex<BTreeMap<String, Entry>>,
     /// Keys a regeneration is in flight for, and a condition to wait on.
     in_flight: Mutex<Vec<String>>,
@@ -261,9 +268,25 @@ pub struct Materializer {
 }
 
 impl Materializer {
-    /// An in-memory store. The schema is created here so a test never has a
-    /// half-built database.
-    pub fn new(clock: Clock) -> Materializer {
+    /// An in-memory store, for one compatibility generation.
+    ///
+    /// The generation is a **constructor parameter**, so a materializer cannot
+    /// exist without one. It used to be a cache-key dimension the author wrote
+    /// as `code_version included_in_key`, with `PW5102` making the omission an
+    /// error.
+    ///
+    /// Architect ruling, 2026-08-06:
+    ///
+    /// > If every shared materialization must be separated across incompatible
+    /// > code generations, that is platform mechanism, not application policy.
+    ///
+    /// The same reasoning as `Authorised` in E7V: the way to guarantee
+    /// something is not to check that a caller did it, it is to leave no way to
+    /// skip it. A rule saying "remember to write this" is a rule that measures
+    /// whether people remember.
+    ///
+    /// The schema is created here so a test never has a half-built database.
+    pub fn new(clock: Clock, compatibility: &str) -> Materializer {
         let db = Connection::open_in_memory().expect("open in-memory sqlite");
         db.execute_batch(
             "CREATE TABLE state (
@@ -281,6 +304,7 @@ impl Materializer {
         Materializer {
             db: Mutex::new(db),
             clock,
+            compatibility: compatibility.to_string(),
             entries: Mutex::new(BTreeMap::new()),
             in_flight: Mutex::new(Vec::new()),
             done: Condvar::new(),
@@ -304,6 +328,22 @@ impl Materializer {
     /// mechanism meant to detect it.
     fn db(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.db.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The storage identity: the application's logical key inside this
+    /// build's compatibility namespace.
+    ///
+    /// Every read and write goes through here, which is what makes the
+    /// namespace unforgettable rather than merely required. Two generations of
+    /// the same program address different entries even for an identical logical
+    /// key — the property `PW5102` used to ask the author to guarantee.
+    fn physical(&self, key: &EntryKey) -> String {
+        format!("{}|{}", self.compatibility, key.logical())
+    }
+
+    /// The generation this materializer serves.
+    pub fn compatibility(&self) -> &str {
+        &self.compatibility
     }
 
     pub fn declare(&self, fragment: &str, policy: FragmentPolicy) {
@@ -419,14 +459,16 @@ impl Materializer {
     /// Read an entry, following the fragment's declared fallback policy.
     pub fn read(&self, key: &EntryKey) -> Read {
         let entries = self.entries.lock().expect("entries");
-        match entries.get(&key.id()) {
+        match entries.get(&self.physical(key)) {
             None => Read::Missing,
             Some(e) if !e.stale => Read::Fresh(e.body.clone()),
             Some(e) => match self.policy(&key.fragment).fallback {
                 Fallback::LastKnownGood => {
                     let body = e.body.clone();
                     drop(entries);
-                    self.record(Trace::ServedLastKnownGood { entry: key.id() });
+                    self.record(Trace::ServedLastKnownGood {
+                        entry: self.physical(key),
+                    });
                     Read::LastKnownGood(body)
                 }
                 Fallback::None => Read::Stale,
@@ -438,7 +480,7 @@ impl Materializer {
         self.entries
             .lock()
             .expect("entries")
-            .get(&key.id())
+            .get(&self.physical(key))
             .cloned()
     }
 
@@ -453,16 +495,14 @@ impl Materializer {
     /// Mark an entry out of date. Idempotent — marking twice is one mark, which
     /// is what makes a duplicate event harmless.
     pub fn invalidate(&self, key: &EntryKey, because: i64) {
+        let id = self.physical(key);
         let mut entries = self.entries.lock().expect("entries");
-        if let Some(e) = entries.get_mut(&key.id())
+        if let Some(e) = entries.get_mut(&id)
             && !e.stale
         {
             e.stale = true;
             drop(entries);
-            self.record(Trace::Invalidated {
-                entry: key.id(),
-                because,
-            });
+            self.record(Trace::Invalidated { entry: id, because });
         }
     }
 
@@ -478,7 +518,7 @@ impl Materializer {
         because: Option<i64>,
         produce: impl FnOnce() -> Result<String, String>,
     ) -> Regenerated {
-        let id = key.id();
+        let id = self.physical(key);
 
         // Nothing to do: an entry exists and is not stale. The duplicate
         // event's path, and the reason duplicates cost nothing.
@@ -632,15 +672,48 @@ mod tests {
     fn an_entry_key_is_its_dimensions_too() {
         let a = EntryKey::new("F", &["47"]).with("locale", "en");
         let b = EntryKey::new("F", &["47"]).with("locale", "fr");
-        assert_ne!(a.id(), b.id(), "two locales are two entries");
+        assert_ne!(a.logical(), b.logical(), "two locales are two entries");
 
         // Order of declaration must not make two spellings of one key differ.
         let c = EntryKey::new("F", &["47"])
             .with("locale", "en")
-            .with("code_version", "abc");
+            .with("tenant", "acme");
         let d = EntryKey::new("F", &["47"])
-            .with("code_version", "abc")
+            .with("tenant", "acme")
             .with("locale", "en");
-        assert_eq!(c.id(), d.id());
+        assert_eq!(c.logical(), d.logical());
+    }
+
+    /// The property that replaced `PW5102`.
+    ///
+    /// Two generations of the same program, the same logical key, and no shared
+    /// storage — guaranteed by there being no way to build a `Materializer`
+    /// without a generation, rather than by a rule asking the author to write
+    /// one.
+    #[test]
+    fn two_generations_of_one_program_never_share_an_entry() {
+        let key = EntryKey::new("F", &["47"]).with("locale", "en");
+        let a = Materializer::new(Clock::new(), "build-a");
+        let b = Materializer::new(Clock::new(), "build-b");
+
+        a.regenerate(&key, None, || Ok("markup from build a".to_string()));
+        assert_eq!(
+            b.read(&key),
+            Read::Missing,
+            "build B is not served A's entry"
+        );
+
+        b.regenerate(&key, None, || Ok("markup from build b".to_string()));
+        assert_eq!(a.read(&key), Read::Fresh("markup from build a".to_string()));
+        assert_eq!(b.read(&key), Read::Fresh("markup from build b".to_string()));
+
+        // The control: the same generation DOES share, or the test above holds
+        // for a store that never returns anything.
+        let a2 = Materializer::new(Clock::new(), "build-a");
+        assert_eq!(
+            a2.physical(&key),
+            a.physical(&key),
+            "one generation, one storage identity"
+        );
     }
 }
