@@ -141,3 +141,89 @@ fn the_property_can_fail() {
         "but the real lexer keeps it"
     );
 }
+
+// ---------------------------------------------------------------------------
+// ADR-0012: the same properties, now asserted against the Rowan green tree.
+//
+// The migration is only real if the tree carries the invariants the hand-rolled
+// representation established. Keeping both sets means a divergence between them
+// is itself detectable.
+// ---------------------------------------------------------------------------
+
+use pw_syntax::kind::SyntaxKind;
+use pw_syntax::tree::{flat_tree, tree_text};
+
+#[test]
+fn every_corpus_file_round_trips_through_the_green_tree() {
+    let files = corpus_files();
+    assert!(
+        files.len() >= 60,
+        "expected the full corpus, found {}",
+        files.len()
+    );
+
+    let mut failures = Vec::new();
+    for path in &files {
+        let src = std::fs::read_to_string(path).expect("read corpus file");
+        if tree_text(&flat_tree(&src)) != src {
+            failures.push(path.display().to_string());
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "green tree lost bytes in: {failures:#?}"
+    );
+}
+
+#[test]
+fn the_green_tree_and_the_token_stream_never_disagree() {
+    // Two independent reconstructions. A divergence means the token->tree
+    // mapping dropped or duplicated something, which no single-source check
+    // could see.
+    for path in corpus_files() {
+        let src = std::fs::read_to_string(&path).expect("read");
+        assert_eq!(
+            reconstruct(&src, &lex(&src)),
+            tree_text(&flat_tree(&src)),
+            "token stream and green tree disagree in {}",
+            path.display()
+        );
+    }
+}
+
+#[test]
+fn green_tree_token_ranges_index_the_real_source() {
+    // A range that does not match its own text means spans handed to
+    // diagnostics would point at the wrong place.
+    for path in corpus_files() {
+        let src = std::fs::read_to_string(&path).expect("read");
+        let tree = flat_tree(&src);
+        for t in tree.children_with_tokens().filter_map(|e| e.into_token()) {
+            let r = t.text_range();
+            let (start, end) = (usize::from(r.start()), usize::from(r.end()));
+            assert_eq!(
+                &src[start..end],
+                t.text(),
+                "range/text mismatch at {start}..{end} in {}",
+                path.display()
+            );
+        }
+    }
+}
+
+#[test]
+fn attribute_comments_survive_into_the_green_tree() {
+    let mut seen = 0;
+    for path in corpus_files() {
+        let src = std::fs::read_to_string(&path).expect("read");
+        seen += flat_tree(&src)
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .filter(|t| t.kind() == SyntaxKind::DocAttr)
+            .count();
+    }
+    assert!(
+        seen > 200,
+        "expected many @-attributes in the tree, saw {seen}"
+    );
+}

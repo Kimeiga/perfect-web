@@ -14,4 +14,5 @@ publish = false
 # forcing it to be the authoritative compiler parser."
 
 [dependencies]
+rowan.workspace = true
 annotate-snippets.workspace = true
