@@ -1939,7 +1939,7 @@ fn effect_rows(
     let reuse = reuse_of(hir, decl);
 
     for source in &found.sources {
-        let Some(why) = forbidden_in(decl, reuse, &source.effect) else {
+        let Some(why) = forbidden_in(decl, reuse, declared_world(hir, decl), &source.effect) else {
             continue;
         };
         if !at_render_time(&source.span) {
@@ -2061,17 +2061,17 @@ fn effect_rows(
     // registered rule sat silent. The effects are inferred; the placement is
     // declared; the check is the intersection.
     if let Some(world) = declared_world(hir, decl) {
-        let declared_names: BTreeSet<&str> = declared
-            .as_deref()
-            .unwrap_or(&[])
-            .iter()
-            .map(String::as_str)
-            .collect();
+        let row = declared.as_deref().unwrap_or(&[]);
         let mut said: BTreeSet<String> = BTreeSet::new();
         for source in &found.sources {
-            // Leave the declared ones to `rules.rs`, which reports them against
-            // the row the author wrote and at that row's span.
-            if declared_names.contains(source.effect.as_str())
+            // Leave anything the row COVERS to `rules.rs`, which reports it
+            // against the row the author wrote and at that row's span.
+            //
+            // Covers, not equals. R-026 declares `secret<Payments>` and the
+            // inferred effect is `secret.read`; an exact match reported it
+            // here as well, so one defect arrived twice in two vocabularies
+            // and the fixture stopped being a single-defect test.
+            if crate::effects::row_covers(row, &source.effect)
                 || world.grants(&source.effect)
                 || !said.insert(source.effect.clone())
             {

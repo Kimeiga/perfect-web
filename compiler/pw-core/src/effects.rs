@@ -127,6 +127,11 @@ impl Inferred {
 /// `database` covers `database.read`: declaring a family accepts its members.
 /// The reverse is not true — declaring `database.read` does not permit
 /// `database.write`, which is what makes a query that writes detectable.
+pub fn row_covers(declared: &[String], effect: &str) -> bool {
+    let set: BTreeSet<&str> = declared.iter().map(String::as_str).collect();
+    covered(&set, effect)
+}
+
 fn covered(declared: &BTreeSet<&str>, effect: &str) -> bool {
     if declared.contains(effect) {
         return true;
@@ -631,7 +636,12 @@ pub fn nondeterministic(effect: &str) -> bool {
     matches!(family_of(effect), "random") || effect.starts_with("clock.wall")
 }
 
-pub fn forbidden_in(decl: &Decl, reuse: Reuse, effect: &str) -> Option<&'static str> {
+pub fn forbidden_in(
+    decl: &Decl,
+    reuse: Reuse,
+    world: Option<crate::placement::World>,
+    effect: &str,
+) -> Option<&'static str> {
     use crate::hir::DeclKind::*;
     let family = family_of(effect);
 
@@ -681,7 +691,15 @@ pub fn forbidden_in(decl: &Decl, reuse: Reuse, effect: &str) -> Option<&'static 
         (View | Component | Page, "network") => {
             Some("a view renders; fetching during render is what streaming exists to avoid")
         }
-        (View | Component | Page, "secret") => Some("a view is rendered where secrets are not"),
+        // A view is *usually* rendered where secrets are not — but a
+        // declaration that names a world where they ARE may read one while
+        // rendering. R-003 is an origin-placed page, and reporting it here
+        // said "a page may not do this" about something a page may do; the
+        // defect is that the secret then reaches the MARKUP, which is
+        // `secret_to_browser` and is reported separately.
+        (View | Component | Page, "secret") if !world.is_some_and(|w| w.grants("secret")) => {
+            Some("a view is rendered where secrets are not")
+        }
         // Charter §7.5A. Reading geometry while rendering forces a synchronous
         // reflow, which is the cost the frame phases exist to make visible.
         // Measuring belongs in a `measure` phase, not in the render itself.
@@ -854,17 +872,46 @@ mod tests {
             body: None,
             children: vec![],
         };
-        assert!(forbidden_in(&view, Reuse::PerReader, "database.read").is_some());
-        assert!(forbidden_in(&view, Reuse::PerReader, "network.fetch").is_some());
+        assert!(forbidden_in(&view, Reuse::PerReader, None, "database.read").is_some());
+        assert!(forbidden_in(&view, Reuse::PerReader, None, "network.fetch").is_some());
         // ...but rendering effects are exactly what a view is for.
-        assert!(forbidden_in(&view, Reuse::PerReader, "dom.mutate").is_none());
+        assert!(forbidden_in(&view, Reuse::PerReader, None, "dom.mutate").is_none());
+
+        // A view placed where secrets live may read one while rendering. What
+        // it may not do is put it in the markup, which is a different
+        // invariant with a different code. R-003 was reported for both, and
+        // "a page may not do this" was false about the one it may.
+        assert!(
+            forbidden_in(&view, Reuse::PerReader, None, "secret.read").is_some(),
+            "a view with no declared world is rendered where secrets are not"
+        );
+        assert!(
+            forbidden_in(
+                &view,
+                Reuse::PerReader,
+                Some(crate::placement::World::Origin),
+                "secret.read"
+            )
+            .is_none(),
+            "an origin-placed view renders where secrets ARE"
+        );
+        assert!(
+            forbidden_in(
+                &view,
+                Reuse::PerReader,
+                Some(crate::placement::World::Browser),
+                "secret.read"
+            )
+            .is_some(),
+            "a browser-placed view still may not"
+        );
 
         let f = crate::hir::Decl {
             kind: DeclKind::Fn,
             ..view
         };
         assert!(
-            forbidden_in(&f, Reuse::PerReader, "database.read").is_none(),
+            forbidden_in(&f, Reuse::PerReader, None, "database.read").is_none(),
             "an ordinary fn may read the database if it says so"
         );
 
@@ -877,18 +924,18 @@ mod tests {
             ..f
         };
         assert!(
-            forbidden_in(&page, Reuse::PerReader, "clock.wall").is_none(),
+            forbidden_in(&page, Reuse::PerReader, None, "clock.wall").is_none(),
             "a page rendered per request may read the clock"
         );
-        assert!(forbidden_in(&page, Reuse::Build, "clock.wall").is_some());
-        assert!(forbidden_in(&page, Reuse::SharedPartition, "clock.wall").is_some());
+        assert!(forbidden_in(&page, Reuse::Build, None, "clock.wall").is_some());
+        assert!(forbidden_in(&page, Reuse::SharedPartition, None, "clock.wall").is_some());
 
         // And the distinction inside the clock family is load-bearing: a
         // monotonic read measures a duration and does not make the output
         // depend on when it ran. Without this, the rule would be "a build-time
         // page may not use the clock", which is a different and wronger claim.
         assert!(
-            forbidden_in(&page, Reuse::Build, "clock.read").is_none(),
+            forbidden_in(&page, Reuse::Build, None, "clock.read").is_none(),
             "a duration measurement does not make a build artifact irreproducible"
         );
     }

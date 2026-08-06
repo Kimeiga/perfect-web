@@ -853,3 +853,77 @@ fn no_diagnostic_restates_its_invariant_in_its_own_words() {
     wrong.dedup();
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Fixtures that deliberately contain more than one defect.
+///
+/// Empty, and it should stay that way. An entry here is a fixture that is not
+/// a single-defect test, and it must list every invariant it expects — a
+/// fixture with an unexplained extra diagnostic is how R-004 hid a false
+/// positive for a day.
+const MULTI_DEFECT: &[(&str, &[&str])] = &[];
+
+/// Every rejected fixture emits ONLY what it is meant to test.
+///
+/// Architect ruling, 2026-08-06, after `query` was found to be parsed as two
+/// expressions:
+///
+/// > A fixture passes only when it emits exactly its intended semantic defect.
+///
+/// R-004 is why. It is caught for `private_in_shared_cache`, its declared
+/// invariant, so the ratchet said "enforced, right reason" — while a second
+/// diagnostic sat in the output saying the page reached the database during
+/// rendering, which was a false positive about a perfectly ordinary query
+/// dependency. Nothing looked at it, because nothing was asked to.
+///
+/// The stronger C1 statement this buys:
+///
+/// > Every rejected fixture is otherwise valid and emits no unexplained
+/// > semantic diagnostic.
+#[test]
+fn every_rejected_fixture_emits_only_its_own_defect() {
+    use pw_core::codes::lookup;
+    use pw_core::rules;
+    use pw_syntax::parse;
+
+    let mut clean = 0;
+    let mut total = 0;
+    let mut noisy = Vec::new();
+    for (name, src, diags) in rejected_results() {
+        total += 1;
+        let declared = src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("// @invariant:"))
+            .map(str::trim)
+            .unwrap_or("");
+        let mut got: Vec<&str> = rules::check(&parse(&src).file)
+            .iter()
+            .filter(|f| f.is_error())
+            .filter_map(|f| lookup(f.code).map(|c| c.symbol))
+            .collect();
+        got.extend(diags.iter().map(|d| d.symbol()));
+        got.sort();
+        got.dedup();
+        let id = &name[..5];
+        let also_expected: &[&str] = MULTI_DEFECT
+            .iter()
+            .find(|(f, _)| *f == id)
+            .map(|(_, v)| *v)
+            .unwrap_or(&[]);
+        let extra: Vec<&str> = got
+            .into_iter()
+            .filter(|s| *s != declared && !also_expected.contains(s))
+            .collect();
+        if extra.is_empty() {
+            clean += 1;
+        } else {
+            noisy.push(format!(
+                "{id}: declares `{declared}` and also emits {extra:?} — either the \
+                 fixture has a second defect (declare it in MULTI_DEFECT) or one of \
+                 those is a false positive"
+            ));
+        }
+    }
+    eprintln!("  single-defect isolation: {clean}/{total}");
+    assert!(noisy.is_empty(), "{}", noisy.join("\n"));
+    assert_eq!(clean, total);
+}
