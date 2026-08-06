@@ -14,7 +14,6 @@ import domain.{ OrderId, OrderProgress, TrackingError }
 
 subscription OrderTracking(order: OrderId)
     -> Stream<OrderProgress, TrackingError>
-{
     scope       component
     transport   websocket
     reconnect   bounded_exponential(max = 5, jitter = true)

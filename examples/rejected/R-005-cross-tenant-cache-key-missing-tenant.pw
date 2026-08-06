@@ -13,7 +13,7 @@
 
 module menu.queries
 
-query Menu(store: StoreId) -> Result<List<MenuItem>, MenuError> {
+query Menu(store: StoreId) -> Result<List<MenuItem>, MenuError>
     cache   shared
     // ERROR: the result depends on Organization<OrganizationId>,
     // but the key is only `store`.

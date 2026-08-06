@@ -14,7 +14,6 @@ module cart.commands
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
-{
     requires      SignedIn
     idempotent_by InteractionId
     optimistic    cart.add(item, quantity)

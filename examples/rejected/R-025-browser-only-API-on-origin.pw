@@ -12,7 +12,7 @@
 
 module delivery.estimate
 
-query DeliveryEstimate(session: SessionId) -> Result<DeliveryEstimate, EstimateError> {
+query DeliveryEstimate(session: SessionId) -> Result<DeliveryEstimate, EstimateError>
     placement origin
     cache     private
 {

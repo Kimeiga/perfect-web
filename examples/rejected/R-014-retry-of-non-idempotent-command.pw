@@ -14,7 +14,6 @@ module payments.charge
 
 command charge_card(order: OrderId, amount: Money<USD>)
     -> Result<PaymentReceipt, PaymentError>
-{
     requires SignedIn
     // ERROR: retry without an idempotency key.
     retry    bounded_exponential(max = 5, jitter = true)

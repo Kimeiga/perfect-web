@@ -12,7 +12,7 @@
 
 module cart.write
 
-command clear_cart() -> Result<(), CartError> {
+command clear_cart() -> Result<(), CartError>
     requires SignedIn
 {
     let tx = Database.begin()

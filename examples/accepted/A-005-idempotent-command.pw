@@ -14,7 +14,6 @@ import domain.{ MenuItemId, PositiveInt, InteractionId, CartError }
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
-{
     requires       SignedIn
     idempotent_by  InteractionId
     transaction    serializable

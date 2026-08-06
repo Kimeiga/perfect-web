@@ -12,7 +12,7 @@
 
 module store.queries
 
-public query Store(id: StoreId) -> Result<Store, StoreError> {
+public query Store(id: StoreId) -> Result<Store, StoreError>
     freshness   30.seconds
     consistency snapshot
     cache       shared
