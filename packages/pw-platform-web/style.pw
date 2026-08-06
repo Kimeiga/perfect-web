@@ -1,0 +1,30 @@
+// @corpus: platform
+// @id: PLATFORM-style
+// @category: platform — layout and style
+// @charter: §7.5A
+// @milestone: E2C
+//
+// Charter v2 §7.5A's frame-phase families. The distinction the layout corpus
+// turns on is here in the rows: reading geometry is `layout.measure`, and a
+// write that can invalidate it is `style.mutate<LayoutAffect>` — so a read
+// after such a write is visible to an effect checker rather than to a reviewer.
+
+module style
+
+import browser.{ Element }
+
+fn measure(el: Element) -> Int !{ layout.measure } { 0 }
+
+fn mutate(el: Element, property: String, value: String) -> () !{ style.mutate } { () }
+
+fn mutate_layout_affecting(el: Element, property: String, value: String) -> ()
+    !{ style.mutate, layout.invalidate }
+{
+    ()
+}
+
+fn composite(el: Element, property: String, value: String) -> ()
+    !{ animation.composite }
+{
+    ()
+}

@@ -79,7 +79,7 @@ test-compile:
     # every accepted file. Feeding it the rejected files too would ask the
     # compiler to resolve 68 files as one program, which they are not — five
     # rejected fixtures reuse module names with each other (E2B).
-    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/accepted/*.pw
+    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/services.pw examples/vendors.pw examples/accepted/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
 rejections:

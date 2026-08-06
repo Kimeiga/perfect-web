@@ -1,0 +1,21 @@
+// @corpus: platform
+// @id: STD-list
+// @category: standard library — collections
+// @charter: §7.1
+// @milestone: E2C
+
+module list
+
+// Pure by construction: every row declares `!{}`, so a body that stays inside
+// `List` cannot acquire an effect. E2D reads these rows; nothing hard-codes
+// "List.map is pure" in a checker.
+
+fn map(items: List<Unknown>, f: Decoder) -> List<Unknown> !{} { items }
+
+fn fold(items: List<Unknown>, seed: Unknown, f: Decoder) -> Unknown !{} { seed }
+
+fn filter(items: List<Unknown>, f: Decoder) -> List<Unknown> !{} { items }
+
+fn length(items: List<Unknown>) -> Int !{} { 0 }
+
+fn enumerate(items: List<Unknown>) -> List<Unknown> !{} { items }

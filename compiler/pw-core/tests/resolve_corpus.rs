@@ -25,6 +25,8 @@ use pw_syntax::parse_tree;
 /// contracts in `packages/`.
 fn library() -> Vec<(String, Hir)> {
     let mut out = read("domain.pw");
+    out.extend(read("services.pw"));
+    out.extend(read("vendors.pw"));
     out.extend(read_at("../packages/pw-std"));
     out.extend(read_at("../packages/pw-platform-web"));
     out

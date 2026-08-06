@@ -1,0 +1,84 @@
+// @corpus: fixture
+// @id: SERVICES
+// @category: application services the corpus calls
+// @charter: §15.1, §15.3
+// @milestone: E2C
+//
+// The application's own data services. Corpus-owned, like `domain` — these are
+// specific to the demonstration, not to the platform.
+//
+// The effect rows are the point. `Stores.get` declaring `!{ database.read }` is
+// what will let E2D infer that a `view` calling it is not pure, and what lets
+// E5's placement solver already know it cannot run in the browser. Before this
+// module those facts lived in a table inside a checker.
+
+module services
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, StoreHours }
+
+// --- stores ---------------------------------------------------------------
+
+fn stores_get(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+    Err(StoreError.NotFound)
+}
+
+fn stores_hours(id: StoreId) -> Result<StoreHours, StoreError> !{ database.read } {
+    Err(StoreError.NotFound)
+}
+
+// --- carts ----------------------------------------------------------------
+
+fn carts_current(s: SessionId) -> Result<Cart, CartError> !{ database.read } {
+    Err(CartError.CartExpired)
+}
+
+fn carts_add(s: SessionId, item: MenuItemId, quantity: PositiveInt)
+    -> Result<Cart, CartError>
+    !{ database.write }
+{
+    Err(CartError.CartExpired)
+}
+
+fn carts_remove(s: SessionId, item: MenuItemId, quantity: PositiveInt)
+    -> Result<Cart, CartError>
+    !{ database.write }
+{
+    Err(CartError.CartExpired)
+}
+
+// --- menus ----------------------------------------------------------------
+
+fn menus_for_store(id: StoreId) -> Result<List<MenuItemId>, StoreError>
+    !{ database.read }
+{
+    Err(StoreError.NotFound)
+}
+
+// --- recommendations ------------------------------------------------------
+
+fn recommender_for_store(id: StoreId)
+    -> Result<List<Recommendation>, RecommendationError>
+    !{ network.fetch }
+{
+    Err(RecommendationError.NoneAvailable)
+}
+
+// --- payments -------------------------------------------------------------
+
+fn payments_capture(order: OrderId, amount: Int) -> Result<Int, StoreError>
+    !{ secret.read, network.fetch }
+{
+    Err(StoreError.Unavailable)
+}
+
+// --- tracking and telemetry -----------------------------------------------
+
+fn tracking_for_order(order: OrderId) -> Result<OrderProgress, StoreError>
+    !{ network.subscribe }
+{
+    Err(StoreError.NotFound)
+}
+
+fn telemetry_record(name: String) -> () !{ network.fetch } { () }

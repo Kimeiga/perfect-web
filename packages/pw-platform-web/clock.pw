@@ -1,0 +1,15 @@
+// @corpus: platform
+// @id: PLATFORM-clock
+// @category: platform — time
+// @charter: §7.5, §14 M5
+// @milestone: E2C
+//
+// Reading the clock is an EFFECT, which is what makes a wall-clock read inside
+// a shared deterministic materialization detectable (corpus R-017) rather than
+// a code-review question.
+
+module clock
+
+fn now() -> Int !{ clock.read } { 0 }
+
+fn today() -> String !{ clock.read } { "" }
