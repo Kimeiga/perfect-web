@@ -102,13 +102,55 @@ was added. That is the evidence the repairs were obstruction-removal.
 | R-010 | `unserializable_capture` |
 | R-012 | `affine_not_consumed_once` |
 | R-022 | `handler_signature_mismatch` |
-| R-023 | **clean** — see `EXPECTED_TO_PASS` |
+| R-023 | **clean** — classified `FixtureDidNotExpressIt` |
 | R-024 | `unsafe_audit_incomplete` |
 | R-025 | `declared_placement_cannot_grant` |
 | R-030 | `private_in_resume_manifest` |
 | R-041 | `forbidden_effect` |
 
+The one miss is **classified**, not rounded away. `EXPECTED_TO_PASS` carries
+one of four judgements per entry, and they mean different things:
+
+| classification | meaning |
+|---|---|
+| `FixtureDidNotExpressIt` | the old text did not contain the violation it declared. Benign — the corpus got more precise. |
+| `SpecificationChanged` | the language or charter changed. Needs a charter reference. |
+| `CompilerRegressed` | it used to be caught and is not. A **defect**. |
+| `KnownCheckerGap` | the checker cannot see it. A **defect**, and must also exist as a `slips-through.pw`. |
+
+The last two are rejected by the test rather than accepted as explanations: a
+regression must be fixed, and a checker gap must be tracked where gaps are
+tracked. Only the two benign classifications may sit in the list quietly.
+
+**R-023 is `FixtureDidNotExpressIt`.** `dead_internal_link` is a *relation*
+between a link and a route table, and the old file contained one half of it.
+Its silence is correct.
+
+The history suite is kept because it can **disagree** with the current corpus.
+Forcing it to 10/10 would remove the only thing it is for.
+
 The C0 texts live in `examples/history/C0/`.
+
+---
+
+## Three separate test bodies
+
+They answer different questions and must not merge. Folding the new programs
+into C1 would make the specification drift every time an implementation is
+tested for generality — which is precisely the failure mode versioning the
+corpus was meant to prevent.
+
+| suite | where | question |
+|---|---|---|
+| **C1** — executable specification | `examples/{accepted,rejected}` | does the compiler conform to the declared corpus? |
+| **G1** — generality challenges | `examples/generality/` | do the same guarantees survive programs the fixtures did not anticipate? |
+| **Robustness** | `compiler/pw-core/tests/robustness.rs`, `examples/robustness/` | can an unanticipated program shape crash the compiler or suppress its output? |
+| **History** | `examples/history/` | does the pre-change text of a modified fixture still fail? |
+
+C1 is frozen. G1 grows freely — it is not a specification, it is a record of
+what has been challenged. Robustness grows by regression: every panic found
+keeps its original reproducer, a minimized one, the phase that crashed, the
+fix, and a negative control showing the old implementation fails.
 
 ---
 

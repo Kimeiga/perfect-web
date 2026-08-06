@@ -19,15 +19,44 @@
 
 use pw_core::check::check_sources;
 
-/// Old texts that are expected to compile clean now, each with its reason.
+/// Old texts that are expected to compile clean now, each **classified**.
 ///
-/// This list is where a genuine specification correction goes. It should stay
-/// short, and every entry should be arguable from the reason alone.
-const EXPECTED_TO_PASS: &[(&str, &str)] = &[(
+/// Architect ruling, 2026-08-06:
+///
+/// > Do not force it to 10/10 merely for neatness. Classify the remaining
+/// > case, and report that classification next to the result. The history
+/// > suite is valuable precisely because it can disagree with the current
+/// > corpus.
+///
+/// Four classifications are possible, and they mean very different things:
+///
+/// - `FixtureDidNotExpressIt` — the old text did not actually contain the
+///   violation it declared. Benign; the corpus got more precise.
+/// - `SpecificationChanged` — the language or the charter changed, so the old
+///   text is no longer wrong. Needs a charter reference.
+/// - `CompilerRegressed` — it used to be caught and is not. A bug, and this
+///   test is how it surfaces.
+/// - `KnownCheckerGap` — the current checker cannot see it. Belongs in
+///   `examples/generality/` as a `slips-through.pw` too.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Why {
+    FixtureDidNotExpressIt,
+    #[allow(dead_code)]
+    SpecificationChanged,
+    #[allow(dead_code)]
+    CompilerRegressed,
+    #[allow(dead_code)]
+    KnownCheckerGap,
+}
+
+const EXPECTED_TO_PASS: &[(&str, Why, &str)] = &[(
     "R-023",
+    Why::FixtureDidNotExpressIt,
     "its old text declared no route at all, so there was no route table for a \
-     link to be dead relative to. The invariant is relational and the old file \
-     did not contain both halves of the relation.",
+     link to be dead relative to. `dead_internal_link` is a RELATION between a \
+     link and a route table, and the old file contained only one half of it — \
+     so the old text did not express the invariant it declared, and its \
+     silence is correct rather than a gap.",
 )];
 
 fn library() -> Vec<(String, String)> {
@@ -122,7 +151,7 @@ fn the_pre_change_text_of_every_repaired_fixture_still_fails() {
         .unwrap_or_else(|| panic!("{name} has no @invariant"));
 
         let caught = diags.iter().any(|d| d.symbol() == declared);
-        let excused = EXPECTED_TO_PASS.iter().find(|(f, _)| *f == id);
+        let excused = EXPECTED_TO_PASS.iter().find(|(f, _, _)| *f == id);
 
         match (caught, excused) {
             (false, None) => wrong.push(format!(
@@ -132,13 +161,33 @@ fn the_pre_change_text_of_every_repaired_fixture_still_fails() {
                  erased.",
                 diags.iter().map(|d| d.symbol()).collect::<Vec<_>>()
             )),
-            (true, Some((_, why))) => wrong.push(format!(
-                "{id}: listed in EXPECTED_TO_PASS but its C0 text is caught for \
+            (true, Some((_, class, why))) => wrong.push(format!(
+                "{id}: listed as {class:?} but its C0 text is caught for \
                  `{declared}` again. Good news; remove the entry. The recorded \
                  reason was: {why}"
             )),
+            // A regression or a known gap is NOT an excuse — it is a defect
+            // being tracked in the wrong place. Only the two benign
+            // classifications may sit in this list quietly.
+            (false, Some((_, class, why)))
+                if matches!(class, Why::CompilerRegressed | Why::KnownCheckerGap) =>
+            {
+                wrong.push(format!(
+                    "{id}: classified {class:?}, which is a defect rather than an \
+                     explanation. A regression must be fixed; a checker gap must \
+                     also exist as a slips-through.pw witness. Reason on file: {why}"
+                ))
+            }
             _ => {}
         }
+    }
+    eprintln!(
+        "  historical compatibility: {}/{} C0 texts still caught",
+        all.len() - EXPECTED_TO_PASS.len(),
+        all.len()
+    );
+    for (id, class, _) in EXPECTED_TO_PASS {
+        eprintln!("    {id}: {class:?}");
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n\n"));
 }
