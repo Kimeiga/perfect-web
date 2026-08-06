@@ -1605,7 +1605,7 @@ fn effect_rows(
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
 ) {
-    use crate::effects::{deferred_spans, forbidden_in, forbidden_in_phase, phase_at};
+    use crate::effects::{Reuse, deferred_spans, forbidden_in, forbidden_in_phase, phase_at};
 
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
@@ -1683,8 +1683,13 @@ fn effect_rows(
         });
     }
 
+    // Charter §7.9, §9.4: is this declaration's output computed once and
+    // reused, or recomputed for its reader? A wall-clock read is only a defect
+    // in the first case.
+    let reuse = reuse_of(hir, decl);
+
     for source in &found.sources {
-        let Some(why) = forbidden_in(decl, &source.effect) else {
+        let Some(why) = forbidden_in(decl, reuse, &source.effect) else {
             continue;
         };
         if !at_render_time(&source.span) {
@@ -1699,12 +1704,26 @@ fn effect_rows(
             reason: "effect_forbidden_in_context",
             detector: Detector::PatternMatrix,
             severity: Severity::Error,
-            message: format!(
-                "`{}` performs `{}`, which a {} may not do",
-                decl.name,
-                source.effect,
-                context_noun(decl)
-            ),
+            message: match reuse {
+                // Named for what makes it wrong. "which a page may not do" is
+                // false — a page may read the clock; a page generated once at
+                // build time may not.
+                Reuse::Build => format!(
+                    "a `Build`-placed {} may not use effect `{}`",
+                    kind_noun(decl.kind),
+                    source.effect
+                ),
+                Reuse::SharedPartition => format!(
+                    "materialization `{}` may not depend on `{}`",
+                    decl.name, source.effect
+                ),
+                Reuse::PerReader => format!(
+                    "`{}` performs `{}`, which a {} may not do",
+                    decl.name,
+                    source.effect,
+                    context_noun(decl)
+                ),
+            },
             primary_span: source.span.clone(),
             related: vec![Related {
                 span: hir.decl_span(decl_id_of(hir, decl)),
@@ -1764,6 +1783,30 @@ fn effect_rows(
             }],
         });
     }
+}
+
+/// Is this declaration's output computed once and reused, or recomputed for
+/// each reader?
+///
+/// Two spellings reach the same place. `placement build` says the output is a
+/// file produced before any request exists; `partition public` says one cache
+/// entry serves every reader. Charter §7.9 and §9.4 give them separate words
+/// because they are separate mechanisms — but the same thing goes wrong in
+/// both, so the check asks one question.
+fn reuse_of(hir: &Hir, decl: &Decl) -> crate::effects::Reuse {
+    use crate::effects::Reuse;
+    if declared_world(hir, decl) == Some(World::Build) {
+        return Reuse::Build;
+    }
+    if let Some(body_id) = decl.body {
+        let body = hir.body(body_id);
+        if let Some((v, _)) = name_pair(body, body.root, "partition")
+            && v == "public"
+        {
+            return Reuse::SharedPartition;
+        }
+    }
+    Reuse::PerReader
 }
 
 /// What to call this declaration in a diagnostic.

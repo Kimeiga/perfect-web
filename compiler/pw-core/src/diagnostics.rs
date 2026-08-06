@@ -199,6 +199,13 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // independence is a declared assertion the code contradicts.
     ("PW3005", "PW0403"),
     ("PW3009", "PW0404"),
+    // A view that fetches, a build-time page that reads the wall clock, a
+    // shared fragment that does. Each is "an effect is not permitted where this
+    // runs, whatever the row says" — PW0401 — differing only in which context
+    // and which effect, which the diagnostic carries as metadata.
+    ("PW0300", "PW0401"),
+    ("PW0314", "PW0401"),
+    ("PW0315", "PW0401"),
     ("PW0316", "PW5011"), // a list over a mutable collection needs a stable key
     ("PW0317", "PW5012"), // an element may only contain the children HTML permits
     ("PW0318", "PW5013"), // interactive behaviour belongs on an interactive element

@@ -12,8 +12,11 @@ module clock
 
 fn now() -> Int !{ clock.read } { 0 }
 
-// Named for what it reads. A wall-clock read inside a shared deterministic
-// materialization is corpus R-017, and this row is what makes it visible.
-fn now_wall() -> Int !{ clock.read } { 0 }
+// `clock.wall` and `clock.read` are different effects because they break
+// different things. A monotonic read gives a duration; a WALL read gives a
+// value that depends on when the code ran, so an artifact generated once and
+// served many times is no longer a function of its inputs (corpus R-016,
+// R-017). The family alone would not tell them apart.
+fn now_wall() -> Int !{ clock.wall } { 0 }
 
-fn today() -> String !{ clock.read } { "" }
+fn today() -> String !{ clock.wall } { "" }

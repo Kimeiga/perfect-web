@@ -20,3 +20,9 @@ fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
 fn find(name: String) -> Result<Store, StoreError> !{ database.read } {
     todo
 }
+
+// Over the network rather than the database: the store record lives in an
+// upstream service. Corpus R-001 calls this from a view.
+fn fetch_store(id: StoreId) -> Result<Store, StoreError> !{ network.fetch } {
+    todo
+}

@@ -82,6 +82,15 @@ test-compile:
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
+# The per-fixture enforcement table. Each rejected fixture is checked as its
+# own program — the shared library, the accepted modules it imports, and the
+# fixture — because five of them reuse module names with each other (E2B).
+evidence-corpus:
+    @PW_WRITE_EVIDENCE=1 cargo test --quiet -p pw-core --test checking_source \
+        corpus_enforcement_table -- --nocapture 2>&1 | grep -v '^$'
+    @echo
+    @head -4 docs/evidence/E2D/corpus-enforcement.txt
+
 rejections:
     -@cargo run --quiet -p pw-cli -- check examples/rejected/*.pw
 

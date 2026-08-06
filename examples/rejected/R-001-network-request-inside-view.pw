@@ -13,6 +13,8 @@
 
 module store.page
 
+import Stores.{ fetch_store }
+
 view StorePage(store_id: StoreId) !{} {
     // ERROR: network effect inside a pure view.
     let store = fetch_store(store_id)

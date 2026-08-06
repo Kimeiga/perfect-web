@@ -485,7 +485,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     // equality and not as another floor — a catch that is merely red is a
     // regression even when the count goes up.
     assert!(
-        errored >= 30,
+        errored >= 33,
         "regressed: {errored}/{total} produce an error"
     );
     assert_eq!(
@@ -493,7 +493,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
         "every catch must be for the declared invariant, not merely red"
     );
     assert!(
-        fully >= 30,
+        fully >= 33,
         "regressed: {fully}/{total} fully enforced, partial list = {PARTIALLY_ENFORCED:?}"
     );
 }
@@ -667,4 +667,87 @@ fn an_unmodelled_capability_family_never_manufactures_a_placement_error() {
         diags.iter().all(|d| d.code != "PW5002"),
         "an unmodelled family must not be unplaceable: {diags:?}"
     );
+}
+
+/// The per-fixture enforcement table, written to `docs/evidence/E2D/`.
+///
+/// The charter requires a gate claim to be backed by a file a recorded command
+/// produced. The obvious way to produce it — a separate reporting binary — was
+/// rejected: it would need its own copy of "the library, plus the accepted
+/// modules a fixture imports, plus the fixture", and a second copy of that is
+/// how a reported number drifts from an enforced one. This is the same code
+/// path the ratchet asserts on, so the file cannot disagree with the test.
+///
+/// Run with `just evidence-corpus`.
+#[test]
+fn corpus_enforcement_table_is_written_when_asked() {
+    use pw_core::diagnostics::canonical_code;
+    use pw_core::rules;
+    use pw_syntax::parse;
+
+    let mut rows: Vec<String> = Vec::new();
+    let (mut caught, mut total) = (0, 0);
+
+    for (name, src, diags) in rejected_results() {
+        total += 1;
+        let mut codes: Vec<String> = rules::check(&parse(&src).file)
+            .iter()
+            .filter(|f| f.is_error())
+            .map(|f| f.code.to_string())
+            .collect();
+        codes.extend(diags.iter().map(|d| d.code.to_string()));
+        codes.sort();
+        codes.dedup();
+
+        let declared = src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("// @rule:"))
+            .map(|r| r.trim().to_string())
+            .unwrap_or_else(|| "-".to_string());
+        let canonical = canonical_code(&declared);
+        let category = src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("// @category:"))
+            .unwrap_or("")
+            .trim();
+
+        let verdict = if codes.iter().any(|c| c == canonical) {
+            caught += 1;
+            "enforced".to_string()
+        } else if codes.is_empty() {
+            "UNCAUGHT".to_string()
+        } else {
+            format!("WRONG REASON ({})", codes.join(" "))
+        };
+        let id = &name[..5];
+        let alias = if canonical == declared {
+            String::new()
+        } else {
+            format!(" (declared {declared})")
+        };
+        rows.push(format!(
+            "{id}  {verdict:<24}  {canonical}{alias}\n       {category}"
+        ));
+    }
+
+    let mut report = String::new();
+    report.push_str(
+        "corpus enforcement — every rejected fixture, checked as its own program\n\
+         (the shared library, the accepted modules it imports, and the fixture)\n\n",
+    );
+    report.push_str(&format!(
+        "{caught}/{total} enforce their declared invariant\n\n"
+    ));
+    for r in &rows {
+        report.push_str(r);
+        report.push('\n');
+    }
+
+    if std::env::var("PW_WRITE_EVIDENCE").is_err() {
+        return;
+    }
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/evidence/E2D");
+    std::fs::create_dir_all(&dir).expect("evidence dir");
+    std::fs::write(dir.join("corpus-enforcement.txt"), &report).expect("write evidence");
+    eprintln!("wrote docs/evidence/E2D/corpus-enforcement.txt");
 }

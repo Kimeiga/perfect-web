@@ -552,9 +552,56 @@ pub fn forbidden_in_phase(phase: &str, effect: &str) -> Option<&'static str> {
 /// Charter §7.5A and §8.5: a `view` renders; it does not fetch. The row it
 /// writes is a claim about itself, and `!{}` on a view that reads the database
 /// is the corpus's very first rejected case.
-pub fn forbidden_in(decl: &Decl, effect: &str) -> Option<&'static str> {
+/// Why a declaration's output is reused rather than recomputed per reader.
+///
+/// Charter §7.9 and §9.4. Two different declarations reach the same place: a
+/// `placement build` page is generated once and shipped as a file, and a
+/// `partition public` materialization is computed once and served from one
+/// cache entry to every reader. In both, output that varies with *when* it ran
+/// is not a function of its declared inputs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reuse {
+    /// Recomputed for its reader; nondeterminism is that reader's own.
+    PerReader,
+    /// Generated once at build time.
+    Build,
+    /// One cache entry serves every reader.
+    SharedPartition,
+}
+
+/// Effects that make an output depend on *when* it ran.
+///
+/// The wall clock is the corpus's case. It is `clock.wall` and not the whole
+/// `clock` family on purpose: a monotonic read measures a duration and can be
+/// deterministic in the sense that matters here, while a wall read cannot.
+pub fn nondeterministic(effect: &str) -> bool {
+    matches!(family_of(effect), "random") || effect.starts_with("clock.wall")
+}
+
+pub fn forbidden_in(decl: &Decl, reuse: Reuse, effect: &str) -> Option<&'static str> {
     use crate::hir::DeclKind::*;
     let family = family_of(effect);
+
+    // Charter §7.9, §9.4. An artifact computed once and reused is only correct
+    // if it is a function of its declared inputs. `clock.wall` makes it a
+    // function of when it ran as well, so two readers of one cache entry — or
+    // one reader of a file generated last Tuesday — get an answer that was
+    // never true for them.
+    if reuse != Reuse::PerReader && nondeterministic(effect) {
+        return Some(match reuse {
+            Reuse::Build => {
+                "static generation requires a deterministic effect row: the output is \
+                 generated once and shipped as a file, so anything that varies with \
+                 when it ran is baked in"
+            }
+            _ => {
+                "a shared materialized fragment must be a pure function of its declared \
+                 dependencies: one cache entry serves every reader, so a value that \
+                 varies with when it was computed is served to readers it was never \
+                 true for"
+            }
+        });
+    }
 
     // A painter is identified by what it declares, not by a declaration kind:
     // `paint.custom` in the row *is* the statement "this runs inside the paint
@@ -754,18 +801,40 @@ mod tests {
             body: None,
             children: vec![],
         };
-        assert!(forbidden_in(&view, "database.read").is_some());
-        assert!(forbidden_in(&view, "network.fetch").is_some());
+        assert!(forbidden_in(&view, Reuse::PerReader, "database.read").is_some());
+        assert!(forbidden_in(&view, Reuse::PerReader, "network.fetch").is_some());
         // ...but rendering effects are exactly what a view is for.
-        assert!(forbidden_in(&view, "dom.mutate").is_none());
+        assert!(forbidden_in(&view, Reuse::PerReader, "dom.mutate").is_none());
 
         let f = crate::hir::Decl {
             kind: DeclKind::Fn,
             ..view
         };
         assert!(
-            forbidden_in(&f, "database.read").is_none(),
+            forbidden_in(&f, Reuse::PerReader, "database.read").is_none(),
             "an ordinary fn may read the database if it says so"
+        );
+
+        // Reuse, not the declaration kind, is what makes a clock read wrong.
+        // The same page is fine when it is rendered for its reader.
+        let page = crate::hir::Decl {
+            kind: DeclKind::Page,
+            ..f
+        };
+        assert!(
+            forbidden_in(&page, Reuse::PerReader, "clock.wall").is_none(),
+            "a page rendered per request may read the clock"
+        );
+        assert!(forbidden_in(&page, Reuse::Build, "clock.wall").is_some());
+        assert!(forbidden_in(&page, Reuse::SharedPartition, "clock.wall").is_some());
+
+        // And the distinction inside the clock family is load-bearing: a
+        // monotonic read measures a duration and does not make the output
+        // depend on when it ran. Without this, the rule would be "a build-time
+        // page may not use the clock", which is a different and wronger claim.
+        assert!(
+            forbidden_in(&page, Reuse::Build, "clock.read").is_none(),
+            "a duration measurement does not make a build artifact irreproducible"
         );
     }
 }

@@ -205,11 +205,6 @@ pub enum RuleStatus {
 pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     // (code, intended owner, missing analysis)
     (
-        "PW0300",
-        "E2D",
-        "effect inference — a network call inside a pure view",
-    ),
-    (
         "PW0304",
         "E2D",
         "effect inference — a secret reaching a public log",
@@ -230,16 +225,6 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
         "PW0310",
         "E9C",
         "affine types — a resource handle that escapes",
-    ),
-    (
-        "PW0314",
-        "E2D",
-        "effect inference — nondeterminism in a static render",
-    ),
-    (
-        "PW0315",
-        "E2D",
-        "effect inference — a wall-clock read in a shared materialization",
     ),
     (
         "PW0320",

@@ -1,0 +1,93 @@
+corpus enforcement — every rejected fixture, checked as its own program
+(the shared library, the accepted modules it imports, and the fixture)
+
+33/44 enforce their declared invariant
+
+R-001  enforced                  PW0401 (declared PW0300)
+       network request inside view
+R-002  enforced                  PW5002 (declared PW0301)
+       database access in browser
+R-003  enforced                  PW5003 (declared PW0302)
+       secret serialized to browser
+R-004  enforced                  PW5001 (declared PW0100)
+       private cart in shared cache
+R-005  enforced                  PW5004 (declared PW0303)
+       cross-tenant cache key missing tenant
+R-006  UNCAUGHT                  PW0304
+       public log of secret value
+R-007  enforced                  PW0305
+       unhandled ADT variant
+R-008  UNCAUGHT                  PW0306
+       ambient null assumption
+R-009  UNCAUGHT                  PW0307
+       unchecked external cast
+R-010  UNCAUGHT                  PW0308
+       nonserializable handler capture
+R-011  UNCAUGHT                  PW0309
+       open transaction not committed or rolled back
+R-012  UNCAUGHT                  PW0310
+       affine resource leaked
+R-013  enforced                  PW2002 (declared PW0311)
+       detached ordinary task
+R-014  enforced                  PW0312
+       retry of non-idempotent command
+R-015  enforced                  PW0313
+       unbounded retry
+R-016  enforced                  PW0401 (declared PW0314)
+       nondeterministic static render
+R-017  enforced                  PW0401 (declared PW0315)
+       wall-clock read in shared deterministic materialization
+R-018  enforced                  PW5011 (declared PW0316)
+       unkeyed mutable list
+R-019  enforced                  PW5012 (declared PW0317)
+       invalid HTML nesting
+R-020  enforced                  PW5013 (declared PW0318)
+       button behavior implemented on inaccessible div
+R-021  enforced                  PW5014 (declared PW0319)
+       label missing from form control
+R-022  UNCAUGHT                  PW0320
+       form handler type mismatch
+R-023  UNCAUGHT                  PW0321
+       dead internal route
+R-024  UNCAUGHT                  PW0322
+       raw unsafe HTML without capability
+R-025  UNCAUGHT                  PW0323
+       browser-only API on origin
+R-026  enforced                  PW5002 (declared PW0324)
+       server secret referenced by edge artifact
+R-027  enforced                  PW0325
+       query key changes without stale-work cancellation policy
+R-028  enforced                  PW2004 (declared PW0326)
+       subscription outlives component scope
+R-029  enforced                  PW0327
+       optimistic state with no rollback path
+R-030  UNCAUGHT                  PW0328
+       private data in resume manifest
+R-031  enforced                  PW5010 (declared PW0329)
+       unsafe escape hatch without justification
+R-032  enforced                  PW0401 (declared PW3001)
+       synchronous geometry read in ordinary code
+R-033  enforced                  PW0401 (declared PW3002)
+       geometry read during render
+R-034  enforced                  PW0402 (declared PW3003)
+       layout read after layout-affecting write
+R-035  enforced                  PW0402 (declared PW3004)
+       layout write during measure phase
+R-036  enforced                  PW0401 (declared PW3001)
+       measure helper hides forbidden geometry read
+R-037  enforced                  PW0401 (declared PW3001)
+       generic callback smuggles layout measure
+R-038  enforced                  PW0403 (declared PW3005)
+       resize observer layout feedback cycle
+R-039  enforced                  PW2004
+       intersection observer unscoped subscription
+R-040  enforced                  PW0401 (declared PW3006)
+       layout-affecting operation in compositor animation
+R-041  enforced                  PW0401 (declared PW3007)
+       custom paint mutates document
+R-042  enforced                  PW0402 (declared PW3008)
+       post-paint same-frame layout measure
+R-043  enforced                  PW0404 (declared PW3009)
+       containment with cross-boundary layout dependency
+R-044  enforced                  PW5010 (declared PW3010)
+       unaudited imperative dom escape
