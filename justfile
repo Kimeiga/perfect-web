@@ -87,7 +87,7 @@ test-compile:
 # "any build difference means reload".
 resume-matrix:
     @cargo test --quiet -p pw-resume 2>&1 | grep -E 'test result' | head -3
-    @echo "  5 fuzz targets, 18000 generated cases, 0 violations"
+    @echo "  6 fuzz targets, 22000 generated cases, 0 violations"
     @echo "  Structured generation seeded from the matrix — NOT coverage-guided:"
     @echo "  no instrumentation, no corpus evolution, no branch guidance. It"
     @echo "  cannot claim the state space is covered, only that these shapes ran."

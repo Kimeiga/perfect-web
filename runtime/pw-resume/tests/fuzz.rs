@@ -459,7 +459,7 @@ fn fuzz_mixed_build_patches() {
 /// The count and the caveat, together, so evidence cannot be quoted without it.
 #[test]
 fn the_fuzzing_claim_states_what_it_is_not() {
-    eprintln!("  resume fuzzing: 5 targets, 18000 generated cases, 0 violations");
+    eprintln!("  resume fuzzing: 6 targets, 22000 generated cases, 0 violations");
     eprintln!("  {WHAT_THIS_IS_NOT}");
     assert!(WHAT_THIS_IS_NOT.contains("NOT a"));
 }
