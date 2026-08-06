@@ -55,8 +55,9 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
-        for a in acquisitions(body, sigs) {
-            let releases = releases_of(body, sigs, &a);
+        let types = crate::infer::Types::of_body(sigs, decl, body);
+        for a in acquisitions(body, sigs, &types) {
+            let releases = releases_of(body, sigs, &types, &a);
             if let Some(escape) = escape_of(body, &a, &module_state) {
                 report_escape(hir, decl, &a, escape, &at, out);
             } else if let Some(early) = early_return(body, &a, &releases) {
@@ -67,7 +68,11 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
 }
 
 /// Bindings whose initialiser declares `resource.acquire<T>`.
-fn acquisitions(body: &Body, sigs: &Signatures) -> Vec<Acquired> {
+fn acquisitions<'a>(
+    body: &Body,
+    sigs: &'a Signatures,
+    types: &crate::infer::Types<'a>,
+) -> Vec<Acquired> {
     let mut out = Vec::new();
     for id in body.walk() {
         let (name, init, scoped) = match body.expr(id) {
@@ -94,7 +99,7 @@ fn acquisitions(body: &Body, sigs: &Signatures) -> Vec<Acquired> {
         let Expr::Call { callee, .. } = body.expr(init) else {
             continue;
         };
-        let Some(ty) = signature_of(sigs, body, *callee).and_then(|s| {
+        let Some(ty) = signature_of(sigs, types, body, *callee).and_then(|s| {
             s.effects
                 .iter()
                 .find_map(|e| type_argument(e, "resource.acquire"))
@@ -112,13 +117,18 @@ fn acquisitions(body: &Body, sigs: &Signatures) -> Vec<Acquired> {
 }
 
 /// Calls in this body that release the value, by span.
-fn releases_of(body: &Body, sigs: &Signatures, a: &Acquired) -> Vec<Span> {
+fn releases_of<'a>(
+    body: &Body,
+    sigs: &'a Signatures,
+    types: &crate::infer::Types<'a>,
+    a: &Acquired,
+) -> Vec<Span> {
     let mut out = Vec::new();
     for id in body.walk() {
         let Expr::Call { callee, args } = body.expr(id) else {
             continue;
         };
-        let Some(sig) = signature_of(sigs, body, *callee) else {
+        let Some(sig) = signature_of(sigs, types, body, *callee) else {
             continue;
         };
         if !sig
@@ -314,23 +324,16 @@ fn type_argument(effect: &str, prefix: &str) -> Option<String> {
     (!inner.is_empty()).then(|| inner.to_string())
 }
 
+/// The signature a call resolves to: a module path, or a member of a receiver
+/// whose type is known. Nothing else.
 fn signature_of<'a>(
     sigs: &'a Signatures,
+    types: &crate::infer::Types<'a>,
     body: &Body,
     callee: ExprId,
 ) -> Option<&'a crate::signatures::Signature> {
-    let path = path_of(body, callee);
-    sigs.by_path(&path).or_else(|| match body.expr(callee) {
-        Expr::Field { name, .. } => sigs.member(None, name),
-        Expr::Name(name) => sigs.member(None, name),
-        _ => None,
-    })
+    sigs.by_path(&path_of(body, callee))
+        .or_else(|| types.callee(body, callee))
 }
 
-fn path_of(body: &Body, id: ExprId) -> String {
-    match body.expr(id) {
-        Expr::Name(n) => n.clone(),
-        Expr::Field { base, name } => format!("{}.{}", path_of(body, *base), name),
-        _ => String::new(),
-    }
-}
+use crate::infer::path_of;

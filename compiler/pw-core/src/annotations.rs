@@ -27,6 +27,10 @@ use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{AttrValue, Body, Decl, Expr, Hir, Node, Span, TypeRefId};
 use crate::signatures::Signatures;
 
+/// Where an `on:` attribute's event type is declared. One name, and the only
+/// module name the compiler knows.
+const EVENTS_MODULE: &str = "events";
+
 pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -239,9 +243,13 @@ fn handler_matches_event(
                 continue;
             };
             // The event an attribute delivers is a platform fact:
-            // `events.submit(event: SubmitEvent)`. No table here.
+            // `events.submit(event: SubmitEvent)`. The MODULE is a language
+            // binding, in the same way `measure` names a frame phase — `on:`
+            // attributes resolve in `events`, and that is stated here rather
+            // than reached by "exactly one module declares a `submit`", which
+            // would make the rule depend on an accident of the program.
             let Some(expected) = sigs
-                .member(None, event)
+                .by_path(&format!("{EVENTS_MODULE}.{event}"))
                 .and_then(|s| s.params.first().cloned())
                 .flatten()
             else {

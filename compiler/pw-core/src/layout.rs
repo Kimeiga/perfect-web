@@ -26,6 +26,7 @@ use std::collections::BTreeSet;
 use crate::codes;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{Body, Decl, Expr, ExprId, Hir, Span};
+use crate::infer::Types;
 use crate::signatures::Signatures;
 
 /// The effect that means "this write can invalidate layout".
@@ -40,8 +41,12 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
-        frame_transaction_order(body, sigs, decl, &at, out);
-        observation_feedback(body, sigs, decl, &at, out);
+        // Resolved by receiver TYPE. `self.style.set_padding(..)` is
+        // `ElementRef` -> `Style` -> a member of `Style`; no step asks whether
+        // `set_padding` happens to be unique in the program.
+        let types = Types::of_body(sigs, decl, body);
+        frame_transaction_order(body, &types, decl, &at, out);
+        observation_feedback(body, &types, decl, &at, out);
         compositor_animation(body, sigs, decl, &at, out);
         false_independence(body, decl, &at, out);
     }
@@ -58,7 +63,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
 /// out synchronously to answer.
 fn frame_transaction_order(
     body: &Body,
-    sigs: &Signatures,
+    types: &Types<'_>,
     decl: &Decl,
     at: &Span,
     out: &mut Vec<Diagnostic>,
@@ -90,7 +95,7 @@ fn frame_transaction_order(
 
         let mut wrote: Option<Span> = None;
         for (span, keyword) in &phases {
-            if *keyword == "mutate" && layout_affecting_write_in(body, sigs, span).is_some() {
+            if *keyword == "mutate" && layout_affecting_write_in(body, types, span).is_some() {
                 wrote = Some(span.clone());
                 continue;
             }
@@ -149,7 +154,7 @@ fn frame_transaction_order(
 /// that the browser reports an undelivered-notification loop for exactly this.
 fn observation_feedback(
     body: &Body,
-    sigs: &Signatures,
+    types: &Types<'_>,
     decl: &Decl,
     at: &Span,
     out: &mut Vec<Diagnostic>,
@@ -179,7 +184,7 @@ fn observation_feedback(
     }
 
     for id in body.walk() {
-        let Some((target, property)) = layout_affecting_write(body, sigs, id) else {
+        let Some((target, property)) = layout_affecting_write(body, types, id) else {
             continue;
         };
         let Some((_, obs)) = observed.iter().find(|(n, _)| *n == target) else {
@@ -328,7 +333,7 @@ fn transitioned_fields(body: &Body, block: ExprId) -> Vec<(String, Span)> {
 
 /// Can the compositor animate this property? Answered by the platform package.
 fn compositable(sigs: &Signatures, property: &str) -> bool {
-    sigs.member(None, &format!("set_{property}"))
+    sigs.member_of("Style", &format!("set_{property}"))
         .is_some_and(|s| s.effects.iter().any(|e| e == "animation.composite"))
 }
 
@@ -469,26 +474,26 @@ fn custom_property_arg(body: &Body, id: ExprId, callee: &str) -> Option<String> 
 
 /// Does this expression call a setter the platform declares layout-affecting?
 /// Returns the receiver it writes to and the setter's name.
-fn layout_affecting_write(body: &Body, sigs: &Signatures, id: ExprId) -> Option<(String, String)> {
+fn layout_affecting_write(body: &Body, types: &Types<'_>, id: ExprId) -> Option<(String, String)> {
     let Expr::Call { callee, .. } = body.expr(id) else {
         return None;
     };
     let Expr::Field { base, name } = body.expr(*callee) else {
         return None;
     };
-    let sig = sigs.member(None, name)?;
+    let sig = types.callee(body, *callee)?;
     if !sig.effects.iter().any(|e| e == LAYOUT_AFFECTING) {
         return None;
     }
     Some((root_name(body, *base)?, name.clone()))
 }
 
-fn layout_affecting_write_in(body: &Body, sigs: &Signatures, span: &Span) -> Option<ExprId> {
+fn layout_affecting_write_in(body: &Body, types: &Types<'_>, span: &Span) -> Option<ExprId> {
     body.walk().into_iter().find(|id| {
         let s = body.expr_span(*id);
         s.start >= span.start
             && s.end <= span.end
-            && layout_affecting_write(body, sigs, *id).is_some()
+            && layout_affecting_write(body, types, *id).is_some()
     })
 }
 

@@ -2,6 +2,7 @@
 // @id: R-040
 // @category: layout-affecting operation in compositor animation
 // @rule: PW3006
+// @invariant: forbidden_effect
 // @charter: §7.5A
 // @milestone: 7
 // @expect-error: `width` is not a compositor-only property

@@ -11,22 +11,22 @@
 
 module style
 
-import browser.{ Element }
+import browser.{ Element, Style }
 
 fn measure(el: Element) -> Int !{ layout.measure } { 0 }
 
-fn mutate(el: Element, property: String, value: String) -> () !{ style.mutate } { () }
+fn mutate(el: Style, property: String, value: String) -> () !{ style.mutate } { () }
 
 // Charter §7.5A's own spelling. The type argument is the point: a write that
 // can invalidate layout is a DIFFERENT effect from one that cannot, and naming
 // them the same would make the distinction a comment.
-fn mutate_layout_affecting(el: Element, property: String, value: String) -> ()
+fn mutate_layout_affecting(el: Style, property: String, value: String) -> ()
     !{ style.mutate<LayoutAffect> }
 {
     ()
 }
 
-fn composite(el: Element, property: String, value: String) -> ()
+fn composite(el: Style, property: String, value: String) -> ()
     !{ animation.composite }
 {
     ()
@@ -36,13 +36,13 @@ fn composite(el: Element, property: String, value: String) -> ()
 // padding invalidate layout, so a geometry read after one of them is a forced
 // synchronous reflow (corpus R-034). A custom property does not.
 
-fn set_width(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
+fn set_width(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_height(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
+fn set_height(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_padding(el: Element, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
+fn set_padding(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_custom(el: Element, property: String, value: String) -> () !{ style.mutate } { () }
+fn set_custom(el: Style, property: String, value: String) -> () !{ style.mutate } { () }
 
 // The compositor-only properties. Charter §7.5A: `animation.composite` runs off
 // the main thread, which is possible exactly because these two do not
@@ -50,6 +50,6 @@ fn set_custom(el: Element, property: String, value: String) -> () !{ style.mutat
 // compiler is what lets the animation check ask a signature "can this property
 // be composited?" instead of consulting a table of property names.
 
-fn set_transform(el: Element, value: String) -> () !{ animation.composite } { () }
+fn set_transform(el: Style, value: String) -> () !{ animation.composite } { () }
 
-fn set_opacity(el: Element, value: String) -> () !{ animation.composite } { () }
+fn set_opacity(el: Style, value: String) -> () !{ animation.composite } { () }

@@ -2,6 +2,7 @@
 // @id: R-016
 // @category: nondeterministic static render
 // @rule: PW0314
+// @invariant: forbidden_effect
 // @charter: §7.9, §9.3
 // @milestone: 6
 // @expect-error: a `Build`-placed page may not use effect `clock.wall`

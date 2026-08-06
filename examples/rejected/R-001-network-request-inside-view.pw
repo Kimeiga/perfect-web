@@ -2,6 +2,7 @@
 // @id: R-001
 // @category: network request inside view
 // @rule: PW0300
+// @invariant: forbidden_effect
 // @charter: §7.4, §16.2
 // @milestone: 2
 // @expect-error: a `view` may not perform network I/O

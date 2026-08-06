@@ -751,3 +751,105 @@ fn corpus_enforcement_table_is_written_when_asked() {
     std::fs::write(dir.join("corpus-enforcement.txt"), &report).expect("write evidence");
     eprintln!("wrote docs/evidence/E2D/corpus-enforcement.txt");
 }
+
+/// The three-way agreement the architect asked for after `PW0323`.
+///
+/// > fixture symbol == emitted invariant symbol == registry meaning for the
+/// > emitted numeric code
+///
+/// Matching on the numeric code alone is matching on a *label*. `PW0323`
+/// carried three meanings at once — the registry's prose, the placement rule
+/// that emitted it, and the fixture that declared it — and every code-level
+/// assertion in this file passed the whole time, because the code genuinely
+/// matched. The symbol is the semantic identity; the number is for users.
+#[test]
+fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
+    use pw_core::codes::lookup;
+    use pw_core::diagnostics::{UNREGISTERED, canonical_code};
+    use pw_core::rules;
+    use pw_syntax::parse;
+
+    let mut wrong = Vec::new();
+    let mut checked = 0;
+
+    for (name, src, diags) in rejected_results() {
+        let Some(declared) = src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("// @invariant:"))
+            .map(str::trim)
+        else {
+            wrong.push(format!("{name}: no `// @invariant:` line"));
+            continue;
+        };
+
+        // What the registry says the fixture's declared CODE means.
+        let want = src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("// @rule:"))
+            .map(|r| canonical_code(r.trim()))
+            .and_then(lookup);
+        match want {
+            Some(c) if c.symbol == declared => {}
+            Some(c) => {
+                wrong.push(format!(
+                    "{name}: declares `{declared}` but its @rule resolves to \
+                     `{}` — the number and the symbol disagree",
+                    c.symbol
+                ));
+                continue;
+            }
+            None => {
+                wrong.push(format!("{name}: its @rule is not a registered code"));
+                continue;
+            }
+        }
+
+        // What actually caught it.
+        let mut symbols: Vec<&str> = rules::check(&parse(&src).file)
+            .iter()
+            .filter(|f| f.is_error())
+            .filter_map(|f| lookup(f.code).map(|c| c.symbol))
+            .collect();
+        symbols.extend(diags.iter().map(|d| d.symbol()));
+        assert!(
+            !symbols.contains(&UNREGISTERED),
+            "{name}: emitted a diagnostic whose code is not in the registry"
+        );
+
+        checked += 1;
+        if !symbols.contains(&declared) {
+            wrong.push(format!(
+                "{name}: declares `{declared}`, caught by {symbols:?}"
+            ));
+        }
+    }
+
+    assert_eq!(checked, 44, "every rejected fixture must be checked");
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// A construction site may not restate an invariant in its own words.
+///
+/// The `invariant` field is written at each `Diagnostic { .. }` literal, and a
+/// second prose definition of one number is half of what made `PW0323`
+/// invisible. The registry's sentence is the sentence.
+#[test]
+fn no_diagnostic_restates_its_invariant_in_its_own_words() {
+    use pw_core::codes::lookup;
+
+    let mut wrong = Vec::new();
+    for (name, _, diags) in rejected_results() {
+        for d in &diags {
+            let Some(c) = lookup(d.code) else { continue };
+            if d.invariant != c.invariant {
+                wrong.push(format!(
+                    "{name}: {} says {:?}, the registry says {:?}",
+                    d.code, d.invariant, c.invariant
+                ));
+            }
+        }
+    }
+    wrong.sort();
+    wrong.dedup();
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

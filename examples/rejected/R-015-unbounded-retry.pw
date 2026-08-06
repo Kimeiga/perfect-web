@@ -2,6 +2,7 @@
 // @id: R-015
 // @category: unbounded retry
 // @rule: PW0313
+// @invariant: retry_unbounded
 // @charter: §9.5
 // @milestone: 4
 // @expect-error: `retry forever` is not a permitted policy

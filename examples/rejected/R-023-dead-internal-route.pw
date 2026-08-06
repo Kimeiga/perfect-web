@@ -2,6 +2,7 @@
 // @id: R-023
 // @category: dead internal route
 // @rule: PW0321
+// @invariant: dead_internal_link
 // @charter: §8.2
 // @milestone: 3
 // @expect-error: internal link target `/stores/{id}/reviews` matches no declared route

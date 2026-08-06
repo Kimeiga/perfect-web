@@ -2,6 +2,7 @@
 // @id: R-022
 // @category: form handler type mismatch
 // @rule: PW0320
+// @invariant: handler_signature_mismatch
 // @charter: §8.2
 // @milestone: 3
 // @expect-error: `on:submit` expects a handler taking `SubmitEvent`, found one taking `PressEvent`
@@ -11,6 +12,8 @@
 // mismatched handler cannot silently never fire.
 
 module checkout.address_form
+
+import events.{ PressEvent }
 
 fn on_press(event: PressEvent) -> () !{} { () }
 

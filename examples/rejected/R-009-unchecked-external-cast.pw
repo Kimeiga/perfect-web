@@ -2,6 +2,7 @@
 // @id: R-009
 // @category: unchecked external cast
 // @rule: PW0307
+// @invariant: unchecked_external_cast
 // @charter: §7.1, §7.10
 // @milestone: 2
 // @expect-error: `Unknown` cannot be cast to `Store`

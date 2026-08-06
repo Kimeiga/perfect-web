@@ -2,6 +2,7 @@
 // @id: R-005
 // @category: cross-tenant cache key missing tenant
 // @rule: PW0303
+// @invariant: cache_key_omits_partition
 // @charter: §7.8, §14 M5
 // @milestone: 5
 // @expect-error: shared cache key for `Menu` omits the required partition `Organization<OrganizationId>`

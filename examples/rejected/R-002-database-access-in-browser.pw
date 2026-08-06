@@ -2,6 +2,7 @@
 // @id: R-002
 // @category: database access in browser
 // @rule: PW0301
+// @invariant: no_feasible_placement
 // @charter: §7.3, §7.9, §14 M5
 // @milestone: 5
 // @expect-error: `database.read<Stores>` is not available at placement Browser

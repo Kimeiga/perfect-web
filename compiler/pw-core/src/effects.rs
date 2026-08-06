@@ -253,21 +253,19 @@ impl<'a> Inference<'a> {
                 continue;
             }
 
-            let declared = types.get(&receiver).map(String::as_str);
-            // The unique-member fallback applies only to a value whose type is
-            // not yet known — a lambda parameter. A CAPITALISED receiver names
-            // a type or module, and if it has no such member the answer is
-            // "unknown", not somebody else's member.
-            //
-            // Without this, `Money.add` borrowed `Carts.add`'s row and reported
-            // a pure calculation as writing to the database.
-            let receiver_is_a_name = receiver.chars().next().is_some_and(char::is_uppercase);
-            let sig = match declared {
-                Some(t) => self.sigs.member(Some(t), &member),
-                None if receiver_is_a_name => None,
-                None => self.sigs.member(None, &member),
+            // By the receiver's TYPE, or not at all. The by-name fallback that
+            // used to sit here is gone: it made whether an effect was seen
+            // depend on no other type declaring a member with the same
+            // spelling, and it had already borrowed `Carts.add`'s row for
+            // `Money.add` once, reporting a pure calculation as writing to the
+            // database. A receiver whose type this program does not state is a
+            // receiver whose members are unknown.
+            let Some(declared) = types.get(&receiver).map(String::as_str) else {
+                continue;
             };
-            let Some(sig) = sig else { continue };
+            let Some(sig) = self.sigs.member_of(declared, &member) else {
+                continue;
+            };
             for e in &sig.effects {
                 out.effects.insert(e.clone());
                 out.sources.push(Source {

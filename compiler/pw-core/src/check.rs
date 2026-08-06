@@ -1254,12 +1254,10 @@ fn sink_level(
     body: &Body,
     callee: ExprId,
 ) -> Option<(String, crate::hir::Span)> {
-    let sig = sigs
-        .by_path(&path_of(body, callee))
-        .or_else(|| match body.expr(callee) {
-            Expr::Field { name, .. } => sigs.member(None, name),
-            _ => None,
-        })?;
+    // By path only. A sink is named — `log.public` — and resolving it by "the
+    // one declaration spelled `public`" would make the privacy rule depend on
+    // no other module having a `public`.
+    let sig = sigs.by_path(&path_of(body, callee))?;
     sig.effects.iter().find_map(|e| {
         let (_, rest) = e.split_once('<')?;
         let level = rest.strip_suffix('>')?;

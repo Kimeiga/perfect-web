@@ -2,6 +2,7 @@
 // @id: R-029
 // @category: optimistic state with no rollback path
 // @rule: PW0327
+// @invariant: optimistic_no_rollback
 // @charter: §7.5, §15.4
 // @milestone: 4
 // @expect-error: `add_to_cart` declares `optimistic` without `rollback`

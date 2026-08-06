@@ -5,7 +5,7 @@
 
 module rules.handler_good
 
-import events
+import events.{ SubmitEvent }
 
 fn on_save(event: SubmitEvent) -> () !{} { () }
 

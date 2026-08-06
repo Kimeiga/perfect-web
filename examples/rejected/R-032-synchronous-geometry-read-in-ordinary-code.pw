@@ -2,6 +2,7 @@
 // @id: R-032
 // @category: synchronous geometry read in ordinary code
 // @rule: PW3001
+// @invariant: forbidden_effect
 // @charter: §7.5A
 // @milestone: 7
 // @expect-error: `offsetWidth` is not available in ordinary application code

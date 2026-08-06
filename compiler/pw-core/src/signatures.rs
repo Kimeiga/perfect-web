@@ -63,9 +63,6 @@ pub struct Signatures {
     /// is a declared type is that type's member: `offsetWidth(el: ElementRef)`
     /// is what `anchor.offsetWidth` means.
     by_member: BTreeMap<(String, String), Signature>,
-    /// Member name → signature, when exactly one type declares it. A fallback
-    /// for a receiver whose type is not yet known — see [`Signatures::member`].
-    unique_member: BTreeMap<String, Option<Signature>>,
 }
 
 impl Signatures {
@@ -113,10 +110,6 @@ impl Signatures {
                 if let Some(receiver) = decl.params.first().and_then(|p| p.ty.clone()) {
                     out.by_member
                         .insert((receiver, decl.name.clone()), sig.clone());
-                    out.unique_member
-                        .entry(decl.name.clone())
-                        .and_modify(|e| *e = None) // a second type claims it
-                        .or_insert_with(|| Some(sig.clone()));
                 }
                 out.by_path.insert(sig.path.clone(), sig.clone());
                 out.by_def.insert(
@@ -139,22 +132,21 @@ impl Signatures {
         self.by_def.get(&def)
     }
 
-    /// A member of `receiver`, or — when the receiver's type is not known — the
-    /// unique declaration of that member name.
+    /// A member of `receiver`, resolved by the receiver's TYPE.
     ///
-    /// The fallback is deliberate and temporary. Until types are inferred, a
-    /// lambda parameter has no declared type, so `el.getBoundingClientRect()`
-    /// inside `List.map(items, el => ..)` cannot say what `el` is. Resolving by
-    /// a member name that **exactly one** type declares is conservative: if two
-    /// types declared it, the answer is ambiguous and nothing is returned.
-    /// A wrong answer here would attribute an effect to the wrong call.
-    pub fn member(&self, receiver: Option<&str>, name: &str) -> Option<&Signature> {
-        if let Some(s) =
-            receiver.and_then(|r| self.by_member.get(&(r.to_string(), name.to_string())))
-        {
-            return Some(s);
-        }
-        self.unique_member.get(name)?.as_ref()
+    /// There is no by-name fallback and deliberately never will be. The
+    /// previous version resolved an unknown receiver to "the one declaration
+    /// with this member name, if exactly one exists" — conservative in that it
+    /// never resolved AMBIGUOUSLY, and unsafe in a way conservatism does not
+    /// fix: whether a correctness check ran at all depended on a global
+    /// accident. `resolve_corpus` showed it — a sibling declaring a second
+    /// `on_press` made the handler rule go silent rather than wrong.
+    ///
+    /// A correctness analysis never means "use this because it happens to be
+    /// the only one with this spelling".
+    pub fn member_of(&self, receiver: &str, name: &str) -> Option<&Signature> {
+        self.by_member
+            .get(&(receiver.to_string(), name.to_string()))
     }
 
     /// Every signature by path. A checker that needs to ask "which declarations
@@ -224,19 +216,70 @@ mod tests {
             "module other\n\n             opaque type Widget = String\n             fn offsetWidth(w: Widget) -> Float !{} { 0.0 }\n             fn only_here(w: Widget) -> Float !{ network.fetch } { 0.0 }\n",
         ]);
 
-        // Known receiver: the right one, with its own row.
-        let s = sigs
-            .member(Some("ElementRef"), "offsetWidth")
-            .expect("member");
-        assert_eq!(s.effects, ["layout.measure"]);
+        // Each receiver gets its own member, with its own row.
+        assert_eq!(
+            sigs.member_of("ElementRef", "offsetWidth")
+                .expect("member")
+                .effects,
+            ["layout.measure"]
+        );
+        assert_eq!(
+            sigs.member_of("Widget", "offsetWidth")
+                .expect("member")
+                .effects,
+            Vec::<String>::new()
+        );
 
-        // Unknown receiver, and TWO types declare `offsetWidth` — so nothing.
-        // Guessing would attribute an effect to the wrong call.
-        assert!(sigs.member(None, "offsetWidth").is_none());
+        // A member that exists on exactly ONE type in the whole program is
+        // still not reachable without knowing the receiver. That is the point:
+        // the old fallback resolved this, so whether a check ran depended on no
+        // other type ever declaring an `only_here`. Adding one elsewhere would
+        // have silently switched the rule off.
+        assert!(sigs.member_of("ElementRef", "only_here").is_none());
+        assert!(sigs.member_of("Widget", "only_here").is_some());
+    }
 
-        // Unknown receiver, but only one type declares it: safe to use.
-        let only = sigs.member(None, "only_here").expect("unique member");
-        assert_eq!(only.effects, ["network.fetch"]);
+    /// The fallback stays deleted.
+    ///
+    /// It is easy to reintroduce — "just resolve it when there's only one" is a
+    /// reasonable-sounding sentence — and the failure it causes is silence, not
+    /// a wrong answer, so nothing goes red when it comes back.
+    #[test]
+    fn there_is_no_by_name_member_lookup_in_the_compiler() {
+        // Assembled at runtime so this test does not match its own source.
+        let needles = [format!("unique{}member", "_"), format!("member(N{}", "one")];
+        let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../");
+        let mut offenders = Vec::new();
+        let mut stack = vec![src_dir];
+        while let Some(dir) = stack.pop() {
+            for e in std::fs::read_dir(&dir).expect("compiler/") {
+                let p = e.expect("entry").path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if p.extension().is_none_or(|x| x != "rs") {
+                    continue;
+                }
+                let text = std::fs::read_to_string(&p).expect("read");
+                for (n, line) in text.lines().enumerate() {
+                    // A doc comment may name the thing it explains why we do
+                    // not do.
+                    if line.trim_start().starts_with("//") {
+                        continue;
+                    }
+                    if needles.iter().any(|needle| line.contains(needle)) {
+                        offenders.push(format!("{}:{}", p.display(), n + 1));
+                    }
+                }
+            }
+        }
+        assert!(
+            offenders.is_empty(),
+            "by-name member lookup is back — a correctness check would depend \
+             on a name being unique across the program:\n  {}",
+            offenders.join("\n  ")
+        );
     }
 
     #[test]

@@ -23,6 +23,15 @@ type MapError =
 // A reference to a live element, as a view holds one.
 opaque type ElementRef = String
 
+// An element's style, as a value with a type. `self.style.set_padding(..)` then
+// resolves member by member — `self` is an `ElementRef`, `.style` is a `Style`,
+// `.set_padding` is a member of `Style` — instead of by "exactly one module
+// declares a `set_padding`", which is an accident of the program rather than a
+// fact about it.
+opaque type Style = String
+
+fn style(el: ElementRef) -> Style !{} { todo }
+
 type Rect = Rect {
     width: Float,
     height: Float,

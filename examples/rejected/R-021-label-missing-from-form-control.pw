@@ -2,6 +2,7 @@
 // @id: R-021
 // @category: label missing from form control
 // @rule: PW0319
+// @invariant: control_without_label
 // @charter: §8.2
 // @milestone: 3
 // @expect-error: `<input>` has no associated label

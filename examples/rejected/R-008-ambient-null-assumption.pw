@@ -2,6 +2,7 @@
 // @id: R-008
 // @category: ambient null assumption
 // @rule: PW0306
+// @invariant: option_used_as_value
 // @charter: §7.1, §7.10
 // @milestone: 2
 // @expect-error: `Option<Store>` cannot be used where `Store` is expected

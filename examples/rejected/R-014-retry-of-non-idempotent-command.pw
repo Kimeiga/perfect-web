@@ -2,6 +2,7 @@
 // @id: R-014
 // @category: retry of non-idempotent command
 // @rule: PW0312
+// @invariant: retry_not_idempotent
 // @charter: §9.5, §15.4
 // @milestone: 4
 // @expect-error: `charge_card` declares `retry bounded_exponential` but is not idempotent

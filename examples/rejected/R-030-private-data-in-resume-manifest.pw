@@ -2,6 +2,7 @@
 // @id: R-030
 // @category: private data in resume manifest
 // @rule: PW0328
+// @invariant: private_in_resume_manifest
 // @charter: §8.5, §7.8
 // @milestone: 7
 // @expect-error: resume manifest for `CartSummary` would contain a `Session<SessionId>` value

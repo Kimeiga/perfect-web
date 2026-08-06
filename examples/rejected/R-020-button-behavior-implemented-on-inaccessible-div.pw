@@ -2,6 +2,7 @@
 // @id: R-020
 // @category: button behavior implemented on inaccessible div
 // @rule: PW0318
+// @invariant: handler_on_inert
 // @charter: §8.2
 // @milestone: 3
 // @expect-error: `<div>` with an `on:press` handler is not keyboard accessible

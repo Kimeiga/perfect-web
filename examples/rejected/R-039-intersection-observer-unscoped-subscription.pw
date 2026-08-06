@@ -2,6 +2,7 @@
 // @id: R-039
 // @category: intersection observer unscoped subscription
 // @rule: PW2004
+// @invariant: scope_outlives_owner
 // @charter: §7.5A, §7.6
 // @milestone: 7
 // @expect-error: `observe.intersection` declares `application` scope inside a component

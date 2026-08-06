@@ -67,7 +67,7 @@ pub struct Repair {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
-    /// Stable, public, identifies the **invariant**.
+    /// Stable, public, identifies the **invariant**. For users and docs.
     pub code: &'static str,
     /// One sentence naming the invariant, in the developer's vocabulary.
     pub invariant: &'static str,
@@ -85,6 +85,23 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    /// The **semantic identity** of what this reports.
+    ///
+    /// Read from the registry rather than stored on the diagnostic, so it
+    /// cannot disagree with the registry — there is one source and no copy to
+    /// drift. `PW0323` acquired three different meanings precisely because the
+    /// number was typed at a construction site, the prose lived in the
+    /// registry, and nothing compared them.
+    pub fn symbol(&self) -> &'static str {
+        crate::codes::lookup(self.code).map_or(UNREGISTERED, |c| c.symbol)
+    }
+
+    /// The registry revision of the invariant this reports. `0` means the code
+    /// is not registered at all.
+    pub fn revision(&self) -> u16 {
+        crate::codes::lookup(self.code).map_or(0, |c| c.revision)
+    }
+
     pub fn error(
         code: &'static str,
         invariant: &'static str,
@@ -234,6 +251,11 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     ("PW0322", "PW5010"),
     ("PW3010", "PW5010"),
 ];
+
+/// The unregistered marker. A diagnostic carrying it named a code the registry
+/// does not have, which `every_emitted_diagnostic_carries_a_registered_symbol`
+/// rejects.
+pub const UNREGISTERED: &str = "<unregistered>";
 
 /// Resolve a corpus-declared code to the canonical invariant code.
 pub fn canonical_code(declared: &str) -> &str {

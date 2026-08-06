@@ -2,6 +2,7 @@
 // @id: R-017
 // @category: wall-clock read in shared deterministic materialization
 // @rule: PW0315
+// @invariant: forbidden_effect
 // @charter: §9.4, §7.9
 // @milestone: 6
 // @expect-error: materialization `MenuFragment` may not depend on `clock.wall`

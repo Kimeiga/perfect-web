@@ -2,6 +2,7 @@
 // @id: R-035
 // @category: layout write during measure phase
 // @rule: PW3004
+// @invariant: wrong_frame_phase
 // @charter: §7.5A
 // @milestone: 7
 // @expect-error: `style.mutate<LayoutAffect>` is not permitted inside a `measure` block

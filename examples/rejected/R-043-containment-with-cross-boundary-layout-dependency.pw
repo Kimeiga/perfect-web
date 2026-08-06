@@ -2,6 +2,7 @@
 // @id: R-043
 // @category: containment with cross-boundary layout dependency
 // @rule: PW3009
+// @invariant: false_independence
 // @charter: §7.5A
 // @milestone: 7
 // @expect-error: subtree declared `independent` but its layout depends on `--page-gutter` from an ancestor

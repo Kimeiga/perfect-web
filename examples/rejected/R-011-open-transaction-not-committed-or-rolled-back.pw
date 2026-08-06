@@ -2,6 +2,7 @@
 // @id: R-011
 // @category: open transaction not committed or rolled back
 // @rule: PW0309
+// @invariant: affine_not_consumed_once
 // @charter: §7.7
 // @milestone: 9
 // @expect-error: affine resource `tx: DatabaseTransaction` is not consumed on every path

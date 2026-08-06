@@ -2,6 +2,7 @@
 // @id: R-019
 // @category: invalid HTML nesting
 // @rule: PW0317
+// @invariant: invalid_nesting
 // @charter: §8.2
 // @milestone: 3
 // @expect-error: `<div>` is not permitted as a child of `<ul>`

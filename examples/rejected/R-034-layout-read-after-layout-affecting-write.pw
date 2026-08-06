@@ -2,6 +2,7 @@
 // @id: R-034
 // @category: layout read after layout-affecting write
 // @rule: PW3003
+// @invariant: wrong_frame_phase
 // @charter: §7.5A
 // @milestone: 7
 // @expect-error: `layout.measure` after `style.mutate<LayoutAffect>` in the same transaction

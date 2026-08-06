@@ -2,6 +2,7 @@
 // @id: R-010
 // @category: nonserializable handler capture
 // @rule: PW0308
+// @invariant: unserializable_capture
 // @charter: §8.5
 // @milestone: 7
 // @expect-error: handler captures `connection: DatabaseConnection`, which is not serializable

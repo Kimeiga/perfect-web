@@ -2,6 +2,7 @@
 // @id: R-037
 // @category: generic callback smuggles layout measure
 // @rule: PW3001
+// @invariant: forbidden_effect
 // @charter: §7.5A, §7.2
 // @milestone: 7
 // @expect-error: `layout.measure` propagates through `List.map`'s callback

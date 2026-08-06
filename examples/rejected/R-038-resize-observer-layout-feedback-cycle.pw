@@ -2,6 +2,7 @@
 // @id: R-038
 // @category: resize observer layout feedback cycle
 // @rule: PW3005
+// @invariant: observation_feedback_cycle
 // @charter: §7.5A
 // @milestone: 7
 // @expect-error: `observe.resize` handler writes a layout-affecting property of the observed element

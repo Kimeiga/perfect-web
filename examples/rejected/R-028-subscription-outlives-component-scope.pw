@@ -2,6 +2,7 @@
 // @id: R-028
 // @category: subscription outlives component scope
 // @rule: PW0326
+// @invariant: scope_outlives_owner
 // @charter: §7.6
 // @milestone: 4
 // @expect-error: subscription `OrderTracking` declares `scope application` inside a component

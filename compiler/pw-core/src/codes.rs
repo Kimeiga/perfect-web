@@ -26,8 +26,16 @@ use std::fmt;
 /// One diagnostic code, with everything the registry knows about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Code {
-    /// The stable public string, e.g. `"PW5002"`.
+    /// The stable public string, e.g. `"PW5002"`. For users and documentation.
     pub id: &'static str,
+    /// The **semantic identity**, and the thing a fixture declares. Two rules
+    /// may not share one, and a number may not mean two things — `PW0323`
+    /// meant three at once and nothing could see it, because matching on the
+    /// number alone is matching on a label rather than on a meaning.
+    pub symbol: &'static str,
+    /// Bumped when the invariant's MEANING changes, so a fixture pinned to an
+    /// older revision fails loudly instead of silently checking something else.
+    pub revision: u16,
     /// One sentence naming the invariant, in the developer's vocabulary.
     pub invariant: &'static str,
     /// Which analysis owns it. Metadata — never part of the public code.
@@ -63,10 +71,12 @@ impl fmt::Display for Code {
 }
 
 macro_rules! codes {
-    ($( $konst:ident = $id:literal, $owner:ident, $invariant:literal; )*) => {
+    ($( $konst:ident = $id:literal / $symbol:ident / $rev:literal, $owner:ident, $invariant:literal; )*) => {
         $(
             pub const $konst: Code = Code {
                 id: $id,
+                symbol: stringify!($symbol),
+                revision: $rev,
                 invariant: $invariant,
                 owner: Owner::$owner,
                 konst: stringify!($konst),
@@ -80,126 +90,126 @@ macro_rules! codes {
 
 codes! {
     // --- syntax (PW00xx) --------------------------------------------------
-    EXPECTED = "PW0001", Syntax, "the parser expected a different token here";
-    UNCLOSED_TYPE_ARGS = "PW0002", Syntax, "a type argument list must be closed";
-    UNCLOSED_EFFECT_ROW = "PW0003", Syntax, "an effect row must be closed";
-    EFFECT_ROW_NEEDS_BRACE = "PW0004", Syntax, "an effect row opens with `{`";
-    UNCLOSED_PARAMS = "PW0005", Syntax, "a parameter list must be closed";
-    UNCLOSED_BLOCK = "PW0006", Syntax, "a block must be closed";
-    UNKNOWN_DECLARATION = "PW0007", Syntax, "this does not begin a declaration";
-    UNCLOSED_PAREN = "PW0008", Syntax, "a parenthesis must be closed";
-    EXPECTED_EXPRESSION = "PW0009", Syntax, "an expression was expected here";
-    UNCLOSED_ARGS = "PW0010", Syntax, "an argument list must be closed";
-    UNCLOSED_LIST = "PW0011", Syntax, "a list literal must be closed";
-    UNCLOSED_MATCH = "PW0012", Syntax, "a match must be closed";
-    NO_PROGRESS = "PW0099", Syntax, "the parser made no progress";
+    EXPECTED = "PW0001" / expected / 1, Syntax, "the parser expected a different token here";
+    UNCLOSED_TYPE_ARGS = "PW0002" / unclosed_type_args / 1, Syntax, "a type argument list must be closed";
+    UNCLOSED_EFFECT_ROW = "PW0003" / unclosed_effect_row / 1, Syntax, "an effect row must be closed";
+    EFFECT_ROW_NEEDS_BRACE = "PW0004" / effect_row_needs_brace / 1, Syntax, "an effect row opens with `{`";
+    UNCLOSED_PARAMS = "PW0005" / unclosed_params / 1, Syntax, "a parameter list must be closed";
+    UNCLOSED_BLOCK = "PW0006" / unclosed_block / 1, Syntax, "a block must be closed";
+    UNKNOWN_DECLARATION = "PW0007" / unknown_declaration / 1, Syntax, "this does not begin a declaration";
+    UNCLOSED_PAREN = "PW0008" / unclosed_paren / 1, Syntax, "a parenthesis must be closed";
+    EXPECTED_EXPRESSION = "PW0009" / expected_expression / 1, Syntax, "an expression was expected here";
+    UNCLOSED_ARGS = "PW0010" / unclosed_args / 1, Syntax, "an argument list must be closed";
+    UNCLOSED_LIST = "PW0011" / unclosed_list / 1, Syntax, "a list literal must be closed";
+    UNCLOSED_MATCH = "PW0012" / unclosed_match / 1, Syntax, "a match must be closed";
+    NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------
     //
     // Allocated through this registry, not chosen in prose. They sit in the
     // syntax range because resolution failures are about the *program text*
     // naming something that is not there, not about what the program means.
-    UNRESOLVED_MODULE = "PW0020", Resolution,
+    UNRESOLVED_MODULE = "PW0020" / unresolved_module / 1, Resolution,
         "an imported module must exist in the workspace";
-    UNRESOLVED_NAME = "PW0021", Resolution,
+    UNRESOLVED_NAME = "PW0021" / unresolved_name / 1, Resolution,
         "an imported name must be declared by the module it comes from";
-    AMBIGUOUS_NAME = "PW0022", Resolution,
+    AMBIGUOUS_NAME = "PW0022" / ambiguous_name / 1, Resolution,
         "a name must resolve to exactly one declaration";
-    PRIVATE_ACCESS = "PW0023", Resolution,
+    PRIVATE_ACCESS = "PW0023" / private_access / 1, Resolution,
         "a private declaration is not visible outside its module";
-    DUPLICATE_DECLARATION = "PW0024", Resolution,
+    DUPLICATE_DECLARATION = "PW0024" / duplicate_declaration / 1, Resolution,
         "a module may declare each name once per namespace";
-    IMPORT_CYCLE = "PW0025", Resolution,
+    IMPORT_CYCLE = "PW0025" / import_cycle / 1, Resolution,
         "modules must not import each other in a cycle";
 
     // --- declaration rules (PW01xx-PW03xx) --------------------------------
-    RETRY_NOT_IDEMPOTENT = "PW0312", DeclarationRules,
+    RETRY_NOT_IDEMPOTENT = "PW0312" / retry_not_idempotent / 1, DeclarationRules,
         "a command that retries must be idempotent";
-    RETRY_UNBOUNDED = "PW0313", DeclarationRules,
+    RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 
-    STALE_KEY_POLICY = "PW0325", DeclarationRules,
+    STALE_KEY_POLICY = "PW0325" / stale_key_policy / 1, DeclarationRules,
         "a keyed query must say what happens when its key changes";
-    OPTIMISTIC_NO_ROLLBACK = "PW0327", DeclarationRules,
+    OPTIMISTIC_NO_ROLLBACK = "PW0327" / optimistic_no_rollback / 1, DeclarationRules,
         "an optimistic transition must declare a rollback path";
-    CACHE_NO_INVALIDATION = "PW0200", DeclarationRules,
+    CACHE_NO_INVALIDATION = "PW0200" / cache_no_invalidation / 1, DeclarationRules,
         "a shared cache should declare how it is invalidated";
 
     // --- effects (PW04xx) -------------------------------------------------
-    UNDECLARED_EFFECT = "PW0400", Effects,
+    UNDECLARED_EFFECT = "PW0400" / undeclared_effect / 1, Effects,
         "an effect row must name every effect the body performs";
-    FORBIDDEN_EFFECT = "PW0401", Effects,
+    FORBIDDEN_EFFECT = "PW0401" / forbidden_effect / 1, Effects,
         "some effects are not permitted where a declaration runs, whatever it declares";
-    WRONG_FRAME_PHASE = "PW0402", Effects,
+    WRONG_FRAME_PHASE = "PW0402" / wrong_frame_phase / 1, Effects,
         "each frame phase permits only the work it exists to do";
 
     // --- layout relations (PW04xx) ----------------------------------------
-    OBSERVATION_FEEDBACK_CYCLE = "PW0403", Layout,
+    OBSERVATION_FEEDBACK_CYCLE = "PW0403" / observation_feedback_cycle / 1, Layout,
         "an observation must not cause the change it observes";
-    FALSE_INDEPENDENCE = "PW0404", Layout,
+    FALSE_INDEPENDENCE = "PW0404" / false_independence / 1, Layout,
         "a subtree declared independent must not depend on anything outside it";
 
     // --- exhaustiveness ---------------------------------------------------
-    NON_EXHAUSTIVE_MATCH = "PW0305", Exhaustiveness,
+    NON_EXHAUSTIVE_MATCH = "PW0305" / non_exhaustive_match / 1, Exhaustiveness,
         "a match must cover every value its scrutinee can take";
 
     // --- types (PW06xx) ---------------------------------------------------
-    OPTION_USED_AS_VALUE = "PW0600", Types,
+    OPTION_USED_AS_VALUE = "PW0600" / option_used_as_value / 1, Types,
         "a value that may be absent must be matched before it is used";
-    UNCHECKED_EXTERNAL_CAST = "PW0601", Types,
+    UNCHECKED_EXTERNAL_CAST = "PW0601" / unchecked_external_cast / 1, Types,
         "an external value must be decoded, not cast";
-    HANDLER_SIGNATURE_MISMATCH = "PW0602", Types,
+    HANDLER_SIGNATURE_MISMATCH = "PW0602" / handler_signature_mismatch / 1, Types,
         "a handler must accept the event its attribute delivers";
 
     // --- structured concurrency (PW20xx) ----------------------------------
-    HANDLE_ESCAPES = "PW2001", ScopeGraph,
+    HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,
         "a handle cannot outlive the scope that owns it";
-    AFFINE_NOT_CONSUMED_ONCE = "PW2005", ScopeGraph,
+    AFFINE_NOT_CONSUMED_ONCE = "PW2005" / affine_not_consumed_once / 1, ScopeGraph,
         "an affine value must be consumed exactly once, in the scope that acquired it";
-    TASK_DETACHED = "PW2002", ScopeGraph,
+    TASK_DETACHED = "PW2002" / task_detached / 1, ScopeGraph,
         "an ordinary task cannot be detached from its scope";
-    HANDLE_USED_LATE = "PW2003", ScopeGraph,
+    HANDLE_USED_LATE = "PW2003" / handle_used_late / 1, ScopeGraph,
         "a handle cannot be used after its owning scope has exited";
-    SCOPE_OUTLIVES_OWNER = "PW2004", ScopeGraph,
+    SCOPE_OUTLIVES_OWNER = "PW2004" / scope_outlives_owner / 1, ScopeGraph,
         "a subscription cannot declare a scope that outlives its owner";
 
     // --- privacy, placement, unsafe boundaries (PW50xx) -------------------
-    PRIVATE_IN_SHARED_CACHE = "PW5001", Privacy,
+    PRIVATE_IN_SHARED_CACHE = "PW5001" / private_in_shared_cache / 1, Privacy,
         "a value that is not public cannot live in a shared cache";
-    NO_FEASIBLE_PLACEMENT = "PW5002", Placement,
+    NO_FEASIBLE_PLACEMENT = "PW5002" / no_feasible_placement / 1, Placement,
         "every declaration must have somewhere it can run";
-    SECRET_TO_BROWSER = "PW5003", Privacy,
+    SECRET_TO_BROWSER = "PW5003" / secret_to_browser / 1, Privacy,
         "a secret cannot be rendered to the browser";
-    CACHE_KEY_OMITS_PARTITION = "PW5004", Privacy,
+    CACHE_KEY_OMITS_PARTITION = "PW5004" / cache_key_omits_partition / 1, Privacy,
         "a shared cache key must carry every partition its value depends on";
     // Distinct from PW5002 on purpose. PW5002 is the solver finding NO world
     // that can run a declaration; this is a world the author NAMED that cannot
     // grant what the declaration needs. A body that would run fine in the
     // browser, pinned to the origin, is wrong without being unplaceable.
-    DECLARED_PLACEMENT_CANNOT_GRANT = "PW5005", Placement,
+    DECLARED_PLACEMENT_CANNOT_GRANT = "PW5005" / declared_placement_cannot_grant / 1, Placement,
         "a declared placement must be able to grant every effect it requires";
-    VALUE_EXCEEDS_SINK_LEVEL = "PW5006", Privacy,
+    VALUE_EXCEEDS_SINK_LEVEL = "PW5006" / value_exceeds_sink_level / 1, Privacy,
         "a sink accepts only values its declared privacy level admits";
-    PRIVATE_IN_RESUME_MANIFEST = "PW5007", Privacy,
+    PRIVATE_IN_RESUME_MANIFEST = "PW5007" / private_in_resume_manifest / 1, Privacy,
         "the resume manifest ships with the public shell and may hold only public values";
-    UNSERIALIZABLE_CAPTURE = "PW5008", Privacy,
+    UNSERIALIZABLE_CAPTURE = "PW5008" / unserializable_capture / 1, Privacy,
         "a resumable handler may capture only what can be written to its manifest";
-    DEAD_INTERNAL_LINK = "PW5009", Markup,
+    DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
-    UNSAFE_AUDIT_INCOMPLETE = "PW5010", DeclarationRules,
+    UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,
         "an unsafe escape hatch must carry a complete audit record";
     // The architect proposed PW5011 for this. That number was already the
     // unkeyed-list invariant — exactly the collision this registry exists to
     // prevent, caught by the registry on its first day. PW5015 instead.
-    UNSAFE_ATTRIBUTION_INVALID = "PW5015", DeclarationRules,
+    UNSAFE_ATTRIBUTION_INVALID = "PW5015" / unsafe_attribution_invalid / 1, DeclarationRules,
         "an escape hatch's attribution target must name a real owner";
-    UNKEYED_LIST = "PW5011", Markup,
+    UNKEYED_LIST = "PW5011" / unkeyed_list / 1, Markup,
         "a list over a mutable collection needs a stable key";
-    INVALID_NESTING = "PW5012", Markup,
+    INVALID_NESTING = "PW5012" / invalid_nesting / 1, Markup,
         "an element may only contain the children HTML permits";
-    HANDLER_ON_INERT = "PW5013", Markup,
+    HANDLER_ON_INERT = "PW5013" / handler_on_inert / 1, Markup,
         "interactive behaviour belongs on an element that can receive it";
-    CONTROL_WITHOUT_LABEL = "PW5014", Markup,
+    CONTROL_WITHOUT_LABEL = "PW5014" / control_without_label / 1, Markup,
         "a form control must have something that names it";
 }
 

@@ -2,6 +2,7 @@
 // @id: R-004
 // @category: private cart in shared cache
 // @rule: PW0100
+// @invariant: private_in_shared_cache
 // @charter: §7.8, §16.3
 // @milestone: 5
 // @expect-error: cannot materialize `StorePage` in a shared public cache

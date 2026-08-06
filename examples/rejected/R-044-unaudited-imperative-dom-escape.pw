@@ -2,6 +2,7 @@
 // @id: R-044
 // @category: unaudited imperative dom escape
 // @rule: PW3010
+// @invariant: unsafe_audit_incomplete
 // @charter: §7.5A, §7.5
 // @milestone: 7
 // @expect-error: `unsafe.imperative` requires a `because` justification and an attribution target

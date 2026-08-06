@@ -2,6 +2,7 @@
 // @id: R-007
 // @category: unhandled ADT variant
 // @rule: PW0305
+// @invariant: non_exhaustive_match
 // @charter: §7.1, §16.2
 // @milestone: 2
 // @expect-error: match on `OrderState` is not exhaustive

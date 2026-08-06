@@ -2,6 +2,7 @@
 // @id: R-027
 // @category: query key changes without stale-work cancellation policy
 // @rule: PW0325
+// @invariant: stale_key_policy
 // @charter: §9.5, §15.6
 // @milestone: 4
 // @expect-error: `Store` declares no policy for superseded keys

@@ -2,6 +2,7 @@
 // @id: R-042
 // @category: post-paint same-frame layout measure
 // @rule: PW3008
+// @invariant: wrong_frame_phase
 // @charter: §7.5A
 // @milestone: 7
 // @expect-error: `post_paint` may not use `layout.measure` in the same frame
