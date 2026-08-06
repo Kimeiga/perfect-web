@@ -13,10 +13,11 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E3 — Marko rendering adapter, streaming SSR, first
-resumption.** E0 and E2A are complete; E1 closed on RQ-2's Outcome 1; E2 has
-five of six gate items, and its sixth (the ≥40 rejected corpus count, at 7/44)
-is owned by E1 and E5 rather than by E2.
+**next milestone:** **E4 — typed resource model and the first complete store
+page.** E0 and E2A are complete; E1 closed on RQ-2's Outcome 1. E2 has five of
+six gate items and E3 has four of six; **both of their open items are owned by
+later milestones** — E2's rejected-corpus count by E1 and E5, E3's streamed
+region by E4's resource model.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -60,6 +61,13 @@ behave as specified under real concurrency: cancellation propagation, ordered
 cleanup, refusal to commit into a dead scope, and no leaked tasks. 12 tests,
 0 failures in 25 consecutive runs. They are **behaviour** results and RQ-4's
 rule holds — neither half may be described as covering the other.
+
+**`pw` renders in a browser.** Two applications written in `.pw` generate Marko
+(ADR-0017), build, and pass 21 tests across Chromium, Firefox and WebKit. The
+static route ships **zero JavaScript** — no script tag, no request — and is
+usable with JS disabled; the counter resumes without re-rendering the inert
+part of the page. Those are Marko's behaviours measured through `pw`, and the
+evidence ledger says so.
 
 **`pw` code executes.** `pw emit-koka` lowers the pure subset (ADR-0015) and
 `just spike-pw-to-koka` compiles and runs it under the pinned Koka 3.2.3,

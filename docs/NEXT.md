@@ -97,6 +97,22 @@ R11 as retired until a real run is green.
 
 ---
 
+## The next milestone: E4
+
+**E4 — typed resource model and the first complete store page.** It is next in
+charter order, and it also unblocks the two items E2 and E3 could not close:
+
+| blocked item | what E4 gives it |
+|---|---|
+| E3 gate 3 — a delayed region streams without blocking the shell | a value that is not ready yet, so there is something to await |
+| E2 gate 2 — ≥40 rejected corpus files | `query`/`command` policy rules with real bodies behind them |
+
+Charter §14 M4 asks for `query`, `command`, `subscription`, `resource` and
+structured `task` as first-class compiler concepts. The declaration syntax for
+all five already parses and lowers; what does not exist is their **meaning**.
+
+---
+
 ## E2's last open gate item
 
 Item 2 — *≥40 rejected examples report errors at original `.pw` spans* — stands
