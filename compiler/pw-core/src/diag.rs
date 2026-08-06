@@ -38,7 +38,7 @@ pub fn render_non_exhaustive(
     site: &MatchSite<'_>,
     styled: bool,
 ) -> Option<String> {
-    if report.is_exhaustive() {
+    if !report.outcome().is_violation() {
         return None;
     }
 

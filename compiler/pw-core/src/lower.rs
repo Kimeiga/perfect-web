@@ -244,6 +244,9 @@ impl Lowerer<'_> {
             Some(b) => self.body(id, &b),
             None => (None, Vec::new()),
         };
+        // Internal invariant, not a claim about the program: `id` was
+        // returned by `alloc` four lines up and arenas do not shrink. No `.pw`
+        // source can make this absent.
         let d = self.hir.decls.get_mut(id.index()).expect("just allocated");
         d.body = body;
         d.children = children;
@@ -596,6 +599,9 @@ impl Lowerer<'_> {
                 let mut kids = node.children().peekable();
                 let scrutinee = match kids.peek().filter(|c| c.kind() != K::MatchArm) {
                     Some(_) => {
+                        // Internal invariant: `peek` returned `Some` on the
+                        // line above and nothing consumed the iterator between
+                        // the two.
                         let c = kids.next().expect("peeked");
                         self.expr(b, &c)
                     }

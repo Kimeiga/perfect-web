@@ -485,3 +485,84 @@ fn the_cli_turns_a_panic_into_a_marked_internal_error() {
         "a contained panic must print something that reproduces it"
     );
 }
+
+/// No panicking construct sits on a path a user program can reach.
+///
+/// Architect ruling, 2026-08-06:
+///
+/// > Add a CI rule banning `unreachable!`, unchecked indexing, and `expect` in
+/// > paths reachable from user programs unless accompanied by a documented
+/// > phase invariant and a targeted generator.
+///
+/// Both panics this project has had were an `expect` or an `unreachable!`
+/// stating a phase invariant that a `.pw` program could violate. The rule is
+/// not "never panic" — a genuine internal invariant may still be asserted —
+/// it is that the assertion must be **argued in a comment** naming why a user
+/// program cannot reach it. An `expect("...")` with no such note is a bet, and
+/// this project has lost that bet twice.
+#[test]
+fn no_unargued_panic_sits_on_a_user_reachable_path() {
+    // Analysis modules: everything a `.pw` program flows through. `codes.rs`
+    // and `diagnostics.rs` are registries, and `types.rs` is the value model
+    // built by the compiler rather than from source.
+    const ANALYSIS: &[&str] = &[
+        "exhaust.rs",
+        "check.rs",
+        "effects.rs",
+        "labels.rs",
+        "infer.rs",
+        "layout.rs",
+        "affine.rs",
+        "annotations.rs",
+        "resume.rs",
+        "routes.rs",
+        "contexts.rs",
+        "resolve.rs",
+        "signatures.rs",
+        "lower.rs",
+        "privacy.rs",
+        "placement.rs",
+        "scope.rs",
+        "rules.rs",
+    ];
+    let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut unargued = Vec::new();
+
+    for name in ANALYSIS {
+        let path = src_dir.join(name);
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        // Tests may panic freely — that is what an assertion is.
+        let body = text.split("#[cfg(test)]").next().unwrap_or(&text);
+        let lines: Vec<&str> = body.lines().collect();
+        for (n, line) in lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            let panics = trimmed.contains("unreachable!")
+                || trimmed.contains(".expect(")
+                || trimmed.contains(".unwrap()")
+                || trimmed.contains("panic!");
+            if !panics {
+                continue;
+            }
+            // Argued if a comment within the preceding six lines explains it.
+            let argued = lines[n.saturating_sub(6)..n]
+                .iter()
+                .any(|l| l.trim_start().starts_with("//"));
+            if !argued {
+                unargued.push(format!("{name}:{}: {}", n + 1, trimmed.trim()));
+            }
+        }
+    }
+
+    assert!(
+        unargued.is_empty(),
+        "these panicking constructs sit on a path a `.pw` program reaches, with \
+         no comment arguing why it cannot:\n  {}\n\nEither argue the invariant \
+         and add a targeted generator for it, or return `Outcome::Blocked`.",
+        unargued.join("\n  ")
+    );
+}

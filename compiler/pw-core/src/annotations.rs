@@ -94,6 +94,8 @@ fn optional_used_as_present(
             (t.path == "Option")
                 .then(|| t.args.first().and_then(|a| body.types.get(a.index())))
                 .flatten()
+                // Internal invariant: this closure only runs inside
+                // `ty.and_then(..)`, so `ty` is `Some` by construction.
                 .map(|inner| (written(body, ty.expect("annotated")), inner.path.clone()))
         });
         let inferred = || {

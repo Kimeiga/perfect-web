@@ -40,6 +40,7 @@ pub mod layout;
 pub mod lower;
 pub mod manifest;
 pub mod marko;
+pub mod outcome;
 pub mod placement;
 pub mod privacy;
 pub mod resolve;

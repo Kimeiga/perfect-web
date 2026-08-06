@@ -528,8 +528,16 @@ fn exhaustiveness(
     }
 
     let report = exhaust::check_match(env.program(), &Type::Adt(adt_id), &lowered);
-    if report.is_exhaustive() {
-        return;
+    match report.outcome() {
+        // Nothing missing, and the analysis actually ran.
+        crate::outcome::Outcome::Proven(_) => return,
+        // No answer. The reason is already reported by whichever phase found
+        // it — `PW0603` above, for the arity case — and saying it twice would
+        // turn one defect into two. What must NOT happen is returning here as
+        // though the match had been proved exhaustive, which is what
+        // `is_exhaustive()` did.
+        crate::outcome::Outcome::Blocked(_) => return,
+        crate::outcome::Outcome::Violation(_) => {}
     }
 
     let missing: Vec<String> = report

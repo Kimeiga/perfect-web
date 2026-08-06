@@ -24,6 +24,7 @@
 //! unreachable arms, and (via witnesses) which constructor is missing rather
 //! than merely that something is.
 
+use crate::outcome::{Blocked, Outcome};
 use crate::types::{Program, Type};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,15 +61,34 @@ pub struct Witness(pub Pattern);
 
 #[derive(Debug, Clone)]
 pub struct MatchReport {
-    /// Concrete values the match does not cover. Empty means exhaustive.
+    /// Concrete values the match does not cover. Empty means exhaustive —
+    /// **only if** `blocked` is also empty. See [`MatchReport::outcome`].
     pub missing: Vec<Witness>,
     /// Arms that can never be reached because earlier arms already cover them.
     pub unreachable: Vec<usize>,
+    /// Reasons the analysis could not run. A non-empty list means `missing`
+    /// says nothing at all.
+    pub blocked: Vec<Blocked>,
 }
 
 impl MatchReport {
-    pub fn is_exhaustive(&self) -> bool {
-        self.missing.is_empty()
+    /// What this report actually concluded.
+    ///
+    /// The three-state answer, and the reason `is_exhaustive` no longer
+    /// exists. It returned `missing.is_empty()`, so a match the analysis could
+    /// not build a matrix for reported nothing missing — and "nothing missing"
+    /// read as a proof of exhaustiveness. The defensive fix that stopped the
+    /// arity panic turned a crash into a false proof, which is worse, because
+    /// a crash is at least loud.
+    pub fn outcome(&self) -> Outcome<&[Witness]> {
+        if !self.blocked.is_empty() {
+            return Outcome::Blocked(self.blocked.clone());
+        }
+        if self.missing.is_empty() {
+            Outcome::Proven(&self.missing)
+        } else {
+            Outcome::Violation(&self.missing)
+        }
     }
 }
 
@@ -137,7 +157,20 @@ fn specialize(matrix: &[Row], ctor: usize, arity: usize) -> Vec<Row> {
                 out.push(r);
             }
             Pattern::Ctor { .. } => {}
-            Pattern::Or(_) => unreachable!("or-patterns are expanded before this point"),
+            // Defensively, like the one in `is_useful`. This is the SAME
+            // `unreachable!` that panicked the compiler, in the sibling
+            // function — the fix removed one and left the other, which is
+            // itself an argument for the CI rule that found it.
+            //
+            // An alternation is a special case of a wildcard, so treating it
+            // as one keeps the matrix total and can only make the analysis
+            // report less. `blockers` has already recorded that the answer is
+            // not a proof.
+            Pattern::Or(_) => {
+                let mut r = vec![Pattern::Wildcard; arity];
+                r.extend_from_slice(rest);
+                out.push(r);
+            }
         }
     }
     out
@@ -346,6 +379,13 @@ pub fn check_match(program: &Program, scrutinee: &Type, arms: &[Arm]) -> MatchRe
 pub fn check_match_multi(program: &Program, scrutinees: &[Type], arms: &[Arm]) -> MatchReport {
     let types: Vec<Type> = scrutinees.to_vec();
 
+    // A pattern whose arity disagrees with its constructor blocks the
+    // analysis. The matrix is still built — padding keeps the algorithm total,
+    // and cascading a second diagnostic from a defect an earlier phase already
+    // reported would be noise — but the RESULT is `Blocked`, so nothing
+    // downstream can read the empty `missing` list as a proof.
+    let blocked = blockers(program, scrutinees.first(), arms);
+
     let mut matrix: Vec<Row> = Vec::new();
     let mut unreachable = Vec::new();
 
@@ -382,7 +422,43 @@ pub fn check_match_multi(program: &Program, scrutinees: &[Type], arms: &[Arm]) -
     MatchReport {
         missing,
         unreachable,
+        blocked,
     }
+}
+
+/// Reasons this match cannot be analysed.
+///
+/// Detected before the matrix is built, so the answer is `Blocked` whatever
+/// the padded matrix happens to produce.
+fn blockers(program: &Program, scrutinee: Option<&Type>, arms: &[Arm]) -> Vec<Blocked> {
+    let Some(ty) = scrutinee else {
+        return Vec::new();
+    };
+    let Some(ctors) = program.ctors_of(ty) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    let mut stack: Vec<&Pattern> = arms.iter().map(|a| &a.pattern).collect();
+    while let Some(p) = stack.pop() {
+        match p {
+            Pattern::Ctor { ctor, args } => {
+                if let Some(c) = ctors.get(*ctor)
+                    && c.fields.len() != args.len()
+                {
+                    let b = Blocked::PatternArity {
+                        ctor: c.name.clone(),
+                    };
+                    if !out.contains(&b) {
+                        out.push(b);
+                    }
+                }
+                stack.extend(args.iter());
+            }
+            Pattern::Or(alts) => stack.extend(alts.iter()),
+            _ => {}
+        }
+    }
+    out
 }
 
 /// Render a witness the way it should appear in a diagnostic.
@@ -483,8 +559,66 @@ mod tests {
             arm(Pattern::ctor(4, vec![Pattern::Wildcard])),
         ];
         let r = check_match(&p, &ty, &arms);
-        assert!(r.is_exhaustive(), "{:?}", r.missing);
+        assert!(!r.outcome().is_violation(), "{:?}", r.missing);
         assert!(r.unreachable.is_empty());
+    }
+
+    #[test]
+    fn a_blocked_analysis_is_not_a_proof_of_exhaustiveness() {
+        // The failure this whole three-state model exists to prevent, as an
+        // assertion. The defensive fix that stopped the arity panic pads the
+        // row, so the algorithm completes and finds nothing missing — and
+        // "nothing missing" is exactly what `is_exhaustive()` returned true
+        // for. A crash became a FALSE PROOF, which is worse: a crash is loud.
+        let mut p = Program::new();
+        let reason = p.declare_adt(
+            "Reason",
+            vec![Ctor {
+                name: "Late".into(),
+                fields: vec![],
+            }],
+        );
+        let state = p.declare_adt(
+            "State",
+            vec![
+                Ctor {
+                    name: "Placed".into(),
+                    fields: vec![],
+                },
+                Ctor {
+                    name: "Cancelled".into(),
+                    fields: vec![Type::Adt(reason)],
+                },
+            ],
+        );
+        let report = check_match(
+            &p,
+            &Type::Adt(state),
+            &[
+                arm(Pattern::Ctor {
+                    ctor: 0,
+                    args: vec![],
+                }),
+                // One field declared, none written.
+                arm(Pattern::Ctor {
+                    ctor: 1,
+                    args: vec![],
+                }),
+            ],
+        );
+
+        assert!(report.missing.is_empty(), "the padded matrix finds nothing");
+        assert!(
+            !report.outcome().is_conclusive(),
+            "and that must NOT read as exhaustive"
+        );
+        assert_eq!(
+            report.outcome().blockers(),
+            &[crate::outcome::Blocked::PatternArity {
+                ctor: "Cancelled".into()
+            }]
+        );
+        assert!(!report.outcome().is_violation(), "nor as a violation");
     }
 
     #[test]
@@ -556,7 +690,7 @@ mod tests {
             arm(Pattern::ctor(2, vec![Pattern::Wildcard])),
         ];
         let r = check_match(&p, &ty, &arms);
-        assert!(!r.is_exhaustive());
+        assert!(r.outcome().is_violation());
         let names: Vec<String> = r
             .missing
             .iter()
@@ -575,7 +709,7 @@ mod tests {
         let mut p = Program::new();
         let ty = order_state(&mut p);
         let arms = vec![arm(Pattern::unit(0)), arm(Pattern::Wildcard)];
-        assert!(check_match(&p, &ty, &arms).is_exhaustive());
+        assert!(!check_match(&p, &ty, &arms).outcome().is_violation());
     }
 
     #[test]
@@ -591,7 +725,7 @@ mod tests {
             arm(Pattern::ctor(4, vec![Pattern::Wildcard])),
         ];
         let r = check_match(&p, &ty, &arms);
-        assert!(!r.is_exhaustive());
+        assert!(r.outcome().is_violation());
         let names: Vec<String> = r
             .missing
             .iter()
@@ -609,7 +743,7 @@ mod tests {
             arm(Pattern::unit(0)), // dead: the wildcard already covered it
         ];
         let r = check_match(&p, &ty, &arms);
-        assert!(r.is_exhaustive());
+        assert!(!r.outcome().is_violation());
         assert_eq!(r.unreachable, vec![1]);
     }
 
@@ -653,7 +787,7 @@ mod tests {
             arm(Pattern::ctor(3, vec![Pattern::Wildcard])),
             arm(Pattern::ctor(4, vec![Pattern::Wildcard])),
         ];
-        assert!(check_match(&p, &ty, &arms).is_exhaustive());
+        assert!(!check_match(&p, &ty, &arms).outcome().is_violation());
     }
 
     #[test]
@@ -664,7 +798,7 @@ mod tests {
             span: 0..0,
         }];
         let r = check_match(&p, &Type::Bool, &only_true);
-        assert!(!r.is_exhaustive());
+        assert!(r.outcome().is_violation());
         assert_eq!(render_witness(&p, &Type::Bool, &r.missing[0]), "false");
     }
 
@@ -674,7 +808,7 @@ mod tests {
         // No finite constructor set exists for Int, so an arm list without a
         // wildcard can never be exhaustive.
         let r = check_match(&p, &Type::Int, &[]);
-        assert!(!r.is_exhaustive());
+        assert!(r.outcome().is_violation());
         let r2 = check_match(
             &p,
             &Type::Int,
@@ -683,7 +817,7 @@ mod tests {
                 span: 0..0,
             }],
         );
-        assert!(r2.is_exhaustive());
+        assert!(!r2.outcome().is_violation());
     }
 
     #[test]
@@ -693,9 +827,9 @@ mod tests {
         let mut p = Program::new();
         let sid = p.declare_opaque("StoreId", Type::Str);
         let ty = Type::Opaque(sid);
-        assert!(!check_match(&p, &ty, &[]).is_exhaustive());
+        assert!(check_match(&p, &ty, &[]).outcome().is_violation());
         assert!(
-            check_match(
+            !check_match(
                 &p,
                 &ty,
                 &[Arm {
@@ -703,7 +837,8 @@ mod tests {
                     span: 0..0
                 }]
             )
-            .is_exhaustive()
+            .outcome()
+            .is_violation()
         );
     }
 
@@ -726,7 +861,7 @@ mod tests {
             span: 0..0,
         }];
         let r = check_match(&p, &ty, &arms);
-        assert!(!r.is_exhaustive());
+        assert!(r.outcome().is_violation());
         let names: Vec<String> = r
             .missing
             .iter()

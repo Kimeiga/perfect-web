@@ -63,7 +63,7 @@ fn pw_rejects_the_match_koka_accepts_under_exn() {
     let (p, ty) = order_state();
     let report = check_match(&p, &ty, &koka_accepted_arms());
     assert!(
-        !report.is_exhaustive(),
+        report.outcome().is_violation(),
         "REGRESSION: pw accepted the non-exhaustive match that Koka only accepts \
          because the effect row admits exn. E1A's reason to exist has gone."
     );
@@ -91,12 +91,12 @@ fn the_result_does_not_depend_on_any_effect_row() {
     let a = check_match(&p, &ty, &arms);
     let b = check_match(&p, &ty, &arms);
     assert_eq!(a.missing.len(), b.missing.len());
-    assert!(!a.is_exhaustive() && !b.is_exhaustive());
+    assert!(a.outcome().is_violation() && b.outcome().is_violation());
 
     // And adding the missing arm fixes it, in every context equally.
     let mut complete = arms.clone();
     complete.push(arm(Pattern::ctor(2, vec![Pattern::Wildcard])));
-    assert!(check_match(&p, &ty, &complete).is_exhaustive());
+    assert!(!check_match(&p, &ty, &complete).outcome().is_violation());
 }
 
 /// A check that cannot fail is not a check (`docs/RISK_QUEUE.md`). This proves
@@ -110,8 +110,12 @@ fn the_checker_can_distinguish_exhaustive_from_not() {
         arm(Pattern::unit(1)),
         arm(Pattern::ctor(2, vec![Pattern::Wildcard])),
     ];
-    assert!(check_match(&p, &ty, &complete).is_exhaustive());
-    assert!(!check_match(&p, &ty, &koka_accepted_arms()).is_exhaustive());
+    assert!(!check_match(&p, &ty, &complete).outcome().is_violation());
+    assert!(
+        check_match(&p, &ty, &koka_accepted_arms())
+            .outcome()
+            .is_violation()
+    );
 }
 
 /// Koka's other measured gap: `Nothing` and `Nil` are both `null`, so a decoder
