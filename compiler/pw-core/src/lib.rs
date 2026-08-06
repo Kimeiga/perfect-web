@@ -24,6 +24,8 @@ pub mod capability;
 pub mod diag;
 pub mod diagnostics;
 pub mod exhaust;
+pub mod hir;
+pub mod lower;
 pub mod rules;
 pub mod scope;
 pub mod types;
