@@ -150,6 +150,30 @@ link.
 `spikes/wasmtime-component/host` (which already computes the actual list) and
 then into the E8 build is the remaining work.
 
+## Corpus harness rules
+
+Architect ruling: rejection is insufficient; a program must be rejected **for
+the specified invariant**.
+
+```text
+accepted program
+  - parses
+  - produces no error diagnostics
+
+rejected program
+  - parses
+  - produces its DECLARED diagnostic code (aliases resolved to canonical)
+  - produces it at the declared or a compatible span
+  - is not counted as passing merely because another rule rejected it
+```
+
+**Accepted programs are checked before rejected ones**, so a false positive
+stops the suite immediately. A rule that fires on a program the corpus calls
+correct is worse than one that misses a violation.
+
+Multi-defect fixtures must list every expected code explicitly. Otherwise each
+rejected fixture should isolate one primary defect.
+
 ## RQ-6 — effect-family rejection coverage
 
 For **every** effect family, three cases are required before the family counts as
@@ -176,10 +200,36 @@ measuring nothing:
 |---|---|---|
 | layout spike F-2 | 79.7 ms → 0.3 ms, looking like a fix | the write stopped invalidating layout, so no work was done |
 | RQ-1 F-1 | 72 "component replacements" | the browser's own initial HTML parse |
+| RQ-1 F-4 | "silent failure, no error signal" | resource-load errors do not bubble; only a capture-phase listener sees them |
 | RQ-2 F-2 | a generic helper reported as **pure** | an effect-polymorphic row variable fell through to the "total" branch |
+| E2 | `pw check` green on 68 files | 13 of them were malformed and no tool had ever read their bodies |
 
-Two flattered the system, one damned it. All three were caught by looking at the
-raw number and asking whether it was plausible.
+All five were caught by looking at a raw number and asking whether it was
+plausible — never by a test going red.
 
-**Rule adopted:** every check ships with a negative case proving it can go red.
-A measurement that cannot fail is not a measurement.
+**Rule adopted**, promoted by the project architect into a general
+admissibility standard:
+
+> **A measurement or checker result is not admissible evidence until its
+> instrument has a negative control proving it can detect the corresponding
+> failure.**
+
+Every gate needs four things:
+
+| | |
+|---|---|
+| **positive control** | the expected-good case passes |
+| **negative control** | an intentionally broken case makes *that exact detector* go red |
+| **plausibility check** | raw values fall in a physically or semantically credible range |
+| **raw evidence** | the unprocessed trace or output is archived |
+
+For parsers and metadata readers, add **mutation tests**: remove an effect row,
+change a constructor tag, omit a source span, misclassify an open row as total,
+change an expected import. The reader must fail closed or make the test red.
+
+This applies to benchmarking, compiler gates, browser instrumentation,
+capability auditing, and the E→P evidence ledger — not only to unit tests.
+
+The five instances so far are why. Two flattered the system, one damned it, and
+one (`.kki` reporting polymorphic rows as total) would have let a *gate* pass
+while hiding the case the architect had flagged as most important.

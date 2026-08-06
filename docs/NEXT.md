@@ -7,6 +7,61 @@ attempt all milestones concurrently."*
 
 ---
 
+## The revised plan
+
+Fixed by the project architect after reviewing E2's results. Items 1–3 are done.
+
+| # | task | status |
+|---|---|---|
+| 1 | Correct the E7 evidence wording — Marko is a resumption/DOM oracle, not a lazy-loading one | **done** |
+| 2 | Adopt Rowan | ADR-0012 accepted; **implementation next** |
+| 3 | Write the formatter ADR, do not implement | **done** (ADR-0013) |
+| 4 | Implement the durable core body grammar | next |
+| 5 | Lower bodies into HIR | after 4 |
+| 6 | Move declaration rules from `pw-cli` into `pw-core` | **done** |
+| 7 | Connect the tested `pw-core` algorithms to `.pw` source | after 5 |
+| 8 | Ratchet semantic corpus enforcement upward from 4/44 | continuous |
+| 9 | Implement `pw fmt` after the syntax/HIR boundary stabilises | after 5 |
+| 10 | Begin E2A-R only once body-level task operations can be represented | after 5 |
+
+### The single biggest architectural decision
+
+> **Do not build an effect-only body parser. Build the real lossless expression
+> syntax now, but stage how much semantic meaning is implemented over it.**
+
+Both alternatives were rejected with reasons worth keeping:
+
+- **An effect-only grammar** creates a second mini-language. The real parser
+  eventually sees one program and the effect parser currently sees another; it
+  can misassociate lambda bodies, call arguments, operator precedence, nested
+  blocks or match arms while still producing plausible-looking effect results.
+  Generic callbacks are specifically a load-bearing test, so syntactic
+  approximation is the wrong layer to economise on.
+- **Declarations alone** cannot analyse
+  `List.map(items, item => database.read(item.id))`. It would prove only direct
+  declared-call propagation — not higher-order source programs, which is the
+  exact failure mode the corpus exists to prevent.
+
+### What "core body grammar" means
+
+Not every final language feature. The durable core:
+
+```text
+names and qualified names      literals
+member/field access            function calls
+lambdas                        blocks
+let bindings                   if/else
+match and patterns             operators with real precedence
+records, tuples, collections   type applications where syntactically relevant
+parenthesised expressions      error/recovery nodes
+```
+
+Queries, commands, subscriptions, resources and tasks should be declarations or
+typed constructs **lowering into the same core expression representation**. E4
+extends the tree; it must not replace its foundation.
+
+---
+
 ## N-0 — Close the Milestone 0 shortfall: Linux CI
 
 **Why now:** the only unmet part of the M0 gate. Risk R11 is the

@@ -17,6 +17,9 @@ Status values: `Proposed` · `Accepted` · `Superseded by ADR-NNNN` · `Rejected
 | [0008](DECISIONS/ADR-0008-wasi-0.2-not-0.3.md) | Target WASI 0.2; 0.3 not reachable through the stable toolchain | Accepted | reuse | Rust ships stable `wasm32-wasip3` |
 | [0009](DECISIONS/ADR-0009-parser-and-diagnostics-stack.md) | Hand-written parser + `annotate-snippets` 0.12.16 diagnostics | Accepted | build | Milestone 2 lossless-tree design |
 | [0010](DECISIONS/ADR-0010-provisional-pw-extension.md) | `.pw` is the provisional source extension | **Proposed** | build | Milestone 2 task 1 owns the real decision |
+| [0011](DECISIONS/ADR-0011-koka-is-an-effects-only-oracle.md) | Koka is an effects-only oracle; `pw` owns value semantics | Accepted | tape | E9 checker reaches parity |
+| [0012](DECISIONS/ADR-0012-adopt-rowan-before-body-parsing.md) | Adopt `rowan` 0.17.0 before body parsing; analyses consume HIR, not syntax nodes | Accepted | reuse | rowan cannot express a needed property |
+| [0013](DECISIONS/ADR-0013-formatter-design.md) | Canonical formatting rules; implementation deferred until ADR-0012 lands | Accepted (design) | build | canonical examples drafted |
 
 ## Decisions the charter asked for and where they landed
 
@@ -63,6 +66,22 @@ They target wasm and must not be pulled into a host-target
 **2026-08-05 — Node 22.21.1 rather than Node 24.**
 Both `vite@8.2.0` (`^20.19.0 || >=22.12.0`) and `marko@6.3.32` (`>=22`) are
 satisfied. Pinning what was actually tested, per charter §3.6. Assumption A-002.
+
+**2026-08-05 — one diagnostic code per invariant, not per detector.**
+`PW2004` ("a resource cannot outlive the scope that owns it") is emitted by both
+the declaration rule and the scope graph, distinguished by a `reason` and
+`detector` field. `PW0326` is a deprecated alias resolving to it. Two permanent
+codes for one invariant would be wrong; aliasing during migration is fine.
+
+**2026-08-05 — semantic rules may not live in the CLI.**
+`pw-syntax` owns syntax, `pw-core` owns meaning and emits one `Diagnostic` type,
+`pw-cli` renders. This is what lets a language server, test harness, build
+system, playground, AI loop and PR analyser share one checker.
+
+**2026-08-05 — E7 is subdivided.**
+E7-R (resumption/DOM), E7-P (patch semantics), E7-L (lazy loading). Marko is the
+accepted oracle for E7-R only; it **fails** E7-L. The undifferentiated sentence
+"Marko is the E7 oracle" is forbidden.
 
 **2026-08-05 — `just ci` runs `clippy -D warnings`.**
 Dead code is treated as a signal, not noise: the first `-D warnings` failure
