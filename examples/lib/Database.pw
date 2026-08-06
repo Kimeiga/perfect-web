@@ -10,8 +10,23 @@ module Database
 
 import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
     MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
-    RecommendationError, PaymentError, TrackingError, DatabaseTransaction }
+    RecommendationError, PaymentError, TrackingError, DatabaseTransaction, DatabaseConnection }
 import browser.{ Element, MapHandle, MapError }
+
+// A live connection. It is a resource for the same reason a transaction is —
+// something outside the program is holding state open on this program's behalf
+// — and that is also why it cannot be written into a resume manifest.
+fn connect() -> DatabaseConnection
+    !{ database.read, resource.acquire<DatabaseConnection> }
+{
+    todo
+}
+
+fn disconnect(c: DatabaseConnection) -> ()
+    !{ resource.release<DatabaseConnection> }
+{
+    todo
+}
 
 // `resource.acquire<T>` in the row is what makes the returned value affine.
 // The checker reads the row; it holds no list of functions that open things,

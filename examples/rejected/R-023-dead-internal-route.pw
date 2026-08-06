@@ -12,6 +12,13 @@
 
 module store.page
 
+// The route table this file is checked against. A link is dead relative to
+// what the program declares, so there has to be something declared.
+page StoreOverview(id: StoreId) !{} {
+    route "/stores/{id}"
+    view { <main><h1>Store</h1></main> }
+}
+
 view StoreLinks(id: StoreId) !{} {
     <nav aria-label="Store">
         <a href="/stores/{id}">Overview</a>

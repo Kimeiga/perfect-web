@@ -146,6 +146,13 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // another module still contributes to its caller's row.
     let mut inference = crate::effects::Inference::new(&sigs);
     inference.run(&hirs);
+    // E7: what the whole program says about a type — is it a resource, and is
+    // it produced only by a scoped declaration. Both are needed before any one
+    // file can be asked what its handlers may capture.
+    let manifest = crate::resume::Manifest::build(&hirs, &sigs);
+    // E6: every route the program declares, so a link can be checked against
+    // what exists rather than against a naming convention.
+    let routes = crate::routes::table(&hirs);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -177,7 +184,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         .enumerate()
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
-            out.extend(check_unit_with(&env, &labels, &sigs, &inference, u));
+            out.extend(check_unit_with(
+                &env, &labels, &sigs, &inference, &manifest, &routes, u,
+            ));
             out.sort_by_key(|d| d.primary_span.start);
             (u.path.clone(), out)
         })
@@ -336,7 +345,17 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     let sigs = Signatures::default();
     let inference = crate::effects::Inference::new(&sigs);
-    check_unit_with(env, &BTreeMap::new(), &sigs, &inference, unit)
+    let manifest = crate::resume::Manifest::default();
+    let routes = std::collections::BTreeSet::new();
+    check_unit_with(
+        env,
+        &BTreeMap::new(),
+        &sigs,
+        &inference,
+        &manifest,
+        &routes,
+        unit,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -345,6 +364,8 @@ fn check_unit_with(
     labels: &BTreeMap<String, Label>,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
+    manifest: &crate::resume::Manifest,
+    routes: &std::collections::BTreeSet<String>,
     unit: &Unit,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
@@ -376,6 +397,12 @@ fn check_unit_with(
 
     // Affine resources: consumed exactly once, in the scope that acquired it.
     crate::affine::check(&unit.hir, sigs, &mut out);
+
+    // Charter §8.5: the resume manifest ships with the document.
+    crate::resume::check(&unit.hir, manifest, &mut out);
+
+    // Charter §8.2: an internal link names a route the program declares.
+    crate::routes::check(&unit.hir, routes, &mut out);
 
     for (id, decl) in unit.hir.all_decls() {
         privacy_and_placement(

@@ -176,6 +176,9 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // The corpus's number for "the placement you named cannot grant this".
     ("PW0323", "PW5005"),
     ("PW0302", "PW5003"),
+    // The resume manifest: one about what a value IS, one about who may read it.
+    ("PW0308", "PW5008"),
+    ("PW0328", "PW5007"),
     // R-006: a secret reaching a sink declared `Public`.
     ("PW0304", "PW5006"), // a secret cannot be rendered to the browser
     ("PW0303", "PW5004"), // a shared cache key must carry every partition
@@ -220,6 +223,7 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     ("PW0307", "PW0601"),
     ("PW0320", "PW0602"),
     ("PW0316", "PW5011"), // a list over a mutable collection needs a stable key
+    ("PW0321", "PW5009"),
     ("PW0317", "PW5012"), // an element may only contain the children HTML permits
     ("PW0318", "PW5013"), // interactive behaviour belongs on an interactive element
     ("PW0319", "PW5014"), // a form control must have something that names it

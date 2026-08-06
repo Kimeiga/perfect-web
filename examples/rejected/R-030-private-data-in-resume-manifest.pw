@@ -12,6 +12,9 @@
 
 module cart.summary_view
 
+import domain.{ Cart }
+import cart.queries
+
 view CartSummary(cart: Cart) !{} {
     <section aria-label="Cart">
         <button

@@ -180,6 +180,12 @@ codes! {
         "a declared placement must be able to grant every effect it requires";
     VALUE_EXCEEDS_SINK_LEVEL = "PW5006", Privacy,
         "a sink accepts only values its declared privacy level admits";
+    PRIVATE_IN_RESUME_MANIFEST = "PW5007", Privacy,
+        "the resume manifest ships with the public shell and may hold only public values";
+    UNSERIALIZABLE_CAPTURE = "PW5008", Privacy,
+        "a resumable handler may capture only what can be written to its manifest";
+    DEAD_INTERNAL_LINK = "PW5009", Markup,
+        "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010", DeclarationRules,
         "an unsafe escape hatch must carry a complete audit record";
     // The architect proposed PW5011 for this. That number was already the
@@ -228,21 +234,6 @@ pub enum RuleStatus {
 /// milestones land; it grows only when a new specification fixture is added.
 pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     // (code, intended owner, missing analysis)
-    (
-        "PW0308",
-        "E7",
-        "serialization analysis — a non-serializable capture",
-    ),
-    (
-        "PW0321",
-        "E6",
-        "route reachability — a route nothing can reach",
-    ),
-    (
-        "PW0328",
-        "E7",
-        "resumption manifest — private data crossing into the public shell",
-    ),
     (
         "PW3011",
         "E7",

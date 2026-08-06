@@ -1,7 +1,7 @@
 corpus enforcement — every rejected fixture, checked as its own program
 (the shared library, the accepted modules it imports, and the fixture)
 
-41/44 enforce their declared invariant
+44/44 enforce their declared invariant
 
 R-001  enforced                  PW0401 (declared PW0300)
        network request inside view
@@ -21,7 +21,7 @@ R-008  enforced                  PW0600 (declared PW0306)
        ambient null assumption
 R-009  enforced                  PW0601 (declared PW0307)
        unchecked external cast
-R-010  UNCAUGHT                  PW0308
+R-010  enforced                  PW5008 (declared PW0308)
        nonserializable handler capture
 R-011  enforced                  PW2005 (declared PW0309)
        open transaction not committed or rolled back
@@ -47,7 +47,7 @@ R-021  enforced                  PW5014 (declared PW0319)
        label missing from form control
 R-022  enforced                  PW0602 (declared PW0320)
        form handler type mismatch
-R-023  UNCAUGHT                  PW0321
+R-023  enforced                  PW5009 (declared PW0321)
        dead internal route
 R-024  enforced                  PW5010 (declared PW0322)
        raw unsafe HTML without capability
@@ -61,7 +61,7 @@ R-028  enforced                  PW2004 (declared PW0326)
        subscription outlives component scope
 R-029  enforced                  PW0327
        optimistic state with no rollback path
-R-030  UNCAUGHT                  PW0328
+R-030  enforced                  PW5007 (declared PW0328)
        private data in resume manifest
 R-031  enforced                  PW5010 (declared PW0329)
        unsafe escape hatch without justification

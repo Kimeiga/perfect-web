@@ -1,0 +1,21 @@
+// @expect: clean
+// The control for the link rule: the same interpolated link shape, pointing at
+// a route this program declares. A rule that reported every interpolated href,
+// or every href at all, would catch this.
+
+module rules.routes_good
+
+import domain.{ StoreId }
+
+page Overview(id: StoreId) !{} {
+    route "/stores/{id}"
+    view { <main><h1>Store</h1></main> }
+}
+
+view Links(id: StoreId) !{} {
+    <nav aria-label="Store">
+        <a href="/stores/{id}">Overview</a>
+        <a href="https://example.com/help">Help</a>
+        <a href="#top">Top</a>
+    </nav>
+}

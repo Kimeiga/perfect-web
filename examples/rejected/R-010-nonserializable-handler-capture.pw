@@ -13,6 +13,9 @@
 
 module admin.panel
 
+import domain.{ DatabaseConnection }
+import Database
+
 view AdminPanel(connection: DatabaseConnection) !{} {
     <button
         // ERROR: capturing a live database connection in a resumable handler.

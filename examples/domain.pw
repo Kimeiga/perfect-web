@@ -54,6 +54,10 @@ type Store = Store {
     hours: StoreHours,
 }
 
+// A live connection to the database. Opaque, and a resource: `Database.connect`
+// declares `resource.acquire<DatabaseConnection>`.
+opaque type DatabaseConnection = String
+
 // An open transaction. Affine: it must end exactly once, and the row of the
 // function that produced it says so.
 opaque type DatabaseTransaction = String

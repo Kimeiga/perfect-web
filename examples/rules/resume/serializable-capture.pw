@@ -1,0 +1,14 @@
+// @expect: clean
+// The control for the capture rules. Same `resumable`, same captures clause —
+// what is captured is an identifier rather than the live thing. A rule that
+// reported every `resumable(captures = ..)` would catch this.
+
+module rules.resume_good
+
+import domain.{ StoreId }
+
+view Panel(store_id: StoreId) !{} {
+    <button on:press={resumable(captures = { store_id }) => refresh(store_id)}>
+        Refresh
+    </button>
+}

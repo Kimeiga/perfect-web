@@ -40,6 +40,8 @@ pub mod marko;
 pub mod placement;
 pub mod privacy;
 pub mod resolve;
+pub mod resume;
+pub mod routes;
 pub mod rules;
 pub mod scope;
 pub mod signatures;
