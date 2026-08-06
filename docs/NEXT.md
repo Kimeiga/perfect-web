@@ -99,82 +99,46 @@ R11 as retired until a real run is green.
 
 ## The next executable task
 
-The corpus gate is met at 44/44. What is left is **not** more compile-fail
-cases — it is replacing the narrow rules that met those cases with the general
-analyses their milestones actually name. `docs/evidence/P0/readiness.txt` lists
-each shortcut; they are, in the order a reader would notice them:
+**The corpus score cannot go higher.** It is 44/44 at corpus version C1, and
+C1 is frozen (`docs/CORPUS.md`). Progress is now measured by the second score.
 
-1. **E9C — control flow.** `affine.rs` asks whether a `return` sits textually
-   between an acquisition and the first release. A release in one branch of an
-   `if` with a return in the other passes today. A real CFG replaces the
-   `early_return` function and nothing else; the acquire/release model, the
-   diagnostic and the controls all stay.
+```text
+corpus conformance:      44 / 44
+generally enforced:       9 / 29
+narrowly enforced:        1 / 29
+generality untested:     19 / 29
+```
 
-2. **E9 — type inference.** `annotations.rs` fires only where the author wrote
-   a type. Dropping `: Option<Store>` from R-008 makes it compile. Inference
-   would reach the same three fixtures without the annotation, and the existing
-   rules become the reporting layer over it.
+### 1. A witness for each of the 19 untested invariants
 
-3. **Interpolation as an expression.** `check.rs::carried_names` reads `{name}`
-   out of a string literal's text, so `{token.value}` is invisible to the
-   privacy-sink rule. This is a parser change — lower an interpolation as an
-   expression — and it is the smallest of the four.
+For each, write a program in `examples/generality/<symbol>/` that violates the
+invariant in a shape the fixture does not have — different control flow, a
+different depth, a different construct — and run it.
 
-4. **E7 — the manifest generator.** `resume.rs` decides what a capture *is*
-   from the enclosing declaration's parameter list. Generating the manifest
-   would settle it from the real value.
+- **Caught?** It is `caught.pw`, `@status: GENERAL`, and the score rises.
+- **Not caught?** It is `slips-through.pw`, `@status: NARROW`, and the score
+  does not. That is not a failure; it is the discovery the exercise exists for,
+  and the gap is now executable rather than unknown.
 
-**Acceptance for each:** the corpus stays at 44/44 with the three numbers
-equal, every existing control stays green, and at least one NEW control is
-added that the narrow rule would have passed and the general one catches.
-That last clause is the point — replacing a shortcut with a real analysis
-should be *visible* in the test suite, or there is no evidence it happened.
+Both outcomes are progress and neither requires deciding in advance which it
+will be. `just generality` reports the result.
 
-### Also open
+The evidence that this finds things: the first afternoon of it turned up a
+**compiler panic** in the exhaustiveness checker that a `.pw` program could
+reach, a label that did not survive rebinding, and a wrong return type in the
+library — none of which 44 fixtures had reached.
 
-E4 (5/7) and E5 (3/5) have gate items that need a store demo and the resource
-generator. Those are product work, not checker work.
+### 2. The two remaining narrow rules
 
-One KNOWN_GAP remains: `PW3011`, which no corpus fixture declares.
+- `resume.rs` reads a capture's type from the enclosing declaration's parameter
+  list only. No witness written yet.
+- `exhaust.rs` does not descend into a match that appears as another match's
+  arm. Witness exists.
 
----
+### 3. E4 and E5's open gate items
 
-## E2's last open gate item
-
-Item 2 — *≥40 rejected examples report errors at original `.pw` spans* — stands
-at **33 of 44**. It is the only E2 gate item still open and it is not E2's to
-close; the remaining eleven belong to E5, E9, E9C, E7 and E6 as listed above.
-
-Items 4 (Koka execution) and 3 (formatting) are closed; 1, 5 and 6 were already.
+E4 is 5/7, E5 3/5. Both need a store demo and the resource generator — product
+work, not checker work.
 
 ---
 
-## Standing obligations (every milestone)
-
-Charter §3.1, plus the admissibility rule now in `docs/RISK_QUEUE.md`:
-
-1. Inspect the repository and `docs/STATUS.md` first.
-2. **Re-verify upstream versions and APIs against primary sources.** E0 found
-   seven wrong assumptions this way.
-3. Write or update an ADR **before** a consequential design change.
-4. Add failing tests or a reproducible benchmark before implementation.
-5. **Give every check a negative control** proving it can go red. Five
-   measurement bugs so far say this is not optional.
-6. Implement the smallest end-to-end vertical slice.
-7. Run all relevant checks.
-8. Record measured results, limitations and unexpected findings.
-9. Make a focused local commit.
-10. Update the milestone gate checklist.
-11. Proceed only when the gate passes, or document precisely why it cannot.
-
-## Carried-forward amendments
-
-- **Exhaustiveness compile-fail cases must declare a total effect row.** Koka
-  accepts a non-exhaustive match in any function declaring `exn`, so a case
-  written without that constraint passes vacuously (E0 finding F-8).
-- **Do not claim nominal domain types are enforced by Koka.** Single-field
-  `value struct`s are erased at the JS boundary (F-4).
-- **A multi-operation effect needs ONE `handler` block.** Chained
-  `with fun op(..)` shorthands leave later operations unhandled (F-6).
-- **`.kki` and the value representation both need golden fixtures per pinned
-  Koka version** (ADR-0011).

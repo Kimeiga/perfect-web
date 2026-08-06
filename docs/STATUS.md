@@ -13,12 +13,15 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E4/E5's remaining gate items** — a store demo and the
-resource generator — and then the *general* analyses whose corpus cases are now
-met by narrower rules: E9 (type inference), E9C (control flow), E7 (the manifest
-generator), E6 (the resource graph). Each of those has a working rule against
-its fixture and none has the general analysis;
-`docs/evidence/P0/readiness.txt` names the shortcut in each.
+**next milestone:** witnesses for the 19 invariants whose generality is
+untested — each is either a promotion or a discovery, and both are progress —
+then E4 (5/7) and E5 (3/5), whose open items need a store demo and the resource
+generator rather than more checker work.
+
+Three of the four shortcuts `readiness.txt` named this morning are closed:
+branch-aware affine analysis, Option inference that does not need the
+annotation, and string holes lowered as expressions. Each replacement is proved
+by a program the narrow rule would have passed.
 
 E0, E2A, **E2**, **E3**, and the inserted **E2B / E2C / E2D** are complete; E1
 closed on RQ-2's Outcome 1. E4 is 5/7 and E5 3/5; their open items need a store
@@ -50,12 +53,26 @@ diagnostic, and the whole declared invariant being checked):
 44 / 44  fully enforce the complete declared invariant
 ```
 
-**Charter §14 M2 gate item 2 — ≥40 of 44 — is met**, and met at 44 with the
-three numbers equal and no wrong-reason catches. What that does *not* mean is
-written down at length in `docs/evidence/P0/readiness.txt`, which is longer on
-the second point than the first: several rules meet their fixture with less
-machinery than the general problem needs, and nine fixtures were given
-declarations they call.
+**Charter §14 M2 gate item 2 — ≥40 of 44 — is met**, at corpus version **C1**
+(`docs/CORPUS.md`), with the three numbers equal and no wrong-reason catches.
+
+There is now a **second gate, and it is open**:
+
+```text
+corpus conformance:      44 / 44
+generally enforced:       9 / 29
+narrowly enforced:        1 / 29   (with an executable witness)
+generality untested:     19 / 29
+```
+
+An invariant counts as *generally* enforced only when a program its fixture did
+not anticipate is caught. `examples/generality/` holds those programs — and
+also `slips-through.pw` files, which are known gaps written as code that must
+compile clean, so `just ci` fails the moment a gap closes and the witness needs
+promoting. `just generality` scores it.
+
+Read the second number as the honest one. It moved 7 → 9 today; the first has
+not moved since it reached 44.
 
 Up from four when E2 began, each with a primary span, an origin span, a note and
 a legal alternative. `just evidence-corpus` regenerates
