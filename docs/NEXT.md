@@ -103,23 +103,38 @@ Every milestone through E5, plus the inserted E2B/E2C/E2D and E7V, is closed.
 All five quality gates are green.
 
 ```text
-corpus conformance        44 / 44   closed at C1
+corpus conformance        44 / 44   at C2
 single-defect isolation   44 / 44
 generality-tested         29 / 29
 headline matrices          8 / 8
 resume compatibility      E7V closed
+resource graph            E6 closed — 6 gate items
 robustness                11 suites, 0 panics
+coverage-guided fuzzing    6 targets, 3600 execs
 historical compatibility   9 / 10   classified
 KNOWN_GAPs                 0
 ```
 
-### 1. E6 — materialized resource graph
+### 1. E7 — the own renderer (E7-R / E7-P / E7-L)
 
-The next milestone in charter order, and the first that is not started. The
-corpus already exercises its invariants (`stale_key_policy`,
-`cache_key_omits_partition`, `dead_internal_link`) and the declarations parse
-and lower; what does not exist is the graph itself — dependency tracking,
-invalidation propagation, and regeneration.
+The next milestone in charter order, and the first that is not started. Marko
+is the accepted oracle for resumption and streamed patches (ADR-0002,
+ADR-0017), and E7V's compatibility decision already governs the real handler
+path in Chromium, Firefox and WebKit. What is missing is a renderer, not a
+decision.
+
+E6 leaves it two things it can use: a fragment's regeneration produces a body,
+and today that body is a string. What a fragment's markup actually *is* belongs
+to the renderer.
+
+Two smaller pieces are E6's and are deliberately not claimed there:
+
+- **Cache-key auditing in `pw explain`** (charter §14 M6 task 9).
+  `Graph::key_gaps` computes the missing dimensions and `PW5102` enforces the
+  one that is always wrong; reporting the rest as advice needs `explain` to
+  read the whole-program graph, which today it does not.
+- **A materialized fragment that renders.** `just materialize` proves what
+  recomputes and what does not; the bodies are strings a test wrote.
 
 ### 2. The large remaining ones
 
@@ -156,6 +171,15 @@ the first version lands.
   because of it. An unresolved type is `PW5016`, never a quiet downgrade to an
   ordinary handler — which would make which handlers resume depend on where
   inference happens to be blind.
+
+**One more, added by E6 and not yet started: the two parsers.** `grammar.rs`
+(Rowan) and `parser.rs` (the declaration AST behind `pw explain` and
+`rules.rs`) disagreed four times in one change — `DECL_STARTERS`, the noun
+tables, `POLICY_KEYWORDS`, and policy-value whitespace. Each is now a single
+definition, which removes the four known disagreements and not the way to
+create a fifth. The real fix is for `explain` and `rules.rs` to read the HIR, at
+which point `parser.rs` deletes; that is ~1,600 lines of migration and is
+scheduled rather than done.
 
 Each is a first version, not a finished one. The fuzzer runs 600 iterations per
 target in CI; the browser path exercises four manifests; the type rule knows

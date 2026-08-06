@@ -1,0 +1,252 @@
+{
+  "nodes": [
+    {
+      "path": "Events.CartChanged",
+      "name": "CartChanged",
+      "node": "event",
+      "params": [
+        "session"
+      ]
+    },
+    {
+      "path": "Events.InventoryChanged",
+      "name": "InventoryChanged",
+      "node": "event",
+      "params": [
+        "store",
+        "item"
+      ]
+    },
+    {
+      "path": "Events.MenuChanged",
+      "name": "MenuChanged",
+      "node": "event",
+      "params": [
+        "store"
+      ]
+    },
+    {
+      "path": "Events.PromotionChanged",
+      "name": "PromotionChanged",
+      "node": "event",
+      "params": [
+        "store"
+      ]
+    },
+    {
+      "path": "Events.StoreChanged",
+      "name": "StoreChanged",
+      "node": "event",
+      "params": [
+        "store"
+      ]
+    },
+    {
+      "path": "Resources.Cart",
+      "name": "Cart",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "session",
+      "params": [
+        "session"
+      ]
+    },
+    {
+      "path": "Resources.Menu",
+      "name": "Menu",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "Resources.Order",
+      "name": "Order",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "Resources.Store",
+      "name": "Store",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.menu_fragment.MenuFragment",
+      "name": "MenuFragment",
+      "node": "materialization",
+      "placement": "edge",
+      "partition": "public",
+      "regenerate": "on_invalidation",
+      "stampede": "single_flight",
+      "fallback": "last_known_good",
+      "varies_by": [
+        "code_version",
+        "locale",
+        "tenant",
+        "privacy_partition",
+        "policy_version"
+      ],
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.page.Cart",
+      "name": "Cart",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "session",
+      "params": [
+        "session"
+      ]
+    },
+    {
+      "path": "store.page.Menu",
+      "name": "Menu",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.page.Store",
+      "name": "Store",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.page.StorePage",
+      "name": "StorePage",
+      "node": "page",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.page.add_to_cart",
+      "name": "add_to_cart",
+      "node": "command",
+      "params": [
+        "item",
+        "quantity"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "Resources.Menu",
+      "to": "Events.MenuChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "Resources.Store",
+      "to": "Events.StoreChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.menu_fragment.MenuFragment",
+      "to": "Events.InventoryChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id",
+        "item"
+      ]
+    },
+    {
+      "from": "store.menu_fragment.MenuFragment",
+      "to": "Events.MenuChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.menu_fragment.MenuFragment",
+      "to": "Events.StoreChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.menu_fragment.MenuFragment",
+      "to": "store.page.Menu",
+      "kind": "reads",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.menu_fragment.MenuFragment",
+      "to": "store.page.Store",
+      "kind": "reads",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.page.StorePage",
+      "to": "store.page.Cart",
+      "kind": "reads",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.StorePage",
+      "to": "store.page.Menu",
+      "kind": "reads",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.page.StorePage",
+      "to": "store.page.Store",
+      "kind": "reads",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.page.add_to_cart",
+      "to": "Events.CartChanged",
+      "kind": "emits",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.add_to_cart",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_session()"
+      ]
+    }
+  ],
+  "dangling": []
+}

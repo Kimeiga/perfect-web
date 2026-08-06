@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Nineteen measurements in this project produced plausible, favourable results
+Twenty-one measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -228,11 +228,18 @@ argument for the admissibility rule above.
 | registry | `PW0323` looked owned and consistent | it meant three things at once: the registry called it "a resource must declare how it is released" (nothing enforced that), `rules.rs` emitted it for a placement failure, and the corpus fixture declaring it is about placement. Had the rule and the fixture ever met, the ratchet would have counted a correct catch under a description of a different rule — and `declared_code == errored` **cannot see that**, because the code genuinely matches |
 | registry | four gap entries read as open work | `PW3001`, `PW3002`, `PW3004` and `PW3008` were aliased onto `PW0401`/`PW0402` when the layout family landed, so nothing could ever resolve to the gap entries. They described work that was already done as unowned |
 | E9C fuzzer | 69 covered regions for the whole compiler | the profile parser looked for `Function name: `, which `llvm-profdata` does not emit, so it matched nothing in the dependencies and measured only the harness. The real figure is 1,200-2,300 per target. Caught by the number being implausible for a parser plus fourteen analyses — not by a test |
+| E6 corpus | A-009 passed as the "edge materialized menu" fixture | a `materialize` block writes its policies INSIDE its braces, the grammar parsed that block as an expression body, and `decl.policies` was empty for every materialization in the corpus. All four of A-009's graph edges pointed at nothing. The fixture demonstrated the SYNTAX of a dependency graph and none of its semantics, and it passed because no analysis had ever read those clauses — the C0→C1 repair arriving in a second place, unnoticed for the same reason |
+| E6 graph | every page's dependency on its own query resolved | it resolved to the TYPE of the same name. `store.page` declares `query Store` and imports `domain.Store`, and the general `resolve` tries the type namespace first, so every page edge pointed at a record definition. The graph was full, the paths were plausible, and no edge named a thing that could be invalidated |
 | E7/E9 inference | every checker resolved sibling declarations, because the API offered a way to say so | the module was a **builder step** — `Types::of_body(..).in_module(m)` — and four of the seven callers never called it. Those four silently inferred with no module, so a bare name never resolved to a sibling and rules that depend on a type went quiet rather than wrong. Found only because a new rule needed to resolve `query Menu(..)` **during** construction, where no builder step had run yet. The fix is not a seventh call site: the module is now a parameter of `of_body`, so a caller cannot forget it and there is no order to get wrong |
 | E2 grammar | an audited `unsafe` was reported as unjustified | the newline rule that ends a statement also ended `unsafe capability … because "…"` before its `because` clause, so the justification became a separate statement and never reached the declaration. **`pw fmt` then baked the misparse into the source**, which is the part worth remembering: a formatter faithfully renders a wrong parse |
 
-The inference row is the same shape as the by-name member fallback deleted in
-E2C, arriving through a different door: **whether a correctness analysis ran at
+The two E6 rows and the inference row share a shape with the by-name member
+fallback deleted in E2C, arriving through three different doors. The E6 graph
+row is the sharpest: a wrong answer that is *shaped like* a right one — a real
+path, to a real declaration, of the wrong kind — is harder to see than no answer
+at all, because every summary count looks correct.
+
+The inference row: **whether a correctness analysis ran at
 all depended on something other than the program.** There it was a global
 accident of spelling; here it was whether a caller remembered a second method
 call. The countermeasure is the same one, and it is not a test — it is removing

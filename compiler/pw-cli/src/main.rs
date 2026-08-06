@@ -839,6 +839,56 @@ mod tests {
         );
     }
 
+    /// The other half of ADR-0018's boundary for E6.
+    ///
+    /// `runtime/pw-materialize/tests/store-graph.json` is real `pw emit-graph`
+    /// output, checked in and read by a crate that shares no type with the
+    /// compiler. That is what makes the boundary testable, and it is also how
+    /// a checked-in fixture goes stale: rename a field here and the runtime's
+    /// tests keep passing against last week's bytes, until an empty list at run
+    /// time becomes a fragment nothing ever invalidates.
+    ///
+    /// So the fixture is regenerated and compared. A rename fails a test.
+    #[test]
+    fn the_committed_graph_matches_what_the_compiler_emits() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut paths: Vec<std::path::PathBuf> = vec![root.join("examples/domain.pw")];
+        for dir in ["examples/lib", "examples/store"] {
+            let mut found: Vec<_> = std::fs::read_dir(root.join(dir))
+                .unwrap_or_else(|e| panic!("{dir}: {e}"))
+                .map(|e| e.expect("entry").path())
+                .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+                .collect();
+            found.sort();
+            paths.extend(found);
+        }
+
+        let hirs: Vec<pw_core::hir::Hir> = paths
+            .iter()
+            .map(|p| {
+                let src = std::fs::read_to_string(p).unwrap_or_else(|e| panic!("{p:?}: {e}"));
+                let parsed = pw_syntax::parse_tree(&src);
+                assert!(parsed.ok(), "{p:?} does not parse");
+                pw_core::lower::lower_file(&src, &parsed.green)
+            })
+            .collect();
+        let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+        let ws = pw_core::resolve::Workspace::build(&refs);
+        let g = pw_core::graph::Graph::build(&refs, &ws);
+        let fresh = serde_json::to_string_pretty(&g).expect("serialize");
+
+        let committed =
+            std::fs::read_to_string(root.join("runtime/pw-materialize/tests/store-graph.json"))
+                .expect("store-graph.json");
+
+        assert_eq!(
+            fresh.trim(),
+            committed.trim(),
+            "the committed graph is stale. Regenerate it with `just materialize` \
+             and say in the commit message what changed about the graph's shape."
+        );
+    }
+
     #[test]
     fn explain_flags_a_session_value_in_a_shared_cache() {
         // The charter §7.8 rule, surfaced as a forward-looking warning until E5

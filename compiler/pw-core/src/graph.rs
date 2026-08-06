@@ -221,18 +221,38 @@ impl Graph {
                 }
                 let module = hir.module_of(id).unwrap_or_default();
                 let from = qualified(module, &decl.name);
+                // An edge's target is a query, a materialization, an event, a
+                // command or a page — never a TYPE. Saying so is not an
+                // optimisation, it is the difference between two right answers:
+                // `store.page` declares `query Store` and imports the type
+                // `domain.Store`, and the general `resolve` tries the type
+                // namespace first, so every page's dependency on its own query
+                // resolved to a record definition instead. The graph looked
+                // full and every edge pointed at the wrong kind of thing.
+                //
+                // Local before imported, across all three, for the same reason
+                // `resolve_in` prefers local within one: a declaration in this
+                // module is what the author meant.
                 let resolve = |name: &str| -> Option<String> {
-                    match ws.resolve(unit, name) {
-                        crate::resolve::Resolution::Local(d)
-                        | crate::resolve::Resolution::Imported { def: d, .. } => {
-                            by_def.get(&d).cloned()
+                    use crate::resolve::{Namespace, Resolution};
+                    const USABLE: [Namespace; 3] =
+                        [Namespace::Term, Namespace::Ui, Namespace::Event];
+                    let mut imported = None;
+                    for ns in USABLE {
+                        match ws.resolve_in(unit, ns, name) {
+                            Resolution::Local(d) => return by_def.get(&d).cloned(),
+                            Resolution::Imported { def, .. } if imported.is_none() => {
+                                imported = by_def.get(&def).cloned();
+                            }
+                            // Ambiguous resolves to NOTHING, not to one of the
+                            // candidates. Two imports offering one name means
+                            // the program does not say which, and picking
+                            // either decides an invalidation boundary by
+                            // accident.
+                            _ => {}
                         }
-                        // Ambiguous is NOT resolved to one of the candidates.
-                        // Two imports offering the same name means the program
-                        // does not say which, and picking either would decide
-                        // an invalidation boundary by accident.
-                        _ => None,
                     }
+                    imported
                 };
 
                 for (policy, kind) in [

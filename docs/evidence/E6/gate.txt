@@ -1,0 +1,97 @@
+E6 — the materialized resource graph
+
+$ just materialize
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+event          Events.InventoryChanged
+event          Events.MenuChanged
+event          Events.PromotionChanged
+event          Events.StoreChanged
+resource       Resources.Cart
+resource       Resources.Menu
+resource       Resources.Order
+resource       Resources.Store
+materialize    store.menu_fragment.MenuFragment
+resource       store.page.Cart
+resource       store.page.Menu
+resource       store.page.Store
+page           store.page.StorePage
+command        store.page.add_to_cart
+
+Resources.Menu  --invalidated-by-->  Events.MenuChanged(id)
+Resources.Store  --invalidated-by-->  Events.StoreChanged(id)
+store.menu_fragment.MenuFragment  --invalidated-by-->  Events.InventoryChanged(id, item)
+store.menu_fragment.MenuFragment  --invalidated-by-->  Events.MenuChanged(id)
+store.menu_fragment.MenuFragment  --invalidated-by-->  Events.StoreChanged(id)
+store.menu_fragment.MenuFragment  --reads-->  store.page.Menu(id)
+store.menu_fragment.MenuFragment  --reads-->  store.page.Store(id)
+store.page.StorePage  --reads-->  store.page.Cart(current_session())
+store.page.StorePage  --reads-->  store.page.Menu(id)
+store.page.StorePage  --reads-->  store.page.Store(id)
+store.page.add_to_cart  --emits-->  Events.CartChanged(current_session())
+store.page.add_to_cart  --invalidates-->  store.page.Cart(current_session())
+
+  gate 1  MenuChanged(47) invalidates 1 of 1000; 999 untouched
+  gate 2  duplicate events coalesce to one regeneration
+  gate 3  last-known-good only where the policy declares it
+  gate 4  compiler PW5101; runtime keeps two sessions apart
+  gate 5  8 concurrent readers, 1 regeneration (and >1 without it)
+  gate 6  the graph above, and the JSON the runtime deserializes
+
+=== THE COMPILER'S HALF ===================================================
+
+$ pw check <platform> examples/domain.pw examples/lib/*.pw examples/store/*.pw
+pw check: 34 file(s), no diagnostics
+
+PW5101 — a shared fragment depending on session data (gate item 4)
+error: [PW5101] `LeakyFragment` is materialized into a shared entry and depends on `Cart`, which is declared `session`
+  --> private-dependency-of-shared-fragment.pw:20:5
+   |
+
+PW5100 — a fragment listening for an event nobody declares
+error: [PW5100] `StaleFragment` is invalidated by `PriceChanged`, which nothing declares
+  --> listens-for-an-undeclared-event.pw:21:5
+   |
+
+PW5102 — a shared key that does not separate the build
+error: [PW5102] `DriftingFragment` is materialized into a shared entry whose key does not separate the build
+  --> shared-key-without-the-build.pw:17:1
+   |
+
+and the control, which differs from each by one line:
+pw check: 33 file(s), no diagnostics
+
+=== THE RUNTIME'S HALF ====================================================
+
+$ cargo test -p pw-materialize
+test tests::an_entry_key_is_its_dimensions_too ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test menu_changed_for_one_store_invalidates_that_store_only ... ok
+test a_command_that_panics_leaves_neither_the_state_nor_the_event ... ok
+test a_duplicate_event_is_harmless ... ok
+test a_rolled_back_command_emits_nothing ... ok
+test a_failed_regeneration_leaves_the_last_good_entry_in_place ... ok
+test a_committed_command_leaves_both ... ok
+test a_private_fragment_never_shares_an_entry_between_sessions ... ok
+test last_known_good_is_served_only_where_the_policy_declares_it ... ok
+test a_cart_event_reaches_one_session_only ... ok
+test an_event_nothing_listens_for_is_recorded_rather_than_dropped ... ok
+test an_event_with_no_arguments_reaches_every_instance ... ok
+test regenerating_one_store_recomputes_one_body ... ok
+test out_of_order_events_reach_the_same_state ... ok
+test without_single_flight_the_same_work_is_done_more_than_once ... ok
+test concurrent_readers_of_one_missing_entry_regenerate_it_once ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test the_declared_key_dimensions_survive_the_boundary ... ok
+test the_compilers_graph_deserializes_with_its_edges_intact ... ok
+test the_menu_fragment_depends_on_the_queries_the_source_names ... ok
+test the_menu_fragment_listens_for_the_events_the_source_declares ... ok
+test an_entry_key_built_from_the_graph_separates_every_declared_dimension ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test one_store_changing_regenerates_one_of_a_thousand ... ok
+test an_event_for_a_store_that_was_never_materialized_regenerates_nothing ... ok
+test the_other_nine_hundred_and_ninety_nine_are_untouched ... ok
+test the_same_thousand_would_have_regenerated_had_the_event_named_them ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

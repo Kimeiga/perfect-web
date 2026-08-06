@@ -80,6 +80,10 @@ test-compile:
     # compiler to resolve 68 files as one program, which they are not — five
     # rejected fixtures reuse module names with each other (E2B).
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
+    # The demo, checked as the program it is. It was outside `ci` until E6,
+    # and E6's first rule found two dangling edges in it — a milestone demo
+    # nothing checks is a milestone demo that can quietly stop being true.
+    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
 # E7V — the resume-version deployment matrix. Every row of the architect's
@@ -118,6 +122,23 @@ each-typing:
     @echo "  accepting: List<T>, Result<List<T>, E>, Option<List<T>>"
     @echo "  refusing:  a non-collection, an unbound name — PW5016, not a"
     @echo "             quiet downgrade to an ordinary handler"
+
+# E6. The resource dependency graph, and the materializer that consumes it.
+# Regenerates the committed graph fixture, because the runtime's tests read
+# real compiler output and a checked-in artifact goes stale silently.
+materialize:
+    @cargo run --quiet -p pw-cli -- emit-graph examples/domain.pw examples/lib/*.pw examples/store/*.pw \
+        > runtime/pw-materialize/tests/store-graph.json
+    @cargo test --quiet -p pw-materialize 2>&1 | grep -E 'test result' | tail -3
+    @cargo run --quiet -p pw-cli -- emit-graph --plain examples/domain.pw examples/lib/*.pw examples/store/*.pw \
+        | tail -n +2
+    @echo
+    @echo "  gate 1  MenuChanged(47) invalidates 1 of 1000; 999 untouched"
+    @echo "  gate 2  duplicate events coalesce to one regeneration"
+    @echo "  gate 3  last-known-good only where the policy declares it"
+    @echo "  gate 4  compiler PW5101; runtime keeps two sessions apart"
+    @echo "  gate 5  8 concurrent readers, 1 regeneration (and >1 without it)"
+    @echo "  gate 6  the graph above, and the JSON the runtime deserializes"
 
 # The THIRD gate: for every syntactically representable program the compiler
 # must produce output, ordinary diagnostics, or a marked internal error — never

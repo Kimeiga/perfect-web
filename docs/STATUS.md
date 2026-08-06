@@ -9,14 +9,27 @@ See `docs/ASSUMPTIONS.md` A-008.
 **numbering:** engineering `E0`–`E15`, public proofs `P0`–`P9`, risk-retirement
 experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
-**current milestone:** **E6 — materialized resource graph.** Everything before it
-is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and the inserted E7V.
-The three items the architect required before E6 could start are also closed —
-coverage-guided fuzzing (`just fuzz`), the compatibility decision on the real
-browser handler path, and typed `{#each}` captures (`just each-typing`).
+**current milestone:** **E7 — the own renderer (E7-R/E7-P/E7-L).** Everything
+before it is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and the
+inserted E7V. The three items the architect required before E6 could start are
+also closed — coverage-guided fuzzing (`just fuzz`), the compatibility decision
+on the real browser handler path, and typed `{#each}` captures
+(`just each-typing`).
 
-**next milestone:** **E6**, then E7's own renderer (E7-R/E7-P/E7-L), E8's Wasm
-capability host, and E9's permanent type checker. Those are the large ones and
+**E6 is complete** (`docs/milestones/E6.md`): the dependency graph is derived
+from declarations and serialized (`pw emit-graph`), three build-time rules
+enforce what an edge may be, and `runtime/pw-materialize` consumes committed
+events from a transactional outbox. Changing one menu item regenerates 1 of
+1000 fragments and leaves 999 untouched — counted from the causality record,
+with the argument-less event that regenerates all 1000 as its control.
+
+Implementing it found that **every graph edge in the corpus pointed at
+nothing**: a `materialize` block's policies were being parsed as expressions, so
+`decl.policies` was empty for every materialization, and seven fixtures named
+resources and events no file in their program declared. Corpus **C2** opened.
+
+**next milestone:** **E7's own renderer** (E7-R/E7-P/E7-L), then E8's Wasm
+capability host and E9's permanent type checker. Those are the large ones and
 none is started; `docs/MILESTONES.md` has the register.
 
 Three of the four shortcuts `readiness.txt` named this morning are closed:
@@ -24,8 +37,8 @@ branch-aware affine analysis, Option inference that does not need the
 annotation, and string holes lowered as expressions. Each replacement is proved
 by a program the narrow rule would have passed.
 
-E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and E7V are complete. E1 closed on
-RQ-2's Outcome 1. E6 onward are not started.
+E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and E7V are complete. E1 closed
+on RQ-2's Outcome 1. E7 onward are not started.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -66,6 +79,7 @@ headline matrices          8 / 8
 resume compatibility      E7V closed — 34 matrix rows, 6 fuzz targets
 robustness                11 suites, 0 panics, 3 regressions retained
 coverage-guided fuzzing    6 targets, 3600 execs, 0 findings
+resource graph            E6 closed — 6 gate items, 24 materializer tests
 historical compatibility   9 / 10   the miss classified
 KNOWN_GAPs                 0
 ```

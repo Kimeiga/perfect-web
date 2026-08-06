@@ -21,6 +21,11 @@ module store.menu_fragment
 
 import domain.{ StoreId, MenuItemId }
 import Events.{ MenuChanged, InventoryChanged, StoreChanged }
+// The queries this fragment materializes. An explicit import, because
+// `depends_on` names a declaration and a name that resolves to nothing is an
+// edge to nothing — which at run time is not an error, it is a fragment that
+// never regenerates.
+import store.page.{ Store, Menu }
 
 materialize MenuFragment(id: StoreId) {
     placement      edge
