@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: secret_to_browser
+// @dimension: branch join
+module generality.secret_branch
+
+import secrets
+import capability.{ Secret, Payments }
+
+page Checkout(dry_run: Bool) {
+    placement origin
+    let key: Secret<Payments> = secrets.payments()
+    let shown = if dry_run { "none" } else { key }
+    view { <main><p>{shown}</p></main> }
+}

@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: task_detached
+// @dimension: nesting — inside a lambda inside a handler
+module generality.task_nested
+
+import Analytics
+import List
+import domain.{ MenuItemId }
+
+view Feed(items: List<MenuItemId>) !{} {
+    <ul>
+        <li>
+            <button on:press={() => List.each(items, i => {
+                task.spawn(detached) { Analytics.record_view(i) }
+            })}>All</button>
+        </li>
+    </ul>
+}

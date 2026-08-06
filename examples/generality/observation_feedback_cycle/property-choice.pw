@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: observation_feedback_cycle
+// @dimension: property choice — a layout write on a DIFFERENT element
+//
+// The component observes its own size and writes a layout-affecting property
+// of something else. A rule keyed on "observes and writes layout" without
+// comparing the two targets would catch this.
+module generality.feedback_other
+
+import style
+import browser.{ ElementRef }
+
+component Panel(sibling: ElementRef) {
+    placement browser
+    let width = observe resize(self) -> Float
+    frame {
+        mutate { sibling.style.set_height(4.px) }
+    }
+}

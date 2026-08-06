@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: unchecked_external_cast
+// @dimension: helper return
+//
+// The `Unknown` arrives from a declared function rather than a parameter.
+module generality.cast_helper
+
+import decode
+
+fn incoming() -> Unknown !{ network.fetch } { todo }
+
+fn parse() -> Store !{ network.fetch } {
+    incoming() as Store
+}

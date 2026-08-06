@@ -1,0 +1,13 @@
+// @status: GENERAL
+// @invariant: option_used_as_value
+// @dimension: nesting
+//
+// The field access is inside a branch, not at the top of the body.
+module generality.option_nested
+
+import Stores
+
+fn name_of(id: StoreId, verbose: Bool) -> String !{ database.read } {
+    let store = Stores.find(id)
+    if verbose { store.name } else { "short" }
+}

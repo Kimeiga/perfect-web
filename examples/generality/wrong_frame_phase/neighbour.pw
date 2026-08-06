@@ -1,10 +1,7 @@
-// @status: GENERAL
+// @status: NEIGHBOUR
 // @invariant: wrong_frame_phase
-// @dimension: helper extraction
-//
-// The write is not in the measure block's own text but inside a helper it
-// calls, and the receiver is a bound local rather than `self`.
-module generality.phase_helper
+// @dimension: valid neighbour — the same write, in the phase that owns it
+module generality.phase_ok
 
 import style
 import browser.{ ElementRef }
@@ -16,7 +13,7 @@ fn widen(target: ElementRef) -> () !{ style.mutate<LayoutAffect> } {
 component Row() {
     placement browser
     frame {
-        measure {
+        mutate {
             let el = self
             widen(el)
         }

@@ -1,0 +1,20 @@
+// @status: NEIGHBOUR
+// @invariant: dead_internal_link
+// @dimension: valid neighbour — links of every kind that are not dead
+module generality.link_ok
+
+import domain.{ StoreId }
+
+page Detail(id: StoreId) !{} {
+    route "/stores/{id}/menu"
+    view { <main><h1>Menu</h1></main> }
+}
+
+view Links(id: StoreId) !{} {
+    <nav aria-label="Store">
+        <a href="/stores/{id}/menu">Menu</a>
+        <a href="https://example.com/help">Help</a>
+        <a href="#top">Top</a>
+        <a href="mailto:hi@example.com">Mail</a>
+    </nav>
+}

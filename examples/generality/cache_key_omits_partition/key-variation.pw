@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: cache_key_omits_partition
+// @dimension: key variation — a key naming a DIFFERENT partition
+//
+// The key carries `session`, and the value depends on the user. Partially
+// partitioned is not partitioned.
+module generality.key_wrong_partition
+
+import Menus
+import context
+
+query Recent(store: StoreId, session: SessionId) -> Result<List<MenuItem>, MenuError>
+    cache shared
+    key   store, session
+{
+    Menus.for_user(store, 10, context.current_user())
+}

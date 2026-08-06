@@ -1183,68 +1183,6 @@ fn body_label(body: &Body, sigs: &Signatures) -> Label {
     label
 }
 
-/// Names bound to a label-introducing call, so a later use can be traced back.
-fn labelled_bindings(
-    body: &Body,
-    sigs: &Signatures,
-) -> BTreeMap<String, (Restriction, crate::hir::Span)> {
-    let mut out: BTreeMap<String, (Restriction, crate::hir::Span)> = BTreeMap::new();
-    // Iterated, because a label survives being rebound. `let same = token` is
-    // still the secret, and a rule that lost it there would be a rule about
-    // *how the value was spelled at the sink* rather than about the value.
-    // A counterexample found this: the same secret, passed bare instead of
-    // interpolated, with one rebinding on the way.
-    for _ in 0..4 {
-        let before = out.len();
-        gather_labels(body, sigs, &mut out);
-        if out.len() == before {
-            break;
-        }
-    }
-    out
-}
-
-fn gather_labels(
-    body: &Body,
-    sigs: &Signatures,
-    out: &mut BTreeMap<String, (Restriction, crate::hir::Span)>,
-) {
-    for id in body.walk() {
-        let Expr::Let { pat, init, ty } = body.expr(id) else {
-            continue;
-        };
-        let (Some(pat), Some(init)) = (pat, init) else {
-            continue;
-        };
-        let HPat::Bind { name, .. } = body.pat(*pat) else {
-            continue;
-        };
-        // Either the initialiser calls an accessor, or the binding is annotated
-        // `Secret<..>` directly.
-        // A written annotation is the most precise source: `let key:
-        // Secret<Payments>` names the capability exactly, where the accessor's
-        // name only implies it.
-        let annotated = ty.and_then(|t| {
-            let t = body.types.get(t.index())?;
-            (t.path == "Secret")
-                .then(|| t.args.first().and_then(|a| body.types.get(a.index())))
-                .flatten()
-                .map(|arg| Restriction::Secret(arg.path.clone()))
-        });
-        let restriction = annotated.or_else(|| match body.expr(*init) {
-            Expr::Call { callee, .. } => sigs
-                .by_path(&path_of(body, *callee))
-                .and_then(|s| s.label.restrictions().next().cloned()),
-            // A rebinding carries the label with it.
-            Expr::Name(from) => out.get(from).map(|(r, _)| r.clone()),
-            _ => None,
-        });
-        if let Some(r) = restriction {
-            out.entry(name.clone()).or_insert((r, body.expr_span(id)));
-        }
-    }
-}
-
 /// E5 rules that need the body's label, not only the declaration header.
 /// The cache partition a declaration asks for, from either place it can be
 /// written: a `query`'s policy block, or a `page`'s body.
@@ -1388,19 +1326,30 @@ fn privacy_flow(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnos
 
     // 1. A secret reaching markup. Markup renders in the browser, and a secret
     //    never leaves the origin (charter §7.8, corpus R-003).
-    let bound = labelled_bindings(body, sigs);
+    //
+    // The VALUE's label, via `labels.rs`. This used to read a map from binding
+    // name to restriction, so `let shown = if dry_run { "none" } else { key }`
+    // rendered a secret that the rule could not see — the same narrowness the
+    // sink rule had, in the one place that had not been migrated with it.
+    let labels = crate::labels::Labels::of_body(sigs, decl, body);
     for id in body.walk() {
         let Expr::Template { parts, .. } = body.expr(id) else {
             continue;
         };
         for part in parts {
-            let name = match body.expr(*part) {
-                Expr::Name(n) => n.clone(),
-                _ => continue,
-            };
-            let Some((Restriction::Secret(cap), origin)) = bound.get(&name) else {
+            let value_label = labels.label(body, *part);
+            let Some(Restriction::Secret(cap)) = value_label.restrictions().next() else {
                 continue;
             };
+            let (name, origin) = body
+                .walk_from(*part)
+                .into_iter()
+                .find_map(|e| match body.expr(e) {
+                    Expr::Name(n) => labels.origin(n).map(|(_, o)| (n.clone(), o.clone())),
+                    _ => None,
+                })
+                .unwrap_or_else(|| ("this value".to_string(), body.expr_span(*part)));
+            let origin = &origin;
             out.push(Diagnostic {
                 code: "PW5003",
                 invariant: "a secret cannot be rendered to the browser",

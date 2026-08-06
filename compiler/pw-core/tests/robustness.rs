@@ -566,3 +566,51 @@ fn no_unargued_panic_sits_on_a_user_reachable_path() {
         unargued.join("\n  ")
     );
 }
+
+/// Boundary: **policy grammar → declaration**.
+///
+/// A policy value may contain any identifier, including one that begins a
+/// declaration elsewhere. `key store, session` ended after the comma because
+/// `session` starts a `session query`, so every clause after it — including
+/// `cache shared` — stopped being a policy and the shared-cache rule simply
+/// did not run. Silently: the query had no cache policy as far as any checker
+/// could tell.
+#[test]
+fn a_policy_value_may_contain_a_word_that_starts_a_declaration() {
+    use pw_core::lower::lower_file;
+    use pw_syntax::parse_tree;
+
+    // Every word that begins a declaration or another policy, used as a key
+    // component. None may truncate the policy block.
+    for word in [
+        "session",
+        "public",
+        "private",
+        "query",
+        "command",
+        "view",
+        "page",
+        "cache",
+        "scope",
+        "placement",
+        "type",
+        "fn",
+        "resource",
+        "partition",
+    ] {
+        let src = format!(
+            "module m\n\nquery Q(a: Int) -> Int\n    cache shared\n    key   a, {word}\n{{\n    0\n}}\n"
+        );
+        let hir = lower_file(&src, &parse_tree(&src).green);
+        let (_, decl) = hir.all_decls().next().expect("the query");
+        assert!(
+            decl.policy("cache").is_some(),
+            "`key a, {word}` truncated the policy block — `cache` is no longer \
+             visible, so every rule reading it silently stops running"
+        );
+        assert!(
+            decl.policy("key").is_some_and(|k| k.value.contains(word)),
+            "`{word}` was dropped from the key value"
+        );
+    }
+}

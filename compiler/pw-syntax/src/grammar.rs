@@ -1329,9 +1329,26 @@ impl<'a> P<'a> {
                 // A policy value must take at least one token. `cache private`
                 // and `scope component` would otherwise end immediately,
                 // because `private` and `component` also start declarations.
+                // A policy value ends where the next clause or declaration
+                // begins — and one only begins at the START OF A LINE.
+                //
+                // Without that condition, `key store, session` ended after the
+                // comma, because `session` also starts a `session query`
+                // declaration. Everything after it stopped being a policy, so
+                // `cache shared` was invisible and the shared-cache rule did
+                // not run at all. Silently: the query simply had no cache
+                // policy as far as any checker could tell.
+                //
+                // `newline_ahead` is the right test even though the name reads
+                // backwards: `nth()` skips trivia WITHOUT advancing `pos`, so
+                // the whitespace between the last consumed token and this one
+                // is still ahead of `pos`. A hand-rolled backwards scan looked
+                // before that whitespace, always answered false, and silently
+                // disabled the rule for two corpus fixtures.
                 if took_value
                     && depth == 0
                     && k == Kind::Ident
+                    && self.newline_ahead()
                     && (POLICY_KEYWORDS.contains(&self.cur_text())
                         || DECL_STARTERS.contains(&self.cur_text()))
                 {

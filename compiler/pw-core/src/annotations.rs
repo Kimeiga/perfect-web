@@ -37,7 +37,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
         let module = module_of(hir, id);
-        let types = crate::infer::Types::of_body(sigs, decl, body);
+        let types = crate::infer::Types::of_body(sigs, decl, body).in_module(module);
         optional_used_as_present(hir, sigs, body, decl, &at, out);
         unchecked_cast(hir, &types, body, decl, &at, out);
         handler_matches_event(hir, body, sigs, decl, module, &at, out);
