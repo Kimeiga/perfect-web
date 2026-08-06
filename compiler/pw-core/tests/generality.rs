@@ -399,9 +399,12 @@ fn every_headline_invariant_has_a_challenge_matrix() {
     for m in &missing {
         eprintln!("    owed: {m}");
     }
+    // All eight now have one, so this is an equality: a headline claim
+    // without a matrix is a claim resting on a single fixture.
     assert!(
-        HEADLINE.len() - missing.len() >= 1,
-        "no headline invariant has a challenge matrix yet"
+        missing.is_empty(),
+        "a headline invariant lost its challenge matrix:\n    {}",
+        missing.join("\n    ")
     );
 }
 
@@ -484,7 +487,7 @@ fn generality_is_reported_separately_from_conformance() {
 
     // Recorded, and ratcheted so it cannot fall.
     assert!(
-        general.len() >= 9,
+        general.len() >= 12,
         "generality-tested regressed: {} / {}",
         general.len(),
         exercised.len()
