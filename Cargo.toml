@@ -5,6 +5,7 @@ members = [
     "compiler/pw-cli",
     "compiler/pw-syntax",
     "runtime/pw-materialize",
+    "runtime/pw-render",
     "runtime/pw-resource",
     "runtime/pw-resume",
     "runtime/pw-resume-wasm",

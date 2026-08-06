@@ -9,6 +9,10 @@ See `docs/ASSUMPTIONS.md` A-008.
 **numbering:** engineering `E0`–`E15`, public proofs `P0`–`P9`, risk-retirement
 experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
+**current milestone:** **E7 — the own renderer.** Tasks 1 and 2 are closed: the
+renderer-independent golden suite is frozen, and `.pw` → template IR → HTML runs
+with Marko nowhere in the chain (`just spike-own-renderer`). E7-R is next.
+
 **current milestone:** **E7 — the own renderer (E7-R/E7-P/E7-L).** Everything
 before it is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and the inserted
 E6F and E7V. The three items the architect required before E6 could start are
@@ -95,6 +99,7 @@ robustness                11 suites, 0 panics, 3 regressions retained
 coverage-guided fuzzing    6 targets, 3600 execs, 0 findings
 resource graph            E6 closed — 6 gate items, 24 materializer tests
 one parser                E6F closed — 5 tests, 0 second trees
+own renderer              E7-2 — 36 browser + 28 unit, 3 engines
 historical compatibility   9 / 10   the miss classified
 KNOWN_GAPs                 0
 ```

@@ -127,7 +127,13 @@ ADR-0017), and E7V's compatibility decision already governs the real handler
 path in Chromium, Firefox and WebKit. What is missing is a renderer, not a
 decision.
 
-**Task 1 is done.** The renderer-independent golden suite is frozen —
+**Tasks 1 and 2 are done.** `just spike-own-renderer` runs the chain end to
+end — `.pw` → `pw check` → `pw emit-template` → `pw-render` → HTML → a browser —
+with Marko nowhere in it. 36 browser assertions in Chromium, Firefox and WebKit,
+28 unit tests over escaping and rendering, and a mutation for every gate that
+makes the exact measurement go red.
+
+**Task 1.** The renderer-independent golden suite is frozen —
 `spikes/pw-to-marko/e2e/golden.mjs` holds the cases as data and
 `golden.spec.mjs` is the only file that knows which renderer is under test, so
 running it against the own renderer is a different server rather than an edited
@@ -135,9 +141,16 @@ test. 12 oracle cases pass in Chromium, Firefox and WebKit; 1 case is the
 project's own target with no oracle, recorded as *not holding* for Marko because
 RQ-1 falsified it there.
 
-E6 leaves the renderer two things it can use: a fragment's regeneration produces
-a body, and today that body is a string. What a fragment's markup actually *is*
-belongs to the renderer.
+**Next: E7-R.** The template IR already splits `Static` from `Part`, which is
+the representation the reactive renderer reuses — the server renders both and
+the browser runtime later updates only the parts. What E7-R adds is stable part
+identity, a compact parts manifest for dynamic regions only, and resumption
+without replaying the component tree.
+
+Deliberately still absent from the renderer, and listed so it is not mistaken
+for an oversight: event handlers are `Blocked`. Attaching behaviour is E7-R's,
+and emitting anything for `on:press` now would invent an encoding the runtime
+does not have.
 
 Two smaller pieces are E6's and are deliberately not claimed there:
 

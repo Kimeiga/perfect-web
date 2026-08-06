@@ -1,0 +1,75 @@
+// @corpus: fixture
+// @id: E7-tricky
+// @category: structures the HTML parser repairs — E7 task 2 gate 4
+// @charter: §14 M7 task 2
+// @milestone: E7
+//
+// HTML is not XML, and that is the whole point of this file.
+//
+// A serializer can emit bytes that look plausible and that the HTML parser
+// repairs into a different tree: a `<tr>` outside a `<tbody>` gets one
+// inserted, a `<p>` inside a `<p>` closes the first, a `</br>` is discarded, a
+// `<div>` inside a `<button>` is legal markup and an accessibility defect.
+//
+// The invariant these exist for is not "the string contains `<tr>`". It is:
+//
+//     the DOM produced by browser parsing corresponds to the template IR's
+//     intended semantic tree
+//
+// which can only be checked in a browser, against the tree, after parsing.
+//
+// What each structure is here for:
+//
+//   table    a browser inserts `<tbody>` when the markup omits one, so the
+//            intended tree and the written tree differ unless it is written
+//   select   accepts only `<option>`/`<optgroup>`; anything else is MOVED out
+//            by the parser, which is a silent restructuring
+//   p        cannot contain a block element: the parser closes the paragraph
+//            and the block becomes a sibling
+//   button   phrasing content only
+//   voids    no closing tag and no self-closing slash — `</br>` is discarded
+//            and `<br/>`'s slash is ignored, so both look fine and one of them
+//            is a different tree
+//   form     works with no script at all
+
+module render.tricky
+
+view Tricky() !{} {
+    <main>
+        <table id="t">
+            <thead>
+                <tr><th>Item</th><th>Price</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Espresso</td><td>3.50</td></tr>
+                <tr><td>Cortado</td><td>4.75</td></tr>
+            </tbody>
+        </table>
+
+        <label for="size">Size</label>
+        <select id="size" name="size">
+            <option value="s">Small</option>
+            <option value="m">Medium</option>
+        </select>
+
+        <div id="paras">
+            <p>First paragraph.</p>
+            <p>Second paragraph.</p>
+        </div>
+
+        <button id="labelled" type="button"><span>Add</span></button>
+
+        <div id="voids">
+            <img src="/logo.png" alt="Blue Bottle">
+            <br>
+            <hr>
+            <input id="field" name="q" type="text" value="tea">
+        </div>
+
+        <form id="search" action="/search" method="get">
+            <label for="q2">Search</label>
+            <input id="q2" name="q" type="search">
+            <button type="submit">Go</button>
+        </form>
+    </main>
+}

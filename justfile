@@ -123,6 +123,10 @@ each-typing:
     @echo "  refusing:  a non-collection, an unbound name — PW5016, not a"
     @echo "             quiet downgrade to an ordinary handler"
 
+# E7 task 2. The own renderer: `.pw` → template IR → HTML, no Marko anywhere.
+spike-own-renderer:
+    @bash spikes/own-renderer/run.sh
+
 # E6F. There is only one parser that decides what a `.pw` program means.
 # Enumerates the real keyword tables rather than a copy of them — a test with
 # its own list would be the fifth copy of the thing this milestone removed.

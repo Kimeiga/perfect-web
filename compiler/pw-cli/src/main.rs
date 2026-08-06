@@ -480,6 +480,76 @@ fn emit_manifest_command(paths: &[&String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// `pw emit-template` — the checked template IR (charter §14 M7 task 2).
+///
+/// The artifact the E7 renderer consumes. Printed as JSON for the same reason
+/// the manifest and the graph are: a runtime that the compiler depends on is
+/// the only runtime there can ever be (ADR-0018).
+fn emit_template_command(paths: &[&String], plain: bool) -> ExitCode {
+    let mut hirs = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        hirs.push(pw_core::lower::lower_file(&src, &parsed.green));
+    }
+    let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+    let templates = pw_core::template_ir::build(&refs);
+
+    let mut blocked = 0usize;
+    for t in &templates {
+        for b in t.blocked() {
+            if let pw_core::template_ir::Part::Blocked { reason, at } = b {
+                eprintln!("{}: blocked at `{at}`: {reason}", t.path);
+                blocked += 1;
+            }
+        }
+    }
+
+    if plain {
+        for t in &templates {
+            println!("{}  ({})", t.path, t.params.join(", "));
+            for c in &t.chunks {
+                match c {
+                    pw_core::template_ir::Chunk::Static(s) => {
+                        println!("    static  {:?}", s);
+                    }
+                    pw_core::template_ir::Chunk::Dynamic(p) => {
+                        println!("    part    {p:?}");
+                    }
+                }
+            }
+            println!();
+        }
+    } else {
+        match serde_json::to_string_pretty(&templates) {
+            Ok(json) => println!("{json}"),
+            Err(e) => {
+                eprintln!("pw: cannot serialize the template IR: {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    // A blocked part is a failing exit code. The renderer refuses it too; a
+    // build that emitted it as a warning would let a page ship with a region
+    // silently missing.
+    if blocked > 0 {
+        eprintln!("pw emit-template: {blocked} blocked part(s)");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
 /// `pw emit-graph` — the resource dependency graph (charter §14 M6 gate 6).
 ///
 /// Every path at once, never per file. A materialization in one module depends
@@ -644,12 +714,19 @@ fn run() -> ExitCode {
 
     if !matches!(
         cmd,
-        "check" | "explain" | "fmt" | "emit-koka" | "emit-marko" | "emit-manifest" | "emit-graph"
+        "check"
+            | "explain"
+            | "fmt"
+            | "emit-koka"
+            | "emit-marko"
+            | "emit-manifest"
+            | "emit-graph"
+            | "emit-template"
     ) || paths.is_empty()
     {
         eprintln!(
-            "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph> \
-             <path.pw>... [--plain]"
+            "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
+             emit-template> <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -659,6 +736,7 @@ fn run() -> ExitCode {
         eprintln!("  emit-marko     write Marko templates to --out DIR (ADR-0017)");
         eprintln!("  emit-manifest  print the resource manifests as JSON");
         eprintln!("  emit-graph     print the resource dependency graph (--plain for text)");
+        eprintln!("  emit-template  print the checked template IR (--plain for text)");
         return ExitCode::from(2);
     }
 
@@ -668,6 +746,10 @@ fn run() -> ExitCode {
 
     if cmd == "emit-graph" {
         return emit_graph_command(&paths, args.iter().any(|a| a == "--plain"));
+    }
+
+    if cmd == "emit-template" {
+        return emit_template_command(&paths, args.iter().any(|a| a == "--plain"));
     }
 
     if cmd == "emit-koka" {

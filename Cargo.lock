@@ -222,6 +222,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-render"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pw-resource"
 version = "0.0.0"
 dependencies = [

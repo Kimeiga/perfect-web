@@ -72,6 +72,19 @@ pub const DECL_STARTERS: &[&str] = &[
     "let",
 ];
 
+/// Elements HTML forbids a closing tag on.
+///
+/// `<img src="x">` has no `</img>` and takes no children, and writing either is
+/// a parse error the browser silently repairs. The grammar has to know the same
+/// list the serializer does, or a page written correctly does not parse.
+///
+/// E7 task 2 gate 4 is what surfaced this: `examples/render/tricky.pw` is
+/// ordinary HTML and `pw check` reported "unclosed block" on it.
+pub const VOID_ELEMENTS: &[&str] = &[
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
+    "track", "wbr",
+];
+
 pub const UI_NOUNS: &[&str] = &["view", "component", "page"];
 
 /// Statement keywords that may appear inside a body and take a
@@ -966,11 +979,17 @@ impl<'a> P<'a> {
     }
 
     /// `<tag attr="v" on:press={h} />`. Returns whether it self-closed.
+    ///
+    /// A void element self-closes whether or not a slash was written, because
+    /// HTML says so — the slash is ignored by every browser parser and a
+    /// closing tag is discarded.
     fn open_tag(&mut self) -> bool {
         self.start(K::OpenTag);
         self.bump(); // `<`
+        let mut void = false;
         // The tag name, which may be dotted for a component: `<store.Card />`.
         if self.at(Kind::Ident) {
+            void = VOID_ELEMENTS.contains(&self.cur_text());
             self.start(K::Name);
             self.bump();
             while self.at(Kind::Dot) && self.nth_is(1, Kind::Ident) {
@@ -994,7 +1013,7 @@ impl<'a> P<'a> {
         }
         self.eat(Kind::RAngle);
         self.finish(); // OpenTag
-        self_closing
+        self_closing || void
     }
 
     /// `class="x"`, `on:press={handler}`, `style:width={w}`, `disabled`.
