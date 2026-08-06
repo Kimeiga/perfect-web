@@ -29,18 +29,21 @@ early by RQ-2 (clean pass). Then **E1A** — `pw` value semantics and boundary A
 | RQ-6 | effect-family rejection coverage | **partial** — layout/DOM families done |
 | RQ-7 | E→P evidence ledger | **done** |
 
-Everything above is `partial` for the same reason: **there is no parser.**
-`compiler/pw-core` has 42 passing tests over exhaustiveness, nominal types, the
-ABI decoder, scope escape and capability audit, but it runs on constructed data
-structures rather than on `.pw` files. **E2 is the unlock** — it puts a front end
-in front of all five checkers at once and turns 68 specification files into 68
-executable tests.
+**E2 has landed a front end.** `just ci` now runs `pw check` over all 68 corpus
+files and they all parse, with precise spans and error recovery. The
+specification is executable in CI rather than merely well-formed.
+
+The RQ items stay `partial` for a narrower reason than before: `pw-core`'s five
+checkers (42 tests) are **not yet wired to the parsed AST**. The 44 rejected
+corpus files parse cleanly and *should* — they are syntactically valid programs
+that violate semantic rules. Connecting the two is the next task and it is
+small.
 
 **public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
 — six of the claims it needs are unstarted, and **45 corpus files exist of which
 0 compile**.
 
-**last passing commit:** `f346484` — layout/DOM corpus.
+**last passing commit:** `9dfd7a7` — E2 front end (`pw check` in CI).
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---
@@ -134,13 +137,12 @@ incremental           5 unrelated updates -> expensive node evaluated once
 
 ## next three concrete tasks
 
-1. **E2 — the parser.** A lossless syntax tree with byte spans, name
-   resolution, and enough of the grammar to feed `pw-core`'s five existing
-   checkers. This is the single highest-leverage remaining task: it converts
-   68 specification files into 68 executable tests and moves six P0 claims from
-   `unstarted` toward `measured`. ADR-0009 already fixed the diagnostics stack;
-   the open question is the lossless tree (`rowan` 0.17.0 and `logos` 0.16.1 are
-   the recorded candidates) needed for idempotent `pw fmt`.
+1. **Wire `pw-core`'s checkers to the parsed AST.** Walk the AST, build
+   `pw-core`'s `Program`, run exhaustiveness / scope / capability checks. This
+   converts 44 rejected corpus files from "parses fine" into real compile
+   failures and moves E2 gate item 2 from FAIL to a measurable number. It is the
+   single highest-leverage remaining task and it is small — both halves already
+   exist and are tested.
 2. **E2A-R** — the runtime half of structured concurrency: owner scopes,
    cancellation propagation, cleanup ordering, leak detection. E2A does not close
    until both halves pass, and the static rules must not be described as covering
