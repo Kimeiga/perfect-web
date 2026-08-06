@@ -1,0 +1,28 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+// @dimension: destructuring
+//
+// The payload is named by a PATTERN rather than by a `let`. Matching on a
+// secret and naming what is inside does not make what is inside public.
+
+module generality.sink_match
+
+import log
+import secrets
+import domain.{ OrderState }
+
+fn audit(state: OrderState) -> () !{ log<Public>, secret<Payments> } {
+    let token = secrets.payments()
+    match state {
+        Draft => log.public("draft")
+        Pricing => log.public("pricing")
+        AuthorizingPayment => log.public(token)
+        Submitting => log.public("submitting")
+        SearchingForDasher => log.public("searching")
+        Confirmed(c) => log.public("confirmed")
+        InProgress(p) => log.public("in progress")
+        Delivered(r) => log.public("delivered")
+        Cancelled(reason) => log.public("cancelled")
+        Failed(f) => log.public("failed")
+    }
+}

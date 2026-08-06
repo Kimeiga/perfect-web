@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: value_exceeds_sink_level
+// @dimension: valid neighbour
+//
+// The control for the whole matrix: every shape above, with a value that is
+// not secret. A rule that reacted to rebinding, records, branches or
+// interpolation rather than to the LABEL would catch this file.
+
+module generality.sink_neighbour
+
+import log
+import Stores
+
+fn audit(id: StoreId, dry_run: Bool) -> () !{ log<Public>, database.read } {
+    let store = Stores.get(id)
+    let same = store
+    let value = if dry_run { "none" } else { same }
+    log.public("loaded {value}")
+}

@@ -34,6 +34,7 @@ pub mod exhaust;
 pub mod hir;
 pub mod infer;
 pub mod koka;
+pub mod labels;
 pub mod layout;
 pub mod lower;
 pub mod manifest;

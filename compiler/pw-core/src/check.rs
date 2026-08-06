@@ -1263,10 +1263,9 @@ fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::hir::Span)> 
 fn privacy_sinks(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnostic>) {
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
-    let bound = labelled_bindings(body, sigs);
-    if bound.is_empty() {
-        return;
-    }
+    // Labels belong to VALUES. `labels.rs` explains why this is not a map from
+    // binding name to restriction any more.
+    let labels = crate::labels::Labels::of_body(sigs, decl, body);
 
     for id in body.walk() {
         let Expr::Call { callee, args } = body.expr(id) else {
@@ -1282,10 +1281,19 @@ fn privacy_sinks(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagno
             continue;
         }
         for arg in args {
-            for (name, span) in carried_names(body, arg.value) {
-                let Some((Restriction::Secret(cap), origin)) = bound.get(&name) else {
+            // The argument's own label, whatever it is spelled as: a name, a
+            // field of one, a branch that returns one, a string with one in a
+            // hole. Not a search for names the body happened to bind.
+            let label = labels.label(body, arg.value);
+            if label.is_public() {
+                continue;
+            }
+            for r in label.restrictions() {
+                let (name, span, origin) = blame(body, &labels, arg.value);
+                let Restriction::Secret(cap) = r else {
                     continue;
                 };
+                let origin = origin.unwrap_or_else(|| span.clone());
                 out.push(Diagnostic {
                     code: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.id,
                     invariant: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.invariant,
@@ -1327,6 +1335,23 @@ fn privacy_sinks(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagno
     }
 }
 
+/// What to blame in the diagnostic: the innermost labelled name inside the
+/// argument, its span, and where it acquired the label.
+fn blame(
+    body: &Body,
+    labels: &crate::labels::Labels<'_>,
+    value: ExprId,
+) -> (String, crate::hir::Span, Option<crate::hir::Span>) {
+    for id in body.walk_from(value) {
+        if let Expr::Name(n) = body.expr(id)
+            && let Some((_, origin)) = labels.origin(n)
+        {
+            return (n.clone(), body.expr_span(id), Some(origin.clone()));
+        }
+    }
+    ("this value".to_string(), body.expr_span(value), None)
+}
+
 /// The privacy level a call's sink declares, with the span of the effect that
 /// declares it.
 fn sink_level(
@@ -1343,23 +1368,6 @@ fn sink_level(
         let level = rest.strip_suffix('>')?;
         (!level.is_empty()).then(|| (level.to_string(), body.expr_span(callee)))
     })
-}
-
-/// The names a value carries into a call.
-///
-/// Just the walk. A string's `{expr}` holes are real expressions in the tree
-/// (`Expr::Interpolated`), so a name inside one is found the same way as a
-/// name passed directly, and `{token.value}` is found too. This used to read
-/// `{name}` out of the literal's characters, which meant a value could leave
-/// through a hole the analysis could not see into.
-fn carried_names(body: &Body, value: ExprId) -> Vec<(String, crate::hir::Span)> {
-    body.walk_from(value)
-        .into_iter()
-        .filter_map(|id| match body.expr(id) {
-            Expr::Name(n) => Some((n.clone(), body.expr_span(id))),
-            _ => None,
-        })
-        .collect()
 }
 
 fn privacy_flow(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnostic>) {

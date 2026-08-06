@@ -134,8 +134,10 @@ fn every_witness_names_a_registered_invariant() {
             w.invariant
         );
         assert!(
-            matches!(w.status.as_str(), "GENERAL" | "NARROW"),
-            "{}: unknown @status {:?}",
+            matches!(w.status.as_str(), "GENERAL" | "NARROW" | "NEIGHBOUR"),
+            "{}: unknown @status {:?} — expected GENERAL (a violation that must \
+             be caught), NARROW (a violation that is not caught yet), or \
+             NEIGHBOUR (a VALID program that must stay clean)",
             w.name,
             w.status
         );
@@ -196,6 +198,17 @@ fn a_general_witness_is_caught_and_a_narrow_one_is_not() {
                     ));
                 }
             }
+            // A valid near-neighbour. It exists to prove the rule reacts to
+            // the INVARIANT rather than to the construct, so it must report
+            // nothing at all — not merely "not this invariant".
+            "NEIGHBOUR" if !got.is_empty() => {
+                wrong.push(format!(
+                    "{}: is a valid neighbour and must compile clean, but reports \
+                     {got:?}. Either the rule is banning the construct rather than \
+                     checking the invariant, or the file is not actually valid.",
+                    w.name
+                ));
+            }
             // The gap must still be a gap. If this fires, that is GOOD NEWS
             // reported as a failure: the analysis got better and the witness
             // needs promoting to `caught.pw`.
@@ -211,6 +224,67 @@ fn a_general_witness_is_caught_and_a_narrow_one_is_not() {
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// Invariants that appear in a headline P0 claim.
+///
+/// Architect ruling, 2026-08-06:
+///
+/// > Every invariant explicitly demonstrated in P0 must be challenge-tested
+/// > rather than merely represented by one corpus fixture.
+///
+/// So these need a matrix — several dimensions of how the same violation can
+/// be written — and a `DIMENSIONS.md` saying which dimensions are relevant and
+/// which are not, with reasons. A single `caught.pw` is not enough for a claim
+/// that goes in front of people.
+const HEADLINE: &[&str] = &[
+    "value_exceeds_sink_level",
+    "private_in_shared_cache",
+    "declared_placement_cannot_grant",
+    "undeclared_effect",
+    "forbidden_effect",
+    "non_exhaustive_match",
+    "affine_not_consumed_once",
+    "scope_outlives_owner",
+];
+
+#[test]
+fn every_headline_invariant_has_a_challenge_matrix() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/generality");
+    let all = witnesses();
+    let mut missing = Vec::new();
+
+    for h in HEADLINE {
+        let files: Vec<&Witness> = all.iter().filter(|w| w.invariant == *h).collect();
+        let general = files.iter().filter(|w| w.status == "GENERAL").count();
+        let dims = root.join(h).join("DIMENSIONS.md").exists();
+
+        // Three is the floor, not a target: the fixture's own shape, at least
+        // two ways of writing it that the fixture does not have, and the
+        // neighbour that proves the rule is not banning the construct.
+        if general < 3 || !dims {
+            missing.push(format!(
+                "{h}: {general} general witness(es), DIMENSIONS.md {}",
+                if dims { "present" } else { "MISSING" }
+            ));
+        }
+    }
+
+    // Recorded rather than asserted at zero: the matrices are being built one
+    // invariant at a time, and this test names which are still owed. The floor
+    // moves up as each lands.
+    eprintln!(
+        "  headline invariants with a matrix: {}/{}",
+        HEADLINE.len() - missing.len(),
+        HEADLINE.len()
+    );
+    for m in &missing {
+        eprintln!("    owed: {m}");
+    }
+    assert!(
+        HEADLINE.len() - missing.len() >= 1,
+        "no headline invariant has a challenge matrix yet"
+    );
 }
 
 /// The second score, recorded next to the first.
@@ -234,6 +308,8 @@ fn generality_is_reported_separately_from_conformance() {
         match w.status.as_str() {
             "GENERAL" => e.0 = true,
             "NARROW" => e.1 = true,
+            // A neighbour on its own proves nothing about generality; it is a
+            // control for the witnesses beside it.
             _ => {}
         }
     }

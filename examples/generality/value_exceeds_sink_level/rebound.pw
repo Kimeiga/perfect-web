@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+// @dimension: rebinding
+//
+// The case that proved labels were attached to names rather than values.
+
+module generality.sink_rebound
+
+import log
+import secrets
+
+fn audit(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
+    let token = secrets.payments()
+    let same = token
+    log.public(same)
+}

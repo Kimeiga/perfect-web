@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+// @dimension: helper return
+//
+// The value leaves and re-enters through a declared function. `wrap` says in
+// its own type that what it returns is still secret, which is the E2C model —
+// one declaration answers the question, and the checker reads it rather than
+// re-deriving it.
+
+module generality.sink_helper
+
+import log
+import secrets
+import capability.{ Secret, Payments }
+
+fn wrap(key: Secret<Payments>) -> Secret<Payments> !{} {
+    key
+}
+
+fn audit(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
+    let token = secrets.payments()
+    log.public(wrap(token))
+}

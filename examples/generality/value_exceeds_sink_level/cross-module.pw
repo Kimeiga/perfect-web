@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+// @dimension: cross-module
+//
+// The secret's declaration is in `secrets`, the sink's in `log`, and neither
+// is in this file. Nothing here says "Secret" — the label comes entirely from
+// signatures resolved across module boundaries.
+
+module generality.sink_cross_module
+
+import log
+import secrets
+
+fn charge_and_note(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
+    log.public(secrets.payments())
+}

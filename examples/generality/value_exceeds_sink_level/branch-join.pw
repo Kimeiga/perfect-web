@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+// @dimension: branch join
+//
+// Secret on one path, public on the other. Charter §7.8 makes the join a
+// UNION of restrictions, so the merged value is still secret — a `max` over an
+// ordering would be the wrong operation and would let this through.
+
+module generality.sink_branch
+
+import log
+import secrets
+
+fn audit(order: OrderId, dry_run: Bool) -> () !{ log<Public>, secret<Payments> } {
+    let token = secrets.payments()
+    let value = if dry_run { "none" } else { token }
+    log.public(value)
+}

@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: value_exceeds_sink_level
+// @dimension: record field
+//
+// The secret is a field of a record built around it, and the record is what
+// reaches the sink. A rule watching for the binding's own name sees nothing.
+
+module generality.sink_record
+
+import log
+import secrets
+
+type Attempt = Attempt { order: OrderId, key: String }
+
+fn audit(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
+    let token = secrets.payments()
+    let attempt = Attempt { order: order, key: token }
+    log.public(attempt)
+}
