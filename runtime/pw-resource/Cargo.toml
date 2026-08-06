@@ -1,0 +1,14 @@
+[package]
+name = "pw-resource"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# E4 — the local resource runtime (charter §14 M4 task 3).
+#
+# Behaviour, not static guarantees: the compiler-side half of E4 is the resource
+# manifest in `pw-core::hir`.
+
+[dependencies]

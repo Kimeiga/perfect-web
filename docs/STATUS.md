@@ -13,11 +13,14 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E4 — typed resource model and the first complete store
-page.** E0 and E2A are complete; E1 closed on RQ-2's Outcome 1. E2 has five of
-six gate items and E3 has four of six; **both of their open items are owned by
-later milestones** — E2's rejected-corpus count by E1 and E5, E3's streamed
-region by E4's resource model.
+**next milestone:** **E5 — privacy-flow, cache-safety and placement checker**,
+with one task carried forward into it: a **generator** connecting a `query` or
+`command` declaration to `runtime/pw-resource`. That single missing piece is
+what E4 gate 1 and E3 gate 3 both wait on.
+
+E0 and E2A are complete; E1 closed on RQ-2's Outcome 1. E2 is 5/6, E3 is 4/6,
+E4 is 5/7 — and every open item traces back either to that generator or to E5's
+privacy checker.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 

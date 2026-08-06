@@ -499,3 +499,87 @@ fn two_template_regions_in_one_body_do_not_duplicate_each_others_parts() {
         "walk() must not repeat an expression"
     );
 }
+
+#[test]
+fn policies_reach_hir_with_their_values_and_spans() {
+    // Charter §14 M4's gate says *all* query and command policies appear in
+    // `pw explain`. A policy the compiler dropped would not, so it has to
+    // survive lowering before anything can display it.
+    let src = "module m\n\
+               public query store(id: StoreId) -> Store\n\
+               \x20   cache          shared\n\
+               \x20   freshness      30.seconds\n\
+               \x20   invalidates_on StoreChanged(id)\n\
+               \x20   offline\n\
+               {\n    Stores.get(id)\n}\n";
+    let hir = lower(src);
+    let (_, d) = hir.all_decls().next().unwrap();
+
+    let got: Vec<(&str, &str)> = d
+        .policies
+        .iter()
+        .map(|p| (p.name.as_str(), p.value.as_str()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            ("cache", "shared"),
+            ("freshness", "30.seconds"),
+            ("invalidates_on", "StoreChanged(id)"),
+            ("offline", ""),
+        ],
+        "in source order, alignment collapsed, a bare policy keeping an empty value"
+    );
+
+    assert_eq!(
+        d.policy("freshness").map(|p| p.value.as_str()),
+        Some("30.seconds")
+    );
+    assert!(
+        d.policy("retry").is_none(),
+        "a policy not written is absent"
+    );
+
+    // The span must underline the policy so a diagnostic can point at it.
+    let p = d.policy("invalidates_on").expect("declared");
+    assert_eq!(
+        &src[p.span.clone()].trim(),
+        &"invalidates_on StoreChanged(id)"
+    );
+}
+
+#[test]
+fn a_declaration_with_no_policy_block_has_none() {
+    // Control: the accessor must distinguish "declared nothing" from "declared
+    // something the lowering could not read".
+    let hir = lower("module m\nfn f() -> Int !{} { 1 }\n");
+    let (_, d) = hir.all_decls().next().unwrap();
+    assert!(d.policies.is_empty());
+}
+
+#[test]
+fn every_policy_in_the_accepted_corpus_survives_lowering() {
+    // The coverage property, again: assert the converse. A policy keyword the
+    // lowering skipped would leave every test above passing.
+    let mut total = 0usize;
+    for path in corpus() {
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        if !name.starts_with("A-") {
+            continue;
+        }
+        let src = std::fs::read_to_string(&path).expect("read");
+        let hir = lower(&src);
+        for (_, d) in hir.all_decls() {
+            for p in &d.policies {
+                total += 1;
+                assert!(!p.name.is_empty(), "{name}: a policy with no name");
+                assert!(
+                    src[p.span.clone()].starts_with(&p.name),
+                    "{name}: {:?} does not start its own span",
+                    p.name
+                );
+            }
+        }
+    }
+    assert!(total >= 20, "expected a real sample, saw {total} policies");
+}

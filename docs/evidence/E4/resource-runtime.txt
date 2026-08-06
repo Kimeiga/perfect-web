@@ -1,0 +1,52 @@
+evidence: E4 — resource runtime and the resource manifest
+recorded: 2026-08-06T04:57:44Z
+commit:   c14ecdb540ff188eda7fc84d8027a72774d8bf69
+host:     Darwin arm64, rustc 1.97.1 (8bab26f4f 2026-07-14)
+commands:
+  cargo test -p pw-resource
+  cargo test -p pw-cli explain_shows_every_policy_the_compiler_knows_about
+  cargo test -p pw-core --test lowering policies
+
+These are BEHAVIOUR results, like E2A-R (ADR-0016). The compiler-side
+half of E4 is the resource manifest in pw-core::hir::Policy.
+
+==================== GATE ITEMS THIS ANSWERS ====================
+  test a_dropped_subscription_releases_even_on_an_early_return ... ok
+  test duplicate_commands_with_one_interaction_id_mutate_once ... ok
+  test a_command_can_invalidate_the_resource_it_changed ... ok
+  test a_fresh_cached_value_is_served_without_a_request ... ok
+  test a_failed_key_does_not_stay_in_flight_forever ... ok
+  test private_state_never_appears_in_public_cache_output ... ok
+  test retries_are_bounded_and_backoff_grows ... ok
+  test the_trace_records_what_actually_happened ... ok
+  test a_recomputation_storm_does_not_exceed_one_request_per_key ... ok
+  test navigating_away_cancels_work_nobody_is_waiting_for ... ok
+
+  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+  charter §14 M4 gate                              test
+  ------------------------------------------------ ----
+  storm <= one in-flight request per key            a_recomputation_storm_does_not_exceed_one_request_per_key
+  duplicate command IDs -> one mutation             duplicate_commands_with_one_interaction_id_mutate_once
+  navigation cancels unneeded work                  navigating_away_cancels_work_nobody_is_waiting_for
+  private state never in public cache output        private_state_never_appears_in_public_cache_output
+  all query/command policies visible in pw explain  explain_shows_every_policy_the_compiler_knows_about
+
+==================== FLAKINESS =================================
+  20 consecutive runs, failures: 0
+
+==================== POLICY VISIBILITY =========================
+  Checked against HIR, not a hand-written list, so a policy the
+  language gains cannot quietly stop being displayed:
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+==================== NOT PROVEN ================================
+  - SQLite is not used; the cache is in memory (M4 task 6 open).
+  - The complete store demo does not exist (task 5 open).
+  - Streamed recommendations and delivery estimate are not wired
+    to a page (task 7 open), so E3 gate 3 is still not met.
+  - Causal traces exist as Trace events but are not rendered from
+    click to DOM part (task 12 open).
+  - Nothing here is driven by .pw source: the manifest is lowered,
+    but no code generator connects a declaration to this runtime.

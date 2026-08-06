@@ -32,7 +32,7 @@ evidence; see ADR-0011.
 | **E2** | Source front end **and semantic integration** — lossless syntax, core body parsing, HIR, source-to-checker wiring, the ≥40 rejected gate | **5 of 6 gate items pass** — Rowan tree, body grammar (68/68 files), HIR (ADR-0014), `pw fmt` (ADR-0013), Koka execution (ADR-0015), exhaustiveness and the scope graph running on source. Open: the ≥40 rejected gate, at 7/44, which needs E1 and E5. |
 | **E2A** | Structured concurrency = **E2A-R** (runtime) + **E2A-S** (static scope checker) *(inserted)* | **COMPLETE** — both halves. E2A-S in `compiler/pw-core/src/scope.rs`, rejecting R-013 and R-039 from source; E2A-R in `runtime/pw-tasks` (ADR-0016), 12 behaviour tests, 0/25 flaky |
 | **E3** | Marko rendering adapter, streaming SSR, first resumption | **4 of 6 gate items pass** — adapter (ADR-0017), two `.pw` apps generating Marko, `/static` ships **zero** JS, counter resumes without re-execution, 21 tests × 3 engines. Open: the streamed region, which needs E4's resource model |
-| **E4** | Typed resource model and the first complete store page | not started |
+| **E4** | Typed resource model and the first complete store page | **5 of 7 gate items pass** — resource manifest in HIR, every policy visible in `pw explain`, and `runtime/pw-resource` with per-key dedup, idempotent commands, ref-counted cancellation and public/private cache separation. Open: the store demo, which needs a generator connecting a declaration to the runtime |
 | **E5** | Privacy-flow, cache-safety, and placement checker | not started |
 | **E6** | Materialized resource graph — the ISR successor | not started |
 | **E7-R** | Own renderer: resumption and DOM preservation | not started — **Marko is the accepted oracle** |

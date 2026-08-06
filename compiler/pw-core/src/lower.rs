@@ -170,6 +170,7 @@ impl Lowerer<'_> {
                 ret: self.return_type(node),
                 variants: self.variants(node),
                 fields: self.record_fields(node),
+                policies: self.policies(node),
                 opaque_of: self.opaque_of(node),
                 declared_effects,
                 body: None,
@@ -231,6 +232,36 @@ impl Lowerer<'_> {
                 })
                 .collect(),
         )
+    }
+
+    /// A declaration's policy block, values kept as written.
+    fn policies(&self, node: &SyntaxNode) -> Vec<Policy> {
+        node.children()
+            .find(|c| c.kind() == K::PolicyList)
+            .map(|list| {
+                list.children()
+                    .filter(|c| c.kind() == K::Policy)
+                    .map(|p| {
+                        let whole = text(self.src, &p);
+                        let trimmed = whole.trim_end();
+                        // The grammar keeps a policy keyword as a bare token,
+                        // so the name is the first word and the value is the
+                        // rest — with the run of alignment spaces collapsed,
+                        // because `freshness      30.seconds` and
+                        // `freshness 30.seconds` declare the same policy.
+                        let (name, value) = match trimmed.split_once(char::is_whitespace) {
+                            Some((n, v)) => (n.to_string(), v.trim().to_string()),
+                            None => (trimmed.to_string(), String::new()),
+                        };
+                        Policy {
+                            name,
+                            value,
+                            span: span_of(&p),
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn variants(&self, node: &SyntaxNode) -> Option<Vec<VariantDef>> {

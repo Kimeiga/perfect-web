@@ -592,6 +592,56 @@ mod tests {
     }
 
     #[test]
+    fn explain_shows_every_policy_the_compiler_knows_about() {
+        // Charter §14 M4 gate: *all* query and command policies are visible in
+        // `pw explain`. Checked against HIR rather than against a hand-written
+        // list, so a policy the language gains cannot quietly stop being shown.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/accepted");
+        let mut checked = 0usize;
+        let mut missing = Vec::new();
+
+        for entry in std::fs::read_dir(&root).expect("accepted/") {
+            let path = entry.expect("entry").path();
+            if path.extension().is_none_or(|e| e != "pw") {
+                continue;
+            }
+            let src = std::fs::read_to_string(&path).expect("read");
+            let text = explain(&parse(&src).file, &src);
+            let hir = pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green);
+
+            for (_, decl) in hir.all_decls() {
+                for policy in &decl.policies {
+                    checked += 1;
+                    // The name must appear, and so must the value — showing
+                    // `retry` without `bounded_exponential(max = 3)` tells a
+                    // reader a policy exists but not what it says.
+                    let shown = text.contains(&policy.name)
+                        && (policy.value.is_empty() || text.contains(&policy.value));
+                    if !shown {
+                        missing.push(format!(
+                            "{}: {} {}",
+                            path.file_name().unwrap().to_string_lossy(),
+                            policy.name,
+                            policy.value
+                        ));
+                    }
+                }
+            }
+        }
+
+        assert!(
+            checked >= 20,
+            "expected a real sample, saw {checked} policies"
+        );
+        assert!(
+            missing.is_empty(),
+            "{} of {checked} policies are not visible in `pw explain`:\n{}",
+            missing.len(),
+            missing.join("\n")
+        );
+    }
+
+    #[test]
     fn explain_flags_a_session_value_in_a_shared_cache() {
         // The charter §7.8 rule, surfaced as a forward-looking warning until E5
         // makes it an error.

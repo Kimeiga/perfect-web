@@ -91,6 +91,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-resource"
+version = "0.0.0"
+
+[[package]]
 name = "pw-syntax"
 version = "0.0.0"
 dependencies = [

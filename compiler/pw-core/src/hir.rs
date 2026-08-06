@@ -157,6 +157,21 @@ pub struct Param {
     pub span: Span,
 }
 
+/// One entry of a declaration's policy block: `freshness 30.seconds`.
+///
+/// The value is kept **as written**. E4 gives individual policies meaning one
+/// at a time, and a policy whose meaning is not yet modelled must still be
+/// visible — charter §14 M4's gate says *all* query and command policies appear
+/// in `pw explain`, and a policy the compiler silently dropped would not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Policy {
+    pub name: String,
+    /// Everything after the keyword, trimmed. Empty when the policy is a bare
+    /// word such as `offline`.
+    pub value: String,
+    pub span: Span,
+}
+
 /// One constructor of a `type T = | A | B(X)` declaration.
 #[derive(Debug, Clone)]
 pub struct VariantDef {
@@ -177,6 +192,8 @@ pub struct Decl {
     pub variants: Option<Vec<VariantDef>>,
     /// The fields, when this declaration defines a record.
     pub fields: Option<Vec<Param>>,
+    /// The declaration's policy block, in source order.
+    pub policies: Vec<Policy>,
     /// `opaque type StoreId = String` — the representation, as written.
     pub opaque_of: Option<String>,
     /// The declared effect row, as written: `!{ database.read<Stores> }` yields
@@ -185,6 +202,13 @@ pub struct Decl {
     pub body: Option<BodyId>,
     /// Declarations nested inside this one, e.g. a `fn` inside a `component`.
     pub children: Vec<DeclId>,
+}
+
+impl Decl {
+    /// The value of a named policy, if the declaration declares it.
+    pub fn policy(&self, name: &str) -> Option<&Policy> {
+        self.policies.iter().find(|p| p.name == name)
+    }
 }
 
 /// One entry in an effect row, with the span of the entry itself so a
