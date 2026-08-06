@@ -17,3 +17,49 @@ export function Recommendations(_id) {
     ),
   );
 }
+
+/* --- E4/E5: the store page -------------------------------------------------
+ *
+ * The split the demo exists to show. `Store` and `Menu` are the same for every
+ * reader — a shared cache is correct for them. `Cart` belongs to one session,
+ * and the `session` modifier on its declaration is what makes putting it in a
+ * shared cache a compile error (PW5001) rather than a leak nobody notices.
+ *
+ * Hand-written, like the rest of this file: the compiler says HOW a resource
+ * behaves via the manifest (ADR-0018); the host decides WHAT it does.
+ */
+const MENU = [
+  { id: "espresso", name: "Espresso" },
+  { id: "cortado", name: "Cortado" },
+  { id: "affogato", name: "Affogato" },
+];
+
+// Per-session carts, so "private" is observable rather than asserted.
+const CARTS = new Map();
+
+export function Store(_id) {
+  return { name: "Blue Bottle" };
+}
+
+export function Menu(_id) {
+  return MENU;
+}
+
+export function current_session() {
+  return "session-1";
+}
+
+export function PositiveInt(n) {
+  return n;
+}
+
+export function Cart(session) {
+  if (!CARTS.has(session)) CARTS.set(session, { line_count: 0 });
+  return CARTS.get(session);
+}
+
+export function add_to_cart(_item, quantity) {
+  const cart = Cart(current_session());
+  cart.line_count += quantity;
+  return cart;
+}

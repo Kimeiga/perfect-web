@@ -138,3 +138,62 @@ test.describe("streamed route", () => {
     await expect(page.locator("#recs-marker li").first()).toHaveText("Affogato");
   });
 });
+
+test.describe("store route — E4 gate 1, E5 gate 2", () => {
+  // The demo both milestones were blocked on. The point is the SPLIT: one
+  // page, public store data beside private cart data, generated from one `.pw`
+  // file whose two queries declare different cache partitions.
+
+  test("renders public store data and private cart data together", async ({ page }) => {
+    await page.goto("/store");
+    await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
+    await expect(page.getByRole("list")).toBeVisible();
+    await expect(page.getByText("Espresso")).toBeVisible();
+    await expect(page.locator("#cart-count")).toBeVisible();
+  });
+
+  test("the public half works with JavaScript disabled", async ({ browser }) => {
+    // The store name and menu are server-rendered. A page that needed JS to
+    // show its menu would not be the thing charter §8.5 asks for.
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto("/store");
+    await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
+    await expect(page.getByText("Cortado")).toBeVisible();
+    await context.close();
+  });
+
+  test("adding to the cart updates only the cart", async ({ page }) => {
+    // Interaction without whole-page re-execution: the store name node is
+    // marked before the click and must survive it, which is the same technique
+    // E3 gate 4 uses for the counter.
+    await page.goto("/store");
+    await page.evaluate(() => {
+      document.querySelector("#store-name").dataset.marker = "before";
+    });
+
+    const before = await page.locator("#cart-count").textContent();
+    await page.getByRole("button", { name: "Add" }).first().click();
+    await expect(page.locator("#cart-count")).not.toHaveText(before);
+
+    const marker = await page.evaluate(
+      () => document.querySelector("#store-name").dataset.marker,
+    );
+    expect(marker, "the public half must not be re-rendered by a cart change").toBe(
+      "before",
+    );
+  });
+
+  test("the served HTML contains no session identifier", async ({ request }) => {
+    // The privacy claim, checked in the BYTES rather than by reading the
+    // policy. The cart's count is rendered; the session it belongs to is not.
+    //
+    // Fetched with the request context rather than read off a navigation
+    // response: `page.goto()`'s response object is not equally available in
+    // every engine, and the first version of this test failed in Firefox for
+    // that reason while the served bytes were in fact clean.
+    const response = await request.get("/store");
+    expect(response.ok()).toBe(true);
+    expect(await response.text()).not.toContain("session-1");
+  });
+});

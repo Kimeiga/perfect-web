@@ -23,7 +23,7 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
     echo "host: $(uname -sm)"
     echo "node: $(node --version)"
     echo "commands:"
-    echo "  pw emit-marko examples/{hello-static,counter}/app.pw --out spikes/pw-to-marko/src/routes/<route>"
+    echo "  pw emit-marko examples/{hello-static,counter,streamed,store}/app.pw --out spikes/pw-to-marko/src/routes/<route>"
     echo "  pnpm --filter spike-pw-to-marko build"
     echo "  node spikes/pw-to-marko/measure.mjs"
     echo "  pnpm --filter spike-pw-to-marko exec playwright test"
@@ -35,7 +35,7 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
     # lives outside routes/, so it survives.
     rm -rf "$SPIKE/src/routes"
     mkdir -p "$SPIKE/src/routes/static" "$SPIKE/src/routes/counter" \
-             "$SPIKE/src/routes/streamed"
+             "$SPIKE/src/routes/streamed" "$SPIKE/src/routes/store"
     cd "$REPO_ROOT"
     cargo run --quiet -p pw-cli -- emit-marko examples/hello-static/app.pw \
         --out "$SPIKE/src/routes/static"
@@ -43,11 +43,16 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
         --out "$SPIKE/src/routes/counter"
     cargo run --quiet -p pw-cli -- emit-marko examples/streamed/app.pw \
         --out "$SPIKE/src/routes/streamed"
+    # E4 gate 1 / E5 gate 2: one page, public store data beside private cart
+    # data, with the split visible in the cache policies.
+    cargo run --quiet -p pw-cli -- emit-marko examples/store/app.pw \
+        --out "$SPIKE/src/routes/store"
 
     # @marko/run routes are `+page.marko`; the adapter emits one file per view.
     mv "$SPIKE/src/routes/static/HelloStatic.marko" "$SPIKE/src/routes/static/+page.marko"
     mv "$SPIKE/src/routes/counter/Counter.marko" "$SPIKE/src/routes/counter/+page.marko"
     mv "$SPIKE/src/routes/streamed/StreamedPage.marko" "$SPIKE/src/routes/streamed/+page.marko"
+    mv "$SPIKE/src/routes/store/StorePage.marko" "$SPIKE/src/routes/store/+page.marko"
     echo
     echo "--- generated: static ---"
     cat "$SPIKE/src/routes/static/+page.marko"
@@ -55,6 +60,8 @@ OUT="$EVIDENCE/spike-pw-to-marko.txt"
     cat "$SPIKE/src/routes/counter/+page.marko"
     echo "--- generated: streamed ---"
     cat "$SPIKE/src/routes/streamed/+page.marko"
+    echo "--- generated: store ---"
+    cat "$SPIKE/src/routes/store/+page.marko"
     echo
 
     echo "===================== 2. BUILD ====================================="

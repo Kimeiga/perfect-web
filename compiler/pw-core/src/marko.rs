@@ -77,7 +77,7 @@ fn render_decl(hir: &Hir, decl: &Decl, source_name: &str) -> Result<String, Stri
     // implementation. Generated templates import it from a host-provided
     // module; the host decides what a `query` actually does, which is the whole
     // point of the manifest being separate from the renderer (ADR-0018).
-    let queries = streamed_queries(body, &roots);
+    let queries = imported_resources(hir, body, &roots);
     if !queries.is_empty() {
         out.push_str(&format!(
             "import {{ {} }} from \"{RESOURCE_MODULE}\";\n\n",
@@ -89,7 +89,32 @@ fn render_decl(hir: &Hir, decl: &Decl, source_name: &str) -> Result<String, Stri
     // (`<let/…>`); an immutable binding is a computed constant (`<const/…>`).
     // Without this the counter has nothing to increment.
     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
-    let ctx = Ctx { params: &params };
+    // Two passes: collect what each binding reads, then render. A handler in
+    // the markup needs to know which binding its command invalidates, and the
+    // markup is rendered after the bindings are known.
+    let mut binding_reads: Vec<(String, String)> = Vec::new();
+    if let Expr::Block { stmts } = body.expr(body.root) {
+        for st in stmts {
+            if let Expr::Let {
+                pat: Some(pat),
+                init: Some(init),
+                ..
+            } = body.expr(*st)
+                && let Pattern::Bind { name, .. } = body.pat(*pat)
+                && let Expr::Keyword {
+                    keyword, modifiers, ..
+                } = body.expr(*init)
+                && matches!(keyword.as_str(), "query" | "subscription")
+            {
+                binding_reads.push((name.clone(), modifiers.first().cloned().unwrap_or_default()));
+            }
+        }
+    }
+    let ctx = Ctx {
+        params: &params,
+        hir,
+        bindings: binding_reads,
+    };
     let mut bindings = String::new();
     if let Expr::Block { stmts } = body.expr(body.root) {
         for st in stmts {
@@ -102,7 +127,32 @@ fn render_decl(hir: &Hir, decl: &Decl, source_name: &str) -> Result<String, Stri
             let Pattern::Bind { name, mutable } = body.pat(*pat) else {
                 continue;
             };
-            let kw = if *mutable { "let" } else { "const" };
+            // A binding a command DECLARES it invalidates must be reactive, or
+            // the mutation runs and the DOM does not move. `const` is correct
+            // for a value nothing invalidates and wrong for one something does
+            // — and which is which is written down: `invalidates Cart(..)`
+            // names the query.
+            //
+            // Found by the store demo's browser test failing in all three
+            // engines. The E3 counter uses `let mut`, so `const` had never been
+            // wrong before.
+            // Compared against the QUERY this binding reads, not the binding's
+            // own name: `let cart = query Cart(..)` binds `cart` and reads
+            // `Cart`, and comparing the two spellings finds nothing.
+            let reads = match body.expr(*init) {
+                Expr::Keyword {
+                    keyword, modifiers, ..
+                } if matches!(keyword.as_str(), "query" | "subscription") => {
+                    modifiers.first().cloned().unwrap_or_default()
+                }
+                _ => String::new(),
+            };
+            let invalidated = !reads.is_empty() && invalidated_queries(hir).contains(&reads);
+            let kw = if *mutable || invalidated {
+                "let"
+            } else {
+                "const"
+            };
             bindings.push_str(&format!(
                 "<{kw}/{name}={}>\n",
                 expr_text(body, *init, &ctx)?
@@ -124,6 +174,11 @@ fn render_decl(hir: &Hir, decl: &Decl, source_name: &str) -> Result<String, Stri
 /// in Marko; its own bindings are plain locals.
 struct Ctx<'a> {
     params: &'a [String],
+    /// The module, for resolving a command's `invalidates` policy.
+    hir: &'a Hir,
+    /// `(binding name, the query it reads)`, so a handler can find which
+    /// reactive binding its command invalidates.
+    bindings: Vec<(String, String)>,
 }
 
 impl Ctx<'_> {
@@ -139,6 +194,131 @@ impl Ctx<'_> {
 /// Where a generated template imports its resource implementations from,
 /// relative to `routes/<route>/+page.marko`.
 pub const RESOURCE_MODULE: &str = "../../resources.mjs";
+
+/// The reactive binding a handler's command invalidates, if any.
+///
+/// `add_to_cart` declares `invalidates Cart(..)`, and the template binds
+/// `let cart = query Cart(..)`. So the handler assigns its result to `cart`.
+fn invalidated_binding(ctx: &Ctx<'_>, body: &Body, call: ExprId) -> Option<String> {
+    let Expr::Call { callee, .. } = body.expr(call) else {
+        return None;
+    };
+    let Expr::Name(command) = body.expr(*callee) else {
+        return None;
+    };
+    let (_, decl) = ctx.hir.all_decls().find(|(_, d)| d.name == *command)?;
+    let query = decl
+        .policies
+        .iter()
+        .find(|p| p.name == "invalidates")?
+        .value
+        .trim()
+        .split('(')
+        .next()?
+        .trim()
+        .to_string();
+    ctx.bindings
+        .iter()
+        .find(|(_, reads)| *reads == query)
+        .map(|(binding, _)| binding.clone())
+}
+
+/// Query names some command in this module declares it invalidates.
+///
+/// The binding for such a query is reactive: a mutation that says it
+/// invalidates `Cart` means the rendered cart must change when it runs.
+fn invalidated_queries(hir: &Hir) -> Vec<String> {
+    let mut out = Vec::new();
+    for (_, d) in hir.all_decls() {
+        for p in &d.policies {
+            if p.name != "invalidates" {
+                continue;
+            }
+            // `invalidates Cart(current_session())` — the query is the head.
+            let head = p
+                .value
+                .trim()
+                .split('(')
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            if !head.is_empty() && !out.contains(&head) {
+                out.push(head);
+            }
+        }
+    }
+    out
+}
+
+/// Every declaration whose implementation this template must import.
+///
+/// Two shapes, and only the first existed before the store demo:
+///
+/// ```text
+/// <stream query={Recommendations(id)}>     a streamed region
+/// let store = query Store(id)              a body-level dependency
+/// ```
+///
+/// A template missing the second import compiles and then fails at runtime
+/// with `Store is not defined`, which is the worst kind of generator bug: it
+/// looks like the host forgot to implement something.
+fn imported_resources(hir: &Hir, body: &Body, roots: &[NodeId]) -> Vec<String> {
+    let mut names = streamed_queries(body, roots);
+
+    // Host-provided free functions the template calls. `current_session` and
+    // the constructor forms are not declarations in the module — the host
+    // supplies them, exactly as it supplies a query's implementation.
+    const HOST_PROVIDED: &[&str] = &["current_session", "PositiveInt"];
+
+    // A call to a `query`, `command` or `subscription` DECLARED in this module
+    // is a resource too. The store demo calls `add_to_cart` from a handler,
+    // which is a command, and a template that does not import it renders and
+    // then fails on click.
+    let resources: Vec<&str> = hir
+        .all_decls()
+        .filter(|(_, d)| {
+            matches!(
+                d.kind,
+                crate::hir::DeclKind::Query
+                    | crate::hir::DeclKind::Command
+                    | crate::hir::DeclKind::Subscription
+            )
+        })
+        .map(|(_, d)| d.name.as_str())
+        .collect();
+    for id in body.walk() {
+        let Expr::Call { callee, .. } = body.expr(id) else {
+            continue;
+        };
+        let Expr::Name(n) = body.expr(*callee) else {
+            continue;
+        };
+        if (resources.contains(&n.as_str()) || HOST_PROVIDED.contains(&n.as_str()))
+            && !names.contains(n)
+        {
+            names.push(n.clone());
+        }
+    }
+
+    for id in body.walk() {
+        let Expr::Keyword {
+            keyword, modifiers, ..
+        } = body.expr(id)
+        else {
+            continue;
+        };
+        if !matches!(keyword.as_str(), "query" | "command" | "subscription") {
+            continue;
+        }
+        if let Some(n) = modifiers.first()
+            && !names.contains(n)
+        {
+            names.push(n.clone());
+        }
+    }
+    names
+}
 
 /// Query names a `<stream>` in this markup calls.
 fn streamed_queries(body: &Body, roots: &[NodeId]) -> Vec<String> {
@@ -460,7 +640,28 @@ fn attr_text(body: &Body, a: &crate::hir::Attr, ctx: &Ctx<'_>) -> Result<String,
         // shaped like its renderer.
         (AttrValue::Expr(e), Some(("on", event))) => {
             let dom = dom_event(event)?;
-            Ok(format!("{dom}() {{ {} }}", expr_text(body, *e, ctx)?))
+            // A handler may be written as a bare expression — `count = count + 1`
+            // — or as a lambda, `() => add_to_cart(id)`. Both mean "do this when
+            // the event fires", and Marko's `onClick() { .. }` is the same shape,
+            // so the lambda's parameters are dropped and its body rendered.
+            //
+            // Only the E3 counter existed when this was written, and it uses the
+            // first form. The store demo uses the second, and the adapter simply
+            // refused it — a whole class of handler that could not be generated,
+            // invisible because no example had one.
+            let inner = match body.expr(*e) {
+                Expr::Lambda { body: b, .. } => *b,
+                _ => *e,
+            };
+            let call = expr_text(body, inner, ctx)?;
+            // A handler that invokes a command which declares `invalidates Q`
+            // must write the result back into `Q`'s reactive binding. Without
+            // it the mutation runs and the DOM does not move — which is what
+            // the store demo's browser test found in all three engines.
+            match invalidated_binding(ctx, body, inner) {
+                Some(binding) => Ok(format!("{dom}() {{ {binding} = {call} }}")),
+                None => Ok(format!("{dom}() {{ {call} }}")),
+            }
         }
         (_, Some(("on", _))) => Err("an `on:` attribute needs a handler expression".to_string()),
 
@@ -516,6 +717,27 @@ fn expr_text(body: &Body, id: ExprId, ctx: &Ctx<'_>) -> Result<String, String> {
                 parts.push(expr_text(body, a.value, ctx)?);
             }
             format!("{}({})", expr_text(body, *callee, ctx)?, parts.join(", "))
+        }
+        // `query Store(id)` — a dependency on a declaration that runs at its
+        // own placement. The template imports its implementation from the host
+        // (ADR-0018), so it renders as the call the host provides.
+        //
+        // This arm exists because making `query` a statement keyword — which
+        // fixed a false positive where every page declaring a dependency looked
+        // like a page reaching the database — changed its HIR shape from `Call`
+        // to `Keyword`, and the adapter had only ever seen the former. No E3
+        // example uses `let x = query Q(..)`, so nothing noticed until the
+        // store demo.
+        Expr::Keyword {
+            keyword,
+            modifiers,
+            args,
+            ..
+        } if matches!(keyword.as_str(), "query" | "command" | "subscription") => {
+            let name = modifiers.first().cloned().unwrap_or_default();
+            let rendered: Result<Vec<String>, String> =
+                args.iter().map(|a| expr_text(body, *a, ctx)).collect();
+            format!("{name}({})", rendered?.join(", "))
         }
         Expr::Binary { op, lhs, rhs } => {
             let o = js_binop(op)?;
