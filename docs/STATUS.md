@@ -54,12 +54,19 @@ enforced by a test, not by convention.
 comment-preserving on all 68 files, `--check` wired into `just ci`. It is a
 canonical *spacing*, not yet canonical line breaking, and the ADR says so.
 
-**public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
-— six of the claims it needs are unstarted, and **45 corpus files exist of which
-0 compile**.
+**`pw` code executes.** `pw emit-koka` lowers the pure subset (ADR-0015) and
+`just spike-pw-to-koka` compiles and runs it under the pinned Koka 3.2.3,
+matching hand-computed values. Two negative controls run with it, including one
+proving the generated `total` annotation is load-bearing rather than
+decorative. **E2 gate: five of six items pass.** The open one is the
+rejected-corpus count, which E1 and E5 own.
 
-**last passing commit:** `62b8539` — `pw fmt`.
-`just ci` passes at that commit on macOS 26.5.2 / arm64, with 198 tests.
+**public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 still cannot be
+published — several claims it needs are unstarted, and of 44 rejected corpus
+files **5 are rejected by the compiler**, not the ≥40 the charter asks for.
+
+**last passing commit:** `04d41fa` — the Koka backend.
+`just ci` passes at that commit on macOS 26.5.2 / arm64, with 206 tests.
 
 ---
 
