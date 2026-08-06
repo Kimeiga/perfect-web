@@ -13,7 +13,7 @@ import domain.{ Store, StoreId }
 
 view Panel(store: Store) !{} {
     let held = store
-    <button on:press={resumable(captures = { held, store.id }) => refresh(held)}>
+    <button on:press={resumable(captures = { held, store.id }) => refresh(held, store.id)}>
         Refresh
     </button>
 }

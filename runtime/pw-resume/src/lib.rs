@@ -547,6 +547,66 @@ pub fn decide(entry: &ResumeEntry, rt: &Runtime, construct: Construct) -> Decisi
     }
 }
 
+/// Proof that [`decide`] said yes.
+///
+/// The only way to obtain one is [`decide`], and the only thing that accepts
+/// one is [`attach`]. That is the whole design: a caller cannot attach a
+/// handler without holding the result of a compatibility check, because there
+/// is no other constructor.
+///
+/// A structural test that greps for a bypass would be a lint. This is the
+/// same idea moved into the type system, where it cannot be forgotten — the
+/// same move as deleting the by-name member fallback rather than documenting
+/// that it should not be used.
+#[derive(Debug)]
+pub struct Authorised {
+    handler: HandlerId,
+    /// The bytes the handler may read: the originals, or what a migration
+    /// produced. Never the manifest's bytes when a migration ran.
+    captures: Vec<u8>,
+    _private: (),
+}
+
+impl Authorised {
+    pub fn handler(&self) -> &HandlerId {
+        &self.handler
+    }
+    /// The captures, available only through the authorisation.
+    pub fn captures(&self) -> &[u8] {
+        &self.captures
+    }
+}
+
+/// Attach a handler, given proof that it may be.
+///
+/// Takes `Authorised` by value, so one decision authorises one attachment.
+pub fn attach(proof: Authorised) -> (HandlerId, Vec<u8>) {
+    (proof.handler, proof.captures)
+}
+
+/// Turn a decision into an authorisation, or nothing.
+///
+/// The single point where a `Decision` becomes permission. `Refuse` yields
+/// `None` — there is no path from a refusal to an `Authorised`.
+pub fn authorise(entry: &ResumeEntry, decision: &Decision) -> Option<Authorised> {
+    match decision {
+        Decision::Resume => Some(Authorised {
+            handler: entry.handler.clone(),
+            captures: entry.captures.clone(),
+            _private: (),
+        }),
+        // The MIGRATED bytes, not the manifest's. Handing the originals to a
+        // handler that expects the new schema would be the mismatch the
+        // migration exists to prevent, arriving one step later.
+        Decision::Migrate { produced } => Some(Authorised {
+            handler: entry.handler.clone(),
+            captures: produced.clone(),
+            _private: (),
+        }),
+        Decision::Refuse { .. } => None,
+    }
+}
+
 /// May a streamed patch be applied to this document?
 ///
 /// Separate from [`decide`] because it is a different question with a different

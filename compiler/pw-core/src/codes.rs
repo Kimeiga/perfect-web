@@ -204,6 +204,11 @@ codes! {
     // which this build can derive a schema.
     RESUME_CAPTURE_SCHEMA_UNNAMEABLE = "PW5016" / resume_capture_schema_unnameable / 1, Privacy,
         "a resumable capture must have a type this build can derive a schema from";
+    // Its own entry, not a reuse of PW5016. That one is about a capture having
+    // a nameable type at all; this is about two independently generated
+    // artifacts within ONE build describing the same handler differently.
+    RESUME_ARTIFACT_CONTRACT_MISMATCH = "PW5017" / resume_artifact_contract_mismatch / 1, Privacy,
+        "a resume manifest and its handler artifact must describe the same contract";
     DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,

@@ -120,7 +120,7 @@ Content addressing identifies each *piece*; `BuildId` identifies the coherent
 | # | item | result |
 |---|---|---|
 | 1 | manifest identity model documented | **PASS** — this file and the module docs |
-| 2 | build-time artifact agreement checked | **PASS** — `PW5016` |
+| 2 | build-time artifact agreement checked | **PASS** — `PW5017`, with six mutation controls. `PW5016` is the narrower, separate check that a capture has a nameable type at all |
 | 3 | runtime compatibility returns a typed decision | **PASS** — `Decision`, never a boolean |
 | 4 | strict matching works | **PASS** |
 | 5 | at least one explicit migration works | **PASS** |
@@ -163,10 +163,60 @@ And not:
 The second requires the decision to be *in the path*, which is E7's generator
 and is not done.
 
+## Build-time artifact agreement
+
+`resume_artifacts.rs` generates the manifest and the handler artifact by two
+**different walks** — the manifest from the `captures` list as written, the
+artifact from what the lambda body reads — and compares them (`PW5017`).
+
+Two sources for one fact is normally a smell. Here it is the point: a generator
+bug that changes one walk and not the other is exactly what the comparison
+exists to catch, and a single source of truth would make it undetectable by
+construction. That is also why a stub generator was refused — it would produce
+`stub says A, stub says A, A == A`.
+
+The test with teeth is not a successful generation. It is six mutations, each
+of exactly one field of one record — manifest capture hash, artifact capture
+hash, document schema, handler identity, platform ABI, build identity — each of
+which must be caught **and named**. Without them, `a_valid_pair_agrees` passes
+even if `compare` returns `None` unconditionally.
+
+## Attachment cannot be bypassed
+
+`Authorised` has a private field, so its only constructor is `authorise`, and
+`attach` takes one by value. A caller cannot reach `attach` without holding the
+result of `decide`. A structural test that greps for a bypass would be a lint;
+this is the same idea in the type system, where it cannot be forgotten — the
+same move as deleting the by-name member fallback rather than documenting that
+it should not be used.
+
+A migration authorises the bytes it **produced**, never the manifest's
+originals. Handing the originals to a handler expecting the new schema would be
+the mismatch the migration exists to prevent, arriving one step later in a place
+nothing checks.
+
 ## What implementing it found
 
-**Nothing, and that is worth recording.** Every other milestone in this project
-found a defect while being built. E7V found none, because it is new code with
-no existing behaviour to contradict — which is itself a reminder that the
-defect-finding has come from *challenging existing analyses*, not from writing
-new ones. The fuzzer is the next thing that can find something here.
+**Nothing while being written, and one thing the moment it was attacked.**
+
+E7V found no defect during construction — the first milestone here that did
+not. Its first independent adversary found one in its first run:
+
+> **R3.** A `Session`-scoped manifest in a `PublicRegion` construct was refused
+> with `RefetchRegion` — recovering private state by re-rendering a public
+> region. 611 of 4000 generated cases.
+
+The deployment matrix could not have found it. Every hand-written row pairs a
+construct with a *consistent* scope, because the disagreeing pair is a
+contradiction no scenario would think to write. The generator produced it by
+taking the cross product.
+
+Recorded in `examples/robustness/regressions/R3-*.md` with the minimized
+reproducer and the negative control. The architect predicted the shape of this
+before it happened:
+
+> New code without an adversarial neighbor is unchallenged, not demonstrated
+> clean.
+
+The artifact comparison then found two more — both in this repository's own
+generality witnesses, which declared captures their bodies never read.

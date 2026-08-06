@@ -631,3 +631,70 @@ fn a_public_manifest_in_a_public_region_still_refetches() {
         other => panic!("expected a refusal, got {other:?}"),
     }
 }
+
+// --- the attachment path -----------------------------------------------------
+
+/// There is no way to attach a handler without a decision.
+///
+/// Enforced by the type system rather than by a lint: `Authorised` has a
+/// private field, so the only constructor is `authorise`, and `attach` takes
+/// one by value. A caller cannot reach `attach` without holding the result of
+/// `decide`.
+///
+/// This is the same move as deleting the by-name member fallback instead of
+/// documenting that it should not be used — a rule nothing can forget.
+#[test]
+fn a_refusal_yields_no_authorisation() {
+    let s = schema_v1();
+    let absent = handler("gone", &s);
+    let present = handler("here", &s);
+    let e = entry(&absent, &s, "B1", PrivacyScope::Public);
+    let d = decide(
+        &e,
+        &runtime(&[(&present, &s)], PrivacyScope::Public),
+        Construct::PublicRegion,
+    );
+    assert!(authorise(&e, &d).is_none(), "a refusal must not authorise");
+}
+
+#[test]
+fn a_resume_authorises_the_manifests_own_captures() {
+    let s = schema_v1();
+    let h = handler("render", &s);
+    let e = entry(&h, &s, "B1", PrivacyScope::Public);
+    let d = decide(
+        &e,
+        &runtime(&[(&h, &s)], PrivacyScope::Public),
+        Construct::PublicRegion,
+    );
+    let proof = authorise(&e, &d).expect("a resume authorises");
+    let (attached, captures) = attach(proof);
+    assert_eq!(attached, h);
+    assert_eq!(captures, e.captures);
+}
+
+/// A migration authorises the MIGRATED bytes, never the originals.
+///
+/// Handing the manifest's own captures to a handler that expects the new
+/// schema would be the mismatch the migration exists to prevent, arriving one
+/// step later and in a place nothing checks.
+#[test]
+fn a_migration_authorises_what_it_produced_and_not_the_original() {
+    let (v1, v2) = (schema_v1(), schema_v2());
+    let h = handler("render", &v1);
+    let mut rt = runtime(&[(&h, &v2)], PrivacyScope::Public);
+    rt.migrations.push(Migration {
+        from: v1.clone(),
+        to: v2,
+        apply: add_locale,
+    });
+    let e = entry(&h, &v1, "B1", PrivacyScope::Public);
+    let d = decide(&e, &rt, Construct::PublicRegion);
+    let proof = authorise(&e, &d).expect("a migration authorises");
+    assert_eq!(proof.captures(), b"store-7|en");
+    assert_ne!(
+        proof.captures(),
+        &e.captures[..],
+        "the ORIGINAL bytes must not reach the handler"
+    );
+}

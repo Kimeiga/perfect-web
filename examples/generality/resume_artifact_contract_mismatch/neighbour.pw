@@ -1,0 +1,16 @@
+// @status: NEIGHBOUR
+// @invariant: resume_artifact_contract_mismatch
+// @dimension: valid neighbour — two captures, both read
+//
+// A rule reacting to "more than one capture", or to a capture reached as a
+// field, would catch this. What matters is that the two walks agree.
+
+module generality.artifact_agrees
+
+import domain.{ Store }
+
+view Panel(store: Store, other: Store) !{} {
+    <button on:press={resumable(captures = { store, other }) => refresh(store, other)}>
+        Refresh
+    </button>
+}

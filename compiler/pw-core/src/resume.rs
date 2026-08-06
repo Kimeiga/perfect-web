@@ -77,6 +77,18 @@ impl Manifest {
     }
 }
 
+/// The captures with their spans, for a diagnostic that points at one.
+fn captures_with_spans(
+    body: &crate::hir::Body,
+    types: &crate::infer::Types<'_>,
+    descriptor: ExprId,
+) -> Vec<(String, Span, Option<String>)> {
+    captures(body, descriptor)
+        .into_iter()
+        .map(|(name, span, expr)| (name, span, types.of(body, expr)))
+        .collect()
+}
+
 /// The capture schema a handler declares: (name, type) per capture.
 ///
 /// E7V's build-time half. The runtime compares content hashes ACROSS
@@ -85,14 +97,14 @@ impl Manifest {
 /// whose type this build cannot determine yields a schema hash derived from a
 /// guess, and a guessed hash matches nothing, so every resume would fail after
 /// deployment for a reason nobody could diagnose from the deployment.
-fn capture_schema(
+pub(crate) fn capture_names_and_types(
     body: &crate::hir::Body,
     types: &crate::infer::Types<'_>,
     descriptor: ExprId,
-) -> Vec<(String, Span, Option<String>)> {
+) -> Vec<(String, Option<String>)> {
     captures(body, descriptor)
         .into_iter()
-        .map(|(name, span, expr)| (name, span, types.of(body, expr)))
+        .map(|(name, _, expr)| (name, types.of(body, expr)))
         .collect()
 }
 
@@ -127,7 +139,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Di
             };
             // Build-time artifact agreement: every capture must have a type
             // the manifest can name.
-            for (name, span, ty) in capture_schema(body, &types, *d) {
+            for (name, span, ty) in captures_with_spans(body, &types, *d) {
                 if ty.is_some() {
                     continue;
                 }

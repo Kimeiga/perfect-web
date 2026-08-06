@@ -13,7 +13,7 @@ import Database
 type AdminSession = AdminSession { connection: DatabaseConnection }
 
 view AdminPanel(session: AdminSession) !{} {
-    <button on:press={resumable(captures = { session.connection }) => flush()}>
+    <button on:press={resumable(captures = { session.connection }) => flush(session.connection)}>
         Flush
     </button>
 }

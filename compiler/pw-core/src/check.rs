@@ -401,6 +401,12 @@ fn check_unit_with(
     // Charter §8.5: the resume manifest ships with the document.
     crate::resume::check(&unit.hir, sigs, manifest, &mut out);
 
+    // E7 generator: the resume manifest and the handler artifact, derived by
+    // two different walks and compared. A disagreement within one build is a
+    // build error; disagreement ACROSS builds is `runtime/pw-resume`'s job and
+    // is not a source diagnostic at all.
+    crate::resume_artifacts::check(&unit.hir, sigs, crate::resume_artifacts::BUILD, &mut out);
+
     // Charter §8.2: an internal link names a route the program declares.
     crate::routes::check(&unit.hir, routes, &mut out);
 

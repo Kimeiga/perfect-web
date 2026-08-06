@@ -463,3 +463,62 @@ fn the_fuzzing_claim_states_what_it_is_not() {
     eprintln!("  {WHAT_THIS_IS_NOT}");
     assert!(WHAT_THIS_IS_NOT.contains("NOT a"));
 }
+
+/// The attachment path, fuzzed.
+///
+/// The property that matters most, and the one a decision-only fuzzer cannot
+/// state: whatever `decide` returns, nothing may reach `attach` without an
+/// authorisation, and an authorisation may never carry bytes the handler's
+/// schema does not describe.
+#[test]
+fn fuzz_the_attachment_path() {
+    let (hs, ss, sc, ab) = (handlers(), schemas(), scopes(), abis());
+    run("attachment path", 4000, |rng| {
+        let (h, want) = rng.pick(&hs).clone();
+        let have = rng.pick(&ss).clone();
+        let mut migrations = Vec::new();
+        if rng.below(2) == 0 {
+            migrations.push(Migration {
+                from: have.clone(),
+                to: want.clone(),
+                apply: identity,
+            });
+        }
+        let entry = ResumeEntry {
+            platform_abi: rng.pick(&ab).clone(),
+            application_build: BuildId("B1".into()),
+            handler: h.clone(),
+            capture_schema: have.clone(),
+            document_schema: SchemaHash::of_fields(&[]),
+            privacy_scope: rng.pick(&sc).clone(),
+            captures: vec![9u8; 1 + rng.below(4)],
+        };
+        let rt = Runtime {
+            abi: vec![PlatformAbi(1)],
+            build: Some(BuildId("B1".into())),
+            handlers: [(h, want.clone())].into_iter().collect(),
+            document_schema: Some(SchemaHash::of_fields(&[])),
+            scope: Some(rng.pick(&sc).clone()),
+            migrations,
+        };
+        let c = *rng.pick(&constructs());
+        let d = decide(&entry, &rt, c);
+        let proof = authorise(&entry, &d);
+
+        // 1. A refusal never authorises.
+        if !d.attaches() && proof.is_some() {
+            return Some("a refusal produced an authorisation".into());
+        }
+        // 2. An authorisation exists only where the decision attached.
+        if d.attaches() && proof.is_none() {
+            return Some("an attaching decision produced no authorisation".into());
+        }
+        // 3. A migration authorises the produced bytes, never the manifest's.
+        if let (Decision::Migrate { produced }, Some(p)) = (&d, &proof)
+            && p.captures() != &produced[..]
+        {
+            return Some("an authorisation carried bytes the migration did not produce".into());
+        }
+        violations(&entry, &rt, c, &d)
+    });
+}

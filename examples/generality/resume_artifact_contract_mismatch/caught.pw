@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: resume_artifact_contract_mismatch
+// @dimension: direct invalid — a capture declared and never read
+//
+// The manifest is derived from the `captures` list as written; the handler
+// artifact from what the body reads. `other` appears in one and not the other,
+// so the two records describe different contracts. Shipped, every resume of
+// this handler would fail after deployment.
+
+module generality.artifact_mismatch
+
+import domain.{ Store }
+
+view Panel(store: Store, other: Store) !{} {
+    <button on:press={resumable(captures = { store, other }) => refresh(store)}>
+        Refresh
+    </button>
+}

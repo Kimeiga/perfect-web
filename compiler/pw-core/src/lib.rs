@@ -45,6 +45,7 @@ pub mod placement;
 pub mod privacy;
 pub mod resolve;
 pub mod resume;
+pub mod resume_artifacts;
 pub mod routes;
 pub mod rules;
 pub mod scope;
