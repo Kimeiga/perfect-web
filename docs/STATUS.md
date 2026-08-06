@@ -17,17 +17,30 @@ Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 and handlers only by ADR-0011. **In progress:** its central question was answered
 early by RQ-2 (clean pass). Then **E1A** — `pw` value semantics and boundary ABI.
 
-**risk-retirement queue:** RQ-1 (Marko resumption) and RQ-2 (Koka higher-order
-effects) are **done**, both passing their pre-registered decision rules. RQ-3
-(`pw` exhaustiveness + typed ABI) is **partial** — the checker exists and is
-tested, but has no parser in front of it until E2. RQ-4 (structured concurrency,
-E2A-R + E2A-S) is next. See `docs/RISK_QUEUE.md`.
+**risk-retirement queue** (`docs/RISK_QUEUE.md`):
+
+| | | |
+|---|---|---|
+| RQ-1 | Marko resumption, Chrome + Safari | **done** — passed its pre-registered rule |
+| RQ-2 | Koka higher-order effect propagation | **done** — Outcome 1, clean pass |
+| RQ-3 | `pw` exhaustiveness + typed ABI | **partial** — checker done; no parser until E2 |
+| RQ-4 | structured concurrency | **partial** — E2A-S done; E2A-R not started |
+| RQ-5 | artifact capability audit | **partial** — rule done; not wired to a build |
+| RQ-6 | effect-family rejection coverage | **partial** — layout/DOM families done |
+| RQ-7 | E→P evidence ledger | **done** |
+
+Everything above is `partial` for the same reason: **there is no parser.**
+`compiler/pw-core` has 42 passing tests over exhaustiveness, nominal types, the
+ABI decoder, scope escape and capability audit, but it runs on constructed data
+structures rather than on `.pw` files. **E2 is the unlock** — it puts a front end
+in front of all five checkers at once and turns 68 specification files into 68
+executable tests.
 
 **public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
 — six of the claims it needs are unstarted, and **45 corpus files exist of which
 0 compile**.
 
-**last passing commit:** `pw-core` — E1A exhaustiveness + typed ABI.
+**last passing commit:** `f346484` — layout/DOM corpus.
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---
@@ -121,20 +134,21 @@ incremental           5 unrelated updates -> expensive node evaluated once
 
 ## next three concrete tasks
 
-1. **Begin Milestone 1 task 1** — Koka effect libraries under `stdlib/koka/`
-   for `database_read`, `database_write`, `network`, `clock`, `random`, `trace`,
-   `session`, `secret`, `storage`, `task_scope`, `resource_scope`, `query`,
-   `command`, `subscription`. Charter v2 also implies layout-phase effect
-   families (§7.5A) — those belong to the browser runtime (M7), not `stdlib/koka`.
-2. **Promote `spikes/koka-js-interop/node/kki.mjs` to `tools/kki-effects/`**
-   with tests. It is the mechanism Milestone 1's gate depends on for
-   *"every effectful example has a visible inferred effect"*.
-3. **Add layout-phase corpus examples.** Charter v2 §7.5A introduces eight new
-   effect families and a hard rule ("ordinary application code must not directly
-   call synchronous geometry APIs"), but the corpus has **no** accepted or
-   rejected example for any of them. Charter §16 says "Add examples before
-   features."
+1. **E2 — the parser.** A lossless syntax tree with byte spans, name
+   resolution, and enough of the grammar to feed `pw-core`'s five existing
+   checkers. This is the single highest-leverage remaining task: it converts
+   68 specification files into 68 executable tests and moves six P0 claims from
+   `unstarted` toward `measured`. ADR-0009 already fixed the diagnostics stack;
+   the open question is the lossless tree (`rowan` 0.17.0 and `logos` 0.16.1 are
+   the recorded candidates) needed for idempotent `pw fmt`.
+2. **E2A-R** — the runtime half of structured concurrency: owner scopes,
+   cancellation propagation, cleanup ordering, leak detection. E2A does not close
+   until both halves pass, and the static rules must not be described as covering
+   the runtime ones.
+3. **Promote `spikes/koka-js-interop/node/kki.mjs` to `tools/kki-effects/`**
+   with golden fixtures per pinned Koka version — for the `.kki` format *and*,
+   per ADR-0011, for the value representation the decoder depends on.
 
-Linux CI is deferred by operator decision to before Milestone 3 (risk R11).
+Linux CI is deferred by operator decision to before E3 (risk R11).
 
 Full ordered list with acceptance criteria: `docs/NEXT.md`.
