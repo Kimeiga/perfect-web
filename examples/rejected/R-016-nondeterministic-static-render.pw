@@ -12,6 +12,8 @@
 
 module marketing.landing
 
+import clock
+
 page Landing() {
     placement build
     cache shared

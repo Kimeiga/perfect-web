@@ -13,6 +13,8 @@
 
 module store.browser_widget
 
+import Stores
+
 component StoreBadge(store_id: StoreId) {
     placement browser
 

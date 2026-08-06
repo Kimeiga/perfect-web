@@ -12,6 +12,8 @@
 
 module store.map_leak
 
+import Maps
+
 let mut cached_handle: Option<MapHandle> = None
 
 fn setup(container: Element) -> () !{ resource.acquire<MapHandle> } {

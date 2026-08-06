@@ -13,6 +13,8 @@ module store.decode
 import domain.{ StoreId, Store, StoreHours }
 import decode.{ Unknown, Decoder, DecodeError, field, string, int, list }
 
+import StoreId
+
 fn decode_store(raw: Unknown) -> Result<Store, DecodeError> !{} {
     let id = field(raw, "id", string)?
     let name = field(raw, "name", string)?

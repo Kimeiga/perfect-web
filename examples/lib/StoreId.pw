@@ -1,0 +1,16 @@
+// @corpus: fixture
+// @id: LIB-StoreId
+// @category: application — parsing an opaque id
+// @charter: §7.1, §15.1
+// @milestone: E2C
+//
+// An opaque id cannot be constructed from a raw String by assignment; it is
+// parsed, and parsing can fail. That is what `opaque` is for (E0 finding F-4).
+
+module StoreId
+
+import domain.{ StoreId, StoreError }
+
+fn from_string(raw: String) -> Result<StoreId, StoreError> !{} {
+    Err(StoreError.DecodeFailed(raw))
+}

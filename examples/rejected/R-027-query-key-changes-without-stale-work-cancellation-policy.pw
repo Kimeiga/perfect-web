@@ -12,6 +12,8 @@
 
 module store.queries
 
+import Stores
+
 public query Store(id: StoreId) -> Result<Store, StoreError>
     freshness   30.seconds
     consistency snapshot

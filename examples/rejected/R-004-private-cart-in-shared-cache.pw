@@ -13,6 +13,13 @@
 
 module store.page
 
+// The queries this page materializes. Declared imports, not ambient visibility:
+// the `Session` label that makes this a violation comes from `Cart`'s own
+// declaration in `cart.queries`, and a checker can only see it if the program
+// says where to look (E2B).
+import store.queries
+import cart.queries
+
 page StorePage(id: StoreId) {
     cache shared
 

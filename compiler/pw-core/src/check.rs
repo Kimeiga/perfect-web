@@ -146,6 +146,12 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             .or_default()
             .push(resolve_diagnostic(e));
     }
+    for (i, u) in units.iter().enumerate() {
+        resolution
+            .entry(i)
+            .or_default()
+            .extend(unresolved_uses(&workspace, i, &u.hir));
+    }
 
     // Declaration name → its privacy label, across every unit. A `page` in one
     // file renders a `session query` declared in another, and that is the
@@ -169,6 +175,98 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             (u.path.clone(), out)
         })
         .collect()
+}
+
+/// Uses of a name nothing declares.
+///
+/// Import failures alone are not enough. `R-004` materializes a `session query
+/// Cart` declared in a file it never imports: with only import checking, that
+/// is silence — and silence is what let the fixture look uncaught rather than
+/// unresolved.
+///
+/// Deliberately conservative about what counts as a use: a bare name that is
+/// not a local binding, and a qualified path whose head names a module. A
+/// method call on a value (`line.item_name`) is a field access, not a path, and
+/// is left alone until types exist.
+fn unresolved_uses(
+    workspace: &crate::resolve::Workspace,
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    use crate::resolve::Resolution;
+
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+
+        let mut in_scope = crate::resolve::local_bindings(body);
+        in_scope.extend(decl.params.iter().map(|p| p.name.clone()));
+        // A declaration can call itself and its siblings.
+        in_scope.extend(hir.all_decls().map(|(_, d)| d.name.clone()));
+
+        for id in body.walk() {
+            let Expr::Call { callee, .. } = body.expr(id) else {
+                continue;
+            };
+            let path = path_of(body, *callee);
+            let Some((head, _)) = path.split_once('.') else {
+                continue;
+            };
+            // Only a head that looks like a module: either the workspace has
+            // it, or it is capitalised and is not a local. Anything else is a
+            // field access on a value.
+            let known_module = workspace.sees_module(unit, head);
+            let module_shaped = head.chars().next().is_some_and(char::is_uppercase)
+                || matches!(
+                    head,
+                    "secrets" | "style" | "clock" | "log" | "database" | "dom"
+                );
+            if in_scope.contains(head) || (!known_module && !module_shaped) {
+                continue;
+            }
+            // `StoreError.DecodeFailed` is a CONSTRUCTOR on a type in scope,
+            // not a member of a module. Both are written `Head.member`, and
+            // treating the second as the first reported every union constructor
+            // in the corpus as undeclared.
+            if !known_module
+                && matches!(
+                    workspace.resolve(unit, head),
+                    Resolution::Local(_) | Resolution::Imported { .. }
+                )
+            {
+                continue;
+            }
+            if workspace.resolve_path(unit, &path) != Resolution::Unresolved {
+                continue;
+            }
+
+            out.push(Diagnostic {
+                code: crate::codes::UNRESOLVED_NAME.id,
+                invariant: crate::codes::UNRESOLVED_NAME.invariant,
+                reason: "unresolved_use",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!("`{path}` does not resolve"),
+                primary_span: body.expr_span(id),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id_of(hir, decl)),
+                    label: format!("used inside `{}`", decl.name),
+                }],
+                explanation: Some(format!(
+                    "`{head}` is not a module this file can see. Names are visible \
+                     through lexical scope, module membership, or an explicit import \
+                     — external implementation is allowed, a missing declaration is \
+                     not."
+                )),
+                repairs: vec![Repair {
+                    description: format!("add `import {head}`, or declare it"),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
 }
 
 /// A resolution failure, as a diagnostic.

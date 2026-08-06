@@ -12,6 +12,8 @@
 
 module legacy.widget
 
+import Legacy
+
 component LegacyWidget() {
     // ERROR: unsafe escape hatch with no justification.
     unsafe.lifecycle {

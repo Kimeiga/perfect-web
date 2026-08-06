@@ -12,6 +12,9 @@ module cart.commands
 
 import domain.{ MenuItemId, PositiveInt, InteractionId, CartError }
 
+import Carts
+import Menu
+
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
     requires      SignedIn

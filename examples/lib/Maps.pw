@@ -1,0 +1,22 @@
+// @corpus: fixture
+// @id: LIB-Maps
+// @category: external implementation — map widget
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Declared, not ambient. `create` reads geometry during init, which is why any component using it must declare and attribute an unsafe capability.
+
+module Maps
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn create(container: Element, center: String) -> Result<MapHandle, MapError> !{ dom.mutate, layout.measure } {
+    todo
+}
+
+fn destroy(handle: MapHandle) -> () !{ dom.mutate } {
+    todo
+}

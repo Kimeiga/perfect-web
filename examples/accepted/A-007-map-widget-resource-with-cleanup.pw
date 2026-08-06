@@ -11,6 +11,8 @@ module store.map_widget
 
 import browser.{ Element, MapHandle, MapError }
 
+import Maps
+
 resource StoreMap(container: Element, center: LatLng)
     -> Result<MapHandle, MapError>
 {

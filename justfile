@@ -73,13 +73,13 @@ test-unit:
 # `pw check examples/rejected/*.pw` deliberately exits 1 — that is the point —
 # so it is asserted in tests rather than run bare here.
 test-compile:
-    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw packages/*/*.pw
+    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw packages/*/*.pw
     cargo run --quiet -p corpus-check -- examples
     # The accepted corpus as the ONE program it is: the shared library plus
     # every accepted file. Feeding it the rejected files too would ask the
     # compiler to resolve 68 files as one program, which they are not — five
     # rejected fixtures reuse module names with each other (E2B).
-    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/services.pw examples/vendors.pw examples/accepted/*.pw
+    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
 rejections:

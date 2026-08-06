@@ -12,6 +12,8 @@
 
 module payments.charge
 
+import Payments
+
 command charge_card(order: OrderId, amount: Money<USD>)
     -> Result<PaymentReceipt, PaymentError>
     requires SignedIn

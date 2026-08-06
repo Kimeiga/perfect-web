@@ -1,0 +1,22 @@
+// @corpus: fixture
+// @id: LIB-Payments
+// @category: application service — payments
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Two rows, because capturing a payment needs BOTH the secret and the network. The placement solver intersects them: only the origin grants both.
+
+module Payments
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn capture(key: Int, order: OrderId, amount: Int) -> Result<Int, PaymentError> !{ secret.read, network.fetch } {
+    todo
+}
+
+fn charge(order: OrderId, amount: Int) -> Result<Int, PaymentError> !{ secret.read, network.fetch } {
+    todo
+}

@@ -25,8 +25,7 @@ use pw_syntax::parse_tree;
 /// contracts in `packages/`.
 fn library() -> Vec<(String, Hir)> {
     let mut out = read("domain.pw");
-    out.extend(read("services.pw"));
-    out.extend(read("vendors.pw"));
+    out.extend(read_at("lib"));
     out.extend(read_at("../packages/pw-std"));
     out.extend(read_at("../packages/pw-platform-web"));
     out
@@ -89,15 +88,42 @@ fn the_accepted_corpus_plus_domain_is_one_resolvable_program() {
 }
 
 #[test]
-fn every_rejected_fixture_resolves_against_domain() {
-    // Each on its own, because five of them share module names with each other.
-    let domain = library();
+fn every_rejected_fixture_resolves_against_the_library_it_imports() {
+    // Each on its own, because five of them share module names with each other
+    // — plus whatever accepted modules the fixture explicitly imports. A
+    // counterexample may depend on a correct module: `R-004` is a page that
+    // MISUSES a correctly-declared session query, and the label that makes it a
+    // violation comes from that query's own declaration.
+    let lib = library();
+    let accepted = read("accepted");
     let mut problems = Vec::new();
     let mut checked = 0;
 
     for one in read("rejected") {
-        let mut files = domain.clone();
         let name = one.0.clone();
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/rejected")
+            .join(&name);
+        let src = std::fs::read_to_string(&path).expect("read");
+        let heads: Vec<String> = src
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("import "))
+            .map(|m| m.split(['.', ' ']).next().unwrap_or("").to_string())
+            .collect();
+
+        let mut files = lib.clone();
+        for (n, h) in &accepted {
+            let module = h
+                .modules
+                .iter()
+                .next()
+                .map(|(_, m, _)| m.name.clone())
+                .unwrap_or_default();
+            let head = module.split('.').next().unwrap_or(&module).to_string();
+            if heads.contains(&head) {
+                files.push((n.clone(), h.clone()));
+            }
+        }
         files.push(one);
         checked += 1;
         let (_, mut p) = build(&files);

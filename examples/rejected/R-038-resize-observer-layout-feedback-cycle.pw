@@ -13,6 +13,8 @@
 
 module store.responsive_menu
 
+import style
+
 component ResponsiveMenu() {
     placement browser
     let width = observe resize(self) -> Float

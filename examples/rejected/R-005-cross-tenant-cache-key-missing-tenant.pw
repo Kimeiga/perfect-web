@@ -13,6 +13,8 @@
 
 module menu.queries
 
+import Menus
+
 query Menu(store: StoreId) -> Result<List<MenuItem>, MenuError>
     cache shared
     // ERROR: the result depends on Organization<OrganizationId>,

@@ -12,6 +12,8 @@ module store.recommendations
 
 import domain.{ StoreId, Recommendation, RecommendationError }
 
+import Recommender
+
 public query Recommendations(id: StoreId)
     -> Result<List<Recommendation>, RecommendationError>
     freshness      10.minutes

@@ -1,0 +1,18 @@
+// @corpus: fixture
+// @id: LIB-Menu
+// @category: application value helpers
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Pure: a predicate over a value already in hand performs nothing.
+
+module Menu
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn is_available(item: MenuItemId) -> Bool !{} {
+    todo
+}

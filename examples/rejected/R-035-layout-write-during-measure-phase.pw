@@ -12,6 +12,9 @@
 
 module store.menu_align
 
+import List
+import style
+
 component MenuAligner(items: List<ElementRef>) {
     placement browser
     frame {

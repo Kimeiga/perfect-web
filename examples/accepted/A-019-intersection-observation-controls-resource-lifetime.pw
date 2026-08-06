@@ -10,6 +10,8 @@
 
 module store.lazy_map
 
+import Maps
+
 component LazyMap(center: LatLng) {
     placement browser
 

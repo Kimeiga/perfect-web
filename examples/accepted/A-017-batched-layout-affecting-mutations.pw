@@ -9,6 +9,8 @@
 
 module cart.badge_sizing
 
+import style
+
 component BadgeRow(badges: List<BadgeId>) {
     placement browser
 

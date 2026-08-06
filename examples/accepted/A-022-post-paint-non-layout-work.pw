@@ -10,6 +10,8 @@
 
 module store.analytics
 
+import Telemetry
+
 component StorePage(id: StoreId) {
     placement browser
 

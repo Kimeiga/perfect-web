@@ -12,6 +12,8 @@
 
 module analytics.ping
 
+import Analytics
+
 view ProductCard(item: MenuItemId) !{} {
     <article>
         <button on:press={() => {

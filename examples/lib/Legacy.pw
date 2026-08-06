@@ -1,0 +1,22 @@
+// @corpus: fixture
+// @id: LIB-Legacy
+// @category: external implementation — legacy widget
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Declared so the effect row is a fact, not a guess.
+
+module Legacy
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn init() -> () !{ dom.mutate } {
+    todo
+}
+
+fn teardown() -> () !{ dom.mutate } {
+    todo
+}

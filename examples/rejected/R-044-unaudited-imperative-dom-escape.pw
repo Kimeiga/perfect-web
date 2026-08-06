@@ -13,6 +13,8 @@
 
 module store.third_party_map
 
+import VendorSdk
+
 component VendorMap(center: LatLng) {
     placement browser
     resource widget {

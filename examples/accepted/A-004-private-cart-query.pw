@@ -12,6 +12,8 @@ module cart.queries
 
 import domain.{ SessionId, Cart, CartError }
 
+import Carts
+
 session query Cart(session: SessionId) -> Result<Cart, CartError>
     freshness     0.seconds
     consistency   read_your_writes

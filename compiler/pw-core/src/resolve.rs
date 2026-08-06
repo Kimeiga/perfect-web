@@ -409,6 +409,45 @@ impl Workspace {
     }
 }
 
+impl Workspace {
+    /// Resolve a qualified path: `Stores.get`, `secrets.payments`.
+    ///
+    /// The module part must be visible — declared here or imported — and the
+    /// member must exist in it. Both halves matter: `Stores.get` where nothing
+    /// imports `Stores` is exactly the ambient lookup E2B removed, and
+    /// `Stores.missing` is a name the module does not have.
+    pub fn resolve_path(&self, unit: UnitId, path: &str) -> Resolution {
+        let Some((head, member)) = path.rsplit_once('.') else {
+            return self.resolve(unit, path);
+        };
+        let Some(m) = self.module_of(unit) else {
+            return Resolution::Unresolved;
+        };
+        // The head names a module this file can see.
+        let visible = m.name == head || m.imports.iter().any(|i| i.module == head);
+        if !visible {
+            return Resolution::Unresolved;
+        }
+        let Some(&t) = self.by_name.get(head) else {
+            return Resolution::Unresolved;
+        };
+        match self.modules[t].lookup_any(member) {
+            Some(def) => Resolution::Imported {
+                def,
+                from: head.to_string(),
+            },
+            None => Resolution::Unresolved,
+        }
+    }
+
+    /// Is `name` a module this unit can see?
+    pub fn sees_module(&self, unit: UnitId, name: &str) -> bool {
+        self.module_of(unit)
+            .is_some_and(|m| m.name == name || m.imports.iter().any(|i| i.module == name))
+            && self.by_name.contains_key(name)
+    }
+}
+
 impl Module {
     /// The first namespace that defines `name`. Used by imports, which name a
     /// symbol without saying which namespace they mean.
@@ -417,6 +456,86 @@ impl Module {
             .into_iter()
             .find_map(|ns| self.defines.get(&(ns, name.to_string())).copied())
     }
+}
+
+/// Names bound inside a body: parameters, `let`s, lambda parameters, match
+/// bindings, and loop variables.
+///
+/// Collected per body rather than per expression because a `let` is visible to
+/// everything after it in the block, and getting that wrong would make the use
+/// checker report the program's own locals as undeclared — which is how a
+/// checker like this becomes noise and gets turned off.
+pub fn local_bindings(body: &crate::hir::Body) -> BTreeSet<String> {
+    use crate::hir::{Expr, Node, Pattern};
+    let mut out = BTreeSet::new();
+
+    fn pattern_names(
+        body: &crate::hir::Body,
+        p: crate::hir::PatternId,
+        out: &mut BTreeSet<String>,
+    ) {
+        match body.pat(p) {
+            Pattern::Bind { name, .. } => {
+                out.insert(name.clone());
+            }
+            Pattern::Ctor { args, .. } => {
+                for a in args {
+                    pattern_names(body, *a, out);
+                }
+            }
+            Pattern::Or(ps) => {
+                for a in ps {
+                    pattern_names(body, *a, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    for id in body.walk() {
+        match body.expr(id) {
+            Expr::Let { pat: Some(p), .. } => pattern_names(body, *p, &mut out),
+            Expr::Lambda { params, .. } => {
+                for p in params {
+                    pattern_names(body, *p, &mut out);
+                }
+            }
+            Expr::Match { arms, .. } => {
+                for a in arms {
+                    pattern_names(body, a.pat, &mut out);
+                }
+            }
+            // A `{#each xs as x (k)}` binds `x` for its children.
+            Expr::Template { roots, .. } => {
+                for n in body.walk_markup(roots) {
+                    let Node::Block { directive, .. } = body.node(n) else {
+                        continue;
+                    };
+                    let Some(rest) = directive.split(" as ").nth(1) else {
+                        continue;
+                    };
+                    let name = rest
+                        .trim()
+                        .split(['(', '}', ' '])
+                        .next()
+                        .unwrap_or("")
+                        .trim();
+                    if !name.is_empty() {
+                        out.insert(name.to_string());
+                    }
+                }
+            }
+            // A body-level statement introduces its modifier words as names:
+            // `observe resize` binds nothing, but `use key: T = ..` binds `key`.
+            Expr::Keyword { modifiers, .. } => {
+                if let Some(first) = modifiers.first() {
+                    out.insert(first.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 /// The declaration a `DefId` points at.
@@ -577,6 +696,34 @@ mod tests {
             backward.resolve(0, "Store"),
             Resolution::Imported { .. }
         ));
+    }
+
+    #[test]
+    fn a_qualified_path_needs_both_the_module_and_the_member() {
+        let lib = "module Stores\n\nfn get(id: Int) -> Int !{ database.read } { 0 }\n";
+        let user = "module page\n\nimport Stores\n\nfn f() -> Int !{} { Stores.get(1) }\n";
+        let (_, ws) = workspace(&[lib, user]);
+        assert!(
+            matches!(
+                ws.resolve_path(1, "Stores.get"),
+                Resolution::Imported { .. }
+            ),
+            "{:?}",
+            ws.resolve_path(1, "Stores.get")
+        );
+
+        // A member the module does not have.
+        assert_eq!(ws.resolve_path(1, "Stores.missing"), Resolution::Unresolved);
+
+        // ...and the ambient case E2B exists to remove: the module is in the
+        // checked set, this file does not import it.
+        let no_import = "module page\n\nfn f() -> Int !{} { Stores.get(1) }\n";
+        let (_, ws) = workspace(&[lib, no_import]);
+        assert_eq!(
+            ws.resolve_path(1, "Stores.get"),
+            Resolution::Unresolved,
+            "a module in the workspace is not visible without an import"
+        );
     }
 
     #[test]

@@ -12,6 +12,8 @@
 
 module cart.commands
 
+import Carts
+
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
     requires      SignedIn

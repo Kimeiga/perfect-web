@@ -1,0 +1,30 @@
+// @corpus: fixture
+// @id: LIB-Carts
+// @category: application service — cart data
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Reads and writes are separate rows: a query may read, only a command may write.
+
+module Carts
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn current(s: SessionId) -> Result<Cart, CartError> !{ database.read } {
+    todo
+}
+
+fn is_empty(s: SessionId) -> Bool !{ database.read } {
+    todo
+}
+
+fn add(s: SessionId, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write } {
+    todo
+}
+
+fn clear(s: SessionId) -> Result<Cart, CartError> !{ database.write } {
+    todo
+}

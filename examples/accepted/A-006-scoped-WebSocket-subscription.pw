@@ -12,6 +12,8 @@ module order.tracking
 
 import domain.{ OrderId, OrderProgress, TrackingError }
 
+import Tracking
+
 subscription OrderTracking(order: OrderId)
     -> Stream<OrderProgress, TrackingError>
     scope         component

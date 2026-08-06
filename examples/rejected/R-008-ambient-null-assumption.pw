@@ -12,6 +12,8 @@
 
 module store.lookup
 
+import Stores
+
 fn store_name(id: StoreId) -> String !{ database.read<Stores> } {
     let store: Option<Store> = Stores.find(id)
     // ERROR: Option<Store> is not Store.

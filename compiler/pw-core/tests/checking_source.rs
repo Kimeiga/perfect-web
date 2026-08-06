@@ -31,21 +31,30 @@ fn corpus_dir(which: &str) -> Vec<std::path::PathBuf> {
 /// reports 20 duplicate declarations for a question nobody meant to ask.
 fn library() -> Vec<(String, String)> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    [
-        "examples/domain.pw",
-        "packages/pw-std/decode.pw",
-        "packages/pw-platform-web/capability.pw",
-        "packages/pw-platform-web/browser.pw",
-    ]
-    .iter()
-    .map(|rel| {
-        let p = root.join(rel);
-        (
-            p.file_name().unwrap().to_string_lossy().to_string(),
-            std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{rel}: {e}")),
-        )
-    })
-    .collect()
+    let mut out = Vec::new();
+    for dir in [
+        "examples/lib",
+        "packages/pw-std",
+        "packages/pw-platform-web",
+    ] {
+        for e in std::fs::read_dir(root.join(dir)).unwrap_or_else(|e| panic!("{dir}: {e}")) {
+            let p = e.expect("entry").path();
+            if p.extension().is_none_or(|x| x != "pw") {
+                continue;
+            }
+            out.push((
+                p.file_name().unwrap().to_string_lossy().to_string(),
+                std::fs::read_to_string(&p).expect("read"),
+            ));
+        }
+    }
+    let domain = root.join("examples/domain.pw");
+    out.push((
+        "domain.pw".to_string(),
+        std::fs::read_to_string(&domain).expect("domain.pw"),
+    ));
+    out.sort();
+    out
 }
 
 /// The accepted corpus as the one program it is: library + every accepted file.
@@ -79,13 +88,38 @@ fn rejected_results() -> Vec<(String, String, Vec<pw_core::diagnostics::Diagnost
         .collect()
 }
 
-/// One rejected fixture, as its own program: library + that file.
+/// One rejected fixture, as its own program: the library, whatever accepted
+/// modules the fixture imports, and the fixture.
+///
+/// A counterexample may legitimately depend on a correct module — `R-004` is a
+/// page that MISUSES a correctly-declared session query, and the `Session`
+/// label that makes it a violation comes from that query's own declaration.
+/// Pulling the dependency in by its import is what keeps the fixture honest:
+/// it sees what it asked for and nothing else.
 fn rejected_program(path: &std::path::Path) -> Vec<(String, String)> {
+    let src = std::fs::read_to_string(path).expect("read");
+    let imported: Vec<String> = src
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("import "))
+        .map(|m| m.split(['.', ' ']).next().unwrap_or("").to_string())
+        .collect();
+
     let mut out = library();
-    out.push((
-        path.file_name().unwrap().to_string_lossy().to_string(),
-        std::fs::read_to_string(path).expect("read"),
-    ));
+    for p in corpus_dir("accepted") {
+        let s = std::fs::read_to_string(&p).expect("read");
+        let Some(module) = s
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("module "))
+            .map(str::trim)
+        else {
+            continue;
+        };
+        let head = module.split('.').next().unwrap_or(module);
+        if imported.iter().any(|i| i == head) {
+            out.push((p.file_name().unwrap().to_string_lossy().to_string(), s));
+        }
+    }
+    out.push((path.file_name().unwrap().to_string_lossy().to_string(), src));
     out
 }
 

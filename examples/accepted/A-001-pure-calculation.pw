@@ -12,6 +12,8 @@ module store.pricing
 
 import domain.{ MenuItemId, Money, USD, PositiveInt }
 
+import List
+
 type CartLine = CartLine {
     item_id: MenuItemId,
     quantity: PositiveInt,

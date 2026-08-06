@@ -1,0 +1,18 @@
+// @corpus: fixture
+// @id: LIB-Database
+// @category: application service — transactions
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// A transaction is an effect. E9C will make failing to end one an error.
+
+module Database
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn begin() -> Int !{ database.transaction } {
+    todo
+}

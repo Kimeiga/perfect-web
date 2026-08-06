@@ -28,3 +28,15 @@ fn composite(el: Element, property: String, value: String) -> ()
 {
     ()
 }
+
+// The setters the corpus uses. The split is the point: width, height and
+// padding invalidate layout, so a geometry read after one of them is a forced
+// synchronous reflow (corpus R-034). A custom property does not.
+
+fn set_width(el: Element, value: String) -> () !{ style.mutate, layout.invalidate } { () }
+
+fn set_height(el: Element, value: String) -> () !{ style.mutate, layout.invalidate } { () }
+
+fn set_padding(el: Element, value: String) -> () !{ style.mutate, layout.invalidate } { () }
+
+fn set_custom(el: Element, property: String, value: String) -> () !{ style.mutate } { () }

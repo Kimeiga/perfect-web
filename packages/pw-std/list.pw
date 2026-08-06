@@ -4,7 +4,7 @@
 // @charter: §7.1
 // @milestone: E2C
 
-module list
+module List
 
 // Pure by construction: every row declares `!{}`, so a body that stays inside
 // `List` cannot acquire an effect. E2D reads these rows; nothing hard-codes
@@ -19,3 +19,7 @@ fn filter(items: List<Unknown>, f: Decoder) -> List<Unknown> !{} { items }
 fn length(items: List<Unknown>) -> Int !{} { 0 }
 
 fn enumerate(items: List<Unknown>) -> List<Unknown> !{} { items }
+
+fn sum(items: List<Int>) -> Int !{} { 0 }
+
+fn maximum(items: List<Int>) -> Int !{} { 0 }

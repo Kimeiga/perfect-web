@@ -12,6 +12,8 @@
 
 module delivery.estimate
 
+import Estimates
+
 query DeliveryEstimate(session: SessionId) -> Result<DeliveryEstimate, EstimateError>
     placement origin
     cache     private

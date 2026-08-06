@@ -1,0 +1,22 @@
+// @corpus: fixture
+// @id: LIB-VendorSdk
+// @category: external implementation — vendor widget
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// External implementation is allowed. Missing declaration is not.
+
+module VendorSdk
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn mount(container: Element, center: String) -> Result<MapHandle, MapError> !{ dom.mutate, layout.measure } {
+    todo
+}
+
+fn destroy(handle: MapHandle) -> () !{ dom.mutate } {
+    todo
+}

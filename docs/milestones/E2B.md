@@ -1,8 +1,8 @@
 # E2B — Program graph and name resolution
 
-**Status: IMPLEMENTED, gate partly met.** The module graph, namespaces and the
-six resolution diagnostics exist and run inside `pw check`. What remains is
-resolving *uses*, not only imports.
+**Status: GATE MET.** The module graph, namespaces, six resolution diagnostics
+and *use* resolution all run inside `pw check`. The accepted corpus — 49 files
+with the library — resolves with no ambient reliance.
 
 ## Why it exists
 
@@ -85,16 +85,40 @@ parsed as *two* declarations — a bare word and an unqualified type — so the 
 looked public and any module could import it. The keyword is now re-parented
 into whatever declaration follows it.
 
-## The honest cost: 19/44 became 18/44
+## Use resolution, and the cost being repaid
+
+Import checking alone was not enough. A *use* of an undeclared name was silence,
+and silence is what let R-004 look uncaught rather than unresolved.
+
+`pw check` now reports a qualified call whose head is not a module the file can
+see. Making that true required the corpus to say what it uses:
+
+```text
+15 modules the corpus called and never imported
+37 corpus files given the imports they were relying on ambiently
+```
+
+Two false positives were designed out rather than tolerated. A method call on a
+value (`line.item_name`) is a field access, not a module path. And
+`StoreError.DecodeFailed` is a *constructor* on a type in scope — both are
+written `Head.member`, and treating the second as the first reported every union
+constructor in the corpus as undeclared.
+
+## The honest cost, and its repayment: 19 → 18 → 19
 
 `R-004` was being caught **through** the ambient union. It materializes a
 `session query Cart` declared in `A-004` — a different file it never imports —
 and that is where its `Session` label came from. Remove the union and the label
 does not propagate, so the fixture is silently uncaught.
 
-Recorded rather than restored. The fix is the one the architect prescribed for
-R-007: the fixture must import what it uses, and E2B must resolve *uses* as well
-as imports so that failing to import is itself an error rather than silence.
+**Now repaid.** R-004 imports `store.queries` and `cart.queries`, and a rejected
+fixture's program is the library plus whatever accepted modules it imports —
+because a counterexample may legitimately depend on a correct module. R-004 is a
+page that *misuses* a correctly-declared session query, and the label that makes
+it a violation comes from that query's own declaration.
+
+Back to 19/44, and this time the label arrives through a declared import rather
+than through an ambient union.
 
 ## Still to do before E2B can close
 
@@ -104,9 +128,7 @@ as imports so that failing to import is itself an error rather than silence.
 - ~~Dedicated resolution fixtures~~ — **done.** `examples/rules/resolution/`
   has all six, each with its own code, plus a valid case so the suite can tell
   a resolver from something that rejects every import.
-- **Resolve uses, not only imports.** Today an `import` that names a missing
-  module or name is an error; a *use* of an unimported name is silence. That
-  silence is what leaves R-004 uncaught.
+- ~~Resolve uses, not only imports~~ — **done.**
 - **Hand `DefId` to the semantic analyses.** `check.rs` still matches some
   names textually. The architectural invariant is not met until it does not:
 

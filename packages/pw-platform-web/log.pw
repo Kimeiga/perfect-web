@@ -1,0 +1,16 @@
+// @corpus: platform
+// @id: PLATFORM-log
+// @category: platform — logging
+// @charter: §7.8, §10
+// @milestone: E2C
+//
+// `log.public` writes somewhere a human will read. Its parameter is `String`,
+// not `Unknown`: a value only reaches it after something has decided it is
+// safe to show, which is what makes a secret reaching it (corpus R-006) a flow
+// violation rather than a formatting question.
+
+module log
+
+fn public(message: String) -> () !{ log.write } { () }
+
+fn private(message: String) -> () !{ log.write } { () }

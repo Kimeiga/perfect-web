@@ -1,0 +1,22 @@
+// @corpus: fixture
+// @id: LIB-Telemetry
+// @category: application service — telemetry
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Declared so the effect row is a fact, not a guess.
+
+module Telemetry
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
+    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import browser.{ Element, MapHandle, MapError }
+
+fn record_height(name: String, px: Int) -> () !{ network.fetch } {
+    todo
+}
+
+fn record_visible(name: String) -> () !{ network.fetch } {
+    todo
+}

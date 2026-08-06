@@ -12,4 +12,8 @@ module clock
 
 fn now() -> Int !{ clock.read } { 0 }
 
+// Named for what it reads. A wall-clock read inside a shared deterministic
+// materialization is corpus R-017, and this row is what makes it visible.
+fn now_wall() -> Int !{ clock.read } { 0 }
+
 fn today() -> String !{ clock.read } { "" }
