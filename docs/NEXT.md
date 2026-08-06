@@ -99,56 +99,53 @@ R11 as retired until a real run is green.
 
 ## The next executable task
 
-Both scores are closed. Neither can go higher, and that is the point — what
-is left is not counting.
+Every milestone through E5, plus the inserted E2B/E2C/E2D and E7V, is closed.
+All five quality gates are green.
 
 ```text
 corpus conformance        44 / 44   closed at C1
 single-defect isolation   44 / 44
 generality-tested         29 / 29
 headline matrices          8 / 8
-known narrow witness       0 / 29
-robustness                 9 suites, 0 panics
+resume compatibility      E7V closed
+robustness                11 suites, 0 panics
+historical compatibility   9 / 10   classified
+KNOWN_GAPs                 0
 ```
 
-### 1. A coverage-guided fuzzer
+### 1. E6 — materialized resource graph
 
-E7V now gives it semantics to test, which is why it comes after rather than
-before. Targets, and the property each must hold:
+The next milestone in charter order, and the first that is not started. The
+corpus already exercises its invariants (`stale_key_policy`,
+`cache_key_omits_partition`, `dead_internal_link`) and the declarations parse
+and lower; what does not exist is the graph itself — dependency tracking,
+invalidation propagation, and regeneration.
+
+### 2. The large remaining ones
+
+None is started, and each is a milestone rather than a task:
 
 ```text
-manifest decoding            no unverified deserialization
-compatibility decisions      no incompatible handler attaches
-migration selection          no migration applied to a schema it was not
-                             written for
-recovery planning            no construct offered a recovery it forbids
-mixed-build patch handling   no patch applied across generations
+E7-R/E7-P/E7-L  pw's own renderer. Marko is the accepted oracle for
+                resumption and streamed patches, and has NO oracle for
+                interaction-lazy loading — RQ-1 falsified that property.
+E8              Rust capability host, WIT worlds, Wasmtime execution
+E9              permanent value type checker and algebraic effect compiler.
+                `annotations.rs` answers three corpus questions from written
+                types; this is the real thing.
+E10–E15         own backends, network lab, HTTP/3, Servo, tooling, hardening
 ```
 
-Overall: no input may cause a panic, unverified deserialization, incompatible
-handler attachment, or privacy-scope weakening.
+### 3. Standing work that is never "done"
 
-`just robustness` reports eleven generator families rather than a bare zero,
-because reverting the constructor-arity fix left corpus-mutation and byte-soup
-green while only the targeted generator went red. A real fuzzer is what retires
-"NOT the compiler cannot crash" from `readiness.txt`.
-
-### 2. Wire the compatibility decision into E7's generator
-
-`decide` has a tested contract and is not in the path. Until it is, the
-available sentence is "accepted only under exact compatible identities or
-explicit checked migrations" and not "resumption is safe across deployments".
-
-### 3. E4 and E5's remaining gate items
-
-E4 is 5/7 and E5 3/5. Both need a store demo and the resource generator —
-product work, and the only items here not about the compiler.
-
-### 4. Claim-by-claim P0 review
-
-Corpus conformance and generality are two of P0's claims. Several others rest
-on Marko and Koka behind adapters and several are unstarted;
-`docs/EVIDENCE_LEDGER.md` governs which sentence each may support.
+- **A real coverage-guided fuzzer.** What exists is structured generation, and
+  `just robustness` says so. It found both compiler panics and R3, which is
+  evidence it works, not evidence it is sufficient.
+- **A browser that calls `decide`.** The bypass is closed by construction and
+  build-time agreement is checked; nothing in a running browser calls either.
+- **Loop-binding types.** `{#each xs as x}` gives `x` no type, because `Param`
+  carries a type's head and not its arguments. The store demo could not use a
+  resumable handler inside a loop for this reason.
 
 ### How to add work here
 

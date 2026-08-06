@@ -9,23 +9,20 @@ See `docs/ASSUMPTIONS.md` A-008.
 **numbering:** engineering `E0`–`E15`, public proofs `P0`–`P9`, risk-retirement
 experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
-**current milestone:** **E0 — COMPLETE.** Gate passed against charter v2
-(six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
-Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
+**current milestone:** **E6 — materialized resource graph.** Everything before it
+is closed: M0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and the inserted E7V.
 
-**next milestone:** witnesses for the 19 invariants whose generality is
-untested — each is either a promotion or a discovery, and both are progress —
-then E4 (5/7) and E5 (3/5), whose open items need a store demo and the resource
-generator rather than more checker work.
+**next milestone:** **E6**, then E7's own renderer (E7-R/E7-P/E7-L), E8's Wasm
+capability host, and E9's permanent type checker. Those are the large ones and
+none is started; `docs/MILESTONES.md` has the register.
 
 Three of the four shortcuts `readiness.txt` named this morning are closed:
 branch-aware affine analysis, Option inference that does not need the
 annotation, and string holes lowered as expressions. Each replacement is proved
 by a program the narrow rule would have passed.
 
-E0, E2A, **E2**, **E3**, and the inserted **E2B / E2C / E2D** are complete; E1
-closed on RQ-2's Outcome 1. E4 is 5/7 and E5 3/5; their open items need a store
-demo and the resource generator, not more compile-fail cases.
+M0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5 and E7V are complete. E1 closed on
+RQ-2's Outcome 1. E6 onward are not started.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
