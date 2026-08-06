@@ -61,6 +61,13 @@ impl World {
 
     /// The worlds that can grant a restricted capability family, or `None` when
     /// the family is unrestricted.
+    ///
+    /// **This is a capability→world table, not a function-name table.** E2C's
+    /// deletion gate is about the latter: no checker may know that
+    /// `secrets.payments` yields a secret. Which *worlds* can grant the
+    /// `secret` capability is a property of the deployment topology — charter
+    /// §1.7 states it directly — and belongs in the compiler until E8's WIT
+    /// worlds make it a declaration too.
     pub fn worlds_for(family: &str) -> Option<&'static [World]> {
         use World::*;
         Some(match family {

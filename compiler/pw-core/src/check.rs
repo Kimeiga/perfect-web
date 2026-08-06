@@ -22,6 +22,7 @@ use crate::hir::{self, AttrValue, Body, Decl, DeclKind, Expr, ExprId, Hir, Node,
 use crate::placement::{ALL_WORLDS, Demand, World, solve};
 use crate::privacy::{Label, Restriction};
 use crate::scope::{HandleKind, Op, ScopeGraph, ScopeKind, ScopeViolation};
+use crate::signatures::Signatures;
 use crate::types::{Ctor, Program, Type};
 
 /// One source file that has been parsed and lowered.
@@ -139,6 +140,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // cannot explain why.
     let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
     let workspace = crate::resolve::Workspace::build(&hirs);
+    // E2C: one set of resolved signatures, shared by every analysis.
+    let sigs = Signatures::build(&workspace, &hirs);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -170,7 +173,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         .enumerate()
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
-            out.extend(check_unit_with(&env, &labels, u));
+            out.extend(check_unit_with(&env, &labels, &sigs, u));
             out.sort_by_key(|d| d.primary_span.start);
             (u.path.clone(), out)
         })
@@ -327,10 +330,15 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
 }
 
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
-    check_unit_with(env, &BTreeMap::new(), unit)
+    check_unit_with(env, &BTreeMap::new(), &Signatures::default(), unit)
 }
 
-fn check_unit_with(env: &Env, labels: &BTreeMap<String, Label>, unit: &Unit) -> Vec<Diagnostic> {
+fn check_unit_with(
+    env: &Env,
+    labels: &BTreeMap<String, Label>,
+    sigs: &Signatures,
+    unit: &Unit,
+) -> Vec<Diagnostic> {
     let mut out = Vec::new();
 
     // Placement is inherited: a `fn` inside a `component placement browser`
@@ -357,7 +365,7 @@ fn check_unit_with(env: &Env, labels: &BTreeMap<String, Label>, unit: &Unit) -> 
             inherited.get(&id.0).copied(),
             &mut out,
         );
-        privacy_flow(&unit.hir, decl, &mut out);
+        privacy_flow(&unit.hir, sigs, decl, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
@@ -1039,54 +1047,30 @@ fn reads_label_with_source(
     (label, source)
 }
 
-/// Standard-library accessors that introduce a privacy label.
+/// Every restriction a body picks up by calling something.
 ///
-/// **A stand-in for signatures that do not exist yet.** With a real library the
-/// checker would read `current_organization()`'s declared return label instead
-/// of consulting a table. The table is here so the rule can be built and tested
-/// now; it is the thing to delete when the library lands, not the rule.
-fn introduced_restriction(path: &str) -> Option<Restriction> {
-    Some(match path {
-        // The parameters are the charter §7.8 type names, because that is what
-        // a developer sees and what the corpus declares it expects. With a real
-        // library these come from the accessor's return label.
-        "current_session" | "session.current" => Restriction::Session("SessionId".into()),
-        "current_user" | "user.current" => Restriction::User("UserId".into()),
-        "current_organization" | "organization.current" => {
-            Restriction::Organization("OrganizationId".into())
-        }
-        "device.id" => Restriction::Device,
-        p if p.starts_with("secrets.") => {
-            Restriction::Secret(capitalize(p.trim_start_matches("secrets.")))
-        }
-        _ => return None,
-    })
-}
-
-fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-        None => String::new(),
-    }
-}
-
-/// Every restriction a body picks up by calling a label-introducing accessor.
-fn body_label(body: &Body) -> Label {
+/// Reads the callee's **declared return label** from its signature. There is no
+/// table of accessor names here any more: a function carries a secret because
+/// it returns `Secret<C>`, not because it is spelled `secrets.something`
+/// (E2C, architect ruling 2026-08-06).
+fn body_label(body: &Body, sigs: &Signatures) -> Label {
     let mut label = Label::public();
     for id in body.walk() {
         let Expr::Call { callee, .. } = body.expr(id) else {
             continue;
         };
-        if let Some(r) = introduced_restriction(&path_of(body, *callee)) {
-            label = label.join(&Label::of(r));
+        if let Some(sig) = sigs.by_path(&path_of(body, *callee)) {
+            label = label.join(&sig.label);
         }
     }
     label
 }
 
 /// Names bound to a label-introducing call, so a later use can be traced back.
-fn labelled_bindings(body: &Body) -> BTreeMap<String, (Restriction, crate::hir::Span)> {
+fn labelled_bindings(
+    body: &Body,
+    sigs: &Signatures,
+) -> BTreeMap<String, (Restriction, crate::hir::Span)> {
     let mut out = BTreeMap::new();
     for id in body.walk() {
         let Expr::Let { pat, init, ty } = body.expr(id) else {
@@ -1111,7 +1095,9 @@ fn labelled_bindings(body: &Body) -> BTreeMap<String, (Restriction, crate::hir::
                 .map(|arg| Restriction::Secret(arg.path.clone()))
         });
         let restriction = annotated.or_else(|| match body.expr(*init) {
-            Expr::Call { callee, .. } => introduced_restriction(&path_of(body, *callee)),
+            Expr::Call { callee, .. } => sigs
+                .by_path(&path_of(body, *callee))
+                .and_then(|s| s.label.restrictions().next().cloned()),
             _ => None,
         });
         if let Some(r) = restriction {
@@ -1132,17 +1118,17 @@ fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::hir::Span)> 
     name_pair(body, body.root, "cache")
 }
 
-fn privacy_flow(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
+fn privacy_flow(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnostic>) {
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
-    let label = body_label(body);
+    let label = body_label(body, sigs);
     if label.is_public() {
         return;
     }
 
     // 1. A secret reaching markup. Markup renders in the browser, and a secret
     //    never leaves the origin (charter §7.8, corpus R-003).
-    let bound = labelled_bindings(body);
+    let bound = labelled_bindings(body, sigs);
     for id in body.walk() {
         let Expr::Template { parts, .. } = body.expr(id) else {
             continue;

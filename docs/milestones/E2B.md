@@ -1,8 +1,21 @@
 # E2B — Program graph and name resolution
 
-**Status: GATE MET.** The module graph, namespaces, six resolution diagnostics
-and *use* resolution all run inside `pw check`. The accepted corpus — 49 files
-with the library — resolves with no ambient reliance.
+**Status: PARTIAL.** Architect ruling, 2026-08-06 — E2B stays open until
+use-site resolution is *integrated*, not merely checked.
+
+```text
+module graph                complete
+namespaces                  complete
+import resolution           complete
+declaration/use resolution  in progress
+fixture isolation           in progress
+```
+
+I had marked this "gate met" on the strength of `pw check` reporting an
+unresolved use. That was overstated: the check runs, but the downstream analyses
+still compare source strings such as `"secrets.payments"` instead of consuming
+the `DefId` resolution produces. Until they do, the graph exists beside the
+checkers rather than underneath them.
 
 ## Why it exists
 

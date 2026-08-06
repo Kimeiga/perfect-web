@@ -36,6 +36,7 @@ pub mod privacy;
 pub mod resolve;
 pub mod rules;
 pub mod scope;
+pub mod signatures;
 pub mod types;
 
 pub use abi::{Decoder, Mode, Value};

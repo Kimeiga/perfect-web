@@ -1,0 +1,25 @@
+// @corpus: platform
+// @id: PLATFORM-context
+// @category: platform — request context
+// @charter: §7.8
+// @milestone: E2C
+//
+// The accessors that introduce a privacy label. Until E2C deleted the
+// stand-in, `check.rs` carried a table saying `current_organization()` yields
+// `Organization<OrganizationId>` — and the function it described did not
+// exist anywhere. The table was the only thing that made the rule work.
+//
+// Now the label comes from the declared return type, so a function carries a
+// restriction because of what it RETURNS, not because of how it is spelled.
+
+module context
+
+import capability.{ Session, User, Organization }
+
+fn current_session() -> Session<SessionId> !{ session.read } { Session("") }
+
+fn current_user() -> User<UserId> !{ session.read } { User("") }
+
+fn current_organization() -> Organization<OrganizationId> !{ session.read } {
+    Organization("")
+}

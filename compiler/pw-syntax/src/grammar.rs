@@ -1754,6 +1754,68 @@ mod tests {
     }
 
     #[test]
+    fn a_visibility_keyword_belongs_to_the_declaration_it_precedes() {
+        // Permanent fixture, at the architect's request. `private type X`
+        // parsed as TWO declarations — a bare word, then an unqualified type —
+        // so the type came out with NO visibility and any module could import
+        // it. That is not merely a parser bug: it silently widened a
+        // module boundary, which is exactly the kind of claim the project makes.
+        for src in [
+            "private type Secretive = Secretive { y: Int }\n",
+            "private type Alias = String\n",
+            "public opaque type Id = String\n",
+            "session fn f() -> Int !{} { 1 }\n",
+            "private let x = 1\n",
+        ] {
+            let p = parse_ok(src);
+            assert_lossless(src, &p);
+
+            let decls: Vec<K> = p
+                .green
+                .children()
+                .map(|c| c.kind())
+                .filter(|k| *k != K::Whitespace)
+                .collect();
+            // ONE declaration, not two. Which flavour of declaration it is is
+            // not what this test is about — that the visibility belongs to it
+            // is.
+            assert_eq!(
+                decls.len(),
+                1,
+                "{src:?} must be ONE declaration, got {decls:?}"
+            );
+            assert!(
+                is_decl_kind(decls[0]),
+                "{src:?} produced {:?}, not a declaration",
+                decls[0]
+            );
+
+            // ...and the visibility must be INSIDE it, or lowering cannot see it.
+            let first = p
+                .green
+                .first_child()
+                .expect("a declaration")
+                .descendants_with_tokens()
+                .filter_map(|e| e.into_token())
+                .find(|t| !t.kind().is_trivia())
+                .expect("a first token");
+            assert!(
+                matches!(first.text(), "private" | "public" | "session"),
+                "{src:?}: the declaration's first token is {:?}",
+                first.text()
+            );
+        }
+
+        // Control: a bare visibility word with no declaration after it must not
+        // silently swallow whatever follows.
+        let stray = parse_tree("private\n\ntype T = T { x: Int }\n");
+        assert_eq!(
+            tree_text(&stray.green),
+            "private\n\ntype T = T { x: Int }\n"
+        );
+    }
+
+    #[test]
     fn compound_comparisons_are_one_operator() {
         // Before `Cmp`, `opens >= closes` lexed as `>` then `=` and parsed as
         // `opens > (= closes)` — an error three tokens later.

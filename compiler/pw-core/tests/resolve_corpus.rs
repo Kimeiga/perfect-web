@@ -206,3 +206,123 @@ fn the_whole_corpus_is_deliberately_not_one_program() {
          simplified"
     );
 }
+
+#[test]
+fn a_fixture_sees_the_same_diagnostics_alone_as_in_the_harness() {
+    // The corpus invariant the architect made permanent:
+    //
+    //   Running one fixture alone and running the complete corpus harness must
+    //   produce the same diagnostics for that fixture.
+    //
+    // It failed before E2B — the harness compiled all 68 files as one
+    // workspace, so a fixture's result depended on which siblings happened to
+    // be in the set.
+    use pw_core::check::check_sources;
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let lib: Vec<(String, String)> = {
+        let mut v = Vec::new();
+        for dir in ["lib", "../packages/pw-std", "../packages/pw-platform-web"] {
+            for e in std::fs::read_dir(root.join(dir)).expect("dir") {
+                let p = e.expect("entry").path();
+                if p.extension().is_some_and(|x| x == "pw") {
+                    v.push((
+                        p.file_name().unwrap().to_string_lossy().to_string(),
+                        std::fs::read_to_string(&p).expect("read"),
+                    ));
+                }
+            }
+        }
+        v.push((
+            "domain.pw".into(),
+            std::fs::read_to_string(root.join("domain.pw")).expect("domain"),
+        ));
+        v
+    };
+
+    let mut checked = 0;
+    for e in std::fs::read_dir(root.join("rejected")).expect("rejected") {
+        let p = e.expect("entry").path();
+        if p.extension().is_none_or(|x| x != "pw") {
+            continue;
+        }
+        let name = p.file_name().unwrap().to_string_lossy().to_string();
+        let src = std::fs::read_to_string(&p).expect("read");
+
+        let mut alone = lib.clone();
+        alone.push((name.clone(), src.clone()));
+        let a: Vec<&str> = check_sources(&alone)
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, d)| d.iter().map(|d| d.code).collect())
+            .unwrap_or_default();
+
+        // The same fixture, with a sibling that shares its module name added.
+        let mut with_sibling = alone.clone();
+        with_sibling.push((
+            "sibling.pw".into(),
+            src.replace("// @id:", "// @sibling @id:"),
+        ));
+        let b: Vec<&str> = check_sources(&with_sibling)
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, d)| d.iter().map(|d| d.code).collect())
+            .unwrap_or_default();
+
+        checked += 1;
+        assert_eq!(
+            a, b,
+            "{name}: a sibling with the same module name changed its diagnostics \
+             — fixtures are not isolated"
+        );
+    }
+    assert!(checked >= 44, "checked {checked} fixtures");
+}
+
+#[test]
+fn two_fixtures_sharing_a_module_name_do_not_contaminate_each_other() {
+    // The architect's explicit request: deliberately give two sibling fixtures
+    // the same module name; both must pass independently rather than collide.
+    //
+    // Synthetic rather than corpus-derived, so the control is provable: each
+    // fixture declares a DIFFERENT type under the SAME module name, and the
+    // other fixture must not be able to see it.
+    use pw_core::check::check_sources;
+    use pw_core::resolve::{Resolution, Workspace};
+
+    let a = "module store.page\n\ntype OnlyInA = OnlyInA { x: Int }\n";
+    let b = "module store.page\n\ntype OnlyInB = OnlyInB { y: Int }\n";
+
+    // Each alone: clean, and sees only its own type.
+    for (name, src, mine, theirs) in [
+        ("a.pw", a, "OnlyInA", "OnlyInB"),
+        ("b.pw", b, "OnlyInB", "OnlyInA"),
+    ] {
+        let files = vec![(name.to_string(), src.to_string())];
+        let diags = &check_sources(&files)[0].1;
+        assert!(diags.is_empty(), "{name} alone must be clean: {diags:?}");
+
+        let hir = lower_file(src, &parse_tree(src).green);
+        let ws = Workspace::build(&[&hir]);
+        assert!(matches!(ws.resolve(0, mine), Resolution::Local(_)));
+        assert_eq!(
+            ws.resolve(0, theirs),
+            Resolution::Unresolved,
+            "{name} must not see the sibling's declaration"
+        );
+    }
+
+    // Together they are a genuine collision — two modules of one name have no
+    // single graph — and the compiler says so rather than picking one.
+    let both = vec![
+        ("a.pw".to_string(), a.to_string()),
+        ("b.pw".to_string(), b.to_string()),
+    ];
+    let reported: usize = check_sources(&both).iter().map(|(_, d)| d.len()).sum();
+    assert!(
+        reported > 0,
+        "compiling both as one program must report the collision, not resolve it \
+         silently — that silence is what let fixture results depend on which \
+         siblings happened to be in the set"
+    );
+}

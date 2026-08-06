@@ -17,3 +17,18 @@ opaque type Secret<C> = String
 type Payments = Payments { name: String }
 
 type Signing = Signing { name: String }
+
+// The scoping labels, as declared types. `Session<SessionId>` is a type a
+// signature can return, which is what lets the privacy checker read a label
+// instead of inferring one from a function's name.
+opaque type Session<S> = String
+
+opaque type User<U> = String
+
+opaque type Organization<O> = String
+
+opaque type SessionId = String
+
+opaque type UserId = String
+
+opaque type OrganizationId = String
