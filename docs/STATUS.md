@@ -10,8 +10,8 @@ See `docs/ASSUMPTIONS.md` A-008.
 experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
 **current milestone:** **E7 — the own renderer (E7-R/E7-P/E7-L).** Everything
-before it is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and the
-inserted E7V. The three items the architect required before E6 could start are
+before it is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and the inserted
+E6F and E7V. The three items the architect required before E6 could start are
 also closed — coverage-guided fuzzing (`just fuzz`), the compatibility decision
 on the real browser handler path, and typed `{#each}` captures
 (`just each-typing`).
@@ -37,8 +37,19 @@ branch-aware affine analysis, Option inference that does not need the
 annotation, and string holes lowered as expressions. Each replacement is proved
 by a program the narrow rule would have passed.
 
-E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and E7V are complete. E1 closed
-on RQ-2's Outcome 1. E7 onward are not started.
+E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6, E6F and E7V are complete. E1
+closed on RQ-2's Outcome 1. E7 onward are not started.
+
+**E6F is complete** (`docs/milestones/E6F.md`): there is one parser. The second
+declaration parser and its AST are deleted — 1,484 lines — and `pw explain`, the
+declaration rules, the generality validity pipeline, the robustness suites and
+the fuzz harness all read the HIR. `just one-parser` enumerates the real keyword
+tables rather than a copy, and asserts structurally that no crate builds a
+second semantic tree.
+
+It found that the validity pipeline had been asking the *legacy* parser whether
+a witness parsed while every analysis ran on the other one — so it certified
+"parses without recovery" for a file no analysis could read.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -83,6 +94,7 @@ resume compatibility      E7V closed — 34 matrix rows, 6 fuzz targets
 robustness                11 suites, 0 panics, 3 regressions retained
 coverage-guided fuzzing    6 targets, 3600 execs, 0 findings
 resource graph            E6 closed — 6 gate items, 24 materializer tests
+one parser                E6F closed — 5 tests, 0 second trees
 historical compatibility   9 / 10   the miss classified
 KNOWN_GAPs                 0
 ```

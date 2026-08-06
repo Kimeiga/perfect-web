@@ -109,6 +109,7 @@ generality-tested         30 / 31   1 known narrow
 headline matrices          9 / 9
 resume compatibility      E7V closed
 resource graph            E6 closed — 6 gate items
+one parser                E6F closed — 5 tests
 robustness                11 suites, 0 panics
 coverage-guided fuzzing    6 targets, 3600 execs
 historical compatibility   9 / 10   classified
@@ -117,7 +118,10 @@ KNOWN_GAPs                 0
 
 ### 1. E7 — the own renderer (E7-R / E7-P / E7-L)
 
-The next milestone in charter order, and the first that is not started. Marko
+**Unblocked.** E6F converged the front end, which the architect required first:
+
+> Doing it afterward would mean debugging renderer behavior while being unsure
+> which interpretation of the source produced it. Marko
 is the accepted oracle for resumption and streamed patches (ADR-0002,
 ADR-0017), and E7V's compatibility decision already governs the real handler
 path in Chromium, Firefox and WebKit. What is missing is a renderer, not a
@@ -172,14 +176,9 @@ the first version lands.
   ordinary handler — which would make which handlers resume depend on where
   inference happens to be blind.
 
-**One more, added by E6 and not yet started: the two parsers.** `grammar.rs`
-(Rowan) and `parser.rs` (the declaration AST behind `pw explain` and
-`rules.rs`) disagreed four times in one change — `DECL_STARTERS`, the noun
-tables, `POLICY_KEYWORDS`, and policy-value whitespace. Each is now a single
-definition, which removes the four known disagreements and not the way to
-create a fifth. The real fix is for `explain` and `rules.rs` to read the HIR, at
-which point `parser.rs` deletes; that is ~1,600 lines of migration and is
-scheduled rather than done.
+- **One parser.** E6F, closed. `just one-parser`. The standing part is the
+  structural test: a second semantic tree can be added tomorrow, and only that
+  test would notice.
 
 Each is a first version, not a finished one. The fuzzer runs 600 iterations per
 target in CI; the browser path exercises four manifests; the type rule knows
