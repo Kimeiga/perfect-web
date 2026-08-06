@@ -1842,7 +1842,7 @@ fn effect_rows(
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
 ) {
-    use crate::effects::{Reuse, deferred_spans, forbidden_in, forbidden_in_phase, phase_at};
+    use crate::effects::{Reuse, forbidden_in, forbidden_in_phase, phase_at};
 
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
@@ -1870,27 +1870,21 @@ fn effect_rows(
     }
     let mut found = inference.infer_in(body, &types);
 
-    // A clause that NAMES another declaration is not this body performing its
-    // effects. Filtered once, here, so every check below sees the same set —
-    // the placement check, the phase check, the context check and the row
-    // check would otherwise each need their own copy of the distinction.
-    let delegated = crate::effects::delegated_spans(body);
-    found.sources.retain(|s| {
-        !delegated
-            .iter()
-            .any(|d| d.start <= s.span.start && s.span.end <= d.end)
-    });
+    // Work that runs somewhere else does not contribute its effects here.
+    // ONE model (`contexts.rs`) rather than a list of syntax exceptions: a
+    // query dependency, a named declaration, a streamed region, a handler and
+    // a later frame phase are the same fact seen six ways.
+    let regions = crate::contexts::elsewhere(body);
+    found
+        .sources
+        .retain(|s| crate::contexts::effects_belong_here(&regions, &s.span));
     found.effects = found.sources.iter().map(|s| s.effect.clone()).collect();
     let found = found;
     // Work inside an event handler, a streamed region or a later frame phase is
     // not done *during render*, so the render-time restriction does not apply
-    // to it. Charter §7.5A.
-    let deferred = deferred_spans(body);
-    let at_render_time = |span: &crate::hir::Span| {
-        !deferred
-            .iter()
-            .any(|d| d.start <= span.start && span.end <= d.end)
-    };
+    // to it. Charter §7.5A — and it is the same question `regions` already
+    // answers, asked from the other side.
+    let at_render_time = |span: &crate::hir::Span| crate::contexts::at_render_time(&regions, span);
 
     // Forbidden first: it is the stronger statement, and reporting both for one
     // call would say the same thing twice.

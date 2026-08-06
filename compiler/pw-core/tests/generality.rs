@@ -156,6 +156,112 @@ fn every_witness_names_a_registered_invariant() {
     }
 }
 
+/// What a witness must clear before its result means anything.
+///
+/// Architect ruling, 2026-08-06:
+///
+/// > A `slips-through.pw` witness must pass parsing, resolution, typing, and
+/// > every unrelated prerequisite before its silence is interpreted as an
+/// > analysis gap. If any prerequisite fails, the witness is INVALID EVIDENCE,
+/// > not a compiler miss.
+///
+/// Reported as a pipeline rather than a boolean, because "this file is
+/// invalid" and "this file is valid and the analysis missed it" are opposite
+/// conclusions and the difference cost a day.
+#[derive(Debug, Default)]
+struct Validity {
+    parsed: bool,
+    resolved: bool,
+    arities_valid: bool,
+    no_unrelated: bool,
+    target_present: bool,
+    failures: Vec<String>,
+}
+
+impl Validity {
+    fn is_valid_evidence(&self) -> bool {
+        self.parsed && self.resolved && self.arities_valid && self.no_unrelated
+    }
+
+    fn render(&self, name: &str) -> String {
+        let tick = |b: bool| if b { "OK  " } else { "FAIL" };
+        format!(
+            "{name}\n    \
+             {} parsed without recovery\n    \
+             {} all names resolved\n    \
+             {} constructor arities valid\n    \
+             {} no unrelated diagnostics\n    \
+             {} target diagnostic present\n    {}",
+            tick(self.parsed),
+            tick(self.resolved),
+            tick(self.arities_valid),
+            tick(self.no_unrelated),
+            tick(self.target_present),
+            self.failures.join("\n    ")
+        )
+    }
+}
+
+/// Run the pipeline for one witness.
+fn validity(w: &Witness) -> Validity {
+    use pw_core::codes::lookup;
+
+    let mut v = Validity::default();
+    let parsed = pw_syntax::parse(&w.src);
+    v.parsed = parsed.errors.is_empty();
+    if !v.parsed {
+        v.failures.push(format!(
+            "parse errors: {:?}",
+            parsed.errors.iter().map(|e| &e.message).collect::<Vec<_>>()
+        ));
+    }
+
+    let got = symbols_for(w);
+    // Resolution and arity are prerequisites for EVERY analysis, so a witness
+    // tripping one has not reached the analysis it claims to be about.
+    let is = |sym: &str| got.contains(sym);
+    v.resolved = !is("unresolved_module") && !is("unresolved_name") && !is("duplicate_declaration");
+    v.arities_valid = !is("constructor_arity");
+    if !v.resolved {
+        v.failures.push("names do not resolve".to_string());
+    }
+    if !v.arities_valid {
+        v.failures
+            .push("a constructor pattern's arity disagrees with its declaration".to_string());
+    }
+
+    let unrelated: Vec<&str> = got
+        .iter()
+        .copied()
+        .filter(|s| *s != w.invariant.as_str())
+        .collect();
+    v.no_unrelated = unrelated.is_empty();
+    if !v.no_unrelated {
+        v.failures
+            .push(format!("unrelated diagnostics: {unrelated:?}"));
+    }
+    v.target_present = got.contains(w.invariant.as_str());
+    let _ = lookup;
+    v
+}
+
+#[test]
+fn every_witness_is_valid_evidence() {
+    let mut bad = Vec::new();
+    for w in witnesses() {
+        let v = validity(&w);
+        if !v.is_valid_evidence() {
+            bad.push(v.render(&w.name));
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "these witnesses are INVALID EVIDENCE — whatever they report or fail to \
+         report is a property of the file, not of the analysis:\n\n  {}",
+        bad.join("\n\n  ")
+    );
+}
+
 /// A witness must be a valid program in every respect except the one it is
 /// about.
 ///

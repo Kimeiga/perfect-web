@@ -27,6 +27,7 @@ pub mod annotations;
 pub mod capability;
 pub mod check;
 pub mod codes;
+pub mod contexts;
 pub mod diag;
 pub mod diagnostics;
 pub mod effects;
