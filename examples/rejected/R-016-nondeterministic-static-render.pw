@@ -14,7 +14,7 @@ module marketing.landing
 
 page Landing() {
     placement build
-    cache     shared
+    cache shared
 
     view {
         <main>

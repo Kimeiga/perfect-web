@@ -17,7 +17,7 @@ component LazyMap(center: LatLng) {
 
     // Scope-owned: leaving the component releases the handle. No manual teardown.
     resource map when visible {
-        scope   component
+        scope component
         acquire { Maps.create(self, center) }
         release(handle) { Maps.destroy(handle) }
     }

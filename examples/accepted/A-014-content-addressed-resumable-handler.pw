@@ -24,8 +24,8 @@ view AddToCartButton(item: MenuItemId, available: Bool) !{} {
 }
 
 handler_policy {
-    identity          content_address(code, captures)
-    captures          serializable_only
+    identity content_address(code, captures)
+    captures serializable_only
     on_version_mismatch safe_refetch
-    load              on_first_interaction
+    load on_first_interaction
 }

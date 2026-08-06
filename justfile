@@ -51,7 +51,8 @@ test: test-unit test-compile
 test-unit:
     cargo test --workspace
 
-# Validates the accepted/rejected corpus. Three phases since E2:
+# Validates the accepted/rejected corpus. Four phases since E2:
+#   0. pw fmt --check — the corpus is canonically formatted (ADR-0013)
 #   1. corpus-check — header well-formedness and full charter §16 coverage
 #   2. pw check on accepted/ — must be CLEAN
 #   3. cargo test  — asserts rejected files are caught by their declared @rule,
@@ -61,6 +62,7 @@ test-unit:
 # `pw check examples/rejected/*.pw` deliberately exits 1 — that is the point —
 # so it is asserted in tests rather than run bare here.
 test-compile:
+    cargo run --quiet -p pw-cli -- fmt --check examples/accepted/*.pw examples/rejected/*.pw
     cargo run --quiet -p corpus-check -- examples
     cargo run --quiet -p pw-cli -- check examples/accepted/*.pw
 

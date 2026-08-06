@@ -17,7 +17,7 @@ component AddedPulse() {
     placement browser
     animate pulse {
         // ERROR: animating width forces layout every frame.
-        width:    100.px -> 120.px -> 100.px
+        width: 100.px -> 120.px -> 100.px
         duration: 180.milliseconds
     }
     view { <span class="badge" animation={pulse} /> }

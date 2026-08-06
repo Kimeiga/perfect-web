@@ -18,12 +18,12 @@ component VendorMap(center: LatLng) {
     // its forced-layout cost is attributed to this component, not amortised
     // silently across the frame.
     unsafe capability synchronous_geometry
-        because """VendorMap reads offsetWidth during init; upstream has no
+    because """VendorMap reads offsetWidth during init; upstream has no
                    measurement-free API. Tracked at vendor-issue-4471."""
-        attributes_forced_layout_to VendorMap
+    attributes_forced_layout_to VendorMap
 
     resource widget {
-        scope   component
+        scope component
         acquire { unsafe.imperative { VendorSdk.mount(self, center) } }
         release(h) { unsafe.imperative { VendorSdk.destroy(h) } }
     }

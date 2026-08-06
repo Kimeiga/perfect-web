@@ -14,18 +14,18 @@ import domain.{ StoreId, Store, StoreHours }
 import decode.{ Unknown, Decoder, DecodeError, field, string, int, list }
 
 fn decode_store(raw: Unknown) -> Result<Store, DecodeError> !{} {
-    let id    = field(raw, "id", string)?
-    let name  = field(raw, "name", string)?
+    let id = field(raw, "id", string)?
+    let name = field(raw, "name", string)?
     let hours = field(raw, "hours", decode_hours)?
     Ok(Store {
         id: StoreId.from_string(id)?,
         name: name,
         hours: hours,
-    })
+        })
 }
 
 fn decode_hours(raw: Unknown) -> Result<StoreHours, DecodeError> !{} {
-    let opens  = field(raw, "opens_minute", int)?
+    let opens = field(raw, "opens_minute", int)?
     let closes = field(raw, "closes_minute", int)?
     if opens >= closes {
         return Err(DecodeError.Invalid("hours", "opens must precede closes"))

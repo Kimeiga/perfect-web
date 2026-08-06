@@ -16,9 +16,9 @@ component AddedPulse() {
     // so writing `width` or `top` here is a compile error rather than a jank bug.
     animate pulse {
         transform: scale(1.0) -> scale(1.08) -> scale(1.0)
-        opacity:   1.0 -> 0.85 -> 1.0
-        duration:  180.milliseconds
-        respects   prefers_reduced_motion
+        opacity: 1.0 -> 0.85 -> 1.0
+        duration: 180.milliseconds
+        respects prefers_reduced_motion
     }
 
     view { <span class="badge" animation={pulse} /> }

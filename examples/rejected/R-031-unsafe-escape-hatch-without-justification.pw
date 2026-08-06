@@ -15,7 +15,7 @@ module legacy.widget
 component LegacyWidget() {
     // ERROR: unsafe escape hatch with no justification.
     unsafe.lifecycle {
-        on_mount  { Legacy.init() }
+        on_mount { Legacy.init() }
         on_unmount { Legacy.teardown() }
     }
 

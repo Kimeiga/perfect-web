@@ -13,9 +13,9 @@ module marketing.terms
 // !{} plus build-known inputs => the placement solver chooses Build.
 page Terms() !{} {
     placement build
-    privacy   Public
-    cache     shared
-    revision  content_hash
+    privacy Public
+    cache shared
+    revision content_hash
 
     view {
         <main>

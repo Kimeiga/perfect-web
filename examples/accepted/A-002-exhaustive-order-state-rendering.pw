@@ -11,7 +11,7 @@
 module order.status_view
 
 import domain.{ OrderConfirmation, OrderProgress, DeliveryReceipt,
-                CancellationReason, OrderFailure }
+    CancellationReason, OrderFailure }
 
 type OrderState =
     | Draft

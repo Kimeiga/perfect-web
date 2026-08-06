@@ -14,13 +14,13 @@ import domain.{ MenuItemId, PositiveInt, InteractionId, CartError }
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
-    requires       SignedIn
-    idempotent_by  InteractionId
-    transaction    serializable
-    optimistic     cart.add(item, quantity)
-    rollback       cart.remove(item, quantity)
-    invalidates    Cart(current_session())
-    retry          transport_only(max = 2, jitter = true)
+    requires      SignedIn
+    idempotent_by InteractionId
+    transaction   serializable
+    optimistic    cart.add(item, quantity)
+    rollback      cart.remove(item, quantity)
+    invalidates   Cart(current_session())
+    retry         transport_only(max = 2, jitter = true)
 {
     // Revalidate availability inside the transaction, not before it.
     let available = Menu.is_available(item)?

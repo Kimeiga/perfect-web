@@ -19,7 +19,7 @@ component MenuAligner(items: List<ElementRef>) {
             items |> List.map(fn(it) it.width())
         }
         let total = derived widths |> List.sum()
-        let max   = derived widths |> List.maximum()
+        let max = derived widths |> List.maximum()
 
         mutate {
             self.style.set_width(max)

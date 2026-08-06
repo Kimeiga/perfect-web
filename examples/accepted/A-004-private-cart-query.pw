@@ -13,12 +13,12 @@ module cart.queries
 import domain.{ SessionId, Cart, CartError }
 
 session query Cart(session: SessionId) -> Result<Cart, CartError>
-    freshness   0.seconds
-    consistency read_your_writes
-    cache       private
-    concurrency one_per_key
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    concurrency   one_per_key
     on_key_change cancel
-    timeout     2.seconds
+    timeout       2.seconds
 {
     Carts.current(session)
 }

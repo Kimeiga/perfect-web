@@ -14,14 +14,14 @@ import domain.{ ConsumerId, OrderDraft, SyncError }
 replicated OrderDraft(consumer: ConsumerId)
     -> Result<OrderDraft, SyncError>
 {
-    privacy       User(consumer)
-    storage       device
-    offline       writable
-    sync          on_reconnect
-    conflict      merge_by_field(
-                      notes         = last_write_wins,
-                      line_quantity = maximum,
-                      removed_lines = union,
-                  )
+    privacy User(consumer)
+    storage device
+    offline writable
+    sync on_reconnect
+    conflict merge_by_field(
+        notes = last_write_wins,
+        line_quantity = maximum,
+        removed_lines = union,
+    )
     on_conflict_unresolved surface_to_user
 }

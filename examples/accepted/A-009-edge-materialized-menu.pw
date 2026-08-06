@@ -13,14 +13,14 @@ module store.menu_materialization
 import domain.{ StoreId, MenuItemId }
 
 materialize MenuFragment(id: StoreId) {
-    placement      edge
-    partition      public
-    depends_on     Store(id), Menu(id)
+    placement edge
+    partition public
+    depends_on Store(id), Menu(id)
     invalidates_on MenuChanged(id),
-                   InventoryChanged(id, _item: MenuItemId)
-    regenerate     on_invalidation
-    stampede       single_flight
-    fallback       last_known_good
-    code_version   included_in_key
-    locale         included_in_key
+    InventoryChanged(id, _item: MenuItemId)
+    regenerate on_invalidation
+    stampede single_flight
+    fallback last_known_good
+    code_version included_in_key
+    locale included_in_key
 }

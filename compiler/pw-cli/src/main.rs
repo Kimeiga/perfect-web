@@ -277,6 +277,54 @@ fn derive_placement(effects: &[&str]) -> &'static str {
     }
 }
 
+/// `pw fmt` — rewrite in place, or with `--check` report and exit non-zero.
+///
+/// `--check` never writes. It is the CI form: a repository is either canonical
+/// or the build fails, with no third state where a tool silently edits code.
+fn fmt_command(paths: &[&String], check_only: bool) -> ExitCode {
+    let mut changed = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let out = pw_syntax::format_source(&src);
+        if out == src {
+            continue;
+        }
+        changed.push((*path).clone());
+        if let Some(Err(e)) = (!check_only).then(|| std::fs::write(path, &out)) {
+            eprintln!("pw: cannot write {path}: {e}");
+            return ExitCode::from(2);
+        }
+    }
+
+    if changed.is_empty() {
+        println!("pw fmt: {} file(s) already formatted", paths.len());
+        return ExitCode::SUCCESS;
+    }
+    if check_only {
+        for c in &changed {
+            println!("would reformat: {c}");
+        }
+        println!(
+            "pw fmt: {} of {} file(s) need formatting",
+            changed.len(),
+            paths.len()
+        );
+        return ExitCode::FAILURE;
+    }
+    println!(
+        "pw fmt: reformatted {} of {} file(s)",
+        changed.len(),
+        paths.len()
+    );
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let plain = args.iter().any(|a| a == "--plain");
@@ -287,12 +335,17 @@ fn main() -> ExitCode {
         .filter(|a| !a.starts_with("--"))
         .collect();
 
-    if !matches!(cmd, "check" | "explain") || paths.is_empty() {
-        eprintln!("usage: pw <check|explain> <path.pw>... [--plain]");
+    if !matches!(cmd, "check" | "explain" | "fmt") || paths.is_empty() {
+        eprintln!("usage: pw <check|explain|fmt> <path.pw>... [--plain]");
         eprintln!();
         eprintln!("  check    parse and report diagnostics");
         eprintln!("  explain  print types, effects, privacy and derived placement");
+        eprintln!("  fmt      rewrite files canonically; --check reports instead");
         return ExitCode::from(2);
+    }
+
+    if cmd == "fmt" {
+        return fmt_command(&paths, args.iter().any(|a| a == "--check"));
     }
 
     let mut errors = 0usize;

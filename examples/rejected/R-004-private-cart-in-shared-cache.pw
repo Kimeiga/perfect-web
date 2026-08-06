@@ -16,8 +16,8 @@ module store.page
 page StorePage(id: StoreId) {
     cache shared
 
-    let store = query Store(id)      // Public
-    let cart  = query Cart(session)  // Session<SessionId>
+    let store = query Store(id) // Public
+    let cart = query Cart(session) // Session<SessionId>
 
     view {
         <main>
