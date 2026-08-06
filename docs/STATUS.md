@@ -33,17 +33,18 @@ early by RQ-2 (clean pass). Then **E1A** — `pw` value semantics and boundary A
 files and they all parse, with precise spans and error recovery. The
 specification is executable in CI rather than merely well-formed.
 
-The RQ items stay `partial` for a narrower reason than before: `pw-core`'s five
-checkers (42 tests) are **not yet wired to the parsed AST**. The 44 rejected
-corpus files parse cleanly and *should* — they are syntactically valid programs
-that violate semantic rules. Connecting the two is the next task and it is
-small.
+**Four rejected corpus files now fail to compile**, each caught by the rule its
+`@rule` header declares, with a primary span, an origin span, a note and a legal
+alternative. `just rejections` shows the current state.
+
+The other 40 need body parsing, effect checking (E1) or privacy/placement (E5).
+Coverage is ratcheted by a test so it cannot silently regress.
 
 **public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
 — six of the claims it needs are unstarted, and **45 corpus files exist of which
 0 compile**.
 
-**last passing commit:** `9dfd7a7` — E2 front end (`pw check` in CI).
+**last passing commit:** `c736ee2` — E2 declaration-level rules.
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---
@@ -137,12 +138,12 @@ incremental           5 unrelated updates -> expensive node evaluated once
 
 ## next three concrete tasks
 
-1. **Wire `pw-core`'s checkers to the parsed AST.** Walk the AST, build
-   `pw-core`'s `Program`, run exhaustiveness / scope / capability checks. This
-   converts 44 rejected corpus files from "parses fine" into real compile
-   failures and moves E2 gate item 2 from FAIL to a measurable number. It is the
-   single highest-leverage remaining task and it is small — both halves already
-   exist and are tested.
+1. **Parse function and template bodies.** This unlocks the largest block of
+   the rejected corpus — the effect-in-view family (`R-001`, `R-033`, `R-036`,
+   `R-037`) and body-level policy violations (`R-004`) — and E1's lowering needs
+   it anyway. `R-037` matters most: an effect smuggled through a generic
+   callback. RQ-2 proved the backend propagates effects that way; the `pw`
+   checker must be shown to do the same, or it is worth approximately nothing.
 2. **E2A-R** — the runtime half of structured concurrency: owner scopes,
    cancellation propagation, cleanup ordering, leak detection. E2A does not close
    until both halves pass, and the static rules must not be described as covering
