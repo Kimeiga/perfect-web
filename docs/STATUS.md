@@ -61,21 +61,24 @@ single figure hides the difference between a red diagnostic, the *right* red
 diagnostic, and the whole declared invariant being checked):
 
 ```text
-44 / 44  rejected fixtures produce a compile error
-44 / 44  emit their declared canonical code
-44 / 44  fully enforce the complete declared invariant
+46 / 46  rejected fixtures produce a compile error
+46 / 46  emit their declared canonical code
+46 / 46  fully enforce the complete declared invariant
 ```
 
-**Charter §14 M2 gate item 2 — ≥40 of 44 — is met**, at corpus version **C1**
+**Charter §14 M2 gate item 2 — ≥40 of 44 — is met**, at corpus version **C3**
 (`docs/CORPUS.md`), with the three numbers equal and no wrong-reason catches.
+The floor is now the directory rather than the constant `44`: a corpus that
+grows past a hardcoded floor leaves its new fixtures unenforced while the
+assertion still passes.
 
 There is now a **second gate, and it is open**:
 
 ```text
-corpus conformance        44 / 44   closed at C1
-single-defect isolation   44 / 44
-generality-tested         29 / 29
-headline matrices          8 / 8
+corpus conformance        46 / 46   at C3
+single-defect isolation   46 / 46
+generality-tested         30 / 31   1 known narrow
+headline matrices          9 / 9
 resume compatibility      E7V closed — 34 matrix rows, 6 fuzz targets
 robustness                11 suites, 0 panics, 3 regressions retained
 coverage-guided fuzzing    6 targets, 3600 execs, 0 findings
@@ -94,8 +97,15 @@ also `slips-through.pw` files, which are known gaps written as code that must
 compile clean, so `just ci` fails the moment a gap closes and the witness needs
 promoting. `just generality` scores it.
 
-Read the second number as the honest one. It moved 7 → 9 today; the first has
-not moved since it reached 44.
+Read the second number as the honest one. It moved 7 → 30 today; the first
+moves only when the corpus does.
+
+**30 / 31, not 31 / 31.** `private_in_shared_materialization` has two executable
+known gaps — a private value reaching a shared fragment through a public query's
+body, by a helper and by a branch — so it is *known narrow* rather than
+generality-tested. Both are programs in
+`examples/generality/private_in_shared_materialization/`, and `just generality`
+fails the moment either stops compiling clean.
 
 Up from four when E2 began, each with a primary span, an origin span, a note and
 a legal alternative. `just evidence-corpus` regenerates

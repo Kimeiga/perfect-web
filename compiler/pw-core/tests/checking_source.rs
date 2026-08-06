@@ -491,8 +491,12 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     // reason catches, which is why `declared_code == errored` is asserted for
     // equality and not as another floor — a catch that is merely red is a
     // regression even when the count goes up.
+    // The floor is the corpus, not a constant. It was 44 at C2 and is 46 at
+    // C3, and writing the number twice is how a corpus grows while the ratchet
+    // stays where it was — the count rises, the assertion still passes, and the
+    // new fixtures are unenforced without anything going red.
     assert!(
-        errored >= 44,
+        errored >= total,
         "regressed: {errored}/{total} produce an error"
     );
     assert_eq!(
@@ -500,7 +504,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
         "every catch must be for the declared invariant, not merely red"
     );
     assert!(
-        fully >= 44,
+        fully >= total,
         "regressed: {fully}/{total} fully enforced, partial list = {PARTIALLY_ENFORCED:?}"
     );
 }
@@ -822,7 +826,11 @@ fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
         }
     }
 
-    assert_eq!(checked, 44, "every rejected fixture must be checked");
+    assert_eq!(
+        checked,
+        rejected_results().len(),
+        "every rejected fixture must be checked"
+    );
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 

@@ -1,0 +1,39 @@
+// @corpus: rejected
+// @id: R-046
+// @category: dependency graph edge to an undeclared target
+// @rule: PW5100
+// @invariant: graph_edge_unresolved
+// @charter: §14 M6 task 1, §9.4
+// @milestone: 6
+// @expect-error: `PriceFragment` is invalidated by `PriceChanged`, which nothing declares
+// @expect-error: a dependency, event or invalidation target must name something the program declares
+//
+// The failure that looks like success.
+//
+// `PriceChanged` is not an event this program declares — a typo, a rename, or
+// an event somebody meant to add. Nothing goes wrong at run time: the
+// materializer is never told to regenerate, and the fragment keeps serving what
+// it last computed. The page stays valid, well-formed and permanently out of
+// date, and no test of the page finds it, because the content is correct
+// content from before.
+//
+// Invalidation is driven by this graph. An edge to nothing is not an error, it
+// is silence — and silence is indistinguishable from a fragment whose inputs
+// never changed.
+
+module store.pricing_fragment
+
+import domain.{ StoreId }
+import Resources.{ Menu }
+import Events.{ MenuChanged }
+
+materialize PriceFragment(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
+    // ERROR: nothing declares `PriceChanged`.
+    invalidates_on MenuChanged(id), PriceChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

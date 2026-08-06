@@ -32,9 +32,9 @@ Generality at freeze:      7/29 invariants generality-tested
 Reproduce: `just ci` for the gate, `just evidence-corpus` for the per-fixture
 table, `just generality` for the second score.
 
-**C1 is frozen, and C2 opened on 2026-08-06** — see below. A change to any file
-under `examples/accepted` or `examples/rejected` opens the next version and
-requires a row in its table plus a recorded reason. The rule exists because the path to 44/44 changed ten
+**C1 is frozen. C2 and C3 both opened on 2026-08-06** — see below. A change to
+any file under `examples/accepted` or `examples/rejected` opens the next version
+and requires a row in its table plus a recorded reason. The rule exists because the path to 44/44 changed ten
 fixtures, and a reader who does not know that will read the number as stronger
 than it is.
 
@@ -224,6 +224,60 @@ role `Stores.pw` and `Carts.pw` have had since C1.
 `A-003` and `A-004` keep their own `Store` and `Cart`. They are the fixtures
 that demonstrate how such a query is *written*, and a fixture referring to
 itself would prove nothing about resolution across files.
+
+---
+
+## C3 — opened 2026-08-06 (E6, on the architect's ruling)
+
+```text
+Corpus version:            C3
+Accepted programs:         24
+Rejected programs:         46
+Charter categories:        24/24 accepted, 46/46 rejected
+Result:                    24/24 accepted clean, 46/46 rejected enforced
+Wrong-reason catches:      0
+Added since C2:            2 fixtures (below)
+Generality at open:        30/31 invariants generality-tested, 1 known narrow
+```
+
+### Why it opened
+
+Architect ruling, 2026-08-06:
+
+> A new user-facing language invariant introduced by E6 should have at least
+> one canonical accepted/rejected specification pair. Otherwise your dashboard
+> eventually says `generality-tested 29 / 29` while the compiler actually
+> contains 31 or 32 semantic invariants. That denominator would have stopped
+> meaning "all invariants".
+
+E6 added two invariants that no §16 category named. They had rule fixtures and
+generality witnesses but no place in the executable specification, so the
+denominator did not move and the score was measuring a smaller compiler than
+the one that exists.
+
+### C2 → C3: the two fixtures added
+
+| fixture | category | invariant | why it is canonical |
+|---|---|---|---|
+| R-045 | private dependency of a shared materialization | `private_in_shared_materialization` | the defect is on the **edge between two individually valid declarations** — `Cart` correctly asks for a private cache, the fragment is correctly entitled to a shared entry, and neither is wrong on its own. No single-declaration rule can see it, and `PW5001` does not |
+| R-046 | dependency graph edge to an undeclared target | `graph_edge_unresolved` | invalidation is driven by the graph, so an edge to nothing is not an error at run time — it is silence, and silence is indistinguishable from a fragment whose inputs never changed |
+
+No accepted fixture was added. A-009 is the accepted neighbour for both: it is a
+shared materialization whose edges all resolve, and since C2 they do.
+
+### The two lines this changed in the test suite
+
+Both were floors written as constants — `errored >= 44`, `checked == 44` — and
+a corpus that grows past a constant floor leaves its new fixtures unenforced
+while the assertion still passes. They now count the directory.
+
+`generality-tested` is **30 / 31 with one known narrow invariant**, not 31/31.
+`private_in_shared_materialization` has two executable known gaps
+(`slips-through-helper.pw`, `slips-through-branch.pw`), and an invariant with a
+known gap is not generality-tested. The published triple is asserted, and a
+`NARROW` witness is only admissible where `DIMENSIONS.md` has a `## Known gaps`
+section — otherwise `NARROW` becomes the escape hatch that turns any failing
+witness into an accepted limitation.
 
 ---
 

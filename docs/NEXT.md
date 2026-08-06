@@ -103,10 +103,10 @@ Every milestone through E5, plus the inserted E2B/E2C/E2D and E7V, is closed.
 All five quality gates are green.
 
 ```text
-corpus conformance        44 / 44   at C2
-single-defect isolation   44 / 44
-generality-tested         29 / 29
-headline matrices          8 / 8
+corpus conformance        46 / 46   at C3
+single-defect isolation   46 / 46
+generality-tested         30 / 31   1 known narrow
+headline matrices          9 / 9
 resume compatibility      E7V closed
 resource graph            E6 closed — 6 gate items
 robustness                11 suites, 0 panics

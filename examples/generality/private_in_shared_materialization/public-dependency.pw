@@ -1,0 +1,20 @@
+// @status: NEIGHBOUR
+// @invariant: private_in_shared_materialization
+// @dimension: valid neighbour — the same SHARED fragment, reading a public
+//             query. A rule reacting to `partition public` alone would catch
+//             this one too.
+module generality.materialize_public_dependency
+
+import domain.{ StoreId }
+import Resources.{ Menu }
+import Events.{ MenuChanged }
+
+materialize PublicMenu(id: StoreId) {
+    placement      edge
+    partition      public
+    depends_on     Menu(id)
+    invalidates_on MenuChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

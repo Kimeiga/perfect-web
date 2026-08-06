@@ -1,0 +1,38 @@
+E6 corpus C3 — the two invariants E6 added to the executable specification
+
+$ cargo run -p corpus-check -- examples
+accepted: 24 files
+accepted: 24/24 charter §16 categories covered
+rejected: 46 files
+rejected: 46/46 charter §16 categories covered
+corpus-check: OK
+
+$ just ci     # the three numbers
+  46/46 emit their declared canonical code
+  46/46 fully enforce the complete declared invariant
+
+$ just generality
+  generality-tested:      30 / 31
+  generality untested:    0 — []
+
+=== R-045 — the defect on an EDGE ========================================
+error: [PW5101] `StoreDashboard` is materialized into a shared entry and depends on `Cart`, which is declared `session`
+   = note: A shared materialization is computed for whoever asks first and served to everyone after. `Cart` is declared `session`, so the first reader's data would be written into storage the rest of them read. Charter §14 M6 gate item 4 states this as a property of the STORAGE; it is decided here, where the dependency is written.
+
+=== R-046 — the edge to nothing ==========================================
+error: [PW5100] `PriceFragment` is invalidated by `PriceChanged`, which nothing declares
+   = note: Invalidation is driven by this graph, so an edge to nothing is not an error at run time — it is silence. `PriceFragment` would never regenerate on `PriceChanged`, and the page it produces would stay valid, correct-looking and permanently out of date. Nothing downstream can distinguish that from a fragment whose inputs never changed.
+
+=== THE PW5101 CHALLENGE MATRIX ==========================================
+
+  caught.pw                    [PW5101] 
+  cross-module.pw              [PW5101] 
+  neighbour.pw                 clean
+  private-cache.pw             [PW5101] 
+  public-dependency.pw         clean
+  slips-through-branch.pw      clean
+  slips-through-helper.pw      clean
+  user-scoped.pw               [PW5101] 
+
+  four caught, two clean neighbours, two executable known gaps.
+  The gaps are why the score is 30/31 and not 31/31.

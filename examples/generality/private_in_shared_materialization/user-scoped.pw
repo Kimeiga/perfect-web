@@ -1,0 +1,29 @@
+// @status: GENERAL
+// @invariant: private_in_shared_materialization
+// @dimension: `private` rather than `session` — the other restricted
+//             visibility, which a rule matching the word `session` would miss
+module generality.materialize_user_scoped
+
+import domain.{ ConsumerId, OrderId, OrderProgress, OrderFailure }
+import Events.{ StoreChanged }
+
+private query Orders(consumer: ConsumerId) -> Result<OrderProgress, OrderFailure>
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           consumer
+    concurrency   one_per_key
+    on_key_change cancel
+{
+    todo
+}
+
+materialize OrderStrip(consumer: ConsumerId) {
+    placement      edge
+    partition      public
+    depends_on     Orders(consumer)
+    invalidates_on StoreChanged(consumer)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

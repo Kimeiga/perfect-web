@@ -1,0 +1,36 @@
+// @corpus: rejected
+// @id: R-045
+// @category: private dependency of a shared materialization
+// @rule: PW5101
+// @invariant: private_in_shared_materialization
+// @charter: §14 M6 gate 4, §7.8, §9.4
+// @milestone: 6
+// @expect-error: `StoreDashboard` is materialized into a shared entry and depends on `Cart`, which is declared `session`
+// @expect-error: a shared materialization may only depend on data every reader of its cache entry may see
+//
+// The defect that lives on an EDGE. Every declaration here is individually
+// correct: `Cart` asks for a private cache and gets one, and a fragment is
+// entitled to ask for a shared entry. Neither of them is wrong. What is wrong
+// is that one reads the other.
+//
+// A shared materialization is computed for whoever asks first and served to
+// everyone after, so the first session's cart would be written into storage the
+// rest of them read. `PW5001` cannot see this — it asks whether a query's own
+// partition admits its own data, and both answers here are yes.
+
+module store.dashboard
+
+import domain.{ StoreId }
+import Resources.{ Menu, Cart }
+import Events.{ MenuChanged }
+
+materialize StoreDashboard(id: StoreId) {
+    placement      edge
+    partition      public
+    // ERROR: `Cart` is session-scoped and this entry is shared.
+    depends_on     Menu(id), Cart(id)
+    invalidates_on MenuChanged(id)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

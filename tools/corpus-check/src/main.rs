@@ -99,6 +99,17 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "post-paint same-frame layout measure",
     "containment with cross-boundary layout dependency",
     "unaudited imperative dom escape",
+    // E6, corpus C3. Two invariants the milestone introduced that no existing
+    // category names, added on the architect's ruling of 2026-08-06:
+    //
+    //   > A new user-facing language invariant introduced by E6 should have at
+    //   > least one canonical accepted/rejected specification pair. Otherwise
+    //   > your dashboard eventually says `generality-tested 29 / 29` while the
+    //   > compiler actually contains 31 or 32 semantic invariants.
+    //
+    // The denominator has to grow, or it stops meaning "all invariants".
+    "private dependency of a shared materialization",
+    "dependency graph edge to an undeclared target",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

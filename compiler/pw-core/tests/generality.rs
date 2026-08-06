@@ -367,6 +367,17 @@ const HEADLINE: &[&str] = &[
     "non_exhaustive_match",
     "affine_not_consumed_once",
     "scope_outlives_owner",
+    // E6. Architect ruling, 2026-08-06:
+    //
+    //   > `PW5101` is especially important because it catches something no
+    //   > individual declaration violates: the error exists on the EDGE between
+    //   > two individually valid declarations. "Private data can never leak into
+    //   > shared materialization through a dependency edge" is basically one of
+    //   > the original reasons this project exists.
+    //
+    // `graph_edge_unresolved` is important but structural, so it needs
+    // generality testing and not headline status.
+    "private_in_shared_materialization",
 ];
 
 #[test]
@@ -491,16 +502,56 @@ fn generality_is_reported_separately_from_conformance() {
         untested.len()
     );
 
-    // Every invariant the corpus exercises now has at least one challenge
-    // witness and no known-narrow one. That is an equality, not a floor:
-    // an invariant losing its witness is a claim losing its evidence.
+    // Every invariant the corpus exercises has a challenge witness. That is an
+    // equality, not a floor: an invariant losing its witness is a claim losing
+    // its evidence.
     //
     // It does NOT mean the analyses are general. It means each has survived a
     // program its fixture did not anticipate, which is the strongest thing a
     // finite suite can say.
     assert_eq!(
-        general.len(),
+        general.len() + narrow.len(),
         exercised.len(),
-        "an invariant lost its challenge witness: narrow={narrow:?} untested={untested:?}"
+        "an invariant lost its challenge witness entirely: untested={untested:?}"
+    );
+
+    // A KNOWN-NARROW invariant is a lower claim, and it may only be made where
+    // the gap is written down as a gap. Without this, `NARROW` is the escape
+    // hatch that turns any failing witness into an accepted limitation — the
+    // score would stay green while the numerator quietly fell.
+    //
+    // `DIMENSIONS.md` is where it has to be written, because that is the file
+    // a reader of the claim opens.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/generality");
+    let mut undeclared = Vec::new();
+    for n in &narrow {
+        let doc = root.join(n).join("DIMENSIONS.md");
+        let says_so = std::fs::read_to_string(&doc)
+            .map(|t| t.contains("Known gaps"))
+            .unwrap_or(false);
+        if !says_so {
+            undeclared.push(format!(
+                "{n}: has a NARROW witness and no `## Known gaps` section in \
+                 {}",
+                doc.display()
+            ));
+        }
+    }
+    assert!(
+        undeclared.is_empty(),
+        "a gap must be declared where the claim is read, not only in a file \
+         header:\n  {}",
+        undeclared.join("\n  ")
+    );
+
+    // And the headline number is what a reader sees, so it is asserted here
+    // rather than only printed. `generality-tested` counts invariants with a
+    // GENERAL witness and NO known gap.
+    assert_eq!(
+        (general.len(), narrow.len(), untested.len()),
+        (30, 1, 0),
+        "the published figure moved. If that is intended, update
+         docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
+         status report that no test holds is a number that drifts."
     );
 }

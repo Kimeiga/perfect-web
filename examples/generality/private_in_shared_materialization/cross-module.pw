@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: private_in_shared_materialization
+// @dimension: cross-module — the session label is declared elsewhere, so this
+//             file's own text contains nothing marked private
+//
+// The realistic shape. Nobody writes `session query` and a shared fragment on
+// the same screen; what happens is that a fragment names a dependency whose
+// restriction lives in a file the author has not opened.
+module generality.materialize_cross_module
+
+import domain.{ SessionId }
+import Resources.{ Cart }
+import Events.{ CartChanged }
+
+materialize AccountPanel(session: SessionId) {
+    placement      edge
+    partition      public
+    depends_on     Cart(session)
+    invalidates_on CartChanged(session)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

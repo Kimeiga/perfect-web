@@ -1,0 +1,34 @@
+// @status: GENERAL
+// @invariant: private_in_shared_materialization
+// @dimension: the restriction is in the CACHING POLICY, not in a visibility
+//             keyword — a rule reading only `session`/`private` on the
+//             declaration would see an unlabelled query and allow it
+//
+// `Draft` declares no visibility at all. What makes it unshareable is
+// `cache private`: it is stored per reader, so one reader's entry is not an
+// answer for another, whatever the label says.
+module generality.materialize_private_cache
+
+import domain.{ SessionId }
+import Events.{ CartChanged }
+
+query Draft(session: SessionId) -> Int
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session
+    concurrency   one_per_key
+    on_key_change cancel
+{
+    0
+}
+
+materialize DraftBadge(session: SessionId) {
+    placement      edge
+    partition      public
+    depends_on     Draft(session)
+    invalidates_on CartChanged(session)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

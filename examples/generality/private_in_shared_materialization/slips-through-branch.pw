@@ -1,0 +1,50 @@
+// @status: NARROW
+// @invariant: private_in_shared_materialization
+// @dimension: the dependency is public on one path and session-derived on the
+//             other, so no single declaration is wrong and the edge is public
+//
+// This compiles clean and it should not.
+//
+// The branch shape is the one that defeats a rule reading declarations rather
+// than values: `Personalised` returns the public menu for a signed-out reader
+// and a session-derived answer for a signed-in one. Its declaration is honest
+// about neither, because a declaration describes one type and this returns one
+// type by two routes.
+//
+// `private_in_shared_cache/branch-join.pw` is the same dimension for pages, and
+// it is CAUGHT there — the label algebra joins the two paths. The difference is
+// not the analysis, it is that a page has a body to run it over.
+module generality.materialize_slips_branch
+
+import domain.{ SessionId }
+import Resources.{ Cart }
+import Events.{ CartChanged }
+
+public query Personalised(session: SessionId) -> Int
+    freshness     5.seconds
+    consistency   snapshot
+    cache         shared
+    key           session
+    concurrency   one_per_key
+    on_key_change cancel
+{
+    if signed_in(session) {
+        private_total(session)
+    } else {
+        0
+    }
+}
+
+fn signed_in(session: SessionId) -> Bool !{} { todo }
+
+fn private_total(session: SessionId) -> Int !{ database.read<Carts> } { todo }
+
+materialize PersonalStrip(session: SessionId) {
+    placement      edge
+    partition      public
+    depends_on     Personalised(session)
+    invalidates_on CartChanged(session)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

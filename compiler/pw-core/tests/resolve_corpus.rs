@@ -132,7 +132,14 @@ fn every_rejected_fixture_resolves_against_the_library_it_imports() {
         }
     }
 
-    assert_eq!(checked, 44, "expected the whole rejected corpus");
+    // Counted from the directory, not written as a constant: a corpus that
+    // grows past a hardcoded floor leaves its new fixtures unchecked while the
+    // assertion still passes.
+    assert_eq!(
+        checked,
+        read("rejected").len(),
+        "expected the whole rejected corpus"
+    );
     assert!(
         problems.is_empty(),
         "{} resolution failure(s):\n{}",
@@ -276,7 +283,11 @@ fn a_fixture_sees_the_same_diagnostics_alone_as_in_the_harness() {
              — fixtures are not isolated"
         );
     }
-    assert!(checked >= 44, "checked {checked} fixtures");
+    assert_eq!(
+        checked,
+        read("rejected").len(),
+        "checked {checked} fixtures"
+    );
 }
 
 #[test]
