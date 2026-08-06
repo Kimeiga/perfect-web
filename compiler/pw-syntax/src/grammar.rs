@@ -98,6 +98,18 @@ const RESOURCE_NOUNS: &[&str] = &[
 
 /// Policy clause keywords. A value runs until the next one, a `{`, or a
 /// declaration keyword.
+/// Words that continue a statement onto the next line rather than beginning a
+/// new one.
+///
+/// The newline rule that ends a statement is right for almost everything and
+/// wrong for these: charter §14 M5 task 6 mandates a `because "…"` on an
+/// escape hatch, and it is written on its own line. Without this the statement
+/// ended early, `because` became a statement of its own, and the justification
+/// never reached the declaration that needed it — so an audited escape hatch
+/// was reported as unjustified.
+const STMT_CLAUSE_KEYWORDS: &[&str] =
+    &["because", "attributes_forced_layout_to", "when", "respects"];
+
 const POLICY_KEYWORDS: &[&str] = &[
     "freshness",
     "consistency",
@@ -316,7 +328,7 @@ impl<'a> P<'a> {
         }
         let found = self.cur().describe();
         let want = k.describe();
-        self.error("PW0100", format!("expected {want} {ctx}, found {found}"));
+        self.error("PW0001", format!("expected {want} {ctx}, found {found}"));
         false
     }
 
@@ -328,7 +340,7 @@ impl<'a> P<'a> {
             true
         } else {
             let found = self.cur().describe();
-            self.error("PW0100", format!("expected {what}, found {found}"));
+            self.error("PW0001", format!("expected {what}, found {found}"));
             false
         }
     }
@@ -337,7 +349,7 @@ impl<'a> P<'a> {
     fn dotted_name(&mut self, what: &str) -> bool {
         if !self.at(Kind::Ident) {
             let found = self.cur().describe();
-            self.error("PW0100", format!("expected {what}, found {found}"));
+            self.error("PW0001", format!("expected {what}, found {found}"));
             return false;
         }
         self.start(K::Name);
@@ -363,7 +375,7 @@ impl<'a> P<'a> {
         }
         if !self.at(Kind::Ident) {
             let found = self.cur().describe();
-            self.error("PW0100", format!("expected a type, found {found}"));
+            self.error("PW0001", format!("expected a type, found {found}"));
             return false;
         }
         self.start(K::TypeRef);
@@ -383,7 +395,7 @@ impl<'a> P<'a> {
                 }
             }
             if !self.eat(Kind::RAngle) {
-                self.error("PW0101", "unclosed type argument list, expected `>`");
+                self.error("PW0002", "unclosed type argument list, expected `>`");
             }
             self.finish();
         }
@@ -411,11 +423,11 @@ impl<'a> P<'a> {
                 }
             }
             if !self.eat(Kind::RBrace) {
-                self.error("PW0102", "unclosed effect row, expected `}`");
+                self.error("PW0003", "unclosed effect row, expected `}`");
             }
         } else {
             self.error_help(
-                "PW0103",
+                "PW0004",
                 "expected `{` after `!` to open an effect row",
                 "write an empty row as `!{}` to claim purity explicitly",
             );
@@ -448,7 +460,7 @@ impl<'a> P<'a> {
             }
         }
         if !self.eat(Kind::RParen) {
-            self.error("PW0104", "unclosed parameter list, expected `)`");
+            self.error("PW0005", "unclosed parameter list, expected `)`");
         }
         self.finish();
     }
@@ -570,7 +582,7 @@ impl<'a> P<'a> {
                     self.expr(0);
                 }
                 if !self.eat(Kind::RParen) {
-                    self.error("PW0107", "unclosed parenthesis, expected `)`");
+                    self.error("PW0008", "unclosed parenthesis, expected `)`");
                 }
                 self.finish();
             }
@@ -639,7 +651,7 @@ impl<'a> P<'a> {
             _ => {
                 self.start(K::ErrorExpr);
                 let found = self.cur().describe();
-                self.error("PW0108", format!("expected an expression, found {found}"));
+                self.error("PW0009", format!("expected an expression, found {found}"));
                 self.bump();
                 self.finish();
                 return;
@@ -692,7 +704,7 @@ impl<'a> P<'a> {
                     }
                 }
                 if !self.eat(Kind::RParen) {
-                    self.error("PW0109", "unclosed argument list, expected `)`");
+                    self.error("PW0010", "unclosed argument list, expected `)`");
                 }
                 self.finish(); // ArgList
                 self.finish(); // CallExpr
@@ -731,7 +743,7 @@ impl<'a> P<'a> {
             }
         }
         if !self.eat(Kind::RBrace) {
-            self.error("PW0111", "unclosed record literal, expected `}`");
+            self.error("PW0012", "unclosed record literal, expected `}`");
         }
     }
 
@@ -764,7 +776,7 @@ impl<'a> P<'a> {
         while !self.at_eof() {
             guard += 1;
             if guard > 50_000 {
-                self.error("PW0199", "template made no progress");
+                self.error("PW0099", "template made no progress");
                 break;
             }
             // Whitespace between markup is CONTENT. It is what separates two
@@ -956,7 +968,7 @@ impl<'a> P<'a> {
         while !self.at(Kind::RBrace) && !self.at_eof() {
             guard += 1;
             if guard > 20_000 {
-                self.error("PW0199", "block made no progress");
+                self.error("PW0099", "block made no progress");
                 break;
             }
             let before = self.pos;
@@ -991,7 +1003,7 @@ impl<'a> P<'a> {
             }
         }
         if !self.eat(Kind::RBrace) {
-            self.error("PW0105", "unclosed block, expected `}`");
+            self.error("PW0006", "unclosed block, expected `}`");
         }
         self.finish();
     }
@@ -1015,7 +1027,7 @@ impl<'a> P<'a> {
         // An optional chain of modifier words before any punctuation:
         // `unsafe capability synchronous_geometry`, `observe resize`.
         while self.at(Kind::Ident)
-            && !self.newline_ahead()
+            && (!self.newline_ahead() || STMT_CLAUSE_KEYWORDS.contains(&self.cur_text()))
             && !STMT_KEYWORDS.contains(&self.cur_text())
         {
             self.bump();
@@ -1057,7 +1069,9 @@ impl<'a> P<'a> {
             self.expr(0);
         }
         // Trailing modifiers before a block: `resource map when visible { .. }`.
-        while self.at(Kind::Ident) && !self.newline_ahead() {
+        while self.at(Kind::Ident)
+            && (!self.newline_ahead() || STMT_CLAUSE_KEYWORDS.contains(&self.cur_text()))
+        {
             self.bump();
         }
         if self.at(Kind::LBrace) {
@@ -1112,7 +1126,7 @@ impl<'a> P<'a> {
             while !self.at(Kind::RBrace) && !self.at_eof() {
                 guard += 1;
                 if guard > 5_000 {
-                    self.error("PW0199", "match made no progress");
+                    self.error("PW0099", "match made no progress");
                     break;
                 }
                 let before = self.pos;
@@ -1128,7 +1142,7 @@ impl<'a> P<'a> {
                 }
             }
             if !self.eat(Kind::RBrace) {
-                self.error("PW0105", "unclosed match, expected `}`");
+                self.error("PW0006", "unclosed match, expected `}`");
             }
         }
         self.finish();
@@ -1196,7 +1210,7 @@ impl<'a> P<'a> {
             _ => {
                 self.start(K::WildcardPat);
                 let found = self.cur().describe();
-                self.error("PW0110", format!("expected a pattern, found {found}"));
+                self.error("PW0011", format!("expected a pattern, found {found}"));
                 self.bump();
                 self.finish();
             }
@@ -1471,7 +1485,7 @@ impl<'a> P<'a> {
         while !self.at_eof() {
             self.fuel += 1;
             if self.fuel > 200_000 {
-                self.error("PW0199", "parser made no progress");
+                self.error("PW0099", "parser made no progress");
                 break;
             }
             let before = self.pos;
@@ -1479,7 +1493,7 @@ impl<'a> P<'a> {
                 self.start(K::ErrorDecl);
                 let found = self.cur().describe();
                 self.error_help(
-                    "PW0106",
+                    "PW0007",
                     format!("expected a declaration, found {found}"),
                     format!(
                         "declarations start with one of: {}",

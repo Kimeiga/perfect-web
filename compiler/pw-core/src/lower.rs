@@ -672,9 +672,17 @@ impl Lowerer<'_> {
             args.push(id);
         }
 
+        // The grammar keeps a `because "…"` string as a bare token, so it is
+        // recovered from the statement's own tokens rather than from `args`.
+        let justification = toks
+            .iter()
+            .find(|t| matches!(t.kind(), K::Str | K::UnterminatedStr))
+            .map(|t| t.text().to_string());
+
         b.expr(
             Expr::Keyword {
                 keyword,
+                justification,
                 modifiers,
                 args,
                 block,

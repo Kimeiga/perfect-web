@@ -723,7 +723,9 @@ mod tests {
         let parsed = parse(src);
         assert!(!parsed.ok());
         let text = render(src, "m.pw", &parsed.errors, false);
-        assert!(text.contains("PW0106"), "{text}");
+        // Syntax errors live in PW00xx; PW01xx and above are semantic
+        // invariants. They shared a range until the collision surfaced.
+        assert!(text.contains("PW0007"), "{text}");
         assert!(text.contains("m.pw"), "{text}");
         assert!(!text.contains('\u{1b}'), "plain output must be ANSI-free");
     }

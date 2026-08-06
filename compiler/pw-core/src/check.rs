@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::exhaust::{self, Arm, Pattern as EPat};
-use crate::hir::{self, Body, Decl, DeclKind, Expr, ExprId, Hir, Pattern as HPat};
+use crate::hir::{self, AttrValue, Body, Decl, DeclKind, Expr, ExprId, Hir, Node, Pattern as HPat};
 use crate::placement::{ALL_WORLDS, Demand, World, solve};
 use crate::privacy::{Label, Restriction};
 use crate::scope::{HandleKind, Op, ScopeGraph, ScopeKind, ScopeViolation};
@@ -132,13 +132,29 @@ fn primitive(name: &str) -> Option<Type> {
 /// Check every unit against the shared environment.
 pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     let env = Env::build(units);
+    // Declaration name → its privacy label, across every unit. A `page` in one
+    // file renders a `session query` declared in another, and that is the
+    // corpus's canonical private-in-shared-cache case (assumption A-009).
+    let mut labels: BTreeMap<String, Label> = BTreeMap::new();
+    for u in units {
+        for (_, d) in u.hir.all_decls() {
+            let l = label_of(d);
+            if !l.is_public() {
+                labels.insert(d.name.clone(), l);
+            }
+        }
+    }
     units
         .iter()
-        .map(|u| (u.path.clone(), check_unit(&env, u)))
+        .map(|u| (u.path.clone(), check_unit_with(&env, &labels, u)))
         .collect()
 }
 
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
+    check_unit_with(env, &BTreeMap::new(), unit)
+}
+
+fn check_unit_with(env: &Env, labels: &BTreeMap<String, Label>, unit: &Unit) -> Vec<Diagnostic> {
     let mut out = Vec::new();
 
     // Placement is inherited: a `fn` inside a `component placement browser`
@@ -160,11 +176,13 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         privacy_and_placement(
             &unit.hir,
             &unit.src,
+            labels,
             decl,
             inherited.get(&id.0).copied(),
             &mut out,
         );
         privacy_flow(&unit.hir, decl, &mut out);
+        markup_rules(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
 
@@ -380,7 +398,7 @@ fn scopes(decl: &Decl, body: &Body, out: &mut Vec<Diagnostic>) {
         ScopeKind::Component | ScopeKind::Block => component,
     };
 
-    let mut declared: Vec<(usize, usize, crate::hir::Span)> = Vec::new();
+    let mut declared: Vec<(usize, usize, crate::hir::Span, String)> = Vec::new();
 
     for id in body.walk() {
         match body.expr(id) {
@@ -416,7 +434,7 @@ fn scopes(decl: &Decl, body: &Body, out: &mut Vec<Diagnostic>) {
                 modifiers,
                 block,
                 ..
-            } if keyword == "observe" => {
+            } if keyword == "observe" || keyword == "subscribe" => {
                 let Some(block) = block else { continue };
                 let Some((scope_name, at)) = block_scope(body, *block) else {
                     continue;
@@ -425,11 +443,11 @@ fn scopes(decl: &Decl, body: &Body, out: &mut Vec<Diagnostic>) {
                     continue;
                 };
                 let label = match modifiers.first() {
-                    Some(m) => format!("observe.{m}"),
-                    None => "observe".to_string(),
+                    Some(m) => format!("{keyword}.{m}"),
+                    None => keyword.clone(),
                 };
                 let h = g.spawn(&label, HandleKind::Subscription, here, body.expr_span(id));
-                declared.push((h, by_kind(kind), at));
+                declared.push((h, by_kind(kind), at.clone(), format!("scope {scope_name}")));
             }
 
             _ => {}
@@ -437,10 +455,21 @@ fn scopes(decl: &Decl, body: &Body, out: &mut Vec<Diagnostic>) {
     }
 
     let mut found = g.check();
-    for (h, scope, span) in declared {
-        found.extend(g.check_declared_scope(h, scope, span));
+    let mut clauses: Vec<Option<String>> = vec![None; found.len()];
+    for (h, scope, span, clause) in declared {
+        if let Some(v) = g.check_declared_scope(h, scope, span) {
+            found.push(v);
+            // The clause as written, so the diagnostic can quote `scope
+            // application` rather than paraphrasing it.
+            clauses.push(Some(clause));
+        }
     }
-    out.extend(found.into_iter().map(to_diagnostic));
+    out.extend(
+        found
+            .into_iter()
+            .zip(clauses)
+            .map(|(v, c)| to_diagnostic(v, c)),
+    );
 }
 
 /// `scope application` inside a block: the scope's name, and the span covering
@@ -458,7 +487,7 @@ fn path_of(body: &Body, id: ExprId) -> String {
     }
 }
 
-fn to_diagnostic(v: ScopeViolation) -> Diagnostic {
+fn to_diagnostic(v: ScopeViolation, clause: Option<String>) -> Diagnostic {
     Diagnostic {
         code: match v.code {
             "PW2001" => "PW2001",
@@ -499,10 +528,12 @@ fn to_diagnostic(v: ScopeViolation) -> Diagnostic {
             "PW2003" => "A result arriving after its owning scope has exited must not be \
                          committed — there is nothing left to commit it to."
                 .to_string(),
-            _ => "A subscription keeps pushing updates for as long as its declared scope \
-                  lives. Declaring a longer scope than the owner means pushing into \
-                  something that no longer exists."
-                .to_string(),
+            _ => format!(
+                "A subscription keeps pushing updates for as long as its declared \
+                 scope lives. `{}` outlives the component that created it, so the \
+                 subscription would push into something that no longer exists.",
+                clause.as_deref().unwrap_or("the declared scope")
+            ),
         }),
         repairs: vec![Repair {
             description: v.help,
@@ -519,9 +550,13 @@ fn to_diagnostic(v: ScopeViolation) -> Diagnostic {
 /// the checker can only *under*-restrict a value it was never told about. It
 /// cannot invent a restriction and reject a legal program.
 fn label_of(decl: &Decl) -> Label {
+    // The parameters are the charter §7.8 type names — `Session<SessionId>`,
+    // not `Session<Cart>`. A label names *what* a value is scoped to, not which
+    // declaration produced it, and the corpus declares the former as the text
+    // the developer must be shown.
     match decl.visibility.as_deref() {
-        Some("session") => Label::session(&decl.name),
-        Some("private") => Label::user(&decl.name),
+        Some("session") => Label::session("SessionId"),
+        Some("private") => Label::user("UserId"),
         _ => Label::public(),
     }
 }
@@ -570,21 +605,32 @@ fn name_pair(body: &Body, block: ExprId, keyword: &str) -> Option<(String, crate
 /// `crate::placement`, not a pattern match on syntax. That is what lets a
 /// diagnostic name the value and the boundary rather than reporting that a
 /// keyword was in the wrong place (charter §14 M5 gate).
+#[allow(clippy::too_many_arguments)]
 fn privacy_and_placement(
     hir: &Hir,
     src: &str,
+    labels: &BTreeMap<String, Label>,
     decl: &Decl,
     inherited: Option<World>,
     out: &mut Vec<Diagnostic>,
 ) {
-    let label = label_of(decl);
+    // The declaration's own visibility, joined with everything its body reads.
+    // A `page` that is itself unlabelled but renders a `session query` is a
+    // session materialization — which is the corpus's canonical case, and is
+    // invisible to a rule that only reads the header.
+    let (read, read_from) = reads_label_with_source(hir, labels, decl);
+    let label = label_of(decl).join(&read);
 
     // 1. A non-public value in a shared cache. Charter §7.8's canonical case.
-    if let Some(cache) = decl
-        .policy("cache")
-        .filter(|c| c.value.trim() == "shared" && !label.safe_in_shared_cache())
+    if let Some((cache_value, cache_span)) =
+        declared_cache(hir, decl).filter(|(v, _)| v == "shared" && !label.safe_in_shared_cache())
     {
         {
+            let cache = crate::hir::Policy {
+                name: "cache".to_string(),
+                value: cache_value,
+                span: cache_span,
+            };
             let needed = label.required_cache_partitions();
             out.push(Diagnostic {
                 code: "PW5001",
@@ -599,11 +645,15 @@ fn privacy_and_placement(
                     label: format!("`{}` is labelled {label} here", decl.name),
                 }],
                 explanation: Some(format!(
-                    "A shared cache is read by every user. {label} is not, so one \
-                     user's value would be served to another. The cause chain is \
-                     the whole point: `{}` is {label}, a shared cache is public, \
-                     and {label} does not flow into public.",
-                    decl.name
+                    "A shared cache may contain only `Public` values, because every \
+                     user reads it. The cause chain: `{}` materializes {}, which is \
+                     labeled `{label}`, and `{label}` does not flow into `Public` — \
+                     so one user's value would be served to another.",
+                    decl.name,
+                    read_from
+                        .as_deref()
+                        .map(|v| format!("`{v}`"))
+                        .unwrap_or_else(|| "a non-public value".to_string()),
                 )),
                 repairs: vec![
                     Repair {
@@ -736,6 +786,83 @@ fn decl_id_of(hir: &Hir, decl: &Decl) -> crate::hir::DeclId {
         .expect("the declaration came from this Hir")
 }
 
+/// Every restriction a declaration picks up by *calling* another declaration.
+///
+/// A `page` that renders a `session query` holds session data, whether or not
+/// the page says so. Reading it from the program — rather than from the table
+/// of library accessors below — is real label propagation: it follows the
+/// author's own declarations, and it improves as the program does.
+/// The same, plus the binding that carried the restriction.
+///
+/// A diagnostic that says "this page is Session" is true and unhelpful; the
+/// author needs to know it was `cart`. The corpus declares that name as text it
+/// expects to see, which is how the gap was found.
+fn reads_label_with_source(
+    hir: &Hir,
+    labels: &BTreeMap<String, Label>,
+    decl: &Decl,
+) -> (Label, Option<String>) {
+    let Some(body_id) = decl.body else {
+        return (Label::public(), None);
+    };
+    let body = hir.body(body_id);
+    let mut label = Label::public();
+    let mut source: Option<String> = None;
+
+    // Bindings, so a labelled call can be attributed to the name it was bound
+    // to rather than to the call itself.
+    let mut bound_at: BTreeMap<usize, String> = BTreeMap::new();
+    for id in body.walk() {
+        let Expr::Let { pat, .. } = body.expr(id) else {
+            continue;
+        };
+        if let Some(HPat::Bind { name, .. }) = pat.map(|p| body.pat(p)) {
+            bound_at.insert(body.expr_span(id).start, name.clone());
+        }
+    }
+
+    for id in body.walk() {
+        // `query Cart(session)` parses as a keyword statement; `Cart(session)`
+        // as a call. Both name a declaration.
+        let called = match body.expr(id) {
+            Expr::Call { callee, .. } => path_of(body, *callee),
+            Expr::Keyword {
+                keyword, modifiers, ..
+            } if keyword == "query" || keyword == "subscribe" => {
+                modifiers.first().cloned().unwrap_or_default()
+            }
+            _ => continue,
+        };
+        if called.is_empty() {
+            continue;
+        }
+        let short = called.rsplit('.').next().unwrap_or(&called);
+        // The program-wide table first — a page usually renders a query
+        // declared in another file — then this unit's own declarations.
+        let mut found = Label::public();
+        if let Some(l) = labels.get(short) {
+            found = found.join(l);
+        }
+        for (_, other) in hir.all_decls().filter(|(_, o)| o.name == short) {
+            found = found.join(&label_of(other));
+        }
+        if found.is_public() {
+            continue;
+        }
+        label = label.join(&found);
+        if source.is_none() {
+            // The nearest enclosing binding, by start offset.
+            let at = body.expr_span(id).start;
+            source = bound_at
+                .range(..=at)
+                .next_back()
+                .map(|(_, n)| n.clone())
+                .or_else(|| Some(short.to_string()));
+        }
+    }
+    (label, source)
+}
+
 /// Standard-library accessors that introduce a privacy label.
 ///
 /// **A stand-in for signatures that do not exist yet.** With a real library the
@@ -819,6 +946,16 @@ fn labelled_bindings(body: &Body) -> BTreeMap<String, (Restriction, crate::hir::
 }
 
 /// E5 rules that need the body's label, not only the declaration header.
+/// The cache partition a declaration asks for, from either place it can be
+/// written: a `query`'s policy block, or a `page`'s body.
+fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::hir::Span)> {
+    if let Some(p) = decl.policy("cache") {
+        return Some((p.value.trim().to_string(), p.span.clone()));
+    }
+    let body = hir.body(decl.body?);
+    name_pair(body, body.root, "cache")
+}
+
 fn privacy_flow(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
@@ -924,4 +1061,298 @@ fn privacy_flow(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
             replacement: None,
         }],
     });
+}
+
+// --- markup rules (E3/E5, no inference required) ---------------------------
+
+/// Elements whose children HTML constrains. Charter §8.2 asks for semantic
+/// HTML; a `<div>` inside a `<ul>` is invalid markup that browsers silently
+/// reparse, so the DOM stops matching the source.
+fn permitted_children(tag: &str) -> Option<&'static [&'static str]> {
+    Some(match tag {
+        "ul" | "ol" => &["li", "script", "template"],
+        "dl" => &["dt", "dd", "div", "script", "template"],
+        "table" => &["caption", "colgroup", "thead", "tbody", "tfoot", "tr"],
+        "thead" | "tbody" | "tfoot" => &["tr"],
+        "tr" => &["td", "th"],
+        "select" => &["option", "optgroup"],
+        _ => return None,
+    })
+}
+
+/// Structural rules over a declaration's markup.
+///
+/// None of these needs effect inference: they are properties of the tree the
+/// author wrote. They are grouped because they share the walk, not because they
+/// share an invariant — each pushes its own code.
+fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
+    let Some(body_id) = decl.body else { return };
+    let body = hir.body(body_id);
+
+    // The escape hatch must justify itself (charter §14 M5 task 6).
+    //
+    // A declaration that declares an audited `unsafe capability … because "…"`
+    // covers the uses of it inside: A-024 justifies the capability once and
+    // then calls `unsafe.imperative` twice, and demanding a fresh string at
+    // every use would make the justification boilerplate rather than a reason.
+    let audited = body.walk().iter().any(|id| {
+        matches!(
+            body.expr(*id),
+            Expr::Keyword {
+                keyword,
+                justification: Some(_),
+                ..
+            } if keyword.starts_with("unsafe")
+        )
+    });
+    for id in body.walk() {
+        let Expr::Keyword {
+            keyword,
+            justification,
+            ..
+        } = body.expr(id)
+        else {
+            continue;
+        };
+        if !keyword.starts_with("unsafe") || justification.is_some() || audited {
+            continue;
+        }
+        out.push(Diagnostic {
+            code: "PW5010",
+            invariant: "an unsafe escape hatch must record why it is necessary",
+            reason: "unsafe_without_justification",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!("`{keyword}` requires a `because` justification string"),
+            primary_span: body.expr_span(id),
+            related: vec![Related {
+                span: hir.decl_span(decl_id_of(hir, decl)),
+                label: format!("`{}` opens an escape hatch here", decl.name),
+            }],
+            explanation: Some(
+                "An escape hatch is a promise that the compiler's rule is wrong here \
+                 and someone checked. Without a written reason there is nothing to \
+                 review, and nothing to delete when the reason stops being true."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: format!(
+                    "write `{keyword} because \"…\"` naming what is unavailable and why"
+                ),
+                replacement: None,
+            }],
+        });
+    }
+
+    // Everything else is about the element tree.
+    let mut roots: Vec<crate::hir::NodeId> = Vec::new();
+    for id in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(id) {
+            roots.extend(r.iter().copied());
+        }
+    }
+
+    for id in body.walk_markup(&roots) {
+        match body.node(id) {
+            // A list without a key cannot preserve identity across a reorder.
+            Node::Block { directive, .. } => {
+                let d = directive.trim();
+                if !d.starts_with("{#each") || d.contains('(') {
+                    continue;
+                }
+                out.push(Diagnostic {
+                    code: "PW5011",
+                    invariant: "a list over a mutable collection needs a stable key",
+                    reason: "unkeyed_each",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message: "`#each` over a mutable collection requires a key expression"
+                        .to_string(),
+                    primary_span: body.node_span(id),
+                    related: vec![Related {
+                        span: hir.decl_span(decl_id_of(hir, decl)),
+                        label: format!("`{}` renders this list", decl.name),
+                    }],
+                    explanation: Some(
+                        "Without a stable key, reordering cannot preserve element identity, \
+                         focus, or state: the renderer matches by position, so the third row \
+                         keeps the second row's open menu and cursor."
+                            .to_string(),
+                    ),
+                    repairs: vec![Repair {
+                        description: "add a key: `{#each items as item (item.id)}`".to_string(),
+                        replacement: None,
+                    }],
+                });
+            }
+
+            Node::Element {
+                tag,
+                attrs,
+                children,
+                ..
+            } => {
+                // Invalid nesting.
+                if let Some(allowed) = permitted_children(tag) {
+                    for c in children {
+                        let Node::Element { tag: child, .. } = body.node(*c) else {
+                            continue;
+                        };
+                        if allowed.contains(&child.as_str()) {
+                            continue;
+                        }
+                        out.push(Diagnostic {
+                            code: "PW5012",
+                            invariant: "an element may only contain the children HTML permits",
+                            reason: "invalid_nesting",
+                            detector: Detector::DeclarationRule,
+                            severity: Severity::Error,
+                            message: format!(
+                                "`<{child}>` is not permitted as a child of `<{tag}>`"
+                            ),
+                            primary_span: body.node_span(*c),
+                            related: vec![Related {
+                                span: body.node_span(id),
+                                label: format!("`<{tag}>` starts here"),
+                            }],
+                            explanation: Some(format!(
+                                "`<{tag}>` accepts only {}. A browser silently reparses \
+                                 invalid nesting, so the DOM stops matching the source and \
+                                 every selector, test and assistive technology sees a \
+                                 different tree than the author wrote.",
+                                allowed
+                                    .iter()
+                                    .map(|t| format!("`<{t}>`"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            )),
+                            repairs: vec![Repair {
+                                description: format!(
+                                    "wrap it in `<{}>`, or move it outside `<{tag}>`",
+                                    allowed[0]
+                                ),
+                                replacement: None,
+                            }],
+                        });
+                    }
+                }
+
+                // Interactive behaviour on a non-interactive element.
+                let handler = attrs.iter().find(|a| a.name.starts_with("on:"));
+                // `<form on:submit>` is the normal way to submit a form, and
+                // omitting `form` here made R-022 — a handler *type* mismatch —
+                // report as an accessibility defect instead. Right file, wrong
+                // rule, and the count would have looked one better than it was.
+                let interactive = matches!(
+                    tag.as_str(),
+                    "button"
+                        | "a"
+                        | "input"
+                        | "select"
+                        | "textarea"
+                        | "summary"
+                        | "label"
+                        | "option"
+                        | "form"
+                        | "details"
+                        | "dialog"
+                );
+                let has_role = attrs.iter().any(|a| a.name == "role");
+                let has_tabindex = attrs.iter().any(|a| a.name == "tabindex");
+                if let Some(h) = handler.filter(|_| !interactive && !(has_role && has_tabindex)) {
+                    {
+                        out.push(Diagnostic {
+                            code: "PW5013",
+                            invariant: "interactive behaviour belongs on an element that can \
+                                        receive it",
+                            reason: "handler_on_inert_element",
+                            detector: Detector::DeclarationRule,
+                            severity: Severity::Error,
+                            message: format!(
+                                "`<{tag}>` with an `{}` handler is not keyboard accessible",
+                                h.name
+                            ),
+                            primary_span: h.span.clone(),
+                            related: vec![Related {
+                                span: body.node_span(id),
+                                label: format!("`<{tag}>` is not an interactive element"),
+                            }],
+                            explanation: Some(
+                                "A pointer handler on an inert element is unreachable by \
+                                 keyboard and invisible to assistive technology. The element \
+                                 looks like a control and is not one."
+                                    .to_string(),
+                            ),
+                            repairs: vec![
+                                Repair {
+                                    description: "use `<button>`, which is focusable and \
+                                                  activates on Enter and Space"
+                                        .to_string(),
+                                    replacement: None,
+                                },
+                                Repair {
+                                    description: "or supply `role`, `tabindex` and keyboard \
+                                                  activation"
+                                        .to_string(),
+                                    replacement: None,
+                                },
+                            ],
+                        });
+                    }
+                }
+
+                // A form control with nothing naming it.
+                if matches!(tag.as_str(), "input" | "select" | "textarea") {
+                    let typ =
+                        attrs
+                            .iter()
+                            .find(|a| a.name == "type")
+                            .and_then(|a| match &a.value {
+                                AttrValue::Static(v) => Some(v.trim_matches('"').to_string()),
+                                _ => None,
+                            });
+                    // `hidden` and `submit` inputs are not labelled controls.
+                    if matches!(
+                        typ.as_deref(),
+                        Some("hidden") | Some("submit") | Some("button")
+                    ) {
+                        continue;
+                    }
+                    let named = attrs.iter().any(|a| {
+                        matches!(a.name.as_str(), "aria-label" | "aria-labelledby" | "id")
+                    });
+                    if named {
+                        continue;
+                    }
+                    out.push(Diagnostic {
+                        code: "PW5014",
+                        invariant: "a form control must have something that names it",
+                        reason: "control_without_label",
+                        detector: Detector::DeclarationRule,
+                        severity: Severity::Error,
+                        message: format!("`<{tag}>` has no associated label"),
+                        primary_span: body.node_span(id),
+                        related: vec![Related {
+                            span: hir.decl_span(decl_id_of(hir, decl)),
+                            label: format!("`{}` renders this control", decl.name),
+                        }],
+                        explanation: Some(
+                            "A control with no accessible name is announced as \"edit text\" \
+                             and nothing else. `name` is submitted to the server; it is not \
+                             read to the user."
+                                .to_string(),
+                        ),
+                        repairs: vec![Repair {
+                            description: "associate a `<label for=...>`, or supply \
+                                          `aria-label`/`aria-labelledby`"
+                                .to_string(),
+                            replacement: None,
+                        }],
+                    });
+                }
+            }
+
+            _ => {}
+        }
+    }
 }

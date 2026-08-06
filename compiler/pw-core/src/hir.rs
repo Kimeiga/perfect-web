@@ -479,6 +479,10 @@ pub enum Expr {
     Keyword {
         /// `unsafe.imperative` keeps its qualification.
         keyword: String,
+        /// A `because "…"` string, as written. Charter §14 M5 task 6 makes it
+        /// mandatory on an escape hatch, so it is a field rather than an
+        /// argument: a rule should not have to guess which argument it was.
+        justification: Option<String>,
         /// The bare modifier words between the keyword and any punctuation:
         /// `unsafe capability synchronous_geometry` yields
         /// `["capability", "synchronous_geometry"]`.

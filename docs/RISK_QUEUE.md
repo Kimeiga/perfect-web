@@ -222,6 +222,8 @@ for the admissibility rule above.
 | E2 grammar | a statement parsed, the next one failed | a modifier loop crossed the newline and ate the next statement's first token |
 | E3 adapter | the generated template looked correct | **Marko strips whitespace between elements**, so `<span>a</span> <span>b</span>` rendered as `ab`. The template-level test asserted the template, and the template was fine — only a browser saw the DOM |
 | E5 placement | corpus coverage rose from 7 to 9 files | an effect family absent from the capability table was granted by **no** world, so two files were reported as unplaceable for a reason that had nothing to do with their actual defect. Right file, wrong rule, and the number went up while nothing was detected |
+| E5 markup | corpus coverage read 20 files | `<form>` was missing from the list of interactive elements, so `<form on:submit={..}>` — the normal way to submit a form — was reported as an accessibility defect. It made R-022, a handler *type* mismatch, look caught. The real number was 19 |
+| E2 grammar | an audited `unsafe` was reported as unjustified | the newline rule that ends a statement also ended `unsafe capability … because "…"` before its `because` clause, so the justification became a separate statement and never reached the declaration. **`pw fmt` then baked the misparse into the source**, which is the part worth remembering: a formatter faithfully renders a wrong parse |
 
 The last four share one shape: **the diagnostic pointed at the line after the
 defect.** A parser that recovers silently moves the blame downstream, which is

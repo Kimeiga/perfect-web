@@ -39,18 +39,19 @@ set of compile-fail cases; E2's needs effect inference.
 files and they all parse, with precise spans and error recovery. The
 specification is executable in CI rather than merely well-formed.
 
-**Eleven rejected corpus files now fail to compile** — up from four when E2
+**Nineteen rejected corpus files now fail to compile** — up from four when E2
 began — each caught by the invariant its `@rule` header declares, with a primary
 span, an origin span, a note and a legal alternative. `just rejections` shows
-the current state. Four are declaration rules; **seven are caught by algorithms
-running on HIR lowered from source**: the exhaustiveness checker (R-007), the
-E2A-S scope graph (R-013, R-039), and E5's placement solver and label algebra
-(R-002, R-003, R-005, R-026).
+the current state. Four are declaration rules; **fifteen are caught by
+algorithms running on HIR lowered from source**: the exhaustiveness checker, the
+E2A-S scope graph, E5's placement solver and label algebra, and E5's markup
+rules.
 
-Zero false positives across the 24 accepted files. The remaining 33 mostly need
+Zero false positives across the 24 accepted files. The remaining 25 mostly need
 **effect inference**, which does not exist: a network call inside a pure view
-cannot be detected without the callee's effects. E9 owns that. Coverage is
-ratcheted by a test so it cannot silently regress.
+cannot be detected without the callee's effects, and the whole layout family
+needs it. E9 owns that. Coverage is ratcheted by a test so it cannot silently
+regress.
 
 **The front end is complete through HIR.** Rowan is adopted (ADR-0012); the
 body grammar parses all 68 corpus files and they round-trip byte-for-byte;

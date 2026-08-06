@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
         } else {
             let found = self.peek().kind.describe();
             let span = self.peek().span.clone();
-            self.error("PW0100", format!("expected {what}, found {found}"), span);
+            self.error("PW0001", format!("expected {what}, found {found}"), span);
             None
         }
     }
@@ -225,7 +225,7 @@ impl<'a> Parser<'a> {
                 Some(t) => end = t.span.end,
                 None => {
                     let span = self.peek().span.clone();
-                    self.error("PW0101", "unclosed type argument list, expected `>`", span);
+                    self.error("PW0002", "unclosed type argument list, expected `>`", span);
                 }
             }
         }
@@ -263,13 +263,13 @@ impl<'a> Parser<'a> {
                 Some(t) => end = t.span.end,
                 None => {
                     let span = self.peek().span.clone();
-                    self.error("PW0102", "unclosed effect row, expected `}`", span);
+                    self.error("PW0003", "unclosed effect row, expected `}`", span);
                 }
             }
         } else {
             let span = self.peek().span.clone();
             self.error_help(
-                "PW0103",
+                "PW0004",
                 "expected `{` after `!` to open an effect row",
                 span,
                 "write an empty row as `!{}` to claim purity explicitly",
@@ -312,7 +312,7 @@ impl<'a> Parser<'a> {
         }
         if self.eat(Kind::RParen).is_none() {
             let span = self.peek().span.clone();
-            self.error("PW0104", "unclosed parameter list, expected `)`", span);
+            self.error("PW0005", "unclosed parameter list, expected `)`", span);
         }
         out
     }
@@ -338,7 +338,7 @@ impl<'a> Parser<'a> {
             }
         }
         self.error(
-            "PW0105",
+            "PW0006",
             "unclosed block, expected `}`",
             open.span.start..end,
         );
@@ -830,7 +830,7 @@ impl<'a> Parser<'a> {
             guard += 1;
             if guard > 100_000 {
                 let span = self.peek().span.clone();
-                self.error("PW0199", "parser made no progress", span);
+                self.error("PW0099", "parser made no progress", span);
                 break;
             }
             let before = self.pos;
@@ -845,7 +845,7 @@ impl<'a> Parser<'a> {
                     let t = self.peek().clone();
                     let found = t.kind.describe();
                     self.error_help(
-                        "PW0106",
+                        "PW0007",
                         format!("expected a declaration, found {found}"),
                         t.span.clone(),
                         format!(

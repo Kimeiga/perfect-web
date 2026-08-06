@@ -171,6 +171,18 @@ const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     ("PW0324", "PW5002"),
     ("PW0302", "PW5003"), // a secret cannot be rendered to the browser
     ("PW0303", "PW5004"), // a shared cache key must carry every partition
+    // R-004 declares PW0100, which `rules.rs` also uses for this invariant —
+    // the charter §16.3 worked example. The scope graph and the label algebra
+    // reach the same conclusion by different routes, so one code, not two.
+    ("PW0100", "PW5001"),
+    ("PW0316", "PW5011"), // a list over a mutable collection needs a stable key
+    ("PW0317", "PW5012"), // an element may only contain the children HTML permits
+    ("PW0318", "PW5013"), // interactive behaviour belongs on an interactive element
+    ("PW0319", "PW5014"), // a form control must have something that names it
+    // Both are "an unsafe escape hatch must record why it is necessary": one
+    // written with no justification at all, one with an unaudited use.
+    ("PW0329", "PW5010"),
+    ("PW3010", "PW5010"),
 ];
 
 /// Resolve a corpus-declared code to the canonical invariant code.
@@ -189,7 +201,26 @@ mod tests {
     #[test]
     fn an_alias_resolves_to_its_canonical_invariant() {
         assert_eq!(canonical_code("PW0326"), "PW2004");
-        assert_eq!(canonical_code("PW0100"), "PW0100");
+        assert_eq!(canonical_code("PW0100"), "PW5001");
+        // A code with no alias is its own canonical form.
+        assert_eq!(canonical_code("PW0312"), "PW0312");
+    }
+
+    #[test]
+    fn syntax_codes_and_semantic_codes_do_not_share_a_range() {
+        // They did: `PW0100` was the parser's "expected X, found Y" AND the
+        // shared-cache invariant, so a corpus file declaring it could match
+        // either. Syntax now lives in PW00xx and semantics at PW01xx and above.
+        for (alias, canonical) in DEPRECATED_ALIASES {
+            assert!(
+                !alias.starts_with("PW000") && !alias.starts_with("PW009"),
+                "{alias} is in the syntax range"
+            );
+            assert!(
+                !canonical.starts_with("PW000"),
+                "{canonical} is in the syntax range"
+            );
+        }
     }
 
     #[test]

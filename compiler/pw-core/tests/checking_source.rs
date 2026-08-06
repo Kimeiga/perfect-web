@@ -346,7 +346,7 @@ fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
         "expected the full rejected corpus, saw {total}"
     );
     assert!(
-        caught.len() >= 11,
+        caught.len() >= 19,
         "semantic coverage regressed: {}/{total} caught — {caught:?}",
         caught.len()
     );
