@@ -43,7 +43,9 @@ pub enum SyntaxKind {
     Dot,
     Arrow,
     FatArrow,
+    Cmp,
     Pipe,
+    PipeGt,
     Bang,
     Eq,
     Question,
@@ -114,6 +116,11 @@ pub enum SyntaxKind {
     ListExpr,
     /// An expression position the parser could not fill.
     ErrorExpr,
+    /// HTML-like markup inside a view or component body. Its `{...}`
+    /// interpolations are parsed as expressions; the markup itself is a region.
+    TemplateRegion,
+    /// A `{ expr }` interpolation inside a template region.
+    Interpolation,
 
     // ---- patterns -------------------------------------------------------- 300..
     WildcardPat = 300,
@@ -163,7 +170,9 @@ impl From<TokenKind> for SyntaxKind {
             TokenKind::Dot => SyntaxKind::Dot,
             TokenKind::Arrow => SyntaxKind::Arrow,
             TokenKind::FatArrow => SyntaxKind::FatArrow,
+            TokenKind::Cmp => SyntaxKind::Cmp,
             TokenKind::Pipe => SyntaxKind::Pipe,
+            TokenKind::PipeGt => SyntaxKind::PipeGt,
             TokenKind::Bang => SyntaxKind::Bang,
             TokenKind::Eq => SyntaxKind::Eq,
             TokenKind::Question => SyntaxKind::Question,
@@ -237,7 +246,9 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         Dot,
         Arrow,
         FatArrow,
+        Cmp,
         Pipe,
+        PipeGt,
         Bang,
         Eq,
         Question,
@@ -297,6 +308,8 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         TupleExpr,
         ListExpr,
         ErrorExpr,
+        TemplateRegion,
+        Interpolation,
         WildcardPat,
         BindingPat,
         CtorPat,
@@ -356,6 +369,7 @@ mod tests {
             TokenKind::Dot,
             TokenKind::Arrow,
             TokenKind::FatArrow,
+            TokenKind::Cmp,
             TokenKind::Pipe,
             TokenKind::Bang,
             TokenKind::Eq,

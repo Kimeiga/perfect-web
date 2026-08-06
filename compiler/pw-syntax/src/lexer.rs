@@ -49,7 +49,15 @@ pub enum Kind {
     Dot,
     Arrow,
     FatArrow,
+    /// `==` `!=` `<=` `>=`. Lexed compound so `a >= b` is not `a > (= b)`.
+    /// `<` and `>` stay separate angle tokens because they also delimit type
+    /// arguments; only the two-byte comparison forms are joined.
+    Cmp,
     Pipe,
+    /// `|>` — the pipeline operator. One token, because lexing it as
+    /// `Pipe` then `RAngle` makes the parser see a bitwise-or followed by a
+    /// stray `>`, which is how the corpus's `a |> f |> g` chains first failed.
+    PipeGt,
     Bang,
     Eq,
     Question,
@@ -101,8 +109,10 @@ impl Kind {
             Kind::Semi => "`;`",
             Kind::Dot => "`.`",
             Kind::Arrow => "`->`",
+            Kind::Cmp => "a comparison operator",
             Kind::FatArrow => "`=>`",
             Kind::Pipe => "`|`",
+            Kind::PipeGt => "`|>`",
             Kind::Bang => "`!`",
             Kind::Eq => "`=`",
             Kind::Question => "`?`",
@@ -188,6 +198,31 @@ pub fn lex(source: &str) -> Vec<Token> {
         }
 
         // --- strings ------------------------------------------------------
+        // `"""..."""` spans lines. A single-quoted string still ends at the
+        // newline: that recovery property is why the multi-line form is
+        // explicit rather than a relaxation of the ordinary one.
+        if c == b'"' && b[i..].starts_with(b"\"\"\"") {
+            let start = i;
+            i += 3;
+            let mut closed = false;
+            while i < b.len() {
+                if b[i..].starts_with(b"\"\"\"") {
+                    i += 3;
+                    closed = true;
+                    break;
+                }
+                i += 1;
+            }
+            out.push(Token {
+                kind: if closed {
+                    Kind::Str
+                } else {
+                    Kind::UnterminatedStr
+                },
+                span: start..i,
+            });
+            continue;
+        }
         if c == b'"' {
             let start = i;
             i += 1;
@@ -267,6 +302,14 @@ pub fn lex(source: &str) -> Vec<Token> {
         }
         if c == b'=' && i + 1 < b.len() && b[i + 1] == b'>' {
             push!(Kind::FatArrow, 2);
+            continue;
+        }
+        if c == b'|' && i + 1 < b.len() && b[i + 1] == b'>' {
+            push!(Kind::PipeGt, 2);
+            continue;
+        }
+        if matches!(c, b'=' | b'!' | b'<' | b'>') && i + 1 < b.len() && b[i + 1] == b'=' {
+            push!(Kind::Cmp, 2);
             continue;
         }
 
@@ -418,6 +461,23 @@ mod tests {
         assert!(toks.iter().any(|t| t.kind == Kind::UnterminatedStr));
         // Lexing continues past it.
         assert!(toks.iter().filter(|t| t.kind == Kind::Ident).count() >= 2);
+    }
+
+    #[test]
+    fn the_pipeline_operator_is_one_token() {
+        let toks: Vec<Kind> = lex("a |> f")
+            .iter()
+            .map(|t| t.kind)
+            .filter(|k| !matches!(k, Kind::Whitespace | Kind::Eof))
+            .collect();
+        assert_eq!(toks, vec![Kind::Ident, Kind::PipeGt, Kind::Ident]);
+        // A bare `|` is still a `|`.
+        let toks: Vec<Kind> = lex("A | B")
+            .iter()
+            .map(|t| t.kind)
+            .filter(|k| !matches!(k, Kind::Whitespace | Kind::Eof))
+            .collect();
+        assert_eq!(toks, vec![Kind::Ident, Kind::Pipe, Kind::Ident]);
     }
 
     #[test]

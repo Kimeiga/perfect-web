@@ -14,12 +14,14 @@
 //! ids and spans, never these nodes.
 
 pub mod ast;
+pub mod grammar;
 pub mod kind;
 pub mod lexer;
 pub mod parser;
 pub mod tree;
 
 pub use ast::{Decl, DeclKind, SourceFile, Visibility};
+pub use grammar::{Parse, SyntaxError, parse_tree};
 pub use kind::{Pw, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use lexer::{Kind, Span, Token, lex};
 pub use parser::{ParseError, Parsed, parse};
