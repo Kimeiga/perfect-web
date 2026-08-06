@@ -99,46 +99,65 @@ R11 as retired until a real run is green.
 
 ## The next executable task
 
-**The corpus score cannot go higher.** It is 44/44 at corpus version C1, and
-C1 is frozen (`docs/CORPUS.md`). Progress is now measured by the second score.
+Both scores are closed. Neither can go higher, and that is the point — what
+is left is not counting.
 
 ```text
-corpus conformance:      44 / 44
-generality-tested:       9 / 29
-known narrow witness:        1 / 29
-generality untested:     19 / 29
+corpus conformance        44 / 44   closed at C1
+single-defect isolation   44 / 44
+generality-tested         29 / 29
+headline matrices          8 / 8
+known narrow witness       0 / 29
+robustness                 9 suites, 0 panics
 ```
 
-### 1. A witness for each of the 19 untested invariants
+### 1. Resumption's third question
 
-For each, write a program in `examples/generality/<symbol>/` that violates the
-invariant in a shape the fixture does not have — different control flow, a
-different depth, a different construct — and run it.
+Charter §8.5 asks three independent things of a resumable capture, and only
+two are checked:
 
-- **Caught?** It is `caught.pw`, `@status: GENERAL`, and the score rises.
-- **Not caught?** It is `slips-through.pw`, `@status: NARROW`, and the score
-  does not. That is not a failure; it is the discovery the exercise exists for,
-  and the gap is now executable rather than unknown.
+```text
+Can this value be serialized?              checked  (its type)
+May it cross this privacy boundary?        checked  (its label)
+Can it be resumed under THIS CODE VERSION? NOT CHECKED
+```
 
-Both outcomes are progress and neither requires deciding in advance which it
-will be. `just generality` reports the result.
+A capture satisfying both of the first two can still be restored into a
+handler whose code has changed. `PW3011` is the reserved code, this is the
+only remaining `KNOWN_GAP`, and it is the only part of a headline construct
+with no analysis at all.
 
-The evidence that this finds things: the first afternoon of it turned up a
-**compiler panic** in the exhaustiveness checker that a `.pw` program could
-reach, a label that did not survive rebinding, and a wrong return type in the
-library — none of which 44 fixtures had reached.
+### 2. A coverage-guided fuzzer
 
-### 2. The two remaining narrow rules
+`just robustness` reports nine generator families rather than a bare zero,
+because this project has the receipt for why the distinction matters:
+reverting the constructor-arity fix left corpus-mutation and byte-soup green
+while only the generator aimed at that seam went red. Structured generation
+found both panics; breadth found neither. A real fuzzer is what retires "NOT
+the compiler cannot crash" from `readiness.txt`.
 
-- `resume.rs` reads a capture's type from the enclosing declaration's parameter
-  list only. No witness written yet.
-- `exhaust.rs` does not descend into a match that appears as another match's
-  arm. Witness exists.
+### 3. E4 and E5's remaining gate items
 
-### 3. E4 and E5's open gate items
+E4 is 5/7 and E5 3/5. Both need a store demo and the resource generator —
+product work, and the only items here not about the compiler.
 
-E4 is 5/7, E5 3/5. Both need a store demo and the resource generator — product
-work, not checker work.
+### 4. Claim-by-claim P0 review
+
+Corpus conformance and generality are two of P0's claims. Several others rest
+on Marko and Koka behind adapters and several are unstarted;
+`docs/EVIDENCE_LEDGER.md` governs which sentence each may support.
+
+### How to add work here
+
+A new invariant needs, before it counts: a corpus fixture (C1 is frozen, so
+this opens C2 — see `docs/CORPUS.md`), a challenge witness, a valid
+neighbour, and a registry entry with a symbol. `just generality` and
+`just ci` will refuse it otherwise, which is the intent.
 
 ---
 
+## Standing obligations (every milestone)
+
+Charter §3.1, plus the admissibility rule in `docs/RISK_QUEUE.md`: a
+measurement or checker result is not admissible evidence until its instrument
+has a negative control proving it can detect the corresponding failure.
