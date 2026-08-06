@@ -40,11 +40,17 @@ alternative. `just rejections` shows the current state.
 The other 40 need body parsing, effect checking (E1) or privacy/placement (E5).
 Coverage is ratcheted by a test so it cannot silently regress.
 
+**Rowan is adopted** (ADR-0012). The green tree, the `SyntaxKind` tag space and
+both losslessness suites are in place; all 68 corpus files round-trip through
+the tree, and the token stream and tree are cross-checked against each other.
+The parser still builds the hand-rolled AST — porting it, then the core body
+grammar, then HIR, is `docs/NEXT.md` item 4.
+
 **public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
 — six of the claims it needs are unstarted, and **45 corpus files exist of which
 0 compile**.
 
-**last passing commit:** `c736ee2` — E2 declaration-level rules.
+**last passing commit:** `4a15477` — ADR-0012 Rowan adoption.
 `just ci` passes at that commit on macOS 26.5.2 / arm64.
 
 ---

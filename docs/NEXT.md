@@ -15,9 +15,9 @@ Fixed by the project architect after reviewing E2's results. Items 1–3 are don
 | # | task | status |
 |---|---|---|
 | 1 | Correct the E7 evidence wording — Marko is a resumption/DOM oracle, not a lazy-loading one | **done** |
-| 2 | Adopt Rowan | ADR-0012 accepted; **implementation next** |
+| 2 | Adopt Rowan | **done** — green tree, `SyntaxKind`, invariants carried over, 68/68 corpus files round-trip |
 | 3 | Write the formatter ADR, do not implement | **done** (ADR-0013) |
-| 4 | Implement the durable core body grammar | next |
+| 4 | Implement the durable core body grammar | **next** — expression and pattern kinds are already reserved in `SyntaxKind` |
 | 5 | Lower bodies into HIR | after 4 |
 | 6 | Move declaration rules from `pw-cli` into `pw-core` | **done** |
 | 7 | Connect the tested `pw-core` algorithms to `.pw` source | after 5 |
@@ -42,6 +42,21 @@ Both alternatives were rejected with reasons worth keeping:
   `List.map(items, item => database.read(item.id))`. It would prove only direct
   declared-call propagation — not higher-order source programs, which is the
   exact failure mode the corpus exists to prevent.
+
+### Where item 4 starts
+
+The tree layer is in place and proven, so item 4 is now a contained task:
+
+1. **Port the declaration parser to emit into `TreeBuilder`.** It currently
+   builds the hand-rolled AST directly. `checkpoint()` / `start_at()` handle the
+   cases where a node's kind is only known after its first token.
+2. **Make `ast.rs` typed wrappers over `SyntaxNode`** rather than an independent
+   structure — the same accessors, backed by the tree.
+3. **Add the expression grammar**, filling the kinds already reserved at 200..
+   and the patterns at 300...
+4. Keep both losslessness suites green throughout. They are the regression net:
+   the token stream and the tree are compared against each other, so a mapping
+   bug shows up immediately.
 
 ### What "core body grammar" means
 
