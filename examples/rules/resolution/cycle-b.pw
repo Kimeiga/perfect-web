@@ -1,0 +1,4 @@
+// @expect: PW0025
+module res_cycle_b
+import res_cycle_a.{ A }
+type B = B { y: Int }

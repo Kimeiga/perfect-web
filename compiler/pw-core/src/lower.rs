@@ -172,6 +172,7 @@ impl Lowerer<'_> {
                 variants: self.variants(node),
                 fields: self.record_fields(node),
                 policies: self.policies(node),
+                imports: imported_names(node),
                 visibility: visibility_of(node),
                 opaque_of: self.opaque_of(node),
                 declared_effects,
@@ -953,6 +954,32 @@ impl Lowerer<'_> {
             .unwrap_or_default();
         b.ty(TypeRef { path, args }, span)
     }
+}
+
+/// The names an `import ... { A, B }` brings into scope.
+///
+/// The grammar skips the brace list as a balanced range, so the names are read
+/// from the declaration's own tokens. That is enough for resolution and avoids
+/// a grammar change; E2B's gate is about the *graph*, not about how the list is
+/// spelled.
+fn imported_names(node: &SyntaxNode) -> Vec<String> {
+    if node.kind() != K::ImportDecl {
+        return Vec::new();
+    }
+    let toks = node
+        .descendants_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| !t.kind().is_trivia())
+        .collect::<Vec<_>>();
+    let Some(open) = toks.iter().position(|t| t.kind() == K::LBrace) else {
+        return Vec::new();
+    };
+    toks[open + 1..]
+        .iter()
+        .take_while(|t| t.kind() != K::RBrace)
+        .filter(|t| t.kind() == K::Ident)
+        .map(|t| t.text().to_string())
+        .collect()
 }
 
 /// The visibility keyword a declaration opens with, if any.

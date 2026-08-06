@@ -22,15 +22,70 @@ fn corpus_dir(which: &str) -> Vec<std::path::PathBuf> {
     out
 }
 
-/// Every corpus file, as (path, source), checked as one program.
+/// The library every corpus program is checked against: the shared `domain`
+/// module plus E2C's platform interfaces.
+///
+/// Before E2B these tests fed the checker all 68 corpus files as if they were
+/// one program. They are not — five rejected fixtures reuse module names with
+/// each other, and 17 are reused across the buckets — so the compiler now
+/// reports 20 duplicate declarations for a question nobody meant to ask.
+fn library() -> Vec<(String, String)> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    [
+        "examples/domain.pw",
+        "packages/pw-std/decode.pw",
+        "packages/pw-platform-web/capability.pw",
+        "packages/pw-platform-web/browser.pw",
+    ]
+    .iter()
+    .map(|rel| {
+        let p = root.join(rel);
+        (
+            p.file_name().unwrap().to_string_lossy().to_string(),
+            std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{rel}: {e}")),
+        )
+    })
+    .collect()
+}
+
+/// The accepted corpus as the one program it is: library + every accepted file.
 fn whole_corpus() -> Vec<(String, String)> {
-    let mut out = Vec::new();
-    for which in ["accepted", "rejected"] {
-        for p in corpus_dir(which) {
-            let name = p.file_name().unwrap().to_string_lossy().to_string();
-            out.push((name, std::fs::read_to_string(&p).expect("read")));
-        }
+    let mut out = library();
+    for p in corpus_dir("accepted") {
+        let name = p.file_name().unwrap().to_string_lossy().to_string();
+        out.push((name, std::fs::read_to_string(&p).expect("read")));
     }
+    out
+}
+
+/// Every rejected fixture, each checked as its own program.
+///
+/// Returns `(file name, source, diagnostics)`. Five of them reuse module names
+/// with each other, so checking them together asks a question nobody meant.
+fn rejected_results() -> Vec<(String, String, Vec<pw_core::diagnostics::Diagnostic>)> {
+    corpus_dir("rejected")
+        .into_iter()
+        .map(|p| {
+            let name = p.file_name().unwrap().to_string_lossy().to_string();
+            let src = std::fs::read_to_string(&p).expect("read");
+            let results = check_sources(&rejected_program(&p));
+            let diags = results
+                .into_iter()
+                .find(|(n, _)| *n == name)
+                .expect("the fixture")
+                .1;
+            (name, src, diags)
+        })
+        .collect()
+}
+
+/// One rejected fixture, as its own program: library + that file.
+fn rejected_program(path: &std::path::Path) -> Vec<(String, String)> {
+    let mut out = library();
+    out.push((
+        path.file_name().unwrap().to_string_lossy().to_string(),
+        std::fs::read_to_string(path).expect("read"),
+    ));
     out
 }
 
@@ -67,14 +122,18 @@ fn no_accepted_corpus_file_reports_a_body_level_error() {
 
 #[test]
 fn the_unhandled_variant_case_is_caught_at_its_real_span() {
-    // R-007 declares `@rule: PW0305` and two `@expect-error` lines. It matches
-    // on `OrderState`, which is declared in A-002 — the files are checked as
-    // one program (assumption A-009).
-    let results = check_sources(&whole_corpus());
+    // R-007 declares `@rule: PW0305`. Since E2B it imports `OrderState` from
+    // `domain` rather than seeing it through an ambient union, so its program
+    // is library + itself.
+    let path = corpus_dir("rejected")
+        .into_iter()
+        .find(|p| p.to_string_lossy().contains("R-007"))
+        .expect("R-007");
+    let results = check_sources(&rejected_program(&path));
     let (_, diags) = results
         .iter()
         .find(|(p, _)| p.starts_with("R-007"))
-        .expect("R-007 is in the corpus");
+        .expect("R-007 is in the program");
 
     let d = diags
         .iter()
@@ -83,11 +142,7 @@ fn the_unhandled_variant_case_is_caught_at_its_real_span() {
 
     assert_eq!(d.message, "match on `OrderState` is not exhaustive");
 
-    let src = whole_corpus()
-        .into_iter()
-        .find(|(p, _)| p.starts_with("R-007"))
-        .map(|(_, s)| s)
-        .unwrap();
+    let src = std::fs::read_to_string(&path).expect("read");
 
     // The span must cover the match, in the original `.pw` file — charter §14
     // M2 gate item 2 says "at original `.pw` spans", not at a generated file's.
@@ -220,11 +275,19 @@ fn the_environment_spans_every_file_checked_together() {
 #[test]
 fn every_diagnostic_carries_what_charter_16_3_requires() {
     // rule + origin span + boundary span + inferred label + legal alternative.
-    let results = check_sources(&whole_corpus());
-    let sources: std::collections::HashMap<_, _> = whole_corpus().into_iter().collect();
+    let mut all: Vec<(String, String, Vec<pw_core::diagnostics::Diagnostic>)> = rejected_results();
+    // Accepted files must produce none, which is asserted elsewhere; include
+    // them so a diagnostic that only appears there is still shape-checked.
+    for (n, s) in whole_corpus() {
+        let d = check_sources(&whole_corpus())
+            .into_iter()
+            .find(|(p, _)| *p == n)
+            .map(|(_, d)| d)
+            .unwrap_or_default();
+        all.push((n, s, d));
+    }
     let mut n = 0;
-    for (path, diags) in &results {
-        let src = &sources[path];
+    for (path, src, diags) in &all {
         for d in diags {
             n += 1;
             assert!(!d.code.is_empty() && !d.invariant.is_empty(), "{path}");
@@ -294,16 +357,22 @@ fn a_caught_file_conveys_every_fact_its_expect_error_lines_declare() {
     // The corpus is the specification. `@expect-error` states what the
     // developer must be told; this asserts the diagnostic actually says it,
     // without pinning the exact prose.
-    let sources: std::collections::HashMap<_, _> = whole_corpus().into_iter().collect();
-    let results = check_sources(&whole_corpus());
     let mut checked = 0;
     let mut missing = Vec::new();
 
-    for (path, diags) in &results {
+    for p in corpus_dir("rejected") {
+        let results = check_sources(&rejected_program(&p));
+        let path = p.file_name().unwrap().to_string_lossy().to_string();
+        let diags = &results
+            .iter()
+            .find(|(n, _)| *n == path)
+            .expect("the fixture")
+            .1;
         if diags.is_empty() {
             continue;
         }
-        let src = &sources[path];
+        let src = &std::fs::read_to_string(&p).expect("read");
+        let path = &path;
         let all: String = diags.iter().map(rendered).collect::<Vec<_>>().join(" ");
         for want in expected_payloads(src) {
             checked += 1;
@@ -339,23 +408,17 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     use pw_core::rules;
     use pw_syntax::parse;
 
-    let results: std::collections::HashMap<_, _> =
-        check_sources(&whole_corpus()).into_iter().collect();
-
     let (mut errored, mut declared_code, mut fully) = (0, 0, 0);
     let mut total = 0;
 
-    for p in corpus_dir("rejected") {
+    for (name, src, diags) in rejected_results() {
         total += 1;
-        let name = p.file_name().unwrap().to_string_lossy().to_string();
-        let src = std::fs::read_to_string(&p).expect("read");
-
         let mut codes: Vec<&str> = rules::check(&parse(&src).file)
             .iter()
             .filter(|f| f.is_error())
             .map(|f| f.code)
             .collect();
-        codes.extend(results.get(&name).into_iter().flatten().map(|d| d.code));
+        codes.extend(diags.iter().map(|d| d.code));
         if codes.is_empty() {
             continue;
         }
@@ -381,8 +444,14 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     eprintln!("  {declared_code}/{total} emit their declared canonical code");
     eprintln!("  {fully}/{total} fully enforce the complete declared invariant");
 
+    // 18, not 19. R-004 was being caught THROUGH assumption A-009's ambient
+    // union: it materializes a `session query Cart` declared in A-004, a
+    // different file it never imports. E2B removed the union, so the label no
+    // longer propagates and the fixture is silently uncaught. Recorded rather
+    // than restored — the fix is R-004 importing what it uses, and E2B
+    // resolving *uses* as well as imports.
     assert!(
-        errored >= 19,
+        errored >= 18,
         "regressed: {errored}/{total} produce an error"
     );
     assert_eq!(
@@ -390,7 +459,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
         "every catch must be for the declared invariant, not merely red"
     );
     assert!(
-        fully >= 19,
+        fully >= 18,
         "regressed: {fully}/{total} fully enforced, partial list = {PARTIALLY_ENFORCED:?}"
     );
 }
@@ -398,23 +467,16 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
 #[test]
 fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
     // The ratchet from docs/NEXT.md item 8, counting declaration rules AND
-    // body-level checks together. It is the honest number: what `pw check`
-    // actually reports on the rejected corpus today.
+    // body-level checks together, each fixture as its own program.
     use pw_core::rules;
     use pw_syntax::parse;
 
-    let results: std::collections::HashMap<_, _> =
-        check_sources(&whole_corpus()).into_iter().collect();
-
     let mut caught = Vec::new();
     let mut total = 0;
-    for p in corpus_dir("rejected") {
+    for (name, src, diags) in rejected_results() {
         total += 1;
-        let name = p.file_name().unwrap().to_string_lossy().to_string();
-        let src = std::fs::read_to_string(&p).expect("read");
         let decl_hits = rules::check(&parse(&src).file).iter().any(|f| f.is_error());
-        let body_hits = results.get(&name).is_some_and(|d| !d.is_empty());
-        if decl_hits || body_hits {
+        if decl_hits || !diags.is_empty() {
             caught.push(name);
         }
     }
@@ -424,7 +486,7 @@ fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
         "expected the full rejected corpus, saw {total}"
     );
     assert!(
-        caught.len() >= 19,
+        caught.len() >= 18,
         "semantic coverage regressed: {}/{total} caught — {caught:?}",
         caught.len()
     );
@@ -433,15 +495,14 @@ fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
 #[test]
 fn every_body_level_rejection_matches_its_declared_rule() {
     use pw_core::diagnostics::canonical_code;
-    let sources: std::collections::HashMap<_, _> = whole_corpus().into_iter().collect();
     let mut mismatches = Vec::new();
     let mut checked = 0;
 
-    for (path, diags) in check_sources(&whole_corpus()) {
-        if !path.starts_with("R-") || diags.is_empty() {
+    for (path, src, diags) in rejected_results() {
+        if diags.is_empty() {
             continue;
         }
-        let src = &sources[&path];
+        let src = &src;
         let Some(rule) = src
             .lines()
             .find_map(|l| l.trim().strip_prefix("// @rule:"))
@@ -466,18 +527,23 @@ fn the_structured_concurrency_rules_run_on_real_bodies() {
     // docs/NEXT.md item 7 for `scope.rs`: the E2A-S graph and its rules were
     // written and tested against hand-built inputs. Nothing is re-implemented
     // here — the bridge builds the graph from HIR and converts what comes back.
-    let sources: std::collections::HashMap<_, _> = whole_corpus().into_iter().collect();
-    let results: std::collections::HashMap<_, _> =
-        check_sources(&whole_corpus()).into_iter().collect();
+    let all = rejected_results();
+    let find = |prefix: &str, code: &'static str| {
+        let (_, src, diags) = all
+            .iter()
+            .find(|(p, _, _)| p.starts_with(prefix))
+            .unwrap_or_else(|| panic!("{prefix} is in the corpus"));
+        let d = diags
+            .iter()
+            .find(|d| d.code == code)
+            .unwrap_or_else(|| panic!("{prefix} must report {code}, got {diags:?}"));
+        (src.clone(), d.clone())
+    };
 
     // R-013: `task.spawn(detached)` with no durable capability. The file
     // declares PW0311, which aliases to the invariant's canonical code.
-    let d = results
-        .iter()
-        .find(|(p, _)| p.starts_with("R-013"))
-        .and_then(|(_, d)| d.iter().find(|d| d.code == "PW2002"))
-        .expect("R-013 must be caught");
-    let src = &sources[results.keys().find(|p| p.starts_with("R-013")).unwrap()];
+    let (src, d) = find("R-013", "PW2002");
+    let src = &src;
     // The primary span is the offending argument, the related span is where the
     // handle came from — charter §16.3 wants both, and they must differ.
     assert_eq!(&src[d.primary_span.clone()], "detached");
@@ -490,12 +556,8 @@ fn the_structured_concurrency_rules_run_on_real_bodies() {
     );
 
     // R-039: a subscription declaring a scope that outlives its component.
-    let d = results
-        .iter()
-        .find(|(p, _)| p.starts_with("R-039"))
-        .and_then(|(_, d)| d.iter().find(|d| d.code == "PW2004"))
-        .expect("R-039 must be caught");
-    let src = &sources[results.keys().find(|p| p.starts_with("R-039")).unwrap()];
+    let (src, d) = find("R-039", "PW2004");
+    let src = &src;
     assert_eq!(&src[d.primary_span.clone()], "scope application");
 
     // Control: the same subscription scoped to its component is legal, and a
@@ -521,10 +583,7 @@ fn the_structured_concurrency_rules_run_on_real_bodies() {
 fn the_privacy_and_placement_rules_catch_their_corpus_cases() {
     // E5's first slice. Each case is a *flow* answered by the algebra in
     // `pw_core::privacy` and `pw_core::placement`, not a syntax pattern.
-    let sources: std::collections::HashMap<_, _> = whole_corpus().into_iter().collect();
-    let results: std::collections::HashMap<_, _> =
-        check_sources(&whole_corpus()).into_iter().collect();
-
+    let all = rejected_results();
     let want = [
         ("R-002", "PW5002"), // database read inside a browser-placed component
         ("R-003", "PW5003"), // a secret rendered into markup
@@ -532,9 +591,9 @@ fn the_privacy_and_placement_rules_catch_their_corpus_cases() {
         ("R-026", "PW5002"), // a secret capability at the edge
     ];
     for (file, code) in want {
-        let (name, diags) = results
+        let (_, src, diags) = all
             .iter()
-            .find(|(p, _)| p.starts_with(file))
+            .find(|(p, _, _)| p.starts_with(file))
             .unwrap_or_else(|| panic!("{file} is in the corpus"));
         let d = diags
             .iter()
@@ -543,7 +602,6 @@ fn the_privacy_and_placement_rules_catch_their_corpus_cases() {
 
         // Charter §14 M5 gate: "Diagnostics name the source value and invalid
         // boundary, not merely a type mismatch."
-        let src = &sources[name];
         assert!(d.primary_span.end <= src.len());
         assert!(!d.related.is_empty(), "{file}: no boundary span");
         let note = d.explanation.as_deref().unwrap_or("");
@@ -555,8 +613,8 @@ fn the_privacy_and_placement_rules_catch_their_corpus_cases() {
 
     // Control: the placement solver must not fire on the accepted corpus, where
     // every declaration has somewhere legal to run.
-    let bad: Vec<&String> = results
-        .iter()
+    let bad: Vec<String> = check_sources(&whole_corpus())
+        .into_iter()
         .filter(|(p, d)| p.starts_with("A-") && d.iter().any(|d| d.code.starts_with("PW50")))
         .map(|(p, _)| p)
         .collect();

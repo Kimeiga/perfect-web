@@ -1,0 +1,3 @@
+// @expect: PW0021
+module res_no_name
+import res_lib.{ Missing }

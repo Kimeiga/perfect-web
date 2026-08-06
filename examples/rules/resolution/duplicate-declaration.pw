@@ -1,0 +1,5 @@
+// @expect: PW0024
+module res_dup
+
+type Thing = Thing { a: Int }
+type Thing = Thing { b: Int }

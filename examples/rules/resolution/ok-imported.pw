@@ -1,0 +1,10 @@
+// @expect: clean
+//
+// The valid case. Without it the suite could not tell a resolver from a
+// checker that rejects every import.
+
+module res_ok
+
+import res_lib.{ Shared }
+
+fn f(s: Shared) -> Int !{} { 1 }

@@ -1,0 +1,48 @@
+// @corpus: platform
+// @id: STD-decode
+// @category: standard library — boundary decoding
+// @charter: §7.3, §14 M4
+// @milestone: E2C
+//
+// E2C's first slice. Interface declarations that the ordinary resolver and the
+// ordinary semantic analyses consume — not a table inside a checker.
+//
+// Architect ruling, 2026-08-06:
+//
+//   standard-library/platform source -> compiled signature manifest ->
+//   the same resolver and semantic checkers used for user modules
+//
+// Bodies are absent on purpose: this declares what exists and what it costs,
+// not how it is implemented. E1A owns the decoder semantics
+// (`compiler/pw-core/src/abi.rs`), and this is the surface those semantics are
+// reached through.
+
+module decode
+
+// A value that has crossed a boundary and has not been checked yet. E0 finding
+// F-4 measured that a backend can represent two distinct `pw` types
+// identically, so nothing arrives typed; it arrives Unknown.
+opaque type Unknown = String
+
+type DecodeError =
+    | Missing(String)
+    | WrongType(String)
+    | Invalid(String, String)
+
+type Decoder = Decoder { name: String }
+
+fn field(raw: Unknown, name: String, inner: Decoder) -> Result<Unknown, DecodeError> !{} {
+    Err(DecodeError.Missing(name))
+}
+
+fn string(raw: Unknown) -> Result<String, DecodeError> !{} {
+    Err(DecodeError.WrongType("String"))
+}
+
+fn int(raw: Unknown) -> Result<Int, DecodeError> !{} {
+    Err(DecodeError.WrongType("Int"))
+}
+
+fn list(raw: Unknown, inner: Decoder) -> Result<List<Unknown>, DecodeError> !{} {
+    Err(DecodeError.WrongType("List"))
+}

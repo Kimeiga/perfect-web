@@ -132,6 +132,21 @@ fn primitive(name: &str) -> Option<Type> {
 /// Check every unit against the shared environment.
 pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     let env = Env::build(units);
+
+    // E2B: one workspace module graph, built before any semantic analysis.
+    // Resolution failures are reported per unit, so a file importing a module
+    // that does not exist says so instead of failing later in a checker that
+    // cannot explain why.
+    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
+    let workspace = crate::resolve::Workspace::build(&hirs);
+    let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
+    for e in &workspace.errors {
+        resolution
+            .entry(e.unit)
+            .or_default()
+            .push(resolve_diagnostic(e));
+    }
+
     // Declaration name → its privacy label, across every unit. A `page` in one
     // file renders a `session query` declared in another, and that is the
     // corpus's canonical private-in-shared-cache case (assumption A-009).
@@ -146,8 +161,71 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     }
     units
         .iter()
-        .map(|u| (u.path.clone(), check_unit_with(&env, &labels, u)))
+        .enumerate()
+        .map(|(i, u)| {
+            let mut out = resolution.remove(&i).unwrap_or_default();
+            out.extend(check_unit_with(&env, &labels, u));
+            out.sort_by_key(|d| d.primary_span.start);
+            (u.path.clone(), out)
+        })
         .collect()
+}
+
+/// A resolution failure, as a diagnostic.
+fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
+    use crate::codes;
+    use crate::resolve::ResolveErrorKind as K;
+
+    let (code, repair) = match &e.kind {
+        K::UnresolvedModule { module } => (
+            codes::UNRESOLVED_MODULE,
+            format!("declare `module {module}`, or import a module that exists"),
+        ),
+        K::UnresolvedName { module, name } => (
+            codes::UNRESOLVED_NAME,
+            format!("declare `{name}` in `{module}`, or import a name it has"),
+        ),
+        K::AmbiguousName { name, .. } => (
+            codes::AMBIGUOUS_NAME,
+            format!("import `{name}` from one module, or qualify each use"),
+        ),
+        K::DuplicateDeclaration { name } => (
+            codes::DUPLICATE_DECLARATION,
+            format!("rename one of them; `{name}` can name one thing per namespace"),
+        ),
+        K::PrivateAccess { module, name } => (
+            codes::PRIVATE_ACCESS,
+            format!("make `{name}` public in `{module}`, or stop importing it"),
+        ),
+        K::ImportCycle { .. } => (
+            codes::IMPORT_CYCLE,
+            "extract the shared declarations into a third module".to_string(),
+        ),
+    };
+
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "name_resolution",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: e.kind.message(),
+        primary_span: e.span.clone(),
+        related: vec![Related {
+            span: e.span.clone(),
+            label: "resolved against the workspace module graph".to_string(),
+        }],
+        explanation: Some(
+            "Names are visible through lexical scope, module membership, or an \
+             explicit import — and through nothing else. External implementation \
+             is allowed; a missing declaration is not."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: repair,
+            replacement: None,
+        }],
+    }
 }
 
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {

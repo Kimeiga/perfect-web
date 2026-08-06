@@ -33,6 +33,7 @@ pub mod manifest;
 pub mod marko;
 pub mod placement;
 pub mod privacy;
+pub mod resolve;
 pub mod rules;
 pub mod scope;
 pub mod types;

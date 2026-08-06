@@ -107,6 +107,23 @@ const RESOURCE_NOUNS: &[&str] = &[
 /// ended early, `because` became a statement of its own, and the justification
 /// never reached the declaration that needed it — so an audited escape hatch
 /// was reported as unjustified.
+/// Declaration node kinds — the ones a visibility keyword may precede.
+fn is_decl_kind(k: K) -> bool {
+    matches!(
+        k,
+        K::FnDecl
+            | K::UiDecl
+            | K::ResourceDecl
+            | K::TypeDecl
+            | K::RecordDecl
+            | K::UnionDecl
+            | K::OpaqueDecl
+            | K::LetDecl
+            | K::ImportDecl
+            | K::ModuleDecl
+    )
+}
+
 const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
@@ -171,6 +188,9 @@ struct P<'a> {
     errors: Vec<SyntaxError>,
     /// Guards against a grammar rule that consumes nothing in a loop.
     fuel: u32,
+    /// A checkpoint taken before a visibility keyword, so the declaration that
+    /// follows can re-parent it (see [`P::start`]).
+    pending_vis: Option<rowan::Checkpoint>,
 }
 
 impl<'a> P<'a> {
@@ -182,6 +202,7 @@ impl<'a> P<'a> {
             b: TreeBuilder::new(src),
             errors: Vec::new(),
             fuel: 0,
+            pending_vis: None,
         }
     }
 
@@ -280,6 +301,17 @@ impl<'a> P<'a> {
     }
 
     fn start(&mut self, k: K) {
+        // A declaration preceded by a visibility keyword re-parents that
+        // keyword into itself, so `private type X` is ONE declaration whose
+        // first token says `private`. Without it the keyword became a
+        // declaration of its own and the type looked public.
+        if let Some(cp) = self.pending_vis.take() {
+            if is_decl_kind(k) {
+                self.b.start_at(cp, k);
+                return;
+            }
+            self.pending_vis = Some(cp);
+        }
         // Trivia belongs *outside* a node it merely precedes, so it is flushed
         // before the node opens. Without this, a comment before `fn` would end
         // up inside the FnDecl and the formatter would move it.
@@ -1287,6 +1319,26 @@ impl<'a> P<'a> {
             }
             self.finish();
             return true;
+        }
+
+        // A visibility keyword may precede any declaration, not only the UI and
+        // resource nouns. `private type Secretive` parsed as TWO declarations —
+        // a bare word and an unqualified type — so the type looked public and a
+        // module could import it.
+        let vis_prefix = (self.at_kw("public") || self.at_kw("session") || self.at_kw("private"))
+            && matches!(
+                &self.src[self.nth(1).span.clone()],
+                "type" | "opaque" | "fn" | "let"
+            );
+
+        if vis_prefix {
+            // Flush trivia, take a checkpoint, then consume the keyword. The
+            // branch below re-parents both under the declaration's real kind
+            // via `start_at`, so the visibility is the declaration's first
+            // token — which is where `lower::visibility_of` looks.
+            self.eat_trivia();
+            self.pending_vis = Some(self.b.checkpoint());
+            self.bump();
         }
 
         if self.at_kw("opaque") {

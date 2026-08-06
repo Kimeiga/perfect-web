@@ -198,6 +198,9 @@ pub struct Decl {
     pub fields: Option<Vec<Param>>,
     /// The declaration's policy block, in source order.
     pub policies: Vec<Policy>,
+    /// For an `import`, the names it brings into scope: `import domain.{ A, B }`
+    /// yields `["A", "B"]`. Empty for a whole-module import.
+    pub imports: Vec<String>,
     /// `public`, `session`, `private` — the visibility keyword as written.
     /// This is where a declaration's privacy label starts (charter §7.8).
     pub visibility: Option<String>,

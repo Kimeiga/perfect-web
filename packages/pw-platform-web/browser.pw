@@ -1,0 +1,21 @@
+// @corpus: platform
+// @id: PLATFORM-browser
+// @category: platform — browser handles
+// @charter: §7.5A, §11.1
+// @milestone: E2C
+
+module browser
+
+// A live DOM node. Exists only where the document does, which is why the
+// placement solver treats a `Device`-restricted or `dom`-effecting body as
+// browser-only.
+opaque type Element = String
+
+// A third-party map widget's handle. The corpus uses it for the audited
+// imperative-escape case (A-024, R-044): an external implementation reached
+// through a declared interface.
+opaque type MapHandle = String
+
+type MapError =
+    | InitFailed(String)
+    | Unsupported

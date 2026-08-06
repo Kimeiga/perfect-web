@@ -121,6 +121,24 @@ type OrderFailure = OrderFailure {
     label: String,
 }
 
+// The order lifecycle. Declared here rather than in a view module so both
+// A-002 (which handles every variant) and R-007 (which does not) import it
+// through the ordinary module graph. R-007 previously relied on assumption
+// A-009's ambient union to see it at all — name-resolution failure must not be
+// what makes an exhaustiveness fixture red.
+
+type OrderState =
+    | Draft
+    | Pricing
+    | AuthorizingPayment
+    | Submitting
+    | SearchingForDasher
+    | Confirmed(OrderConfirmation)
+    | InProgress(OrderProgress)
+    | Delivered(DeliveryReceipt)
+    | Cancelled(CancellationReason)
+    | Failed(OrderFailure)
+
 // --- recommendations ------------------------------------------------------
 
 type Recommendation = Recommendation {

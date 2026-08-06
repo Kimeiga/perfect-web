@@ -1,0 +1,3 @@
+// @expect: PW0020
+module res_no_module
+import nowhere.{ Shared }

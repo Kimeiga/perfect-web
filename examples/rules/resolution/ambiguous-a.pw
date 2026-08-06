@@ -1,0 +1,3 @@
+// @expect: clean
+module res_amb_a
+type Thing = Thing { a: Int }

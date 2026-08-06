@@ -1,0 +1,13 @@
+// @corpus: platform
+// @id: PLATFORM-capability
+// @category: platform — capability handles
+// @charter: §7.8, §11
+// @milestone: E2C
+
+module capability
+
+// A capability's secret material. The privacy checker reads `Secret<C>` as a
+// restriction that never leaves the origin; the placement solver reads the
+// capability family from the effect row of whatever produced it. One
+// declaration, three consumers — which is the point of E2C.
+opaque type Secret = String

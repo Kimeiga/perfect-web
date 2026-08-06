@@ -1,0 +1,8 @@
+// @expect: PW0023
+//
+// The module exists and declares the name, but does not make it public.
+// "External implementation is allowed. Missing declaration is not" — and a
+// declaration that exists is still not automatically yours to use.
+
+module res_private
+import res_lib.{ Secretive }

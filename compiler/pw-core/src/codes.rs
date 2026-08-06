@@ -37,6 +37,7 @@ pub struct Code {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Owner {
     Syntax,
+    Resolution,
     DeclarationRules,
     Exhaustiveness,
     ScopeGraph,
@@ -81,6 +82,24 @@ codes! {
     UNCLOSED_LIST = "PW0011", Syntax, "a list literal must be closed";
     UNCLOSED_MATCH = "PW0012", Syntax, "a match must be closed";
     NO_PROGRESS = "PW0099", Syntax, "the parser made no progress";
+
+    // --- name resolution (PW002x) -----------------------------------------
+    //
+    // Allocated through this registry, not chosen in prose. They sit in the
+    // syntax range because resolution failures are about the *program text*
+    // naming something that is not there, not about what the program means.
+    UNRESOLVED_MODULE = "PW0020", Resolution,
+        "an imported module must exist in the workspace";
+    UNRESOLVED_NAME = "PW0021", Resolution,
+        "an imported name must be declared by the module it comes from";
+    AMBIGUOUS_NAME = "PW0022", Resolution,
+        "a name must resolve to exactly one declaration";
+    PRIVATE_ACCESS = "PW0023", Resolution,
+        "a private declaration is not visible outside its module";
+    DUPLICATE_DECLARATION = "PW0024", Resolution,
+        "a module may declare each name once per namespace";
+    IMPORT_CYCLE = "PW0025", Resolution,
+        "modules must not import each other in a cycle";
 
     // --- declaration rules (PW01xx-PW03xx) --------------------------------
     RETRY_NOT_IDEMPOTENT = "PW0312", DeclarationRules,
@@ -141,6 +160,157 @@ pub fn lookup(id: &str) -> Option<Code> {
     ALL.iter().copied().find(|c| c.id == id)
 }
 
+/// What a corpus fixture's `@rule` resolves to.
+///
+/// Architect ruling, 2026-08-06: model the categories explicitly rather than
+/// treating every unregistered code as one generic exception. An unknown code
+/// is a typo or a fixture nobody can ever satisfy; a *known gap* is the corpus
+/// doing its job, naming an invariant the compiler has not built yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuleStatus {
+    Registered(Code),
+    /// Declared by a fixture, not yet implemented, with an owner.
+    KnownGap {
+        code: &'static str,
+        intended_owner: &'static str,
+        missing_analysis: &'static str,
+    },
+    /// Neither. Always a failure.
+    Unknown,
+}
+
+/// Invariants the corpus specifies and the compiler has not built.
+///
+/// Each names the milestone that will own it and the analysis that is missing,
+/// so the list is a work plan rather than a list of excuses. It shrinks as
+/// milestones land; it grows only when a new specification fixture is added.
+pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
+    // (code, intended owner, missing analysis)
+    (
+        "PW0300",
+        "E2D",
+        "effect inference — a network call inside a pure view",
+    ),
+    (
+        "PW0304",
+        "E2D",
+        "effect inference — a secret reaching a public log",
+    ),
+    ("PW0306", "E9", "type checking — an ambient null assumption"),
+    ("PW0307", "E9", "type checking — an unchecked external cast"),
+    (
+        "PW0308",
+        "E7",
+        "serialization analysis — a non-serializable capture",
+    ),
+    (
+        "PW0309",
+        "E9C",
+        "affine types — a transaction neither committed nor rolled back",
+    ),
+    (
+        "PW0310",
+        "E9C",
+        "affine types — a resource handle that escapes",
+    ),
+    (
+        "PW0314",
+        "E2D",
+        "effect inference — nondeterminism in a static render",
+    ),
+    (
+        "PW0315",
+        "E2D",
+        "effect inference — a wall-clock read in a shared materialization",
+    ),
+    (
+        "PW0320",
+        "E9",
+        "type checking — a handler signature that does not match its event",
+    ),
+    (
+        "PW0321",
+        "E6",
+        "route reachability — a route nothing can reach",
+    ),
+    (
+        "PW0322",
+        "E5",
+        "capability checking — raw HTML without the capability",
+    ),
+    (
+        "PW0328",
+        "E5",
+        "placement — a browser-only API on the origin",
+    ),
+    (
+        "PW3001",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3002",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3003",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3004",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3005",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3006",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3007",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3008",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3009",
+        "E2D",
+        "effect inference — the layout and frame-phase family",
+    ),
+    (
+        "PW3011",
+        "E7",
+        "resumption manifest — private data crossing into it",
+    ),
+];
+
+/// Classify a corpus `@rule`, after alias resolution.
+pub fn rule_status(declared: &str) -> RuleStatus {
+    let canonical = crate::diagnostics::canonical_code(declared);
+    if let Some(c) = lookup(canonical) {
+        return RuleStatus::Registered(c);
+    }
+    if let Some((code, owner, analysis)) = KNOWN_GAPS.iter().find(|(c, _, _)| *c == canonical) {
+        return RuleStatus::KnownGap {
+            code,
+            intended_owner: owner,
+            missing_analysis: analysis,
+        };
+    }
+    RuleStatus::Unknown
+}
+
 impl Owner {
     /// The code range this owner's diagnostics must sit in, or `""` when the
     /// owner is semantic and may live anywhere at `PW01xx` or above.
@@ -149,7 +319,7 @@ impl Owner {
     /// has to answer this question before it can register a code.
     pub fn range(self) -> &'static str {
         match self {
-            Owner::Syntax => "PW00",
+            Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             _ => "",
         }
@@ -159,7 +329,7 @@ impl Owner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostics::{DEPRECATED_ALIASES, canonical_code};
+    use crate::diagnostics::DEPRECATED_ALIASES;
 
     #[test]
     fn every_code_is_unique() {
@@ -209,14 +379,13 @@ mod tests {
     }
 
     #[test]
-    fn every_corpus_rule_resolves_to_a_registered_code_or_a_known_gap() {
-        // A fixture whose `@rule` names nothing the compiler could ever emit is
-        // either a typo or a rule nobody has built. Both are worth knowing, and
-        // the second is the corpus doing its job — so unregistered codes are
-        // listed, not failed.
+    fn every_corpus_rule_is_registered_or_an_owned_known_gap() {
+        // The ratchet the architect specified:
+        //   unknown == 0
+        //   known_gaps only shrink, or grow with an approved new fixture
+        // An implemented invariant must not silently fall back to "known gap".
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/rejected");
-        let mut unregistered = Vec::new();
-        let mut resolved = 0;
+        let (mut registered, mut gaps, mut unknown) = (0, 0, Vec::new());
 
         for e in std::fs::read_dir(&root).expect("rejected/") {
             let path = e.expect("entry").path();
@@ -231,26 +400,55 @@ mod tests {
             else {
                 continue;
             };
-            let canonical = canonical_code(rule);
-            if lookup(canonical).is_some() {
-                resolved += 1;
-            } else {
-                unregistered.push(format!(
-                    "{}: @rule {rule} -> {canonical}",
+            match rule_status(rule) {
+                RuleStatus::Registered(_) => registered += 1,
+                RuleStatus::KnownGap { .. } => gaps += 1,
+                RuleStatus::Unknown => unknown.push(format!(
+                    "{}: @rule {rule}",
                     path.file_name().unwrap().to_string_lossy()
-                ));
+                )),
             }
         }
 
-        assert!(resolved >= 19, "only {resolved} corpus rules resolve");
-        // The rest name invariants nobody has implemented yet. That number
-        // going DOWN is the project making progress; it must not go up.
+        eprintln!("  Corpus invariants");
+        eprintln!("  - registered: {registered}");
+        eprintln!("  - known gaps: {gaps}");
+        eprintln!("  - unknown:    {}", unknown.len());
+
         assert!(
-            unregistered.len() <= 25,
-            "{} corpus rules name no registered code:\n{}",
-            unregistered.len(),
-            unregistered.join("\n")
+            unknown.is_empty(),
+            "a fixture names an invariant that is neither built nor planned — a \
+             typo, or a rule nobody can ever satisfy:\n{}",
+            unknown.join("\n")
         );
+        assert!(
+            registered >= 19,
+            "registered rules regressed to {registered}"
+        );
+        assert!(
+            gaps <= 25,
+            "known gaps grew to {gaps} without a new fixture"
+        );
+    }
+
+    #[test]
+    fn every_known_gap_names_an_owner_and_the_missing_analysis() {
+        // A gap list without owners is a list of excuses. With them it is a
+        // work plan, and `docs/NEXT.md` can be generated from it.
+        for (code, owner, analysis) in KNOWN_GAPS {
+            assert!(
+                lookup(code).is_none(),
+                "{code} is registered AND listed as a gap"
+            );
+            assert!(
+                owner.starts_with('E') || owner.starts_with('P'),
+                "{code}'s owner {owner:?} is not a milestone"
+            );
+            assert!(
+                analysis.len() > 15,
+                "{code}'s missing analysis is not described: {analysis:?}"
+            );
+        }
     }
 
     #[test]

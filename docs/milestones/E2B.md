@@ -1,7 +1,8 @@
 # E2B — Program graph and name resolution
 
-**Status: NOT STARTED.** Inserted by architect ruling, 2026-08-06, ahead of
-E2C and E2D. Its first blocker is cleared.
+**Status: IMPLEMENTED, gate partly met.** The module graph, namespaces and the
+six resolution diagnostics exist and run inside `pw check`. What remains is
+resolving *uses*, not only imports.
 
 ## Why it exists
 
@@ -57,20 +58,57 @@ through an explicit, versioned, content-hashed interface module; a missing
 
 > External implementation is allowed. Missing declaration is not.
 
-## Still to do before E2B can close
+## What the resolver found
 
-- **R-007 must import `OrderState`.** It currently relies on the ambient union
-  to reach its exhaustiveness defect. Name-resolution failure must not be what
-  makes an exhaustiveness fixture red.
-- **Dedicated resolution fixtures**, so resolution defects stop being smuggled
-  into tests about other things:
+**The corpus is not one program**, and it said so: five rejected fixtures reuse
+module names with each other and 17 are reused across the buckets. The real
+shape, which is also how the corpus is used:
 
 ```text
-examples/rules/resolution/
-├── unresolved-import
-├── unresolved-name
-├── ambiguous-import
-├── private-declaration-access
-├── duplicate-declaration
-└── invalid-module-cycle
+library + accepted/*        one program        (0 collisions)
+library + one rejected/*    one program each   (a counterexample)
 ```
+
+`just ci` and the test harness were both checking all 68 files as one program.
+That was never a question anyone meant to ask, and the answer was 20 duplicate
+declarations.
+
+**Names need namespaces.** `A-003` declares `query Store` and imports
+`type Store`; `A-008` declares `query Recommendations` and `view
+Recommendations`. Neither is a mistake — a type, a data operation and a rendered
+view are different kinds of thing. A single flat namespace called both
+duplicates. Resolution is now keyed by `(Namespace, name)` with three
+namespaces: `Type`, `Term`, `Ui`.
+
+**A visibility keyword only worked on some declarations.** `private type X`
+parsed as *two* declarations — a bare word and an unqualified type — so the type
+looked public and any module could import it. The keyword is now re-parented
+into whatever declaration follows it.
+
+## The honest cost: 19/44 became 18/44
+
+`R-004` was being caught **through** the ambient union. It materializes a
+`session query Cart` declared in `A-004` — a different file it never imports —
+and that is where its `Session` label came from. Remove the union and the label
+does not propagate, so the fixture is silently uncaught.
+
+Recorded rather than restored. The fix is the one the architect prescribed for
+R-007: the fixture must import what it uses, and E2B must resolve *uses* as well
+as imports so that failing to import is itself an error rather than silence.
+
+## Still to do before E2B can close
+
+- ~~R-007 must import `OrderState`~~ — **done.** `OrderState` moved into
+  `examples/domain.pw` and both `A-002` and `R-007` import it, so an
+  exhaustiveness fixture is no longer red for a resolution reason.
+- ~~Dedicated resolution fixtures~~ — **done.** `examples/rules/resolution/`
+  has all six, each with its own code, plus a valid case so the suite can tell
+  a resolver from something that rejects every import.
+- **Resolve uses, not only imports.** Today an `import` that names a missing
+  module or name is an error; a *use* of an unimported name is silence. That
+  silence is what leaves R-004 uncaught.
+- **Hand `DefId` to the semantic analyses.** `check.rs` still matches some
+  names textually. The architectural invariant is not met until it does not:
+
+  > After E2B, semantic analyses consume `DefId`. They do not make semantic
+  > decisions from textual names.

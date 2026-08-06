@@ -1,0 +1,11 @@
+// @expect: PW0022
+//
+// One name, two modules, no way to tell which was meant. Reported at the use
+// rather than silently taking the first import.
+
+module res_ambiguous
+
+import res_amb_a.{ Thing }
+import res_amb_b.{ Thing }
+
+fn f(t: Thing) -> Int !{} { 1 }

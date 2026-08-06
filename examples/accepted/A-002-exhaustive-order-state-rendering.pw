@@ -10,20 +10,8 @@
 
 module order.status_view
 
-import domain.{ OrderConfirmation, OrderProgress, DeliveryReceipt,
+import domain.{ OrderState, OrderConfirmation, OrderProgress, DeliveryReceipt,
     CancellationReason, OrderFailure }
-
-type OrderState =
-    | Draft
-    | Pricing
-    | AuthorizingPayment
-    | Submitting
-    | SearchingForDasher
-    | Confirmed(OrderConfirmation)
-    | InProgress(OrderProgress)
-    | Delivered(DeliveryReceipt)
-    | Cancelled(CancellationReason)
-    | Failed(OrderFailure)
 
 view OrderStatus(state: OrderState) !{} {
     <section aria-label="Order status">

@@ -1,0 +1,8 @@
+// @expect: clean
+//
+// The module the fixtures beside this one import from.
+
+module res_lib
+
+type Shared = Shared { x: Int }
+private type Secretive = Secretive { y: Int }

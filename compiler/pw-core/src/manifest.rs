@@ -393,6 +393,7 @@ mod tests {
                     value: v.into(),
                     span: 0..0,
                 }],
+                imports: vec![],
                 visibility: None,
                 declared_effects: None,
                 body: None,
