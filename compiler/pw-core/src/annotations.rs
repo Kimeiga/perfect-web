@@ -37,7 +37,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
         let module = module_of(hir, id);
-        optional_used_as_present(hir, body, decl, &at, out);
+        optional_used_as_present(hir, sigs, body, decl, &at, out);
         unchecked_cast(hir, body, decl, &at, out);
         handler_matches_event(hir, body, sigs, decl, module, &at, out);
     }
@@ -62,18 +62,26 @@ fn module_of(hir: &Hir, decl: crate::hir::DeclId) -> Option<&str> {
 
 fn optional_used_as_present(
     hir: &Hir,
+    sigs: &Signatures,
     body: &Body,
     decl: &Decl,
     at: &Span,
     out: &mut Vec<Diagnostic>,
 ) {
-    // Bindings the author annotated `Option<T>`, with the inner type.
+    // Bindings that hold an `Option<T>`, with the inner type.
+    //
+    // From the ANNOTATION where the author wrote one, and otherwise from the
+    // initialiser's declared return type. The second source is what makes this
+    // a rule about the program rather than about how much the author chose to
+    // write down: `let store = Stores.find(id)` is an `Option<Store>` because
+    // `find` says so, and dropping the annotation used to make the defect
+    // disappear.
     let mut optional: Vec<(String, String, String, Span)> = Vec::new();
     for id in body.walk() {
         let Expr::Let {
             pat: Some(pat),
-            ty: Some(ty),
-            ..
+            ty,
+            init,
         } = body.expr(id)
         else {
             continue;
@@ -81,21 +89,25 @@ fn optional_used_as_present(
         let crate::hir::Pattern::Bind { name, .. } = body.pat(*pat) else {
             continue;
         };
-        let Some(t) = body.types.get(ty.index()) else {
+        let annotated = ty.and_then(|t| body.types.get(t.index())).and_then(|t| {
+            (t.path == "Option")
+                .then(|| t.args.first().and_then(|a| body.types.get(a.index())))
+                .flatten()
+                .map(|inner| (written(body, ty.expect("annotated")), inner.path.clone()))
+        });
+        let inferred = || {
+            let init = (*init)?;
+            let sig = sigs.by_path(&crate::infer::path_of(body, callee_of(body, init)?))?;
+            if sig.returns.as_deref() != Some("Option") {
+                return None;
+            }
+            let inner = sig.returns_args.first()?.clone();
+            Some((format!("Option<{inner}>"), inner))
+        };
+        let Some((written, inner)) = annotated.or_else(inferred) else {
             continue;
         };
-        if t.path != "Option" {
-            continue;
-        }
-        let Some(inner) = t.args.first().and_then(|a| body.types.get(a.index())) else {
-            continue;
-        };
-        optional.push((
-            name.clone(),
-            written(body, *ty),
-            inner.path.clone(),
-            body.expr_span(id),
-        ));
+        optional.push((name.clone(), written, inner, body.expr_span(id)));
     }
     if optional.is_empty() {
         return;
@@ -317,6 +329,14 @@ fn written(body: &Body, id: TypeRefId) -> String {
     }
     let args: Vec<String> = t.args.iter().map(|a| written(body, *a)).collect();
     format!("{}<{}>", t.path, args.join(", "))
+}
+
+/// The callee of a call expression, if this is one.
+fn callee_of(body: &Body, id: crate::hir::ExprId) -> Option<crate::hir::ExprId> {
+    match body.expr(id) {
+        Expr::Call { callee, .. } => Some(*callee),
+        _ => None,
+    }
 }
 
 fn lower_head(t: &str) -> String {

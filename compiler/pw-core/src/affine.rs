@@ -60,7 +60,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
             let releases = releases_of(body, sigs, &types, &a);
             if let Some(escape) = escape_of(body, &a, &module_state) {
                 report_escape(hir, decl, &a, escape, &at, out);
-            } else if let Some(early) = early_return(body, &a, &releases) {
+            } else if let Some(early) = unreleased_path(body, &a, &releases) {
                 report_unconsumed(hir, sigs, decl, &a, early, &at, out);
             }
         }
@@ -152,19 +152,106 @@ fn releases_of<'a>(
     out
 }
 
-/// A `return` between the acquisition and every release of it.
-fn early_return(body: &Body, a: &Acquired, releases: &[Span]) -> Option<Span> {
-    let first_release = releases.iter().map(|s| s.start).min();
-    body.walk().into_iter().find_map(|id| {
-        let Expr::Name(n) = body.expr(id) else {
-            return None;
+/// What happens to the resource along the paths through one construct.
+#[derive(Debug, Default, Clone)]
+struct Flow {
+    /// EVERY path through this construct releases before leaving it.
+    released: bool,
+    /// Paths that leave the enclosing body without having released.
+    escapes: Vec<Span>,
+}
+
+/// Does every path from the acquisition reach a release?
+///
+/// This replaced a textual scan — "is there a `return` between the acquisition
+/// and the first release" — which met R-011 and missed the shape where the
+/// release is written first:
+///
+/// ```text
+/// if empty { rollback(tx) } else { return Ok(()) }
+/// ```
+///
+/// Here the release precedes the return in the text and every path is *not*
+/// covered. The witness for that gap lived in
+/// `examples/generality/affine_not_consumed_once/slips-through.pw`; this is
+/// what promoted it.
+///
+/// The analysis is over the statement tree rather than a basic-block graph,
+/// which is enough because `pw` has no `goto`, no labelled break and no loop
+/// that can carry a resource out. Each construct answers two questions: do all
+/// my paths release, and which of my paths leave the body without releasing.
+fn unreleased_path(body: &Body, a: &Acquired, releases: &[Span]) -> Option<Span> {
+    let flow = flow_of(body, body.root, a, releases, &mut false);
+    flow.escapes.first().cloned()
+}
+
+fn flow_of(body: &Body, id: ExprId, a: &Acquired, releases: &[Span], live: &mut bool) -> Flow {
+    let span = body.expr_span(id);
+
+    // The acquisition itself: the resource is live from here on.
+    if span == a.span {
+        *live = true;
+        return Flow::default();
+    }
+
+    // A release. Everything after it on this path is covered.
+    if releases.contains(&span) {
+        return Flow {
+            released: true,
+            escapes: Vec::new(),
         };
-        if n != "return" {
-            return None;
+    }
+
+    match body.expr(id) {
+        Expr::Block { stmts } => {
+            let mut out = Flow::default();
+            for s in stmts {
+                if out.released {
+                    // Already released on this path; nothing later can leak it.
+                    break;
+                }
+                let f = flow_of(body, *s, a, releases, live);
+                out.released |= f.released;
+                if !out.released {
+                    out.escapes.extend(f.escapes);
+                }
+            }
+            out
         }
-        let span = body.expr_span(id);
-        (span.start > a.span.start && first_release.is_none_or(|r| span.start < r)).then_some(span)
-    })
+        Expr::If { cond, then, els } => {
+            let _ = flow_of(body, *cond, a, releases, live);
+            let t = flow_of(body, *then, a, releases, live);
+            let e = els.map(|e| flow_of(body, e, a, releases, live));
+            let mut escapes = t.escapes;
+            let mut released = t.released;
+            match e {
+                // Both branches must release for the whole `if` to.
+                Some(e) => {
+                    released &= e.released;
+                    escapes.extend(e.escapes);
+                }
+                // No else: the fall-through path does not release here.
+                None => released = false,
+            }
+            Flow { released, escapes }
+        }
+        Expr::Match { arms, .. } => {
+            let mut released = !arms.is_empty();
+            let mut escapes = Vec::new();
+            for arm in arms {
+                let f = flow_of(body, arm.body, a, releases, live);
+                released &= f.released;
+                escapes.extend(f.escapes);
+            }
+            Flow { released, escapes }
+        }
+        // A `return` while the resource is live and unreleased on this path.
+        Expr::Name(n) if n == "return" && *live => Flow {
+            released: false,
+            escapes: vec![span],
+        },
+        _ => Flow::default(),
+    }
 }
 
 /// An assignment that puts the value somewhere the acquiring scope cannot see.

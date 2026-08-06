@@ -1,0 +1,26 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+//
+// A third control-flow shape: a `match` rather than an `if`, three arms, and
+// exactly one of them leaves without releasing. Neither the fixture nor the
+// other counterexample has a match in it.
+
+module generality.affine_match
+
+import Carts
+import Database
+import domain.{ OrderState }
+
+command settle(state: OrderState) -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    match state {
+        Placed => tx.commit()
+        Cancelled(r) => Database.rollback(tx)
+        // Leaves the transaction open.
+        Delivered => return Ok(())
+        Preparing => Database.rollback(tx)
+        Ready => tx.commit()
+    }
+}

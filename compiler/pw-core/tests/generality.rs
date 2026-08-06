@@ -238,7 +238,7 @@ fn generalization_is_reported_separately_from_conformance() {
 
     // Recorded, and ratcheted so it cannot fall.
     assert!(
-        general.len() >= 7,
+        general.len() >= 9,
         "generalization regressed: {} / {}",
         general.len(),
         exercised.len()

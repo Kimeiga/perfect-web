@@ -37,6 +37,10 @@ pub struct Signature {
     pub label: Label,
     /// The return type's head, without arguments.
     pub returns: Option<String>,
+    /// The return type's arguments: `Option<Store>` gives `["Store"]`. Needed
+    /// wherever the head alone does not say what a value IS — `Option` is not
+    /// a type, `Option<Store>` is.
+    pub returns_args: Vec<String>,
     /// Each parameter's declared type head, in order. `None` where the
     /// parameter carries no annotation.
     pub params: Vec<Option<String>>,
@@ -101,6 +105,7 @@ impl Signatures {
                         .collect(),
                     label: label_from_return(decl.ret.as_deref(), &decl.ret_args),
                     returns: decl.ret.clone(),
+                    returns_args: decl.ret_args.clone(),
                     params: decl.params.iter().map(|p| p.ty.clone()).collect(),
                 };
                 // A function whose first parameter is a declared type reads as

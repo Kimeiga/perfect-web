@@ -17,7 +17,9 @@ fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
     todo
 }
 
-fn find(name: String) -> Result<Store, StoreError> !{ database.read } {
+// `find` may not find one, and says so in its type. `get` is the form that
+// fails loudly; this is the form whose absence is a value.
+fn find(name: String) -> Option<Store> !{ database.read } {
     todo
 }
 

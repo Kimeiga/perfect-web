@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: option_used_as_value
+//
+// This file was `slips-through.pw` until the rule stopped depending on the
+// author having written the type down, and it is why that changed.
+//
+// Identical to R-008 except that the annotation is absent. `Stores.find`
+// returns `Option<Store>` and its signature says so, so the type is knowable
+// without it — the old rule fired only where the author WROTE the type, which
+// made the defect disappear when the annotation did.
+
+module generality.option_unannotated
+
+import Stores
+
+fn store_name(id: StoreId) -> String !{ database.read<Stores> } {
+    let store = Stores.find(id)
+    store.name
+}
