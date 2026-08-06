@@ -359,28 +359,118 @@ fn emit_koka_command(paths: &[&String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// `pw emit-marko` — write generated templates under `--out DIR` (ADR-0017).
+///
+/// Requires an explicit output directory. Defaulting to the source directory
+/// would put build output next to authoring source, which is the exact thing
+/// charter §14 M3 task 3 forbids.
+fn emit_marko_command(paths: &[&String], out_dir: Option<String>) -> ExitCode {
+    let Some(out_dir) = out_dir else {
+        eprintln!("pw emit-marko: --out DIR is required");
+        eprintln!("  generated templates are build output and must not be written");
+        eprintln!("  beside authoring source (charter §14 M3 task 3, ADR-0017)");
+        return ExitCode::from(2);
+    };
+    if let Err(e) = std::fs::create_dir_all(&out_dir) {
+        eprintln!("pw: cannot create {out_dir}: {e}");
+        return ExitCode::from(2);
+    }
+
+    let mut written = 0usize;
+    let mut skipped = 0usize;
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        let name = Path::new(path)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| (*path).clone());
+        let out = pw_core::marko::render_module(&hir, &name);
+
+        for (file, text) in &out.files {
+            let dest = Path::new(&out_dir).join(file);
+            if let Err(e) = std::fs::write(&dest, text) {
+                eprintln!("pw: cannot write {}: {e}", dest.display());
+                return ExitCode::from(2);
+            }
+            println!("{}", dest.display());
+            written += 1;
+        }
+        for s in &out.skipped {
+            eprintln!("skipped {}: {}", s.name, s.reason);
+            skipped += 1;
+        }
+    }
+
+    println!("pw emit-marko: {written} file(s) written, {skipped} skipped");
+    if written == 0 {
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let plain = args.iter().any(|a| a == "--plain");
     let cmd = args.first().map(|s| s.as_str()).unwrap_or("");
-    let paths: Vec<&String> = args
-        .iter()
-        .skip(1)
-        .filter(|a| !a.starts_with("--"))
-        .collect();
+    // `--out DIR` takes a value, so DIR must not also be read as a source
+    // path. Without this the output directory is opened as a `.pw` file and the
+    // command fails after already having written its files.
+    let mut paths: Vec<&String> = Vec::new();
+    let mut skip_next = false;
+    for (i, a) in args.iter().enumerate().skip(1) {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if a == "--out" {
+            skip_next = true;
+            continue;
+        }
+        if a.starts_with("--") {
+            continue;
+        }
+        let _ = i;
+        paths.push(a);
+    }
 
-    if !matches!(cmd, "check" | "explain" | "fmt" | "emit-koka") || paths.is_empty() {
-        eprintln!("usage: pw <check|explain|fmt|emit-koka> <path.pw>... [--plain]");
+    if !matches!(
+        cmd,
+        "check" | "explain" | "fmt" | "emit-koka" | "emit-marko"
+    ) || paths.is_empty()
+    {
+        eprintln!("usage: pw <check|explain|fmt|emit-koka|emit-marko> <path.pw>... [--plain]");
         eprintln!();
-        eprintln!("  check      parse and report diagnostics");
-        eprintln!("  explain    print types, effects, privacy and derived placement");
-        eprintln!("  fmt        rewrite files canonically; --check reports instead");
-        eprintln!("  emit-koka  print Koka for the pure subset (ADR-0015)");
+        eprintln!("  check       parse and report diagnostics");
+        eprintln!("  explain     print types, effects, privacy and derived placement");
+        eprintln!("  fmt         rewrite files canonically; --check reports instead");
+        eprintln!("  emit-koka   print Koka for the pure subset (ADR-0015)");
+        eprintln!("  emit-marko  write Marko templates to --out DIR (ADR-0017)");
         return ExitCode::from(2);
     }
 
     if cmd == "emit-koka" {
         return emit_koka_command(&paths);
+    }
+
+    if cmd == "emit-marko" {
+        let out_dir = args
+            .iter()
+            .position(|a| a == "--out")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
+        return emit_marko_command(&paths, out_dir);
     }
 
     if cmd == "fmt" {

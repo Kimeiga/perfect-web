@@ -1,4 +1,6 @@
 packages:
   - "spikes/marko-stream-resume"
+  # E3: routes here are GENERATED from `.pw` by `pw emit-marko` (ADR-0017).
+  - "spikes/pw-to-marko"
   # runtime/*, benchmarks/baselines/* and examples/* join as milestones need them
   # (PROJECT_CHARTER.md §12: do not create empty directories to look complete).

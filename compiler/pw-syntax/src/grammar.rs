@@ -219,6 +219,11 @@ impl<'a> P<'a> {
     /// identifiers must stop here. Without this guard a trailing-modifier loop
     /// swallows the first token of the *next* statement and the error surfaces
     /// one line later, pointing at innocent code.
+    /// Is there unconsumed trivia before the next significant token?
+    fn trivia_pending(&self) -> bool {
+        self.toks.get(self.pos).is_some_and(|t| t.kind.is_trivia())
+    }
+
     fn newline_ahead(&self) -> bool {
         self.toks[self.pos..]
             .iter()
@@ -267,6 +272,17 @@ impl<'a> P<'a> {
         // before the node opens. Without this, a comment before `fn` would end
         // up inside the FnDecl and the formatter would move it.
         self.eat_trivia();
+        self.b.start(k);
+    }
+
+    /// Open a node **without** flushing trivia first.
+    ///
+    /// The one exception to the rule above, and it is markup: whitespace
+    /// between two inline elements is content, not formatting. Flushing it
+    /// first put it outside the `Text` node that was created to hold it, so the
+    /// node came out empty and the space never reached HIR — which renders
+    /// `<span>a</span> <span>b</span>` with the words run together.
+    fn start_keeping_trivia(&mut self, k: K) {
         self.b.start(k);
     }
     fn finish(&mut self) {
@@ -748,6 +764,14 @@ impl<'a> P<'a> {
             if guard > 50_000 {
                 self.error("PW0199", "template made no progress");
                 break;
+            }
+            // Whitespace between markup is CONTENT. It is what separates two
+            // inline elements, and leaving it as trivia drops it from HIR — so
+            // `<span>a</span> <span>b</span>` renders without the space.
+            if depth > 0 && self.trivia_pending() {
+                self.start_keeping_trivia(K::Text);
+                self.eat_trivia();
+                self.finish();
             }
             match self.cur() {
                 Kind::LAngle if self.nth_is(1, Kind::Slash) => {

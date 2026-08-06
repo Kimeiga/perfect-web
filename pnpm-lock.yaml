@@ -24,6 +24,22 @@ importers:
         specifier: 8.2.0
         version: 8.2.0(esbuild@0.27.7)
 
+  spikes/pw-to-marko:
+    dependencies:
+      marko:
+        specifier: 6.3.32
+        version: 6.3.32
+    devDependencies:
+      '@marko/run':
+        specifier: 0.11.8
+        version: 0.11.8(esbuild@0.27.7)(marko@6.3.32)
+      '@marko/run-adapter-node':
+        specifier: 2.0.6
+        version: 2.0.6(@marko/run@0.11.8(esbuild@0.27.7)(marko@6.3.32))
+      vite:
+        specifier: 8.2.0
+        version: 8.2.0(esbuild@0.27.7)
+
 packages:
 
   '@babel/runtime@7.29.7':

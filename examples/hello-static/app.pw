@@ -1,0 +1,28 @@
+// @corpus: fixture
+// @id: E3-static
+// @category: static route, no interaction
+// @charter: §14 M3 gate 1-2, §8.2
+// @milestone: E3
+//
+// The zero-JavaScript route. No state, no handlers, no streaming — semantic
+// HTML only. If the built output still ships framework JavaScript, that is a
+// measured fact to record (charter §18.4: the 0-JS budget is "a target to
+// test, not a fact to fake").
+
+module store.hello_static
+
+view HelloStatic() !{} {
+    <main>
+        <h1>Blue Bottle</h1>
+        <p>A static store page. No state, no handlers, no streaming.</p>
+        <h2>Menu</h2>
+        <ul aria-label="Menu">
+            <li><span>Espresso</span> <span>$3.50</span></li>
+            <li><span>Cortado</span> <span>$4.75</span></li>
+            <li><span>Cold Brew</span> <span>$5.25</span></li>
+        </ul>
+        <nav aria-label="Routes">
+            <a href="/counter">interactive route</a>
+        </nav>
+    </main>
+}

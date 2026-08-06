@@ -131,6 +131,11 @@ spike-koka:
 spike-pw-to-koka:
     @bash spikes/pw-to-koka/run.sh
 
+# E3: routes GENERATED from `.pw` by `pw emit-marko`, built and measured.
+# Needs node + pnpm, so it is not part of `just ci`.
+spike-pw-to-marko:
+    @bash spikes/pw-to-marko/run.sh
+
 spike-wasmtime:
     @bash spikes/wasmtime-component/run.sh
 

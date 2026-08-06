@@ -1,0 +1,36 @@
+// @corpus: fixture
+// @id: E3-counter
+// @category: one interactive control on a mostly inert page
+// @charter: §14 M3 gate 4, §8.5
+// @milestone: E3
+//
+// The claim under test is charter §8.5: SSR emits semantic HTML plus only the
+// metadata needed to resume interactions, rather than re-executing the whole
+// component tree in the browser. The inert region exists so the interactive
+// payload can be compared against something much larger than itself.
+
+module store.counter
+
+view Counter() !{} {
+    let mut count = 0
+
+    <main>
+        <h1>Blue Bottle</h1>
+        <section aria-label="Store information">
+            <p>A static description block, present so the page is not dominated
+               by the one interactive control.</p>
+            <h2>Menu</h2>
+            <ul aria-label="Menu">
+                <li><span>Espresso</span> <span>$3.50</span></li>
+                <li><span>Cortado</span> <span>$4.75</span></li>
+                <li><span>Cold Brew</span> <span>$5.25</span></li>
+                <li><span>Macchiato</span> <span>$4.00</span></li>
+                <li><span>Flat White</span> <span>$5.00</span></li>
+            </ul>
+        </section>
+        <section aria-label="Cart">
+            <p>In cart: <output id="count">{count}</output></p>
+            <button id="add" on:press={count = count + 1}>Add to cart</button>
+        </section>
+    </main>
+}
