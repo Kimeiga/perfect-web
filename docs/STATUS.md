@@ -13,9 +13,11 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 (six spikes) on 2026-08-05, with one documented shortfall: Linux CI.
 Full assessment: `docs/milestones/M0.md` (read `M0` there as `E0`).
 
-**next milestone:** **E1 — Koka effect-system feasibility**, narrowed to effects
-and handlers only by ADR-0011. **In progress:** its central question was answered
-early by RQ-2 (clean pass). Then **E1A** — `pw` value semantics and boundary ABI.
+**next milestone:** **E2 — source language front end. In progress.** Four of its
+six gate items pass. E1 is closed on RQ-2's measured Outcome 1; E1A is
+algorithmically implemented and now partly reachable from source. The two open
+E2 gate items are lowering to Koka (item 4) and the rejected-corpus count
+(item 2), which E1 and E5 own.
 
 **risk-retirement queue** (`docs/RISK_QUEUE.md`):
 
@@ -33,25 +35,31 @@ early by RQ-2 (clean pass). Then **E1A** — `pw` value semantics and boundary A
 files and they all parse, with precise spans and error recovery. The
 specification is executable in CI rather than merely well-formed.
 
-**Four rejected corpus files now fail to compile**, each caught by the rule its
+**Five rejected corpus files now fail to compile**, each caught by the rule its
 `@rule` header declares, with a primary span, an origin span, a note and a legal
-alternative. `just rejections` shows the current state.
+alternative. `just rejections` shows the current state. Four are declaration
+rules; **R-007 is the first caught by an algorithm** — the exhaustiveness
+checker, running on HIR lowered from source, naming every missing variant.
 
-The other 40 need body parsing, effect checking (E1) or privacy/placement (E5).
-Coverage is ratcheted by a test so it cannot silently regress.
+The other 39 need effect checking (E1) or privacy/placement (E5). Coverage is
+ratcheted by a test so it cannot silently regress.
 
-**Rowan is adopted** (ADR-0012). The green tree, the `SyntaxKind` tag space and
-both losslessness suites are in place; all 68 corpus files round-trip through
-the tree, and the token stream and tree are cross-checked against each other.
-The parser still builds the hand-rolled AST — porting it, then the core body
-grammar, then HIR, is `docs/NEXT.md` item 4.
+**The front end is complete through HIR.** Rowan is adopted (ADR-0012); the
+body grammar parses all 68 corpus files and they round-trip byte-for-byte;
+lowering (ADR-0014) turns them into id-indexed arenas with a span on every node,
+and `pw-core`'s checkers consume those ids without ever seeing a syntax node —
+enforced by a test, not by convention.
+
+**`pw fmt` ships** (ADR-0013 amendment). Idempotent, token- and
+comment-preserving on all 68 files, `--check` wired into `just ci`. It is a
+canonical *spacing*, not yet canonical line breaking, and the ADR says so.
 
 **public claims:** governed by `docs/EVIDENCE_LEDGER.md`. P0 cannot be published
 — six of the claims it needs are unstarted, and **45 corpus files exist of which
 0 compile**.
 
-**last passing commit:** `4a15477` — ADR-0012 Rowan adoption.
-`just ci` passes at that commit on macOS 26.5.2 / arm64.
+**last passing commit:** `62b8539` — `pw fmt`.
+`just ci` passes at that commit on macOS 26.5.2 / arm64, with 198 tests.
 
 ---
 
