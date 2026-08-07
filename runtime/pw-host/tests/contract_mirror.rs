@@ -142,7 +142,22 @@ fn the_real_contracts_drive_a_real_admission() {
             Node {
                 name: "origin-1".into(),
                 world: "origin".into(),
-                grants: BTreeSet::from(["database.read".to_string(), "database.write".to_string()]),
+                // The DOMAINS, not the families. `database.write<Carts>` is
+                // what the command requires and `grants` is exact membership,
+                // so a node offering `database.write` in general does not
+                // satisfy it — which is the point. Architect ruling,
+                // 2026-08-07: a component permitted to write Carts must not
+                // thereby acquire authority over Payments or AdminSettings.
+                //
+                // The bare spellings were here until the ontology made
+                // `database.write` generic, and this test going red is what
+                // that change looks like from the host's side.
+                grants: BTreeSet::from([
+                    "database.read<Carts>".to_string(),
+                    "database.read<Menus>".to_string(),
+                    "database.read<Stores>".to_string(),
+                    "database.write<Carts>".to_string(),
+                ]),
             },
         ],
     };
@@ -162,7 +177,10 @@ fn the_real_contracts_drive_a_real_admission() {
     );
 
     // The instance receives handles for exactly what it requires.
-    let backing = BTreeMap::from([("database.write".to_string(), "connection".to_string())]);
+    let backing = BTreeMap::from([(
+        "database.write<Carts>".to_string(),
+        "connection".to_string(),
+    )]);
     let granted = Granted::from(&admit(&command, &topology, "origin-1", &actual), &backing)
         .expect("admitted");
     assert_eq!(granted.count(), command.required_capabilities.len());

@@ -62,20 +62,51 @@ effect database.read<T> {
     host       "pw:host/database#read"
 }
 
-// NO type parameter, and the asymmetry with `read` above is the corpus's
-// rather than a design choice: all five parameterized uses in the corpus are
-// reads, and `database.write` is written bare twice and never otherwise.
+// Generic, on the architect's ruling of 2026-08-07 — and this is the one place
+// so far where the ontology deliberately leads the corpus rather than
+// describing it:
 //
-// Declaring `database.write<T>` for symmetry was the first version of this
-// file, and `every_other_effect_is_written_at_exactly_the_arity_it_declares`
-// rejected it — a declaration that describes what the vocabulary OUGHT to
-// look like is the thing an ontology exists to replace. Whether read and write
-// should agree is the same open question as `database.read`'s own arity, and
-// it is one question rather than three.
-effect database.write {
+// > Here I would intentionally not let the existing two bare corpus uses
+// > dictate the final ontology. […] A component permitted `database.write<Carts>`
+// > should not automatically acquire authority to write Payments, Users,
+// > AdminSettings, if the host can enforce that distinction. […] I'd rather
+// > start precise.
+//
+// An earlier version of this file declared `database.write<T>` for symmetry
+// with `read` and the arity test rejected it, correctly at the time: the
+// declaration described what the vocabulary ought to look like rather than what
+// the program said. What changed is not the evidence but the ruling — least
+// authority is a design goal the ontology is allowed to express, where symmetry
+// alone was not. If E8 later proves a host cannot enforce write authority at
+// domain granularity, this collapses on that evidence.
+//
+// Both bare uses were `Carts.add` and `Carts.clear`, so `<Carts>` is what they
+// already meant.
+effect database.write<T> {
     placement  origin
-    capability database.write
+    capability database.write<T>
     host       "pw:host/database#write"
+}
+
+// Opening a connection. Architect ruling, 2026-08-07:
+//
+// > `Database.connect` does not semantically perform `database.read<Database>`.
+// > We only wrote that because we lacked the vocabulary to state what it
+// > actually does. The ontology now exists specifically so we don't have to lie
+// > like that.
+//
+// It was `database.read<Database>` — "touches the database", with an argument
+// naming the module that said so — and the row was load-bearing anyway,
+// because `resource` is not a restricted family and without it `connect` was
+// placeable in the browser. Making the vocabulary one word larger let the
+// program say the true thing instead.
+//
+// Explicitly NOT `database.read<_>`: a wildcard may be useful later for effect
+// polymorphism, and "connect" is not "read any domain".
+effect database.connect {
+    placement  origin
+    capability database.connect
+    host       "pw:host/database#connect"
 }
 
 // A transaction is not a read or a write: it is the authority to hold one

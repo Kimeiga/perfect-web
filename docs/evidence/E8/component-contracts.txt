@@ -25,22 +25,22 @@ Resources.Store  abi 67b9938482d95947
   runs at   build, browser, edge, origin
   exports   query Store
 
-store.page.Cart  abi ecde9085de19af23
+store.page.Cart  abi 37cb9e8b9dc1738c
   runs at   origin
-  needs     database.read
-  host      pw:host/database#read  (database.read)
+  needs     database.read<Carts>
+  host      pw:host/database#read  (database.read<Carts>)
   exports   query Cart
 
-store.page.Menu  abi 0b0e5b9145063f31
+store.page.Menu  abi 60058db28f2ab607
   runs at   origin
-  needs     database.read
-  host      pw:host/database#read  (database.read)
+  needs     database.read<Menus>
+  host      pw:host/database#read  (database.read<Menus>)
   exports   query Menu
 
-store.page.Store  abi 3aa6df5aa87af2a3
+store.page.Store  abi 4aedcc2febb0861f
   runs at   origin
-  needs     database.read
-  host      pw:host/database#read  (database.read)
+  needs     database.read<Stores>
+  host      pw:host/database#read  (database.read<Stores>)
   exports   query Store
 
 store.page.StorePage  abi fc9b014826c42a8b
@@ -52,15 +52,15 @@ store.page.StorePage  abi fc9b014826c42a8b
   component pw:app/store.page.clear_cart#clear_cart
   exports   page StorePage
 
-store.page.add_to_cart  abi 4d95ea407cbb5eb7
+store.page.add_to_cart  abi a809c7313f7a7740
   runs at   origin
-  needs     database.write
-  host      pw:host/database#write  (database.write)
+  needs     database.write<Carts>
+  host      pw:host/database#write  (database.write<Carts>)
   exports   command add_to_cart
 
-store.page.clear_cart  abi c2a781d6ccefae55
+store.page.clear_cart  abi 0d616e1b3bc2bdba
   runs at   origin
-  needs     database.write
-  host      pw:host/database#write  (database.write)
+  needs     database.write<Carts>
+  host      pw:host/database#write  (database.write<Carts>)
   exports   command clear_cart
 

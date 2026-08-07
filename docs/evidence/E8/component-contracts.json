@@ -78,11 +78,12 @@
   {
     "component_id": "store.page.Cart",
     "capability_mapping": 1,
-    "abi_schema": "ecde9085de19af23",
+    "abi_schema": "37cb9e8b9dc1738c",
     "required_capabilities": [
       {
         "family": "database",
-        "operation": "read"
+        "operation": "read",
+        "argument": "Carts"
       }
     ],
     "allowed_placements": [
@@ -92,7 +93,7 @@
       {
         "interface": "pw:host/database",
         "name": "read",
-        "capability": "database.read",
+        "capability": "database.read<Carts>",
         "kind": "host_capability"
       }
     ],
@@ -106,11 +107,12 @@
   {
     "component_id": "store.page.Menu",
     "capability_mapping": 1,
-    "abi_schema": "0b0e5b9145063f31",
+    "abi_schema": "60058db28f2ab607",
     "required_capabilities": [
       {
         "family": "database",
-        "operation": "read"
+        "operation": "read",
+        "argument": "Menus"
       }
     ],
     "allowed_placements": [
@@ -120,7 +122,7 @@
       {
         "interface": "pw:host/database",
         "name": "read",
-        "capability": "database.read",
+        "capability": "database.read<Menus>",
         "kind": "host_capability"
       }
     ],
@@ -134,11 +136,12 @@
   {
     "component_id": "store.page.Store",
     "capability_mapping": 1,
-    "abi_schema": "3aa6df5aa87af2a3",
+    "abi_schema": "4aedcc2febb0861f",
     "required_capabilities": [
       {
         "family": "database",
-        "operation": "read"
+        "operation": "read",
+        "argument": "Stores"
       }
     ],
     "allowed_placements": [
@@ -148,7 +151,7 @@
       {
         "interface": "pw:host/database",
         "name": "read",
-        "capability": "database.read",
+        "capability": "database.read<Stores>",
         "kind": "host_capability"
       }
     ],
@@ -207,11 +210,12 @@
   {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "4d95ea407cbb5eb7",
+    "abi_schema": "a809c7313f7a7740",
     "required_capabilities": [
       {
         "family": "database",
-        "operation": "write"
+        "operation": "write",
+        "argument": "Carts"
       }
     ],
     "allowed_placements": [
@@ -221,7 +225,7 @@
       {
         "interface": "pw:host/database",
         "name": "write",
-        "capability": "database.write",
+        "capability": "database.write<Carts>",
         "kind": "host_capability"
       }
     ],
@@ -235,11 +239,12 @@
   {
     "component_id": "store.page.clear_cart",
     "capability_mapping": 1,
-    "abi_schema": "c2a781d6ccefae55",
+    "abi_schema": "0d616e1b3bc2bdba",
     "required_capabilities": [
       {
         "family": "database",
-        "operation": "write"
+        "operation": "write",
+        "argument": "Carts"
       }
     ],
     "allowed_placements": [
@@ -249,7 +254,7 @@
       {
         "interface": "pw:host/database",
         "name": "write",
-        "capability": "database.write",
+        "capability": "database.write<Carts>",
         "kind": "host_capability"
       }
     ],

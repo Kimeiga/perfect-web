@@ -21,10 +21,10 @@ fn is_empty(s: SessionId) -> Bool !{ database.read<Carts> } {
     todo
 }
 
-fn add(s: SessionId, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write } {
+fn add(s: SessionId, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write<Carts> } {
     todo
 }
 
-fn clear(s: SessionId) -> Result<Cart, CartError> !{ database.write } {
+fn clear(s: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> } {
     todo
 }

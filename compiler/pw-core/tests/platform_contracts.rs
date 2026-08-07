@@ -320,7 +320,13 @@ fn the_trusted_platform_contract_is_hashed() {
     // Public }`. Architect ruling — effect NAMES are ambient because the
     // package exports them; their ARGUMENTS are not, and `log<Public>` had
     // been naming a type it never imported.
-    const EXPECTED: u64 = 0x230b_cc94_8538_4f92;
+    // Changed again 2026-08-07: `effect database.connect` is new and
+    // `database.write` became `database.write<T>`. Architect rulings —
+    // `Database.connect` does not perform `database.read<Database>` and only
+    // said so for want of vocabulary; and a component permitted
+    // `database.write<Carts>` should not thereby write Payments. The second is
+    // the ontology deliberately leading the corpus rather than describing it.
+    const EXPECTED: u64 = 0x9302_133f_df38_f72c;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
