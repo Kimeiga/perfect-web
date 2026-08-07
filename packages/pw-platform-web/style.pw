@@ -15,7 +15,7 @@ import browser.{ Element, Style }
 
 fn measure(el: Element) -> Int !{ layout.measure } { 0 }
 
-fn mutate(el: Style, property: String, value: String) -> () !{ style.mutate } { () }
+fn mutate(el: Style, property: String, value: String) -> () !{ style.mutate<PaintOnly> } { () }
 
 // The marker a layout-affecting write names.
 //
@@ -25,6 +25,18 @@ fn mutate(el: Style, property: String, value: String) -> () !{ style.mutate } { 
 // distinction the next comment calls "the point" rested on a spelling no
 // checker could resolve. Found by the rule on its first run against the corpus.
 type LayoutAffect = LayoutAffect {}
+
+// Its counterpart: a write that cannot invalidate layout, and therefore costs
+// only paint.
+//
+// Declared 2026-08-07 because `effect style.mutate<T>` binds a parameter and a
+// use must supply it — architect ruling: omission must not secretly mean "any
+// T". Before this there was no way to SAY "a style write that does not affect
+// layout"; the bare `style.mutate` said it by omission, which is the wildcard
+// the ruling rejects. `layout.rs` matches the written form
+// `style.mutate<LayoutAffect>`, so a `PaintOnly` write is not layout-affecting
+// for exactly the reason it reads as if it should be.
+type PaintOnly = PaintOnly {}
 
 // Charter §7.5A's own spelling. The type argument is the point: a write that
 // can invalidate layout is a DIFFERENT effect from one that cannot, and naming
@@ -51,7 +63,7 @@ fn set_height(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { 
 
 fn set_padding(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_custom(el: Style, property: String, value: String) -> () !{ style.mutate } { () }
+fn set_custom(el: Style, property: String, value: String) -> () !{ style.mutate<PaintOnly> } { () }
 
 // The compositor-only properties. Charter §7.5A: `animation.composite` runs off
 // the main thread, which is possible exactly because these two do not

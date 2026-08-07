@@ -10,7 +10,7 @@ module generality.effect_partial
 import Stores
 import Analytics
 
-fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
     Analytics.record_view(id)
     Stores.get(id)
 }

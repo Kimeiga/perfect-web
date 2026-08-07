@@ -11,7 +11,7 @@ import device
 import domain.{ Location }
 
 fn locate(id: StoreId) -> Result<Store, StoreError>
-    !{ device.location, database.read }
+    !{ device.location, database.read<Stores> }
 {
     // BOTH effects are performed, not merely declared.
     //

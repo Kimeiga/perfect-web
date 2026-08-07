@@ -9,7 +9,7 @@ module rules.sink_good
 import log
 import Stores
 
-fn trace(id: StoreId) -> () !{ log<Public>, database.read } {
+fn trace(id: StoreId) -> () !{ log<Public>, database.read<Stores> } {
     let store = Stores.get(id)
     log.public("loaded {store}")
 }

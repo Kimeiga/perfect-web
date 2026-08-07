@@ -4,7 +4,7 @@
 // @charter: §7.5, §15.1
 // @milestone: E2C
 //
-// database.read is why a browser-placed body cannot call this, and why a `view` declaring `!{{}}` that does is not pure.
+// database.read<Stores> is why a browser-placed body cannot call this, and why a `view` declaring `!{{}}` that does is not pure.
 
 module Stores
 
@@ -13,13 +13,13 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
     RecommendationError, PaymentError, TrackingError }
 import browser.{ Element, MapHandle, MapError }
 
-fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
     todo
 }
 
 // `find` may not find one, and says so in its type. `get` is the form that
 // fails loudly; this is the form whose absence is a value.
-fn find(name: String) -> Option<Store> !{ database.read } {
+fn find(name: String) -> Option<Store> !{ database.read<Stores> } {
     todo
 }
 

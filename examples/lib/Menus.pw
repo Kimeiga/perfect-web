@@ -15,18 +15,18 @@ import browser.{ Element, MapHandle, MapError }
 
 // The public menu: the same for every reader, which is what makes a shared
 // cache correct for it (E4's store demo).
-fn for_store(store: StoreId) -> Result<List<MenuItemId>, StoreError> !{ database.read } {
+fn for_store(store: StoreId) -> Result<List<MenuItemId>, StoreError> !{ database.read<Menus> } {
     todo
 }
 
 // Partitioned by user rather than by organization. Declared so a challenge
 // witness can vary the PARTITION without varying anything else.
 fn for_user(store: StoreId, limit: Int, user: String) -> Result<List<MenuItemId>, StoreError>
-    !{ database.read }
+    !{ database.read<Menus> }
 {
     todo
 }
 
-fn for_store_in_org(store: StoreId, org: String) -> Result<List<MenuItemId>, StoreError> !{ database.read } {
+fn for_store_in_org(store: StoreId, org: String) -> Result<List<MenuItemId>, StoreError> !{ database.read<Menus> } {
     todo
 }

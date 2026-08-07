@@ -7,7 +7,7 @@ module generality.option_nested
 
 import Stores
 
-fn name_of(id: StoreId, verbose: Bool) -> String !{ database.read } {
+fn name_of(id: StoreId, verbose: Bool) -> String !{ database.read<Stores> } {
     let store = Stores.find(id)
     if verbose { store.name } else { "short" }
 }

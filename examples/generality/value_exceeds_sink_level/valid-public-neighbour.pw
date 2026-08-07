@@ -11,7 +11,7 @@ module generality.sink_neighbour
 import log
 import Stores
 
-fn audit(id: StoreId, dry_run: Bool) -> () !{ log<Public>, database.read } {
+fn audit(id: StoreId, dry_run: Bool) -> () !{ log<Public>, database.read<Stores> } {
     let store = Stores.get(id)
     let same = store
     let value = if dry_run { "none" } else { same }

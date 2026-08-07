@@ -310,7 +310,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // declaration is the only thing that can say so. This is the fact
     // `World::worlds_for` holds as a hard-coded table, and moving it here is
     // what eventually lets that table be deleted rather than relocated.
-    const EXPECTED: u64 = 0x829a_057b_aa9d_3eaa;
+    // Changed again 2026-08-07: `style.pw` gained `type PaintOnly` and its two
+    // bare `style.mutate` rows became `style.mutate<PaintOnly>`. Architect
+    // ruling — `effect style.mutate<T>` binds a parameter and a use must
+    // supply it, so the bare form said "does not invalidate layout" by
+    // omission. There was no way to say it positively; now there is.
+    const EXPECTED: u64 = 0x563f_1bb0_e013_54d9;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

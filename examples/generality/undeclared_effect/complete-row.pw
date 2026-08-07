@@ -10,11 +10,11 @@ import Stores
 import Analytics
 import List
 
-fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read, network.fetch } {
+fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores>, network.fetch } {
     Analytics.record_view(id)
     Stores.get(id)
 }
 
-fn labels(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{ database.read } {
+fn labels(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{ database.read<Stores> } {
     List.map(ids, id => Stores.get(id))
 }

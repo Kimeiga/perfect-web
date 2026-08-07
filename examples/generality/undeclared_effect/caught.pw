@@ -10,11 +10,11 @@ module generality.effect_depth
 import Stores
 import List
 
-fn inner(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+fn inner(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
     Stores.get(id)
 }
 
-fn middle(id: StoreId) -> Result<Store, StoreError> !{ database.read } {
+fn middle(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
     inner(id)
 }
 

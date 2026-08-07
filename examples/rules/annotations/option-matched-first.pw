@@ -7,7 +7,7 @@ module rules.opt_good
 
 import Stores
 
-fn name_of(id: StoreId) -> String !{ database.read } {
+fn name_of(id: StoreId) -> String !{ database.read<Stores> } {
     let store: Option<Store> = Stores.find(id)
     match store {
         Some(s) => s.name

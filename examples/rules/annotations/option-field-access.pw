@@ -5,7 +5,7 @@ module rules.opt_bad
 
 import Stores
 
-fn name_of(id: StoreId) -> String !{ database.read } {
+fn name_of(id: StoreId) -> String !{ database.read<Stores> } {
     let store: Option<Store> = Stores.find(id)
     store.name
 }

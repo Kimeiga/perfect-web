@@ -13,11 +13,11 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
     RecommendationError, PaymentError, TrackingError }
 import browser.{ Element, MapHandle, MapError }
 
-fn current(s: SessionId) -> Result<Cart, CartError> !{ database.read } {
+fn current(s: SessionId) -> Result<Cart, CartError> !{ database.read<Carts> } {
     todo
 }
 
-fn is_empty(s: SessionId) -> Bool !{ database.read } {
+fn is_empty(s: SessionId) -> Bool !{ database.read<Carts> } {
     todo
 }
 

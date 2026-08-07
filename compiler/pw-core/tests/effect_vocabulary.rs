@@ -230,20 +230,43 @@ fn every_declaration_says_what_authority_it_needs() {
     );
 }
 
-/// The effects written at more than one arity, and how many uses each shape has.
+/// The effects written at more than one arity.
 ///
-/// **A ratchet, not an allowance.** The architect's test list says a bare
-/// `database.read` is a wrong-arity error, and the corpus writes one nineteen
-/// times. Wiring the diagnostic today would report nineteen working rows, so
-/// the conflict is MEASURED and pinned here instead of being discovered later
-/// as a surprise — and a third ambiguous effect cannot be added quietly.
+/// **Empty, and it stays empty.** Architect ruling, 2026-08-07:
 ///
-/// Format: effect, uses without an argument, uses with one.
-const ARITY_UNSETTLED: &[(&str, usize, usize)] =
-    &[("database.read", 19, 5), ("style.mutate", 2, 7)];
+/// > I would keep the original rule: `effect database.read<T>` means a use must
+/// > supply exactly one argument. […] Don't make omission secretly mean
+/// > wildcard.
+///
+/// It was two entries — `database.read` written bare 19 times and
+/// `style.mutate` twice — and all 21 rows were classified and specified rather
+/// than mechanically rewritten. What each turned out to be:
+///
+/// ```text
+/// 7   examples/lib/*.pw          real interface contracts. `Stores.get` reads
+///                                Stores, `Carts.current` reads Carts,
+///                                `Menus.for_store` reads Menus. The row was
+///                                saying "the database" where the function
+///                                names the domain in its own module header
+/// 9   generality/ and rules/     fixtures whose bodies all call `Stores.*`,
+///                                so `<Stores>` is what they already meant
+/// 2   style.pw                   `mutate` and `set_custom`, which said "does
+///                                not invalidate layout" by OMISSION — the
+///                                wildcard the ruling rejects, and there was no
+///                                way to say it positively until `PaintOnly`
+/// 1   Database.connect           see below: the one that is not a domain read
+/// 2   Menus.for_user etc.        partition witnesses, same domain
+/// ```
+///
+/// So the ruling's prediction held: the rows were underspecified rather than
+/// deliberately general, and specifying them named a distinction the platform
+/// had been making in comments. `PaintOnly` is the clearest case — five corpus
+/// files distinguished layout-affecting writes from ordinary ones, and the
+/// ordinary side of that distinction had no name.
+const ARITY_UNSETTLED: &[(&str, usize, usize)] = &[];
 
 #[test]
-fn the_two_effects_written_at_two_arities_are_exactly_the_ones_recorded() {
+fn no_effect_is_written_at_two_different_arities() {
     let mut found: Vec<(String, usize, usize)> = Vec::new();
     for (name, shapes) in written() {
         if shapes.len() < 2 {
@@ -262,20 +285,22 @@ fn the_two_effects_written_at_two_arities_are_exactly_the_ones_recorded() {
         found, expected,
         "\nThe corpus writes an effect at two different arities, and the set \
          has changed.\n\n\
-         If you REPAIRED one, remove it from `ARITY_UNSETTLED` — the list may \
-         only shrink.\n\
-         If you ADDED one: an effect's arity is part of its identity, and \
-         `database.read` written both ways is the open question this list \
-         exists to keep visible. See `docs/NEXT.md`.\n"
+         An effect's arity is part of its identity, and a use must supply \
+         exactly the number its declaration binds. Omission does NOT mean \
+         \"any T\" — architect ruling, 2026-08-07. If a row genuinely means \
+         \"any database read\", that is the motivating case for explicit \
+         wildcard syntax (`database.read<_>`) and wants a ruling, not a bare \
+         spelling.\n"
     );
 }
 
 #[test]
-fn every_other_effect_is_written_at_exactly_the_arity_it_declares() {
-    // The positive side, and the reason the ratchet above is two entries
-    // rather than a shrug: twenty-three of twenty-five effects already agree
-    // with their declaration, so the two that do not are a real inconsistency
-    // and not the normal state of the corpus.
+fn every_effect_is_written_at_exactly_the_arity_it_declares() {
+    // The rule, now that `ARITY_UNSETTLED` is empty: a use supplies exactly
+    // the number of arguments its declaration binds. This and
+    // `no_effect_is_written_at_two_different_arities` are complementary —
+    // that one catches an effect written inconsistently even when nothing
+    // declares it, this one catches one written consistently and wrongly.
     let (_hirs, ontology) = ontology_and_hirs();
     let unsettled: BTreeSet<&str> = ARITY_UNSETTLED.iter().map(|(n, _, _)| *n).collect();
 

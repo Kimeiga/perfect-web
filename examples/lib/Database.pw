@@ -16,8 +16,20 @@ import browser.{ Element, MapHandle, MapError }
 // A live connection. It is a resource for the same reason a transaction is —
 // something outside the program is holding state open on this program's behalf
 // — and that is also why it cannot be written into a resume manifest.
+// `database.read<Database>` is the one row of the twenty-one that specifying
+// did not improve. Connecting is not reading a domain — but the row is
+// load-bearing anyway: `resource` is not a restricted family, so without it
+// `connect` is placeable in the browser. So it says "touches the database"
+// with an argument that names the module saying it.
+//
+// **The motivating case for explicit wildcard syntax** — architect ruling,
+// 2026-08-07: "if it genuinely means 'any database read', record that as the
+// motivating case for an explicit wildcard feature rather than inventing one
+// implicitly." `database.read<_>` would say this exactly. A `database.connect`
+// operation would say it better still, and both are rulings rather than
+// choices to make here.
 fn connect() -> DatabaseConnection
-    !{ database.read, resource.acquire<DatabaseConnection> }
+    !{ database.read<Database>, resource.acquire<DatabaseConnection> }
 {
     todo
 }
