@@ -115,6 +115,7 @@ pub struct Import {
 /// What class an ACTUAL Wasm import falls into.
 ///
 /// The audit classifies rather than flattening, because each class is
+pub mod plan;
 /// constrained by a different thing: a host capability by the contract's
 /// `required_capabilities` and the node's grants, a component interface by that
 /// component's own contract, and a runtime import by nothing at all — which is
