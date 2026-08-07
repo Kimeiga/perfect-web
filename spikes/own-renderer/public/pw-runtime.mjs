@@ -419,6 +419,12 @@ function loadHandler(identity) {
 }
 
 async function attach() {
+  // Marked, so activation cost is a MEASUREMENT rather than a wall-clock guess
+  // taken from outside. `performance.measure` attributes the work to this
+  // runtime; a stopwatch around navigation would also count the network, the
+  // parser and the paint.
+  performance.mark("pw:activate:start");
+
   // One traversal, before anything else. Every later lookup is a map hit.
   const indexed = buildIndex();
   log.push(`indexed ${indexed} address(es)`);
@@ -491,6 +497,9 @@ async function attach() {
       `attached ${part.id} to ${owners.length} instance(s): ${addresses.join(" ")}`,
     );
   }
+
+  performance.mark("pw:activate:end");
+  performance.measure("pw:activate", "pw:activate:start", "pw:activate:end");
 
   subscribe();
   window.__pw.ready = true;

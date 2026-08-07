@@ -231,23 +231,28 @@ test.describe("the identity checks can fail", () => {
   });
 });
 
-test.describe("the remaining E7-L gap, recorded", () => {
-  test("handler code is still fetched before interaction", async ({ page }) => {
-    // Not a failure. E7-R's question is whether the renderer can produce the
-    // page, authorise the handler and update targeted parts; E7-L's is whether
-    // the executable bytes were withheld until needed.
+test.describe("what activation costs, now that E7-L has closed", () => {
+  test("the runtime and the decision load eagerly; handlers do not", async ({ page }) => {
+    // This test used to record E7-L as an open gap: "handler code is still
+    // fetched before interaction". It is kept, inverted, because the
+    // distinction it was drawing is the one worth holding on to.
     //
-    // Recorded here so the gap is a measured fact rather than a note, and so
-    // the day it closes this test goes red for the right reason.
+    // Two things load before any interaction and both must: the runtime, which
+    // finds and addresses the parts, and the decision, which authorises
+    // handlers. Neither is behaviour. Behaviour is what E7-L withholds — see
+    // `lazy-handler.spec.mjs` for the twelve controls.
     const requested = [];
     page.on("request", (r) => requested.push(r.url()));
     await ready(page);
+    await page.waitForTimeout(300);
 
     const eager = requested.filter((u) => u.endsWith(".mjs") || u.endsWith(".wasm"));
+    expect(eager.some((u) => u.includes("pw-runtime")), "the runtime loads").toBe(true);
+    expect(eager.some((u) => u.includes("pw-resume")), "the decision loads").toBe(true);
     expect(
-      eager.length,
-      "the runtime and the decision are loaded eagerly today — this is E7-L's work",
-    ).toBeGreaterThan(0);
+      eager.filter((u) => u.includes("/handler/")),
+      "and no handler does",
+    ).toEqual([]);
   });
 });
 

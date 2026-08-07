@@ -156,6 +156,15 @@ golden-both: golden-marko golden-pw
 spike-own-renderer:
     @bash spikes/own-renderer/run.sh
 
+# E7 gate items 7-10: runtime size, activation CPU, forced synchronous layout,
+# and the large-menu case.
+#
+# Run ALONE, on Chromium only. Three engine families in parallel saturate the
+# machine, and a long-animation-frame measurement taken under that load
+# measures the load — it failed exactly that way before being separated out.
+e7-performance:
+    @bash spikes/own-renderer/performance.sh
+
 # E6F. There is only one parser that decides what a `.pw` program means.
 # Enumerates the real keyword tables rather than a copy of them — a test with
 # its own list would be the fifth copy of the thing this milestone removed.

@@ -124,7 +124,10 @@ async function mark(page) {
 async function settled(page, names) {
   try {
   await expect
-    .poll(async () => (await shown(page)).map((r) => r.name), { timeout: 5000 })
+    // Generous, because the suite runs three engine families in parallel and
+    // a patch that takes four seconds to arrive under that load is slow rather
+    // than absent. The assertion still fails if the change never comes.
+    .poll(async () => (await shown(page)).map((r) => r.name), { timeout: 15000 })
     .toEqual(names);
   } catch (e) {
     console.log("DIAG:", await page.evaluate(() => window.__pw.log.join(" | ")));

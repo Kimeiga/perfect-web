@@ -1,0 +1,28 @@
+E7 gate items 7-10 — the own renderer's cost, measured
+
+produced by: just e7-performance
+engine:      chromium (Long Animation Frame API is Chromium-only)
+workers:     1 (a loaded machine measures the load)
+
+Every number below has a negative control in the same session:
+  the forced-layout detector is shown going red on a deliberate thrash;
+  the layout-read counter is shown counting a deliberate read;
+  the uncontained large menu is shown costing measurable time.
+
+  static-route-script-bytes=0 wasm-bytes=0
+  interactive-script-bytes=28471
+  interactive-wasm-bytes=74222
+  script 28471 http://127.0.0.1:3148/pw-runtime.mjs
+  wasm 74222 http://127.0.0.1:3148/pw-resume.wasm
+  activation-ms=22.70
+  interaction-long-frames=0 worst-ms=0.0 forced-attr-exposed=false
+  control-long-frames=1 worst-ms=150.8
+  runtime-layout-reads=0
+  large-menu-items=1000
+  large-menu-content-visibility=auto
+  large-menu-first-layout-ms-visible=10.8 samples=[9.9,10.8,19.4,9.2,10.8]
+  large-menu-first-layout-ms-contained=1.8 samples=[1.5,1.9,1.8,1.6,1.8]
+
+  ✓  6 [chromium] › e2e/performance.spec.mjs:317:1 › gate 10: a thousand-item menu keeps a bounded rendering cost (1.2s)
+
+  6 passed (8.3s)

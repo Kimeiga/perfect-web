@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Thirty-two measurements in this project produced plausible, favourable results
+Thirty-four measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -243,6 +243,8 @@ argument for the admissibility rule above.
 | E7-P transport | the cursor protocol worked for every subscriber that had ever received a frame | sequences started at zero and the initial cursor was zero, so the very first frame a subscriber ever received was numbered zero, `since=0` read it as already acknowledged, and it was never delivered. Every test that sent two things passed. An off-by-one at the exact boundary where nothing has happened yet is invisible to any fixture that warms up first |
 | E7-L resume | `resumable() => clear_cart()` rendered a button that could never work | a resume manifest was only generated when the handler CAPTURED something, so "not resumable" and "resumable with nothing captured" were one test. A handler that needs nothing from the document got no identity, could not be authorised, and attached nothing — and the page looked complete. The compiler said nothing because, as far as it was concerned, there was no resumable handler there to say anything about |
 | E7-L resume | the second handler was refused with code 9, malformed | the runtime built a capture schema as `of_fields(&[(name, "T")])`, and for a handler with no captures that is a schema of ONE field named `""` rather than the schema of no fields. `decide` correctly refuses a manifest carrying no capture bytes under a non-empty schema, so a handler that captures nothing was malformed by construction. Fail-closed worked and the only symptom was a button that never attached |
+| E7-L host | `add_to_cart` incremented the cart correctly in every test | the read sat OUTSIDE the lock: `let next = cart_value(session) + 1;` then commit, then write. Two presses landing in the same instant both read 0, both computed 1, and one was lost. Every test that clicks once and waits passes; the test that found it clicks TWICE CONCURRENTLY, and it was written to prove something else entirely — that a handler module is fetched once rather than twice |
+| E8-0 contract | `Resources.Cart` required `database.read`, which read like exactly the right answer for a cart query | its body is `todo` — it performs nothing. `Inference::known` is keyed by the BARE declaration name, so `Resources.Cart` and `store.page.Cart` share one entry, and the contract handed one component the authority of a different component that happens to have the same name. Every capability in the emitted set was plausible for the component it was attached to, which is why reading the output did not find it; deriving from the BODY did |
 
 The two E6 rows and the inference row share a shape with the by-name member
 fallback deleted in E2C, arriving through three different doors. The E6 graph

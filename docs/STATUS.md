@@ -15,16 +15,50 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 A storage change is not a protocol change, and a test proves it: two storage
 representations of one identity derive the same wire id.
 
-**current milestone:** **E7 — the own renderer.** Tasks 1 and 2 are closed and
-E7-R's vertical slice runs: the **real store page** is rendered by the own
-renderer, its handler is authorised by `decide()` before it attaches, and a
-click updates only the cart's part while every menu node keeps its identity.
-A click changes the browser because the **declared resource dependency
-changed** — the command commits and returns nothing about the cart; the event's
-arguments select which entries invalidate; the resource refreshes with a
-version; the subscriber is told. 120 browser assertions across Chromium,
-Firefox and WebKit (`just spike-own-renderer`), and `just golden-both` runs the
-shared case set against Marko and the own renderer as separate processes.
+**current milestone:** **E8 — the capability host.** E7 is complete; all ten of
+its gate items have evidence under `docs/evidence/E7/`.
+
+**E7, closed.** The **real store page** is rendered by the own renderer, its
+handlers are authorised by `decide()` before they attach, and a click updates
+only the cart's part while every menu node keeps its identity. A click changes
+the browser because the **declared resource dependency changed** — the command
+commits and returns nothing about the cart; the event's arguments select which
+entries invalidate; the resource refreshes with a version; the subscriber is
+told. 258 browser assertions across Chromium, Firefox and WebKit
+(`just spike-own-renderer`), and `just golden-both` runs the shared case set
+against Marko and the own renderer as separate processes.
+
+E7-P added keyed collections — `InsertBefore`, `InsertAfter`, `RemoveInstance`
+and `MoveInstance`, with DOM identity surviving a move because the nodes are
+moved rather than rebuilt — the public menu materialized once and shared so
+that one patch reaches every reader, and **two transports** carrying the same
+frames: a held streaming connection and a long poll, under one cursor
+discipline where a client's next request is its acknowledgement of the last
+frames it applied.
+
+E7-L added interaction-lazy code loading. The document carries no behaviour;
+handlers are served by IDENTITY and fetched on first interaction, after the
+E7V decision authorises them. An unauthorised handler is never fetched, and a
+failed load is visible on the element and recoverable.
+
+`just e7-performance` measures gate items 7–10 alone on Chromium, because a
+long-animation-frame measurement taken while three engine families hammer the
+machine measures the machine. Every figure has a negative control in the same
+session:
+
+```text
+static route            0 bytes of script, 0 of wasm
+interactive route       28,471 bytes script + 74,222 wasm, no handler bytes
+activation              ~4-25 ms, marked by the runtime itself
+interaction long frames 0   (control: a deliberate thrash gives 1 at 150 ms)
+runtime layout reads    0   (control: the counter counts a deliberate read)
+1,000-item menu         10.1 ms uncontained → 1.7 ms with content-visibility
+```
+
+Gate 9 is proved rather than sampled: the runtime performs **no layout reads at
+all**, so it cannot interleave measurement with mutation.
+`forcedStyleAndLayoutDuration` is not exposed by this browser — E0 measured
+that — so gate 8 uses the long-animation-frame count E0 validated instead.
 
 Live parts are addressed as `IdentityDomain + InstancePath + LocalPartId`. A
 template part *definition* is not a document part *instance*: the store page's
@@ -44,12 +78,8 @@ domain **refuses the render**: correctness does not rest on probability.
 template renderer, with a poisoned artifact as the negative control — and then
 observed, by a MutationObserver that sees mutations only inside the cart part.
 
-Handler bytes are still fetched eagerly. That is E7-L's work and it is recorded
-as a measured fact rather than a note.
-
-**current milestone:** **E7 — the own renderer (E7-R/E7-P/E7-L).** Everything
-before it is closed: E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6 and the inserted
-E6F and E7V. The three items the architect required before E6 could start are
+**everything before E8 is closed:** E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4,
+E5, E6, E7 and the inserted E6F and E7V. The three items the architect required before E6 could start are
 also closed — coverage-guided fuzzing (`just fuzz`), the compatibility decision
 on the real browser handler path, and typed `{#each}` captures
 (`just each-typing`).
@@ -66,17 +96,23 @@ nothing**: a `materialize` block's policies were being parsed as expressions, so
 `decl.policies` was empty for every materialization, and seven fixtures named
 resources and events no file in their program declared. Corpus **C2** opened.
 
-**next milestone:** **E7's own renderer** (E7-R/E7-P/E7-L), then E8's Wasm
-capability host and E9's permanent type checker. Those are the large ones and
-none is started; `docs/MILESTONES.md` has the register.
+**next milestone:** **E8's Wasm capability host**, beginning with **E8-0**: the
+frozen compiler→host `ComponentContract`. The architect's ruling of 2026-08-07
+sets the order and the principle:
+
+> The compiler decides what authority code needs. The host decides whether that
+> authority physically exists. Neither should reconstruct the other's answer.
+
+Then E9's permanent type and effect compiler. `docs/MILESTONES.md` has the
+register.
 
 Three of the four shortcuts `readiness.txt` named this morning are closed:
 branch-aware affine analysis, Option inference that does not need the
 annotation, and string holes lowered as expressions. Each replacement is proved
 by a program the narrow rule would have passed.
 
-E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6, E6F and E7V are complete. E1
-closed on RQ-2's Outcome 1. E7 onward are not started.
+E0, E1A, E2, E2A, E2B, E2C, E2D, E3, E4, E5, E6, E6F, E7V and E7 are complete.
+E1 closed on RQ-2's Outcome 1. E8 onward are not started.
 
 **E6F is complete** (`docs/milestones/E6F.md`): there is one parser. The second
 declaration parser and its AST are deleted — 1,484 lines — and `pw explain`, the

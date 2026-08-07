@@ -210,24 +210,31 @@ impl Server {
     /// rolls back, and then neither the state nor the event survives — so the
     /// browser receives nothing, which is the property ADR-0019 exists for.
     fn add_to_cart(&self, session: &str, fail: bool) -> Result<(), String> {
-        let next = self.cart_value(session) + 1;
-        let result: Result<Vec<i64>, String> = self.materializer.command(|tx| {
-            Materializer::set_state(tx, &format!("cart:{session}"), &next.to_string());
-            if fail {
-                return Err("the command failed after writing".to_string());
-            }
-            Ok(vec![pw_materialize::Event::new(
-                "Events.CartChanged",
-                &[session],
-            )])
-        });
-        // Rolled back: neither the state nor the event survives, so the cart
-        // is not updated and nothing is queued for the browser.
-        result?;
-        self.carts
-            .lock()
-            .expect("carts")
-            .insert(session.to_string(), next);
+        // Read, commit and write under ONE lock.
+        //
+        // The read used to sit outside it, so two presses landing in the same
+        // instant both read 0, both computed 1, and one of them was lost — a
+        // classic read-modify-write race, invisible to every test that clicks
+        // once and waits. `lazy-handler.spec.mjs` clicks twice concurrently to
+        // prove the module is fetched once, and that is what found it.
+        {
+            let mut carts = self.carts.lock().expect("carts");
+            let next = carts.get(session).copied().unwrap_or(0) + 1;
+            let result: Result<Vec<i64>, String> = self.materializer.command(|tx| {
+                Materializer::set_state(tx, &format!("cart:{session}"), &next.to_string());
+                if fail {
+                    return Err("the command failed after writing".to_string());
+                }
+                Ok(vec![pw_materialize::Event::new(
+                    "Events.CartChanged",
+                    &[session],
+                )])
+            });
+            // Rolled back: neither the state nor the event survives, so the
+            // cart is not updated and nothing is queued for the browser.
+            result?;
+            carts.insert(session.to_string(), next);
+        }
 
         // The materializer drains the committed event and regenerates the
         // entry it invalidates. The version moves because the RESOURCE moved.
@@ -238,13 +245,19 @@ impl Server {
     /// `clear_cart`, through the same path as `add_to_cart`.
     fn clear_cart(&self, session: &str) -> Result<(), String> {
         let key = session.to_string();
-        self.materializer.command::<String>(|_tx| {
-            self.carts.lock().expect("carts").insert(key.clone(), 0);
-            Ok(vec![pw_materialize::Event::new(
-                "Events.CartChanged",
-                &[&key],
-            )])
-        })?;
+        // The same discipline as `add_to_cart`: the state change and the
+        // command commit under one lock, so a clear racing an add cannot land
+        // between the add's read and its write.
+        {
+            let mut carts = self.carts.lock().expect("carts");
+            self.materializer.command::<String>(|_tx| {
+                Ok(vec![pw_materialize::Event::new(
+                    "Events.CartChanged",
+                    &[&key],
+                )])
+            })?;
+            carts.insert(key.clone(), 0);
+        }
         self.drain(session);
         Ok(())
     }
@@ -787,6 +800,20 @@ fn menu_value(items: &[(String, String)]) -> Value {
     Value::List(items.iter().map(|(id, name)| item(id, name)).collect())
 }
 
+/// The containment the large-menu case relies on.
+///
+/// `content-visibility: auto` rather than virtualization: a menu is
+/// semantically a list of independent items, so every item stays in the
+/// document, findable and in the accessibility tree, and the ones off screen
+/// are simply not laid out until they approach the viewport. Virtualization
+/// removes items from the document, which is a correctness cost that has to be
+/// justified per case rather than adopted as a default.
+///
+/// `contain-intrinsic-size` is not optional with it: without a placeholder
+/// size the scrollbar jumps as items are realized, which is the visible defect
+/// that makes people abandon containment and reach for virtualization.
+const STYLE: &str = "#menu li { content-visibility: auto; contain-intrinsic-size: auto 42px; }";
+
 /// The graph, as `pw emit-graph` produced it. Read at build time so the server
 /// cannot drift from the compiler's answer between runs.
 const GRAPH: &str = include_str!("../../../../runtime/pw-materialize/tests/store-graph.json");
@@ -1033,6 +1060,25 @@ fn handle(server: &Server, mut stream: TcpStream) {
         }
         ("GET", "/stream") => stream_frames(server, &mut stream, &session, fresh, query),
         ("GET", "/StorePage.html") | ("GET", "/") => {
+            // The large-menu case, for E7 gate item 10. A query parameter
+            // rather than a second route: the same page, the same renderer,
+            // the same runtime — only more items, which is what makes the
+            // measurement about SIZE rather than about a different page.
+            let items: usize = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("items="))
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
+            if items > 0 {
+                let mut menu = server.menu.lock().expect("menu");
+                if menu.len() != items {
+                    *menu = (0..items)
+                        .map(|i| (format!("item-{i}"), format!("Item {i}")))
+                        .collect();
+                    drop(menu);
+                    server.materializer.invalidate(&server.menu_key(), 0);
+                }
+            }
             // Registering the subscriber HERE, when the document is served,
             // rather than when it first subscribes: the page holds instances
             // from this moment on, so a structural change after this moment
@@ -1247,6 +1293,7 @@ fn document(body: &str, templates: &[Template], cursor: u64) -> String {
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <title>Store</title>\n</head>\n<body>\n{body}\n\
+         <style>{STYLE}</style>\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          <script type=\"module\" src=\"/pw-runtime.mjs\"></script>\n\
          </body>\n</html>\n"

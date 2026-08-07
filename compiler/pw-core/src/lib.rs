@@ -28,6 +28,7 @@ pub mod capability;
 pub mod check;
 pub mod codes;
 pub mod contexts;
+pub mod contract;
 pub mod diag;
 pub mod diagnostics;
 pub mod effects;

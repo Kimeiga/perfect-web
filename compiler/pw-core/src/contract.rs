@@ -1,0 +1,429 @@
+//! E8-0 — what the compiler hands the host, frozen.
+//!
+//! Architect ruling, 2026-08-07:
+//!
+//! > The compiler decides what authority code needs. The host decides whether
+//! > that authority physically exists. Neither should reconstruct the other's
+//! > answer.
+//!
+//! and, on the shape of the boundary:
+//!
+//! > Freeze the compiler→host `ComponentContract` — component_id, abi_schema,
+//! > required_capabilities, allowed_placements, imports, exports. Rule: actual
+//! > Wasm imports ⊆ statically allowed set, never a superset. E8 consumes
+//! > capabilities; it does not define effect semantics.
+//!
+//! # What this module is careful NOT to do
+//!
+//! It does not say what a capability *means*. `database.read<Stores>` is a
+//! name derived from an effect row; whether a `database.read` exists, what it
+//! connects to, and whether this deployment has one are the host's questions.
+//! A compiler that answered them would be a second deployment topology, and
+//! the two would disagree the first time one of them changed.
+//!
+//! It also does not invent placements. `allowed_placements` is E5's solver
+//! output — the worlds that can satisfy what this component does — and nothing
+//! here re-derives it from the capability list.
+//!
+//! # The rule, and why it is a subset
+//!
+//! ```text
+//! actual Wasm imports  ⊆  the contract's allowed imports
+//! ```
+//!
+//! **Subset, never superset.** A component that imports fewer host functions
+//! than it is allowed to is fine: dead code, a branch never compiled in, a
+//! capability declared for a sibling. A component that imports even one it was
+//! not allowed is not a component with a small mistake — it is a component
+//! whose authority the compiler never approved, and the host has no basis for
+//! deciding whether it should have it.
+//!
+//! The audit is **fail-closed**. An import the audit cannot parse counts as
+//! undeclared, because "I could not tell what this asks for" and "this asks
+//! for nothing" must never produce the same verdict.
+//!
+//! # A data artifact
+//!
+//! ADR-0018: the contract is JSON. The compiler emits it and the host reads
+//! it; neither links the other. The host mirrors these types by field name,
+//! exactly as `pw-materialize` mirrors the graph and `pw-resource` mirrors
+//! `EntryIdentitySpec`.
+
+use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
+
+use crate::effects::Inference;
+use crate::hir::{DeclKind, Expr, Hir};
+use crate::placement::{Demand, World, solve};
+use crate::privacy::Label;
+use crate::signatures::Signatures;
+
+/// One capability a component needs, as the compiler derived it.
+///
+/// Structured rather than a string, because the host has to make decisions on
+/// the parts. `database.read<Stores>` and `database.write<Stores>` differ in
+/// the operation; `database.read<Stores>` and `database.read<Payments>` differ
+/// in what they reach. A host that had to re-parse a string to see that would
+/// be reimplementing this derivation, badly, at the point where it matters
+/// most.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Capability {
+    /// `database`, `secret`, `dom`. The restricted family E5's world table
+    /// keys on.
+    pub family: String,
+    /// `read`, `write`, `mutate`. Empty when the effect names only a family.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub operation: String,
+    /// The type argument, where the effect carries one: `Stores` in
+    /// `database.read<Stores>`.
+    ///
+    /// Part of the capability's IDENTITY, not a decoration. E2D recorded what
+    /// happens when it is dropped: `secret<Payments>` and `secret<Sessions>`
+    /// collapse into one, and a component authorised for one reaches the
+    /// other.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub argument: Option<String>,
+}
+
+impl Capability {
+    /// Parse `family.operation<Argument>` as an effect row writes it.
+    pub fn parse(effect: &str) -> Capability {
+        let (head, argument) = match effect.split_once('<') {
+            Some((h, rest)) => (h, Some(rest.trim_end_matches('>').to_string())),
+            None => (effect, None),
+        };
+        let (family, operation) = match head.split_once('.') {
+            Some((f, o)) => (f.to_string(), o.to_string()),
+            None => (head.to_string(), String::new()),
+        };
+        Capability {
+            family,
+            operation,
+            argument,
+        }
+    }
+
+    /// The canonical text form, and the one an import names.
+    pub fn name(&self) -> String {
+        let mut out = self.family.clone();
+        if !self.operation.is_empty() {
+            out.push('.');
+            out.push_str(&self.operation);
+        }
+        if let Some(a) = &self.argument {
+            out.push('<');
+            out.push_str(a);
+            out.push('>');
+        }
+        out
+    }
+}
+
+/// A host function this component is allowed to import, and what authorises it.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Import {
+    /// The host interface, in the Wasm component naming the host will use.
+    pub interface: String,
+    /// The function within it.
+    pub name: String,
+    /// Which required capability makes this import legitimate.
+    ///
+    /// Present so the audit's refusal can say *why* — "this module imports
+    /// `pw:host/database#read`, and nothing in its effect row asks for
+    /// `database.read`" is actionable; "undeclared import" is not.
+    pub capability: String,
+}
+
+impl Import {
+    /// The wire form the audit compares: `interface#name`.
+    pub fn key(&self) -> String {
+        format!("{}#{}", self.interface, self.name)
+    }
+}
+
+/// Something the component provides to the host.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Export {
+    pub name: String,
+    /// The declaration kind it came from: `query`, `command`, `page`.
+    pub kind: String,
+}
+
+/// **What the compiler tells the host about one component.**
+///
+/// Frozen at E8-0: E8 may consume every field and must add none. A host that
+/// needed a seventh field would be asking the compiler a question the compiler
+/// has no business answering, or answering one itself that it should be asking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComponentContract {
+    /// The component's semantic identity: its module path.
+    pub component_id: String,
+    /// A hash over the component's INTERFACE — its exports, their kinds, its
+    /// capabilities and its placements. Not over source text: a comment must
+    /// not change it, and a new capability must.
+    pub abi_schema: String,
+    pub required_capabilities: Vec<Capability>,
+    /// The worlds E5's solver found can satisfy this component.
+    ///
+    /// Empty means *nowhere* — a component that cannot run anywhere, which the
+    /// host must refuse rather than place somewhere and hope.
+    pub allowed_placements: Vec<String>,
+    pub imports: Vec<Import>,
+    pub exports: Vec<Export>,
+}
+
+/// What an audit of a built artifact concluded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Audit {
+    /// Every actual import is in the allowed set.
+    Satisfied,
+    /// At least one is not. Carries all of them, because a build that fixes
+    /// the first and rediscovers the second is a slow way to learn the shape
+    /// of a problem.
+    Undeclared(Vec<String>),
+}
+
+impl Audit {
+    pub fn is_satisfied(&self) -> bool {
+        matches!(self, Audit::Satisfied)
+    }
+}
+
+/// **The rule.** Actual imports ⊆ allowed imports.
+///
+/// Fail-closed by construction: the allowed set is what the contract lists, and
+/// anything not in it is undeclared. There is no "unknown interface" branch to
+/// forget, because there is no lookup — only membership.
+pub fn audit(contract: &ComponentContract, actual: &[String]) -> Audit {
+    let allowed: BTreeSet<String> = contract.imports.iter().map(Import::key).collect();
+    let mut undeclared: Vec<String> = actual
+        .iter()
+        .filter(|i| !allowed.contains(*i))
+        .cloned()
+        .collect();
+    undeclared.sort();
+    undeclared.dedup();
+    if undeclared.is_empty() {
+        Audit::Satisfied
+    } else {
+        Audit::Undeclared(undeclared)
+    }
+}
+
+/// The host interface a capability family is served by.
+///
+/// A NAMING convention, deliberately, and deliberately shallow: the compiler
+/// says which interface a capability would be served by, and the host decides
+/// whether it has one. If this function grew a table of what each interface
+/// provides, the compiler would own the deployment topology twice.
+fn interface_for(family: &str) -> String {
+    format!("pw:host/{family}")
+}
+
+/// Derive every component's contract from a checked program.
+///
+/// One pass, from the same signatures and the same placement solver every other
+/// analysis uses. Nothing here re-derives an effect row or a world.
+pub fn contracts(hirs: &[&Hir], sigs: &Signatures) -> Vec<ComponentContract> {
+    // INFERRED effects, not declared ones.
+    //
+    // A query's authority is in its body: `Menu` writes no effect row and
+    // calls a helper that reads the database, and the host has to be told
+    // about that read. A contract built from declared rows would hand the most
+    // ordinary component in the language an empty capability set and let it
+    // import whatever it liked — the audit would pass, because the allowed set
+    // it compared against was the wrong one.
+    let mut inference = Inference::new(sigs);
+    inference.run(hirs);
+
+    let mut out = Vec::new();
+    for hir in hirs {
+        for (id, decl) in hir.all_decls() {
+            // Components are the things a host runs: the units with behaviour.
+            // A type or an import declaration has no authority to describe.
+            let kind = match decl.kind {
+                DeclKind::Query => "query",
+                DeclKind::Command => "command",
+                DeclKind::Page => "page",
+                DeclKind::Component => "component",
+                _ => continue,
+            };
+
+            // ONE CONTRACT PER DECLARATION, not per module.
+            //
+            // Least authority. A module holding a database query and a browser
+            // component would otherwise give the component the query's
+            // `database.read` and the query the component's `dom.mutate` — and
+            // then E5's solver would find nowhere either could run, because the
+            // union of their demands is unsatisfiable. Aggregating by module
+            // over-grants and under-places at the same time.
+            let module = hir.module_of(id).unwrap_or_default().to_string();
+            let component_id = if module.is_empty() {
+                decl.name.clone()
+            } else {
+                format!("{module}.{}", decl.name)
+            };
+
+            // What this component performs, EXCLUDING its resumable handlers.
+            //
+            // A handler is a separately loaded unit with its own identity —
+            // E7-L made that concrete — so its authority is its own. A page
+            // that renders `on:press={.. => add_to_cart(..)}` would otherwise
+            // require `database.write` to RENDER, and a host granting it would
+            // give the render path authority it never uses.
+            //
+            // The handler's own authority is not lost: the command it calls is
+            // itself a component with its own contract, so `add_to_cart`'s
+            // `database.write` is recorded once, against the thing that
+            // performs it.
+            let effects: Vec<String> = match decl.body {
+                Some(body_id) => {
+                    let body = hir.body(body_id);
+                    let lambdas: Vec<_> = body
+                        .walk()
+                        .into_iter()
+                        .filter(|e| matches!(body.expr(*e), Expr::Lambda { .. }))
+                        .collect();
+                    inference
+                        .infer_excluding(body, &lambdas)
+                        .effects
+                        .into_iter()
+                        .collect()
+                }
+                None => inference
+                    .effects_of(&decl.name)
+                    .map(|set| set.iter().cloned().collect())
+                    .unwrap_or_default(),
+            };
+
+            let capabilities: Vec<Capability> = effects
+                .iter()
+                .map(|e| Capability::parse(e))
+                .filter(|c| World::worlds_for(&c.family).is_some())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect();
+
+            // Placements from E5's solver, given the same demand every other
+            // caller builds. Not re-derived from the capability list: the
+            // solver also weighs privacy labels, and a second derivation here
+            // would agree until a label mattered.
+            let demand = Demand {
+                effects: effects.clone(),
+                label: Label::public(),
+                declared: None,
+            };
+            let allowed_placements: Vec<String> = solve(&demand)
+                .feasible
+                .into_iter()
+                .map(|w| w.name().to_string())
+                .collect();
+
+            let imports: Vec<Import> = capabilities
+                .iter()
+                .map(|c| Import {
+                    interface: interface_for(&c.family),
+                    name: if c.operation.is_empty() {
+                        "use".to_string()
+                    } else {
+                        c.operation.clone()
+                    },
+                    capability: c.name(),
+                })
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect();
+
+            // What this component provides. One entry today, because a
+            // declaration is the unit; the field is plural because grouping
+            // several declarations into one instantiable component is E8's
+            // decision to make, not something to foreclose here.
+            let exports = vec![Export {
+                name: decl.name.clone(),
+                kind: kind.to_string(),
+            }];
+
+            let abi_schema = schema_of(&component_id, &exports, &capabilities, &allowed_placements);
+            out.push(ComponentContract {
+                component_id,
+                abi_schema,
+                required_capabilities: capabilities,
+                allowed_placements,
+                imports,
+                exports,
+            });
+        }
+    }
+    out.sort_by(|a, b| a.component_id.cmp(&b.component_id));
+    out
+}
+
+/// A hash over the interface, and over nothing else.
+///
+/// Exports, their kinds, the capabilities and the placements. Not the bodies:
+/// a component whose implementation changed but whose authority and interface
+/// did not is the same contract, and a host that reloaded on every edit would
+/// be reacting to noise. Not the source text either — see
+/// `resume_artifacts`'s scheme 1 for what that costs.
+fn schema_of(
+    module: &str,
+    exports: &[Export],
+    capabilities: &[Capability],
+    placements: &[String],
+) -> String {
+    let mut text = String::from(module);
+    for e in exports {
+        text.push_str(&format!("|{}:{}", e.kind, e.name));
+    }
+    for c in capabilities {
+        text.push_str(&format!("|cap:{}", c.name()));
+    }
+    for p in placements {
+        text.push_str(&format!("|at:{p}"));
+    }
+    hash(&text)
+}
+
+fn hash(content: &str) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in content.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{h:016x}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_capability_keeps_its_type_argument() {
+        // E2D's lesson, at the boundary this time. Dropping the argument
+        // collapses `secret<Payments>` and `secret<Sessions>` into one
+        // capability, and a component authorised for one reaches the other.
+        let a = Capability::parse("secret<Payments>");
+        let b = Capability::parse("secret<Sessions>");
+        assert_ne!(a, b);
+        assert_eq!(a.family, "secret");
+        assert_eq!(a.argument.as_deref(), Some("Payments"));
+        assert_eq!(a.name(), "secret<Payments>");
+    }
+
+    #[test]
+    fn an_operation_is_part_of_the_identity() {
+        assert_ne!(
+            Capability::parse("database.read<Stores>"),
+            Capability::parse("database.write<Stores>")
+        );
+    }
+
+    #[test]
+    fn a_bare_family_parses() {
+        let c = Capability::parse("secret");
+        assert_eq!(c.family, "secret");
+        assert!(c.operation.is_empty());
+        assert_eq!(c.name(), "secret");
+    }
+}

@@ -671,6 +671,61 @@ fn emit_template_command(paths: &[&String], plain: bool) -> ExitCode {
 /// `--plain` prints the edges for a person; the default prints JSON. Both, and
 /// not one dressed as the other: the gate asks for inspectable AND
 /// serializable, and a blob is not inspectable.
+/// E8-0 — the compiler→host `ComponentContract`, as JSON.
+///
+/// A DATA artifact (ADR-0018). The compiler emits it; the host deserializes it
+/// and mirrors the types by field name. Neither links the other, which is what
+/// keeps "the compiler decides what authority code needs, the host decides
+/// whether it exists" a boundary rather than a slogan.
+fn emit_contracts_command(paths: &[&String], plain: bool) -> ExitCode {
+    let mut hirs = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        hirs.push(pw_core::lower::lower_file(&src, &parsed.green));
+    }
+    let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = pw_core::signatures::Signatures::build(&ws, &refs);
+    let contracts = pw_core::contract::contracts(&refs, &sigs);
+
+    if plain {
+        for c in &contracts {
+            println!("{}  abi {}", c.component_id, c.abi_schema);
+            println!("  runs at   {}", c.allowed_placements.join(", "));
+            for cap in &c.required_capabilities {
+                println!("  needs     {}", cap.name());
+            }
+            for i in &c.imports {
+                println!("  may call  {}  ({})", i.key(), i.capability);
+            }
+            for e in &c.exports {
+                println!("  exports   {} {}", e.kind, e.name);
+            }
+            println!();
+        }
+    } else {
+        match serde_json::to_string_pretty(&contracts) {
+            Ok(json) => println!("{json}"),
+            Err(e) => {
+                eprintln!("pw: cannot serialize contracts: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+    ExitCode::SUCCESS
+}
+
 fn emit_graph_command(paths: &[&String], plain: bool) -> ExitCode {
     let mut hirs = Vec::new();
     for path in paths {
@@ -833,12 +888,13 @@ fn run() -> ExitCode {
             | "emit-marko"
             | "emit-manifest"
             | "emit-graph"
+            | "emit-contracts"
             | "emit-template"
     ) || paths.is_empty()
     {
         eprintln!(
             "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
-             emit-template> <path.pw>... [--plain]"
+             emit-contracts|emit-template> <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -858,6 +914,10 @@ fn run() -> ExitCode {
 
     if cmd == "emit-graph" {
         return emit_graph_command(&paths, args.iter().any(|a| a == "--plain"));
+    }
+
+    if cmd == "emit-contracts" {
+        return emit_contracts_command(&paths, args.iter().any(|a| a == "--plain"));
     }
 
     if cmd == "emit-template" {

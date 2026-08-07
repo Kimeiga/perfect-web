@@ -1,0 +1,61 @@
+E8-0 — the compiler→host ComponentContract for the store demo
+
+produced by: cargo run -p pw-cli -- emit-contracts --plain <the store program>
+
+One contract per DECLARATION, not per module: least authority, and a new
+declaration leaves every existing contract byte-identical.
+
+Note StorePage: rendering needs no authority and runs anywhere. Its
+handler calls add_to_cart, which needs database.write and runs only at
+the origin — recorded once, against the thing that performs it.
+
+Resources.Cart  abi 65933ef1a76eff17
+  runs at   build, browser, edge, origin
+  exports   query Cart
+
+Resources.Menu  abi 295b1410021b7731
+  runs at   build, browser, edge, origin
+  exports   query Menu
+
+Resources.Order  abi 74d8f0d6d1bf67c7
+  runs at   build, browser, edge, origin
+  exports   query Order
+
+Resources.Store  abi 67b9938482d95947
+  runs at   build, browser, edge, origin
+  exports   query Store
+
+store.page.Cart  abi ecde9085de19af23
+  runs at   origin
+  needs     database.read
+  may call  pw:host/database#read  (database.read)
+  exports   query Cart
+
+store.page.Menu  abi 0b0e5b9145063f31
+  runs at   origin
+  needs     database.read
+  may call  pw:host/database#read  (database.read)
+  exports   query Menu
+
+store.page.Store  abi 3aa6df5aa87af2a3
+  runs at   origin
+  needs     database.read
+  may call  pw:host/database#read  (database.read)
+  exports   query Store
+
+store.page.StorePage  abi fc9b014826c42a8b
+  runs at   build, browser, edge, origin
+  exports   page StorePage
+
+store.page.add_to_cart  abi 4d95ea407cbb5eb7
+  runs at   origin
+  needs     database.write
+  may call  pw:host/database#write  (database.write)
+  exports   command add_to_cart
+
+store.page.clear_cart  abi c2a781d6ccefae55
+  runs at   origin
+  needs     database.write
+  may call  pw:host/database#write  (database.write)
+  exports   command clear_cart
+

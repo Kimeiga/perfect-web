@@ -26,6 +26,7 @@ Status values: `Proposed` · `Accepted` · `Superseded by ADR-NNNN` · `Rejected
 | [0017](DECISIONS/ADR-0017-marko-adapter-boundary.md) | The Marko adapter is a one-way lowering from HIR; generated files are build output, never authored | Accepted | tape | E7-R passes the golden suite (ADR-0002) |
 | [0018](DECISIONS/ADR-0018-manifest-is-the-compiler-runtime-boundary.md) | The resource manifest is a data artifact; neither compiler nor runtime depends on the other | Accepted | build | E8 selects the host execution model |
 | [0019](DECISIONS/ADR-0019-materializer-store-and-outbox.md) | The materializer's state and its outbox share one SQLite database, so a command writes both in one transaction | Accepted | build | E8 selects the host execution model |
+| [0020](DECISIONS/ADR-0020-component-contract-is-the-compiler-host-boundary.md) | The compiler hands the host a six-field `ComponentContract`, one per declaration, and actual Wasm imports must be a SUBSET of what it allows | Accepted | build | E9 lowers capabilities and effects into it |
 
 ## Decisions the charter asked for and where they landed
 

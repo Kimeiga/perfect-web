@@ -29,7 +29,7 @@ const ENGINES = ["chromium", "firefox", "webkit"];
 /// exactly as two engines did, and the second time it presented as frames
 /// arriving in a different order rather than as a wrong list — which is much
 /// harder to read as interference.
-const MUTATING = ["keyed-list", "transport"];
+const MUTATING = ["keyed-list", "transport", "performance"];
 
 export const MUTABLE_PORTS = Object.fromEntries(
   MUTATING.map((suite, s) => [
@@ -38,10 +38,27 @@ export const MUTABLE_PORTS = Object.fromEntries(
   ]),
 );
 
-const HOSTS = MUTATING.flatMap((suite) => Object.values(MUTABLE_PORTS[suite]));
+// The performance run needs ONE host, not eleven.
+//
+// Playwright starts every declared `webServer` before the first test, and
+// eleven processes coming up while the first navigation happens is itself the
+// load a long-animation-frame measurement is trying not to see. It failed
+// exactly that way: gate 8 reported an interaction long frame on a cold start
+// and none on a warm one.
+const HOSTS = process.env.PW_PERFORMANCE
+  ? [MUTABLE_PORTS.performance.chromium]
+  : [PORT, ...MUTATING.flatMap((suite) => Object.values(MUTABLE_PORTS[suite]))];
 
 export default defineConfig({
   testDir: "./e2e",
+  // The performance gate is excluded from the parallel suite and run alone by
+  // `just e7-performance`.
+  //
+  // Not a convenience: three engine families times several workers saturates
+  // the machine, and a long-animation-frame measurement taken under that load
+  // measures the load. It failed exactly that way — the clean run reported a
+  // long frame that the same page, alone, does not produce.
+  testIgnore: process.env.PW_PERFORMANCE ? [] : ["**/performance.spec.mjs"],
   fullyParallel: true,
   reporter: [["list"]],
   use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "off" },
@@ -51,13 +68,6 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
   webServer: [
-    {
-      command: `../../target/debug/pw-dev-server dist`,
-      env: { PORT: String(PORT) },
-      port: PORT,
-      reuseExistingServer: !!process.env.PW_REUSE,
-      timeout: 60_000,
-    },
     ...HOSTS.map((port) => ({
       command: `../../target/debug/pw-dev-server dist`,
       env: { PORT: String(port) },

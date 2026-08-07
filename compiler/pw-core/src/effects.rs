@@ -285,6 +285,61 @@ impl<'a> Inference<'a> {
     }
 
     /// What one body performs, with a reason for each effect.
+    /// What one body performs, EXCLUDING the given subtrees.
+    ///
+    /// E8-0 needs this. A page that renders `on:press={.. => add_to_cart(..)}`
+    /// contains a call to a command that writes the database — but the page
+    /// does not perform that write. The handler does, when someone presses the
+    /// button, and E7-L already makes the handler a separately loaded unit
+    /// with its own identity.
+    ///
+    /// Without the exclusion the page's contract requires `database.write`,
+    /// and a host granting it would give the render path authority it never
+    /// uses. That is the exact over-granting the capability model exists to
+    /// prevent, arriving through the front door.
+    pub fn infer_excluding(&self, body: &Body, exclude: &[ExprId]) -> Inferred {
+        let mut out = self.infer(body);
+        if exclude.is_empty() {
+            return out;
+        }
+
+        let inside = |span: &Span| {
+            exclude.iter().any(|root| {
+                let outer = body.expr_span(*root);
+                span.start >= outer.start && span.end <= outer.end
+            })
+        };
+
+        // SUBTRACTED, not rebuilt.
+        //
+        // An effect is dropped only when it has at least one source and every
+        // one of them lies inside an excluded subtree. Rebuilding the set from
+        // the surviving sources instead was wrong in the direction that
+        // matters: an effect carried without a source vanished, and a query
+        // that reads the database reported needing no authority at all.
+        //
+        // Keeping a sourceless effect is the conservative direction. An
+        // over-stated capability is refused work; an under-stated one is
+        // authority nobody approved.
+        let mut dropped: BTreeSet<String> = BTreeSet::new();
+        for effect in &out.effects {
+            let mut seen = false;
+            let mut all_inside = true;
+            for s in out.sources.iter().filter(|s| &s.effect == effect) {
+                seen = true;
+                if !inside(&s.span) {
+                    all_inside = false;
+                }
+            }
+            if seen && all_inside {
+                dropped.insert(effect.clone());
+            }
+        }
+        out.effects.retain(|e| !dropped.contains(e));
+        out.sources.retain(|s| !inside(&s.span));
+        out
+    }
+
     pub fn infer(&self, body: &Body) -> Inferred {
         let mut out = Inferred::default();
         // Lambdas are visited through their enclosing call, so the reason can

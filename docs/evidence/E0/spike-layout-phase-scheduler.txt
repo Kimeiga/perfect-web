@@ -1,7 +1,7 @@
 spike: layout-phase-scheduler
-generated: 2026-08-06T19:57:21Z
+generated: 2026-08-07T12:14:27Z
 node: v22.21.1
-chrome: Google Chrome 150.0.7871.187 
+chrome: Google Chrome 151.0.7922.76 
 host: Darwin arm64 / Apple M2 Pro
 command: node spikes/layout-phase-scheduler/measure.mjs
 
@@ -17,19 +17,19 @@ task 13), not a benchmark result (charter §18.5).
 =========== 1. FORCED SYNCHRONOUS LAYOUT: THRASH vs PHASED ==========
 
   elements   mode     median ms   runs                               checksum
-  400        thrash   78.7        [79.8,78.1,78.7,76.3,78.7,100.2,81.9] 59600
-  400        phased   0.3         [0.7,0.4,0.2,0.3,0.3,0.2,0.2]      59600
-             -> phase scheduling is 262.3x faster; identical checksum: true
+  400        thrash   78.9        [76.5,77.4,77.2,80.5,78.9,79,79]   59600
+  400        phased   0.3         [1.1,0.3,0.6,0.5,0.3,0.3,0.3]      59600
+             -> phase scheduling is 263x faster; identical checksum: true
 
-  1200       thrash   679.3       [645.7,671.4,707.6,697.6,685.1,671.2,679.3] 178800
-  1200       phased   0.7         [1.1,0.7,1.3,0.8,0.7,0.7,0.6]      178800
-             -> phase scheduling is 970.4x faster; identical checksum: true
+  1200       thrash   678.5       [657.1,664.7,679.4,678.5,679.4,679.4,674.1] 178800
+  1200       phased   0.7         [1.1,0.8,0.9,0.7,0.7,0.6,0.7]      178800
+             -> phase scheduling is 969.3x faster; identical checksum: true
 
 =========== 2. LONG ANIMATION FRAME ATTRIBUTION =====================
 
-  n=400   thrash  loafSupported=true longFrames=7  duration=83.2ms blocking=33.1ms
+  n=400   thrash  loafSupported=true longFrames=7  duration=79.9ms blocking=29.8ms
   n=400   phased  loafSupported=true longFrames=0  (no frame exceeded the 50ms LoAF threshold)
-  n=1200  thrash  loafSupported=true longFrames=7  duration=685.4ms blocking=635.3ms
+  n=1200  thrash  loafSupported=true longFrames=7  duration=688ms blocking=637.8ms
   n=1200  phased  loafSupported=true longFrames=0  (no frame exceeded the 50ms LoAF threshold)
 
   forcedStyleAndLayoutDuration exposed by this browser: false
@@ -48,9 +48,9 @@ task 13), not a benchmark result (charter §18.5).
 
   supported: contain=true  content-visibility=true
   build + first layout of 3000 rows:
-    plain     median 25.1 ms   [26.8,22.5,25.1,25.3,23.8]
-    contained median 5.7 ms   [5.6,6.8,6.4,5.5,5.7]
-    -> 4.4x faster with contain + content-visibility
+    plain     median 21 ms   [25.3,21,21,23.7,20.9]
+    contained median 6 ms   [6.1,6,6,6.3,5.6]
+    -> 3.5x faster with contain + content-visibility
   check:containment-helps-initial-layout=pass
 
   CAVEAT (measured): containment does NOT help a forced layout that
