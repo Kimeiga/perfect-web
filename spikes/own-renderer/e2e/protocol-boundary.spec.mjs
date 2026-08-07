@@ -19,6 +19,12 @@ test.afterEach(async ({ page }) => {
 });
 
 test("every frame the browser receives is a protocol frame", async ({ page }) => {
+  // Pinned to the long poll, because this test READS the response body and a
+  // held streaming connection has no body to read until it closes. That is a
+  // limit of the instrument, not of the claim: `transport.spec.mjs` runs the
+  // same subscription over both adapters and compares the frames, so "these
+  // are the frames" and "both adapters carry the same frames" together cover
+  // what one interception cannot.
   const frames = [];
   await page.route("**/stream*", async (route) => {
     const response = await route.fetch();
@@ -36,7 +42,7 @@ test("every frame the browser receives is a protocol frame", async ({ page }) =>
     await route.fulfill({ response, body });
   });
 
-  await page.goto("/StorePage.html");
+  await page.goto("/StorePage.html?transport=poll");
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
@@ -68,7 +74,7 @@ test("no server-side concept reaches the browser", async ({ page }) => {
     await route.fulfill({ response });
   });
 
-  await page.goto("/StorePage.html");
+  await page.goto("/StorePage.html?transport=poll");
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
@@ -105,7 +111,7 @@ test("this boundary check can fail", async ({ page }) => {
     if (/json|html/.test(type)) seen.push(await response.text());
     await route.fulfill({ response });
   });
-  await page.goto("/StorePage.html");
+  await page.goto("/StorePage.html?transport=poll");
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
 
   const everything = seen.join("\n");

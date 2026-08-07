@@ -21,11 +21,24 @@ const PORT = Number(process.env.PORT ?? 3141);
 // single extra host merely moved the interference somewhere less obvious —
 // where it showed up as one engine's reorder failing for another engine's
 // reasons.
-export const MUTABLE_PORTS = {
-  chromium: PORT + 1,
-  firefox: PORT + 2,
-  webkit: PORT + 3,
-};
+const ENGINES = ["chromium", "firefox", "webkit"];
+
+/// The suites that mutate shared state, each with a host per engine.
+///
+/// Per SUITE as well as per engine: two mutating files on one host interfere
+/// exactly as two engines did, and the second time it presented as frames
+/// arriving in a different order rather than as a wrong list — which is much
+/// harder to read as interference.
+const MUTATING = ["keyed-list", "transport"];
+
+export const MUTABLE_PORTS = Object.fromEntries(
+  MUTATING.map((suite, s) => [
+    suite,
+    Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 1 + s * ENGINES.length + i])),
+  ]),
+);
+
+const HOSTS = MUTATING.flatMap((suite) => Object.values(MUTABLE_PORTS[suite]));
 
 export default defineConfig({
   testDir: "./e2e",
@@ -45,7 +58,7 @@ export default defineConfig({
       reuseExistingServer: !!process.env.PW_REUSE,
       timeout: 60_000,
     },
-    ...Object.values(MUTABLE_PORTS).map((port) => ({
+    ...HOSTS.map((port) => ({
       command: `../../target/debug/pw-dev-server dist`,
       env: { PORT: String(port) },
       port,

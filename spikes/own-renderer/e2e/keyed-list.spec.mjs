@@ -32,7 +32,7 @@ import { MUTABLE_PORTS } from "../playwright.config.mjs";
 // broadcast property the last test in this file proves.
 test.use({
   baseURL: async ({}, use, testInfo) => {
-    await use(`http://127.0.0.1:${MUTABLE_PORTS[testInfo.project.name]}`);
+    await use(`http://127.0.0.1:${MUTABLE_PORTS["keyed-list"][testInfo.project.name]}`);
   },
 });
 

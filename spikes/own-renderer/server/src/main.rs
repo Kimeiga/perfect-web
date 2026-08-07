@@ -962,6 +962,79 @@ fn handle(server: &Server, mut stream: TcpStream) {
 ///
 /// The transport, and only the transport. `pw-protocol` names none of this, so
 /// E7-P can replace it with a streaming fetch without a frame changing.
+/// The streaming adapter: one connection, frames written as they arrive.
+///
+/// # Why two adapters exist
+///
+/// Architect ruling, 2026-08-07: a multiplexed `StreamFrame` transport, *with
+/// long-poll as a fallback adapter*. Two of them is the point. A protocol with
+/// exactly one transport is indistinguishable from a protocol that IS its
+/// transport, and the difference only becomes visible when a second one has to
+/// carry the same frames without changing them.
+///
+/// Both adapters deliver identical frames, in order, under the same cursor
+/// discipline. What differs is only when the connection ends: this one holds
+/// it open and writes batch after batch; the long poll returns after the first
+/// batch and is asked again.
+///
+/// No `content-length`, and the body is terminated by the close. That is the
+/// oldest streaming mechanism HTTP has and needs no chunked framing to be
+/// written by hand — which matters here, because a bug in hand-rolled chunked
+/// encoding would look exactly like a transport that drops frames.
+fn stream_open(
+    server: &Server,
+    stream: &mut TcpStream,
+    session: &str,
+    fresh: bool,
+    mut since: u64,
+) {
+    let cookie = if fresh {
+        format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
+    } else {
+        String::new()
+    };
+    let head = format!(
+        "HTTP/1.1 200 OK\r\ncontent-type: application/x-ndjson\r\n\
+         cache-control: no-store\r\n{cookie}connection: close\r\n\r\n"
+    );
+    if stream.write_all(head.as_bytes()).is_err() {
+        return;
+    }
+
+    // Bounded, like the long poll: a held connection is a held thread, and
+    // three engine families times six workers is eighteen of them.
+    for _ in 0..80 {
+        let batch = {
+            let mut queue = server.pending.lock().expect("pending");
+            let waiting = queue.entry(session.to_string()).or_default();
+            waiting.acknowledge(since);
+            let (cursor, frames) = waiting.after(since);
+            if frames.is_empty() {
+                None
+            } else {
+                let body: Vec<serde_json::Value> = frames
+                    .into_iter()
+                    .map(|f| serde_json::to_value(f).expect("frame"))
+                    .collect();
+                Some((cursor, serde_json::to_string(&body).expect("frames")))
+            }
+        };
+
+        if let Some((cursor, frames)) = batch {
+            // Written, but NOT acknowledged. The cursor advances here only for
+            // this connection's own reads; the subscriber's copy is dropped on
+            // the next request, which is the client saying it applied them.
+            // A write that never arrives therefore costs nothing.
+            let line = format!("{{\"cursor\":{cursor},\"frames\":{frames}}}\n");
+            if stream.write_all(line.as_bytes()).is_err() || stream.flush().is_err() {
+                return;
+            }
+            since = cursor;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+}
+
 fn stream_frames(
     server: &Server,
     stream: &mut TcpStream,
@@ -979,6 +1052,13 @@ fn stream_frames(
         .find_map(|p| p.strip_prefix("since="))
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
+
+    // One route, two adapters. The frames are the same either way — see
+    // `e2e/transport.spec.mjs`, which runs the whole subscription twice.
+    if _query.split('&').any(|p| p == "mode=stream") {
+        stream_open(server, stream, session, fresh, since);
+        return;
+    }
 
     for _ in 0..40 {
         {

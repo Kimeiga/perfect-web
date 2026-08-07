@@ -552,27 +552,96 @@ function applyFrame(frame) {
  */
 let cursor = parts.cursor ?? 0;
 
-async function subscribe() {
+/**
+ * Apply one delivered batch.
+ *
+ * Every adapter ends here, and this function has no idea which one called it.
+ * That is the whole design: `pw-protocol` names no transport, so a transport
+ * cannot smuggle meaning into a frame — and a second adapter is how that stops
+ * being a claim and becomes something a test can fail.
+ */
+function applyBatch(batch) {
+  window.__pw.updated = [];
+  for (const frame of batch.frames ?? []) applyFrame(frame);
+  // Advanced only AFTER applying. Advancing on receipt would acknowledge
+  // frames a mid-batch failure never applied, and the server would drop them.
+  cursor = batch.cursor ?? cursor;
+  window.__pw.cursor = cursor;
+}
+
+/**
+ * The long poll: one batch per request.
+ *
+ * The cursor is BOTH the request and the acknowledgement — asking for what
+ * follows N tells the server that N arrived and was applied. A response that
+ * never reaches this page costs nothing, because the frames are still there
+ * for the next ask.
+ */
+async function pollOnce() {
+  const response = await fetch(`/stream?since=${cursor}`);
+  applyBatch(await response.json());
+}
+
+/**
+ * The streaming adapter: one connection, many batches.
+ *
+ * Newline-delimited JSON, read incrementally. A partial line is held rather
+ * than parsed — a batch split across two network chunks is the normal case,
+ * not an error, and parsing half of one would apply half a change.
+ */
+async function streamOnce() {
+  const response = await fetch(`/stream?since=${cursor}&mode=stream`);
+  if (!response.body) throw new Error("no streaming body");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let held = "";
   for (;;) {
-    let batch;
+    const { value, done } = await reader.read();
+    if (done) return;
+    held += decoder.decode(value, { stream: true });
+    const lines = held.split("\n");
+    held = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line) applyBatch(JSON.parse(line));
+    }
+  }
+}
+
+/**
+ * Which adapter to use.
+ *
+ * Streaming where the engine supports a readable response body, long poll
+ * otherwise — and long poll again if streaming fails once, because a transport
+ * that cannot connect is not a reason to stop subscribing. `?transport=` lets
+ * a test pin one, so "both adapters deliver the same frames" is measured
+ * rather than assumed.
+ */
+function chosenTransport() {
+  const pinned = new URLSearchParams(location.search).get("transport");
+  if (pinned === "poll") return "poll";
+  if (pinned === "stream") return "stream";
+  return typeof ReadableStream === "function" ? "stream" : "poll";
+}
+
+async function subscribe() {
+  let transport = chosenTransport();
+  window.__pw.transport = transport;
+  for (;;) {
     try {
-      // The cursor is BOTH the request and the acknowledgement: asking for
-      // what follows N tells the server that N arrived and was applied. So a
-      // response that never reaches this page — a reload, a dropped
-      // connection, a killed tab — costs nothing, because the frames are
-      // still there for the next ask.
-      const response = await fetch(`/stream?since=${cursor}`);
-      batch = await response.json();
+      if (transport === "stream") await streamOnce();
+      else await pollOnce();
     } catch {
+      if (transport === "stream" && chosenTransport() !== "stream") {
+        // Fall back once, and say so. A silent fallback would make the
+        // streaming adapter untestable: every run would look like whichever
+        // one happened to work.
+        transport = "poll";
+        window.__pw.transport = "poll (fell back)";
+        log.push("transport fell back to long poll");
+        continue;
+      }
       return; // the page is going away
     }
-    window.__pw.updated = [];
-    for (const frame of batch.frames ?? []) applyFrame(frame);
-    // Advanced only AFTER applying, and only once the whole body parsed.
-    // Advancing on receipt would acknowledge frames a mid-batch failure never
-    // applied, and they would never be sent again.
-    cursor = batch.cursor ?? cursor;
-    window.__pw.cursor = cursor;
   }
 }
 
