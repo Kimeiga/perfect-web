@@ -203,6 +203,34 @@ effects; the `pw` checker must be shown to do the same.
 
 ---
 
+## Coincidental correctness
+
+**Named 2026-08-07**, after five instances in one session:
+
+> The compiler emits the right verdict, but the semantic information that is
+> supposed to justify that verdict never actually flowed through the program.
+
+`R-037` is the clearest: the diagnostic was correct, the code was correct, the
+invariant was correct, and the mechanism had no connection to the claim. The
+fixture would have passed identically had it written `fn(anything_at_all)`.
+
+**None of the five was found by a test going red.** Each surfaced when a change
+removed the mechanism propping it up — deleting a name-based fallback, moving
+placement to inferred effects, requiring a capability argument to resolve. Which
+ones were found depended on what happened to be changed next.
+
+The admissibility rule below does not catch this, and neither does the
+broken-path control: R-037's chain was intact in the sense that every link
+existed. **The link that mattered was carrying no information.**
+
+The countermeasure is ADR-0022 — semantic provenance, a five-check fixture rule,
+and metamorphic perturbation testing. For Tier 1 analyses the admissibility
+requirements gain a fifth entry:
+
+| | |
+|---|---|
+| **provenance** | the conclusion can name the resolved facts that caused it, and a test asserts the required edges and the forbidden evidence sources |
+
 ## The recurring bug
 
 Thirty-nine measurements in this project produced plausible, favourable results

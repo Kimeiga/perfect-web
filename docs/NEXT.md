@@ -97,6 +97,29 @@ change that quietly went global is the thing the ruling warned about.
 is a name and the expression grammar reads `<` as a comparison, which is the
 same reason a `materialize` block's policies live inside its braces (E6).
 
+### Slice 2 — and it is the first consumer of ADR-0022
+
+Architect ruling, 2026-08-07: **do not delay slice 2 for the provenance work —
+build it into slice 2.**
+
+> So slice 2 becomes both: completion of the effect ontology; and the first
+> production implementation of semantic provenance.
+
+Each transition below must produce evidence, and a test must assert that no
+later analysis splits `"database.read"` at the dot.
+
+### The immediate sequence
+
+```text
+1  minimal semantic Fact/Provenance infrastructure   (ADR-0022)
+2  effect ontology slice 2, using it
+3  declare the concrete ~25 effects — no wildcards
+4  unknown family / operation / arity diagnostics
+5  `interface_for` becomes declaration-driven
+6  metamorphic controls for the effect-propagation headline cases
+7  deployment planning
+```
+
 ### Slice 2 — what remains
 
 1. **Resolve an effect row against the declarations.**
