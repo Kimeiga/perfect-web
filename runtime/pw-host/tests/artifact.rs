@@ -145,6 +145,7 @@ fn the_std_component_is_refused_for_authority_nobody_asked_for() {
                     interface: interface.to_string(),
                     name: name.to_string(),
                     capability: "store.read".into(),
+                    kind: ImportKind::HostCapability,
                 }
             })
             .collect(),

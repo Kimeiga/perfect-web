@@ -15,21 +15,28 @@ undeclared: ["wasi:cli/environment@0.2.9#get-environment", "wasi:cli/exit@0.2.9#
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test a_capabilitys_type_argument_is_part_of_what_is_granted ... ok
+test a_component_dependency_is_not_authority ... ok
+test a_component_granted_nothing_gets_an_empty_linker ... ok
 test a_component_is_admitted_where_its_world_and_its_capabilities_are_both_present ... ok
 test a_component_needing_nothing_is_admitted_and_granted_nothing ... ok
+test a_component_slot_cannot_be_filled_by_a_host_import_or_the_reverse ... ok
 test a_component_that_can_run_nowhere_is_refused_everywhere ... ok
+test a_contract_from_an_unknown_capability_mapping_is_refused ... ok
 test a_guest_receives_a_handle_and_never_the_value ... ok
 test a_handle_from_another_instance_does_not_work_here ... ok
 test a_refused_admission_yields_no_capabilities_at_all ... ok
+test a_runtime_import_can_never_be_authorised ... ok
 test an_admitted_instance_gets_exactly_its_contract_and_not_the_nodes_whole_set ... ok
 test an_artifact_importing_more_than_its_contract_allows_is_refused ... ok
+test an_import_is_classified_before_it_is_compared ... ok
 test an_unknown_node_is_refused_rather_than_defaulted ... ok
 test every_refusal_is_reported_not_only_the_first ... ok
 test importing_fewer_than_allowed_is_fine ... ok
 test placement_and_capability_are_two_checks_and_can_disagree_either_way ... ok
+test the_linker_is_built_from_the_admission_and_not_from_the_node ... ok
 test the_std_runtime_import_set_is_refused_wholesale ... ok
 test the_topology_is_data_the_host_owns ... ok
-test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test a_component_that_cannot_be_read_is_not_treated_as_importing_nothing ... ok
 test the_declared_component_imports_exactly_what_its_world_says ... minimal guest imports: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
 test the_std_component_is_refused_for_authority_nobody_asked_for ... std guest imports 34 interfaces
@@ -37,6 +44,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 test a_capability_survives_the_crossing_with_its_argument ... ok
 test the_compilers_contracts_deserialize_with_every_field_populated ... ok
 test the_real_contracts_drive_a_real_admission ... ok
+test the_store_page_depends_on_components_without_acquiring_their_authority ... ok
 test the_store_page_renders_without_authority_and_its_command_does_not ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

@@ -41,6 +41,11 @@ fmt-check:
 
 lint:
     cargo clippy --workspace --all-targets -- -D warnings
+    # `pw-host`'s engine feature is not exercised by `just test`, because a
+    # Wasm engine is not needed to decide a capability question. But an
+    # unbuilt cfg rots: a field added to `Import` broke `tests/artifact.rs`
+    # and nothing noticed until `just e8-host` ran. Compiled here, run there.
+    cargo clippy -p pw-host --features engine --all-targets -- -D warnings
 
 # Two tracked paths differing only by case are one file on macOS and two on
 # Linux. Charter §13.5; a Mac cannot construct the collision to prove it.
