@@ -1,0 +1,34 @@
+// @corpus: platform
+// @id: PLATFORM-std-effects
+// @category: platform — the host-independent effect vocabulary
+// @charter: §7.5A, §10
+// @milestone: E8
+//
+// The effects that exist wherever Pleris runs. Architect ruling, 2026-08-07:
+// `pw-std` for `log` and `trace`, `pw-platform-web` for the rest — because a
+// non-web host has no `dom.mutate` and should not inherit one.
+//
+// Both declare `capability none`, and that is an answer rather than a gap. An
+// effect describes what computation DOES; a capability is the authority it
+// needs; a host interface is one ABI representation of that authority. Writing
+// to a log is an effect a deployment may observe and constrain, and it is not
+// authority a host grants — an ontology that could not say so would force
+// every effect to invent a capability it does not want.
+
+module std.effects
+
+// The privacy level is the point, and it is a type argument rather than part
+// of the name: `log<Public>` names a sink whose contents anyone may read, so a
+// `Secret<Payments>` reaching it (corpus R-006) is a flow the compiler sees.
+// `packages/pw-platform-web/log.pw` declares the functions; this declares what
+// they perform.
+effect log<L> {
+    capability none
+}
+
+// Diagnostic output for a developer, with no privacy parameter because it is
+// not a sink application data reaches. Kept distinct from `log` so a
+// deployment can drop one and keep the other.
+effect trace {
+    capability none
+}

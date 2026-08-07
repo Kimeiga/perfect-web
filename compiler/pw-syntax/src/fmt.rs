@@ -228,10 +228,11 @@ impl Fmt {
         if kind == K::LBrace && prev == '!' {
             return false;
         }
-        if matches!(kind, K::LAngle | K::RAngle) && in_type_position(parent) {
+        if matches!(kind, K::LAngle | K::RAngle) && (in_type_position(parent) || in_policy(parent))
+        {
             return false;
         }
-        if prev == '<' && in_type_position(parent) {
+        if prev == '<' && (in_type_position(parent) || in_policy(parent)) {
             return false;
         }
         // A prefix operator hugs its operand. The operand is usually a *child*
@@ -426,6 +427,22 @@ fn in_type_position(n: &SyntaxNode) -> bool {
             .any(|a| matches!(a.kind(), K::TypeArgList | K::TypeRef))
 }
 
+/// A policy clause's value, where `<` and `>` also delimit type arguments.
+///
+/// `capability database.read<T>` — E8's effect declaration. A policy value is
+/// consumed as raw tokens (`grammar::policies`), so the tree cannot say "this
+/// is a type" the way it can inside a `TypeRef`, and the enclosing clause says
+/// it instead. Sound because a policy value is a declarative name and never an
+/// expression: there is no policy in the language whose value is a comparison.
+///
+/// Without this, `pw fmt` rewrote `capability database.read<T>` as
+/// `capability database.read < T >` — the exact defect `grammar::type_params`
+/// exists to prevent one layer up, arriving through the one construct whose
+/// value is not a parsed type.
+fn in_policy(n: &SyntaxNode) -> bool {
+    n.kind() == K::Policy
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562,6 +579,36 @@ mod tests {
             "an empty effect row is `!{{}}`:\n{out}"
         );
         assert_eq!(out, format_source(&out));
+    }
+
+    #[test]
+    fn a_capability_clauses_type_argument_is_not_spaced_like_a_comparison() {
+        // E8's effect declaration. A policy value is consumed as raw tokens,
+        // so `<` reached `needs_space_before` with a `Policy` parent and was
+        // spaced as an operator: `capability database.read < T >`. The
+        // declaration then no longer looked like the effect row it describes,
+        // which is the one property the flat-dotted form exists for.
+        let src = "module p\n\neffect database.read<T> {\n    \
+                   capability database.read<T>\n    \
+                   host \"pw:host/database#read\"\n}\n";
+        let out = format_source(src);
+        assert!(
+            out.contains("capability database.read<T>"),
+            "a capability's type argument must not be spaced:\n{out}"
+        );
+        assert!(
+            out.contains("effect database.read<T>"),
+            "and neither must the declaration's own binder:\n{out}"
+        );
+        assert_eq!(out, format_source(&out), "idempotent");
+    }
+
+    #[test]
+    fn a_comparison_in_an_expression_is_still_spaced() {
+        // The control. If `<` stopped being spaced everywhere, the test above
+        // would pass while the formatter had been broken for ordinary code.
+        let out = format_source("module p\n\nfn f(a: Int) -> Bool !{} {\n    a<1\n}\n");
+        assert!(out.contains("a < 1"), "a comparison is an operator:\n{out}");
     }
 
     #[test]

@@ -312,3 +312,39 @@ failure, so a working page never emits a query at all.
 than through dynamic `import()` — at which point the module map is not involved
 and the retry is an ordinary refetch. E9 owns handler code generation and is the
 natural place for that to change.
+
+---
+
+## A-017 — a capability's type argument is judged against the whole program
+
+**Assumed since** 2026-08-07 (E8), `pw-core/capability.rs`,
+`pw-core/ontology.rs`'s `TypeArgument::Unscoped`.
+
+`PW5200` asks whether an effect's type argument names *anything the program
+declares*, not whether the file that wrote it can see the declaration.
+`examples/generality/value_exceeds_sink_level/branch-join.pw` writes
+`secret<Payments>` while importing neither `capability` nor `Payments`, and
+three other corpus files depend on the same latitude.
+
+**What this leaves open.** It is assumption A-009's ambient union, surviving in
+one place. A file can name an argument it has no relationship with, and a
+capability's identity therefore depends on the whole checked set rather than on
+one file's imports. Two programs that differ only in which files were passed to
+`pw check` can disagree about whether an argument resolves.
+
+**Why it is safe to hold now.** The alternative is rejecting working corpus
+programs to satisfy a rule nobody has asked for yet, and the exposure is
+narrow: the argument still has to name a real declaration, so the failure mode
+is a capability that is *correctly identified but reached from too far away* —
+not one that names nothing.
+
+The compromise is **named rather than absent**: `Ontology::resolve` returns
+`TypeArgument::Unscoped` for exactly this case, distinct from both `Type` and
+`Module`, so the count is measurable and a later tightening has a list to work
+from instead of a search.
+
+**Retire when** the effect vocabulary's own visibility question is answered —
+see `docs/NEXT.md`. Every file writing `!{ database.read }` needs the effect
+declarations in scope, and whatever mechanism supplies that (a prelude, package
+metadata, an implicit platform import) supplies it for arguments too. Answering
+one and not the other would leave two visibility rules for one row.

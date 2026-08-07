@@ -291,7 +291,19 @@ fn the_trusted_platform_contract_is_hashed() {
     // `LayoutAffect` was declared NOWHERE. The distinction the module's own
     // comment calls "the point" rested on a spelling no checker could resolve.
     // Found by `PW5200` on its first run against the real corpus.
-    const EXPECTED: u64 = 0x3f49_cfe5_6ba9_052d;
+    //
+    // Changed 2026-08-07: `packages/pw-std/effects.pw` and
+    // `packages/pw-platform-web/effects.pw` are new — the effect ontology's
+    // slice 3, declaring all 25 effects the corpus writes. This is the largest
+    // single change to the trusted contract so far and it is deliberately a
+    // change to the contract rather than to any checker: `interface_for` still
+    // formats `pw:host/{family}`, and the `host` clauses here are what will
+    // replace it. Nothing reads them yet, so this commit changes what the
+    // platform SAYS and not yet what the compiler does.
+    //
+    // Two declared arities disagree with the corpus and are recorded rather
+    // than reconciled — `tests/effect_vocabulary.rs`'s `ARITY_UNSETTLED`.
+    const EXPECTED: u64 = 0x5ee1_d596_cf3f_16f3;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

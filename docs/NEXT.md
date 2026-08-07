@@ -136,13 +136,63 @@ later analysis splits `"database.read"` at the dot.
 1  minimal semantic Fact/Provenance infrastructure   DONE — pw-core/provenance.rs
    first consumer: effect inference's member resolution
    R-037's chain asserted in tests/causal_evidence.rs
-2  effect ontology slice 2, using it
-3  declare the concrete ~25 effects — no wildcards
-4  unknown family / operation / arity diagnostics
+2  effect ontology slice 2, using it                 DONE — pw-core/ontology.rs
+   EffectPath → EffectDefId → EffectInstance, 16 controls
+3  declare the concrete effects — no wildcards       DONE — 25 declared, 0 undeclared
+4  unknown family / operation / arity diagnostics    BLOCKED on the arity ruling below
 5  `interface_for` becomes declaration-driven
 6  metamorphic controls for the effect-propagation headline cases
 7  deployment planning
 ```
+
+### Two findings from steps 2 and 3, both needing a ruling
+
+**1. The vocabulary above was recalled, and the corpus disagrees.** Measured
+from the lowered effect rows of every `.pw` outside `examples/history/`:
+
+```text
+in the list, in no effect row     cache.read  cache.write  observe.*  durable.*
+in effect rows, not in the list   session.read  device.query
+                                  network.subscribe  unsafe.raw_html
+                                  unsafe.raw_attribute  post_paint
+```
+
+`observe.resize` and `observe.intersection` are real, but they are the
+`observe resize(self)` keyword form and never appear in a row; `durable` is a
+task modifier. Neither is an effect today. `tests/effect_vocabulary.rs` now
+reads the rows rather than a list, so the next divergence is a failure.
+
+**2. Two effects are written at two arities, and the ruling says that is an
+error.** Also measured:
+
+```text
+database.read     19 uses bare      5 uses with an argument
+style.mutate       2 uses bare      7 uses with an argument
+```
+
+The ruling's test list says `database.read` written bare is a wrong-arity
+error. Wiring that diagnostic today reports **21 working corpus rows**, so
+step 4 is blocked on which way this goes, and the count is pinned in
+`ARITY_UNSETTLED` so a third cannot join quietly. The three readings:
+
+- **the corpus is wrong** — add the argument to 21 rows; `database.read`
+  always names which store;
+- **the bare form is the broader claim**, exactly as a family covers its
+  members one level up, and `Capability::argument` is already `Option`;
+- **they are two effects**, and the bare one means "some unspecified store",
+  which is the weakest and probably wrong.
+
+Nothing else disagrees: 23 of 25 effects are written at exactly the arity they
+declare, which is what makes these two an inconsistency rather than the normal
+state of the corpus.
+
+**A third thing, not a question but a consequence.** Every corpus file writing
+`!{ database.read }` would need `import web.effects` for the ontology's
+visibility check to resolve it — and the prelude was deferred on the grounds
+that "receiver-directed resolution removed the reason the platform needed
+ambient visibility". An effect vocabulary every file writes is a demonstrated
+need for implicit imports, which is the condition the deferral named. Step 4
+cannot be wired without answering it.
 
 ### Slice 2 — what remains
 

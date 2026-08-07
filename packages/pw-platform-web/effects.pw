@@ -1,0 +1,218 @@
+// @corpus: platform
+// @id: PLATFORM-web-effects
+// @category: platform — the web host's effect vocabulary
+// @charter: §7.5A, §7.8, §7.9, §9.4, §11
+// @milestone: E8
+//
+// **Every effect the corpus writes, declared.** Architect ruling, 2026-08-07:
+//
+// > Do not wait for full E9 to declare effect families and operations. […]
+// > A wildcard is convenient documentation but terrible semantic identity.
+//
+// so there are no wildcards here: each entry is one operation with one arity.
+//
+// The list was MEASURED from the corpus, not recalled. `docs/NEXT.md` carried
+// a remembered vocabulary that turned out to include `cache.read`,
+// `cache.write`, `observe.*` and `durable.*` — none of which appears in any
+// effect row — and to omit `session.read`, `device.query`, `network.subscribe`
+// and `unsafe.raw_html`, which do. `docs/RISK_QUEUE.md` 37 is what one missing
+// declaration already cost: `LayoutAffect` was written in five files and
+// declared nowhere, so a distinction `style.pw` called "the point" rested on a
+// spelling no checker could resolve.
+//
+// Three facts that used to be one string, separated here:
+//
+//     effect            something computation does
+//     capability        the authority required to do it
+//     host              one ABI representation of that authority
+//
+// Not every effect needs a capability, and an effect with `capability none` is
+// a declared effect rather than an undeclared one.
+
+module web.effects
+
+// --- data ------------------------------------------------------------------
+
+// The type argument names WHICH data, and it is part of the capability's
+// identity: `database.read<Stores>` and `database.read<Payments>` are
+// different authority, and collapsing them lets a component authorised for one
+// reach the other.
+//
+// ARITY IS UNSETTLED HERE. The corpus writes `database.read` 19 times and
+// `database.read<..>` 5 times, and the ruling's test list says a bare
+// `database.read` is a wrong-arity error. Declared with the parameter as the
+// ruling specifies; the diagnostic that would enforce it is NOT wired, because
+// wiring it today reports nineteen working corpus rows. See `docs/NEXT.md`.
+effect database.read<T> {
+    capability database.read<T>
+    host       "pw:host/database#read"
+}
+
+// NO type parameter, and the asymmetry with `read` above is the corpus's
+// rather than a design choice: all five parameterized uses in the corpus are
+// reads, and `database.write` is written bare twice and never otherwise.
+//
+// Declaring `database.write<T>` for symmetry was the first version of this
+// file, and `every_other_effect_is_written_at_exactly_the_arity_it_declares`
+// rejected it — a declaration that describes what the vocabulary OUGHT to
+// look like is the thing an ontology exists to replace. Whether read and write
+// should agree is the same open question as `database.read`'s own arity, and
+// it is one question rather than three.
+effect database.write {
+    capability database.write
+    host       "pw:host/database#write"
+}
+
+// A transaction is not a read or a write: it is the authority to hold one
+// open, which is what makes `resource.acquire<DatabaseTransaction>` and its
+// matching release checkable as an affine pair.
+effect database.transaction {
+    capability database.transaction
+    host       "pw:host/database#transaction"
+}
+
+// --- secrets and session ----------------------------------------------------
+
+// `secret<Payments>` — the capability tag is the argument. Charter §7.8: a
+// secret never leaves the origin, and which secret it is decides which
+// component may hold it.
+effect secret<C> {
+    capability secret<C>
+    host       "pw:host/secrets#get"
+}
+
+// Reading a secret's VALUE, as distinct from holding the capability. The
+// corpus writes both, and they are not the same authority.
+effect secret.read {
+    capability secret.read
+    host       "pw:host/secrets#read"
+}
+
+effect session.read {
+    capability session.read
+    host       "pw:host/session#read"
+}
+
+// --- network ----------------------------------------------------------------
+
+effect network.fetch {
+    capability network.fetch
+    host       "pw:host/network#fetch"
+}
+
+effect network.subscribe {
+    capability network.subscribe
+    host       "pw:host/network#subscribe"
+}
+
+// --- the document, and charter §7.5A's frame phases -------------------------
+
+// `dom.mutate` and `dom.read` need no host capability: the document is the
+// browser world's own, and a component placed there has it by being there.
+// Placement is what constrains them — `World::worlds_for` — not a grant.
+effect dom.mutate {
+    capability none
+}
+
+effect dom.read {
+    capability none
+}
+
+// Reading geometry. The effect the whole frame-phase model turns on: doing it
+// during render forces a synchronous reflow, and doing it after paint forces a
+// second layout for a frame nobody will see.
+effect layout.measure {
+    capability none
+}
+
+// A style write. The type argument distinguishes one that can invalidate
+// layout from one that cannot — charter §7.5A, and the distinction five corpus
+// files depend on.
+//
+// ARITY IS UNSETTLED, as for `database.read`: 7 uses carry `<LayoutAffect>`
+// and 2 do not.
+effect style.mutate<T> {
+    capability none
+}
+
+// A compositor animation, which runs without layout. Declared so animating a
+// property that invalidates layout is a checkable mistake rather than a slow
+// page.
+effect animation.composite {
+    capability none
+}
+
+// A painter. Charter §7.5A gives it inputs precisely so its result can be
+// replayed and cached, which is only sound if it is a pure function of them.
+effect paint.custom {
+    capability none
+}
+
+// After presentation. `intrinsic_effect` in `effects.rs` produces `paint.post`
+// for a `post_paint { .. }` block while `A-022` writes `post_paint` in its
+// row: two spellings for one thing, recorded rather than reconciled here
+// because reconciling them changes what a corpus file says.
+effect paint.post {
+    capability none
+}
+
+effect post_paint {
+    capability none
+}
+
+// --- device ------------------------------------------------------------------
+
+// Real authority, and the reason it is separate from `device.query`: knowing
+// where someone is and knowing what their screen can do are not the same ask.
+effect device.location {
+    capability device.location
+    host       "pw:host/device#location"
+}
+
+effect device.query {
+    capability device.query
+    host       "pw:host/device#query"
+}
+
+// --- resources ---------------------------------------------------------------
+
+// The affine pair. The type argument is the resource being acquired, so an
+// acquire of one kind and a release of another do not cancel.
+effect resource.acquire<R> {
+    capability resource.acquire<R>
+    host       "pw:host/resource#acquire"
+}
+
+effect resource.release<R> {
+    capability resource.release<R>
+    host       "pw:host/resource#release"
+}
+
+// --- time ---------------------------------------------------------------------
+
+// Split deliberately. A wall-clock read makes an output depend on WHEN it ran,
+// so a build-time page or a shared materialization holding one serves an answer
+// that was never true for its reader (charter §7.9, §9.4). A monotonic read
+// measures a duration and does not.
+effect clock.wall {
+    capability clock.wall
+    host       "pw:host/clock#wall"
+}
+
+effect clock.read {
+    capability none
+}
+
+// --- the escape hatches --------------------------------------------------------
+
+// Charter §16: an escape hatch is declared, audited and attributed. Declaring
+// them as effects is what makes `unsafe.raw_html` appear in an effect row and
+// therefore in a contract, rather than being a syntactic marker a reviewer has
+// to notice.
+effect unsafe.raw_html {
+    capability none
+}
+
+effect unsafe.raw_attribute {
+    capability none
+}
