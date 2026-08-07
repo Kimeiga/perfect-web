@@ -27,6 +27,7 @@ Status values: `Proposed` · `Accepted` · `Superseded by ADR-NNNN` · `Rejected
 | [0018](DECISIONS/ADR-0018-manifest-is-the-compiler-runtime-boundary.md) | The resource manifest is a data artifact; neither compiler nor runtime depends on the other | Accepted | build | E8 selects the host execution model |
 | [0019](DECISIONS/ADR-0019-materializer-store-and-outbox.md) | The materializer's state and its outbox share one SQLite database, so a command writes both in one transaction | Accepted | build | E8 selects the host execution model |
 | [0020](DECISIONS/ADR-0020-component-contract-is-the-compiler-host-boundary.md) | The compiler hands the host a six-field `ComponentContract`, one per declaration, and actual Wasm imports must be a SUBSET of what it allows | Accepted | build | E9 lowers capabilities and effects into it |
+| [0021](DECISIONS/ADR-0021-the-language-is-called-pleris.md) | The language is **Pleris**; Perfect Web stays the project, `.pw` the source format, `pw-*` the internal crates | Accepted | prose only | a public launch needs a formal trademark/organization clearance pass |
 
 ## Decisions the charter asked for and where they landed
 

@@ -8,18 +8,80 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 Ten steps. 1 is partly done; 2-10 are not started.
 
+The language is **Pleris** (ADR-0021); Perfect Web stays the project, `.pw` the
+source format, `pw-*` the internal crates. Whether the developer-facing CLI
+becomes `pleris` rather than `pw` is undecided and purely mechanical —
+`justfile`, docs, evidence scripts — so it blocks nothing.
+
 | # | task | state |
 |---|---|---|
 | 1 | Delete program-wide-unique resolution | **partly done** — see below |
 | 2 | Build-time diagnostic for an unresolved capability argument | not started |
 | 3 | Placement consumes `effective_effects` | not started |
 | 4 | The deployment planner abstraction | not started |
-| 5 | Freeze `ComponentBinding` / remote-capable semantics | not started |
+| 5 | Freeze `ComponentBinding` / remote-capable semantics | not started — **design settled**, see below |
 | 6 | Generate WIT worlds from semantic contracts | not started |
 | 7 | Typed linking only from `Granted` | not started |
 | 8 | Run real `add_to_cart` through Wasmtime | not started |
 | 9 | Fuel and memory limits | not started |
 | 10 | Replace `worlds_for` with declared node topology | not started |
+
+### Step 5's design, ruled 2026-08-07
+
+I asked whether `RemoteCapable` is the predicate the resume manifest already
+computes. The answer:
+
+> Remote-capable is not equivalent to resume-serializable. But they are two
+> policies over the same underlying semantic fact: whether a typed value can
+> safely cross a boundary. Don't build a second `is_remote_capable_type()`
+> beside `is_serializable_capture()`.
+
+```text
+                  boundary-transfer analysis
+                     /                 \
+          resume-capture policy      remote-call policy
+```
+
+So `pw-core/boundary.rs` owns `transfer_profile(type)` and
+`can_cross(profile, BoundaryContext)`, returning `Proven | Violation | Blocked`
+— **not a bool**. `resume.rs` adds its version policy; a new `binding.rs` adds
+the RPC/ABI policy.
+
+The profile knows: wire schema/codec, privacy label, affine/resource status,
+local-only handles, capabilities, schema identity. "Serializable" is too weak a
+word for it — `OpenTransaction` could be encoded as a handle number and still
+must not be reconstructed elsewhere. The concept is **transferability**.
+
+`BindingMode` as an enum is rejected:
+
+```rust
+struct BindingSupport { local: LocalSupport, remote: RemoteSupport }
+```
+
+because `Either` is just both, and an enum forecloses "remote ✓ only through a
+host-mediated handle proxy".
+
+Remote capability is a property of an **interface edge**, not a component:
+`get(StoreId) -> Result<Store, StoreError>` is probably remotable and
+`with_transaction(fn(OpenTransaction) -> T)` is not, in the same component.
+Arguments, results AND errors are all checked, in both directions.
+
+### A permanent corpus rule, adopted 2026-08-07
+
+After R-037 (`docs/RISK_QUEUE.md` 35):
+
+> Any fixture whose claimed invariant requires propagation across one or more
+> semantic edges must contain a discriminating control that breaks one edge and
+> causes the target diagnostic to disappear.
+
+R-037 produced *exactly the intended diagnostic for completely unrelated
+reasons*, which is worse than an ordinary false positive. Controls to add:
+rename the callback parameter (spelling independence); a collection whose
+element type has no such member (receiver typing matters); a callback that does
+not call the member (the path matters). The same shape applies to privacy
+propagation, resource invalidation and placement.
+
+Not yet written. This is corpus work, and it belongs with step 1's audit.
 
 ### Step 1, what is done and what is not
 
@@ -48,11 +110,21 @@ corpus is 46/46 without it.
    ```
 
    `effects.rs:550` is the scoped-and-unique branch and is fine. The other eight
-   are unexamined. The test should be an allow-list in the shape of
-   `name-keyed-allow.txt`, and **each entry needs a reason someone has actually
-   verified** — writing eight reasons without reading eight call sites is the
-   failure this project exists to avoid, so it was left undone rather than
-   filled in.
+   are unexamined. The allow-list must record a **CATEGORY**, not prose —
+   architect ruling, 2026-08-07:
+
+   ```text
+   syntax-only spelling operation          allowed
+   diagnostic display                      allowed
+   qualified identity serialization        possibly allowed
+   semantic resolution from last segment   FORBIDDEN
+   ```
+
+   Each entry needs a category someone has actually verified. Writing eight
+   classifications without reading eight call sites is the failure this project
+   exists to avoid, so it was left undone rather than filled in.
+
+   **Step 1 closes when this passes**, not before.
 
 ---|---|---|
 | 1 | Generate a WIT world per `ComponentContract` | the world's imports are exactly `contract.imports`, and `wit-bindgen` accepts it |
