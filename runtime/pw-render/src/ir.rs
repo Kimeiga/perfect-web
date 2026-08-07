@@ -112,8 +112,13 @@ pub enum Part {
         /// `press`, from `on:press`. The semantic event, not a DOM event name:
         /// translating it is the runtime's job and it differs per element.
         event: String,
-        /// The handler's identity, as the resume manifest names it.
+        /// The handler's identity, as the resume manifest names it: what
+        /// authorises this handler to attach here.
         handler: String,
+        /// The handler's name: which code to load. A different question from
+        /// the identity, and E7-L needs both — see `pw_core::template_ir`.
+        #[serde(default)]
+        name: String,
     },
     /// A region rendered only when a condition holds.
     Conditional {
@@ -242,8 +247,11 @@ pub struct PartEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<ElementId>,
     /// What the part reads, for a text or attribute part; the collection for a
-    /// loop; the handler for an event.
+    /// loop; the handler IDENTITY for an event.
     pub value: String,
+    /// The handler's name, for an event part.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
 }
 
 /// One renderable declaration.
@@ -300,6 +308,10 @@ impl Template {
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
                         Part::Blocked { .. } => String::new(),
+                    },
+                    name: match p {
+                        Part::Event { name, .. } => name.clone(),
+                        _ => String::new(),
                     },
                 });
                 match p {

@@ -98,6 +98,22 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     Carts.add(current_session(), item, quantity)
 }
 
+// A SECOND handler on the same page, and the reason it exists is E7-L.
+//
+// "The exact handler is fetched" is unfalsifiable with one handler: any fetch
+// is the right fetch. With two, the page can be made to demonstrate that
+// pressing Add loads `add_to_cart` and leaves `clear_cart` unfetched — which is
+// the whole claim, and the one thing a single-handler demo cannot show.
+command clear_cart()
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    invalidates   Cart(current_session())
+    emits         CartChanged(current_session())
+{
+    Carts.clear(current_session())
+}
+
 page StorePage(id: StoreId) {
     placement origin
     cache private
@@ -128,6 +144,13 @@ page StorePage(id: StoreId) {
 
             <section aria-label="Cart">
                 <p id="cart-count">{cart.line_count}</p>
+                <button
+                    id="clear-cart"
+                    type="button"
+                    on:press={resumable() => clear_cart()}
+                >
+                    Clear
+                </button>
             </section>
         </main>
     }

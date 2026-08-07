@@ -90,10 +90,13 @@ fn manifest_of(
     document_schema: &str,
     build: &str,
 ) -> Option<ResumeManifest> {
-    let captures = crate::resume::capture_names_and_types(body, types, descriptor);
-    if captures.is_empty() {
+    // Resumable, not "captures something". A handler that captures nothing is
+    // still a handler with an identity, an ABI, a build and a document schema;
+    // its capture schema is simply the schema of nothing.
+    if !crate::resume::is_resumable(body, descriptor) {
         return None;
     }
+    let captures = crate::resume::capture_names_and_types(body, types, descriptor);
     let capture_schema = schema_of(&captures);
     Some(ResumeManifest {
         handler: handler_id(src, body, types, lambda, &capture_schema),
@@ -119,10 +122,10 @@ fn artifact_of(
     document_schema: &str,
     build: &str,
 ) -> Option<HandlerArtifact> {
-    let declared = crate::resume::capture_names_and_types(body, types, descriptor);
-    if declared.is_empty() {
+    if !crate::resume::is_resumable(body, descriptor) {
         return None;
     }
+    let declared = crate::resume::capture_names_and_types(body, types, descriptor);
     let Expr::Lambda { body: inner, .. } = body.expr(lambda) else {
         return None;
     };

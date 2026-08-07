@@ -213,7 +213,22 @@ pub enum Part {
         /// translating it is the runtime's job and it differs per element.
         event: String,
         /// The handler's identity, as the resume manifest names it.
+        ///
+        /// **What authorises it.** Derived from the implementation, its
+        /// dependencies, its capture schema and the platform ABI, so a changed
+        /// handler is a different identity and the runtime refuses to resume
+        /// into it.
         handler: String,
+        /// The handler's NAME: which behaviour to load.
+        ///
+        /// A different question from the identity, and E7-L needs both. The
+        /// identity says *may this handler attach here*; the name says *which
+        /// code is it*. One value cannot answer both, because the identity
+        /// changes when the implementation changes and the code to load is the
+        /// same code either way — so a loader keyed on identity alone would
+        /// have nothing to ask for.
+        #[serde(default)]
+        name: String,
     },
     /// A region rendered only when a condition holds.
     Conditional {
@@ -395,8 +410,12 @@ pub struct PartEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<ElementId>,
     /// What the part reads, for a text or attribute part; the collection for a
-    /// loop; the handler for an event.
+    /// loop; the handler IDENTITY for an event.
     pub value: String,
+    /// The handler's name, for an event part. Which code to load, as opposed
+    /// to which identity to authorise — see [`Part::Event`].
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
 }
 
 impl Template {
@@ -432,6 +451,10 @@ impl Template {
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
                         Part::Blocked { .. } => String::new(),
+                    },
+                    name: match p {
+                        Part::Event { name, .. } => name.clone(),
+                        _ => String::new(),
                     },
                 });
                 match p {
@@ -578,6 +601,25 @@ struct Lowering<'a> {
     decl: crate::hir::DeclId,
 }
 
+/// The name of the thing a handler lambda calls.
+///
+/// `on:press={resumable(..) => add_to_cart(..)}` is `add_to_cart`. Empty when
+/// the handler is not a lambda that calls a named thing — in which case there
+/// is no separately loadable behaviour to name, and the runtime says so rather
+/// than guessing.
+fn called_name(body: &Body, expr: crate::hir::ExprId) -> String {
+    let Expr::Lambda { body: inner, .. } = body.expr(expr) else {
+        return String::new();
+    };
+    let Expr::Call { callee, .. } = body.expr(*inner) else {
+        return String::new();
+    };
+    match body.expr(*callee) {
+        Expr::Name(n) => n.clone(),
+        _ => String::new(),
+    }
+}
+
 fn roots_of(body: &Body) -> Vec<NodeId> {
     let mut roots = Vec::new();
     for e in body.walk() {
@@ -702,11 +744,16 @@ fn lower_element(
                     .unwrap_or_default(),
                 _ => String::new(),
             };
+            let name = match &a.value {
+                AttrValue::Expr(e) => called_name(body, *e),
+                _ => String::new(),
+            };
             out.push(Chunk::Dynamic(Part::Event {
                 id: ix.part(),
                 owner: owner.expect("an element with a handler owns an identity"),
                 event: event.to_string(),
                 handler,
+                name,
             }));
             continue;
         }

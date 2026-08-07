@@ -286,3 +286,29 @@ path ran, so a test cannot mistake one for the other.
 **Retire when** `moveBefore` is Baseline. The fallback then becomes dead code
 and should be deleted rather than kept "just in case" — a fallback nothing
 exercises is a fallback nobody knows is broken.
+
+---
+
+## A-016 — a retried handler load asks for a different specifier
+
+**Assumed since** 2026-08-07 (E7-L), `spikes/own-renderer/public/pw-runtime.mjs`.
+
+The browser's module map caches **failures** as well as successes. Re-importing
+a specifier whose first load failed returns the same rejected promise for the
+lifetime of the page: the network is never touched again, and the control that
+depends on it is permanently dead. So a retry appends `?attempt=N`.
+
+**What this leaves open.** The identity is the path and the attempt counter is
+a query, so an intermediary keying its cache on the full URL sees each retry as
+a distinct resource. That is the desired behaviour for a retry and the wrong
+behaviour for a cache trying to be helpful.
+
+**Why it is safe to hold now.** The alternative is a page where one failed load
+disables a control until reload, which is exactly the "the button does nothing"
+failure `lazy-handler.spec.mjs` exists to prevent. The counter only grows on
+failure, so a working page never emits a query at all.
+
+**Retire when** handler modules are fetched and instantiated explicitly rather
+than through dynamic `import()` — at which point the module map is not involved
+and the retry is an ordinary refetch. E9 owns handler code generation and is the
+natural place for that to change.

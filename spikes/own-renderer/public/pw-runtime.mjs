@@ -354,10 +354,68 @@ const RESUME_FIELDS = [
   "construct",
 ];
 
-function manifestFor() {
+/**
+ * The manifest for ONE handler.
+ *
+ * The document carries a base manifest and the part carries which handler it
+ * is, so two handlers on one page present two manifests and `decide` answers
+ * about the one being attached. A single page-wide manifest would authorise
+ * every handler on the strength of whichever one it described.
+ */
+function manifestFor(part) {
   const r = parts.resume;
   if (!r) return null;
-  return RESUME_FIELDS.map((f) => r[f] ?? "").join("|");
+  const per = (r.handlers ?? {})[part?.name] ?? {};
+  return RESUME_FIELDS.map((f) => per[f] ?? r[f] ?? "").join("|");
+}
+
+// --- E7-L: handler code, loaded on interaction --------------------------
+//
+// Architect ruling, 2026-08-07: handler bytes absent before interaction; the
+// exact handler fetched on first interaction; E7V check → Authorised → attach
+// → run; unrelated handler code still absent.
+//
+// So the document carries no behaviour. An element with a handler gets a
+// listener whose whole job is to LOAD the handler, check it, and run it — and
+// the second press finds it already loaded.
+
+/** handler identity → the module, or the in-flight promise for it. */
+const loaded = new Map();
+
+/**
+ * Fetch a handler by IDENTITY.
+ *
+ * By identity rather than by name, because a changed implementation is a
+ * different identity and therefore a different URL. A name-keyed URL would let
+ * a cache serve yesterday's behaviour into today's document, and the resume
+ * check would pass — it compares identities, and the document's identity would
+ * be the new one.
+ *
+ * In flight is remembered, not just resolved: two fast presses must not become
+ * two fetches, and a `has()` check that only saw finished loads would let the
+ * second press start a second one.
+ */
+const attempts = new Map();
+
+function loadHandler(identity) {
+  if (loaded.has(identity)) return loaded.get(identity);
+  // A retry asks for a different specifier.
+  //
+  // The module map caches FAILURES as well as successes, so re-importing the
+  // same specifier after a failed load returns the same rejected promise
+  // forever — the network is never touched again and the button is
+  // permanently dead. The identity still names the module; the counter only
+  // makes the failed attempt distinguishable from the next one.
+  const attempt = attempts.get(identity) ?? 0;
+  const url = attempt === 0 ? `/handler/${identity}.mjs` : `/handler/${identity}.mjs?attempt=${attempt}`;
+  const pending = import(url).then((module) => {
+    loaded.set(identity, module);
+    log.push(`loaded ${identity}`);
+    return module;
+  });
+  loaded.set(identity, pending);
+  window.__pw.fetched = (window.__pw.fetched ?? 0) + 1;
+  return pending;
 }
 
 async function attach() {
@@ -382,11 +440,19 @@ async function attach() {
     // The decision, before anything is bound. `decide` returning anything but
     // "attach" leaves the element without a listener — the button is inert
     // rather than wrong.
-    const manifest = manifestFor();
+    //
+    // Asked NOW rather than on interaction, deliberately. A refused handler
+    // must never load its code: fetching first and checking after would make
+    // the refusal a formality the network had already ignored.
+    const manifest = manifestFor(part);
     const verdict =
       decide && manifest ? decide(manifest) : { attach: false, recovery: "no-decision" };
     if (!verdict.attach) {
-      log.push(`refused ${part.id}: ${verdict.recovery}`);
+      // The CODE as well as the recovery. "refused 5: none" says a handler
+      // was refused and nothing about why; the code is the one field that
+      // distinguishes an unknown handler from a widened privacy scope from a
+      // stale document schema.
+      log.push(`refused ${part.id}: code ${verdict.code} recovery ${verdict.recovery}`);
       continue;
     }
 
@@ -394,17 +460,31 @@ async function attach() {
       const at = addresses[i];
       el.addEventListener("click", async (e) => {
         e.preventDefault();
-        // The command COMMITS and returns nothing about the cart. The browser
-        // learns the new value from the RESOURCE, because that is what the
-        // program declares the page depends on:
-        //
-        //   command add_to_cart(..) invalidates Cart(current_session())
-        //
-        // A response carrying the value would make the UI change because an
-        // endpoint said so, which is the thing E6 exists to replace.
-        await fetch("/command/add_to_cart", { method: "POST" });
-
-        void at;
+        try {
+          // Authorised above; loaded here. The order is the point of E7-L:
+          // the bytes for this handler do not exist in this page until
+          // somebody presses this button.
+          const module = await loadHandler(part.value);
+          // The command COMMITS and returns nothing about the cart. The
+          // browser learns the new value from the RESOURCE, because that is
+          // what the program declares the page depends on:
+          //
+          //   command add_to_cart(..) invalidates Cart(current_session())
+          //
+          // A response carrying the value would make the UI change because an
+          // endpoint said so, which is the thing E6 exists to replace.
+          await module.run();
+        } catch (error) {
+          // A load that fails is VISIBLE and leaves the button usable. A
+          // silent failure here is the worst outcome available: the press did
+          // nothing, the page looks fine, and the next press is the user's
+          // only way to find out.
+          loaded.delete(part.value);
+          attempts.set(part.value, (attempts.get(part.value) ?? 0) + 1);
+          el.dataset.pwHandlerError = "1";
+          log.push(`handler ${part.value} failed to load: ${error.message ?? error}`);
+          window.__pw.handlerErrors = (window.__pw.handlerErrors ?? 0) + 1;
+        }
       });
     }
     log.push(

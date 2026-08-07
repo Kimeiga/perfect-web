@@ -530,6 +530,7 @@ fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
             owner: ElementId(3),
             event: "press".into(),
             handler: "add_to_cart".into(),
+            name: "add_to_cart".into(),
         }),
         Chunk::Static("Add</button>".into()),
     ]);

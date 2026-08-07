@@ -235,6 +235,20 @@ impl Server {
         Ok(())
     }
 
+    /// `clear_cart`, through the same path as `add_to_cart`.
+    fn clear_cart(&self, session: &str) -> Result<(), String> {
+        let key = session.to_string();
+        self.materializer.command::<String>(|_tx| {
+            self.carts.lock().expect("carts").insert(key.clone(), 0);
+            Ok(vec![pw_materialize::Event::new(
+                "Events.CartChanged",
+                &[&key],
+            )])
+        })?;
+        self.drain(session);
+        Ok(())
+    }
+
     /// Consume committed events and regenerate what they invalidate.
     fn drain(&self, session: &str) {
         let key = self.cart_key(session);
@@ -548,6 +562,20 @@ impl Server {
         )
     }
 
+    /// Which handler an identity names, if this build has it.
+    ///
+    /// Answered from the compiler's template IR rather than from a list here.
+    /// A list would be a second answer to "which handlers exist", and the
+    /// first thing it would do is disagree.
+    fn handler_named(&self, identity: &str) -> Option<String> {
+        self.templates.iter().find_map(|t| {
+            t.manifest().into_iter().find_map(|p| {
+                (p.kind == "event" && p.value == identity && !p.name.is_empty())
+                    .then(|| p.name.clone())
+            })
+        })
+    }
+
     /// The graph the materializer consumes.
     fn graph(&self) -> pw_materialize::Graph {
         pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses")
@@ -823,6 +851,20 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 &format!("{{\"committed\":{ok}}}"),
             );
         }
+        ("POST", "/command/clear_cart") => {
+            // The second command, and the reason it exists is E7-L: two
+            // handlers are what make "the exact handler was loaded" a claim
+            // that can be false. It goes through the same path — commit state
+            // and event together, then drain.
+            let ok = server.clear_cart(&session).is_ok();
+            respond_json(
+                &mut stream,
+                202,
+                &session,
+                fresh,
+                &format!("{{\"committed\":{ok}}}"),
+            );
+        }
         ("POST", "/command/add_and_fail") => {
             let _ = server.add_to_cart(&session, true);
             respond_json(&mut stream, 500, &session, fresh, "{\"committed\":false}");
@@ -922,6 +964,60 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     version.0,
                     identity.partition_text()
                 ),
+            );
+        }
+        // E7-L — the handler's code, fetched on first interaction and not
+        // before.
+        //
+        // Keyed by handler IDENTITY, not by name: a changed implementation is
+        // a different identity, so it is a different URL and no cache can
+        // serve yesterday's behaviour to today's document. The name is what
+        // the module DOES; the identity is which version of it this document
+        // was rendered against.
+        //
+        // Generating the module here is the dev host standing in for E9's code
+        // generator. What is real is the boundary: the document does not carry
+        // it, the browser asks for it by identity, and the server refuses an
+        // identity this build does not have.
+        ("GET", route) if route.starts_with("/handler/") => {
+            let id = route
+                .trim_start_matches("/handler/")
+                .trim_end_matches(".mjs");
+            // The query is the browser's, not ours: a retry appends one so the
+            // module map treats it as a new specifier, because a failed load
+            // is cached forever otherwise. The identity is still the path.
+            let id = id.split('?').next().unwrap_or(id);
+            let Some(name) = server.handler_named(id) else {
+                // An identity this build does not know. Refused rather than
+                // guessed: serving *some* handler for an unknown identity is
+                // how a stale document ends up running new code.
+                respond(
+                    &mut stream,
+                    404,
+                    "text/plain; charset=utf-8",
+                    &session,
+                    fresh,
+                    b"no such handler",
+                );
+                return;
+            };
+            // Deliberately tiny, and deliberately not a bundle. Every handler
+            // is its own module, because "the exact handler was fetched" is
+            // only observable if handlers are separable.
+            let body = format!(
+                "// handler {name}, identity {id}\n\
+                 export const name = {name:?};\n\
+                 export async function run() {{\n\
+                 \x20 await fetch(\"/command/{name}\", {{ method: \"POST\" }});\n\
+                 }}\n"
+            );
+            respond(
+                &mut stream,
+                200,
+                "text/javascript; charset=utf-8",
+                &session,
+                fresh,
+                body.as_bytes(),
             );
         }
         ("GET", "/menu") => {
@@ -1128,10 +1224,21 @@ fn document(body: &str, templates: &[Template], cursor: u64) -> String {
         // would replay changes this document already contains.
         "cursor": cursor,
         "parts": template.manifest(),
+        // One base manifest and a per-handler override.
+        //
+        // Per handler, because `decide` answers about ONE handler and a page
+        // with two would otherwise authorise both on the strength of whichever
+        // one the page-wide manifest described. `clear_cart` captures nothing,
+        // so its capture schema is the schema of nothing — which is still a
+        // schema, and still has to match.
         "resume": {
             "scheme": "2", "abi": "1", "build": BUILD, "handler": "add_to_cart",
             "capture": "cart", "document": "cart-doc", "scope": "public",
             "captures": "x", "construct": "region",
+            "handlers": {
+                "add_to_cart": { "handler": "add_to_cart", "capture": "cart", "captures": "x" },
+                "clear_cart": { "handler": "clear_cart", "capture": "", "captures": "" },
+            },
         },
     });
     let json = serde_json::to_string(&manifest)

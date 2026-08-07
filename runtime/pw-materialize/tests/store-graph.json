@@ -168,6 +168,12 @@
         "item",
         "quantity"
       ]
+    },
+    {
+      "path": "store.page.clear_cart",
+      "name": "clear_cart",
+      "node": "command",
+      "params": []
     }
   ],
   "edges": [
@@ -270,6 +276,22 @@
     },
     {
       "from": "store.page.add_to_cart",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.clear_cart",
+      "to": "Events.CartChanged",
+      "kind": "emits",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.clear_cart",
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [

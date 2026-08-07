@@ -103,6 +103,20 @@ fn captures_with_spans(
 /// whose type this build cannot determine yields a schema hash derived from a
 /// guess, and a guessed hash matches nothing, so every resume would fail after
 /// deployment for a reason nobody could diagnose from the deployment.
+/// Is this descriptor a `resumable(..)` call at all?
+///
+/// Separate from "does it capture anything". The two were one test — an empty
+/// capture list meant no resume artifact — and that silently denied an identity
+/// to `resumable() => clear_cart()`, a handler that legitimately needs nothing
+/// from the document. Without an identity it cannot be authorised, so the
+/// button rendered, existed, and could never work; nothing said so.
+pub(crate) fn is_resumable(body: &crate::hir::Body, descriptor: ExprId) -> bool {
+    let Expr::Call { callee, .. } = body.expr(descriptor) else {
+        return false;
+    };
+    matches!(body.expr(*callee), Expr::Name(n) if n == "resumable")
+}
+
 pub(crate) fn capture_names_and_types(
     body: &crate::hir::Body,
     types: &crate::infer::Types<'_>,

@@ -210,19 +210,45 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     let sigs = Signatures::build(&Workspace::build(&refs), &refs);
 
     let pairs = pw_core::resume_artifacts::generate(&app, &hirs[1], &sigs, "test-build");
+    // Two: `add_to_cart`, which captures the loop item, and `clear_cart`,
+    // which captures nothing and is resumable all the same. E7-L needs the
+    // second — with one handler, "the exact handler was fetched" is satisfied
+    // by any fetch at all.
     assert_eq!(
         pairs.len(),
-        1,
-        "the store page declares exactly one resumable handler"
+        2,
+        "the store page declares two resumable handlers"
     );
-    let (m, a) = &pairs[0];
+    for (m, a) in &pairs {
+        assert_eq!(
+            pw_core::resume_artifacts::disagreement(m, a),
+            None,
+            "the manifest and the handler artifact must agree"
+        );
+        assert!(
+            !m.handler.is_empty(),
+            "every resumable handler has an identity"
+        );
+        assert!(
+            !m.capture_schema.is_empty(),
+            "a schema is a hash, and a hash of nothing is still a hash"
+        );
+    }
+
+    // The two differ, which is what makes a loop-bound capture observable: one
+    // handler captures `item` and one captures nothing, and if the capture
+    // never reached the schema both would hash the same.
+    let schemas: std::collections::BTreeSet<&str> = pairs
+        .iter()
+        .map(|(m, _)| m.capture_schema.as_str())
+        .collect();
     assert_eq!(
-        pw_core::resume_artifacts::disagreement(m, a),
-        None,
-        "the manifest and the handler artifact must agree"
-    );
-    assert!(
-        !m.capture_schema.is_empty(),
+        schemas.len(),
+        2,
         "a loop-bound capture must reach the schema"
     );
+
+    let handlers: std::collections::BTreeSet<&str> =
+        pairs.iter().map(|(m, _)| m.handler.as_str()).collect();
+    assert_eq!(handlers.len(), 2, "and two handlers are two identities");
 }

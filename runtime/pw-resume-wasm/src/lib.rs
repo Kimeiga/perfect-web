@@ -126,7 +126,18 @@ pub extern "C" fn last_trace_len() -> usize {
 fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
     let f: Vec<&str> = text.split('|').collect();
     let field = |i: usize| f.get(i).copied().unwrap_or_default();
-    let schema = |s: &str| SchemaHash::of_fields(&[(s, "T")]);
+    // The schema of NOTHING is the schema of no fields, not the schema of one
+    // field named "". `decide` refuses a manifest that carries no capture
+    // bytes under a non-empty schema — correctly — so a handler that captures
+    // nothing was malformed by construction, and the only symptom was a button
+    // that never attached.
+    let schema = |s: &str| {
+        if s.is_empty() {
+            SchemaHash::of_fields(&[])
+        } else {
+            SchemaHash::of_fields(&[(s, "T")])
+        }
+    };
 
     let scheme = HashScheme(field(0).parse().unwrap_or(0));
     let abi = PlatformAbi(field(1).parse().unwrap_or(0));
@@ -142,13 +153,23 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
         &schema(field(4)),
         &abi,
     );
-    // What this build knows: the store page's own handler, at scheme 2.
-    let known = HandlerId::derive(
-        &ImplementationHash::new(CURRENT_SCHEME, "add_to_cart"),
-        &DependencySet::of(&[["app", "store", "Term", "add_to_cart", "r1"]]),
-        &schema("cart"),
-        &PlatformAbi(1),
-    );
+    // What this build knows: the store page's TWO handlers, at scheme 2.
+    //
+    // Two, because E7-L's claim is that the exact handler is loaded — and with
+    // one known handler, "the right one was authorised" is satisfied by
+    // authorising anything. `clear_cart` captures nothing, so its capture
+    // schema is the schema of nothing, which is still a schema.
+    let known = |name: &str, capture: &str| {
+        (
+            HandlerId::derive(
+                &ImplementationHash::new(CURRENT_SCHEME, name),
+                &DependencySet::of(&[["app", "store", "Term", name, "r1"]]),
+                &schema(capture),
+                &PlatformAbi(1),
+            ),
+            schema(capture),
+        )
+    };
     let entry = ResumeEntry {
         hash_scheme: scheme,
         platform_abi: abi,
@@ -162,7 +183,9 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
     let rt = Runtime {
         abi: vec![PlatformAbi(1)],
         build: Some(BuildId("B1".into())),
-        handlers: [(known, schema("cart"))].into_iter().collect(),
+        handlers: [known("add_to_cart", "cart"), known("clear_cart", "")]
+            .into_iter()
+            .collect(),
         document_schema: Some(schema("cart-doc")),
         scope: Some(PrivacyScope::Public),
         migrations: Vec::new(),

@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Thirty measurements in this project produced plausible, favourable results
+Thirty-two measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -241,6 +241,8 @@ argument for the admissibility rule above.
 | E7-P materializer | every E6 test passed, and the browser suite failed "sometimes, under load" | `Materializer::drain` consumed **every** pending outbox event and invalidated only those matching the instances the CALLER supplied. A caller's instance set is what that caller happens to know about — one session's entry — never everything that exists, so a drain issued for session A consumed session B's event and left a `Consumed` trace claiming the work was done. Invisible to every single-instance test, because with one instance the supplied set IS the whole set. It was written off as flakiness for one commit, which is the part worth remembering: **"it fails occasionally under parallelism" is a description of a race, not of a flaky harness** |
 | E7-P transport | the long poll delivered frames, and a reloaded page silently stopped receiving them | frames were REMOVED from the queue when read. A page that reloaded left an in-flight poll behind; that request's thread woke, took the frames the new page had not yet asked for, wrote them to a socket nobody was reading, and returned. Reading is not delivery. Fixed by making the client's next request its acknowledgement of the last sequence it APPLIED, so writing to a dead socket loses nothing |
 | E7-P transport | the cursor protocol worked for every subscriber that had ever received a frame | sequences started at zero and the initial cursor was zero, so the very first frame a subscriber ever received was numbered zero, `since=0` read it as already acknowledged, and it was never delivered. Every test that sent two things passed. An off-by-one at the exact boundary where nothing has happened yet is invisible to any fixture that warms up first |
+| E7-L resume | `resumable() => clear_cart()` rendered a button that could never work | a resume manifest was only generated when the handler CAPTURED something, so "not resumable" and "resumable with nothing captured" were one test. A handler that needs nothing from the document got no identity, could not be authorised, and attached nothing — and the page looked complete. The compiler said nothing because, as far as it was concerned, there was no resumable handler there to say anything about |
+| E7-L resume | the second handler was refused with code 9, malformed | the runtime built a capture schema as `of_fields(&[(name, "T")])`, and for a handler with no captures that is a schema of ONE field named `""` rather than the schema of no fields. `decide` correctly refuses a manifest carrying no capture bytes under a non-empty schema, so a handler that captures nothing was malformed by construction. Fail-closed worked and the only symptom was a button that never attached |
 
 The two E6 rows and the inference row share a shape with the by-name member
 fallback deleted in E2C, arriving through three different doors. The E6 graph
