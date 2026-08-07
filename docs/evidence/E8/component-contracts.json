@@ -1,6 +1,7 @@
 [
   {
     "component_id": "Resources.Cart",
+    "capability_mapping": 1,
     "abi_schema": "65933ef1a76eff17",
     "required_capabilities": [],
     "allowed_placements": [
@@ -19,6 +20,7 @@
   },
   {
     "component_id": "Resources.Menu",
+    "capability_mapping": 1,
     "abi_schema": "295b1410021b7731",
     "required_capabilities": [],
     "allowed_placements": [
@@ -37,6 +39,7 @@
   },
   {
     "component_id": "Resources.Order",
+    "capability_mapping": 1,
     "abi_schema": "74d8f0d6d1bf67c7",
     "required_capabilities": [],
     "allowed_placements": [
@@ -55,6 +58,7 @@
   },
   {
     "component_id": "Resources.Store",
+    "capability_mapping": 1,
     "abi_schema": "67b9938482d95947",
     "required_capabilities": [],
     "allowed_placements": [
@@ -73,6 +77,7 @@
   },
   {
     "component_id": "store.page.Cart",
+    "capability_mapping": 1,
     "abi_schema": "ecde9085de19af23",
     "required_capabilities": [
       {
@@ -99,6 +104,7 @@
   },
   {
     "component_id": "store.page.Menu",
+    "capability_mapping": 1,
     "abi_schema": "0b0e5b9145063f31",
     "required_capabilities": [
       {
@@ -125,6 +131,7 @@
   },
   {
     "component_id": "store.page.Store",
+    "capability_mapping": 1,
     "abi_schema": "3aa6df5aa87af2a3",
     "required_capabilities": [
       {
@@ -151,6 +158,7 @@
   },
   {
     "component_id": "store.page.StorePage",
+    "capability_mapping": 1,
     "abi_schema": "fc9b014826c42a8b",
     "required_capabilities": [],
     "allowed_placements": [
@@ -169,6 +177,7 @@
   },
   {
     "component_id": "store.page.add_to_cart",
+    "capability_mapping": 1,
     "abi_schema": "4d95ea407cbb5eb7",
     "required_capabilities": [
       {
@@ -195,6 +204,7 @@
   },
   {
     "component_id": "store.page.clear_cart",
+    "capability_mapping": 1,
     "abi_schema": "c2a781d6ccefae55",
     "required_capabilities": [
       {

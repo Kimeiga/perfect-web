@@ -100,6 +100,37 @@ name — `database` → `pw:host/database` — and stops. Whether such an interf
 exists, what it connects to, and whether this deployment has one are the host's
 questions. A compiler that answered them would be a second deployment topology.
 
+### The capability mapping is versioned
+
+**Amendment, 2026-08-07**, on the architect's ruling that WIT generation must
+not hard-code today's effect syntax:
+
+> Separate semantic identity from representation. […] E9 is free later to change
+> the inference algorithm, source notation, internal effect-row representation
+> and polymorphism machinery without changing `CapabilityId(DatabaseRead,
+> Stores)` — unless E9 actually proves our semantic capability ontology itself
+> was wrong.
+
+So the contract carries `capability_mapping`, and a host that reads a version it
+does not understand **refuses** rather than interpreting the capabilities under
+its own. Two mappings can spell one capability the same way and mean different
+authority; a host that guessed would be guessing about exactly the thing it
+exists to decide.
+
+`Capability::resolve` is the construction path, and it resolves the type
+ARGUMENT against the program's declared types. `database.read<Stroes>` is
+reported rather than accepted — otherwise it becomes a capability nothing will
+ever grant and the failure appears at deployment.
+
+An unresolvable argument **keeps** the capability. Over-stating is refused work;
+under-stating is authority nobody approved, and silently dropping a capability
+whose argument was misspelled is the second one.
+
+What is NOT yet resolved: the family and operation are still read from the
+row's spelling. A declared capability table — so `database.read` is a
+declaration rather than a string — is E9's, and `CAPABILITY_MAPPING` is what
+makes that change legible when it happens.
+
 ## Consequences
 
 - E8 consumes six fields and may add none. A seventh would mean the compiler is

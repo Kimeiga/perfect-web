@@ -87,8 +87,69 @@ pub struct Capability {
     pub argument: Option<String>,
 }
 
+/// The version of the capability→representation mapping this build used.
+///
+/// Architect ruling, 2026-08-07:
+///
+/// > E9 is free later to change the inference algorithm, source notation,
+/// > internal effect-row representation and polymorphism machinery without
+/// > changing `CapabilityId(DatabaseRead, Stores)` — unless E9 actually proves
+/// > our semantic capability ontology itself was wrong.
+///
+/// Recorded so a host can tell a mapping change from an authority change. Two
+/// contracts with different mapping versions are not comparable; two with the
+/// same version and different capabilities are a real difference.
+pub const CAPABILITY_MAPPING: u32 = 1;
+
+/// Why an effect could not be turned into a capability.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NotACapability {
+    /// The family is not one this platform restricts. Not an error — an
+    /// unrestricted effect simply needs no host authority.
+    Unrestricted { family: String },
+    /// The type argument names nothing the program declares.
+    ///
+    /// Refused rather than kept as a string: `database.read<Stores>` and
+    /// `database.read<Stroes>` would otherwise be two different capabilities,
+    /// one of which nothing will ever grant, and the failure would appear at
+    /// deployment as "the node does not grant `database.read<Stroes>`".
+    UnknownArgument { family: String, argument: String },
+}
+
 impl Capability {
+    /// Build a capability from an effect, resolving its type argument.
+    ///
+    /// The architect's requirement that capability identity come "from
+    /// resolved platform declarations, not from parsing strings out of
+    /// effect-row syntax". What is resolved today is the ARGUMENT — against
+    /// the declared types of the program — and the family, against the set the
+    /// platform restricts. The family/operation pair is still read from the
+    /// row's spelling; a declared capability table is E9's, and until it exists
+    /// this is the honest half.
+    pub fn resolve(
+        effect: &str,
+        declared_types: &BTreeSet<String>,
+    ) -> Result<Capability, NotACapability> {
+        let c = Capability::parse(effect);
+        if World::worlds_for(&c.family).is_none() {
+            return Err(NotACapability::Unrestricted { family: c.family });
+        }
+        if let Some(a) = &c.argument
+            && !declared_types.contains(a)
+        {
+            return Err(NotACapability::UnknownArgument {
+                family: c.family.clone(),
+                argument: a.clone(),
+            });
+        }
+        Ok(c)
+    }
+
     /// Parse `family.operation<Argument>` as an effect row writes it.
+    ///
+    /// Not the construction path a contract uses — see [`Capability::resolve`].
+    /// Kept public because a HOST reading a contract has only the canonical
+    /// text and must be able to recover the parts.
     pub fn parse(effect: &str) -> Capability {
         let (head, argument) = match effect.split_once('<') {
             Some((h, rest)) => (h, Some(rest.trim_end_matches('>').to_string())),
@@ -160,6 +221,13 @@ pub struct Export {
 pub struct ComponentContract {
     /// The component's semantic identity: its module path.
     pub component_id: String,
+    /// Which capability→representation mapping produced this contract.
+    ///
+    /// Six semantic fields plus one about the artifact itself. A host reading a
+    /// mapping version it does not know must refuse rather than interpret the
+    /// capabilities under its own — see [`CAPABILITY_MAPPING`].
+    #[serde(default = "default_mapping")]
+    pub capability_mapping: u32,
     /// A hash over the component's INTERFACE — its exports, their kinds, its
     /// capabilities and its placements. Not over source text: a comment must
     /// not change it, and a new capability must.
@@ -172,6 +240,10 @@ pub struct ComponentContract {
     pub allowed_placements: Vec<String>,
     pub imports: Vec<Import>,
     pub exports: Vec<Export>,
+}
+
+fn default_mapping() -> u32 {
+    CAPABILITY_MAPPING
 }
 
 /// What an audit of a built artifact concluded.
@@ -237,6 +309,16 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // it compared against was the wrong one.
     let mut inference = Inference::new(sigs, ws);
     inference.run(hirs);
+
+    // Every type the program declares, for resolving a capability's argument.
+    // A misspelled `database.read<Stroes>` must be refused here rather than
+    // becoming a capability nothing will ever grant.
+    let declared_types: BTreeSet<String> = hirs
+        .iter()
+        .flat_map(|h| h.all_decls().map(|(_, d)| d).collect::<Vec<_>>())
+        .filter(|d| matches!(d.kind, DeclKind::Type | DeclKind::Opaque))
+        .map(|d| d.name.clone())
+        .collect();
 
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
@@ -310,8 +392,23 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
 
             let capabilities: Vec<Capability> = effects
                 .iter()
-                .map(|e| Capability::parse(e))
-                .filter(|c| World::worlds_for(&c.family).is_some())
+                .filter_map(|e| match Capability::resolve(e, &declared_types) {
+                    Ok(c) => Some(c),
+                    // An unrestricted family needs no host authority. This is
+                    // the only reason an effect may leave no capability behind.
+                    Err(NotACapability::Unrestricted { .. }) => None,
+                    // An unresolvable argument KEEPS the capability.
+                    //
+                    // Dropping it would remove authority the program asked for,
+                    // and the whole point of the direction argument is that
+                    // over-stating is refused work while under-stating is
+                    // authority nobody approved. The mistake surfaces at
+                    // deployment as "the node does not grant
+                    // `database.read<Stroes>`", which is a bad diagnostic —
+                    // making it a build-time one is the next step and is
+                    // recorded in `docs/NEXT.md`, not silently absorbed here.
+                    Err(NotACapability::UnknownArgument { .. }) => Some(Capability::parse(e)),
+                })
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect();
@@ -358,6 +455,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             let abi_schema = schema_of(&component_id, &exports, &capabilities, &allowed_placements);
             out.push(ComponentContract {
                 component_id,
+                capability_mapping: CAPABILITY_MAPPING,
                 abi_schema,
                 required_capabilities: capabilities,
                 allowed_placements,

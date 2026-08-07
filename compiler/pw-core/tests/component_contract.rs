@@ -89,10 +89,15 @@ fn one(sources: &[&str], module: &str) -> ComponentContract {
 }
 
 #[test]
-fn a_contract_carries_the_six_fields_and_no_others() {
+fn a_contract_carries_the_six_semantic_fields_and_no_others() {
     // Frozen means frozen. Serialized and read back as a map, so a seventh
-    // field added later fails here rather than being discovered by a host that
-    // silently ignores it.
+    // SEMANTIC field added later fails here rather than being discovered by a
+    // host that silently ignores it.
+    //
+    // `capability_mapping` is not a seventh: it says which mapping produced the
+    // other six, so a host can tell a representation change from an authority
+    // change. A contract carrying a mapping version it does not know must be
+    // refused rather than interpreted under its own.
     let c = one(&[PROGRAM], "shop.origin.Menu");
     let json = serde_json::to_value(&c).expect("serialize");
     let mut keys: Vec<&str> = json
@@ -107,11 +112,79 @@ fn a_contract_carries_the_six_fields_and_no_others() {
         [
             "abi_schema",
             "allowed_placements",
+            "capability_mapping",
             "component_id",
             "exports",
             "imports",
             "required_capabilities",
         ]
+    );
+    assert_eq!(c.capability_mapping, pw_core::contract::CAPABILITY_MAPPING);
+}
+
+#[test]
+fn a_capabilitys_argument_is_resolved_against_the_programs_types() {
+    use pw_core::contract::{Capability as Cap, NotACapability};
+    use std::collections::BTreeSet;
+
+    let declared: BTreeSet<String> = ["Stores".to_string()].into_iter().collect();
+
+    // Resolved.
+    assert_eq!(
+        Cap::resolve("database.read<Stores>", &declared)
+            .expect("resolves")
+            .name(),
+        "database.read<Stores>"
+    );
+
+    // An unrestricted family needs no host authority at all.
+    assert_eq!(
+        Cap::resolve("log", &declared),
+        Err(NotACapability::Unrestricted {
+            family: "log".into()
+        })
+    );
+
+    // A misspelled argument is REPORTED, not accepted silently. Without this,
+    // `database.read<Stroes>` becomes a capability nothing will ever grant and
+    // the failure appears at deployment rather than at build.
+    assert_eq!(
+        Cap::resolve("database.read<Stroes>", &declared),
+        Err(NotACapability::UnknownArgument {
+            family: "database".into(),
+            argument: "Stroes".into()
+        })
+    );
+}
+
+#[test]
+fn an_unresolvable_argument_does_not_remove_authority() {
+    // The direction that matters. Over-stating a capability is refused work;
+    // under-stating it is authority nobody approved — so a capability whose
+    // argument does not resolve is KEPT, and the mistake surfaces as a refusal
+    // rather than as a silent grant.
+    let program = "\
+module shop.typo
+
+fn read() -> Int !{ database.read<Stroes> } { 0 }
+
+public query Menu(id: Int) -> Int
+    freshness   5.minutes
+    consistency snapshot
+    cache       shared
+    key         id
+{
+    read()
+}
+";
+    let c = one(&[program], "shop.typo.Menu");
+    assert_eq!(
+        c.required_capabilities
+            .iter()
+            .map(Capability::name)
+            .collect::<Vec<_>>(),
+        ["database.read<Stroes>"],
+        "the capability survives even though nothing will grant it"
     );
 }
 

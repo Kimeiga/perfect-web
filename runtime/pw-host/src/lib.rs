@@ -106,9 +106,18 @@ pub struct Export {
     pub kind: String,
 }
 
+/// The capability→representation mapping this host understands.
+///
+/// A contract produced under a different mapping is not comparable: the same
+/// `database.read<Stores>` may mean something else. Refused rather than
+/// interpreted — see [`Refusal::UnknownMapping`].
+pub const CAPABILITY_MAPPING: u32 = 1;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComponentContract {
     pub component_id: String,
+    #[serde(default)]
+    pub capability_mapping: u32,
     pub abi_schema: String,
     pub required_capabilities: Vec<Capability>,
     pub allowed_placements: Vec<String>,
@@ -179,6 +188,13 @@ pub enum Refusal {
     UndeclaredImport { imports: Vec<String> },
     /// The contract can run nowhere at all.
     Unplaceable,
+    /// The contract was produced under a capability mapping this host does not
+    /// know, so its capabilities cannot be compared with this node's grants.
+    ///
+    /// Refused rather than interpreted. Two mappings can spell one capability
+    /// the same way and mean different authority, and a host that guessed would
+    /// be guessing about exactly the thing it exists to decide.
+    UnknownMapping { found: u32, understood: u32 },
 }
 
 impl std::fmt::Display for Refusal {
@@ -202,6 +218,10 @@ impl std::fmt::Display for Refusal {
             Refusal::Unplaceable => {
                 f.write_str("this component's demands can be satisfied by no world")
             }
+            Refusal::UnknownMapping { found, understood } => write!(
+                f,
+                "the contract uses capability mapping {found}; this host understands {understood}"
+            ),
         }
     }
 }
@@ -243,6 +263,13 @@ pub fn admit(
     actual: &[String],
 ) -> Admission {
     let mut refusals = Vec::new();
+
+    if contract.capability_mapping != CAPABILITY_MAPPING {
+        refusals.push(Refusal::UnknownMapping {
+            found: contract.capability_mapping,
+            understood: CAPABILITY_MAPPING,
+        });
+    }
 
     if contract.allowed_placements.is_empty() {
         refusals.push(Refusal::Unplaceable);

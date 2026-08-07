@@ -59,6 +59,7 @@ fn imports(path: PathBuf) -> Vec<String> {
 fn contract(imports: Vec<Import>) -> ComponentContract {
     ComponentContract {
         component_id: "spike.Store".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
         abi_schema: "abi".into(),
         required_capabilities: vec![Capability {
             family: "store".into(),

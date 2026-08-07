@@ -41,6 +41,7 @@ fn contract(id: &str, placements: &[&str], capabilities: &[&str]) -> ComponentCo
     let required = caps(capabilities);
     ComponentContract {
         component_id: id.to_string(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
         abi_schema: "abi".to_string(),
         imports: required
             .iter()
@@ -304,6 +305,7 @@ fn every_refusal_is_reported_not_only_the_first() {
             Refusal::Ungranted { .. } => "capability",
             Refusal::UndeclaredImport { .. } => "import",
             Refusal::Unplaceable => "unplaceable",
+            Refusal::UnknownMapping { .. } => "mapping",
         })
         .collect();
     assert_eq!(kinds, ["world", "capability", "import"]);
@@ -433,4 +435,24 @@ fn a_component_granted_nothing_gets_an_empty_linker() {
     let granted =
         Granted::from(&admit(&c, &topology(), "laptop", &[]), &BTreeMap::new()).expect("admitted");
     assert!(linkable(&c, &granted).is_empty());
+}
+
+#[test]
+fn a_contract_from_an_unknown_capability_mapping_is_refused() {
+    // Two mappings can spell one capability the same way and mean different
+    // authority. A host that interpreted an unknown mapping would be guessing
+    // about exactly the thing it exists to decide.
+    let mut c = contract("shop.Menu", &["origin"], &["database.read<Stores>"]);
+    c.capability_mapping = pw_host::CAPABILITY_MAPPING + 1;
+
+    let a = admit(&c, &topology(), "primary", &allowed(&c));
+    assert!(a.refusals().contains(&Refusal::UnknownMapping {
+        found: pw_host::CAPABILITY_MAPPING + 1,
+        understood: pw_host::CAPABILITY_MAPPING,
+    }));
+
+    // The control: the same contract at the known mapping is admitted, so the
+    // refusal is about the mapping rather than about the contract.
+    c.capability_mapping = pw_host::CAPABILITY_MAPPING;
+    assert!(admit(&c, &topology(), "primary", &allowed(&c)).is_admitted());
 }
