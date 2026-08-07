@@ -116,7 +116,14 @@ fn the_compiler_answers_which_partition_a_resource_entry_belongs_to() {
 }
 
 #[test]
-fn the_generation_participates_only_where_an_entry_outlives_a_deployment() {
+fn the_generation_is_not_inferred_from_the_partition() {
+    // Architect ruling, 2026-08-07, correcting a coupling this bridge shipped
+    // with: privacy partition must not decide whether an entry survives a
+    // deployment. They are orthogonal — a public entry can become incompatible
+    // after a deploy, and a private one can stay compatible across one.
+    //
+    // The first version answered the second question with the first, so a
+    // session-scoped entry silently claimed to be build-stable.
     let g = graph();
     let menu = g
         .entry_identity("world.Menu", &["47".into()], None)
@@ -125,15 +132,41 @@ fn the_generation_participates_only_where_an_entry_outlives_a_deployment() {
         .entry_identity("world.Cart", &["s-a".into()], Some("s-a"))
         .expect("Cart");
 
+    assert!(menu.compatibility.is_some(), "public carries a generation");
     assert!(
-        menu.compatibility.is_some(),
-        "a shared entry outlives the build that wrote it"
+        cart.compatibility.is_some(),
+        "and so does session-scoped: `public` must never mean `build-stable`"
     );
-    assert!(
-        cart.compatibility.is_none(),
-        "a private entry is re-read per reader, so its identity does not move \
-         when a build does"
-    );
+    assert_eq!(menu.compatibility, cart.compatibility);
+}
+
+/// The discriminating matrix the architect required before building on this.
+///
+/// Two orthogonal dimensions, and neither may infer the other.
+#[test]
+fn partition_and_generation_vary_independently() {
+    use pw_resource::Partition;
+
+    let of = |key: &str, partition: Partition, generation: &str| {
+        wire(&EntryIdentity::new("R", &[key], partition).generation(generation))
+    };
+    let public = || Partition::Public;
+    let session = |id: &str| Partition::Session { id: id.to_string() };
+
+    // same key, same partition, different generation → different identity
+    assert_ne!(of("k", public(), "A"), of("k", public(), "B"));
+    assert_ne!(of("k", session("X"), "A"), of("k", session("X"), "B"));
+
+    // same key, different partition, same generation → different identity
+    assert_ne!(of("k", public(), "A"), of("k", session("X"), "A"));
+    assert_ne!(of("k", session("X"), "A"), of("k", session("Y"), "A"));
+
+    // same key, same partition, same generation → same identity
+    assert_eq!(of("k", public(), "A"), of("k", public(), "A"));
+    assert_eq!(of("k", session("X"), "A"), of("k", session("X"), "A"));
+
+    // and the key is not ignored, or every row above holds for a constant
+    assert_ne!(of("k", public(), "A"), of("other", public(), "A"));
 }
 
 #[test]

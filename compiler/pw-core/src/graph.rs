@@ -404,10 +404,28 @@ impl Graph {
             resource: node.path.clone(),
             logical_key: logical_key.to_vec(),
             partition,
-            // The generation participates for a SHARED entry, which outlives
-            // the deployment that wrote it. A private entry is re-read per
-            // reader, so its identity does not move when a build does.
-            compatibility: (partition_is_shared(&node.kind)).then(|| self.compatibility.clone()),
+            // ALWAYS, and never inferred from the partition.
+            //
+            // Architect ruling, 2026-08-07 — correcting a coupling this bridge
+            // shipped with:
+            //
+            //   > Privacy partition must not decide whether an entry survives
+            //   > a deployment. […] A public entry can absolutely become
+            //   > incompatible after a deploy. A private entry can remain
+            //   > perfectly compatible across a deploy.
+            //
+            // They are orthogonal questions: the partition asks WHO may share
+            // an entry, the generation asks WHICH code generations may regard
+            // it as the same entry. The first version answered the second with
+            // the first, so a session-scoped entry silently claimed to be
+            // build-stable and a public one silently claimed not to be.
+            //
+            // V1 is conservative: every entry carries the generation. V2
+            // replaces the coarse whole-build value with a per-resource
+            // contract hash, so an unrelated deployment stops invalidating
+            // everything — and that will come from the resource's own
+            // compatibility contract, never from `Partition::Public`.
+            compatibility: Some(self.compatibility.clone()),
         })
     }
 
@@ -570,17 +588,6 @@ pub struct KeyGap {
     pub resource: String,
     pub component: String,
     pub why: String,
-}
-
-/// Is this node's storage shared between readers?
-fn partition_is_shared(kind: &NodeKind) -> bool {
-    match kind {
-        NodeKind::Resource { partition, .. } => partition
-            .as_deref()
-            .is_none_or(|p| !p.starts_with("private")),
-        NodeKind::Materialization { partition, .. } => partition.as_deref() == Some("public"),
-        _ => false,
-    }
 }
 
 fn qualified(module: &str, name: &str) -> String {
