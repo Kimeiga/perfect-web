@@ -140,17 +140,57 @@ and the ontology's `capability none` is **right** where `worlds_for` disagreed.
 1  placement metadata on effect declarations        DONE
 2  complete row → EffectInstance resolution         PARTIAL — resolve() exists,
                                                     no checker calls it yet
-3  enforce exact generic arity; open a new corpus   NEXT — 21 rows to classify
-   version for the 21 underspecified rows
+3  enforce exact generic arity; open a new corpus   DONE — 21 rows classified,
+   version for the 21 underspecified rows            no version opened (below)
 4  declare every actually-used concrete effect      DONE — 25, no wildcards
-5  unknown family / operation / argument / arity    after 3
-   diagnostics
+5  unknown family / operation / argument / arity    NEXT — blocked with 2 on
+   diagnostics                                       effect-name visibility
 6  the pre-change ComponentContract matrix          DONE — tests/contract_matrix.rs
 7  capability/host mapping declaration-driven       DONE
 8  the post-change matrix; only intended changes    DONE — four rows moved,
                                                     all four predicted
 9  deployment planning
 ```
+
+### Step 3's result, and the two things it found
+
+No corpus version opened: none of the 21 rows is under `examples/accepted` or
+`examples/rejected`, and every accepted and rejected verdict is unchanged. That
+was measured rather than assumed — the library's rows are what every fixture's
+inference reads.
+
+**`style.mutate` was saying something by omission it had no way to say.** Five
+corpus files distinguish a layout-affecting write via `style.mutate<LayoutAffect>`,
+and the ordinary side of that distinction was the BARE spelling — the implicit
+wildcard, doing real semantic work. `type PaintOnly` names it.
+
+**`Database.connect` is the motivating case for `database.read<_>`.** Connecting
+is not reading a domain, and the row is load-bearing anyway: `resource` is not a
+restricted family, so without `database.read` the function is placeable in the
+browser. It says `database.read<Database>` today, which is "touches the
+database" with an argument naming the module that says so. Explicit wildcard
+syntax, or a `database.connect` operation, would both say it properly — a
+ruling, recorded at the site.
+
+### Steps 2 and 5 are blocked together, on one question
+
+The checker does not yet call `Ontology::resolve`, so no `PW52xx` fires for an
+unknown family or operation. Wiring it needs the effect declarations to be IN
+SCOPE where rows are written, and today no corpus file imports `web.effects`.
+
+Three ways out, and they want a ruling:
+
+- a **package-declared prelude**, which the earlier ruling deferred until
+  Pleris had "a demonstrated need for implicit imports" — an effect vocabulary
+  every file writes is that need arriving;
+- **membership rather than visibility** for effect names, as `declared_for`
+  already does for contracts, which extends A-017's compromise from type
+  arguments to effect names;
+- **an implicit platform import** for the effect namespace only, on the grounds
+  that an effect name appears only in a row and never in an expression.
+
+Whichever wins should decide A-017 too. Answering one and not the other leaves
+two visibility rules for one row.
 
 **Step 8's result.** Exactly four contract rows changed, and the two controls
 did not:
