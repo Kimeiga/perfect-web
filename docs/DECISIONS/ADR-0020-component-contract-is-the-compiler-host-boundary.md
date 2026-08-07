@@ -183,10 +183,16 @@ makes that change legible when it happens.
 - The effect inference now has a scoped form. `infer_excluding` is used only
   here today, but the distinction it draws — *this body performs* versus *this
   body mentions* — is the same one E9's effect rows will need.
-- `worlds_for` remains in the compiler. The architect's E8 list replaces it with
-  a declarative host topology; until then it is the one place the deployment
-  shape is written, and `allowed_placements` is its output rather than a second
-  copy.
+- `worlds_for` remained in the compiler when this was written — a hard-coded
+  family→world table, the one place the deployment shape lived, with
+  `allowed_placements` as its output rather than a second copy. **Deleted
+  2026-08-07.** Where an effect is meaningful is the `placement` clause on its
+  own declaration; which node grants which capability is the deployment's
+  `Topology`. `allowed_placements` is still the solver's output and still not a
+  second copy, and there is no longer a third thing in between. An effect the
+  program does not declare now gets no placement answer at all, rather than the
+  table's `None` — which was read as *grants it*, and made `secret<Payments>`
+  placeable in the browser for a milestone.
 
 ## What would falsify this
 

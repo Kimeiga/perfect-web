@@ -30,6 +30,58 @@ pub enum World {
 
 pub const ALL_WORLDS: &[World] = &[World::Build, World::Browser, World::Edge, World::Origin];
 
+/// **Where an effect is meaningful, as the program declares it.**
+///
+/// Architect ruling, 2026-08-07, on deleting `World::worlds_for`:
+///
+/// > Do not turn `ontology lookup failed` into `no placement restriction`.
+/// > That would recreate the `secret<Payments>` hole in a new form. […]
+/// > `enum PlacementLookup { Known, Unrestricted, Blocked }` is safer than
+/// > returning `Option<Set<World>>`, where `None` can ambiguously mean either
+/// > "anywhere" or "I don't know."
+///
+/// The two readings of `None` have opposite safety, and the deleted table
+/// collapsed them: `secret<Payments>` missed its entry and came back "not
+/// restricted", which is the answer an unmodelled effect legitimately gets.
+/// One value cannot mean both.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlacementLookup {
+    /// A declaration names the worlds this effect is meaningful in.
+    Known(Vec<World>),
+    /// Declared, and declared to constrain nothing. `effect log<L>` happens
+    /// everywhere; so does `session.read`, whose *authority* is a capability
+    /// and whose availability is a property of a topology.
+    Unrestricted,
+    /// **Nothing declares this effect, so placement does not continue.**
+    ///
+    /// `code` names the diagnostic that owns the failure — the block is
+    /// already reported, in the vocabulary of the thing that is actually
+    /// wrong, and a consumer must not invent a second message for it.
+    Blocked { code: &'static str },
+}
+
+/// **What a program declares about where its effects are meaningful.**
+///
+/// A trait rather than a concrete `&Ontology` so that `placement.rs` keeps
+/// knowing nothing about how an effect name is taken apart. The compiler's
+/// implementation is `ontology::Ontology`; the tests below supply their own,
+/// which is what makes the solver testable without a parser.
+pub trait Placements {
+    fn placement_of(&self, effect: &str) -> PlacementLookup;
+}
+
+/// Whether one world can host one effect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Grant {
+    Yes,
+    No,
+    /// The effect does not resolve, so the question has no answer. **Not a
+    /// no**: a caller that reports "cannot run here" for a `Blocked` effect
+    /// sends the reader to the placement they wrote instead of to the effect
+    /// they misspelled.
+    Blocked,
+}
+
 impl World {
     pub fn name(self) -> &'static str {
         match self {
@@ -40,61 +92,35 @@ impl World {
         }
     }
 
-    /// Can this world grant `capability`?
+    /// Can this world host `effect`, given what the program declares?
     ///
-    /// **Only restricted families are listed.** Anything not in the table is
-    /// available everywhere, because a checker must not reject what it has not
-    /// been taught.
+    /// **Three-valued, and that is the whole point.** A world that cannot
+    /// answer is not a world that permits: see [`PlacementLookup`].
     ///
-    /// The first version had it the other way round: an unlisted family was
-    /// granted by nobody, so a declaration using `log` or `resource` — neither
-    /// of which the table mentioned — was reported as having nowhere to run.
-    /// Two corpus files were "caught" that way. Right file, wrong reason, and
-    /// the coverage number went up while nothing had actually been detected.
-    pub fn grants(self, capability: &str) -> bool {
-        // `crate::effects::family_of`, and NOT a second `split('.')` here.
-        //
-        // It was one, and it stripped no type argument: `secret<Payments>` has
-        // no dot at all, so the "family" was the whole string, `worlds_for`
-        // returned `None`, and **the corpus's most-used secret effect was
-        // placeable in every world including the browser and build time.**
-        // Twelve uses, and it never showed, because `forbidden_in` and
-        // `secret_to_browser` catch a secret reaching the browser through
-        // rules that use `family_of` and strip correctly. Defence in depth hid
-        // a hole in one of the layers.
-        //
-        // Found by `tests/contract_matrix.rs` on its first run — an instrument
-        // built to freeze today's behaviour before changing it, which is what
-        // `docs/RISK_QUEUE.md`'s admissibility rule asks for and why it caught
-        // something the change itself would have quietly repaired.
-        let family = crate::effects::family_of(capability);
-        match Self::worlds_for(family) {
-            Some(worlds) => worlds.contains(&self),
-            None => true,
+    /// There was a `worlds_for` table here — `"database" => [Origin]` — and it
+    /// was deleted on 2026-08-07 by ruling. Two things it taught are worth
+    /// keeping in view, because both were live defects:
+    ///
+    /// - The first version listed the families a world *could* grant, so an
+    ///   unlisted family was granted by nobody and `log` made a declaration
+    ///   unplaceable. Two corpus files were "caught" that way: right file,
+    ///   wrong reason, and a coverage number that moved while nothing had been
+    ///   detected. Hence [`PlacementLookup::Unrestricted`] as a real answer.
+    /// - The table was consulted with a second `split('.')` that stripped no
+    ///   type argument, so `secret<Payments>` — no dot at all — had the whole
+    ///   string for a family, matched nothing, and **was placeable in every
+    ///   world including the browser.** Twelve uses, invisible for a
+    ///   milestone, because `forbidden_in` and `secret_to_browser` caught it
+    ///   through rules that stripped correctly. Defence in depth hid a hole in
+    ///   one of the layers. The effect name is now taken apart in exactly one
+    ///   module, `ontology.rs`, and this asks it rather than parsing.
+    pub fn grants(self, effect: &str, declared: &dyn Placements) -> Grant {
+        match declared.placement_of(effect) {
+            PlacementLookup::Unrestricted => Grant::Yes,
+            PlacementLookup::Known(worlds) if worlds.contains(&self) => Grant::Yes,
+            PlacementLookup::Known(_) => Grant::No,
+            PlacementLookup::Blocked { .. } => Grant::Blocked,
         }
-    }
-
-    /// The worlds that can grant a restricted capability family, or `None` when
-    /// the family is unrestricted.
-    ///
-    /// **This is a capability→world table, not a function-name table.** E2C's
-    /// deletion gate is about the latter: no checker may know that
-    /// `secrets.payments` yields a secret. Which *worlds* can grant the
-    /// `secret` capability is a property of the deployment topology — charter
-    /// §1.7 states it directly — and belongs in the compiler until E8's WIT
-    /// worlds make it a declaration too.
-    pub fn worlds_for(family: &str) -> Option<&'static [World]> {
-        use World::*;
-        Some(match family {
-            // Privileged, server-side only.
-            "database" | "secret" | "durable" => &[Origin],
-            // The user's machine, and only there.
-            "dom" | "style" | "layout" | "observe" | "animation" | "paint" | "device" => &[Browser],
-            // Anywhere with a request context; build time has none.
-            "network" => &[Browser, Edge, Origin],
-            "cache" => &[Edge, Origin],
-            _ => return None,
-        })
     }
 
     /// May a value carrying `label` be present in this world?
@@ -166,11 +192,24 @@ pub struct Demand {
 pub struct Solution {
     pub feasible: BTreeSet<World>,
     pub ruled_out: Vec<Ruling>,
+    /// Effects nothing declares.
+    ///
+    /// **A blocked solution is not an unsatisfiable one**, and reading
+    /// `feasible.is_empty()` without asking this reports "nowhere to run"
+    /// about a program whose real defect is an effect that names nothing.
+    /// `feasible` is empty either way, so the safe direction is preserved: a
+    /// caller that forgets refuses rather than permits.
+    pub blocked: Vec<String>,
 }
 
 impl Solution {
     pub fn is_satisfiable(&self) -> bool {
         !self.feasible.is_empty()
+    }
+
+    /// Did an effect fail to resolve, leaving placement with no basis?
+    pub fn is_blocked(&self) -> bool {
+        !self.blocked.is_empty()
     }
 
     /// Every reason a specific world was rejected — the cause chain.
@@ -179,10 +218,11 @@ impl Solution {
     }
 }
 
-/// Solve a demand against every world.
-pub fn solve(demand: &Demand) -> Solution {
+/// Solve a demand against every world, given what the program declares.
+pub fn solve(demand: &Demand, declared: &dyn Placements) -> Solution {
     let mut feasible = BTreeSet::new();
     let mut ruled_out = Vec::new();
+    let mut blocked = BTreeSet::new();
 
     for &world in ALL_WORLDS {
         let mut ok = true;
@@ -196,14 +236,25 @@ pub fn solve(demand: &Demand) -> Solution {
         }
 
         for effect in &demand.effects {
-            if !world.grants(effect) {
-                ruled_out.push(Ruling {
-                    world,
-                    reason: RuledOut::MissingCapability {
-                        effect: effect.clone(),
-                    },
-                });
-                ok = false;
+            match world.grants(effect, declared) {
+                Grant::Yes => {}
+                Grant::No => {
+                    ruled_out.push(Ruling {
+                        world,
+                        reason: RuledOut::MissingCapability {
+                            effect: effect.clone(),
+                        },
+                    });
+                    ok = false;
+                }
+                // Not a `Ruling`: nothing about this world ruled it out. The
+                // effect has no meaning in this program, and saying "the
+                // browser cannot grant `databse.read`" would confirm the typo
+                // as a capability while blaming the placement.
+                Grant::Blocked => {
+                    blocked.insert(effect.clone());
+                    ok = false;
+                }
             }
         }
         for r in demand.label.restrictions() {
@@ -226,6 +277,7 @@ pub fn solve(demand: &Demand) -> Solution {
     Solution {
         feasible,
         ruled_out,
+        blocked: blocked.into_iter().collect(),
     }
 }
 
@@ -233,11 +285,53 @@ pub fn solve(demand: &Demand) -> Solution {
 mod tests {
     use super::*;
 
+    /// The vocabulary these tests solve against, standing in for a platform
+    /// package's declarations.
+    ///
+    /// A slice of pairs rather than a map, so the test double cannot become a
+    /// second effect table with a lookup order of its own. Everything absent
+    /// is `Blocked`, which is what the compiler now does: the real
+    /// `Unrestricted` cases are listed with an empty world set, exactly as a
+    /// declaration with no `placement` clause produces.
+    struct Vocabulary(&'static [(&'static str, &'static [World])]);
+
+    const PLATFORM: Vocabulary = Vocabulary(&[
+        ("database.read", &[World::Origin]),
+        ("database.write", &[World::Origin]),
+        ("secret", &[World::Origin]),
+        ("secret.use", &[World::Origin]),
+        ("dom.mutate", &[World::Browser]),
+        ("device.geolocation", &[World::Browser]),
+        (
+            "network.fetch",
+            &[World::Browser, World::Edge, World::Origin],
+        ),
+        ("cache.write", &[World::Edge, World::Origin]),
+        // Declared, and declared to constrain nothing.
+        ("log", &[]),
+        ("resource.acquire", &[]),
+    ]);
+
+    impl Placements for Vocabulary {
+        fn placement_of(&self, effect: &str) -> PlacementLookup {
+            let name = effect.split('<').next().unwrap_or(effect);
+            match self.0.iter().find(|(n, _)| *n == name) {
+                Some((_, [])) => PlacementLookup::Unrestricted,
+                Some((_, worlds)) => PlacementLookup::Known(worlds.to_vec()),
+                None => PlacementLookup::Blocked { code: "PW5201" },
+            }
+        }
+    }
+
     fn demand(effects: &[&str]) -> Demand {
         Demand {
             effects: effects.iter().map(|s| s.to_string()).collect(),
             ..Default::default()
         }
+    }
+
+    fn solve(demand: &Demand) -> Solution {
+        super::solve(demand, &PLATFORM)
     }
 
     #[test]
@@ -339,9 +433,9 @@ mod tests {
 
     #[test]
     fn every_world_grants_something_and_nothing_grants_everything() {
-        // A table where one world granted everything would make the whole
+        // A vocabulary where one world granted everything would make the whole
         // check vacuous, and one that granted nothing would make it useless.
-        let families = [
+        let effects = [
             "database.read",
             "network.fetch",
             "dom.mutate",
@@ -350,33 +444,80 @@ mod tests {
             "device.geolocation",
         ];
         for &w in ALL_WORLDS {
-            let n = families.iter().filter(|f| w.grants(f)).count();
-            assert!(n < families.len(), "{w} grants everything");
+            let n = effects
+                .iter()
+                .filter(|f| w.grants(f, &PLATFORM) == Grant::Yes)
+                .count();
+            assert!(n < effects.len(), "{w} grants everything");
         }
         assert!(
-            families.iter().any(|f| World::Origin.grants(f)),
+            effects
+                .iter()
+                .any(|f| World::Origin.grants(f, &PLATFORM) == Grant::Yes),
             "origin must grant something"
         );
     }
 
     #[test]
-    fn an_unknown_capability_family_rules_out_nothing() {
-        // The dangerous direction. The first version granted an unlisted family
-        // nowhere, so `log` and `resource` — neither in the table — made a
-        // declaration unplaceable. Two corpus files were reported for the wrong
-        // reason, which raises a coverage number while detecting nothing.
-        for family in ["log", "resource", "something.nobody.modelled"] {
-            let s = solve(&demand(&[family]));
+    fn a_declared_effect_with_no_placement_rules_out_nothing() {
+        // The dangerous direction, and the reason `Unrestricted` is a value
+        // rather than an absence. The first version of the deleted table
+        // listed the families a world *could* grant, so an unlisted one was
+        // granted by nobody and `log` made a declaration unplaceable. Two
+        // corpus files were reported for the wrong reason, which raises a
+        // coverage number while detecting nothing.
+        for effect in ["log<Public>", "resource.acquire<Db>"] {
+            let s = solve(&demand(&[effect]));
             assert_eq!(
                 s.feasible.len(),
                 ALL_WORLDS.len(),
-                "`{family}` is not modelled and must not rule out any world"
+                "`{effect}` declares no placement and must not rule out any world"
             );
+            assert!(!s.is_blocked(), "`{effect}` IS declared");
         }
-        assert!(World::worlds_for("log").is_none());
+    }
+
+    #[test]
+    fn an_undeclared_effect_is_blocked_and_not_unrestricted() {
+        // **The hole this migration exists to close.** `worlds_for` answered
+        // `None` for an effect it did not model, and `None` meant "grants it".
+        // So an effect the program never declared — a typo, a family from
+        // another platform — was placeable everywhere, which is the answer a
+        // legitimately-unconstrained effect gets.
+        //
+        // Architect ruling, 2026-08-07:
+        //
+        // > Do not turn `ontology lookup failed` into `no placement
+        // > restriction`. That would recreate the `secret<Payments>` hole in a
+        // > new form.
+        let s = solve(&demand(&["databse.read"]));
+        assert!(s.is_blocked(), "an undeclared effect has no placement");
+        assert_eq!(s.blocked, ["databse.read"]);
         assert!(
-            World::worlds_for("database").is_some(),
-            "but a known one is restricted"
+            s.feasible.is_empty(),
+            "and blocked must not read as feasible-everywhere"
         );
+        // ...and it is not reported as a world's failing, because no world
+        // failed. There is nothing to place.
+        assert!(s.ruled_out.is_empty(), "{:?}", s.ruled_out);
+
+        // The contrast that makes the assertion mean something: the correctly
+        // spelled effect is Origin-only, not blocked.
+        let ok = solve(&demand(&["database.read"]));
+        assert!(!ok.is_blocked());
+        assert_eq!(ok.feasible, BTreeSet::from([World::Origin]));
+    }
+
+    #[test]
+    fn a_type_argument_is_not_part_of_the_lookup() {
+        // `secret<Payments>` has no dot, so the deleted table's `split('.')`
+        // gave it the whole string for a family, matched nothing, and made the
+        // corpus's most-used secret effect placeable in the browser. Twelve
+        // uses, invisible for a milestone.
+        assert_eq!(
+            solve(&demand(&["secret<Payments>"])).feasible,
+            BTreeSet::from([World::Origin])
+        );
+        assert!(!solve(&demand(&["secret<Payments>"])).is_blocked());
     }
 }

@@ -28,6 +28,8 @@ use pw_core::resolve::Workspace;
 use pw_core::signatures::Signatures;
 use pw_syntax::parse_tree;
 
+mod support;
+
 /// A program with three components whose authority differs in every dimension
 /// that matters: family, operation, type argument, and none at all.
 const PROGRAM: &str = "\
@@ -71,8 +73,12 @@ component Label() {
 ";
 
 fn build(sources: &[&str]) -> Vec<ComponentContract> {
-    let hirs: Vec<Hir> = sources
-        .iter()
+    // The effect vocabulary, selected the way a real program selects one.
+    // Since `World::worlds_for` was deleted an effect nothing declares has no
+    // capability and no placement, so a fixture that performs `database.read`
+    // has to say what `database.read` is — see `tests/support/mod.rs`.
+    let hirs: Vec<Hir> = std::iter::once(&support::VOCABULARY)
+        .chain(sources.iter())
         .map(|s| lower_file(s, &parse_tree(s).green))
         .collect();
     let refs: Vec<&Hir> = hirs.iter().collect();
@@ -125,23 +131,27 @@ fn a_contract_carries_the_six_semantic_fields_and_no_others() {
 #[test]
 fn a_capabilitys_argument_is_resolved_against_the_programs_types() {
     use pw_core::contract::{Capability as Cap, NotACapability};
+    use pw_core::ontology::Ontology;
     use std::collections::BTreeSet;
 
     let declared: BTreeSet<String> = ["Stores".to_string()].into_iter().collect();
+    let hir = lower_file(support::VOCABULARY, &parse_tree(support::VOCABULARY).green);
+    let ws = Workspace::build(&[&hir]);
+    let ontology = Ontology::build_with(&[&hir], &ws);
 
     // Resolved.
     assert_eq!(
-        Cap::resolve("database.read<Stores>", &declared)
+        Cap::resolve("database.read<Stores>", &declared, &ontology)
             .expect("resolves")
             .name(),
         "database.read<Stores>"
     );
 
-    // An unrestricted family needs no host authority at all.
+    // An effect declared with `capability none` needs no host authority.
     assert_eq!(
-        Cap::resolve("log", &declared),
+        Cap::resolve("trace", &declared, &ontology),
         Err(NotACapability::Unrestricted {
-            family: "log".into()
+            family: "trace".into()
         })
     );
 
@@ -149,10 +159,21 @@ fn a_capabilitys_argument_is_resolved_against_the_programs_types() {
     // `database.read<Stroes>` becomes a capability nothing will ever grant and
     // the failure appears at deployment rather than at build.
     assert_eq!(
-        Cap::resolve("database.read<Stroes>", &declared),
+        Cap::resolve("database.read<Stroes>", &declared, &ontology),
         Err(NotACapability::UnknownArgument {
             family: "database".into(),
             argument: "Stroes".into()
+        })
+    );
+
+    // And an effect the program never declared is neither of those. It used to
+    // be `Unrestricted` whenever the deleted `worlds_for` table had no row for
+    // its family, which is the same answer `trace` gets above — so a typo and
+    // a deliberately authority-free effect were indistinguishable.
+    assert_eq!(
+        Cap::resolve("databse.read<Stores>", &declared, &ontology),
+        Err(NotACapability::Undeclared {
+            effect: "databse.read<Stores>".into()
         })
     );
 }

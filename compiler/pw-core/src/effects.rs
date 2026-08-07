@@ -923,6 +923,10 @@ pub fn forbidden_in(
     decl: &Decl,
     reuse: Reuse,
     world: Option<crate::placement::World>,
+    // Where the program declares its effects are meaningful. Needed for one
+    // question below — is this a world secrets exist in — which used to read a
+    // hard-coded table in `placement.rs`.
+    declared: &dyn crate::placement::Placements,
     effect: &str,
 ) -> Option<&'static str> {
     use crate::hir::DeclKind::*;
@@ -980,7 +984,16 @@ pub fn forbidden_in(
         // said "a page may not do this" about something a page may do; the
         // defect is that the secret then reaches the MARKUP, which is
         // `secret_to_browser` and is reported separately.
-        (View | Component | Page, "secret") if !world.is_some_and(|w| w.grants("secret")) => {
+        //
+        // `Grant::Blocked` counts as "secrets are not here": if this program
+        // declares no `secret` effect, `world` cannot be a world that holds
+        // one. That is the conservative reading and it is also the true one —
+        // the family the match arm named came from the effect's own spelling,
+        // and a spelling is not a declaration.
+        (View | Component | Page, "secret")
+            if !world
+                .is_some_and(|w| w.grants("secret", declared) == crate::placement::Grant::Yes) =>
+        {
             Some("a view is rendered where secrets are not")
         }
         // Charter §7.5A. Reading geometry while rendering forces a synchronous
@@ -997,8 +1010,36 @@ pub fn forbidden_in(
 mod tests {
     use super::*;
     use crate::lower::lower_file;
+    use crate::placement::{PlacementLookup, World};
     use crate::resolve::Workspace;
     use pw_syntax::parse_tree;
+
+    /// The one declaration `forbidden_in` asks a [`crate::placement::Placements`]
+    /// for: is `secret` an effect this world holds.
+    ///
+    /// Matched by whole spelling rather than by splitting a name, because a
+    /// test double that took an effect name apart would be a second parser of
+    /// the thing `ontology.rs` is the only module allowed to parse.
+    struct Platform;
+
+    impl crate::placement::Placements for Platform {
+        fn placement_of(&self, effect: &str) -> PlacementLookup {
+            match effect {
+                "secret" | "secret.read" => PlacementLookup::Known(vec![World::Origin]),
+                _ => PlacementLookup::Unrestricted,
+            }
+        }
+    }
+
+    /// [`super::forbidden_in`] against that vocabulary.
+    fn forbidden_in(
+        decl: &Decl,
+        reuse: Reuse,
+        world: Option<World>,
+        effect: &str,
+    ) -> Option<&'static str> {
+        super::forbidden_in(decl, reuse, world, &Platform, effect)
+    }
 
     fn program(sources: &[&str]) -> (Vec<Hir>, Signatures, Workspace) {
         let owned: Vec<Hir> = sources

@@ -48,7 +48,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{Decl, DeclKind, EffectRef, Hir, Span};
-use crate::placement::{ALL_WORLDS, World};
+use crate::placement::{ALL_WORLDS, PlacementLookup, World};
 use crate::provenance::{Evidence, FactId, FactKind, Route};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
 
@@ -812,6 +812,46 @@ fn impact_clauses(decl: &Decl, ws: &Workspace, unit: usize) -> Vec<Impact> {
         .collect()
 }
 
+/// **Where an effect is meaningful, for `placement.rs`'s solver.**
+///
+/// The declaration is now the only source of this fact. `World::worlds_for`
+/// held it as a hard-coded family→world table until 2026-08-07 and the two
+/// agreed at the moment of deletion — `tests/placement_migration.rs` is the
+/// frozen baseline that says so.
+///
+/// The three answers are the ruling's, and the middle one is why they are three
+/// rather than two:
+///
+/// ```text
+/// declared, with a placement clause   Known      the constraint
+/// declared, with none                 Unrestricted  meaningful anywhere
+/// not declared                        Blocked    no answer exists
+/// ```
+///
+/// `Blocked` names the diagnostic that owns it rather than carrying a message,
+/// because the mistake is in the effect row and `check_effect_rows` already
+/// reports it there. A placement rule inventing its own wording would deliver
+/// one defect twice in two vocabularies.
+impl crate::placement::Placements for Ontology {
+    fn placement_of(&self, effect: &str) -> PlacementLookup {
+        match self.declared_for(effect) {
+            Some(d) if d.placement.is_empty() => PlacementLookup::Unrestricted,
+            Some(d) => PlacementLookup::Known(d.placement.clone()),
+            // Which of the two unknown-effect codes owns it is the same
+            // question `resolve` answers, asked without a unit: a family
+            // something was declared into, with an operation nobody declared,
+            // is a different mistake from a family that does not exist.
+            None => PlacementLookup::Blocked {
+                code: if self.has_family(EffectPath::parse(effect).family()) {
+                    crate::codes::UNKNOWN_EFFECT_OPERATION.id
+                } else {
+                    crate::codes::UNKNOWN_EFFECT_FAMILY.id
+                },
+            },
+        }
+    }
+}
+
 /// `placement browser` → `[Browser]`; `placement browser, edge, origin` →
 /// three.
 ///
@@ -946,14 +986,31 @@ pub fn check_effect_rows(
     use crate::codes;
     use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 
-    // A program with no effect declarations at all is one checked without a
-    // platform package — `pw check` on a single file, a test fixture, a spike.
-    // Reporting every row in it as unknown would make the rule useless where it
-    // is most often run, and would say "your effect does not exist" when the
-    // truth is "no vocabulary was supplied". Silence is the honest answer.
-    if ontology.is_empty() {
-        return;
-    }
+    // **No exemption for a program with no effect declarations at all.**
+    //
+    // There was one: a checked set with an empty ontology returned here in
+    // silence, on the reasoning that "your effect does not exist" is the wrong
+    // thing to say when the truth is "no vocabulary was supplied". The
+    // architect ruled against it on 2026-08-07, deciding the same question for
+    // placement:
+    //
+    // > A pure standalone file can still check without a web platform package.
+    // > But if it writes `!{ database.read<Stores> }` without a selected or
+    // > imported platform environment that declares `database.read`, the
+    // > compiler should say, effectively: `database.read` has no meaning in
+    // > this program. It should NOT say: I recognize that string from an old
+    // > compiler table, so I'll assume origin.
+    //
+    // What made the exemption look harmless was the table underneath it —
+    // placement and capability still had answers for an undeclared effect, so
+    // silence here cost nothing visible. With `worlds_for` deleted the silence
+    // is the whole failure: the row is unreported, placement is `Blocked`, and
+    // a contract comes out with no placements and no explanation.
+    //
+    // Longer term a project selects `pw-std` and `pw-platform-web` through its
+    // configuration and ordinary programs never see this. That is a project
+    // environment concern and not a reason for the compiler to answer from a
+    // vocabulary the program did not select.
 
     for (_, decl) in hir.all_decls() {
         for entry in decl.declared_effects.iter().flatten() {

@@ -555,11 +555,25 @@ fn an_argument_that_names_nothing_in_scope_is_still_pw5200() {
 }
 
 #[test]
-fn a_file_checked_with_no_vocabulary_at_all_is_not_flooded() {
-    // The rule that keeps this usable. `pw check` on one file supplies no
-    // platform package, so the ontology is empty — and reporting every row in
-    // it as unknown would say "your effect does not exist" when the truth is
-    // "no vocabulary was supplied".
+fn a_file_checked_with_no_vocabulary_at_all_is_told_so() {
+    // **This test asserted the opposite until 2026-08-07.** An empty ontology
+    // reported nothing, on the reasoning that "your effect does not exist" is
+    // the wrong thing to say when the truth is "no vocabulary was supplied".
+    //
+    // Architect ruling, on deleting `World::worlds_for`:
+    //
+    // > A pure standalone file can still check without a web platform package.
+    // > But if it writes `!{ database.read<Stores> }` without a selected or
+    // > imported platform environment that declares `database.read`, the
+    // > compiler should say, effectively: `database.read` has no meaning in
+    // > this program. […] That stricter behavior is a feature.
+    //
+    // What made the silence look harmless was the table underneath it. An
+    // undeclared effect still got a placement from `worlds_for` and a
+    // capability from its family, so nothing downstream noticed the row had
+    // never resolved. With the table gone the silence is the failure: the row
+    // goes unreported, placement is `Blocked`, and the contract comes out with
+    // no placements and nothing saying why.
     let src = user("layout.measure");
     let alone = pw_core::check::check_sources(&[("one.pw".to_string(), src)]);
     let codes: Vec<&str> = alone
@@ -567,7 +581,20 @@ fn a_file_checked_with_no_vocabulary_at_all_is_not_flooded() {
         .flat_map(|(_, ds)| ds.iter().map(|d| d.code))
         .collect();
     assert!(
-        !codes.iter().any(|c| c.starts_with("PW520")),
-        "an empty ontology reports nothing: {codes:?}"
+        codes.contains(&"PW5201"),
+        "`layout.measure` has no meaning in a program that declares no effects: \
+         {codes:?}"
     );
+
+    // And a file with no effect rows at all still checks clean, which is what
+    // "a pure standalone file can still check" means. Without this the
+    // assertion above would also pass for a compiler that had simply started
+    // rejecting everything.
+    let pure = "module solo\n\nfn double(x: Int) -> Int { x }\n";
+    let clean = pw_core::check::check_sources(&[("pure.pw".to_string(), pure.to_string())]);
+    let clean_codes: Vec<&str> = clean
+        .iter()
+        .flat_map(|(_, ds)| ds.iter().map(|d| d.code))
+        .collect();
+    assert!(clean_codes.is_empty(), "{clean_codes:?}");
 }

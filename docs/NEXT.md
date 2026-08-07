@@ -6,7 +6,7 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ## Now: the architect's sequence of 2026-08-07 (second ruling)
 
-Ten steps. 1 is partly done; 2-10 are not started.
+Ten steps. 1-4 and 10 are done; 5-9 are E8's remaining work.
 
 The language is **Pleris** (ADR-0021); Perfect Web stays the project, `.pw` the
 source format, `pw-*` the internal crates. Whether the developer-facing CLI
@@ -19,13 +19,13 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 | 1a | Repair the two `forbidden` last-segment sites | **done** — ratchet at 0 |
 | 2 | Build-time diagnostic for an unresolved capability argument | **done** — `PW5200`, `Owner::Capability`, 8 controls. Unknown FAMILY and OPERATION still need the declared capability table (E9) |
 | 3 | Placement consumes `effective_effects` | **done** — both discriminating controls, and it found a witness proving an annotation |
-| 4 | The deployment planner abstraction | not started |
+| 4 | The deployment planner abstraction | **done** — `runtime/pw-host/src/plan.rs` |
 | 5 | Freeze `ComponentBinding` / remote-capable semantics | not started — **design settled**, see below |
 | 6 | Generate WIT worlds from semantic contracts | not started |
 | 7 | Typed linking only from `Granted` | not started |
 | 8 | Run real `add_to_cart` through Wasmtime | not started |
 | 9 | Fuel and memory limits | not started |
-| 10 | Replace `worlds_for` with declared node topology | not started |
+| 10 | Replace `worlds_for` with declared node topology | **done** — deleted 2026-08-07; placement is the declaration's own clause |
 
 **Revised 2026-08-07 by ruling: pull the effect/capability ontology forward.**
 
@@ -156,71 +156,70 @@ later analysis splits `"database.read"` at the dot.
 1  unresolved facet markers are a build error   DONE — PW5204
 2  canonical policy-keyword coverage guard      DONE — directional, with the
                                                  mutation that motivated it
-3  session.read: capability + topology, not     NEXT
+3  session.read: capability + topology, not     DONE — no intrinsic placement
    guessed placement
-4  freeze the placement migration matrix
+4  freeze the placement migration matrix        DONE — placement_migration.rs
 5  deployment planning on ontology + topology   DONE — pw-host/src/plan.rs
-6  delete World::worlds_for                     NEXT — consumers listed below
-7  boundary-transfer local/remote binding feasibility
+6  delete World::worlds_for                     DONE — see below
+7  boundary-transfer local/remote binding feasibility   NEXT
 8  WIT generation
 ```
 
-### Step 6, with the migration mapped
+### Step 6, as it landed
 
-`World::grants(capability)` consults the hard-coded `worlds_for` table. The
-ontology declares the same fact per effect and the two agree today —
-`the_ontology_and_worlds_for_agree_about_placement_where_both_speak`. The
-baseline is frozen in `tests/placement_migration.rs`: 30 effect rows plus three
-combinations proving placement is an intersection.
+`World::worlds_for` is gone. Where an effect is meaningful is the `placement`
+clause on its declaration and nothing else. The evidence is
+`docs/evidence/E8/placement-migration.txt`, produced by `just e8-placement`.
 
-**Six consumers, and the reason this is not a rename:** several have no ontology
-in scope, so the migration is a threading change before it is a deletion.
+**The lookup is three-valued**, on the ruling:
 
-```text
-placement.rs:71   World::grants           the core — every other caller goes
-                                          through it
-check.rs:1113     row-covers-or-grants    inside a declared-placement check
-check.rs:1177     declared world vs row
-check.rs:2203     effect at render time
-check.rs:2209     the `elsewhere` worlds
-contract.rs:169   the fallback when nothing declares the effect
-effects.rs        forbidden_in's `secret` world test
+> Do not turn `ontology lookup failed` into `no placement restriction`. That
+> would recreate the `secret<Payments>` hole in a new form.
+
+```rust
+pub enum PlacementLookup {
+    Known(Vec<World>),          // the declared constraint
+    Unrestricted,               // declared, and declared to constrain nothing
+    Blocked { code: &'static str },  // nothing declares it; placement stops
+}
 ```
 
-The shape: `grants` takes a placement lookup the caller supplies from the
-ontology, rather than reading a static table. `Demand` is the natural place to
-carry it, since `solve` already receives one.
+`Option<Vec<World>>` could not say that — `None` read as both *anywhere* and
+*I don't know*, and the deleted table collapsed them. `World::grants` returns
+`Grant::{Yes, No, Blocked}` for the same reason, so every consumer had to say
+what it does about the third case rather than inheriting a `bool`.
 
-**And no fallback afterwards.** `contract.rs:169` is the fallback today —
-an effect nothing declares keeps its `worlds_for` answer. After the deletion an
-undeclared effect must be diagnosed, not interpreted by legacy placement
-knowledge. `PW5201` already exists for exactly that, so the diagnostic is
-written; what changes is that placement stops silently answering.
+Seven consumers, all migrated, and `contract.rs`'s fallback deleted rather than
+threaded. Two things fell out of the deletion:
 
-Acceptance, per the ruling: every row in `placement_migration.rs` unchanged, and
-any row that moves classified explicitly rather than accepted.
+- `Capability::resolve(effect, types)` became vacuous — it passed an empty
+  ontology, and without a table underneath, every call could only answer
+  `Undeclared`. It survived exactly as long as there was a table to answer for
+  it, which is the argument against having had one. Deleted;
+  `resolve(effect, types, ontology)` is the only form.
+- `check_effect_rows`'s empty-ontology exemption is gone, on the ruling that
+  single-file strictness is correct. What made the silence look harmless was
+  the same table: an undeclared effect still had a placement and a capability,
+  so nothing downstream noticed the row had never resolved.
 
-**Step 3, specified.** `session.read` declares `placement browser, edge, origin`
-today, derived from `Label::may_hold`'s rule for a session-restricted value.
-That conflates two questions:
+**Results.** Every row in `placement_migration.rs` unchanged, and
+`docs/evidence/E8/component-contracts.{json,txt}` reproduced byte for byte. One
+row moved, in `effect_vocabulary.rs`: `post_paint` joined the
+placement-constrained-but-authority-free list, because the old test asked the
+table and the table had no `post_paint` entry to speak with. A statement of what
+the declarations say, now that they are the only thing that says it.
 
-```text
-Session<A>      who may observe the value
-session.read    the authority needed to obtain session state
-```
+**The negative control the ruling asked for by name** is
+`an_undeclared_effect_gets_no_placement_answer`: `dom.thing` — a family the
+deleted table DID restrict, with an operation nobody declares — must not acquire
+a placement. It proves the deletion is semantic and not merely that the table
+stopped being called in today's fixtures.
 
-It should declare `capability session.read` and **no intrinsic placement**, and
-the topology should say which nodes provide it. Then the same program gets a
-different feasible deployment under a different topology, which is the point.
-
-Do this BEFORE deleting `worlds_for`, so the migration matrix catches any
-accidental placement movement.
-
-**Step 6's discipline**, per the ruling: freeze current placement results, make
-planning consume ontology + topology only, delete the table, require every
-intended row unchanged, classify any that moved. **No fallback afterwards** — an
-undeclared effect must be diagnosed, not interpreted by legacy placement
-knowledge.
+**And the structural gate**, `no_source_file_maps_an_effect_family_to_a_world`:
+no file under `compiler/pw-core/src` may put a quoted family name on a line with
+a `World` variant. The scan stops at each file's `#[cfg(test)]`, because two
+test doubles live past it and exist precisely because the code under test no
+longer carries a table.
 
 **Step 5's shape**, settled:
 
@@ -259,13 +258,11 @@ and `runtime/pw-host` admits against a `Topology`. What is missing is the thing
 that PLANS — reads a program's contracts and a deployment's topology and says
 which component goes where, refusing when nothing fits.
 
-It should consume `allowed_placements` and `required_capabilities` as they now
-are; both are declaration-driven, which they were not when the item was
-written. The `worlds_for` table is the remaining hard-coded input, and
-`the_ontology_and_worlds_for_agree_about_placement_where_both_speak` is the
-test that says deleting it is safe.
+It consumes `allowed_placements` and `required_capabilities` as they now are;
+both are declaration-driven, which they were not when the item was written, and
+since step 6 there is no hard-coded input left on either side.
 
-### The two rulings this sequence turns on### The two rulings this sequence turns on
+### The two rulings this sequence turns on
 
 > **Effect declarations are ambient only because the selected platform package
 > explicitly exports them into the Effect prelude. Their arguments are not
@@ -419,7 +416,7 @@ declaration already cost.
 7   WIT generation
 8   typed linking from Granted
 9   add_to_cart through Wasmtime
-10  fuel/memory limits and declared topology replacing worlds_for
+10  fuel/memory limits (the declared topology replacing worlds_for is DONE)
 ```
 
 Full E9 still comes after E8. The point of pulling the ontology forward is to
@@ -531,7 +528,7 @@ corpus is 46/46 without it.
 | 2 | Typed linking from a `Granted` | `linkable()`'s list becomes real `Linker` entries; a component whose contract omits an import fails to instantiate, with the engine's own diagnostic |
 | 3 | Run the store's `add_to_cart` as a component | the dev server's command path goes through the host instead of a Rust closure |
 | 4 | Fuel and memory limits per instance | E0's `check:fuel` moved from the spike into `pw-host`, driven by policy rather than a constant |
-| 5 | Retire `worlds_for` in favour of the declared topology | the compiler keeps solving placement; the *table* of which world grants which family comes from a declaration the deployment owns |
+| 5 | Retire `worlds_for` in favour of the declared topology | **done 2026-08-07.** The compiler keeps solving placement; where an effect is meaningful comes from its own `placement` clause, and which node grants which capability comes from the deployment's `Topology`. No table in between |
 
 **What is already proved** (`just e8-host`, `docs/evidence/E8/`):
 

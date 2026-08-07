@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::exhaust::{self, Arm, Pattern as EPat};
 use crate::hir::{self, AttrValue, Body, Decl, DeclKind, Expr, ExprId, Hir, Node, Pattern as HPat};
-use crate::placement::{ALL_WORLDS, Demand, World, solve};
+use crate::placement::{ALL_WORLDS, Demand, Placements, World, solve};
 use crate::privacy::{Label, Restriction};
 use crate::scope::{HandleKind, Op, ScopeGraph, ScopeKind, ScopeViolation};
 use crate::signatures::Signatures;
@@ -493,6 +493,10 @@ fn check_unit_with(
             &unit.src,
             labels,
             inference,
+            // Where each effect is meaningful, as the program declares it.
+            // There was a hard-coded family→world table in `placement.rs`
+            // answering this; the declaration is now the only source.
+            ontology,
             at,
             id,
             decl,
@@ -1001,6 +1005,7 @@ fn privacy_and_placement(
     src: &str,
     labels: &BTreeMap<crate::resolve::DefId, Label>,
     inference: &crate::effects::Inference<'_>,
+    declared: &dyn crate::placement::Placements,
     at: usize,
     id: crate::hir::DeclId,
     decl: &Decl,
@@ -1108,9 +1113,10 @@ fn privacy_and_placement(
         .map(|e| e.path.clone())
         .collect();
     if let Some(w) = world
-        && effects
-            .iter()
-            .any(|e| !crate::effects::row_covers(&row, e) && !w.grants(e))
+        && effects.iter().any(|e| {
+            !crate::effects::row_covers(&row, e)
+                && w.grants(e, declared) == crate::placement::Grant::No
+        })
     {
         return;
     }
@@ -1120,8 +1126,16 @@ fn privacy_and_placement(
         label: label.clone(),
         declared: world,
     };
-    let solution = solve(&demand);
+    let solution = solve(&demand, declared);
     if solution.is_satisfiable() {
+        return;
+    }
+    // An effect that names nothing has no placement, and this rule has nothing
+    // to say about it. `check_effect_rows` reports the row — with the family it
+    // could not find and the nearest spelling — and reporting "nowhere to run"
+    // here as well would name the declaration's placement as the problem while
+    // the problem is a word in its row.
+    if solution.is_blocked() {
         return;
     }
 
@@ -1174,7 +1188,7 @@ fn privacy_and_placement(
         .iter()
         .find(|e| {
             effects.iter().any(|f| f == &e.path || f == &e.written)
-                && world.is_some_and(|w| !w.grants(&e.path))
+                && world.is_some_and(|w| w.grants(&e.path, declared) == crate::placement::Grant::No)
         })
         .map(|e| e.span.clone())
         .or_else(|| decl.policy("placement").map(|p| p.span.clone()))
@@ -2067,7 +2081,13 @@ fn effect_rows(
     let reuse = reuse_of(hir, decl);
 
     for source in &found.sources {
-        let Some(why) = forbidden_in(decl, reuse, declared_world(hir, decl), &source.effect) else {
+        let Some(why) = forbidden_in(
+            decl,
+            reuse,
+            declared_world(hir, decl),
+            ontology,
+            &source.effect,
+        ) else {
             continue;
         };
         if !at_render_time(&source.span) {
@@ -2199,19 +2219,31 @@ fn effect_rows(
             // inferred effect is `secret.read`; an exact match reported it
             // here as well, so one defect arrived twice in two vocabularies
             // and the fixture stopped being a single-defect test.
+            // `Grant::Blocked` continues too, and for a different reason than
+            // `Grant::Yes`: the effect names nothing, `check_effect_rows` owns
+            // that, and "not available at placement origin" would confirm a
+            // typo as an effect while blaming the placement.
             if crate::effects::row_covers(row, &source.effect)
-                || world.grants(&source.effect)
+                || world.grants(&source.effect, ontology) != crate::placement::Grant::No
                 || !said.insert(source.effect.clone())
             {
                 continue;
             }
-            let family = source.effect.split('.').next().unwrap_or(&source.effect);
-            let elsewhere = World::worlds_for(family).unwrap_or(&[]);
-            let elsewhere = elsewhere
-                .iter()
-                .map(|w| format!("`{w:?}`"))
-                .collect::<Vec<_>>()
-                .join(" or ");
+            let family = crate::effects::family_of(&source.effect);
+            // Where this effect IS meaningful, from its declaration. It came
+            // from `World::worlds_for(family)`, a hard-coded family→world
+            // table, and the two answers differ in a way worth having: the
+            // table could only speak per family, so `secret<Payments>` — no
+            // dot, no family — got an empty list and the explanation said
+            // "only  can", with nothing in the gap.
+            let elsewhere = match ontology.placement_of(&source.effect) {
+                crate::placement::PlacementLookup::Known(worlds) => worlds
+                    .iter()
+                    .map(|w| format!("`{w:?}`"))
+                    .collect::<Vec<_>>()
+                    .join(" or "),
+                _ => String::new(),
+            };
             out.push(Diagnostic {
                 code: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.id,
                 invariant: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.invariant,

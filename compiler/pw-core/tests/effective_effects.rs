@@ -31,6 +31,8 @@ use pw_core::resolve::Workspace;
 use pw_core::signatures::Signatures;
 use pw_syntax::parse_tree;
 
+mod support;
+
 const LIB: &str = "\
 module Stores
 
@@ -42,15 +44,22 @@ fn note(x: Int) -> Int !{ trace } { x }
 ";
 
 fn codes(src: &str) -> Vec<&'static str> {
-    check_sources(&[("lib.pw".into(), LIB.into()), ("t.pw".into(), src.into())])
-        .into_iter()
-        .flat_map(|(_, d)| d)
-        .map(|d| d.code)
-        .collect()
+    check_sources(&[
+        ("effects.pw".into(), support::VOCABULARY.into()),
+        ("lib.pw".into(), LIB.into()),
+        ("t.pw".into(), src.into()),
+    ])
+    .into_iter()
+    .flat_map(|(_, d)| d)
+    .map(|d| d.code)
+    .collect()
 }
 
 fn required(src: &str, component: &str) -> Vec<String> {
-    let hirs: Vec<Hir> = [LIB, src]
+    // The vocabulary first: an effect nothing declares has no capability and no
+    // placement since `worlds_for` was deleted, which is what this file is
+    // measuring the consequences of.
+    let hirs: Vec<Hir> = [support::VOCABULARY, LIB, src]
         .iter()
         .map(|s| lower_file(s, &parse_tree(s).green))
         .collect();

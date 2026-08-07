@@ -183,6 +183,30 @@ e8-contracts:
     @cargo test --quiet -p pw-host --test contract_mirror 2>&1 | tail -3
     @echo "  the host reads the compiler's contracts, field for field"
 
+# E8 step 6. The placement baseline, across the deletion of `World::worlds_for`.
+#
+# The migration oracle the architect asked for: freeze current placement
+# results, make placement consume the ontology only, delete the table, require
+# every intended row unchanged and classify anything that moved. Every row is
+# in `compiler/pw-core/tests/placement_migration.rs`, including the frozen copy
+# of what the deleted table said.
+e8-placement:
+    @{ echo "E8 step 6 — placement after World::worlds_for was deleted"; echo; \
+       echo "produced by: just e8-placement"; echo; \
+       echo "The hard-coded family->world table is gone. Where an effect is"; \
+       echo "meaningful is now the placement clause on its declaration, and an"; \
+       echo "effect nothing declares gets no placement answer at all rather"; \
+       echo "than the table's None, which was read as 'grants it'."; echo; \
+       cargo test -p pw-core --test placement_migration 2>&1 \
+         | grep -E '^(test |test result)'; \
+       echo; echo "and the contracts the deletion could have moved,"; \
+       echo "after re-running just e8-contracts:"; echo; \
+       git diff --stat -- docs/evidence/E8/component-contracts.json \
+         docs/evidence/E8/component-contracts.txt | sed 's/^/  /'; \
+       echo "  (nothing listed means they were reproduced byte for byte)"; \
+     } > docs/evidence/E8/placement-migration.txt
+    @tail -5 docs/evidence/E8/placement-migration.txt
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

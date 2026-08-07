@@ -332,12 +332,11 @@ fn every_effect_is_written_at_exactly_the_arity_it_declares() {
     );
 }
 
-// --- placement: the fact `worlds_for` holds as a table ----------------------
+// --- placement: the fact the deleted table used to hold ---------------------
 
-/// Where the ontology and `World::worlds_for` disagree, and why.
+/// The families that are placement-constrained but not authority-constrained.
 ///
-/// Architect ruling, 2026-08-07: the declarations are closer to correct than
-/// `worlds_for`, because that table conflates two questions.
+/// The three separated facts, and the pair this test is about:
 ///
 /// ```text
 /// Effect       what computation does
@@ -345,102 +344,54 @@ fn every_effect_is_written_at_exactly_the_arity_it_declares() {
 /// Placement    where it is meaningful/possible
 /// ```
 ///
-/// `worlds_for` answers the third and `Capability::resolve` reads its answer as
-/// the second, which is why `dom.mutate` emits `pw:host/dom#mutate` today —
-/// asking a host to grant the document to code whose only crime is being a
-/// user interface. The declarations say `placement browser, capability none`,
-/// which is both facts stated separately.
+/// `World::worlds_for` answered the third and `Capability::resolve` read its
+/// answer as the second, which is why `dom.mutate` used to emit
+/// `pw:host/dom#mutate` — asking a host to grant the document to code whose
+/// only crime is being a user interface. These five families are where the two
+/// questions came apart: `placement browser, capability none` is both facts
+/// stated separately, and a host is asked for neither.
 ///
-/// This test is the INSTRUMENT for steps 6-8: it measures the divergence
-/// before anything acts on it, so a later contract diff can be attributed to
-/// the ontology rather than to an accident.
+/// The table is gone as of 2026-08-07; `tests/placement_migration.rs` holds
+/// what it said, frozen. This states the fact from the declarations alone, so
+/// a family gaining or losing a capability clause is still a visible change to
+/// what the compiler tells a host.
 #[test]
-fn the_ontology_and_worlds_for_agree_about_placement_where_both_speak() {
-    use pw_core::placement::World;
-
-    let (_hirs, ontology) = ontology_and_hirs();
-    let mut disagreements: Vec<String> = Vec::new();
-    let mut compared = 0usize;
-
-    for decl in ontology.declarations() {
-        if decl.placement.is_empty() {
-            continue;
-        }
-        let Some(table) = World::worlds_for(decl.path.family()) else {
-            // The table says nothing, so there is nothing to agree with. The
-            // declaration is then the ONLY statement of where the effect is
-            // meaningful, which is the point of adding the clause.
-            continue;
-        };
-        compared += 1;
-        let declared: BTreeSet<World> = decl.placement.iter().copied().collect();
-        let tabled: BTreeSet<World> = table.iter().copied().collect();
-        if declared != tabled {
-            disagreements.push(format!(
-                "{}: declared {:?}, `worlds_for` says {:?}",
-                decl.path.text(),
-                declared.iter().map(|w| w.name()).collect::<Vec<_>>(),
-                tabled.iter().map(|w| w.name()).collect::<Vec<_>>(),
-            ));
-        }
-    }
-
-    assert!(
-        compared >= 10,
-        "only {compared} effects were compared, which is too few for this to \
-         be measuring the table"
-    );
-    assert!(
-        disagreements.is_empty(),
-        "the ontology and `World::worlds_for` disagree about WHERE an effect \
-         is meaningful:\n  {}\n\n\
-         They must agree before `worlds_for` can be deleted — otherwise \
-         deleting it changes placement as well as authority, and the contract \
-         diff in step 8 cannot be attributed.",
-        disagreements.join("\n  ")
-    );
-}
-
-/// The families `worlds_for` restricts that NO declaration claims a capability
-/// for.
-///
-/// This is the whole of step 7's blast radius, measured. Each is a family where
-/// `Capability::resolve` produces a capability today — because the family is in
-/// the table — and where the declaration says `capability none`. Making
-/// `interface_for` declaration-driven removes exactly these host imports and
-/// nothing else.
-#[test]
-fn the_families_that_lose_a_host_import_are_exactly_the_ones_recorded() {
-    use pw_core::placement::World;
-
-    const LOSES_ITS_HOST_IMPORT: &[&str] = &["animation", "dom", "layout", "paint", "style"];
+fn the_families_that_need_no_host_import_are_exactly_the_ones_recorded() {
+    // `post_paint` is here and was not in the table-based version of this test,
+    // which is the one row the migration moved. Not a change in behaviour: the
+    // deleted table had no `post_paint` entry, so it said nothing about the
+    // family and the old test skipped it. Reading the declarations directly
+    // sees what the declarations say. It is a placement-constrained,
+    // authority-free effect exactly like `paint`, and the reason it exists at
+    // all — two spellings for one thing, `paint.post` and `post_paint` — is
+    // recorded in `packages/pw-platform-web/effects.pw` rather than reconciled
+    // here, because reconciling it changes what corpus file A-022 says.
+    const NEEDS_NO_HOST_IMPORT: &[&str] =
+        &["animation", "dom", "layout", "paint", "post_paint", "style"];
 
     let (_hirs, ontology) = ontology_and_hirs();
     let mut found: BTreeSet<String> = BTreeSet::new();
     for decl in ontology.declarations() {
         let family = decl.path.family();
-        if World::worlds_for(family).is_some() && decl.capability.is_none() {
+        if !decl.placement.is_empty() && decl.capability.is_none() {
             found.insert(family.to_string());
         }
     }
 
-    let expected: BTreeSet<String> = LOSES_ITS_HOST_IMPORT
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let expected: BTreeSet<String> = NEEDS_NO_HOST_IMPORT.iter().map(|s| s.to_string()).collect();
     assert_eq!(
         found, expected,
-        "\nThe set of families that would lose a host import has changed.\n\n\
-         Every family here is one `World::worlds_for` restricts and whose \
-         declaration says `capability none` — placement-constrained rather \
-         than authority-constrained. Step 7 removes their host imports, and \
-         step 8 verifies that ONLY these changed. A family joining or leaving \
-         this list changes what the compiler tells the host.\n"
+        "\nThe set of families that need no host import has changed.\n\n\
+         Every family here declares a placement and `capability none` — \
+         constrained by where it is meaningful rather than by authority. A \
+         family joining this list stops asking a host for something; a family \
+         leaving it starts. Both change what the compiler tells the host, and \
+         neither should happen by accident.\n"
     );
 
-    // The control: `database` is restricted AND declares a capability, so it
-    // is not in the list. Without this the assertion above would also pass for
-    // a bug that put every restricted family in the set.
+    // The control: `database` declares both a placement and a capability, so
+    // it is not in the list. Without this the assertion above would also pass
+    // for a bug that put every placement-constrained family in the set.
     assert!(!found.contains("database"), "{found:?}");
     assert!(!found.contains("secret"), "{found:?}");
     assert!(!found.contains("network"), "{found:?}");

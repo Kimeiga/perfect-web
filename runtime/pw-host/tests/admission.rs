@@ -381,10 +381,11 @@ fn a_refused_admission_yields_no_capabilities_at_all() {
 
 #[test]
 fn the_topology_is_data_the_host_owns() {
-    // "A declarative host topology replacing `worlds_for`". The compiler's
-    // table says which worlds COULD grant a family — a statement about the
-    // shape of the web. This says what this deployment's machines actually
-    // have, which no compiler can know.
+    // "A declarative host topology replacing `worlds_for`". That table said
+    // which worlds COULD grant a family — a statement about the shape of the
+    // web — and the compiler deleted it on 2026-08-07 for a `placement` clause
+    // per effect. This says what this deployment's machines actually have,
+    // which no compiler can know however its effects are declared.
     let json = r#"{
       "nodes": [
         { "name": "edge-lhr", "world": "edge", "grants": ["cache.read"] },

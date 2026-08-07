@@ -56,7 +56,7 @@ use serde::{Deserialize, Serialize};
 use crate::effects::Inference;
 use crate::hir::{DeclKind, Expr, Hir};
 use crate::ontology::Ontology;
-use crate::placement::{Demand, World, solve};
+use crate::placement::{Demand, solve};
 use crate::privacy::Label;
 use crate::resolve::Workspace;
 use crate::signatures::Signatures;
@@ -115,26 +115,29 @@ pub enum NotACapability {
     /// one of which nothing will ever grant, and the failure would appear at
     /// deployment as "the node does not grant `database.read<Stroes>`".
     UnknownArgument { family: String, argument: String },
+    /// **Nothing in the program declares this effect at all.**
+    ///
+    /// Distinct from `Unrestricted`, and the distinction is the point: one is
+    /// "declared, and needs no authority", the other is "there is no such
+    /// effect here". Collapsing them is what a fallback does — it turns *I do
+    /// not know* into *no restriction*, which is the shape that made
+    /// `secret<Payments>` placeable in the browser.
+    Undeclared { effect: String },
 }
 
 impl Capability {
-    /// Build a capability from an effect, resolving its type argument.
+    /// **Build a capability from an effect, against what the program declares.**
     ///
     /// The architect's requirement that capability identity come "from
     /// resolved platform declarations, not from parsing strings out of
-    /// effect-row syntax". What is resolved today is the ARGUMENT — against
-    /// the declared types of the program — and the family, against the set the
-    /// platform restricts. The family/operation pair is still read from the
-    /// row's spelling; a declared capability table is E9's, and until it exists
-    /// this is the honest half.
-    pub fn resolve(
-        effect: &str,
-        declared_types: &BTreeSet<String>,
-    ) -> Result<Capability, NotACapability> {
-        Capability::resolve_with(effect, declared_types, &Ontology::default())
-    }
-
-    /// [`Capability::resolve`], asking the ontology first.
+    /// effect-row syntax".
+    ///
+    /// There was a second entry point — `Capability::resolve(effect, types)`,
+    /// which passed `Ontology::default()` — and deleting the `worlds_for`
+    /// fallback made it vacuous: an empty ontology declares nothing, so every
+    /// call could only answer [`NotACapability::Undeclared`]. It survived
+    /// exactly as long as there was a table underneath to answer for it, which
+    /// is the whole argument against having had one.
     ///
     /// **Whether an effect needs host authority is a DECLARED fact.** Architect
     /// ruling, 2026-08-07:
@@ -144,18 +147,25 @@ impl Capability {
     /// > rather than granting every browser component unrestricted DOM
     /// > authority merely because it performs UI work.
     ///
-    /// `World::worlds_for` answers a different question — where an effect is
+    /// `World::worlds_for` answered a different question — where an effect is
     /// *meaningful* — and reading its restricted-family list as "needs a
     /// capability" is what made `layout.measure` ask a host to grant the layout
-    /// engine. The declaration now decides, and `worlds_for` is consulted only
-    /// when nothing declares the effect.
+    /// engine. **The declaration is now the only thing that decides.**
     ///
-    /// That fallback is the conservative direction and stays until the
-    /// declarations are reachable from every program: over-stating authority is
-    /// refused work, under-stating it is authority nobody approved. A program
-    /// checked without the platform packages therefore behaves exactly as
-    /// before rather than silently losing its capability set.
-    pub fn resolve_with(
+    /// There was a fallback here, and deleting it is the substance of the
+    /// architect's step 6:
+    ///
+    /// > ontology doesn't know effect → diagnostic already exists → contract
+    /// > generation is Blocked. No legacy interpretation.
+    ///
+    /// The fallback read `worlds_for` when nothing declared the effect, so an
+    /// undeclared spelling the old table happened to recognise still produced a
+    /// capability. It was the conservative direction and it was still split
+    /// semantic authority: an effect this program never declared got authority
+    /// from a table in the compiler. An unresolved effect now yields
+    /// [`NotACapability::Undeclared`], which a caller must handle as a refusal
+    /// rather than as "unrestricted".
+    pub fn resolve(
         effect: &str,
         declared_types: &BTreeSet<String>,
         ontology: &Ontology,
@@ -166,10 +176,11 @@ impl Capability {
                 return Err(NotACapability::Unrestricted { family: c.family });
             }
             Some(_) => {}
-            None if World::worlds_for(&c.family).is_none() => {
-                return Err(NotACapability::Unrestricted { family: c.family });
+            None => {
+                return Err(NotACapability::Undeclared {
+                    effect: effect.to_string(),
+                });
             }
-            None => {}
         }
         if let Some(a) = &c.argument
             && !declared_types.contains(a)
@@ -614,7 +625,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             let capabilities: Vec<Capability> = effects
                 .iter()
                 .filter_map(
-                    |e| match Capability::resolve_with(e, &declared_types, &ontology) {
+                    |e| match Capability::resolve(e, &declared_types, &ontology) {
                         Ok(c) => Some(c),
                         // An unrestricted family needs no host authority. This is
                         // the only reason an effect may leave no capability behind.
@@ -630,6 +641,14 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                         // making it a build-time one is the next step and is
                         // recorded in `docs/NEXT.md`, not silently absorbed here.
                         Err(NotACapability::UnknownArgument { .. }) => Some(Capability::parse(e)),
+                        // An effect nothing declares KEEPS its capability too,
+                        // for the same reason and one more: the contract must
+                        // not come out looking like a component that needs
+                        // nothing. It cannot be deployed regardless —
+                        // `allowed_placements` is empty below, because
+                        // placement is `Blocked` for the same effect — and the
+                        // build has already reported the row.
+                        Err(NotACapability::Undeclared { .. }) => Some(Capability::parse(e)),
                     },
                 )
                 .collect::<BTreeSet<_>>()
@@ -645,7 +664,12 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                 label: Label::public(),
                 declared: None,
             };
-            let allowed_placements: Vec<String> = solve(&demand)
+            // A `Blocked` effect leaves this EMPTY, and empty is the contract's
+            // existing word for "no node may run this". The host refuses it
+            // everywhere, which is what "contract generation is Blocked" means
+            // in the artifact's own vocabulary — no new field, and no way to
+            // read an undeclared effect as an unconstrained one.
+            let allowed_placements: Vec<String> = solve(&demand, &ontology)
                 .feasible
                 .into_iter()
                 .map(|w| w.name().to_string())

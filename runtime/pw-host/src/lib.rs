@@ -206,11 +206,12 @@ impl ComponentContract {
 /// One place code can run, and what it actually has.
 ///
 /// **Declarative, and the host's own.** The architect's E8 list calls for "a
-/// declarative host topology replacing `worlds_for`", and this is the half that
-/// belongs here: `worlds_for` says which worlds *could* grant a family, which
-/// is a statement about the shape of the web. This says which capabilities THIS
-/// deployment's node has, which is a statement about a machine — and no
-/// compiler can know it.
+/// declarative host topology replacing `worlds_for`". That table said which
+/// worlds *could* grant a family — a statement about the shape of the web —
+/// and it was deleted from the compiler on 2026-08-07 in favour of a
+/// `placement` clause on each effect declaration. This is the other half: which
+/// capabilities THIS deployment's node has, which is a statement about a
+/// machine, and no compiler can know it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Node {
     /// The node's name, for diagnostics.

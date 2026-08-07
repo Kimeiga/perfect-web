@@ -13,11 +13,21 @@
 
 use pw_core::check::check_sources;
 
+mod support;
+
 fn program(files: &[(&str, &str)]) -> Vec<(String, Vec<String>)> {
-    let owned: Vec<(String, String)> = files
-        .iter()
-        .map(|(n, s)| ((*n).to_string(), (*s).to_string()))
-        .collect();
+    // Every program gets the effect vocabulary, because since `worlds_for` was
+    // deleted an effect nothing declares has no placement to be outside of —
+    // and `declared_placement_cannot_grant` is precisely a claim about where an
+    // effect is meaningful.
+    let owned: Vec<(String, String)> =
+        std::iter::once(("effects.pw".to_string(), support::VOCABULARY.to_string()))
+            .chain(
+                files
+                    .iter()
+                    .map(|(n, s)| ((*n).to_string(), (*s).to_string())),
+            )
+            .collect();
     check_sources(&owned)
         .into_iter()
         .map(|(n, ds)| (n, ds.iter().map(|d| d.symbol().to_string()).collect()))
@@ -133,15 +143,19 @@ fn a_secret_crosses_a_module_boundary_into_markup() {
 #[test]
 fn an_effect_becomes_forbidden_only_at_the_caller_in_another_file() {
     let r = program(&[
+        // `database.read<Store>`, not a bare `database.read`. The effect binds
+        // one type parameter and omission is not a wildcard — architect ruling,
+        // 2026-08-07 — so the bare form is `PW5203` and the fixture would be
+        // reporting an arity mistake rather than the thing it is about.
         (
             "stores.pw",
             "module Stores\n\ntype Store = Store { name: String }\n\n\
-             fn get(id: Int) -> Store !{ database.read } { todo }\n",
+             fn get(id: Int) -> Store !{ database.read<Store> } { todo }\n",
         ),
         (
             "view.pw",
-            "module store.badge\n\nimport Stores\n\n\
-             view Badge(id: Int) !{ database.read } {\n    \
+            "module store.badge\n\nimport Stores.{ Store }\n\n\
+             view Badge(id: Int) !{ database.read<Store> } {\n    \
              <p>{Stores.get(id).name}</p>\n}\n",
         ),
     ]);

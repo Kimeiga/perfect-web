@@ -39,9 +39,30 @@ its WIT world and its component demands fifteen, because Rust `std` on
 `wasm32-wasip2` injects fourteen `wasi:*` interfaces during runtime
 initialization. It is refused, and every one is named.
 
-What remains for E8 is in `docs/NEXT.md`: WIT world generation, typed linking
-from a `Granted`, running a real command through the host, per-instance fuel and
-memory limits, and retiring `worlds_for` in favour of the declared topology.
+What remains for E8 is in `docs/NEXT.md`: boundary-transfer binding feasibility,
+WIT world generation, typed linking from a `Granted`, running a real command
+through the host, and per-instance fuel and memory limits.
+
+**Deployment planning is done.** `runtime/pw-host/src/plan.rs` reads a program's
+contracts and a deployment's topology and says which component may go where,
+composing one `admit()` call per (component, node) pair rather than re-deriving
+admission. No edge in the store demo is necessarily remote — `StorePage` needs
+no capability and places at the origin alongside the command it calls — which is
+the planner being right rather than the demo being thin: the language states
+constraints, and browser/server separation existing conceptually is not one.
+
+**`World::worlds_for` is deleted** (2026-08-07). Where an effect is meaningful
+is the `placement` clause on its declaration; the hard-coded family→world table
+is gone, and with it the answer it gave for effects nothing declares. That
+answer was `None`, read as *grants it*, which is how `secret<Payments>` was
+placeable in the browser for a milestone. The lookup is now three-valued —
+`Known` / `Unrestricted` / `Blocked` — so *no restriction* and *I don't know*
+cannot be the same value. Evidence: `docs/evidence/E8/placement-migration.txt`,
+and the committed contracts reproduce byte for byte across the deletion.
+
+One consequence worth knowing before it surprises someone: **a program that
+selects no platform package is now told its effects have no meaning.** It was
+silent, and silence was safe only because the table still answered underneath.
 
 **The effect ontology is pulled forward ahead of WIT** (architect ruling,
 2026-08-07), so E8 does not freeze today's stringly effect vocabulary into the
@@ -64,6 +85,9 @@ wildcard, and all 21 underspecified rows were classified and specified. The
 declarations were right where `World::worlds_for` disagreed: `dom`, `style`,
 `layout`, `animation` and `paint` are placement-constrained rather than
 authority-constrained, and five families stopped asking a host to grant them.
+Six, once the table was gone and the question could be asked of the
+declarations directly: `post_paint` was in the same position and the table had
+no row to speak with.
 
 **A package declares which namespace it exports.** `prelude Effect` in
 `web.effects` makes effect NAMES ambient; their ARGUMENTS are not, and a file
@@ -419,19 +443,20 @@ incremental           5 unrelated updates -> expensive node evaluated once
 
 ## next three concrete tasks
 
-1. **Parse function and template bodies.** This unlocks the largest block of
-   the rejected corpus — the effect-in-view family (`R-001`, `R-033`, `R-036`,
-   `R-037`) and body-level policy violations (`R-004`) — and E1's lowering needs
-   it anyway. `R-037` matters most: an effect smuggled through a generic
-   callback. RQ-2 proved the backend propagates effects that way; the `pw`
-   checker must be shown to do the same, or it is worth approximately nothing.
-2. **E2A-R** — the runtime half of structured concurrency: owner scopes,
-   cancellation propagation, cleanup ordering, leak detection. E2A does not close
-   until both halves pass, and the static rules must not be described as covering
-   the runtime ones.
-3. **Promote `spikes/koka-js-interop/node/kki.mjs` to `tools/kki-effects/`**
-   with golden fixtures per pinned Koka version — for the `.kki` format *and*,
-   per ADR-0011, for the value representation the decoder depends on.
+1. **Boundary-transfer binding feasibility.** The planner records edges and does
+   not classify them: whether a placed edge may be remote is a question about
+   what crosses it. `transfer_profile` and `BindingSupport { local, remote }`
+   are the shape E8's binding design settled on. The synthetic
+   `BrowserOnly A → OriginOnly B` case in `runtime/pw-host/tests/planning.rs` is
+   what exercises it, deliberately — the store demo has no necessarily-remote
+   edge and should not be distorted to manufacture one.
+2. **WIT world generation** from `ComponentContract`. The world's imports must
+   be exactly `contract.imports`, and `wit-bindgen` must accept it. Every input
+   is now declaration-driven on both sides, which it was not when this item was
+   written.
+3. **Typed linking only from a `Granted`.** `linkable()`'s list becomes real
+   `Linker` entries, and a component whose contract omits an import fails to
+   instantiate with the engine's own diagnostic rather than ours.
 
 Linux CI is deferred by operator decision to before E3 (risk R11).
 
