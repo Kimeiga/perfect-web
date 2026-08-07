@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Thirty-eight measurements in this project produced plausible, favourable results
+Thirty-nine measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -249,6 +249,7 @@ argument for the admissibility rule above.
 | E8 corpus history | `the_pre_change_text_of_every_repaired_fixture_still_fails` passed for R-001 and R-024 | both C0 texts call a function they never import, so the call names nothing the program declares. They became catchable only through the same by-spelling matching — a test asserting "this historical defect is still detected" was itself relying on ambient resolution E2B had removed. Deleting the fallback made both go silent, correctly, and they are now recorded as `FixtureDidNotExpressIt` with the reason |
 | E8 capability | `style.mutate<LayoutAffect>` distinguished a layout-affecting write from an ordinary one, in five corpus files, and `style.pw`'s own comment called the type argument "the point" | `LayoutAffect` was declared NOWHERE. The distinction rested on a spelling no checker could resolve, so `style.mutate<LayoutAffect>` and `style.mutate<Anything>` were the same effect to every analysis that read the row. Two fixtures, an accepted example and two generality witnesses all wrote it. Found by `PW5200` on its first run against the real corpus — the rule was written for a typo and found a five-file convention naming nothing |
 | E8 audit | the privacy checker read a page's label from every declaration in the program sharing the query's spelling, and had never produced a wrong answer | it JOINS rather than picks, so an unrelated `Cart` could only make a page look MORE private — the safe direction, which is exactly why nobody looked. It was still RISK_QUEUE 34's shape, and the fixtures that appeared to prove cross-module labels worked (R-004's C0 text, `cross_file.rs`) were passing through it. Repairing it exposed a second defect underneath: `query Cart(s)` resolved to the TYPE `Cart` rather than the query, because the general resolver tries the type namespace first — the E6 defect, in a third place |
+| E8 placement | `generality/no_feasible_placement/caught.pw` proved the analysis reaches "two capabilities no single world grants" — an INDIRECT, general shape rather than a declaration the checker could read off | its body called only `Stores.get`, so `device.location` existed in the annotation and nowhere else. The witness proved that a checker reading a DECLARED row reports a declared row. It went silent the moment placement started reading what the body does, which is the only reason anyone found out. Repaired by making the body perform both effects |
 
 The two E6 rows and the inference row share a shape with the by-name member
 fallback deleted in E2C, arriving through three different doors. The E6 graph

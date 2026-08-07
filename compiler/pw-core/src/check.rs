@@ -469,6 +469,7 @@ fn check_unit_with(
             labels,
             inference,
             at,
+            id,
             decl,
             inherited.get(&id.0).copied(),
             &mut out,
@@ -974,6 +975,7 @@ fn privacy_and_placement(
     labels: &BTreeMap<crate::resolve::DefId, Label>,
     inference: &crate::effects::Inference<'_>,
     at: usize,
+    id: crate::hir::DeclId,
     decl: &Decl,
     inherited: Option<World>,
     out: &mut Vec<Diagnostic>,
@@ -1041,20 +1043,51 @@ fn privacy_and_placement(
         }
     }
 
-    // 2. Placement. The demand is the declared effect row plus the label; the
-    // solver answers which worlds can satisfy it.
-    let effects: Vec<String> = decl
+    // 2. Placement. The demand is what this definition EFFECTIVELY needs, plus
+    // the label; the solver answers which worlds can satisfy it.
+    //
+    // `effective_effects`, not the declared row. Architect ruling, 2026-08-07:
+    //
+    // > Placement and E8 contract generation should use the same central
+    // > effective-effects function. No caller should independently decide
+    // > whether to look at declarations or inference.
+    //
+    // Two answers to "what does this need" is how one semantic declaration ends
+    // up with two answers about where it can run — the pattern this project has
+    // spent its life deleting. It also means an over-declared row no longer
+    // narrows placement: `fn f() !{ database.read, trace } { trace("hi") }`
+    // needs `trace`, and a host must not be asked for database access because
+    // an annotation permitted it.
+    let effects: Vec<String> = inference.effective_effects(at, hir, id);
+    if effects.is_empty() && label.is_public() {
+        return;
+    }
+
+    let world = declared_world(hir, decl).or(inherited);
+
+    // An effect the row does NOT cover, at a world the author declared, is
+    // `DECLARED_PLACEMENT_CANNOT_GRANT`'s to report — against the call that
+    // performs it, naming the worlds that could. Reporting it here as well
+    // would deliver one defect twice in two vocabularies, which is what
+    // `every_rejected_fixture_emits_only_its_own_defect` exists to prevent.
+    //
+    // Covers, not equals: R-026 declares `secret<Payments>` and its body
+    // performs `secret.read`. The row covers it, so this rule owns it.
+    let row: Vec<String> = decl
         .declared_effects
         .as_deref()
         .unwrap_or_default()
         .iter()
         .map(|e| e.path.clone())
         .collect();
-    if effects.is_empty() && label.is_public() {
+    if let Some(w) = world
+        && effects
+            .iter()
+            .any(|e| !crate::effects::row_covers(&row, e) && !w.grants(e))
+    {
         return;
     }
 
-    let world = declared_world(hir, decl).or(inherited);
     let demand = Demand {
         effects: effects.clone(),
         label: label.clone(),
@@ -1068,7 +1101,13 @@ fn privacy_and_placement(
     // The effect AS WRITTEN, type arguments included. `database.read` and
     // `database.read<Stores>` are the same capability but not the same text,
     // and the corpus declares which one the developer must be shown.
-    let written: Vec<String> = decl
+    //
+    // From the ROW's source span where a row exists, and from the effective set
+    // otherwise. The row is what the author wrote and what the corpus declares
+    // it must be shown: R-026 writes `secret<Payments>` and performs
+    // `secret.read`, and being told about `secret.read` names something that
+    // appears nowhere in the file.
+    let mut written: Vec<String> = decl
         .declared_effects
         .as_deref()
         .unwrap_or_default()
@@ -1080,6 +1119,9 @@ fn privacy_and_placement(
                 .to_string()
         })
         .collect();
+    if written.is_empty() {
+        written = effects.clone();
+    }
 
     // Nowhere can run this. Name every reason, for every world — that is the
     // cause chain charter §14 M5 task 5 asks for.
@@ -1103,7 +1145,10 @@ fn privacy_and_placement(
         .as_deref()
         .unwrap_or_default()
         .iter()
-        .find(|e| world.is_some_and(|w| !w.grants(&e.path)))
+        .find(|e| {
+            effects.iter().any(|f| f == &e.path || f == &e.written)
+                && world.is_some_and(|w| !w.grants(&e.path))
+        })
         .map(|e| e.span.clone())
         .or_else(|| decl.policy("placement").map(|p| p.span.clone()))
         .unwrap_or_else(|| hir.decl_span(decl_id_of(hir, decl)));

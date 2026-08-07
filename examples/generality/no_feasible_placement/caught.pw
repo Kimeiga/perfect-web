@@ -13,5 +13,15 @@ import domain.{ Location }
 fn locate(id: StoreId) -> Result<Store, StoreError>
     !{ device.location, database.read }
 {
+    // BOTH effects are performed, not merely declared.
+    //
+    // The body used to call only `Stores.get`, so `device.location` existed
+    // only in the annotation. That was enough while placement read the
+    // DECLARED row; it stopped being enough when placement started reading
+    // what the body does (architect ruling, 2026-08-07), and the witness went
+    // silent — proving it had been evidence about an annotation rather than
+    // about a program.
+    let here = device.current_location()
+    let north = here.lat
     Stores.get(id)
 }

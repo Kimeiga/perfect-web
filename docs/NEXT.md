@@ -18,7 +18,7 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 | 1 | Delete program-wide-unique resolution | **done** — audit landed; prelude deferred by ruling |
 | 1a | Repair the two `forbidden` last-segment sites | **done** — ratchet at 0 |
 | 2 | Build-time diagnostic for an unresolved capability argument | **done** — `PW5200`, `Owner::Capability`, 8 controls. Unknown FAMILY and OPERATION still need the declared capability table (E9) |
-| 3 | Placement consumes `effective_effects` | not started |
+| 3 | Placement consumes `effective_effects` | **done** — both discriminating controls, and it found a witness proving an annotation |
 | 4 | The deployment planner abstraction | not started |
 | 5 | Freeze `ComponentBinding` / remote-capable semantics | not started — **design settled**, see below |
 | 6 | Generate WIT worlds from semantic contracts | not started |
