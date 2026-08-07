@@ -92,7 +92,8 @@
       {
         "interface": "pw:host/database",
         "name": "read",
-        "capability": "database.read"
+        "capability": "database.read",
+        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -119,7 +120,8 @@
       {
         "interface": "pw:host/database",
         "name": "read",
-        "capability": "database.read"
+        "capability": "database.read",
+        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -146,7 +148,8 @@
       {
         "interface": "pw:host/database",
         "name": "read",
-        "capability": "database.read"
+        "capability": "database.read",
+        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -167,7 +170,33 @@
       "edge",
       "origin"
     ],
-    "imports": [],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Cart",
+        "name": "Cart",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.Menu",
+        "name": "Menu",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.Store",
+        "name": "Store",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.add_to_cart",
+        "name": "add_to_cart",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.clear_cart",
+        "name": "clear_cart",
+        "kind": "component"
+      }
+    ],
     "exports": [
       {
         "name": "StorePage",
@@ -192,7 +221,8 @@
       {
         "interface": "pw:host/database",
         "name": "write",
-        "capability": "database.write"
+        "capability": "database.write",
+        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -219,7 +249,8 @@
       {
         "interface": "pw:host/database",
         "name": "write",
-        "capability": "database.write"
+        "capability": "database.write",
+        "kind": "host_capability"
       }
     ],
     "exports": [

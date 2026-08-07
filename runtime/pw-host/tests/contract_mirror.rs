@@ -38,25 +38,42 @@ fn the_compilers_contracts_deserialize_with_every_field_populated() {
         assert!(!c.component_id.is_empty());
         assert!(!c.abi_schema.is_empty());
         assert!(!c.exports.is_empty(), "{} exports nothing", c.component_id);
-        // Every import names the capability that authorises it, and that
+        // Every HOST import names the capability that authorises it, and that
         // capability is one the contract actually requires. A mirror that
         // dropped `capability` would leave this empty and the audit would still
         // "work" — while every refusal became unexplainable.
+        //
+        // A COMPONENT import names none, and must not: it is a dependency on
+        // another component whose own authority is independently constrained,
+        // not authority this one holds.
         for i in &c.imports {
-            assert!(
-                !i.capability.is_empty(),
-                "{} has a nameless import",
-                c.component_id
-            );
-            assert!(
-                c.required_capabilities
-                    .iter()
-                    .any(|r| r.name() == i.capability),
-                "{}: import {} claims `{}`, which it does not require",
-                c.component_id,
-                i.key(),
-                i.capability
-            );
+            match i.kind {
+                ImportKind::HostCapability => {
+                    assert!(
+                        !i.capability.is_empty(),
+                        "{}: host import {} names no capability",
+                        c.component_id,
+                        i.key()
+                    );
+                    assert!(
+                        c.required_capabilities
+                            .iter()
+                            .any(|r| r.name() == i.capability),
+                        "{}: import {} claims `{}`, which it does not require",
+                        c.component_id,
+                        i.key(),
+                        i.capability
+                    );
+                }
+                ImportKind::Component => assert!(
+                    i.capability.is_empty(),
+                    "{}: component import {} claims capability `{}` — a \
+                     dependency is not authority",
+                    c.component_id,
+                    i.key(),
+                    i.capability
+                ),
+            }
         }
     }
 }
@@ -149,4 +166,33 @@ fn the_real_contracts_drive_a_real_admission() {
     let granted = Granted::from(&admit(&command, &topology, "origin-1", &actual), &backing)
         .expect("admitted");
     assert_eq!(granted.count(), command.required_capabilities.len());
+}
+
+#[test]
+fn the_store_page_depends_on_components_without_acquiring_their_authority() {
+    // The architect's ruling made concrete on real compiler output. The page
+    // reads three queries and triggers two commands; two of those components
+    // need `database.read` or `database.write`. The page needs neither.
+    let page = find("store.page.StorePage");
+
+    let deps: Vec<String> = page
+        .imports
+        .iter()
+        .filter(|i| i.kind == ImportKind::Component)
+        .map(|i| i.key())
+        .collect();
+    assert!(
+        deps.len() >= 3,
+        "the page depends on the components it reads and calls: {deps:?}"
+    );
+    assert!(
+        page.imports.iter().all(|i| i.kind == ImportKind::Component),
+        "and holds no host capability of its own"
+    );
+    assert!(page.required_capabilities.is_empty());
+
+    // The components it depends on DO need authority — recorded against them.
+    let menu = find("store.page.Menu");
+    assert!(!menu.required_capabilities.is_empty());
+    assert_eq!(menu.allowed_placements, ["origin"]);
 }

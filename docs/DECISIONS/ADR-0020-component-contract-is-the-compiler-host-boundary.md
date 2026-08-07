@@ -100,6 +100,49 @@ name — `database` → `pw:host/database` — and stops. Whether such an interf
 exists, what it connects to, and whether this deployment has one are the host's
 questions. A compiler that answered them would be a second deployment topology.
 
+### A component dependency is not authority
+
+**Amendment, 2026-08-07.** Architect ruling:
+
+> A component import isn't automatically "authority". It is a dependency on
+> another component whose own authority is independently constrained.
+
+So the three fields divide as:
+
+```text
+required_capabilities   things supplied by the host/environment
+imports                 exports required from other application components,
+                        AND the host interfaces those capabilities are served by
+exports                 application interfaces this component offers
+```
+
+Each import carries an `ImportKind`. The store page depends on five components —
+three queries it reads and two commands its handlers call — and requires no
+capability of its own. Two of those components need `database.read` or
+`database.write`; the page needs neither.
+
+The audit CLASSIFIES rather than flattening, and each class is compared against
+its own source. A flattened set would let a component interface fill a host
+capability slot and the reverse, and then "this component may call the database"
+and "this component may call the Store query" become one permission.
+
+Classification is by **membership, not spelling**. The compiler emits
+`pw:host/…` and `pw:app/…`, but a component built against a hand-written WIT
+world uses that world's names — refusing those on a prefix would make the audit
+a check on naming rather than on authority.
+
+The one exception is `is_runtime`: a `wasi:*` import is refused whatever the
+contract says. No effect row asks for it and no node grants it, so a contract
+cannot authorise one by listing it, and that check runs before membership for
+exactly that reason.
+
+Finding a page's dependencies needs both a call walk and `graph::queried` —
+`let menu = query Menu(id)` is a keyword form, not a call — and it must prefer
+the COMPONENT namespace: `store.page` declares `query Store` and imports
+`domain.Store`, and the general resolver tries types first. That is the E6
+defect where every page dependency resolved to a record definition, arriving in
+a second place.
+
 ### The capability mapping is versioned
 
 **Amendment, 2026-08-07**, on the architect's ruling that WIT generation must

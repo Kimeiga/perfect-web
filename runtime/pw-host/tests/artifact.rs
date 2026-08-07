@@ -105,6 +105,7 @@ fn the_declared_component_imports_exactly_what_its_world_says() {
                 interface: interface.to_string(),
                 name: name.to_string(),
                 capability: "store.read".into(),
+                kind: ImportKind::HostCapability,
             }
         })
         .collect();

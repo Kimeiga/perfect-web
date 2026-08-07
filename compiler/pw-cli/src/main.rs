@@ -707,7 +707,14 @@ fn emit_contracts_command(paths: &[&String], plain: bool) -> ExitCode {
                 println!("  needs     {}", cap.name());
             }
             for i in &c.imports {
-                println!("  may call  {}  ({})", i.key(), i.capability);
+                match i.kind {
+                    pw_core::contract::ImportKind::HostCapability => {
+                        println!("  host      {}  ({})", i.key(), i.capability)
+                    }
+                    pw_core::contract::ImportKind::Component => {
+                        println!("  component {}", i.key())
+                    }
+                }
             }
             for e in &c.exports {
                 println!("  exports   {} {}", e.kind, e.name);

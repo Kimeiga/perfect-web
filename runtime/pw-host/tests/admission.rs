@@ -53,6 +53,7 @@ fn contract(id: &str, placements: &[&str], capabilities: &[&str]) -> ComponentCo
                     c.operation.clone()
                 },
                 capability: c.name(),
+                kind: ImportKind::HostCapability,
             })
             .collect(),
         required_capabilities: required,
@@ -455,4 +456,160 @@ fn a_contract_from_an_unknown_capability_mapping_is_refused() {
     // refusal is about the mapping rather than about the contract.
     c.capability_mapping = pw_host::CAPABILITY_MAPPING;
     assert!(admit(&c, &topology(), "primary", &allowed(&c)).is_admitted());
+}
+
+// --- three classes of import, three sources of truth -------------------
+
+fn with_component_dep(mut c: ComponentContract) -> ComponentContract {
+    c.imports.push(Import {
+        interface: "pw:app/shop.Store".into(),
+        name: "Store".into(),
+        capability: String::new(),
+        kind: ImportKind::Component,
+    });
+    c
+}
+
+#[test]
+fn an_import_is_classified_before_it_is_compared() {
+    // Architect ruling, 2026-08-07: the audit should classify actual Wasm
+    // imports rather than flatten all imports into one set. Each class gets
+    // compared against its own allowed source.
+    let c = with_component_dep(contract(
+        "shop.Page",
+        &["origin"],
+        &["database.read<Stores>"],
+    ));
+    assert_eq!(classify(&c, "pw:host/database#read"), ImportClass::Host);
+    assert_eq!(
+        classify(&c, "pw:app/shop.Store#Store"),
+        ImportClass::Component
+    );
+    assert_eq!(
+        classify(&c, "wasi:cli/exit@0.2.9#exit"),
+        ImportClass::Runtime
+    );
+    // Anything the contract does not list is runtime — the fail-closed
+    // direction, because an interface nobody described is authority nobody
+    // decided about.
+    assert_eq!(classify(&c, "mystery"), ImportClass::Runtime);
+
+    // MEMBERSHIP, not spelling. A component built against a hand-written WIT
+    // world uses that world's names, and refusing those on a prefix would make
+    // the audit a check on naming rather than on authority.
+    let mut spike = contract("spike.Store", &["origin"], &[]);
+    spike.imports.push(Import {
+        interface: "perfect-web:store/stores@0.1.0".into(),
+        name: "read".into(),
+        capability: "store.read".into(),
+        kind: ImportKind::HostCapability,
+    });
+    assert_eq!(
+        classify(&spike, "perfect-web:store/stores@0.1.0#read"),
+        ImportClass::Host
+    );
+}
+
+#[test]
+fn a_component_dependency_is_not_authority() {
+    // A page that calls a privileged query depends on it; it does not acquire
+    // its `database.read`. The dependency is allowed and the capability is not.
+    let c = with_component_dep(contract("shop.Page", &["origin"], &[]));
+    assert!(c.required_capabilities.is_empty());
+
+    let a = admit(
+        &c,
+        &topology(),
+        "primary",
+        &["pw:app/shop.Store#Store".into()],
+    );
+    assert!(
+        a.is_admitted(),
+        "the dependency is declared: {:?}",
+        a.refusals()
+    );
+
+    // And the host grants it nothing, however privileged the component it calls.
+    let granted = Granted::from(&a, &BTreeMap::new()).expect("admitted");
+    assert_eq!(granted.count(), 0);
+    assert!(linkable(&c, &granted).is_empty());
+}
+
+#[test]
+fn a_component_slot_cannot_be_filled_by_a_host_import_or_the_reverse() {
+    // The confusion the split exists to prevent. A flattened set would let
+    // either satisfy the other, and then "this component may call the database"
+    // and "this component may call the Store query" become one permission.
+    let c = with_component_dep(contract(
+        "shop.Page",
+        &["origin"],
+        &["database.read<Stores>"],
+    ));
+
+    // The declared pair, in their own slots: admitted.
+    assert!(
+        admit(
+            &c,
+            &topology(),
+            "primary",
+            &[
+                "pw:host/database#read".into(),
+                "pw:app/shop.Store#Store".into()
+            ]
+        )
+        .is_admitted()
+    );
+
+    // A component import that is not declared: refused, even though a host
+    // import IS declared.
+    let a = admit(
+        &c,
+        &topology(),
+        "primary",
+        &["pw:app/shop.Ledger#Ledger".into()],
+    );
+    assert_eq!(
+        a.refusals(),
+        [Refusal::UndeclaredImport {
+            imports: vec!["pw:app/shop.Ledger#Ledger".into()]
+        }]
+    );
+
+    // A host import that is not declared: refused, even though a component
+    // import IS declared.
+    let a = admit(&c, &topology(), "primary", &["pw:host/secret#read".into()]);
+    assert_eq!(
+        a.refusals(),
+        [Refusal::UndeclaredImport {
+            imports: vec!["pw:host/secret#read".into()]
+        }]
+    );
+}
+
+#[test]
+fn a_runtime_import_can_never_be_authorised() {
+    // No effect row asks for `wasi:cli/exit` and no node grants it: it is not
+    // authority the program requested, it is authority the toolchain added. So
+    // there is deliberately no way to put one in a contract and have it pass.
+    let mut c = contract("shop.Menu", &["origin"], &["database.read<Stores>"]);
+    c.imports.push(Import {
+        interface: "wasi:cli/exit@0.2.9".into(),
+        name: "exit".into(),
+        capability: "database.read<Stores>".into(),
+        kind: ImportKind::HostCapability,
+    });
+
+    let a = admit(
+        &c,
+        &topology(),
+        "primary",
+        &["wasi:cli/exit@0.2.9#exit".into()],
+    );
+    assert_eq!(
+        a.refusals(),
+        [Refusal::UndeclaredImport {
+            imports: vec!["wasi:cli/exit@0.2.9#exit".into()]
+        }],
+        "a contract cannot authorise a runtime import by listing it"
+    );
 }

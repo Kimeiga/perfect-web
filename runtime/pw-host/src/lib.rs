@@ -87,11 +87,80 @@ impl Capability {
     }
 }
 
+/// Where an import's implementation comes from, and therefore what constrains
+/// it.
+///
+/// Architect ruling, 2026-08-07:
+///
+/// > A component import isn't automatically "authority". It is a dependency on
+/// > another component whose own authority is independently constrained.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportKind {
+    #[default]
+    HostCapability,
+    Component,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Import {
     pub interface: String,
     pub name: String,
+    #[serde(default)]
     pub capability: String,
+    #[serde(default)]
+    pub kind: ImportKind,
+}
+
+/// What class an ACTUAL Wasm import falls into.
+///
+/// The audit classifies rather than flattening, because each class is
+/// constrained by a different thing: a host capability by the contract's
+/// `required_capabilities` and the node's grants, a component interface by that
+/// component's own contract, and a runtime import by nothing at all — which is
+/// why the third class exists and is always refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportClass {
+    Host,
+    Component,
+    /// `wasi:*` and anything else the toolchain injected. Never allowed: see
+    /// `docs/evidence/E0/spike-wasmtime-component.txt` F-2.
+    Runtime,
+}
+
+/// Which class an import falls into, given the contract that should describe it.
+///
+/// MEMBERSHIP decides, not spelling. The compiler emits `pw:host/…` and
+/// `pw:app/…`, but a component built against a hand-written WIT world uses
+/// whatever names that world declares — and refusing those on a prefix would
+/// make the audit a check on naming rather than on authority.
+///
+/// The one exception is [`is_runtime`], which no contract can override.
+pub fn classify(contract: &ComponentContract, import: &str) -> ImportClass {
+    if is_runtime(import) {
+        return ImportClass::Runtime;
+    }
+    for i in &contract.imports {
+        if i.key() == import {
+            return match i.kind {
+                ImportKind::HostCapability => ImportClass::Host,
+                ImportKind::Component => ImportClass::Component,
+            };
+        }
+    }
+    ImportClass::Runtime
+}
+
+/// Is this an interface the toolchain injected rather than the program asked
+/// for?
+///
+/// `docs/evidence/E0/spike-wasmtime-component.txt` F-2: Rust `std` on
+/// `wasm32-wasip2` adds fourteen `wasi:*` interfaces during runtime
+/// initialization. No effect row asks for them and no node grants them, so a
+/// contract cannot authorise one by listing it — this check runs BEFORE
+/// membership for exactly that reason.
+pub fn is_runtime(import: &str) -> bool {
+    import.starts_with("wasi:")
 }
 
 impl Import {
@@ -302,11 +371,37 @@ pub fn admit(
         }
     }
 
-    // 3. The artifact audit. ADR-0020's rule, applied to the built thing.
-    let allowed: BTreeSet<String> = contract.imports.iter().map(Import::key).collect();
+    // 3. The artifact audit. ADR-0020's rule, applied to the built thing —
+    //    and CLASSIFIED, so each class is compared against its own source.
+    //
+    //    A flattened set would let a component interface satisfy a host
+    //    capability slot and vice versa, which is the one confusion the split
+    //    exists to prevent.
+    let host_allowed: BTreeSet<String> = contract
+        .imports
+        .iter()
+        .filter(|i| i.kind == ImportKind::HostCapability)
+        .map(Import::key)
+        .collect();
+    let component_allowed: BTreeSet<String> = contract
+        .imports
+        .iter()
+        .filter(|i| i.kind == ImportKind::Component)
+        .map(Import::key)
+        .collect();
+
     let mut undeclared: Vec<String> = actual
         .iter()
-        .filter(|i| !allowed.contains(*i))
+        .filter(|i| {
+            // A runtime import is never allowed, whatever a contract says.
+            if is_runtime(i) {
+                return true;
+            }
+            // Otherwise: allowed if the contract lists it, IN EITHER CLASS —
+            // and the classes are separate sets, so a component interface
+            // cannot fill a host capability slot or the reverse.
+            !host_allowed.contains(*i) && !component_allowed.contains(*i)
+        })
         .cloned()
         .collect();
     undeclared.sort();

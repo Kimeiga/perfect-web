@@ -741,7 +741,12 @@ fn key_text(body: &crate::hir::Body, id: crate::hir::ExprId) -> String {
 }
 
 /// `let menu = query Menu(id)` in a page body -> `("Menu", ["id"])`.
-fn queried(body: &crate::hir::Body) -> Vec<(String, Vec<String>)> {
+/// The resources a body READS: `let menu = query Menu(id)`.
+///
+/// Shared with `contract.rs`, which needs the same list for a page's component
+/// dependencies. A second finder would agree until one of them learned about a
+/// new form.
+pub(crate) fn queried(body: &crate::hir::Body) -> Vec<(String, Vec<String>)> {
     use crate::hir::Expr;
     let mut out = Vec::new();
     for id in body.walk() {

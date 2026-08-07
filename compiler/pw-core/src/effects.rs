@@ -509,6 +509,14 @@ impl<'a> Inference<'a> {
     /// `usize::MAX` means "no unit", which resolves nothing — the honest
     /// answer for a caller that did not say where it was standing. Falling back
     /// to a name match would reintroduce exactly the defect this replaces.
+    /// [`Inference::resolved`], exposed for callers that need the same answer.
+    ///
+    /// Public so contract derivation resolves component calls the SAME way
+    /// effect propagation does. A second resolver would agree until it did not.
+    pub fn resolved_from(&self, unit: usize, path: &str) -> Option<DefId> {
+        self.resolved(unit, path)
+    }
+
     fn resolved(&self, unit: usize, path: &str) -> Option<DefId> {
         if unit == usize::MAX {
             return None;

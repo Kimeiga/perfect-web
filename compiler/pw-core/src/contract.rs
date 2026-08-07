@@ -49,7 +49,7 @@
 //! exactly as `pw-materialize` mirrors the graph and `pw-resource` mirrors
 //! `EntryIdentitySpec`.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -185,16 +185,45 @@ impl Capability {
 /// A host function this component is allowed to import, and what authorises it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Import {
-    /// The host interface, in the Wasm component naming the host will use.
+    /// The interface, in the Wasm component naming the host will use.
     pub interface: String,
     /// The function within it.
     pub name: String,
-    /// Which required capability makes this import legitimate.
+    /// Which required capability makes this import legitimate — for a HOST
+    /// import only.
     ///
-    /// Present so the audit's refusal can say *why* — "this module imports
+    /// Present so the audit's refusal can say *why*: "this module imports
     /// `pw:host/database#read`, and nothing in its effect row asks for
     /// `database.read`" is actionable; "undeclared import" is not.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub capability: String,
+    /// What kind of dependency this is.
+    ///
+    /// Architect ruling, 2026-08-07:
+    ///
+    /// > A component import isn't automatically "authority". It is a dependency
+    /// > on another component whose own authority is independently constrained.
+    ///
+    /// A page reading `query Store(id)` depends on the `Store` component; it
+    /// does not thereby acquire that component's `database.read`. Flattening
+    /// the two into one set would make every caller of a privileged component
+    /// look privileged.
+    #[serde(default)]
+    pub kind: ImportKind,
+}
+
+/// Where an import's implementation comes from, and therefore what constrains
+/// it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportKind {
+    /// Supplied by the host or environment. Constrained by
+    /// `required_capabilities` and by what the node grants.
+    #[default]
+    HostCapability,
+    /// An export of another application component. Constrained by that
+    /// component's own contract, which the host checks independently.
+    Component,
 }
 
 impl Import {
@@ -284,6 +313,99 @@ pub fn audit(contract: &ComponentContract, actual: &[String]) -> Audit {
     }
 }
 
+/// Is this declaration something a host runs?
+///
+/// A type or an import declaration has no authority to describe, and a plain
+/// `fn` is compiled into its callers rather than instantiated on its own.
+fn component_kind(kind: DeclKind) -> Option<&'static str> {
+    Some(match kind {
+        DeclKind::Query => "query",
+        DeclKind::Command => "command",
+        DeclKind::Page => "page",
+        DeclKind::Component => "component",
+        _ => return None,
+    })
+}
+
+/// The other components this declaration's body calls.
+///
+/// Resolved, so `Cart` in one module and `Cart` in another are two
+/// dependencies — the same requirement `docs/RISK_QUEUE.md` 34 is about.
+fn component_calls(
+    inference: &Inference<'_>,
+    unit: usize,
+    hir: &Hir,
+    id: crate::hir::DeclId,
+    components: &BTreeMap<crate::resolve::DefId, (String, String)>,
+) -> Vec<Import> {
+    let Some(body_id) = hir.decl(id).body else {
+        return Vec::new();
+    };
+    let body = hir.body(body_id);
+    // Calls, and the resources a body READS.
+    //
+    // `let menu = query Menu(id)` is not a `Call` — it is the keyword form the
+    // dependency graph already knows how to find, so `graph::queried` is reused
+    // rather than reimplemented. A second finder would agree until one of them
+    // learned about a new form.
+    let mut paths: Vec<String> = body
+        .walk()
+        .into_iter()
+        .filter_map(|expr| match body.expr(expr) {
+            Expr::Call { callee, .. } => Some(crate::infer::path_of(body, *callee)),
+            _ => None,
+        })
+        .collect();
+    paths.extend(
+        crate::graph::queried(body)
+            .into_iter()
+            .map(|(name, _)| name),
+    );
+
+    let mut out = Vec::new();
+    for path in paths {
+        if path.is_empty() {
+            continue;
+        }
+        // The COMPONENT of that name, preferentially.
+        //
+        // `store.page` declares `query Store` and imports `domain.Store`, and
+        // the general resolver tries the type namespace first — which is how
+        // `docs/RISK_QUEUE.md` recorded every page dependency resolving to a
+        // record definition. Here the question is specifically "which component
+        // does this call", so the module-qualified form is tried first and the
+        // general resolution is the fallback.
+        let qualified = if path.contains('.') {
+            None
+        } else {
+            hir.module_of(id)
+                .map(|m| format!("{m}.{path}"))
+                .and_then(|q| inference.resolved_from(unit, &q))
+                .filter(|d| components.contains_key(d))
+        };
+        let Some(def) = qualified.or_else(|| inference.resolved_from(unit, &path)) else {
+            continue;
+        };
+        // Itself is not a dependency: a recursive query does not import its
+        // own export, and recording it would make every host wire a component
+        // to itself.
+        if def == (crate::resolve::DefId { unit, decl: id.0 }) {
+            continue;
+        }
+        if let Some((component, name)) = components.get(&def) {
+            out.push(Import {
+                interface: format!("pw:app/{component}"),
+                name: name.clone(),
+                capability: String::new(),
+                kind: ImportKind::Component,
+            });
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// The host interface a capability family is served by.
 ///
 /// A NAMING convention, deliberately, and deliberately shallow: the compiler
@@ -320,17 +442,38 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
         .map(|d| d.name.clone())
         .collect();
 
+    // Which declarations ARE components, by resolved identity. A call to one
+    // is a component dependency; a call to a plain `fn` is not — a helper is
+    // compiled into its caller and has no separate contract to depend on.
+    let components: BTreeMap<crate::resolve::DefId, (String, String)> = hirs
+        .iter()
+        .enumerate()
+        .flat_map(|(unit, hir)| {
+            hir.all_decls()
+                .filter(|(_, d)| component_kind(d.kind).is_some())
+                .map(|(id, d)| {
+                    let module = hir.module_of(id).unwrap_or_default().to_string();
+                    let path = if module.is_empty() {
+                        d.name.clone()
+                    } else {
+                        format!("{module}.{}", d.name)
+                    };
+                    (
+                        crate::resolve::DefId { unit, decl: id.0 },
+                        (path, d.name.clone()),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             // Components are the things a host runs: the units with behaviour.
             // A type or an import declaration has no authority to describe.
-            let kind = match decl.kind {
-                DeclKind::Query => "query",
-                DeclKind::Command => "command",
-                DeclKind::Page => "page",
-                DeclKind::Component => "component",
-                _ => continue,
+            let Some(kind) = component_kind(decl.kind) else {
+                continue;
             };
 
             // ONE CONTRACT PER DECLARATION, not per module.
@@ -428,7 +571,10 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                 .map(|w| w.name().to_string())
                 .collect();
 
-            let imports: Vec<Import> = capabilities
+            // Host authority, and component dependencies, in one list but
+            // never one CLASS. A page that calls a privileged query depends on
+            // it; it does not acquire its authority.
+            let mut imports: BTreeSet<Import> = capabilities
                 .iter()
                 .map(|c| Import {
                     interface: interface_for(&c.family),
@@ -438,10 +584,13 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                         c.operation.clone()
                     },
                     capability: c.name(),
+                    kind: ImportKind::HostCapability,
                 })
-                .collect::<BTreeSet<_>>()
-                .into_iter()
                 .collect();
+            for dep in component_calls(&inference, unit, hir, id, &components) {
+                imports.insert(dep);
+            }
+            let imports: Vec<Import> = imports.into_iter().collect();
 
             // What this component provides. One entry today, because a
             // declaration is the unit; the field is plural because grouping
