@@ -162,6 +162,38 @@ link.
 `spikes/wasmtime-component/host` (which already computes the actual list) and
 then into the E8 build is the remaining work.
 
+## Milestone ordering, and one place it is wrong
+
+Not a defect in the code. A defect in the plan, recorded here because
+`docs/MILESTONES.md` reads as a sequence and this item cannot be done in the
+order it appears.
+
+**E8's fifth gate item — "run the store's `add_to_cart` as a component, so the
+dev server's command path goes through the host instead of a Rust closure" —
+needs a Pleris→Wasm-component backend.** There is none. `pw emit-koka` covers
+the pure subset and no code generator sits behind it. The backend is **E10**
+("own backends"), which is two milestones later.
+
+What has been done instead is the half that does not need one: the command path
+now calls `admit` against a declared topology before acting, so `add_to_cart`
+requires `database.write<Carts>` by its own contract and a node without it
+refuses. That is real, it is tested in both directions, and it is not the gate
+item. The BODY is still a Rust closure.
+
+Three ways out, and choosing between them is the architect's:
+
+```text
+1  close E8 on the four items it can meet, and move the fifth to E10
+2  hold E8 open until E10 lands, and work E9 in parallel
+3  build a minimal backend inside E8 for one command, which is E10's
+   design decision taken under a deadline
+```
+
+**The charter's rule — do not start the next milestone until the current one's
+gate passes — makes this blocking rather than cosmetic.** Read strictly, E9
+cannot start. Read as intended, a gate item that depends on a later milestone
+is a sequencing mistake and not a reason to stop.
+
 ## Corpus harness rules
 
 Architect ruling: rejection is insufficient; a program must be rejected **for
