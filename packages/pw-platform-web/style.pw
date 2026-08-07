@@ -17,6 +17,15 @@ fn measure(el: Element) -> Int !{ layout.measure } { 0 }
 
 fn mutate(el: Style, property: String, value: String) -> () !{ style.mutate } { () }
 
+// The marker a layout-affecting write names.
+//
+// Declared, because a capability's type argument is part of its identity and
+// `PW5200` requires it to name something. `style.mutate<LayoutAffect>` was
+// written in five corpus files and `LayoutAffect` was declared nowhere — the
+// distinction the next comment calls "the point" rested on a spelling no
+// checker could resolve. Found by the rule on its first run against the corpus.
+type LayoutAffect = LayoutAffect {}
+
 // Charter §7.5A's own spelling. The type argument is the point: a write that
 // can invalidate layout is a DIFFERENT effect from one that cannot, and naming
 // them the same would make the distinction a comment.

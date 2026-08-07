@@ -150,6 +150,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // it produced only by a scoped declaration. Both are needed before any one
     // file can be asked what its handlers may capture.
     let manifest = crate::resume::Manifest::build(&hirs, &sigs);
+    // E8 step 2: what a capability's type argument may name.
+    let declared_types = crate::capability::capability_argument_names(&hirs);
     // E6: every route the program declares, so a link can be checked against
     // what exists rather than against a naming convention.
     let routes = crate::routes::table(&hirs);
@@ -189,7 +191,16 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
             out.extend(check_unit_with(
-                &env, &labels, &sigs, &inference, &manifest, &routes, &graph, i, u,
+                &env,
+                &labels,
+                &sigs,
+                &inference,
+                &manifest,
+                &routes,
+                &graph,
+                i,
+                &declared_types,
+                u,
             ));
             out.sort_by_key(|d| d.primary_span.start);
             (u.path.clone(), out)
@@ -371,6 +382,7 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         // This entry point builds a workspace from ONE unit, so the unit it
         // resolves in is 0. `check_units` is what real callers use.
         0,
+        &crate::capability::capability_argument_names(&[&unit.hir]),
         unit,
     )
 }
@@ -387,6 +399,10 @@ fn check_unit_with(
     // Which unit this is, so a call to a SIBLING resolves rather than being
     // matched by spelling — `docs/RISK_QUEUE.md` 34.
     at: usize,
+    // Every type the whole program declares, for resolving capability
+    // arguments. Whole-program, because `database.read<Stores>` in one file
+    // names a type declared in another.
+    types: &std::collections::BTreeSet<String>,
     unit: &Unit,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
@@ -450,6 +466,7 @@ fn check_unit_with(
         privacy_flow(&unit.hir, sigs, decl, &mut out);
         privacy_sinks(&unit.hir, sigs, decl, &mut out);
         effect_rows(&unit.hir, sigs, inference, at, id, decl, &mut out);
+        crate::capability::capability_arguments(&unit.hir, decl, types, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);

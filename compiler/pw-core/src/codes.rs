@@ -65,6 +65,17 @@ pub enum Owner {
     /// E6: the resource dependency graph. What a materialization depends on,
     /// what invalidates it, and what its cache key must separate.
     ResourceGraph,
+    /// E8: what a component's authority NAMES.
+    ///
+    /// Separate from `Placement`, which decides where a body may run given the
+    /// capabilities it needs. These are about whether the capability is a
+    /// capability at all — a family, an operation and a type argument that
+    /// resolve to something the program declares.
+    ///
+    /// A capability nobody can grant is not a deployment problem to discover
+    /// on a node. It is a source-program error with a span and an obvious
+    /// repair.
+    Capability,
 }
 
 impl fmt::Display for Code {
@@ -240,6 +251,15 @@ codes! {
         "a dependency, event or invalidation target must name something the program declares";
     PRIVATE_IN_SHARED_MATERIALIZATION = "PW5101" / private_in_shared_materialization / 1, ResourceGraph,
         "a shared materialization may only depend on data every reader of its cache entry may see";
+
+    // --- what a capability names (PW52xx, E8) -----------------------------
+    //
+    // A capability that resolves to nothing is not a deployment problem. It
+    // becomes "the node does not grant `database.read<Stroes>`" at a moment
+    // when the person who typed `Stroes` is nowhere near, and the message
+    // describes the deployment rather than the typo.
+    UNRESOLVED_CAPABILITY_ARGUMENT = "PW5200" / unresolved_capability_argument / 1, Capability,
+        "a capability's type argument must name a type the program declares";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
@@ -324,6 +344,7 @@ impl Owner {
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
             Owner::ResourceGraph => "PW51",
+            Owner::Capability => "PW52",
             _ => "",
         }
     }

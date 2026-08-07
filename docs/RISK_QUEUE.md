@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Thirty-six measurements in this project produced plausible, favourable results
+Thirty-seven measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -247,6 +247,7 @@ argument for the admissibility rule above.
 | E8-0 contract *(fixed)* | `Resources.Cart` required `database.read`, which read like exactly the right answer for a cart query | its body is `todo` — it performs nothing. `Inference::known` is keyed by the BARE declaration name, so `Resources.Cart` and `store.page.Cart` share one entry, and the contract handed one component the authority of a different component that happens to have the same name. Every capability in the emitted set was plausible for the component it was attached to, which is why reading the output did not find it; deriving from the BODY did |
 | E8 resolution | R-037 was caught, with the right code, for the right invariant: `layout.measure` smuggled through `List.map`'s callback | its callback parameter was never bound. `fn(el) ..` writes the parameter as a declaration-shaped `Param` holding a `Name`, and `param_pattern` handled only the `x => e` spelling — so `el` lowered to `Pattern::Error` and had no type. The effect was found by matching the spelling `getBoundingClientRect` against every declaration in the program, which would have worked equally well if the fixture had written `fn(anything_at_all)`. The fixture tests that effects propagate through a generic callback, and nothing was propagating through anything |
 | E8 corpus history | `the_pre_change_text_of_every_repaired_fixture_still_fails` passed for R-001 and R-024 | both C0 texts call a function they never import, so the call names nothing the program declares. They became catchable only through the same by-spelling matching — a test asserting "this historical defect is still detected" was itself relying on ambient resolution E2B had removed. Deleting the fallback made both go silent, correctly, and they are now recorded as `FixtureDidNotExpressIt` with the reason |
+| E8 capability | `style.mutate<LayoutAffect>` distinguished a layout-affecting write from an ordinary one, in five corpus files, and `style.pw`'s own comment called the type argument "the point" | `LayoutAffect` was declared NOWHERE. The distinction rested on a spelling no checker could resolve, so `style.mutate<LayoutAffect>` and `style.mutate<Anything>` were the same effect to every analysis that read the row. Two fixtures, an accepted example and two generality witnesses all wrote it. Found by `PW5200` on its first run against the real corpus — the rule was written for a typo and found a five-file convention naming nothing |
 
 The two E6 rows and the inference row share a shape with the by-name member
 fallback deleted in E2C, arriving through three different doors. The E6 graph

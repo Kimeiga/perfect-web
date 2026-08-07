@@ -178,6 +178,161 @@ pub fn render_undeclared_imports(audit: &CapabilityAudit) -> Option<String> {
     ))
 }
 
+// --- E8 step 2: what a capability's type argument names ---------------------
+
+use crate::codes;
+use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
+use crate::hir::{Decl, DeclKind, Hir};
+use std::collections::BTreeSet;
+
+/// Everything a capability argument may legitimately name.
+///
+/// Types, opaque types **and modules**.
+///
+/// The corpus writes `database.read<Stores>`, and `Stores` is a MODULE — the
+/// domain being read — not a type. A first version of this rule accepted only
+/// types and reported both `R-002` and `R-008` as defective, which is the
+/// false positive the architect's ruling specifically warns about: the check
+/// exists so a name that resolves to nothing is caught early, not so a
+/// convention the corpus already uses is outlawed.
+///
+/// Opaque types count for the reason the ruling gives — "unless the name refers
+/// to a properly declared external/opaque contract". A module is exactly such a
+/// contract, and so is an `opaque type`.
+pub fn capability_argument_names(hirs: &[&Hir]) -> BTreeSet<String> {
+    let mut out: BTreeSet<String> = hirs
+        .iter()
+        .flat_map(|h| h.all_decls().map(|(_, d)| d).collect::<Vec<_>>())
+        .filter(|d| matches!(d.kind, DeclKind::Type | DeclKind::Opaque))
+        .map(|d| d.name.clone())
+        .collect();
+    // Module names. `module Stores` is a header rather than a declaration, so
+    // it is read from `module_of` — the same place resolution reads it.
+    for h in hirs {
+        for (id, _) in h.all_decls() {
+            if let Some(m) = h.module_of(id) {
+                out.insert(m.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// `database.read<Stroes>` — a capability nobody can ever grant.
+///
+/// Architect ruling, 2026-08-07:
+///
+/// > Deployment is far too late to tell the developer "the node doesn't provide
+/// > `database.read<Stroes>`". The actual problem is: `Stroes` does not name a
+/// > type. That is a source-program error with a precise source span and an
+/// > obvious repair. […] Not a warning. Authority requirements are not
+/// > something we should "best effort" through.
+///
+/// The unresolved capability is deliberately KEPT in the contract — see
+/// ADR-0020. Over-stating authority is refused work; under-stating it is
+/// authority nobody approved. This rule is what makes the over-statement
+/// visible at the moment it can be repaired.
+pub fn capability_arguments(
+    hir: &Hir,
+    decl: &Decl,
+    known: &BTreeSet<String>,
+    out: &mut Vec<Diagnostic>,
+) {
+    let _ = hir;
+    let Some(row) = &decl.declared_effects else {
+        return;
+    };
+    for effect in row {
+        let Some(argument) = argument_of(&effect.written) else {
+            continue;
+        };
+        if known.contains(&argument) {
+            continue;
+        }
+        let suggestion = nearest(&argument, known);
+        let mut message = format!("unknown capability type argument `{argument}`");
+        if let Some(near) = &suggestion {
+            message.push_str(&format!("; did you mean `{near}`?"));
+        }
+        out.push(Diagnostic {
+            code: codes::UNRESOLVED_CAPABILITY_ARGUMENT.id,
+            invariant: codes::UNRESOLVED_CAPABILITY_ARGUMENT.invariant,
+            reason: "capability_argument_names_no_type",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message,
+            primary_span: effect.span.clone(),
+            related: vec![Related {
+                span: effect.span.clone(),
+                label: match &suggestion {
+                    Some(near) => {
+                        format!("`{argument}` names nothing this program declares; `{near}` does")
+                    }
+                    None => format!("`{argument}` names nothing this program declares"),
+                },
+            }],
+            explanation: Some(
+                "A capability's type argument is part of its IDENTITY: \
+                 `database.read<Stores>` and `database.read<Payments>` are different \
+                 authority. An argument naming nothing produces a capability no \
+                 deployment can ever grant, and without this rule the failure appears \
+                 as `the node does not grant ..` at deployment — describing the \
+                 deployment rather than the declaration that caused it, and far from \
+                 anyone who could repair it."
+                    .to_string(),
+            ),
+            repairs: match &suggestion {
+                Some(near) => vec![Repair {
+                    description: format!("did you mean `{near}`?"),
+                    replacement: None,
+                }],
+                None => vec![Repair {
+                    description: format!("declare `{argument}`, or import the module that does"),
+                    replacement: None,
+                }],
+            },
+        });
+    }
+}
+
+/// The `<Argument>` of an effect, if it has one.
+fn argument_of(effect: &str) -> Option<String> {
+    let (_, rest) = effect.split_once('<')?;
+    let arg = rest.trim_end_matches('>').trim();
+    (!arg.is_empty()).then(|| arg.to_string())
+}
+
+/// The closest declared type, when one is close enough to be a typo.
+///
+/// A suggestion that is merely the alphabetically first type would be worse
+/// than none — it sends the reader to an unrelated declaration. So the distance
+/// is bounded relative to the length of what was written.
+fn nearest(written: &str, known: &BTreeSet<String>) -> Option<String> {
+    let budget = (written.len() / 3).max(1);
+    known
+        .iter()
+        .map(|t| (distance(written, t), t))
+        .filter(|(d, _)| *d <= budget)
+        .min_by_key(|(d, t)| (*d, t.len()))
+        .map(|(_, t)| t.clone())
+}
+
+/// Levenshtein distance, iteratively.
+fn distance(a: &str, b: &str) -> usize {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut row = vec![0usize; b.len() + 1];
+    for (i, ca) in a.iter().enumerate() {
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let cost = usize::from(ca != cb);
+            row[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(row[j] + 1);
+        }
+        std::mem::swap(&mut prev, &mut row);
+    }
+    prev[b.len()]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

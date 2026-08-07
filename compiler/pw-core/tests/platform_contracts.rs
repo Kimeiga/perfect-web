@@ -284,7 +284,14 @@ fn the_trusted_platform_contract_is_hashed() {
     // was invisible while nothing depended on the element's type and stopped
     // being invisible when a resumable handler inside the loop began hashing
     // it into a capture schema.
-    const EXPECTED: u64 = 0xa281_06af_28ba_31cc;
+    //
+    // Changed 2026-08-07: `packages/pw-platform-web/style.pw` gained
+    // `type LayoutAffect`. `style.mutate<LayoutAffect>` appears in five corpus
+    // files — R-034, R-035, A-020 and two generality witnesses — and
+    // `LayoutAffect` was declared NOWHERE. The distinction the module's own
+    // comment calls "the point" rested on a spelling no checker could resolve.
+    // Found by `PW5200` on its first run against the real corpus.
+    const EXPECTED: u64 = 0x3f49_cfe5_6ba9_052d;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
