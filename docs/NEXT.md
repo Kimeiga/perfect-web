@@ -97,6 +97,28 @@ change that quietly went global is the thing the ruling warned about.
 is a name and the expression grammar reads `<` as a comparison, which is the
 same reason a `materialize` block's policies live inside its braces (E6).
 
+### What provenance covers so far
+
+`pw-core/src/provenance.rs`: `Fact { kind, origin, depends_on }`, an `Evidence`
+DAG, and `Route` — `Qualified`, `ReceiverType`, `ScopedName`, and
+`ProgramWideName`, which is deleted from the compiler and **kept nameable so a
+test can forbid it**. A route with no name cannot be forbidden, and that is the
+route every instance of coincidental correctness so far has travelled by.
+
+One consumer: effect inference's member resolution records the receiver-type
+edge and the callback it travelled through.
+
+`tests/causal_evidence.rs` asserts R-037's claim as a chain — required edges,
+the forbidden source, and a semantics-breaking control (a receiver whose type
+has no such member produces no chain at all).
+
+**Verified against the defect it exists for:** unbinding the callback parameter,
+as before `3a0f319`, turns the two chain assertions red. Two others stay green,
+which is correct — they are about the forbidden route and the breaking control.
+
+Still to record: privacy labels, placement demands, capabilities, resource
+invalidation. Tier 1 in ADR-0022, and none of them recorded yet.
+
 ### Slice 2 — and it is the first consumer of ADR-0022
 
 Architect ruling, 2026-08-07: **do not delay slice 2 for the provenance work —
@@ -111,7 +133,9 @@ later analysis splits `"database.read"` at the dot.
 ### The immediate sequence
 
 ```text
-1  minimal semantic Fact/Provenance infrastructure   (ADR-0022)
+1  minimal semantic Fact/Provenance infrastructure   DONE — pw-core/provenance.rs
+   first consumer: effect inference's member resolution
+   R-037's chain asserted in tests/causal_evidence.rs
 2  effect ontology slice 2, using it
 3  declare the concrete ~25 effects — no wildcards
 4  unknown family / operation / arity diagnostics

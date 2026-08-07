@@ -101,6 +101,14 @@ impl Via {
 pub struct Inferred {
     pub effects: BTreeSet<Effect>,
     pub sources: Vec<Source>,
+    /// Which resolved facts produced these effects — ADR-0022.
+    ///
+    /// Recorded, not recomputed: every entry is a value this walk already
+    /// concluded. `docs/RISK_QUEUE.md`'s coincidental-correctness section is
+    /// what it is for — `R-037` produced exactly the right effect set through
+    /// a mechanism unrelated to what its fixture claimed, and no assertion on
+    /// `effects` or `sources` could see that.
+    pub evidence: crate::provenance::Evidence,
 }
 
 impl Inferred {
@@ -330,6 +338,18 @@ impl<'a> Inference<'a> {
             let Some(sig) = self.sigs.member_of(declared, &member) else {
                 continue;
             };
+            // The fact `R-037` claimed and did not have: this member was
+            // found because the RECEIVER'S TYPE declares it.
+            let resolved = out.evidence.record(
+                crate::provenance::FactKind::ResolvedMember {
+                    receiver_type: declared.to_string(),
+                    member: member.clone(),
+                    via: crate::provenance::Route::ReceiverType,
+                },
+                span.clone(),
+                vec![],
+            );
+
             let callee = format!("{receiver}.{member}");
             let via = match enclosing_callback(body, id, &inside_callback) {
                 Some(passed_to) => Via::Callback {
@@ -341,6 +361,25 @@ impl<'a> Inference<'a> {
                 },
             };
             for e in &sig.effects {
+                // Through the callback, if it is inside one — and depending on
+                // the resolution, so the chain is walkable rather than three
+                // facts that happen to be present.
+                let mut cause = resolved;
+                if let Via::Callback { passed_to, .. } = &via {
+                    cause = out.evidence.record(
+                        crate::provenance::FactKind::ThroughCallback {
+                            passed_to: passed_to.clone(),
+                        },
+                        span.clone(),
+                        vec![resolved],
+                    );
+                }
+                out.evidence.record(
+                    crate::provenance::FactKind::Effect { effect: e.clone() },
+                    span.clone(),
+                    vec![cause],
+                );
+
                 out.effects.insert(e.clone());
                 out.sources.push(Source {
                     effect: e.clone(),
@@ -1076,6 +1115,7 @@ mod tests {
         // never claimed anything would reject working programs, and E2D's job
         // is to check claims, not to invent them.
         let found = Inferred {
+            evidence: crate::provenance::Evidence::default(),
             effects: BTreeSet::from(["database.read".to_string()]),
             sources: vec![Source {
                 effect: "database.read".into(),

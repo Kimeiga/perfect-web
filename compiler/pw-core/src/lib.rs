@@ -45,6 +45,7 @@ pub mod marko;
 pub mod outcome;
 pub mod placement;
 pub mod privacy;
+pub mod provenance;
 pub mod resolve;
 pub mod resume;
 pub mod resume_artifacts;
