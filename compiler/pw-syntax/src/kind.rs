@@ -96,6 +96,14 @@ pub enum SyntaxKind {
     Field,
     PolicyList,
     Policy,
+    /// A clause written in policy position whose head the parser does not
+    /// know: `partiton public`.
+    ///
+    /// **Preserved rather than dropped.** Pleris may reject authored semantics;
+    /// it must never silently erase them. An empty policy list means the author
+    /// specified none, and that must not be observationally equal to "the
+    /// author specified something the compiler did not understand".
+    UnknownPolicy,
     /// A body captured but not yet parsed into expressions. E2's next task
     /// replaces this with real expression nodes.
     Body,
@@ -321,6 +329,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         Field,
         PolicyList,
         Policy,
+        UnknownPolicy,
         Body,
         Name,
         BlockExpr,

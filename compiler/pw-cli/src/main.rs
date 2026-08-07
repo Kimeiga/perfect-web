@@ -391,6 +391,7 @@ fn derive_placement(effects: &[&str]) -> &'static str {
 /// or the build fails, with no third state where a tool silently edits code.
 fn fmt_command(paths: &[&String], check_only: bool) -> ExitCode {
     let mut changed = Vec::new();
+    let mut refused: Vec<String> = Vec::new();
     for path in paths {
         let src = match std::fs::read_to_string(path) {
             Ok(s) => s,
@@ -399,6 +400,28 @@ fn fmt_command(paths: &[&String], check_only: bool) -> ExitCode {
                 return ExitCode::from(2);
             }
         };
+        // **Never overwrite source the parser has said it does not
+        // understand.** Architect ruling, 2026-08-07:
+        //
+        // > Formatting to stdout for inspection is one thing; overwriting
+        // > source whose meaning the parser has explicitly said it does not
+        // > understand is another.
+        //
+        // A file containing an `UnknownPolicy` or an error node has been
+        // rejected, and rewriting it in place would canonicalise a program
+        // whose semantics the compiler never established — turning "I could not
+        // read this" into "here is my version of it".
+        //
+        // `--check` still reports, because reading is safe and a formatting
+        // difference is worth knowing about either way.
+        let parsed = pw_syntax::parse_tree(&src);
+        if !check_only && !parsed.ok() {
+            eprintln!(
+                "pw fmt: refusing to rewrite {path}: it does not parse cleanly,                  and formatting it would canonicalise a program whose meaning                  this compiler has not established. Run `pw check {path}` first."
+            );
+            refused.push((*path).clone());
+            continue;
+        }
         let out = pw_syntax::format_source(&src);
         if out == src {
             continue;
@@ -410,6 +433,13 @@ fn fmt_command(paths: &[&String], check_only: bool) -> ExitCode {
         }
     }
 
+    if !refused.is_empty() {
+        println!(
+            "pw fmt: refused {} file(s) that do not parse cleanly",
+            refused.len()
+        );
+        return ExitCode::FAILURE;
+    }
     if changed.is_empty() {
         println!("pw fmt: {} file(s) already formatted", paths.len());
         return ExitCode::SUCCESS;

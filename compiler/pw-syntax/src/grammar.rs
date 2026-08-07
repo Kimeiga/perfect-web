@@ -316,6 +316,29 @@ impl<'a> P<'a> {
         self.toks.get(self.pos).is_some_and(|t| t.kind.is_trivia())
     }
 
+    /// Is there a newline between the current significant token and the `n`th
+    /// one after it?
+    ///
+    /// A policy clause's value is on the head's own line: `partiton public`.
+    /// A bare identifier alone on a line is not a clause — and `nth` skips
+    /// trivia without advancing, so this has to look at the raw stream.
+    fn nth_starts_line(&self, n: usize) -> bool {
+        let mut seen = 0usize;
+        for t in &self.toks[self.pos..] {
+            if t.kind.is_trivia() {
+                if seen > 0 && self.src[t.span.clone()].contains('\n') {
+                    return true;
+                }
+                continue;
+            }
+            seen += 1;
+            if seen > n {
+                return false;
+            }
+        }
+        true
+    }
+
     fn newline_ahead(&self) -> bool {
         self.toks[self.pos..]
             .iter()
@@ -1367,13 +1390,64 @@ impl<'a> P<'a> {
 
     // --- declarations -------------------------------------------------------
 
+    /// Does an identifier here start a clause the parser does not know?
+    ///
+    /// **The invariant this exists for:** Pleris may reject authored semantics,
+    /// but it must never silently erase them. `partiton public` used to become
+    /// `policies = []` — observationally identical to a declaration with no
+    /// policy at all — and `impact` did exactly that in the platform library
+    /// for a whole commit while every rule reading it got an empty answer.
+    ///
+    /// A policy head is a bare identifier followed by a value on the same line.
+    /// It is never followed by `.`, `(`, `=`, `<`, `,` or `{`, which is what
+    /// separates it from an expression: `Stores.get(1)` and `partiton public`
+    /// are both identifier-led, and only the second is a clause. A declaration
+    /// starter is excluded because a policy list ends where the next
+    /// declaration begins.
+    fn at_unknown_policy(&self) -> bool {
+        if !self.at(Kind::Ident) {
+            return false;
+        }
+        let head = self.cur_text();
+        if POLICY_KEYWORDS.contains(&head) || DECL_STARTERS.contains(&head) {
+            return false;
+        }
+        // A value must follow, on this line.
+        !matches!(
+            self.nth(1).kind,
+            Kind::Dot
+                | Kind::LParen
+                | Kind::Eq
+                | Kind::LAngle
+                | Kind::Comma
+                | Kind::LBrace
+                | Kind::RBrace
+                | Kind::Arrow
+                | Kind::Colon
+                | Kind::Eof
+        ) && !self.nth_starts_line(1)
+    }
+
     fn policies(&mut self) {
-        if !(self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text())) {
+        let known = self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text());
+        if !known && !self.at_unknown_policy() {
             return;
         }
         self.start(K::PolicyList);
-        while self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text()) {
-            self.start(K::Policy);
+        while (self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text()))
+            || self.at_unknown_policy()
+        {
+            // Recorded as what it is. `Policy` for a head the parser knows,
+            // `UnknownPolicy` for one it does not — never nothing.
+            let unknown = !POLICY_KEYWORDS.contains(&self.cur_text());
+            if unknown {
+                let head = self.cur_text().to_string();
+                self.error(
+                    "PW0005",
+                    format!("unknown policy `{head}`; the compiler does not know this clause"),
+                );
+            }
+            self.start(if unknown { K::UnknownPolicy } else { K::Policy });
             self.bump(); // keyword
             let mut depth = 0i32;
             let mut took_value = false;
@@ -1413,7 +1487,14 @@ impl<'a> P<'a> {
                     && k == Kind::Ident
                     && self.newline_ahead()
                     && (POLICY_KEYWORDS.contains(&self.cur_text())
-                        || DECL_STARTERS.contains(&self.cur_text()))
+                        || DECL_STARTERS.contains(&self.cur_text())
+                        // An UNKNOWN head ends this clause too. Without it the
+                        // value loop swallows the next line — `capability none`
+                        // followed by `impakt layout_write` became one policy
+                        // whose value was `none impakt layout_write`, so the
+                        // clause the parser was supposed to reject disappeared
+                        // into the one it accepted.
+                        || self.at_unknown_policy())
                 {
                     break;
                 }
