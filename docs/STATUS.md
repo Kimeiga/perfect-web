@@ -75,9 +75,21 @@ than accommodated, and C4 opened for the three rejected fixtures among them.
 operation, and a wrong argument count — the three diagnostics that were
 impossible before anything declared what a family was.
 
-**One substantial change remains before deployment planning**, in
-`docs/NEXT.md` step 7: a frame-phase block says *when* work runs, not *what* it
-does, so `mutate { .. }` must stop synthesizing `style.mutate`.
+**A frame phase says when work runs, not what it does.** `mutate { .. }` no
+longer synthesizes `style.mutate`; an effect comes from a resolved operation.
+Execution context is the whole enclosing chain rather than the innermost phase,
+because an inner `measure` does not escape an outer `post_paint` — R-042 is
+that program, and it was caught until now only because a made-up effect landed
+at a convenient span.
+
+Phase legality reads **declared semantic facets** — `layout_read`,
+`layout_write`, `paint_write`, `dom_write`, `compositor` — rather than an
+effect's family. The family was too coarse to be a proxy for meaning:
+`style.mutate<LayoutAffect>` and `style.mutate<PaintOnly>` share one, so the
+animate rule could not catch the case its own comment described.
+
+**The effect ontology is complete.** Next is deployment planning
+(`docs/NEXT.md` step 13).
 
 **E7, closed.** The **real store page** is rendered by the own renderer, its
 handlers are authorised by `decide()` before they attach, and a click updates

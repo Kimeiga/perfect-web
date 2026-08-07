@@ -130,29 +130,60 @@ build it into slice 2.**
 Each transition below must produce evidence, and a test must assert that no
 later analysis splits `"database.read"` at the dot.
 
-### The immediate sequence
-
-The architect's sequence of 2026-08-07, **fourth ruling**, which settled the
-blocker rather than deferring to deployment planning.
+### The immediate sequence — the effect ontology is COMPLETE
 
 ```text
  1  package-declared Effect prelude                 DONE
  2  pw-platform-web exports through it              DONE
- 3  effect arguments obey normal scope; repair      DONE — 31 rows, 20 files
-    every A-017 case                                       C4 opened
+ 3  effect arguments obey normal scope              DONE — 31 rows, C4 opened
  4  delete TypeArgument::Unscoped                   DONE — A-017 retired
- 5  finish EffectPath → EffectDefId → EffectInstance DONE — wired into check.rs
+ 5  finish EffectPath → EffectDefId → EffectInstance DONE
  6  unknown family / operation / arity diagnostics  DONE — PW5201/5202/5203
- 7  remove frame-phase intrinsic_effect             NEXT — the one substantial
-                                                     semantic change left
+ 7  remove frame-phase intrinsic_effect             DONE — R-042 repaired,
+                                                     phases_at reads the chain
  8  add database.connect                            DONE
  9  database.write becomes database.write<T>        DONE
-10  finish declaration-driven capability/host       DONE
+10  declaration-driven capability/host lowering     DONE
 11  re-run the ComponentContract matrix             DONE
-12  deployment planning                             after 7
+12  semantic effect facets; phase rules consume     DONE — the family check
+    them; delete the family check                    is deleted
+13  deployment planning                             **NEXT**
 ```
 
-### The two rulings this sequence turns on
+**Nothing in the effect ontology is outstanding.** The chain is:
+
+```text
+EffectPath + type arguments
+        ↓  ontology.rs, the only place a dotted effect name is split
+EffectDefId + resolved TypeArguments
+        ↓
+EffectInstance + semantic facets
+        ↓
+placement (declared)   capability (declared)   phase legality (facets)
+        ↓
+CapabilityId → HostInterface → WIT
+```
+
+Three structural gates hold it: `last_segment.rs` (no second place splits an
+effect name), `no_source_file_maps_a_phase_keyword_to_an_effect_spelling` (a
+phase creates an execution context, never an effect), and
+`no_effect_is_written_at_two_different_arities`.
+
+### Step 13 — deployment planning
+
+`docs/NEXT.md`'s older E8 table item 4, and now unblocked: the compiler emits
+`ComponentContract`s carrying declared capabilities and declared placements,
+and `runtime/pw-host` admits against a `Topology`. What is missing is the thing
+that PLANS — reads a program's contracts and a deployment's topology and says
+which component goes where, refusing when nothing fits.
+
+It should consume `allowed_placements` and `required_capabilities` as they now
+are; both are declaration-driven, which they were not when the item was
+written. The `worlds_for` table is the remaining hard-coded input, and
+`the_ontology_and_worlds_for_agree_about_placement_where_both_speak` is the
+test that says deleting it is safe.
+
+### The two rulings this sequence turns on### The two rulings this sequence turns on
 
 > **Effect declarations are ambient only because the selected platform package
 > explicitly exports them into the Effect prelude. Their arguments are not
