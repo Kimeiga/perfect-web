@@ -150,8 +150,18 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // it produced only by a scoped declaration. Both are needed before any one
     // file can be asked what its handlers may capture.
     let manifest = crate::resume::Manifest::build(&hirs, &sigs);
-    // E8 step 2: what a capability's type argument may name.
-    let declared_types = crate::capability::capability_argument_names(&hirs);
+    // E8 step 2: what a capability's type argument may name, PER UNIT.
+    //
+    // Whole-program until 2026-08-07, which was assumption A-017 and is now
+    // retired: an argument resolves from where it was written, exactly as a
+    // type in an expression does.
+    let visible_types: Vec<std::collections::BTreeSet<String>> = (0..units.len())
+        .map(|u| crate::ontology::argument_names_visible_from(&workspace, u, &hirs))
+        .collect();
+    // E8 slice 2: what each effect a row names actually IS. One ontology for
+    // the whole program, beside the signatures, because both answer questions
+    // about the same rows.
+    let ontology = crate::ontology::Ontology::build(&hirs);
     // E6: every route the program declares, so a link can be checked against
     // what exists rather than against a naming convention.
     let routes = crate::routes::table(&hirs);
@@ -167,10 +177,13 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             .push(resolve_diagnostic(e));
     }
     for (i, u) in units.iter().enumerate() {
-        resolution
-            .entry(i)
-            .or_default()
-            .extend(unresolved_uses(&workspace, i, &u.hir));
+        let per_unit = resolution.entry(i).or_default();
+        per_unit.extend(unresolved_uses(&workspace, i, &u.hir));
+        // Every effect row, against the declarations. Reported beside the
+        // resolution failures because that is what it is: a name in a row that
+        // resolves to nothing is the same class of mistake as a name in an
+        // expression that does.
+        crate::ontology::check_effect_rows(&ontology, &workspace, i, &u.hir, per_unit);
     }
 
     // Declaration name → its privacy label, across every unit. A `page` in one
@@ -207,7 +220,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
                 &routes,
                 &graph,
                 i,
-                &declared_types,
+                &visible_types[i],
                 u,
             ));
             out.sort_by_key(|d| d.primary_span.start);
@@ -390,7 +403,7 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         // This entry point builds a workspace from ONE unit, so the unit it
         // resolves in is 0. `check_units` is what real callers use.
         0,
-        &crate::capability::capability_argument_names(&[&unit.hir]),
+        &crate::ontology::argument_names_visible_from(&ws, 0, &[&unit.hir]),
         unit,
     )
 }
@@ -407,9 +420,9 @@ fn check_unit_with(
     // Which unit this is, so a call to a SIBLING resolves rather than being
     // matched by spelling — `docs/RISK_QUEUE.md` 34.
     at: usize,
-    // Every type the whole program declares, for resolving capability
-    // arguments. Whole-program, because `database.read<Stores>` in one file
-    // names a type declared in another.
+    // What a capability argument may name FROM THIS UNIT: the types and
+    // modules it can see. Per-unit since A-017 was retired — the ambient
+    // whole-program set is gone.
     types: &std::collections::BTreeSet<String>,
     unit: &Unit,
 ) -> Vec<Diagnostic> {

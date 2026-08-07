@@ -425,3 +425,149 @@ fn a_family_exists_because_something_was_declared_into_it() {
     assert!(empty.is_empty());
     assert!(!empty.has_family("database"));
 }
+
+// --- the diagnostics ---------------------------------------------------------
+//
+// `PW5201`/`PW5202`/`PW5203`, reported by `check_effect_rows` on real source.
+// The tests above assert on `Ontology::resolve`; these assert that a developer
+// running `pw check` is told, which is a different claim and was untrue until
+// the Effect prelude made effect names resolvable without an import.
+
+fn codes_for(src: &str) -> Vec<String> {
+    let platform = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages");
+    let mut sources: Vec<(String, String)> = ["pw-std", "pw-platform-web"]
+        .iter()
+        .flat_map(|d| {
+            let mut v: Vec<(String, String)> = std::fs::read_dir(platform.join(d))
+                .expect("package")
+                .filter_map(|e| {
+                    let p = e.expect("entry").path();
+                    (p.extension()? == "pw").then(|| {
+                        (
+                            p.file_name().unwrap().to_string_lossy().to_string(),
+                            std::fs::read_to_string(&p).expect("read"),
+                        )
+                    })
+                })
+                .collect();
+            v.sort();
+            v
+        })
+        .collect();
+    sources.push(("user.pw".to_string(), src.to_string()));
+    pw_core::check::check_sources(&sources)
+        .into_iter()
+        .filter(|(name, _)| name == "user.pw")
+        .flat_map(|(_, ds)| ds.into_iter().map(|d| d.code.to_string()))
+        .collect()
+}
+
+/// A file that writes one effect row and imports nothing.
+fn user(row: &str) -> String {
+    format!("module app\n\nfn f() -> Int !{{ {row} }} {{ 0 }}\n")
+}
+
+#[test]
+fn the_platform_vocabulary_resolves_with_no_import_at_all() {
+    // The positive control, and the thing the Effect prelude bought. Without
+    // it every assertion below would pass for the wrong reason — everything
+    // would be an unknown family.
+    for row in ["layout.measure", "dom.mutate", "network.fetch", "trace"] {
+        assert!(
+            codes_for(&user(row)).is_empty(),
+            "`{row}` must need no import: {:?}",
+            codes_for(&user(row))
+        );
+    }
+}
+
+#[test]
+fn an_argument_still_needs_its_import_even_when_the_effect_does_not() {
+    // **The ruling's two halves, in one file.** `secret` resolves through the
+    // prelude with no import; `Payments` is declared in `module capability`
+    // and does not.
+    //
+    // > Effect names resolve through that prelude; their arguments resolve
+    // > through ordinary lexical/module visibility.
+    //
+    // Until `PW5200` became visibility-scoped this passed silently: the
+    // ontology obeyed the ruling and the rule that REPORTS the mistake still
+    // judged arguments against the whole program, so the half of the ruling
+    // a developer would actually see was missing.
+    let without = codes_for(&user("secret<Payments>"));
+    assert!(
+        without.contains(&"PW5200".to_string()),
+        "an unimported argument is an error: {without:?}"
+    );
+    // Not an unknown EFFECT, though — the effect resolved fine.
+    assert!(!without.contains(&"PW5201".to_string()), "{without:?}");
+
+    let with = codes_for(
+        "module app
+
+import capability.{ Payments }
+
+         fn f() -> Int !{ secret<Payments> } { 0 }
+",
+    );
+    assert!(with.is_empty(), "importing it is the repair: {with:?}");
+}
+
+#[test]
+fn a_misspelled_family_is_reported_as_pw5201() {
+    let found = codes_for(&user("databse.read<Stores>"));
+    assert!(found.contains(&"PW5201".to_string()), "{found:?}");
+}
+
+#[test]
+fn a_misspelled_operation_is_reported_as_pw5202() {
+    // A DIFFERENT code from the family typo, which is the whole reason there
+    // are three. `databse.read` and `database.reed` are one typo each and send
+    // a reader to two different places.
+    let found = codes_for(&user("database.reed<Stores>"));
+    assert!(found.contains(&"PW5202".to_string()), "{found:?}");
+    assert!(!found.contains(&"PW5201".to_string()), "{found:?}");
+}
+
+#[test]
+fn a_missing_type_argument_is_reported_as_pw5203() {
+    // Architect ruling, 2026-08-07: omission is not a wildcard.
+    let found = codes_for(&user("database.read"));
+    assert!(found.contains(&"PW5203".to_string()), "{found:?}");
+}
+
+#[test]
+fn a_surplus_type_argument_is_reported_as_pw5203() {
+    // The other direction, so "wrong arity" cannot come to mean "too few".
+    let found = codes_for(&user("layout.measure<Stores>"));
+    assert!(found.contains(&"PW5203".to_string()), "{found:?}");
+}
+
+#[test]
+fn an_argument_that_names_nothing_in_scope_is_still_pw5200() {
+    // The older rule, unchanged. `Stroes` names nothing, and that is a
+    // different mistake from the effect itself being unknown — so the effect
+    // resolves and only the argument is reported.
+    let found = codes_for(&user("database.read<Stroes>"));
+    assert!(found.contains(&"PW5200".to_string()), "{found:?}");
+    assert!(!found.contains(&"PW5201".to_string()), "{found:?}");
+    assert!(!found.contains(&"PW5202".to_string()), "{found:?}");
+}
+
+#[test]
+fn a_file_checked_with_no_vocabulary_at_all_is_not_flooded() {
+    // The rule that keeps this usable. `pw check` on one file supplies no
+    // platform package, so the ontology is empty — and reporting every row in
+    // it as unknown would say "your effect does not exist" when the truth is
+    // "no vocabulary was supplied".
+    let src = user("layout.measure");
+    let alone = pw_core::check::check_sources(&[("one.pw".to_string(), src)]);
+    let codes: Vec<&str> = alone
+        .iter()
+        .flat_map(|(_, ds)| ds.iter().map(|d| d.code))
+        .collect();
+    assert!(
+        !codes.iter().any(|c| c.starts_with("PW520")),
+        "an empty ontology reports nothing: {codes:?}"
+    );
+}

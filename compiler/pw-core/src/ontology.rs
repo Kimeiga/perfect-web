@@ -536,6 +536,47 @@ impl Ontology {
     }
 }
 
+/// What an effect's type argument may name, **from where it was written**.
+///
+/// Architect ruling, 2026-08-07:
+///
+/// > Effect names resolve through that prelude; their arguments resolve through
+/// > ordinary lexical/module visibility. […] If `Payments` isn't imported or
+/// > otherwise in scope, that's a source error.
+///
+/// One implementation, used by [`Ontology::argument`] and by `PW5200`. They
+/// were two — the ontology asked the workspace and `capability.rs` asked a
+/// whole-program set — which meant the ruling was obeyed by the analysis and
+/// not by the rule that reports it, so a file naming an out-of-scope argument
+/// got no error at all.
+///
+/// Modules count for the reason `capability.rs` records: `database.read<Stores>`
+/// names the domain being read, and `Stores` is a module.
+pub fn argument_names_visible_from(ws: &Workspace, unit: usize, hirs: &[&Hir]) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for hir in hirs {
+        for (_, decl) in hir.all_decls() {
+            if !matches!(decl.kind, DeclKind::Type | DeclKind::Opaque) || decl.name.is_empty() {
+                continue;
+            }
+            if matches!(
+                ws.resolve_in(unit, Namespace::Type, &decl.name),
+                Resolution::Local(_) | Resolution::Imported { .. }
+            ) {
+                out.insert(decl.name.clone());
+            }
+        }
+        for (id, _) in hir.all_decls() {
+            if let Some(m) = hir.module_of(id)
+                && ws.sees_module(unit, m)
+            {
+                out.insert(m.to_string());
+            }
+        }
+    }
+    out
+}
+
 /// `capability database.read<T>` → `Some("database.read<T>")`;
 /// `capability none` → `None`.
 ///
@@ -610,6 +651,142 @@ fn distance(a: &str, b: &str) -> usize {
         std::mem::swap(&mut prev, &mut row);
     }
     prev[b.len()]
+}
+
+/// Report every effect row in one unit against the ontology.
+///
+/// **The consumer that makes the ontology load-bearing.** Until this ran, an
+/// effect resolved to a declaration only where a contract asked; a row could
+/// name nothing at all and no diagnostic said so — which is the state
+/// `docs/RISK_QUEUE.md` 37 describes, where `LayoutAffect` named nothing in
+/// five files for three milestones.
+///
+/// The three codes are separate because they send a reader to three different
+/// places. A family typo, an operation typo and a wrong argument count are not
+/// the same mistake, and "unknown effect" would be the message for all three.
+pub fn check_effect_rows(
+    ontology: &Ontology,
+    ws: &Workspace,
+    unit: usize,
+    hir: &Hir,
+    out: &mut Vec<crate::diagnostics::Diagnostic>,
+) {
+    use crate::codes;
+    use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
+
+    // A program with no effect declarations at all is one checked without a
+    // platform package — `pw check` on a single file, a test fixture, a spike.
+    // Reporting every row in it as unknown would make the rule useless where it
+    // is most often run, and would say "your effect does not exist" when the
+    // truth is "no vocabulary was supplied". Silence is the honest answer.
+    if ontology.is_empty() {
+        return;
+    }
+
+    for (_, decl) in hir.all_decls() {
+        for entry in decl.declared_effects.iter().flatten() {
+            let mut evidence = Evidence::default();
+            let Err(e) = ontology.resolve(ws, unit, entry, &mut evidence) else {
+                continue;
+            };
+            let (code, message, label, repair) = match &e {
+                EffectError::UnknownFamily {
+                    family, nearest, ..
+                } => (
+                    codes::UNKNOWN_EFFECT_FAMILY,
+                    match nearest {
+                        Some(n) => format!("unknown effect family `{family}`; did you mean `{n}`?"),
+                        None => format!("unknown effect family `{family}`"),
+                    },
+                    format!("no package in scope declares an effect under `{family}`"),
+                    match nearest {
+                        Some(n) => format!("did you mean `{n}`?"),
+                        None => "declare the effect, or select a package that does".to_string(),
+                    },
+                ),
+                EffectError::UnknownOperation {
+                    family,
+                    operation,
+                    declared,
+                    nearest,
+                    ..
+                } => (
+                    codes::UNKNOWN_EFFECT_OPERATION,
+                    match nearest {
+                        Some(n) => {
+                            format!(
+                                "`{family}` declares no operation `{operation}`; did you mean `{n}`?"
+                            )
+                        }
+                        None => format!("`{family}` declares no operation `{operation}`"),
+                    },
+                    format!(
+                        "`{family}` declares: {}",
+                        declared
+                            .iter()
+                            .map(|d| format!("`{family}.{d}`"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    match nearest {
+                        Some(n) => format!("did you mean `{family}.{n}`?"),
+                        None => format!("use one of the operations `{family}` declares"),
+                    },
+                ),
+                EffectError::WrongArity {
+                    effect,
+                    expected,
+                    found,
+                    ..
+                } => (
+                    codes::EFFECT_ARITY_MISMATCH,
+                    format!(
+                        "`{effect}` takes {expected} type argument{}, and {found} {} given",
+                        if *expected == 1 { "" } else { "s" },
+                        if *found == 1 { "was" } else { "were" }
+                    ),
+                    match (expected, found) {
+                        (1, 0) => format!(
+                            "`{effect}` alone does not say WHICH — omission is not a wildcard"
+                        ),
+                        (0, _) => format!("`{effect}` binds no type parameter"),
+                        _ => format!("`{effect}` binds {expected}"),
+                    },
+                    if *expected > *found {
+                        format!("write `{effect}<..>` naming what it applies to")
+                    } else {
+                        format!("write `{effect}` with {expected} argument(s)")
+                    },
+                ),
+            };
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "effect_row_does_not_resolve",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: e.span().clone(),
+                related: vec![Related {
+                    span: e.span().clone(),
+                    label,
+                }],
+                explanation: Some(
+                    "An effect is a DECLARATION, not a spelling. Before the ontology, \
+                     `log` and a misspelled `databse` were indistinguishable to every \
+                     checker, because nothing said what a family was — and \
+                     `style.mutate<LayoutAffect>` appeared in five corpus files while \
+                     `LayoutAffect` was declared nowhere, so a distinction the platform \
+                     called `the point` rested on a spelling no checker could resolve."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: repair,
+                    replacement: None,
+                }],
+            });
+        }
+    }
 }
 
 #[cfg(test)]

@@ -260,6 +260,21 @@ codes! {
     // describes the deployment rather than the typo.
     UNRESOLVED_CAPABILITY_ARGUMENT = "PW5200" / unresolved_capability_argument / 1, Capability,
         "a capability's type argument must name a type the program declares";
+    // The three the effect ontology makes possible. Before it, `log` and a
+    // misspelled `databse` were indistinguishable to every checker: nothing
+    // declared what a family was, so there was nothing to be unknown against.
+    //
+    // Split three ways rather than one "unknown effect", because they send a
+    // reader to three different places. `databse.read` is a typo in the family;
+    // `database.reed` is a typo in the operation, and the family's real
+    // operations can be listed; `database.read` with no argument is neither —
+    // the name is right and the application is wrong.
+    UNKNOWN_EFFECT_FAMILY = "PW5201" / unknown_effect_family / 1, Capability,
+        "an effect must name a family some package declares";
+    UNKNOWN_EFFECT_OPERATION = "PW5202" / unknown_effect_operation / 1, Capability,
+        "an effect must name an operation its family declares";
+    EFFECT_ARITY_MISMATCH = "PW5203" / effect_arity_mismatch / 1, Capability,
+        "an effect must be given exactly the type arguments its declaration binds";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
