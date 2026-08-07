@@ -122,6 +122,155 @@ function setRange(address, text) {
   return true;
 }
 
+/**
+ * The nodes one loop instance owns, its anchors included.
+ *
+ * `null` when the instance is not in the document — which a patch targeting a
+ * nonexistent instance must be refused for, rather than silently doing nothing.
+ */
+function instanceRange(scope, token) {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
+  let start = null;
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.data === `pw:s${scope}@${token}`) start = node;
+    else if (node.data === `pw:e${scope}@${token}` && start) {
+      return { start, end: node };
+    }
+  }
+  return null;
+}
+
+/** Every node from an instance's start anchor to its end anchor, inclusive. */
+function instanceNodes(range) {
+  const nodes = [range.start];
+  let n = range.start.nextSibling;
+  while (n && n !== range.end) {
+    nodes.push(n);
+    n = n.nextSibling;
+  }
+  nodes.push(range.end);
+  return nodes;
+}
+
+/**
+ * Move nodes without recreating them, preserving as much state as the engine
+ * allows.
+ *
+ * `Element.moveBefore()` is an ATOMIC move: the node is never removed from the
+ * document, so focus, `:active`, CSS animations and transitions, iframe load
+ * state, fullscreen, popover and modal state all survive. `insertBefore()` on
+ * an attached node is specified as a remove followed by an insert, and every
+ * one of those is lost.
+ *
+ * Verified against MDN (`Element/moveBefore`, read 2026-08-07): the method is
+ * on the PARENT, the moved node must be an Element or CharacterData — comment
+ * anchors qualify — and it is explicitly not Baseline. So the fallback is not
+ * optional, and `docs/ASSUMPTIONS.md` records what it cannot preserve.
+ *
+ * The fallback restores focus and the caret by hand. That is a smaller claim
+ * than the atomic move makes, and stating it is the point: an implementation
+ * that quietly did less would pass the same focus test.
+ */
+const ATOMIC_MOVE = typeof Element.prototype.moveBefore === "function";
+
+function moveNodes(parent, nodes, anchor) {
+  if (ATOMIC_MOVE) {
+    for (const node of nodes) parent.moveBefore(node, anchor);
+    return "atomic";
+  }
+  const active = document.activeElement;
+  const caret =
+    active && "selectionStart" in active
+      ? [active.selectionStart, active.selectionEnd]
+      : null;
+  const scroll = active?.scrollTop;
+  for (const node of nodes) parent.insertBefore(node, anchor);
+  if (active && active.isConnected && document.activeElement !== active) {
+    active.focus({ preventScroll: true });
+    if (caret) active.setSelectionRange(caret[0], caret[1]);
+    if (scroll !== undefined) active.scrollTop = scroll;
+  }
+  return "restored";
+}
+
+/** Parse instance markup into nodes, anchors included. */
+function parseInstance(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  return [...template.content.childNodes];
+}
+
+/**
+ * Apply a structural operation to a keyed collection.
+ *
+ * Returns false when the operation names an instance the document does not
+ * have. A patch that addressed nothing must be REFUSED rather than ignored:
+ * the two are indistinguishable from the outside, and one of them means the
+ * page and the server disagree about what the document contains.
+ */
+function applyList(key, scope, op) {
+  switch (op.op) {
+    case "insert_before":
+    case "insert_after": {
+      const loop = index.get(key);
+      if (!loop) return false;
+      let parent;
+      let anchor;
+      if (op.instance == null) {
+        // No anchor instance: the head for `insert_before`, the tail for
+        // `insert_after`. The only way into an EMPTY collection, which has no
+        // instance to sit beside.
+        parent = loop.start.parentNode;
+        anchor = op.op === "insert_before" ? loop.start.nextSibling : loop.end;
+      } else {
+        const at = instanceRange(scope, op.instance);
+        if (!at) return false;
+        parent = at.start.parentNode;
+        anchor = op.op === "insert_before" ? at.start : at.end.nextSibling;
+      }
+      for (const node of parseInstance(op.html)) parent.insertBefore(node, anchor);
+      return true;
+    }
+
+    case "remove_instance": {
+      const at = instanceRange(scope, op.instance);
+      if (!at) return false;
+      for (const node of instanceNodes(at)) node.remove();
+      return true;
+    }
+
+    case "move_instance": {
+      const at = instanceRange(scope, op.instance);
+      if (!at) return false;
+      // The NODES are moved, not recreated. That is the whole reason a list is
+      // keyed: a move that deleted and re-rendered would lose focus, scroll,
+      // form state and any identity a test marked — and would look identical
+      // in a screenshot.
+      const nodes = instanceNodes(at);
+      let anchor;
+      if (op.after) {
+        const after = instanceRange(scope, op.after);
+        if (!after) return false;
+        anchor = after.end.nextSibling;
+      } else {
+        // To the front: just inside the LOOP's own range, whose address is
+        // the patch's target. Reconstructing that address from the scope id
+        // would assume the loop is at the top level, which a nested loop is
+        // not.
+        const loop = index.get(key);
+        if (!loop) return false;
+        anchor = loop.start.nextSibling;
+      }
+      window.__pw.moveKind = moveNodes(at.start.parentNode, nodes, anchor);
+      return true;
+    }
+
+    default:
+      return false;
+  }
+}
+
 // --- the compatibility decision -----------------------------------------
 //
 // The same wasm E7V compiled, and the same rule: the gate FAILS CLOSED. A
@@ -355,10 +504,30 @@ function applyFrame(frame) {
       for (const r of frame.basis.resources) held.set(r.entry, r.version);
       const key = addressKey(frame.target);
       const op = frame.operation;
-      if (op.op === "replace_text" && setRange(key, op.text)) {
-        window.__pw.updated.push(key);
-        const at = frame.basis.resources.map((r) => r.version).join(",");
-        log.push(`updated ${key} at version ${at}`);
+      const at = frame.basis.resources.map((r) => r.version).join(",");
+
+      if (op.op === "replace_text") {
+        if (setRange(key, op.text)) {
+          window.__pw.updated.push(key);
+          log.push(`updated ${key} at version ${at}`);
+        }
+        return;
+      }
+
+      // Structural operations on a keyed collection. The target names the LOOP;
+      // `op.instance` names which of its instances.
+      const scope = frame.target.part;
+      if (applyList(key, scope, op)) {
+        // The index maps addresses to nodes, and a structural change moves
+        // nodes. Rebuilt rather than patched incrementally: an index that
+        // tracked its own edits is a second model of the document, and the
+        // document is right here to be read.
+        buildIndex();
+        window.__pw.updated.push(`${key}:${op.op}`);
+        log.push(`${op.op} on ${key} at version ${at}`);
+      } else {
+        log.push(`refused ${op.op}: no instance ${op.instance}`);
+        window.__pw.refused = (window.__pw.refused ?? 0) + 1;
       }
       return;
     }
@@ -373,17 +542,37 @@ function applyFrame(frame) {
   }
 }
 
+/**
+ * Where this page is in its subscriber's frame sequence.
+ *
+ * Carried by the document rather than starting at zero. A reloaded page's
+ * document already contains every change committed before it was rendered, so
+ * asking from zero would replay them — and replaying a structural patch is not
+ * a no-op: an item would be inserted twice.
+ */
+let cursor = parts.cursor ?? 0;
+
 async function subscribe() {
   for (;;) {
-    let frames;
+    let batch;
     try {
-      const response = await fetch("/stream");
-      frames = await response.json();
+      // The cursor is BOTH the request and the acknowledgement: asking for
+      // what follows N tells the server that N arrived and was applied. So a
+      // response that never reaches this page — a reload, a dropped
+      // connection, a killed tab — costs nothing, because the frames are
+      // still there for the next ask.
+      const response = await fetch(`/stream?since=${cursor}`);
+      batch = await response.json();
     } catch {
       return; // the page is going away
     }
     window.__pw.updated = [];
-    for (const frame of frames) applyFrame(frame);
+    for (const frame of batch.frames ?? []) applyFrame(frame);
+    // Advanced only AFTER applying, and only once the whole body parsed.
+    // Advancing on receipt would acknowledge frames a mid-batch failure never
+    // applied, and they would never be sent again.
+    cursor = batch.cursor ?? cursor;
+    window.__pw.cursor = cursor;
   }
 }
 

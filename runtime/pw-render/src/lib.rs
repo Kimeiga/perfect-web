@@ -237,6 +237,101 @@ impl Env {
 ///
 /// `others` is every template that may be reached by a `Component` part. A
 /// component naming a template not in the set is `Blocked`, not skipped.
+/// Render ONE instance of a keyed loop, anchors included.
+///
+/// What a patch carries when it inserts an item: the markup the server would
+/// have produced for that instance in a full render, byte for byte, including
+/// its instance boundaries. Producing it here rather than in a patch generator
+/// is what keeps one renderer — a second one would drift, and the drift would
+/// show up as an inserted item that looks right and cannot be addressed.
+///
+/// The env must carry the same [`IdentityDomain`] the document was rendered
+/// with, or the instance's token will not match the addresses already in the
+/// browser's index.
+pub fn render_instance(
+    t: &Template,
+    each: PartId,
+    item: &Value,
+    env: &Env,
+    others: &[Template],
+) -> Result<String, Blocked> {
+    fn find(chunks: &[Chunk], each: PartId) -> Option<&Part> {
+        for c in chunks {
+            let Chunk::Dynamic(p) = c else { continue };
+            if p.id() == Some(each) {
+                return Some(p);
+            }
+            let nested = match p {
+                Part::Conditional {
+                    then, otherwise, ..
+                } => find(then, each).or_else(|| find(otherwise, each)),
+                Part::Each { body, .. } => find(body, each),
+                _ => None,
+            };
+            if nested.is_some() {
+                return nested;
+            }
+        }
+        None
+    }
+
+    let Some(Part::Each {
+        id,
+        binding,
+        key,
+        body,
+        ..
+    }) = find(&t.chunks, each)
+    else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("part {each} is not a keyed loop in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    let Some(field) = key else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: "an unkeyed loop has no addressable instance to render".into(),
+            at: t.path.clone(),
+        });
+    };
+
+    let raw = match item {
+        Value::Record(fields) => fields
+            .get(field)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default(),
+        other => other.as_str().unwrap_or_default(),
+    };
+    if raw.is_empty() {
+        return Err(Blocked::MissingLoopKey {
+            each: *id,
+            field: field.clone(),
+        });
+    }
+
+    let token = env.domain.instance_token(&env.path, *id, &raw);
+    let scoped = env.with(binding, item.clone()).within(*id, token.clone());
+    let mut out = format!("<!--pw:s{id}@{token}-->");
+    emit(body, &scoped, others, &mut out)?;
+    out.push_str(&format!("<!--pw:e{id}@{token}-->"));
+    Ok(out)
+}
+
+/// The instance token an item would get in this template's loop.
+///
+/// The server needs it to say WHICH instance a patch removes or moves, and
+/// deriving it here rather than in the patch generator keeps one derivation.
+pub fn instance_token_of(each: PartId, item: &Value, key_field: &str, env: &Env) -> InstanceToken {
+    let raw = match item {
+        Value::Record(fields) => fields
+            .get(key_field)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default(),
+        other => other.as_str().unwrap_or_default(),
+    };
+    env.domain.instance_token(&env.path, each, &raw)
+}
+
 pub fn render(t: &Template, env: &Env, others: &[Template]) -> Result<String, Blocked> {
     let mut out = String::new();
     emit(&t.chunks, env, others, &mut out)?;

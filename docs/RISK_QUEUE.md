@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Twenty-seven measurements in this project produced plausible, favourable results
+Thirty measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -238,6 +238,9 @@ argument for the admissibility rule above.
 | E6 graph | every page's dependency on its own query resolved | it resolved to the TYPE of the same name. `store.page` declares `query Store` and imports `domain.Store`, and the general `resolve` tries the type namespace first, so every page edge pointed at a record definition. The graph was full, the paths were plausible, and no edge named a thing that could be invalidated |
 | E7/E9 inference | every checker resolved sibling declarations, because the API offered a way to say so | the module was a **builder step** — `Types::of_body(..).in_module(m)` — and four of the seven callers never called it. Those four silently inferred with no module, so a bare name never resolved to a sibling and rules that depend on a type went quiet rather than wrong. Found only because a new rule needed to resolve `query Menu(..)` **during** construction, where no builder step had run yet. The fix is not a seventh call site: the module is now a parameter of `of_body`, so a caller cannot forget it and there is no order to get wrong |
 | E2 grammar | an audited `unsafe` was reported as unjustified | the newline rule that ends a statement also ended `unsafe capability … because "…"` before its `because` clause, so the justification became a separate statement and never reached the declaration. **`pw fmt` then baked the misparse into the source**, which is the part worth remembering: a formatter faithfully renders a wrong parse |
+| E7-P materializer | every E6 test passed, and the browser suite failed "sometimes, under load" | `Materializer::drain` consumed **every** pending outbox event and invalidated only those matching the instances the CALLER supplied. A caller's instance set is what that caller happens to know about — one session's entry — never everything that exists, so a drain issued for session A consumed session B's event and left a `Consumed` trace claiming the work was done. Invisible to every single-instance test, because with one instance the supplied set IS the whole set. It was written off as flakiness for one commit, which is the part worth remembering: **"it fails occasionally under parallelism" is a description of a race, not of a flaky harness** |
+| E7-P transport | the long poll delivered frames, and a reloaded page silently stopped receiving them | frames were REMOVED from the queue when read. A page that reloaded left an in-flight poll behind; that request's thread woke, took the frames the new page had not yet asked for, wrote them to a socket nobody was reading, and returned. Reading is not delivery. Fixed by making the client's next request its acknowledgement of the last sequence it APPLIED, so writing to a dead socket loses nothing |
+| E7-P transport | the cursor protocol worked for every subscriber that had ever received a frame | sequences started at zero and the initial cursor was zero, so the very first frame a subscriber ever received was numbered zero, `since=0` read it as already acknowledged, and it was never delivered. Every test that sent two things passed. An off-by-one at the exact boundary where nothing has happened yet is invisible to any fixture that warms up first |
 
 The two E6 rows and the inference row share a shape with the by-name member
 fallback deleted in E2C, arriving through three different doors. The E6 graph

@@ -251,6 +251,15 @@ pub enum Trace {
         id: i64,
         event: String,
     },
+    /// Listened for, but not by anything this caller named. Left pending.
+    ///
+    /// Distinct from `NoSubscriber` on purpose: one says "nobody wants this",
+    /// the other says "somebody wants this and they were not here". Merging
+    /// them would hide the difference between a graph gap and a scheduling gap.
+    Deferred {
+        id: i64,
+        event: String,
+    },
     Invalidated {
         entry: String,
         because: i64,
@@ -652,6 +661,7 @@ impl Materializer {
                 self.consume(c.id);
                 continue;
             }
+            let mut matched = false;
             for key in instances {
                 if !fragments.contains(&key.fragment) {
                     continue;
@@ -665,11 +675,34 @@ impl Materializer {
                 if !c.event.args.is_empty() && !c.event.args.iter().all(|a| key.key.contains(a)) {
                     continue;
                 }
+                matched = true;
                 let already = self.entry(key).map(|e| e.stale).unwrap_or(true);
                 self.invalidate(key, c.id);
                 if !already {
                     invalidated.push((key.clone(), c.id));
                 }
+            }
+
+            // An event with listeners that matched NONE of the instances this
+            // caller supplied stays pending.
+            //
+            // `instances` is what the caller happens to know about, not the
+            // set of everything that exists. Consuming here would destroy an
+            // event on behalf of an instance the caller never named: two
+            // sessions draining concurrently, and whichever ran first would
+            // silently swallow the other's invalidation. The failure is
+            // beautifully deniable — an occasional un-updated page, no error
+            // anywhere, and a `Consumed` trace claiming the work was done.
+            //
+            // The `NoSubscriber` branch above still consumes, and correctly:
+            // an event with no listeners at all cannot match a set the caller
+            // has not thought of, because there is no set it could match.
+            if !matched {
+                self.record(Trace::Deferred {
+                    id: c.id,
+                    event: c.event.name.clone(),
+                });
+                continue;
             }
             self.record(Trace::Consumed {
                 id: c.id,

@@ -232,3 +232,57 @@ union of user declarations, and no opaque-symbol fallback: external
 implementation is allowed through an explicit interface module, a missing
 declaration is not. E2B owns the change; `examples/domain.pw` was written so the
 corpus can survive it.
+
+---
+
+## A-014 — an unclaimed event stays in the outbox forever
+
+**Assumed since** 2026-08-07 (E7-P), `runtime/pw-materialize/src/lib.rs`.
+
+`Materializer::drain` consumes an event when nothing listens for it, or when it
+matches one of the instances the caller supplied. An event that IS listened for
+but matches none of the supplied instances stays pending — see
+`docs/RISK_QUEUE.md` 28 for what happened when it did not.
+
+**What this leaves open.** An event whose matching instance never appears
+again — a session that closed, a store that was deleted — is never consumed.
+The outbox grows, and every drain re-walks a lengthening tail.
+
+**Why it is safe to hold now.** The alternative loses invalidations, and a lost
+invalidation is a page that is silently wrong. A growing outbox is visible,
+bounded by traffic, and costs only work. The dev host restarts with an empty
+database, so the growth cannot accumulate across runs.
+
+**Retire when** entries carry a retention horizon. The natural rule is the one
+E6 already implies: an event cannot be claimed by an entry that no longer
+exists, so consumption should be tied to the entry lifecycle rather than to a
+timer. `concurrent_drain.rs::an_event_nobody_listens_for_is_still_consumed`
+pins the branch that must NOT start deferring when this changes.
+
+---
+
+## A-015 — a moved node keeps only focus and caret without an atomic move
+
+**Assumed since** 2026-08-07 (E7-P), `spikes/own-renderer/public/pw-runtime.mjs`.
+
+`MoveInstance` moves the existing nodes rather than re-rendering them.
+`Element.moveBefore()` does this atomically and preserves focus, `:active`, CSS
+animations and transitions, iframe load state, fullscreen, popover and modal
+state — verified against MDN `Web/API/Element/moveBefore`, read 2026-08-07,
+which also states it is **not Baseline**.
+
+**What this leaves open.** On an engine without `moveBefore`, the runtime falls
+back to `insertBefore` and restores the focused element, its caret and its
+scroll offset by hand. A running CSS animation restarts; an iframe reloads; a
+`:active` element is released; an open popover closes.
+
+**Why it is safe to hold now.** The alternative — refusing to reorder at all
+where the atomic move is missing — makes keyed collections unusable on those
+engines. The fallback is strictly better than the re-render it replaces, and
+the difference is stated rather than hidden. `keyed-list.spec.mjs` asserts the
+focus property on all three engines, and `window.__pw.moveKind` records which
+path ran, so a test cannot mistake one for the other.
+
+**Retire when** `moveBefore` is Baseline. The fallback then becomes dead code
+and should be deleted rather than kept "just in case" — a fallback nothing
+exercises is a fallback nobody knows is broken.

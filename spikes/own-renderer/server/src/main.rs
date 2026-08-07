@@ -44,8 +44,66 @@ use std::sync::{Arc, Mutex};
 use pw_document::{IdentityDomain, LocalPartId, PartAddress, Partition, TemplateSchemaId};
 use pw_materialize::{Clock, EntryKey, FragmentPolicy, Materializer};
 use pw_protocol::{CURRENT, CausalBasis, Patch, PatchOp, ResourceEntryId, StreamFrame, Version};
-use pw_render::{Env, Template, Value};
+use pw_render::{Env, PartId, Template, Value};
 use pw_resource::{DevelopmentIdentityKey, EntryIdentity};
+
+/// One subscriber's undelivered frames, and where its cursor is.
+///
+/// # Why frames are not removed when they are read
+///
+/// The first transport drained the queue on read and wrote the frames to the
+/// socket. A page that reloaded left an in-flight long poll behind; that
+/// request's thread woke, took the frames the reload had not yet asked for,
+/// wrote them to a socket nobody was reading, and returned. The frames were
+/// gone and the new page waited forever — reproducibly, and only when a
+/// reload raced a change, which is why it looked like flakiness.
+///
+/// So delivery is acknowledged rather than assumed. Each frame carries a
+/// sequence number; a subscriber asks for everything after the last sequence
+/// it APPLIED; and the server drops a frame only once a later request proves
+/// the client got past it. Writing to a dead socket now loses nothing.
+#[derive(Default)]
+struct Subscriber {
+    /// The last sequence assigned. Sequences start at ONE, so that the
+    /// initial cursor — zero, meaning "nothing acknowledged yet" — is smaller
+    /// than every frame. With zero-based sequences the very first frame a
+    /// subscriber ever received was numbered zero, `since=0` read it as
+    /// already acknowledged, and it was never delivered. It cost a real
+    /// invalidation and looked like a transport that simply had nothing to say.
+    last_seq: u64,
+    frames: Vec<(u64, StreamFrame)>,
+}
+
+impl Subscriber {
+    fn push(&mut self, frame: StreamFrame) {
+        self.last_seq += 1;
+        self.frames.push((self.last_seq, frame));
+    }
+
+    /// Everything after `since`, and the cursor a client that applies it all
+    /// should report next time.
+    fn after(&self, since: u64) -> (u64, Vec<&StreamFrame>) {
+        let frames: Vec<&StreamFrame> = self
+            .frames
+            .iter()
+            .filter(|(s, _)| *s > since)
+            .map(|(_, f)| f)
+            .collect();
+        let cursor = self
+            .frames
+            .iter()
+            .map(|(s, _)| *s)
+            .filter(|s| *s > since)
+            .max()
+            .unwrap_or(since);
+        (cursor, frames)
+    }
+
+    /// Forget what the client has acknowledged.
+    fn acknowledge(&mut self, through: u64) {
+        self.frames.retain(|(s, _)| *s > through);
+    }
+}
 
 /// The build this server serves. One value, used as the compatibility
 /// generation everywhere it is needed, so nothing derives a second one.
@@ -57,6 +115,12 @@ const IDENTITY: DevelopmentIdentityKey = DevelopmentIdentityKey;
 struct Server {
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
+    /// The keyed collection E7-P's structural patches operate on.
+    ///
+    /// Mutable, because a list that never changes cannot demonstrate that a
+    /// change preserves identity. Each item is `(key, name)` and the key is
+    /// what `{#each menu as item key item.id}` declares.
+    menu: Mutex<Vec<(String, String)>>,
     /// The materializer's clock, advanced once per regeneration.
     ///
     /// A version is `Entry.generated_at`, which is a clock reading — so a clock
@@ -71,7 +135,7 @@ struct Server {
     /// The document's static assets.
     dist: std::path::PathBuf,
     /// Frames waiting for each session's subscriber.
-    pending: Mutex<BTreeMap<String, Vec<StreamFrame>>>,
+    pending: Mutex<BTreeMap<String, Subscriber>>,
 }
 
 /// The semantic identity of one session's cart.
@@ -90,6 +154,12 @@ fn cart_identity(session: &str) -> EntryIdentity {
     .generation(BUILD)
 }
 
+/// The menu's entry identity — PUBLIC, and carrying the same generation a
+/// session-scoped entry does. Partition and compatibility are orthogonal.
+fn menu_identity() -> EntryIdentity {
+    EntryIdentity::new("store.page.Menu", &["47"], pw_resource::Partition::Public).generation(BUILD)
+}
+
 fn cart_entry(session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(&cart_identity(session), &IDENTITY)
 }
@@ -104,6 +174,7 @@ impl Server {
             clock,
             materializer,
             carts: Mutex::new(BTreeMap::new()),
+            menu: Mutex::new(default_menu()),
             dist,
             pending: Mutex::new(BTreeMap::new()),
         }
@@ -224,6 +295,174 @@ impl Server {
         }));
     }
 
+    // --- E7-P: keyed collections -------------------------------------
+    //
+    // Architect ruling, 2026-08-07:
+    //
+    // > DOM identity should survive moves. A `MoveInstance` that deletes and
+    // > recreates the node is not equivalent.
+    //
+    // Everything below therefore derives ONE thing on the server — which
+    // instance, and what its markup is — and sends it. The browser does not
+    // re-render, and it does not diff: it has no template and no previous
+    // model to diff against.
+
+    /// The menu's loop part, from the compiler's manifest.
+    fn menu_part(&self) -> (&Template, LocalPartId) {
+        let template = self
+            .templates
+            .iter()
+            .find(|t| t.name == "StorePage")
+            .expect("StorePage");
+        let part = template
+            .manifest()
+            .into_iter()
+            .find(|p| p.kind == "each")
+            .expect("the store page has a keyed loop");
+        (template, LocalPartId(part.id.0))
+    }
+
+    /// The text part inside the loop body that shows an item's name.
+    fn item_name_part(&self) -> LocalPartId {
+        let (template, _) = self.menu_part();
+        let part = template
+            .manifest()
+            .into_iter()
+            .find(|p| p.value == "item.name")
+            .expect("the loop body shows the item's name");
+        LocalPartId(part.id.0)
+    }
+
+    fn menu_address(&self) -> PartAddress {
+        let (template, part) = self.menu_part();
+        PartAddress::new(&TemplateSchemaId(template.schema.clone()), part)
+    }
+
+    /// The identity domain a session's document was rendered in.
+    ///
+    /// Derived HERE and used by both the full render and every patch, so a
+    /// token in a patch is the token already in the page. Two derivations
+    /// would agree until one of them changed.
+    fn domain(&self, session: &str) -> IdentityDomain {
+        IdentityDomain::document(
+            "StorePage(47)",
+            Partition::Session {
+                id: session.to_string(),
+            },
+            BUILD,
+        )
+        .keyed("own-renderer-spike-key")
+    }
+
+    fn menu_env(&self, session: &str) -> Env {
+        Env::new().in_domain(self.domain(session))
+    }
+
+    /// The public entry whose version every menu patch is caused by.
+    fn menu_key(&self) -> EntryKey {
+        EntryKey::from_identity(&menu_identity())
+    }
+
+    fn menu_version(&self) -> Version {
+        Version(
+            self.materializer
+                .entry(&self.menu_key())
+                .map(|e| e.generated_at)
+                .unwrap_or(0),
+        )
+    }
+
+    /// Regenerate the menu entry and broadcast one structural patch per
+    /// subscriber.
+    ///
+    /// Per subscriber, because an instance token is scoped to the DOCUMENT it
+    /// appears in: two sessions render the same item at different tokens, and
+    /// a single broadcast frame would address at most one of them. The
+    /// alternative — one shared token — is the public-fragment case, and it is
+    /// a different partition rather than a shortcut for this one.
+    fn broadcast_menu(&self, op: MenuOp) -> Result<(), String> {
+        // The subscriber table is taken FIRST and held throughout.
+        //
+        // It is what serializes a change against a document being served: a
+        // page rendered from the new list must not also receive the patch that
+        // produced it, and a page rendered from the old list must receive it.
+        // Without the interlock both orders are possible and the second one
+        // applies a change twice — an item inserted, then inserted again.
+        let mut queue = self.pending.lock().expect("pending");
+        {
+            // Refusals happen before anything is regenerated: a rejected
+            // operation must leave no version behind, or the page would be
+            // told to catch up to a change that did not happen.
+            let mut items = self.menu.lock().expect("menu");
+            op.apply(&mut items)?;
+        }
+
+        self.clock.advance(1);
+        let items = self.menu.lock().expect("menu").clone();
+        let rendered = items
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
+        self.materializer
+            .regenerate(&self.menu_key(), None, || Ok(rendered));
+
+        let entry = ResourceEntryId::derive(&menu_identity(), &IDENTITY);
+        let version = self.menu_version();
+        let (template, part) = self.menu_part();
+        let target = self.menu_address();
+
+        let sessions: Vec<String> = queue.keys().cloned().collect();
+        if std::env::var("PW_TRACE").is_ok() {
+            eprintln!("broadcast {:?} to {sessions:?}", op);
+        }
+        for session in sessions {
+            let env = self.menu_env(&session);
+            let operation = op
+                .patch(template, part, &items, &env, &self.templates)
+                .map_err(|b| format!("{b:?}"))?;
+            let target = op.target(&target, part, self.item_name_part(), &env, part);
+            let waiting = queue.entry(session).or_default();
+            waiting.push(StreamFrame::ResourceChanged {
+                protocol: CURRENT,
+                entry: entry.clone(),
+                version,
+            });
+            waiting.push(StreamFrame::Patch(Patch {
+                protocol: CURRENT,
+                basis: CausalBasis::of(entry.clone(), version),
+                target: target.clone(),
+                operation: operation.clone(),
+            }));
+        }
+        Ok(())
+    }
+
+    /// The document, and an empty queue for whoever receives it.
+    ///
+    /// A freshly rendered document already reflects every change committed
+    /// before it was rendered. Delivering the patches for those changes as
+    /// well would apply them twice — and the second application is not a
+    /// no-op, because inserting an item is not idempotent. A reload is the
+    /// ordinary way to reach that state, so this is not an edge case.
+    ///
+    /// Clearing rather than replaying is right because a patch is a
+    /// TRANSITION. It is only meaningful against the state it was derived
+    /// from, and this document was not derived from that state.
+    ///
+    /// Returns the cursor the document should subscribe from, so a reloaded
+    /// page does not ask for frames the reload already made meaningless.
+    fn serve_document(&self, session: &str) -> (String, u64) {
+        self.drain(session);
+        let mut queue = self.pending.lock().expect("pending");
+        let waiting = queue.entry(session.to_string()).or_default();
+        waiting.frames.clear();
+        let cursor = waiting.last_seq;
+        // Rendered while the table is held, so a change cannot land between
+        // the clear and the render and be lost by it.
+        (self.render_store(session), cursor)
+    }
+
     /// Where the cart's value appears.
     ///
     /// Found in the template IR by the value it reads, so the address is the
@@ -258,7 +497,7 @@ impl Server {
             .expect("StorePage");
         let env = Env::new()
             .set("store.name", Value::Text("Blue Bottle".into()))
-            .set("menu", menu())
+            .set("menu", menu_value(&self.menu.lock().expect("menu")))
             .set("cart.line_count", Value::Int(self.cart_value(session)))
             // A page, not a materialization: its domain is the route identity
             // and its partition. The generation is carried whatever the
@@ -277,22 +516,181 @@ impl Server {
     }
 }
 
-fn menu() -> Value {
-    Value::List(
-        [
-            ("espresso", "Espresso"),
-            ("cortado", "Cortado"),
-            ("cold-brew", "Cold Brew"),
-        ]
-        .into_iter()
-        .map(|(id, name)| {
-            let mut f = BTreeMap::new();
-            f.insert("id".to_string(), Value::Text(id.into()));
-            f.insert("name".to_string(), Value::Text(name.into()));
-            Value::Record(f)
+/// A structural change to a keyed collection.
+///
+/// One type, holding both halves of the change: what it does to the server's
+/// list, and what patch describes it. Splitting them is how a list and its
+/// patches drift — the patch generator gets an off-by-one the state does not
+/// have, and the page ends up with an order the server never held.
+#[derive(Debug, Clone)]
+enum MenuOp {
+    /// Insert `(id, name)` before or after `at`.
+    Insert {
+        id: String,
+        name: String,
+        /// The instance to anchor to, or the head/tail of the collection.
+        at: Option<String>,
+        before: bool,
+    },
+    Remove {
+        id: String,
+    },
+    /// Move `id` after `after`, or to the front when `after` is `None`.
+    Move {
+        id: String,
+        after: Option<String>,
+    },
+    /// Change one item's ordinary field. Not structural — and included here to
+    /// prove that it does NOT disturb its siblings.
+    Rename {
+        id: String,
+        name: String,
+    },
+}
+
+impl MenuOp {
+    fn position(items: &[(String, String)], id: &str) -> Result<usize, String> {
+        items
+            .iter()
+            .position(|(k, _)| k == id)
+            .ok_or_else(|| format!("no item `{id}`"))
+    }
+
+    fn apply(&self, items: &mut Vec<(String, String)>) -> Result<(), String> {
+        match self {
+            MenuOp::Insert {
+                id,
+                name,
+                at,
+                before,
+            } => {
+                // A duplicate key is REFUSED, not disambiguated. Two instances
+                // with one key means one address for two places, which is
+                // `docs/RISK_QUEUE.md` 25 arriving through the front door.
+                if items.iter().any(|(k, _)| k == id) {
+                    return Err(format!("duplicate key `{id}`"));
+                }
+                if id.is_empty() {
+                    return Err("an item with no key has no address".into());
+                }
+                let at = match at {
+                    Some(a) => {
+                        let p = Self::position(items, a)?;
+                        if *before { p } else { p + 1 }
+                    }
+                    // No anchor: the head for `before`, the tail for `after`.
+                    // This is the only way an item can enter an empty
+                    // collection without re-rendering the document.
+                    None if *before => 0,
+                    None => items.len(),
+                };
+                items.insert(at, (id.clone(), name.clone()));
+            }
+            MenuOp::Remove { id } => {
+                let at = Self::position(items, id)?;
+                items.remove(at);
+            }
+            MenuOp::Move { id, after } => {
+                let from = Self::position(items, id)?;
+                let item = items.remove(from);
+                let to = match after {
+                    None => 0,
+                    Some(a) => Self::position(items, a)? + 1,
+                };
+                items.insert(to, item);
+            }
+            MenuOp::Rename { id, name } => {
+                let at = Self::position(items, id)?;
+                items[at].1 = name.clone();
+            }
+        }
+        Ok(())
+    }
+
+    /// The patch describing this change, with markup the renderer produced.
+    fn patch(
+        &self,
+        template: &Template,
+        part: LocalPartId,
+        items: &[(String, String)],
+        env: &Env,
+        others: &[Template],
+    ) -> Result<PatchOp, pw_render::Blocked> {
+        let each = part;
+        let token = |id: &str| pw_render::instance_token_of(each, &item(id, ""), "id", env);
+        Ok(match self {
+            MenuOp::Insert {
+                id,
+                name,
+                at,
+                before,
+            } => {
+                let html =
+                    pw_render::render_instance(template, each, &item(id, name), env, others)?;
+                let instance = at.as_deref().map(token);
+                if *before {
+                    PatchOp::InsertBefore { instance, html }
+                } else {
+                    PatchOp::InsertAfter { instance, html }
+                }
+            }
+            MenuOp::Remove { id } => PatchOp::RemoveInstance {
+                instance: token(id),
+            },
+            MenuOp::Move { id, after } => PatchOp::MoveInstance {
+                instance: token(id),
+                after: after.as_deref().map(token),
+            },
+            MenuOp::Rename { name, .. } => {
+                // The item's TEXT part, addressed inside the instance by
+                // `target` below. A rename that reinserted the item would also
+                // work visually and would destroy the node — which is the whole
+                // distinction this milestone exists to make.
+                let _ = items;
+                PatchOp::ReplaceText { text: name.clone() }
+            }
         })
-        .collect(),
-    )
+    }
+
+    /// For `Rename`, the address is inside the instance rather than the loop.
+    fn target(
+        &self,
+        base: &PartAddress,
+        scope: LocalPartId,
+        inner: LocalPartId,
+        env: &Env,
+        each: PartId,
+    ) -> PartAddress {
+        match self {
+            MenuOp::Rename { id, .. } => {
+                let token = pw_render::instance_token_of(each, &item(id, ""), "id", env);
+                PartAddress::new(&base.template, inner).within(scope, token)
+            }
+            _ => base.clone(),
+        }
+    }
+}
+
+fn default_menu() -> Vec<(String, String)> {
+    [
+        ("espresso", "Espresso"),
+        ("cortado", "Cortado"),
+        ("cold-brew", "Cold Brew"),
+    ]
+    .into_iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect()
+}
+
+fn item(id: &str, name: &str) -> Value {
+    let mut f = BTreeMap::new();
+    f.insert("id".to_string(), Value::Text(id.into()));
+    f.insert("name".to_string(), Value::Text(name.into()));
+    Value::Record(f)
+}
+
+fn menu_value(items: &[(String, String)]) -> Value {
+    Value::List(items.iter().map(|(id, name)| item(id, name)).collect())
 }
 
 /// The graph, as `pw emit-graph` produced it. Read at build time so the server
@@ -375,10 +773,91 @@ fn handle(server: &Server, mut stream: TcpStream) {
             server.drain(&session);
             respond_json(&mut stream, 202, &session, fresh, "{}");
         }
+        // E7-P's structural commands. Each mutates the keyed collection and
+        // broadcasts the patch that describes the mutation. A refusal returns
+        // 409 and changes nothing — including the version.
+        ("POST", "/command/menu") => {
+            let q = |k: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{k}=")))
+                    .map(|v| v.replace("%20", " "))
+            };
+            let id = q("id").unwrap_or_default();
+            let op = match q("op").as_deref() {
+                Some("insert_before") | Some("insert_after") => MenuOp::Insert {
+                    name: q("name").unwrap_or_else(|| id.clone()),
+                    id,
+                    at: q("at"),
+                    before: q("op").as_deref() == Some("insert_before"),
+                },
+                Some("remove") => MenuOp::Remove { id },
+                Some("move") => MenuOp::Move {
+                    id,
+                    after: q("after"),
+                },
+                Some("rename") => MenuOp::Rename {
+                    name: q("name").unwrap_or_default(),
+                    id,
+                },
+                _ => {
+                    respond_json(&mut stream, 400, &session, fresh, "{\"error\":\"no op\"}");
+                    return;
+                }
+            };
+            match server.broadcast_menu(op) {
+                Ok(()) => respond_json(&mut stream, 202, &session, fresh, "{\"committed\":true}"),
+                Err(e) => respond_json(
+                    &mut stream,
+                    409,
+                    &session,
+                    fresh,
+                    &format!("{{\"committed\":false,\"refused\":\"{e}\"}}"),
+                ),
+            }
+        }
+        // A patch addressing an instance that does not exist. Not reachable
+        // through any command — injected, because the property under test is
+        // what the BROWSER does when a server and a page disagree, and a
+        // correct server never produces the disagreement.
+        ("POST", "/command/menu_ghost") => {
+            let entry = ResourceEntryId::derive(&menu_identity(), &IDENTITY);
+            let version = server.menu_version();
+            let mut queue = server.pending.lock().expect("pending");
+            queue
+                .entry(session.clone())
+                .or_default()
+                .push(StreamFrame::Patch(Patch {
+                    protocol: CURRENT,
+                    basis: CausalBasis::of(entry, Version(version.0 + 1)),
+                    target: server.menu_address(),
+                    operation: PatchOp::RemoveInstance {
+                        instance: pw_document::InstanceToken::from_wire("nosuchinstance"),
+                    },
+                }));
+            drop(queue);
+            respond_json(&mut stream, 202, &session, fresh, "{}");
+        }
+        ("GET", "/menu") => {
+            let items = server.menu.lock().expect("menu");
+            let ids: Vec<String> = items.iter().map(|(k, _)| format!("\"{k}\"")).collect();
+            respond_json(
+                &mut stream,
+                200,
+                &session,
+                fresh,
+                &format!("{{\"items\":[{}]}}", ids.join(",")),
+            );
+        }
         ("GET", "/stream") => stream_frames(server, &mut stream, &session, fresh, query),
         ("GET", "/StorePage.html") | ("GET", "/") => {
-            server.drain(&session);
-            let body = document(&server.render_store(&session), &server.templates);
+            // Registering the subscriber HERE, when the document is served,
+            // rather than when it first subscribes: the page holds instances
+            // from this moment on, so a structural change after this moment
+            // has an address in it. A registration deferred to the first poll
+            // would silently drop every change that raced it.
+            let (rendered, cursor) = server.serve_document(&session);
+            let body = document(&rendered, &server.templates, cursor);
             respond(
                 &mut stream,
                 200,
@@ -409,24 +888,43 @@ fn stream_frames(
     // eighteen pages each holding one — a longer hold made the suite flaky
     // under parallelism while every test passed alone, which is a harness
     // failure that reads exactly like a runtime failure.
+    let since: u64 = _query
+        .split('&')
+        .find_map(|p| p.strip_prefix("since="))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+
     for _ in 0..40 {
         {
             let mut queue = server.pending.lock().expect("pending");
-            if let Some(frames) = queue.get_mut(session)
-                && !frames.is_empty()
-            {
+            let waiting = queue.entry(session.to_string()).or_default();
+            // This request is the client's acknowledgement of everything up to
+            // `since`: it applied those frames and asked for what follows.
+            waiting.acknowledge(since);
+            let (cursor, frames) = waiting.after(since);
+            if !frames.is_empty() {
                 let body: Vec<serde_json::Value> = frames
-                    .drain(..)
-                    .map(|f| serde_json::to_value(&f).expect("frame"))
+                    .into_iter()
+                    .map(|f| serde_json::to_value(f).expect("frame"))
                     .collect();
-                let json = serde_json::to_string(&body).expect("frames");
+                let json = format!(
+                    "{{\"cursor\":{cursor},\"frames\":{}}}",
+                    serde_json::to_string(&body).expect("frames")
+                );
+                // Left in place until the next request proves they arrived.
                 respond_json(stream, 200, session, fresh, &json);
                 return;
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
-    respond_json(stream, 200, session, fresh, "[]");
+    respond_json(
+        stream,
+        200,
+        session,
+        fresh,
+        &format!("{{\"cursor\":{since},\"frames\":[]}}"),
+    );
 }
 
 fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &str, fresh: bool) {
@@ -451,7 +949,7 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &st
 }
 
 /// The document shell, with the parts manifest and the runtime.
-fn document(body: &str, templates: &[Template]) -> String {
+fn document(body: &str, templates: &[Template], cursor: u64) -> String {
     let template = templates
         .iter()
         .find(|t| t.name == "StorePage")
@@ -459,6 +957,10 @@ fn document(body: &str, templates: &[Template]) -> String {
     let manifest = serde_json::json!({
         "template": template.path,
         "schema": template.schema,
+        // Where this document starts listening. A page carries its own
+        // position rather than starting at zero, because starting at zero
+        // would replay changes this document already contains.
+        "cursor": cursor,
         "parts": template.manifest(),
         "resume": {
             "scheme": "2", "abi": "1", "build": BUILD, "handler": "add_to_cart",

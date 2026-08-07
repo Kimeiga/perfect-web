@@ -20,11 +20,16 @@ test.afterEach(async ({ page }) => {
 
 test("every frame the browser receives is a protocol frame", async ({ page }) => {
   const frames = [];
-  await page.route("**/stream", async (route) => {
+  await page.route("**/stream*", async (route) => {
     const response = await route.fetch();
     const body = await response.text();
     try {
-      frames.push(...JSON.parse(body));
+      // `{ cursor, frames }`. The cursor is transport bookkeeping — which
+      // frames this subscriber has acknowledged — and is deliberately not a
+      // protocol frame: it says nothing about the document or its resources.
+      const batch = JSON.parse(body);
+      expect(typeof batch.cursor, "the batch carries a cursor").toBe("number");
+      frames.push(...(batch.frames ?? []));
     } catch {
       /* an empty poll */
     }

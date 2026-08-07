@@ -161,12 +161,21 @@ pub enum PatchOp {
     // an `InstancePath` frame names which instance — and reserving the shape
     // means a list operation is a new variant rather than a new protocol.
     /// Insert a rendered instance before the instance the address names.
+    /// Insert before an instance, or at the HEAD of the collection when
+    /// `instance` is `None`.
+    ///
+    /// The anchor is optional because a keyed collection can be empty, and an
+    /// empty collection has no instance to anchor to. Without this the first
+    /// item could only ever arrive by re-rendering the document, and a
+    /// collection that emptied would be permanently unfillable — a hole that
+    /// only appears in the one state a demo never reaches.
     InsertBefore {
-        instance: InstanceToken,
+        instance: Option<InstanceToken>,
         html: String,
     },
+    /// Insert after an instance, or at the TAIL when `instance` is `None`.
     InsertAfter {
-        instance: InstanceToken,
+        instance: Option<InstanceToken>,
         html: String,
     },
     RemoveInstance {
