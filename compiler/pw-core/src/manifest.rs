@@ -389,6 +389,7 @@ mod tests {
                 variants: None,
                 fields: None,
                 opaque_of: None,
+                type_params: vec![],
                 policies: vec![crate::hir::Policy {
                     name: "consistency".into(),
                     value: v.into(),

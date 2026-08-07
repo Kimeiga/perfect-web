@@ -246,6 +246,7 @@ impl Lowerer<'_> {
                 imports: imported_names(node),
                 visibility: visibility_of(node),
                 opaque_of: self.opaque_of(node),
+                type_params: self.type_params(node),
                 declared_effects,
                 body: None,
                 children: Vec::new(),
@@ -414,21 +415,54 @@ impl Lowerer<'_> {
         row.children()
             .filter(|c| c.kind() == K::EffectRef)
             .map(|e| {
-                // `database.read<Stores>` — the path is the name, the type
-                // arguments are not part of the effect's identity.
-                let path = e
-                    .children()
-                    .find(|c| c.kind() == K::TypeRef)
+                // `database.read<Stores>` — the path is the name, and the type
+                // arguments come from the `TypeArgList` the grammar already
+                // built. Taken from the TREE rather than sliced back out of
+                // the text: the parser has answered this question once, and a
+                // second answer is how the two come to disagree.
+                let head = e.children().find(|c| c.kind() == K::TypeRef);
+                let path = head
+                    .as_ref()
                     .and_then(|t| t.children().find(|c| c.kind() == K::Name))
                     .map(|n| n.text().to_string())
                     .unwrap_or_else(|| text(self.src, &e).trim().to_string());
+                let args = head
+                    .as_ref()
+                    .and_then(|t| t.children().find(|c| c.kind() == K::TypeArgList))
+                    .map(|list| {
+                        list.children()
+                            .filter(|c| c.kind() == K::TypeRef)
+                            .map(|a| type_path(&a))
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 EffectRef {
                     path,
                     written: text(self.src, &e).trim().to_string(),
+                    args,
                     span: span_of(&e),
                 }
             })
             .collect()
+    }
+
+    /// The type parameters a declaration binds: the `TypeArgList` that is the
+    /// declaration's OWN child, as `type_params()` in the grammar builds it.
+    ///
+    /// Its own child, deliberately. A `TypeArgList` nested inside a `TypeRef`
+    /// is an argument at a use site — `-> Result<Store, StoreError>` — and
+    /// reading one of those as a parameter binding would give every function
+    /// returning a generic type a set of parameters it never declared.
+    fn type_params(&self, node: &SyntaxNode) -> Vec<String> {
+        node.children()
+            .find(|c| c.kind() == K::TypeArgList)
+            .map(|list| {
+                list.children()
+                    .filter(|c| c.kind() == K::TypeRef)
+                    .map(|p| type_path(&p))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Lower a `Body` node, hoisting any nested declarations out of it.

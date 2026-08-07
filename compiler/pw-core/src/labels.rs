@@ -350,6 +350,7 @@ fn dummy() -> Decl {
         imports: vec![],
         visibility: None,
         opaque_of: None,
+        type_params: vec![],
         declared_effects: None,
         body: None,
         children: vec![],

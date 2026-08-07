@@ -232,6 +232,15 @@ pub struct Decl {
     pub visibility: Option<String>,
     /// `opaque type StoreId = String` — the representation, as written.
     pub opaque_of: Option<String>,
+    /// The type parameters this declaration binds: `["C"]` for
+    /// `opaque type Secret<C>`, `["T"]` for `effect database.read<T>`.
+    ///
+    /// Recorded because ARITY is a checkable property and the tree already
+    /// knows it. `database.read` written with no argument and
+    /// `database.read<A, B>` written with two are both wrong against a
+    /// declaration binding one, and a checker that had to count `<`s in a
+    /// string would be parsing the source a second time.
+    pub type_params: Vec<String>,
     /// The declared effect row, as written: `!{ database.read<Stores> }` yields
     /// `["database.read"]`. Empty for `!{}`; `None` when no row was written.
     pub declared_effects: Option<Vec<EffectRef>>,
@@ -259,6 +268,13 @@ pub struct EffectRef {
     /// layout is a different effect from one that cannot — so the identity a
     /// checker compares and the text a developer reads must both keep it.
     pub written: String,
+    /// The type arguments, **as the parser found them**: `["LayoutAffect"]`.
+    ///
+    /// Lowered from the `TypeArgList` the grammar already builds, not sliced
+    /// out of `written` afterwards. Two arguments are two entries, which is
+    /// what makes `database.read<A, B>` distinguishable from a one-argument
+    /// effect whose argument happens to contain a comma.
+    pub args: Vec<String>,
     pub span: Span,
 }
 

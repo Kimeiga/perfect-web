@@ -42,6 +42,7 @@ pub mod layout;
 pub mod lower;
 pub mod manifest;
 pub mod marko;
+pub mod ontology;
 pub mod outcome;
 pub mod placement;
 pub mod privacy;

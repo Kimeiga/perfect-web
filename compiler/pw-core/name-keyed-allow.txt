@@ -24,3 +24,6 @@ scope.rs:by_name             scope names within one declaration's body
 resolve.rs:by_name           MODULE names, which are globally unique by construction — this is the machinery that resolves everything else
 types.rs:by_adt_name         a type name inside one type environment; the environment is per-program
 types.rs:by_opaque_name      same as `by_adt_name`
+ontology.rs:by_name          an effect's dotted name IS its identity: the vocabulary is ONE flat namespace by design, which is what makes `database.read` mean the same thing in every row. Two declarations of one spelling are a conflict, and `conflicts` records them rather than letting the map absorb one
+ontology.rs:conflicts        keyed by the contested spelling, because the spelling is what is contested; the DefIds of every claimant are the value
+ontology.rs:families         a family is NOT a declaration and has no DefId to key by — it exists because operations were declared into it, and `EffectPath::family` is the only thing that produces one

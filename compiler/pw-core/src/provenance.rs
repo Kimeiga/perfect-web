@@ -89,6 +89,24 @@ pub enum FactKind {
         member: String,
         via: Route,
     },
+    /// A written effect resolved to a declaration.
+    ///
+    /// The ontology's answer, and the one that makes "no checker splits
+    /// `database.read` at the dot" checkable: a fact recording that the WHOLE
+    /// path named a declaration is different evidence from a fact recording
+    /// that a final segment matched something.
+    ResolvedEffect {
+        path: String,
+        to: crate::ontology::EffectDefId,
+        via: Route,
+    },
+    /// An effect's type argument was looked up.
+    ///
+    /// Recorded whether or not it resolved. That an argument named nothing is
+    /// a fact about the program — `docs/RISK_QUEUE.md` 37, where
+    /// `LayoutAffect` named nothing in five files — and a graph holding only
+    /// successes cannot tell "checked and found" from "never looked".
+    ResolvedTypeArgument { written: String, resolved: bool },
     /// An effect entered a body.
     Effect { effect: String },
     /// An effect crossed into a lambda handed to another function.
@@ -163,12 +181,20 @@ impl Evidence {
         self.facts
             .iter()
             .filter_map(|f| match &f.kind {
-                FactKind::ResolvedCall { via, .. } | FactKind::ResolvedMember { via, .. } => {
-                    Some(*via)
-                }
+                FactKind::ResolvedCall { via, .. }
+                | FactKind::ResolvedMember { via, .. }
+                | FactKind::ResolvedEffect { via, .. } => Some(*via),
                 _ => None,
             })
             .collect()
+    }
+
+    /// Did this written effect resolve to a declaration, and to which?
+    pub fn effect_resolved(&self, path: &str) -> Option<crate::ontology::EffectDefId> {
+        self.facts.iter().find_map(|f| match &f.kind {
+            FactKind::ResolvedEffect { path: p, to, .. } if p == path => Some(*to),
+            _ => None,
+        })
     }
 
     /// Did a member resolve on this receiver type?
