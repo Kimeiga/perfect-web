@@ -192,15 +192,6 @@ pub struct Inference<'a> {
     known: BTreeMap<DefId, BTreeSet<Effect>>,
     // NOTE: `known` keyed by a `String` would be RISK_QUEUE 34 again. See
     // `name-keyed-allow.txt` and `tests/name_keyed_maps.rs`.
-    /// Last-segment spellings that name exactly ONE declaration in the whole
-    /// program. `None` means several do, and therefore no answer.
-    ///
-    /// The last resort for a MEMBER call whose receiver's module is not
-    /// imported — `el.getBoundingClientRect()` in a file that imports only
-    /// `List`. Uniqueness is what makes it safe: the collision RISK_QUEUE 34
-    /// is about (`Resources.Cart` and `store.page.Cart`) resolves to `None`
-    /// here and contributes nothing, where the old rule silently picked one.
-    unique_names: BTreeMap<String, Option<DefId>>,
     /// Which unit each `Hir` in the last `run` was, so a declaration can be
     /// given the same `DefId` the workspace gave it.
     workspace: &'a Workspace,
@@ -211,7 +202,6 @@ impl<'a> Inference<'a> {
         Self {
             sigs,
             known: BTreeMap::new(),
-            unique_names: BTreeMap::new(),
             workspace,
         }
     }
@@ -229,18 +219,6 @@ impl<'a> Inference<'a> {
     pub fn run(&mut self, hirs: &[&Hir]) {
         for (unit, hir) in hirs.iter().enumerate() {
             for (id, d) in hir.all_decls() {
-                // Built once, counting duplicates: a second declaration with
-                // the same spelling turns the entry into `None` rather than
-                // overwriting it.
-                let def = self.def_of(unit, id);
-                self.unique_names
-                    .entry(d.name.clone())
-                    .and_modify(|slot| {
-                        if *slot != Some(def) {
-                            *slot = None;
-                        }
-                    })
-                    .or_insert(Some(def));
                 if let Some(row) = &d.declared_effects {
                     self.known.insert(
                         self.def_of(unit, id),
@@ -297,6 +275,25 @@ impl<'a> Inference<'a> {
     /// not in a list of property names here — which is what E2C's deletion gate
     /// requires and what lets a new accessor be added without touching a checker.
     fn member_effects(&self, body: &Body, types: &BTreeMap<String, String>, out: &mut Inferred) {
+        // Which lambdas were handed to which function, so a member call inside
+        // a callback names the callback rather than only itself.
+        //
+        // The same map the call walk builds, for the same reason: R-037's
+        // claim is that `layout.measure` propagates through `List.map`'s
+        // callback, and a diagnostic that named only
+        // `el.getBoundingClientRect` would be true and would not say that.
+        let mut inside_callback: BTreeMap<ExprId, String> = BTreeMap::new();
+        for id in body.walk() {
+            if let Expr::Call { callee, args } = body.expr(id) {
+                let name = path_of(body, *callee);
+                for a in args {
+                    if matches!(body.expr(a.value), Expr::Lambda { .. }) {
+                        inside_callback.insert(a.value, name.clone());
+                    }
+                }
+            }
+        }
+
         for id in body.walk() {
             // Both shapes: a property read, and a method call on a value.
             let (receiver, member, span) = match body.expr(id) {
@@ -333,14 +330,22 @@ impl<'a> Inference<'a> {
             let Some(sig) = self.sigs.member_of(declared, &member) else {
                 continue;
             };
+            let callee = format!("{receiver}.{member}");
+            let via = match enclosing_callback(body, id, &inside_callback) {
+                Some(passed_to) => Via::Callback {
+                    passed_to,
+                    callee: callee.clone(),
+                },
+                None => Via::Direct {
+                    callee: callee.clone(),
+                },
+            };
             for e in &sig.effects {
                 out.effects.insert(e.clone());
                 out.sources.push(Source {
                     effect: e.clone(),
                     span: span.clone(),
-                    via: Via::Direct {
-                        callee: format!("{receiver}.{member}"),
-                    },
+                    via: via.clone(),
                 });
             }
         }
@@ -560,23 +565,23 @@ impl<'a> Inference<'a> {
                 _ => found = Some(candidate),
             }
         }
-        if found.is_some() {
-            return found;
-        }
-
-        // Last resort: a spelling that names exactly ONE declaration in the
-        // whole program. `R-037` needs it — `el.getBoundingClientRect()` in a
-        // file that imports only `List`, so the platform module holding that
-        // declaration is not visible by any rule this function can apply.
+        // And that is all. There is deliberately NO program-wide fallback.
         //
-        // Uniqueness is the whole safety argument. The old rule took the last
-        // segment and picked whatever matched; this one refuses when more than
-        // one does, so `RISK_QUEUE` 34's two `Cart`s contribute nothing instead
-        // of contributing each other's effects.
+        // There was one — a spelling that named exactly one declaration
+        // anywhere in the program — and the architect's ruling of 2026-08-07
+        // ordered it deleted:
         //
-        // It stays until platform packages have a declared prelude status, at
-        // which point the scoped branch above covers this case honestly.
-        self.unique_names.get(last).copied().flatten()
+        // > Delete program-wide-unique resolution completely. Add a structural
+        // > test proving no correctness path performs global last-segment
+        // > uniqueness lookup.
+        //
+        // What it was load-bearing for was `el.getBoundingClientRect()`, and
+        // that now resolves through the RECEIVER's type: `infer.rs` gives a
+        // callback's parameter the element type of the collection it is applied
+        // to, and `member_effects` looks the member up on that type. A member
+        // is visible because its receiver declares it, not because nothing else
+        // in the program happens to share its spelling.
+        found
     }
 
     /// **What this definition actually requires at run time.**

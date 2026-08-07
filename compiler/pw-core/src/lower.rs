@@ -883,7 +883,18 @@ impl Lowerer<'_> {
     fn param_pattern(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> PatternId {
         let span = span_of(node);
         match node.kind() {
-            K::NameExpr => {
+            // `x => e` writes the parameter as an expression; `fn(x) e`
+            // writes it as a declaration-shaped `Param` holding a `Name`.
+            // Both are parameters, and only the first was handled: `fn(el) ..`
+            // lowered its parameter to `Pattern::Error`, so `el` was bound to
+            // nothing and every rule that needed its type saw an untyped
+            // receiver.
+            //
+            // Nothing complained, because the effect checker had a by-spelling
+            // fallback that found `getBoundingClientRect` without needing a
+            // receiver at all. R-037 was caught for a reason unrelated to what
+            // it tests — see `docs/RISK_QUEUE.md`.
+            K::NameExpr | K::Name => {
                 let name = text(self.src, node).trim().to_string();
                 if name == "_" {
                     b.pat(Pattern::Wild, span)
@@ -895,6 +906,14 @@ impl Lowerer<'_> {
                         },
                         span,
                     )
+                }
+            }
+            K::Param => {
+                // `el` or `el: T` — the binding is the first child; a written
+                // type annotation is a sibling this pattern does not carry.
+                match node.children().next() {
+                    Some(c) => self.param_pattern(b, &c),
+                    None => b.pat(Pattern::Error, span),
                 }
             }
             K::ParamList | K::TupleExpr | K::ListExpr => {

@@ -161,6 +161,76 @@ impl<'a> Types<'a> {
             }
         }
 
+        // A CALLBACK's parameter takes the element type of the collection the
+        // callback is applied to.
+        //
+        // `items |> List.map(fn(el) el.getBoundingClientRect().width)` gives
+        // `el` the type `ElementRef`, so `getBoundingClientRect` resolves
+        // through the RECEIVER rather than through a spelling.
+        //
+        // Architect ruling, 2026-08-07:
+        //
+        // > `el.getBoundingClientRect()` should resolve because
+        // > `type(el) = Element` and Element's declared member set contains
+        // > `getBoundingClientRect` — not because some globally unique
+        // > declaration has that spelling.
+        //
+        // The same shape `{#each}` already relies on, one level down. It is
+        // deliberately narrow: the callback's FIRST parameter, and only when a
+        // sibling argument is a collection whose element type is known. A
+        // callback over something that is not a collection binds nothing,
+        // because there is nothing to be right about.
+        // `xs |> f(cb)` keeps its pipe: the HIR is `Binary { Pipe, xs, f(cb) }`
+        // rather than a call with `xs` prepended. So the piped value is
+        // collected here and offered to the call on its right, which is what
+        // `|>` means.
+        let mut piped: BTreeMap<ExprId, ExprId> = BTreeMap::new();
+        for id in body.walk() {
+            if let Expr::Binary {
+                op: crate::hir::BinOp::Pipe,
+                lhs,
+                rhs,
+            } = body.expr(id)
+            {
+                piped.insert(*rhs, *lhs);
+            }
+        }
+
+        for id in body.walk() {
+            let Expr::Call { args, .. } = body.expr(id) else {
+                continue;
+            };
+            // The element type any sibling argument offers — including the
+            // piped receiver.
+            let element = args
+                .iter()
+                .map(|a| a.value)
+                .chain(piped.get(&id).copied())
+                .find_map(|value| {
+                    let name = path_of(body, value);
+                    element_of
+                        .get(&name)
+                        .cloned()
+                        .or_else(|| types.element_type(body, &name))
+                });
+            let Some(element) = element else { continue };
+
+            for a in args {
+                let Expr::Lambda { params, .. } = body.expr(a.value) else {
+                    continue;
+                };
+                let Some(first) = params.first() else {
+                    continue;
+                };
+                // `fn(el)` arrives as a constructor-shaped wrapper around the
+                // binding — the parameter LIST is call-shaped — so the name is
+                // found by walking rather than matched at the top.
+                if let Some(name) = first_bound_name(body, *first) {
+                    types.bindings.entry(name).or_insert(element.clone());
+                }
+            }
+        }
+
         // A binding whose initialiser has a knowable type. Iterated, so
         // `let a = f()` then `let b = a.g()` both resolve; bounded because each
         // round can only add bindings and there are finitely many.
@@ -241,6 +311,17 @@ impl<'a> Types<'a> {
     ///
     /// `None` is a real answer and callers must treat it as one. It means "this
     /// program does not say", not "look it up some other way".
+    /// Every name this body binds to a known type.
+    ///
+    /// Exposed so the effect checker's member lookup uses the SAME environment
+    /// the type inference built, rather than assembling a narrower one from
+    /// declaration parameters alone. A callback parameter typed here — `el` in
+    /// `items |> List.map(fn(el) ..)` — is invisible to a second construction,
+    /// and `el.getBoundingClientRect()` then resolves through nothing.
+    pub fn bindings(&self) -> &BTreeMap<String, String> {
+        &self.bindings
+    }
+
     pub fn of(&self, body: &Body, id: ExprId) -> Option<String> {
         match body.expr(id) {
             Expr::Name(n) => self.bindings.get(n).cloned(),
@@ -293,6 +374,21 @@ impl<'a> Types<'a> {
 /// loop iterates what is inside. That is not the same as ignoring them: a
 /// `Result` still has to be handled, and `option_used_as_value` is the rule
 /// that says so. This answers a different question — what one element IS.
+/// The first name a pattern binds, however it is wrapped.
+///
+/// A lambda parameter list is call-shaped, so `fn(el)` lowers to a constructor
+/// pattern with an empty path around the binding. Matching `Bind` at the top
+/// finds nothing, and finding nothing here is indistinguishable from a callback
+/// over something untyped.
+fn first_bound_name(body: &Body, pat: crate::hir::PatternId) -> Option<String> {
+    use crate::hir::Pattern;
+    match body.pat(pat) {
+        Pattern::Bind { name, .. } => Some(name.clone()),
+        Pattern::Ctor { args, .. } => args.iter().find_map(|a| first_bound_name(body, *a)),
+        _ => None,
+    }
+}
+
 fn element_of_written(head: &str, args: &[String]) -> Option<String> {
     match head {
         "List" => args.first().map(|a| strip_args(a)),

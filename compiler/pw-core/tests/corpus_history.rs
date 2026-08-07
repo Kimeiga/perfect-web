@@ -49,15 +49,37 @@ enum Why {
     KnownCheckerGap,
 }
 
-const EXPECTED_TO_PASS: &[(&str, Why, &str)] = &[(
-    "R-023",
-    Why::FixtureDidNotExpressIt,
-    "its old text declared no route at all, so there was no route table for a \
-     link to be dead relative to. `dead_internal_link` is a RELATION between a \
-     link and a route table, and the old file contained only one half of it — \
-     so the old text did not express the invariant it declared, and its \
-     silence is correct rather than a gap.",
-)];
+const EXPECTED_TO_PASS: &[(&str, Why, &str)] = &[
+    (
+        "R-001",
+        Why::FixtureDidNotExpressIt,
+        "its old text called `fetch_store` without importing `Stores`, so the \
+         call named nothing this program declares. It became catchable only \
+         because effect inference matched a bare spelling against every \
+         declaration in the program — the ambient resolution E2B removed and \
+         the architect ordered deleted on 2026-08-07 (`docs/RISK_QUEUE.md` \
+         34). With honest resolution a file that imports nothing sees nothing, \
+         so the old text cannot express `forbidden_effect` and its silence is \
+         correct. The repaired fixture, which imports `Stores`, is caught.",
+    ),
+    (
+        "R-024",
+        Why::FixtureDidNotExpressIt,
+        "the same shape as R-001: `raw_html` was called without importing \
+         `html`, so the call named nothing. `unsafe_audit_incomplete` is a \
+         statement about a declared unsafe capability, and the old text had no \
+         declaration to be incomplete about — it was caught only by spelling.",
+    ),
+    (
+        "R-023",
+        Why::FixtureDidNotExpressIt,
+        "its old text declared no route at all, so there was no route table \
+         for a link to be dead relative to. `dead_internal_link` is a RELATION \
+         between a link and a route table, and the old file contained only one \
+         half of it — so the old text did not express the invariant it \
+         declared, and its silence is correct rather than a gap.",
+    ),
+];
 
 fn library() -> Vec<(String, String)> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

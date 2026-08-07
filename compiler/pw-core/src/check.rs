@@ -449,7 +449,7 @@ fn check_unit_with(
         );
         privacy_flow(&unit.hir, sigs, decl, &mut out);
         privacy_sinks(&unit.hir, sigs, decl, &mut out);
-        effect_rows(&unit.hir, inference, at, decl, &mut out);
+        effect_rows(&unit.hir, sigs, inference, at, id, decl, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
@@ -1829,8 +1829,10 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
 /// here — a `view` reaching the database is not fixed by declaring it.
 fn effect_rows(
     hir: &Hir,
+    sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
     at: usize,
+    id: crate::hir::DeclId,
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
 ) {
@@ -1838,15 +1840,22 @@ fn effect_rows(
 
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
-    // The types the declaration makes known: its parameters, plus any annotated
-    // binding. Enough for a member access on a declared value; a lambda
-    // parameter has no annotation and falls back to the unique-member rule.
-    let mut types: BTreeMap<String, String> = BTreeMap::new();
-    for p in &decl.params {
-        if let Some(t) = &p.ty {
-            types.insert(p.name.clone(), t.clone());
-        }
-    }
+    // The SAME type environment the inference built, not a narrower one
+    // assembled here.
+    //
+    // It used to be declaration parameters plus annotated `let`s, and a lambda
+    // parameter — having no annotation — fell through to a by-spelling rule
+    // that the architect ordered deleted on 2026-08-07. `Types::of_body` types
+    // a callback's parameter from the collection it is applied to, so `el` in
+    // `items |> List.map(fn(el) ..)` is an `ElementRef` here and
+    // `el.getBoundingClientRect()` resolves through its RECEIVER.
+    //
+    // Two constructions of one environment is how the narrower one silently
+    // wins, which is exactly what happened.
+    let mut types: BTreeMap<String, String> =
+        crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id))
+            .bindings()
+            .clone();
     for id in body.walk() {
         let Expr::Let {
             pat: Some(pat),

@@ -205,7 +205,7 @@ effects; the `pw` checker must be shown to do the same.
 
 ## The recurring bug
 
-Thirty-four measurements in this project produced plausible, favourable results
+Thirty-six measurements in this project produced plausible, favourable results
 while measuring nothing. The count is kept accurate deliberately: it is the
 argument for the admissibility rule above.
 
@@ -245,6 +245,8 @@ argument for the admissibility rule above.
 | E7-L resume | the second handler was refused with code 9, malformed | the runtime built a capture schema as `of_fields(&[(name, "T")])`, and for a handler with no captures that is a schema of ONE field named `""` rather than the schema of no fields. `decide` correctly refuses a manifest carrying no capture bytes under a non-empty schema, so a handler that captures nothing was malformed by construction. Fail-closed worked and the only symptom was a button that never attached |
 | E7-L host | `add_to_cart` incremented the cart correctly in every test | the read sat OUTSIDE the lock: `let next = cart_value(session) + 1;` then commit, then write. Two presses landing in the same instant both read 0, both computed 1, and one was lost. Every test that clicks once and waits passes; the test that found it clicks TWICE CONCURRENTLY, and it was written to prove something else entirely — that a handler module is fetched once rather than twice |
 | E8-0 contract *(fixed)* | `Resources.Cart` required `database.read`, which read like exactly the right answer for a cart query | its body is `todo` — it performs nothing. `Inference::known` is keyed by the BARE declaration name, so `Resources.Cart` and `store.page.Cart` share one entry, and the contract handed one component the authority of a different component that happens to have the same name. Every capability in the emitted set was plausible for the component it was attached to, which is why reading the output did not find it; deriving from the BODY did |
+| E8 resolution | R-037 was caught, with the right code, for the right invariant: `layout.measure` smuggled through `List.map`'s callback | its callback parameter was never bound. `fn(el) ..` writes the parameter as a declaration-shaped `Param` holding a `Name`, and `param_pattern` handled only the `x => e` spelling — so `el` lowered to `Pattern::Error` and had no type. The effect was found by matching the spelling `getBoundingClientRect` against every declaration in the program, which would have worked equally well if the fixture had written `fn(anything_at_all)`. The fixture tests that effects propagate through a generic callback, and nothing was propagating through anything |
+| E8 corpus history | `the_pre_change_text_of_every_repaired_fixture_still_fails` passed for R-001 and R-024 | both C0 texts call a function they never import, so the call names nothing the program declares. They became catchable only through the same by-spelling matching — a test asserting "this historical defect is still detected" was itself relying on ambient resolution E2B had removed. Deleting the fallback made both go silent, correctly, and they are now recorded as `FixtureDidNotExpressIt` with the reason |
 
 The two E6 rows and the inference row share a shape with the by-name member
 fallback deleted in E2C, arriving through three different doors. The E6 graph
