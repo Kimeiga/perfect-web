@@ -1,0 +1,26 @@
+# Correctness caches keyed by a raw name, and why each is legitimate.
+#
+# `docs/RISK_QUEUE.md` 34: `Inference::known` was keyed by a bare declaration
+# name, so two declarations spelled `Cart` in different modules shared one
+# entry and one silently received the other's effects. Architect ruling,
+# 2026-08-07: add "a structural guard against newly introduced correctness
+# caches keyed solely by raw declaration strings where a resolved ID is
+# available".
+#
+# `tests/name_keyed_maps.rs` enumerates every `BTreeMap<String, ..>` /
+# `HashMap<String, ..>` field in this crate and requires a line here. A new one
+# is a deliberate act with a written reason, not an accident.
+#
+# Format: <file>:<field>  <reason>
+
+check.rs:adts                 a type NAME is the key an exhaustiveness question is asked with; E9 replaces it with AdtId
+check.rs:ctor_names          same key as `adts`, and retired with it
+infer.rs:bindings            LOCAL bindings inside one body. A local has no DefId and cannot collide across modules
+labels.rs:bindings           local bindings inside one body, as above
+resume.rs:resources          a TYPE name, from the whole-program manifest; E9 replaces it with a resolved type id
+resume.rs:scoped             same key as `resources`, and retired with it
+signatures.rs:by_path        a fully-qualified path IS a resolved identity: `store.page.Cart` names one declaration. `by_def` exists beside it for callers holding a DefId
+scope.rs:by_name             scope names within one declaration's body
+resolve.rs:by_name           MODULE names, which are globally unique by construction — this is the machinery that resolves everything else
+types.rs:by_adt_name         a type name inside one type environment; the environment is per-program
+types.rs:by_opaque_name      same as `by_adt_name`

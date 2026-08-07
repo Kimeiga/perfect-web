@@ -57,6 +57,7 @@ use crate::effects::Inference;
 use crate::hir::{DeclKind, Expr, Hir};
 use crate::placement::{Demand, World, solve};
 use crate::privacy::Label;
+use crate::resolve::Workspace;
 use crate::signatures::Signatures;
 
 /// One capability a component needs, as the compiler derived it.
@@ -225,7 +226,7 @@ fn interface_for(family: &str) -> String {
 ///
 /// One pass, from the same signatures and the same placement solver every other
 /// analysis uses. Nothing here re-derives an effect row or a world.
-pub fn contracts(hirs: &[&Hir], sigs: &Signatures) -> Vec<ComponentContract> {
+pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<ComponentContract> {
     // INFERRED effects, not declared ones.
     //
     // A query's authority is in its body: `Menu` writes no effect row and
@@ -234,11 +235,11 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures) -> Vec<ComponentContract> {
     // ordinary component in the language an empty capability set and let it
     // import whatever it liked — the audit would pass, because the allowed set
     // it compared against was the wrong one.
-    let mut inference = Inference::new(sigs);
+    let mut inference = Inference::new(sigs, ws);
     inference.run(hirs);
 
     let mut out = Vec::new();
-    for hir in hirs {
+    for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             // Components are the things a host runs: the units with behaviour.
             // A type or an import declaration has no authority to describe.
@@ -280,21 +281,31 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures) -> Vec<ComponentContract> {
             let effects: Vec<String> = match decl.body {
                 Some(body_id) => {
                     let body = hir.body(body_id);
+                    // Only the DEFERRED body, not the whole lambda.
+                    //
+                    // Architect ruling, 2026-08-07:
+                    //
+                    //   effects of reading/building captures -> render context
+                    //   effects inside handler invocation    -> handler
+                    //
+                    // A lambda's descriptor — `resumable(captures = { .. })` —
+                    // is evaluated while the page renders: the captures are
+                    // read, typed and serialized then. Excluding it would let a
+                    // page perform an effect at render time and attribute it to
+                    // a button nobody has pressed.
                     let lambdas: Vec<_> = body
                         .walk()
                         .into_iter()
-                        .filter(|e| matches!(body.expr(*e), Expr::Lambda { .. }))
+                        .filter_map(|e| match body.expr(e) {
+                            Expr::Lambda { body: inner, .. } => Some(*inner),
+                            _ => None,
+                        })
                         .collect();
-                    inference
-                        .infer_excluding(body, &lambdas)
-                        .effects
-                        .into_iter()
-                        .collect()
+                    inference.effective_effects_excluding(unit, hir, id, &lambdas)
                 }
-                None => inference
-                    .effects_of(&decl.name)
-                    .map(|set| set.iter().cloned().collect())
-                    .unwrap_or_default(),
+                // No body: an interface, or platform-external code. One
+                // operation decides, for both branches.
+                None => inference.effective_effects(unit, hir, id),
             };
 
             let capabilities: Vec<Capability> = effects

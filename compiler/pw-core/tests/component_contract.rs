@@ -76,8 +76,9 @@ fn build(sources: &[&str]) -> Vec<ComponentContract> {
         .map(|s| lower_file(s, &parse_tree(s).green))
         .collect();
     let refs: Vec<&Hir> = hirs.iter().collect();
-    let sigs = Signatures::build(&Workspace::build(&refs), &refs);
-    contracts(&refs, &sigs)
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    contracts(&refs, &sigs, &ws)
 }
 
 fn one(sources: &[&str], module: &str) -> ComponentContract {

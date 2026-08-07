@@ -144,7 +144,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     let sigs = Signatures::build(&workspace, &hirs);
     // E2D: effects inferred over the whole program, so a helper declared in
     // another module still contributes to its caller's row.
-    let mut inference = crate::effects::Inference::new(&sigs);
+    let mut inference = crate::effects::Inference::new(&sigs, &workspace);
     inference.run(&hirs);
     // E7: what the whole program says about a type — is it a resource, and is
     // it produced only by a scoped declaration. Both are needed before any one
@@ -348,7 +348,8 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
 
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     let sigs = Signatures::default();
-    let inference = crate::effects::Inference::new(&sigs);
+    let workspace = crate::resolve::Workspace::default();
+    let inference = crate::effects::Inference::new(&sigs, &workspace);
     let manifest = crate::resume::Manifest::default();
     let routes = std::collections::BTreeSet::new();
     // One unit's own graph. Enough for a single-file caller, and honestly

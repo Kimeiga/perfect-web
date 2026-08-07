@@ -39,6 +39,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{Body, Decl, Expr, ExprId, Hir, Span};
+use crate::resolve::{DefId, Resolution, Workspace};
 use crate::signatures::Signatures;
 
 /// An effect, as written in a row: `database.read`, `layout.measure`.
@@ -173,25 +174,54 @@ fn is_broader(declared: &str, effect: &str) -> bool {
 pub struct Inference<'a> {
     sigs: &'a Signatures,
     /// Declaration name → the effects its body performs.
-    known: BTreeMap<String, BTreeSet<Effect>>,
+    /// Inferred facts, keyed by RESOLVED IDENTITY.
+    ///
+    /// `docs/RISK_QUEUE.md` 34: this was keyed by the bare declaration name, so
+    /// `Resources.Cart` and `store.page.Cart` shared one entry and one of them
+    /// silently received facts belonging to the other. A query whose body is
+    /// `todo` was reported as requiring `database.read`, which is exactly what
+    /// a cart query *should* require — the wrongness was invisible in the
+    /// output because the borrowed fact was plausible for its new owner.
+    ///
+    /// Architect ruling, 2026-08-07:
+    ///
+    /// > It should be `DefId → inferred facts` […] never `"Cart" → inferred
+    /// > facts`. This is not "implementing the permanent E9 type system early".
+    /// > It is repairing the current compiler so every existing analysis
+    /// > consumes the name resolution machinery E2B already established.
+    known: BTreeMap<DefId, BTreeSet<Effect>>,
+    // NOTE: a `BTreeMap<String, ..>` here would be RISK_QUEUE 34 again. See
+    // `name-keyed-allow.txt` and `tests/name_keyed_maps.rs`.
+    /// Which unit each `Hir` in the last `run` was, so a declaration can be
+    /// given the same `DefId` the workspace gave it.
+    workspace: &'a Workspace,
 }
 
 impl<'a> Inference<'a> {
-    pub fn new(sigs: &'a Signatures) -> Self {
+    pub fn new(sigs: &'a Signatures, workspace: &'a Workspace) -> Self {
         Self {
             sigs,
             known: BTreeMap::new(),
+            workspace,
         }
+    }
+
+    /// The identity of a declaration, as the workspace assigns it.
+    ///
+    /// Built the same way `Signatures::build` builds its `by_def` key, because
+    /// two constructions of one identity is how this defect gets reintroduced.
+    fn def_of(&self, unit: usize, id: crate::hir::DeclId) -> DefId {
+        DefId { unit, decl: id.0 }
     }
 
     /// Seed from every declared row in the program, then iterate to a fixed
     /// point over local helpers.
     pub fn run(&mut self, hirs: &[&Hir]) {
-        for hir in hirs {
-            for (_, d) in hir.all_decls() {
+        for (unit, hir) in hirs.iter().enumerate() {
+            for (id, d) in hir.all_decls() {
                 if let Some(row) = &d.declared_effects {
                     self.known.insert(
-                        d.name.clone(),
+                        self.def_of(unit, id),
                         row.iter().map(|e| e.written.clone()).collect(),
                     );
                 }
@@ -202,11 +232,11 @@ impl<'a> Inference<'a> {
         // until nothing changes — the effect set is finite, so this terminates.
         for _ in 0..8 {
             let mut changed = false;
-            for hir in hirs {
-                for (_, d) in hir.all_decls() {
+            for (unit, hir) in hirs.iter().enumerate() {
+                for (id, d) in hir.all_decls() {
                     let Some(body_id) = d.body else { continue };
-                    let found = self.infer(hir.body(body_id));
-                    let entry = self.known.entry(d.name.clone()).or_default();
+                    let found = self.infer_at(unit, hir.body(body_id));
+                    let entry = self.known.entry(self.def_of(unit, id)).or_default();
                     let before = entry.len();
                     entry.extend(found.effects);
                     if entry.len() != before {
@@ -297,8 +327,8 @@ impl<'a> Inference<'a> {
     /// and a host granting it would give the render path authority it never
     /// uses. That is the exact over-granting the capability model exists to
     /// prevent, arriving through the front door.
-    pub fn infer_excluding(&self, body: &Body, exclude: &[ExprId]) -> Inferred {
-        let mut out = self.infer(body);
+    pub fn infer_excluding(&self, unit: usize, body: &Body, exclude: &[ExprId]) -> Inferred {
+        let mut out = self.infer_at(unit, body);
         if exclude.is_empty() {
             return out;
         }
@@ -340,7 +370,18 @@ impl<'a> Inference<'a> {
         out
     }
 
+    /// `infer`, without a unit to resolve names in.
+    ///
+    /// Kept for callers that have a body and no workspace position. It can
+    /// still resolve a call through `Signatures::by_path`, which is a
+    /// fully-qualified lookup; what it cannot do is find a SIBLING's inferred
+    /// row, because "which sibling" is a question only a unit can answer.
     pub fn infer(&self, body: &Body) -> Inferred {
+        self.infer_at(usize::MAX, body)
+    }
+
+    /// What one body performs, resolving unqualified calls within `unit`.
+    pub fn infer_at(&self, unit: usize, body: &Body) -> Inferred {
         let mut out = Inferred::default();
         // Lambdas are visited through their enclosing call, so the reason can
         // say *which* function the callback was handed to.
@@ -388,11 +429,15 @@ impl<'a> Inference<'a> {
 
             // A signature first — that is E2C's single source of truth — then a
             // local declaration's own inferred effects.
+            //
+            // Resolved, not spelled. `Cart` in one module and `Cart` in another
+            // are two declarations, and matching on the last segment of a path
+            // gave one of them the other's effects — `RISK_QUEUE` 34.
             let effects: Vec<Effect> = match self.sigs.by_path(&path) {
                 Some(sig) => sig.effects.clone(),
                 None => self
-                    .known
-                    .get(path.rsplit('.').next().unwrap_or(&path))
+                    .resolved(unit, &path)
+                    .and_then(|def| self.known.get(&def))
                     .map(|s| s.iter().cloned().collect())
                     .unwrap_or_default(),
             };
@@ -427,9 +472,111 @@ impl<'a> Inference<'a> {
         out
     }
 
-    /// The effects a named declaration performs, after propagation.
-    pub fn effects_of(&self, name: &str) -> Option<&BTreeSet<Effect>> {
-        self.known.get(name)
+    /// Which declaration a path names, from inside `unit`.
+    ///
+    /// `usize::MAX` means "no unit", which resolves nothing — the honest
+    /// answer for a caller that did not say where it was standing. Falling back
+    /// to a name match would reintroduce exactly the defect this replaces.
+    fn resolved(&self, unit: usize, path: &str) -> Option<DefId> {
+        if unit == usize::MAX {
+            return None;
+        }
+        match self.workspace.resolve_path(unit, path) {
+            Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+            _ => None,
+        }
+    }
+
+    /// **What this definition actually requires at run time.**
+    ///
+    /// Architect ruling, 2026-08-07, and the reason no caller may decide this
+    /// for itself:
+    ///
+    /// ```text
+    /// DeclaredEffects       what this interface permits/promises
+    /// InferredEffects       what this implementation actually performs
+    /// RequiredCapabilities  what this compiled artifact currently needs
+    ///
+    /// local code      RequiredCapabilities <- InferredEffects
+    /// bodyless code   RequiredCapabilities <- DeclaredEffects
+    /// ```
+    ///
+    /// So for
+    ///
+    /// ```text
+    /// fn foo() !{ database.read, trace } { trace("hello") }
+    /// ```
+    ///
+    /// the host must not grant database access merely because the annotation
+    /// permitted it. The declaration still CONSTRAINS: a later implementation
+    /// that adds `database.write` is outside its contract and the checker says
+    /// so — that check lives with the row rules and is unaffected by this.
+    ///
+    /// A definition with no body is an interface or separately compiled code.
+    /// Its declared row is a promise, and a promise is all there is.
+    pub fn effective_effects(&self, unit: usize, hir: &Hir, id: crate::hir::DeclId) -> Vec<String> {
+        let decl = hir.decl(id);
+        match decl.body {
+            Some(body) => {
+                let mut out: Vec<String> = self
+                    .infer_at(unit, hir.body(body))
+                    .effects
+                    .into_iter()
+                    .collect();
+                out.sort();
+                out.dedup();
+                out
+            }
+            None => decl
+                .declared_effects
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .map(|e| e.written.clone())
+                .collect(),
+        }
+    }
+
+    /// `effective_effects`, minus what only happens inside `exclude`.
+    ///
+    /// E8-0 needs this for a page whose handler lambdas are separately loaded
+    /// units — see `infer_excluding`. The declared-versus-inferred rule is the
+    /// same one; only the scope narrows.
+    pub fn effective_effects_excluding(
+        &self,
+        unit: usize,
+        hir: &Hir,
+        id: crate::hir::DeclId,
+        exclude: &[ExprId],
+    ) -> Vec<String> {
+        let decl = hir.decl(id);
+        match decl.body {
+            Some(body) => {
+                let mut out: Vec<String> = self
+                    .infer_excluding(unit, hir.body(body), exclude)
+                    .effects
+                    .into_iter()
+                    .collect();
+                out.sort();
+                out.dedup();
+                out
+            }
+            None => self.effective_effects(unit, hir, id),
+        }
+    }
+
+    /// The effects a declaration performs, after propagation.
+    pub fn effects_of_def(&self, def: DefId) -> Option<&BTreeSet<Effect>> {
+        self.known.get(&def)
+    }
+
+    /// The effects of the declaration `path` names, from inside `unit`.
+    ///
+    /// There is deliberately no bare-name form. A caller that has only a
+    /// spelling does not have enough information to be answered, and the
+    /// previous version answered anyway.
+    pub fn effects_of(&self, unit: usize, path: &str) -> Option<&BTreeSet<Effect>> {
+        self.resolved(unit, path).and_then(|d| self.known.get(&d))
     }
 }
 

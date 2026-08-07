@@ -697,7 +697,7 @@ fn emit_contracts_command(paths: &[&String], plain: bool) -> ExitCode {
     let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
     let ws = pw_core::resolve::Workspace::build(&refs);
     let sigs = pw_core::signatures::Signatures::build(&ws, &refs);
-    let contracts = pw_core::contract::contracts(&refs, &sigs);
+    let contracts = pw_core::contract::contracts(&refs, &sigs, &ws);
 
     if plain {
         for c in &contracts {
