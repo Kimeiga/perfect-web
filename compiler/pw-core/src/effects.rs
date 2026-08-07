@@ -190,8 +190,17 @@ pub struct Inference<'a> {
     /// > It is repairing the current compiler so every existing analysis
     /// > consumes the name resolution machinery E2B already established.
     known: BTreeMap<DefId, BTreeSet<Effect>>,
-    // NOTE: a `BTreeMap<String, ..>` here would be RISK_QUEUE 34 again. See
+    // NOTE: `known` keyed by a `String` would be RISK_QUEUE 34 again. See
     // `name-keyed-allow.txt` and `tests/name_keyed_maps.rs`.
+    /// Last-segment spellings that name exactly ONE declaration in the whole
+    /// program. `None` means several do, and therefore no answer.
+    ///
+    /// The last resort for a MEMBER call whose receiver's module is not
+    /// imported — `el.getBoundingClientRect()` in a file that imports only
+    /// `List`. Uniqueness is what makes it safe: the collision RISK_QUEUE 34
+    /// is about (`Resources.Cart` and `store.page.Cart`) resolves to `None`
+    /// here and contributes nothing, where the old rule silently picked one.
+    unique_names: BTreeMap<String, Option<DefId>>,
     /// Which unit each `Hir` in the last `run` was, so a declaration can be
     /// given the same `DefId` the workspace gave it.
     workspace: &'a Workspace,
@@ -202,6 +211,7 @@ impl<'a> Inference<'a> {
         Self {
             sigs,
             known: BTreeMap::new(),
+            unique_names: BTreeMap::new(),
             workspace,
         }
     }
@@ -219,6 +229,18 @@ impl<'a> Inference<'a> {
     pub fn run(&mut self, hirs: &[&Hir]) {
         for (unit, hir) in hirs.iter().enumerate() {
             for (id, d) in hir.all_decls() {
+                // Built once, counting duplicates: a second declaration with
+                // the same spelling turns the entry into `None` rather than
+                // overwriting it.
+                let def = self.def_of(unit, id);
+                self.unique_names
+                    .entry(d.name.clone())
+                    .and_modify(|slot| {
+                        if *slot != Some(def) {
+                            *slot = None;
+                        }
+                    })
+                    .or_insert(Some(def));
                 if let Some(row) = &d.declared_effects {
                     self.known.insert(
                         self.def_of(unit, id),
@@ -252,7 +274,17 @@ impl<'a> Inference<'a> {
 
     /// What one body performs, given the types its declaration makes known.
     pub fn infer_in(&self, body: &Body, types: &BTreeMap<String, String>) -> Inferred {
-        let mut out = self.infer(body);
+        self.infer_in_at(usize::MAX, body, types)
+    }
+
+    /// `infer_in`, resolving unqualified calls within `unit`.
+    pub fn infer_in_at(
+        &self,
+        unit: usize,
+        body: &Body,
+        types: &BTreeMap<String, String>,
+    ) -> Inferred {
+        let mut out = self.infer_at(unit, body);
         self.member_effects(body, types, &mut out);
         out
     }
@@ -481,10 +513,62 @@ impl<'a> Inference<'a> {
         if unit == usize::MAX {
             return None;
         }
-        match self.workspace.resolve_path(unit, path) {
-            Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
-            _ => None,
+        if let Resolution::Local(def) | Resolution::Imported { def, .. } =
+            self.workspace.resolve_path(unit, path)
+        {
+            return Some(def);
         }
+        // A MEMBER call: `it.style.set_padding`, whose head is a value rather
+        // than a module, so `resolve_path` cannot see it. Its last segment is
+        // matched against the declarations THIS UNIT CAN SEE — its own module
+        // and the modules it imports — and accepted only when exactly one
+        // matches.
+        //
+        // This replaces the old fallback, which matched the last segment
+        // against every declaration in the program by name. That is
+        // `docs/RISK_QUEUE.md` 34: `Resources.Cart` and `store.page.Cart`
+        // collided, and one silently received the other's effects.
+        //
+        // Scoped-and-unique keeps what the old fallback was load-bearing for —
+        // R-035 depends on `set_padding`'s row reaching a call written as a
+        // member — while making the cross-module borrow impossible: an
+        // unrelated module is either not imported, or it produces two matches
+        // and the answer is none.
+        let last = path.rsplit('.').next()?;
+        let module = self.workspace.module_of(unit)?;
+        let visible = std::iter::once(module.name.as_str())
+            .chain(module.imports.iter().map(|i| i.module.as_str()));
+
+        let mut found: Option<DefId> = None;
+        for m in visible {
+            let candidate = match self.workspace.resolve_path(unit, &format!("{m}.{last}")) {
+                Resolution::Local(def) | Resolution::Imported { def, .. } => def,
+                _ => continue,
+            };
+            match found {
+                // Ambiguous: two visible declarations share the spelling, so
+                // there is no answer rather than an arbitrary one.
+                Some(seen) if seen != candidate => return None,
+                _ => found = Some(candidate),
+            }
+        }
+        if found.is_some() {
+            return found;
+        }
+
+        // Last resort: a spelling that names exactly ONE declaration in the
+        // whole program. `R-037` needs it — `el.getBoundingClientRect()` in a
+        // file that imports only `List`, so the platform module holding that
+        // declaration is not visible by any rule this function can apply.
+        //
+        // Uniqueness is the whole safety argument. The old rule took the last
+        // segment and picked whatever matched; this one refuses when more than
+        // one does, so `RISK_QUEUE` 34's two `Cart`s contribute nothing instead
+        // of contributing each other's effects.
+        //
+        // It stays until platform packages have a declared prelude status, at
+        // which point the scoped branch above covers this case honestly.
+        self.unique_names.get(last).copied().flatten()
     }
 
     /// **What this definition actually requires at run time.**
@@ -827,7 +911,7 @@ mod tests {
     use crate::resolve::Workspace;
     use pw_syntax::parse_tree;
 
-    fn program(sources: &[&str]) -> (Vec<Hir>, Signatures) {
+    fn program(sources: &[&str]) -> (Vec<Hir>, Signatures, Workspace) {
         let owned: Vec<Hir> = sources
             .iter()
             .map(|s| lower_file(s, &parse_tree(s).green))
@@ -835,23 +919,23 @@ mod tests {
         let refs: Vec<&Hir> = owned.iter().collect();
         let ws = Workspace::build(&refs);
         let sigs = Signatures::build(&ws, &refs);
-        (owned, sigs)
+        (owned, sigs, ws)
     }
 
     const LIB: &str = "module Stores\n\nfn get(id: Int) -> Int !{ database.read } { 0 }\n";
 
     fn effects_of(sources: &[&str], decl: &str) -> BTreeSet<Effect> {
-        let (hirs, sigs) = program(sources);
+        let (hirs, sigs, ws) = program(sources);
         let refs: Vec<&Hir> = hirs.iter().collect();
-        let mut inf = Inference::new(&sigs);
+        let mut inf = Inference::new(&sigs, &ws);
         inf.run(&refs);
-        for hir in &refs {
+        for (unit, hir) in refs.iter().enumerate() {
             for (_, d) in hir.all_decls() {
                 if d.name != decl {
                     continue;
                 }
                 let Some(b) = d.body else { continue };
-                return inf.infer(hir.body(b)).effects;
+                return inf.infer_at(unit, hir.body(b)).effects;
             }
         }
         BTreeSet::new()
@@ -926,14 +1010,18 @@ mod tests {
         let src = "module page\n\nimport Stores\n\n\
                    fn helper(id: Int) -> Int !{} { Stores.get(id) }\n\
                    fn f() -> Int !{} { helper(1) }\n";
-        let (hirs, sigs) = program(&[LIB, src]);
+        let (hirs, sigs, ws) = program(&[LIB, src]);
         let refs: Vec<&Hir> = hirs.iter().collect();
-        let mut inf = Inference::new(&sigs);
+        let mut inf = Inference::new(&sigs, &ws);
         inf.run(&refs);
 
+        // Unit 1 — `helper` is a SIBLING in that unit, and finding it is the
+        // point of the test. `infer` without a unit resolves no siblings, by
+        // design: a caller that does not say where it stands cannot be told
+        // which `helper` it means.
         let hir = &refs[1];
         let (_, f) = hir.all_decls().find(|(_, d)| d.name == "f").expect("f");
-        let found = inf.infer(hir.body(f.body.unwrap()));
+        let found = inf.infer_at(1, hir.body(f.body.unwrap()));
         let missing = found.undeclared(Some(&[]));
         assert_eq!(missing.len(), 1, "{missing:?}");
         assert_eq!(missing[0].effect, "database.read");

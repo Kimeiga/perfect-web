@@ -24,3 +24,4 @@ scope.rs:by_name             scope names within one declaration's body
 resolve.rs:by_name           MODULE names, which are globally unique by construction — this is the machinery that resolves everything else
 types.rs:by_adt_name         a type name inside one type environment; the environment is per-program
 types.rs:by_opaque_name      same as `by_adt_name`
+effects.rs:unique_names       a spelling that names exactly ONE declaration program-wide, used only when no module-scoped resolution applies (a member call on a value whose module is not imported — R-037). Ambiguity resolves to None, so RISK_QUEUE 34's two `Cart`s contribute nothing rather than each other's effects. Retire when platform packages have declared prelude status

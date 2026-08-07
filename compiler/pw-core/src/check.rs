@@ -189,7 +189,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
             out.extend(check_unit_with(
-                &env, &labels, &sigs, &inference, &manifest, &routes, &graph, u,
+                &env, &labels, &sigs, &inference, &manifest, &routes, &graph, i, u,
             ));
             out.sort_by_key(|d| d.primary_span.start);
             (u.path.clone(), out)
@@ -348,8 +348,10 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
 
 pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     let sigs = Signatures::default();
-    let workspace = crate::resolve::Workspace::default();
-    let inference = crate::effects::Inference::new(&sigs, &workspace);
+    // One unit's own workspace, so a call to a sibling in the same file still
+    // resolves. Narrower than `check_units` by construction — see below.
+    let own = crate::resolve::Workspace::build(&[&unit.hir]);
+    let inference = crate::effects::Inference::new(&sigs, &own);
     let manifest = crate::resume::Manifest::default();
     let routes = std::collections::BTreeSet::new();
     // One unit's own graph. Enough for a single-file caller, and honestly
@@ -366,6 +368,9 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         &manifest,
         &routes,
         &graph,
+        // This entry point builds a workspace from ONE unit, so the unit it
+        // resolves in is 0. `check_units` is what real callers use.
+        0,
         unit,
     )
 }
@@ -379,6 +384,9 @@ fn check_unit_with(
     manifest: &crate::resume::Manifest,
     routes: &std::collections::BTreeSet<String>,
     graph: &crate::graph::Graph,
+    // Which unit this is, so a call to a SIBLING resolves rather than being
+    // matched by spelling — `docs/RISK_QUEUE.md` 34.
+    at: usize,
     unit: &Unit,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
@@ -441,7 +449,7 @@ fn check_unit_with(
         );
         privacy_flow(&unit.hir, sigs, decl, &mut out);
         privacy_sinks(&unit.hir, sigs, decl, &mut out);
-        effect_rows(&unit.hir, inference, decl, &mut out);
+        effect_rows(&unit.hir, inference, at, decl, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
@@ -1822,6 +1830,7 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
 fn effect_rows(
     hir: &Hir,
     inference: &crate::effects::Inference<'_>,
+    at: usize,
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
 ) {
@@ -1851,7 +1860,7 @@ fn effect_rows(
             types.insert(name.clone(), ty.path.clone());
         }
     }
-    let mut found = inference.infer_in(body, &types);
+    let mut found = inference.infer_in_at(at, body, &types);
 
     // Work that runs somewhere else does not contribute its effects here.
     // ONE model (`contexts.rs`) rather than a list of syntax exceptions: a
