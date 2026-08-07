@@ -107,6 +107,13 @@ pub enum FactKind {
     /// `LayoutAffect` named nothing in five files — and a graph holding only
     /// successes cannot tell "checked and found" from "never looked".
     ResolvedTypeArgument { written: String, resolved: bool },
+    /// A resolved effect carries a semantic facet — what it does to the frame,
+    /// as opposed to what its family is called.
+    ///
+    /// Recorded because phase legality is now decided on facets, and a rule
+    /// that rejects a program should be able to say which facet did it rather
+    /// than naming a family the effect does not belong to.
+    EffectFacet { effect: String, facet: String },
     /// An effect entered a body.
     Effect { effect: String },
     /// An effect crossed into a lambda handed to another function.

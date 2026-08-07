@@ -31,6 +31,12 @@
 
 module web.effects
 
+// The layout-impact marker, so `impact layout_write when LayoutAffect` names a
+// DECLARATION rather than a spelling. An unresolvable marker makes its clause
+// inert on purpose — falling back to text is exactly how `LayoutAffect` named
+// nothing in five files for three milestones.
+import style.{ LayoutAffect }
+
 // **This package exports its effect vocabulary.** Architect ruling,
 // 2026-08-07:
 //
@@ -168,11 +174,14 @@ effect network.subscribe {
 // browser world's own, and a component placed there has it by being there.
 // Placement is what constrains them — `World::worlds_for` — not a grant.
 effect dom.mutate {
+    impact     dom_write
+    impact     layout_write
     placement  browser
     capability none
 }
 
 effect dom.read {
+    impact     layout_read
     placement  browser
     capability none
 }
@@ -181,6 +190,7 @@ effect dom.read {
 // during render forces a synchronous reflow, and doing it after paint forces a
 // second layout for a frame nobody will see.
 effect layout.measure {
+    impact     layout_read
     placement  browser
     capability none
 }
@@ -192,6 +202,8 @@ effect layout.measure {
 // ARITY IS UNSETTLED, as for `database.read`: 7 uses carry `<LayoutAffect>`
 // and 2 do not.
 effect style.mutate<T> {
+    impact     paint_write
+    impact     layout_write when LayoutAffect
     placement  browser
     capability none
 }
@@ -200,6 +212,7 @@ effect style.mutate<T> {
 // property that invalidates layout is a checkable mistake rather than a slow
 // page.
 effect animation.composite {
+    impact     compositor
     placement  browser
     capability none
 }

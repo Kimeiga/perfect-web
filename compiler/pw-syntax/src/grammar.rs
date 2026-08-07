@@ -171,6 +171,10 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // `materialize` block's policies live inside its braces (E6).
     "capability",
     "host",
+    // What an effect does to the frame: `impact layout_write when LayoutAffect`.
+    // A policy clause for the same reason `capability` is — the value is a
+    // declarative name, not an expression.
+    "impact",
     "freshness",
     "consistency",
     "cache",

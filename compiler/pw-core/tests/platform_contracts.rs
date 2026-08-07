@@ -326,7 +326,13 @@ fn the_trusted_platform_contract_is_hashed() {
     // said so for want of vocabulary; and a component permitted
     // `database.write<Carts>` should not thereby write Payments. The second is
     // the ontology deliberately leading the corpus rather than describing it.
-    const EXPECTED: u64 = 0x9302_133f_df38_f72c;
+    // Changed again 2026-08-07: effects declare `impact` facets — what they do
+    // to the FRAME, as opposed to what family they are named after. Architect
+    // ruling: `style.mutate<LayoutAffect>` is not a layout-family effect but it
+    // IS layout-affecting, so phase legality could not be keyed on the family.
+    // `web.effects` also imports `style.{ LayoutAffect }`, because
+    // `impact layout_write when LayoutAffect` must name a declaration.
+    const EXPECTED: u64 = 0xd65d_6d9c_6142_e9c3;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

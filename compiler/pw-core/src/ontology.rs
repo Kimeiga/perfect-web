@@ -151,11 +151,97 @@ impl TypeArgument {
     }
 }
 
+/// **What an effect DOES to the frame**, as distinct from what it is called.
+///
+/// Architect ruling, 2026-08-07:
+///
+/// > `style.mutate<LayoutAffect>` is not a "layout-family" effect, but it IS
+/// > layout-affecting. […] give resolved `EffectInstance`s semantic
+/// > traits/facets that phase checking consumes […] rather than
+/// > `family == "layout"`.
+///
+/// The family was a proxy for meaning and it was too coarse: `style.mutate`
+/// with a layout-affecting argument and one without share a family, so no rule
+/// keyed on the family could tell them apart. `forbidden_in_phase("animate",
+/// "layout")` therefore could not catch the exact case its own comment
+/// described.
+///
+/// **Declared, not derived from a spelling.** Each effect names its impacts in
+/// its own declaration, and an impact may be conditional on a type argument:
+///
+/// ```pleris
+/// effect style.mutate<T> {
+///     impact style_write
+///     impact layout_write when LayoutAffect
+/// }
+/// ```
+///
+/// The condition is resolved to a `DefId` once, when the ontology is built, so
+/// matching it against an instance's argument is identity comparison. No
+/// checker holds the spelling `LayoutAffect`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Facet {
+    /// Reads geometry. Forces layout if one is pending.
+    LayoutRead,
+    /// Writes something that can invalidate layout.
+    LayoutWrite,
+    /// Writes something that costs only paint.
+    PaintWrite,
+    /// Changes the document tree.
+    DomWrite,
+    /// Runs on the compositor, off the main thread.
+    CompositorOperation,
+}
+
+impl Facet {
+    /// The spelling an `impact` clause uses. One name per facet, because a
+    /// facet is a language concept and an alias would give it two.
+    pub fn named(name: &str) -> Option<Facet> {
+        Some(match name {
+            "layout_read" => Facet::LayoutRead,
+            "layout_write" => Facet::LayoutWrite,
+            "paint_write" => Facet::PaintWrite,
+            "dom_write" => Facet::DomWrite,
+            "compositor" => Facet::CompositorOperation,
+            _ => return None,
+        })
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Facet::LayoutRead => "layout_read",
+            Facet::LayoutWrite => "layout_write",
+            Facet::PaintWrite => "paint_write",
+            Facet::DomWrite => "dom_write",
+            Facet::CompositorOperation => "compositor",
+        }
+    }
+}
+
+/// One `impact` clause: a facet, and the argument it is conditional on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Impact {
+    pub facet: Facet,
+    /// `impact layout_write when LayoutAffect` — the marker, resolved to a
+    /// declaration when the declaring module can see it. `None` means the
+    /// impact is unconditional.
+    ///
+    /// A `DefId` rather than a name, so matching an instance's argument is
+    /// identity comparison. `Some(None)` — written but unresolvable — makes the
+    /// clause inert rather than matching by spelling: an unresolved marker is
+    /// the `LayoutAffect` situation all over again, and silently falling back
+    /// to text is how it survived three milestones.
+    pub when: Option<Option<DefId>>,
+}
+
 /// **A resolved effect.** What every analysis downstream consumes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectInstance {
     pub effect: EffectDefId,
     pub args: Vec<TypeArgument>,
+    /// What this instance does to the frame, after its conditional impacts have
+    /// been matched against its resolved arguments.
+    pub facets: BTreeSet<Facet>,
     /// The row entry this came from, for a diagnostic that underlines it.
     pub span: Span,
 }
@@ -247,6 +333,9 @@ pub struct EffectDecl {
     /// anywhere, which is the right default because a checker must not reject
     /// what it has not been taught.
     pub placement: Vec<World>,
+    /// What this effect does to the frame — see [`Facet`]. Empty for an effect
+    /// with no frame consequence, which is most of them.
+    pub impacts: Vec<Impact>,
     pub span: Span,
 }
 
@@ -272,6 +361,12 @@ pub struct Ontology {
 impl Ontology {
     /// Collect every `effect` declaration in the program.
     pub fn build(hirs: &[&Hir]) -> Ontology {
+        Ontology::build_with(hirs, &Workspace::default())
+    }
+
+    /// [`Ontology::build`], resolving each `impact .. when ..` marker through
+    /// the workspace so a facet condition is a `DefId` rather than a name.
+    pub fn build_with(hirs: &[&Hir], ws: &Workspace) -> Ontology {
         // No program-wide name set. There was one — every type, opaque type
         // and module in the checked set — and it existed only to distinguish
         // "declared somewhere" from "declared nowhere". Both are now the same
@@ -306,6 +401,7 @@ impl Ontology {
                         capability: capability_clause(decl),
                         host: host_clause(decl),
                         placement: placement_clause(decl),
+                        impacts: impact_clauses(decl, ws, unit),
                         span: hir.decl_span(id),
                     },
                 );
@@ -347,6 +443,42 @@ impl Ontology {
     pub fn declared_for(&self, written: &str) -> Option<&EffectDecl> {
         self.by_name
             .get(written.split('<').next().unwrap_or(written))
+    }
+
+    /// The facets of an effect **as inference carries it**: a written
+    /// spelling, with no `EffectInstance` to hand.
+    ///
+    /// `Source` holds an effect as text — that is how E2D's inference has
+    /// always propagated one — so the phase rule needs a way in from a string.
+    /// The string is taken apart HERE, in the one module allowed to, using the
+    /// same argument resolution [`Ontology::argument`] uses, and everything
+    /// downstream receives facets.
+    ///
+    /// Retiring this means carrying `EffectInstance` through inference instead
+    /// of a spelling, which is E9's to do when effect rows become real.
+    pub fn facets_of(&self, ws: &Workspace, unit: usize, written: &str) -> BTreeSet<Facet> {
+        let Some(decl) = self.declared_for(written) else {
+            return BTreeSet::new();
+        };
+        let args: Vec<DefId> = written
+            .split_once('<')
+            .map(|(_, rest)| rest.trim_end_matches('>'))
+            .into_iter()
+            .flat_map(|a| a.split(','))
+            .filter_map(|a| match ws.resolve_in(unit, Namespace::Type, a.trim()) {
+                Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+                _ => None,
+            })
+            .collect();
+        decl.impacts
+            .iter()
+            .filter(|i| match &i.when {
+                None => true,
+                Some(Some(marker)) => args.contains(marker),
+                Some(None) => false,
+            })
+            .map(|i| i.facet)
+            .collect()
     }
 
     /// The declaration an instance names.
@@ -454,15 +586,47 @@ impl Ontology {
             });
         }
 
-        let args = entry
+        let args: Vec<TypeArgument> = entry
             .args
             .iter()
             .map(|a| self.argument(ws, unit, a, &entry.span, resolved, evidence))
             .collect();
 
+        // What this instance does to the frame. An unconditional impact always
+        // applies; a conditional one applies when one of the resolved arguments
+        // IS the declaration the condition named — compared by `DefId`, so no
+        // checker downstream ever reads a marker's spelling.
+        let facets: BTreeSet<Facet> = decl
+            .impacts
+            .iter()
+            .filter(|i| match &i.when {
+                None => true,
+                Some(Some(marker)) => args
+                    .iter()
+                    .any(|a| matches!(a, TypeArgument::Type { def, .. } if def == marker)),
+                // Written and unresolvable: inert. Falling back to a spelling
+                // match here would rebuild the defect this whole slice exists
+                // to remove.
+                Some(None) => false,
+            })
+            .map(|i| i.facet)
+            .collect();
+
+        for f in &facets {
+            evidence.record(
+                FactKind::EffectFacet {
+                    effect: entry.path.clone(),
+                    facet: f.name().to_string(),
+                },
+                entry.span.clone(),
+                vec![resolved],
+            );
+        }
+
         Ok(Resolved::Operation(EffectInstance {
             effect: decl.def,
             args,
+            facets,
             span: entry.span.clone(),
         }))
     }
@@ -597,6 +761,32 @@ fn host_clause(decl: &Decl) -> Option<String> {
     let value = decl.policy("host")?.value.trim();
     let value = value.trim_matches('"');
     (!value.is_empty()).then(|| value.to_string())
+}
+
+/// Every `impact` clause on a declaration.
+///
+/// `impact style_write` is unconditional; `impact layout_write when LayoutAffect`
+/// applies only when an argument resolves to that marker. The marker is looked
+/// up from the DECLARING unit, because that is where it is written.
+fn impact_clauses(decl: &Decl, ws: &Workspace, unit: usize) -> Vec<Impact> {
+    decl.policies
+        .iter()
+        .filter(|p| p.name == "impact")
+        .filter_map(|p| {
+            let value = p.value.trim();
+            let (facet, marker) = match value.split_once(" when ") {
+                Some((f, m)) => (f.trim(), Some(m.trim())),
+                None => (value, None),
+            };
+            Some(Impact {
+                facet: Facet::named(facet)?,
+                when: marker.map(|m| match ws.resolve_in(unit, Namespace::Type, m) {
+                    Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+                    _ => None,
+                }),
+            })
+        })
+        .collect()
 }
 
 /// `placement browser` → `[Browser]`; `placement browser, edge, origin` →

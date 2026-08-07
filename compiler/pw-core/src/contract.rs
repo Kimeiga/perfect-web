@@ -508,7 +508,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // What each effect DECLARES about itself: whether it needs host authority,
     // and which interface serves it. Built once, beside the inference, because
     // both answer questions about the same rows.
-    let ontology = Ontology::build(hirs);
+    let ontology = Ontology::build_with(hirs, ws);
 
     // Every type the program declares, for resolving a capability's argument.
     // A misspelled `database.read<Stroes>` must be refused here rather than

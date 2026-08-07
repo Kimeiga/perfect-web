@@ -161,7 +161,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // E8 slice 2: what each effect a row names actually IS. One ontology for
     // the whole program, beside the signatures, because both answer questions
     // about the same rows.
-    let ontology = crate::ontology::Ontology::build(&hirs);
+    let ontology = crate::ontology::Ontology::build_with(&hirs, &workspace);
     // E6: every route the program declares, so a link can be checked against
     // what exists rather than against a naming convention.
     let routes = crate::routes::table(&hirs);
@@ -219,6 +219,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
                 &manifest,
                 &routes,
                 &graph,
+                &ontology,
+                &workspace,
                 i,
                 &visible_types[i],
                 u,
@@ -400,6 +402,8 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         &manifest,
         &routes,
         &graph,
+        &crate::ontology::Ontology::build_with(&[&unit.hir], &ws),
+        &ws,
         // This entry point builds a workspace from ONE unit, so the unit it
         // resolves in is 0. `check_units` is what real callers use.
         0,
@@ -417,6 +421,11 @@ fn check_unit_with(
     manifest: &crate::resume::Manifest,
     routes: &std::collections::BTreeSet<String>,
     graph: &crate::graph::Graph,
+    // What each effect DECLARES about itself, and the graph its arguments
+    // resolve through. Phase legality reads an effect's semantic facets, which
+    // only its declaration knows.
+    ontology: &crate::ontology::Ontology,
+    ws: &crate::resolve::Workspace,
     // Which unit this is, so a call to a SIBLING resolves rather than being
     // matched by spelling — `docs/RISK_QUEUE.md` 34.
     at: usize,
@@ -489,7 +498,9 @@ fn check_unit_with(
         );
         privacy_flow(&unit.hir, sigs, id, decl, &mut out);
         privacy_sinks(&unit.hir, sigs, id, decl, &mut out);
-        effect_rows(&unit.hir, sigs, inference, at, id, decl, &mut out);
+        effect_rows(
+            &unit.hir, sigs, inference, ontology, ws, at, id, decl, &mut out,
+        );
         crate::capability::capability_arguments(&unit.hir, decl, types, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
@@ -1935,10 +1946,15 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
 /// Two questions, two codes. An **undeclared** effect is a row that understates
 /// what the body does. A **forbidden** effect is one that no row could permit
 /// here — a `view` reaching the database is not fixed by declaring it.
+#[allow(clippy::too_many_arguments)]
 fn effect_rows(
     hir: &Hir,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
+    // Phase legality is decided on an effect's semantic FACETS, which only its
+    // declaration knows — see `ontology::Facet`.
+    ontology: &crate::ontology::Ontology,
+    ws: &crate::resolve::Workspace,
     at: usize,
     id: crate::hir::DeclId,
     decl: &Decl,
@@ -2008,7 +2024,9 @@ fn effect_rows(
         // synthesized effect happened to be recorded at the outer phase's span.
         let Some((phase, why)) = crate::effects::phases_at(body, &source.span)
             .into_iter()
-            .find_map(|p| forbidden_in_phase(&p, &source.effect).map(|w| (p, w)))
+            .find_map(|p| {
+                forbidden_in_phase(&p, &ontology.facets_of(ws, at, &source.effect)).map(|w| (p, w))
+            })
         else {
             continue;
         };

@@ -39,6 +39,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{Body, Decl, Expr, ExprId, Hir, Span};
+use crate::ontology::Facet;
 use crate::resolve::{DefId, Resolution, Workspace};
 use crate::signatures::Signatures;
 
@@ -834,36 +835,54 @@ pub fn phases_at(body: &Body, span: &Span) -> Vec<String> {
     found.into_iter().map(|(_, k)| k).collect()
 }
 
-/// May an effect happen in this frame phase?
+/// May work with these FACETS happen in this frame phase?
 ///
-/// Each entry is charter §7.5A stating what a phase is *for*. A phase that
-/// permitted everything would not be a phase.
-pub fn forbidden_in_phase(phase: &str, effect: &str) -> Option<&'static str> {
-    let family = effect.split('.').next().unwrap_or(effect);
-    match (phase, family) {
+/// Architect ruling, 2026-08-07:
+///
+/// ```text
+/// animate phase forbids LayoutRead | LayoutWrite
+/// measure phase forbids LayoutWrite
+/// mutate  phase permits appropriate writes
+/// ```
+///
+/// > rather than `family == "layout"`.
+///
+/// It was keyed on the family, and the family is a proxy for meaning that is
+/// too coarse to be one: `style.mutate<LayoutAffect>` and
+/// `style.mutate<PaintOnly>` share a family, so the animate rule could not
+/// catch the exact case its own comment described. Each entry is charter §7.5A
+/// stating what a phase is *for*; a phase that permitted everything would not
+/// be a phase.
+///
+/// The facets come from the effect's own declaration — see
+/// [`crate::ontology::Facet`] — so a new effect with layout consequences is
+/// caught here without teaching this function its name.
+pub fn forbidden_in_phase(phase: &str, facets: &BTreeSet<Facet>) -> Option<&'static str> {
+    let has = |f: Facet| facets.contains(&f);
+    match phase {
         // The measure phase reads. A write inside it invalidates the very
         // geometry the phase exists to read consistently.
-        ("measure", "style") | ("measure", "dom") => Some(
-            "the measure phase reads geometry; writing inside it invalidates what \
-                  the rest of the phase is about to read",
+        "measure" if has(Facet::LayoutWrite) || has(Facet::DomWrite) => Some(
+            "the measure phase reads geometry; writing inside it invalidates what              the rest of the phase is about to read",
         ),
         // After paint, the frame is already on screen. Measuring forces the
         // browser to lay out again for a frame nobody will see.
-        ("post_paint", "layout") => Some(
-            "the frame is already presented; measuring now forces a second layout \
-                  for a frame nobody will see",
+        "post_paint" if has(Facet::LayoutRead) => Some(
+            "the frame is already presented; measuring now forces a second layout              for a frame nobody will see",
         ),
         // A painter draws. Touching the document from inside one re-enters
         // layout from a phase that runs after it.
-        ("draw", "dom") | ("draw", "style") | ("draw", "layout") => Some(
-            "a painter draws; reaching the document from inside one re-enters \
-                  layout from a phase that runs after it",
-        ),
+        "draw" if has(Facet::DomWrite) || has(Facet::LayoutWrite) || has(Facet::LayoutRead) => {
+            Some(
+                "a painter draws; reaching the document from inside one re-enters                  layout from a phase that runs after it",
+            )
+        }
         // A compositor animation runs off the main thread. An animated property
-        // that invalidates layout drags it back on.
-        ("animate", "layout") => Some(
-            "a compositor animation runs without layout; animating a property that \
-                  invalidates it forces a layout every frame",
+        // that invalidates layout drags it back on — and THAT is the case the
+        // family-keyed version could not see, because a layout-affecting style
+        // write is in the `style` family.
+        "animate" if has(Facet::LayoutWrite) || has(Facet::LayoutRead) => Some(
+            "a compositor animation runs without layout; animating a property that              invalidates it forces a layout every frame",
         ),
         _ => None,
     }

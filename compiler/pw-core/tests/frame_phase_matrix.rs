@@ -288,27 +288,25 @@ fn a_geometry_read_inside_an_animate_phase_is_rejected() {
 }
 
 #[test]
-fn a_layout_affecting_write_inside_an_animate_phase_is_not_rejected() {
-    // **A gap the matrix found, and it is not the one it looks like.**
+fn a_layout_affecting_write_inside_an_animate_phase_is_rejected() {
+    // **The gap semantic facets closed.**
     //
-    // `forbidden_in_phase` keys on an effect's FAMILY, and
+    // `forbidden_in_phase` keyed on an effect's FAMILY, and
     // `style.mutate<LayoutAffect>` has family `style` — so the rule
-    // `("animate", "layout")` never sees it. A compositor animation that
-    // writes a layout-affecting property is exactly what that rule's own
-    // comment describes ("animating a property that invalidates it forces a
-    // layout every frame") and exactly what it cannot catch.
+    // `("animate", "layout")` could not see the exact case its own comment
+    // described. It now asks whether the effect has the `layout_write` facet,
+    // which `style.mutate<T>` declares conditionally on its argument:
     //
-    // The distinction lives in `layout.rs`, which matches the WRITTEN form
-    // `style.mutate<LayoutAffect>` — so it is expressible; `forbidden_in_phase`
-    // just works one level too coarse to use it.
-    //
-    // Recorded rather than repaired: it predates this change, it has no corpus
-    // fixture, and widening a phase rule is a separate ruling from deleting a
-    // synthesized effect.
+    // ```pleris
+    // effect style.mutate<T> {
+    //     impact paint_write
+    //     impact layout_write when LayoutAffect
+    // }
+    // ```
     let found = codes(&component("animate { style.set_width(s, \"1px\") }"));
     assert!(
-        !found.contains(&"PW0402".to_string()),
-        "if this now fires, the gap is closed: {found:?}"
+        found.contains(&"PW0402".to_string()),
+        "animating a layout-affecting property forces a layout every frame: {found:?}"
     );
 }
 
@@ -406,4 +404,84 @@ fn the_gate_can_detect_the_thing_it_forbids() {
     let (lhs, rhs) = sample.split_once("=>").expect("an arm");
     assert!(lhs.contains("\"measure\""));
     assert!(rhs.contains('.') && rhs.contains('"'));
+}
+
+// --- phase impact, frozen before facets ---------------------------------------
+//
+// Architect ruling, 2026-08-07:
+//
+// > `style.mutate<LayoutAffect>` is not a "layout-family" effect, but it IS
+// > layout-affecting. So `forbidden_in_phase("animate", "layout")` is now too
+// > crude. […] give resolved `EffectInstance`s semantic traits/facets that
+// > phase checking consumes.
+//
+// The rows below are the ruling's matrix. One was wrong when it was written —
+// a layout-affecting style write in the animate phase was allowed — because the
+// rule keyed on an effect's FAMILY, and `style.mutate<LayoutAffect>` is in the
+// `style` family. `forbidden_in_phase` now reads declared FACETS, and the two
+// `style.mutate` rows differ while sharing a family, which is the whole point.
+
+/// Does this program report a wrong-frame-phase error?
+fn wrong_phase(body: &str) -> bool {
+    codes(&component(body)).contains(&"PW0402".to_string())
+}
+
+#[test]
+fn the_phase_impact_matrix() {
+    // allowed, and must stay allowed
+    assert!(
+        !wrong_phase("animate { style.composite(s, \"opacity\", \"1\") }"),
+        "a compositor operation is what the animate phase is FOR"
+    );
+    assert!(
+        !wrong_phase("measure { pure(1) }"),
+        "a pure measure phase does nothing"
+    );
+    assert!(
+        !wrong_phase("measure { style.measure(el) }"),
+        "reading geometry is what the measure phase is FOR"
+    );
+
+    // rejected, and already correct
+    assert!(
+        wrong_phase("animate { style.measure(el) }"),
+        "a compositor animation may not force layout"
+    );
+    assert!(
+        wrong_phase("measure { style.set_width(s, \"1px\") }"),
+        "writing inside the measure phase invalidates what it is about to read"
+    );
+
+    // **The gap semantic facets closed.** Was allowed; the family was the same
+    // as a paint-only write's, so no family-keyed rule could tell them apart.
+    assert!(
+        wrong_phase("animate { style.set_width(s, \"1px\") }"),
+        "a layout-affecting write in the animate phase forces a layout every frame"
+    );
+
+    // And the row that proves the fix is not collateral damage: a paint-only
+    // write shares the family and must stay legal.
+    assert!(
+        !wrong_phase("animate { style.set_custom(s, \"--x\", \"1\") }"),
+        "a paint-only write does not invalidate layout"
+    );
+}
+
+#[test]
+fn a_family_only_check_cannot_see_a_layout_affecting_write() {
+    // **The negative control the ruling asks for**, stated against the rule
+    // itself rather than through a program: a checker that looks only at the
+    // `layout` family gives the same answer for a layout-affecting style write
+    // as for a paint-only one. That is the defect, in one assertion.
+    use pw_core::effects::family_of;
+    assert_eq!(family_of("style.mutate<LayoutAffect>"), "style");
+    assert_eq!(family_of("style.mutate<PaintOnly>"), "style");
+    assert_eq!(
+        family_of("style.mutate<LayoutAffect>"),
+        family_of("style.mutate<PaintOnly>"),
+        "the family cannot distinguish them, so no rule keyed on it can"
+    );
+    // Whereas `layout.measure` is a different family, which is the ONLY reason
+    // the animate/layout rule ever fires.
+    assert_eq!(family_of("layout.measure"), "layout");
 }
