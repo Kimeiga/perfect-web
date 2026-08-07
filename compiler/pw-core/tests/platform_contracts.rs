@@ -332,7 +332,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // IS layout-affecting, so phase legality could not be keyed on the family.
     // `web.effects` also imports `style.{ LayoutAffect }`, because
     // `impact layout_write when LayoutAffect` must name a declaration.
-    const EXPECTED: u64 = 0xd65d_6d9c_6142_e9c3;
+    // Changed again 2026-08-07: `session.read` lost its `placement` clause.
+    // Architect ruling — `Session<A>` says who may observe a value and
+    // `session.read` says what authority reads session state; deriving the
+    // second from the first was a guess. Topology decides where a session
+    // provider exists.
+    const EXPECTED: u64 = 0x998d_aca0_ffce_9b73;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

@@ -143,13 +143,23 @@ effect secret.read {
     host       "pw:host/secrets#read"
 }
 
-// Anywhere with a request context, which is `Label::may_hold`'s rule for a
-// session-restricted value and not `worlds_for`'s — `session` is not in that
-// table at all, so it is unconstrained today. `browser, edge, origin` matches
-// the privacy rule rather than narrowing to origin, because narrowing is a
-// change with a diff and there is no evidence for one.
+// **No intrinsic placement.** Architect ruling, 2026-08-07:
+//
+// > I don't love deriving `session.read → browser, edge, origin` merely because
+// > `Session<A>` may exist there. […] host topology says where a session
+// > provider exists.
+//
+// It declared `browser, edge, origin`, derived from `Label::may_hold`'s rule
+// for a session-restricted value — which answers a different question:
+//
+//     Session<A>      who may observe the value
+//     session.read    the authority needed to obtain session state
+//
+// There is no world where reading session state is meaningless, so there is no
+// intrinsic restriction to declare. Which nodes actually provide `session.read`
+// is a property of a deployment, and the same program gets a different feasible
+// placement under a different topology. That is the point.
 effect session.read {
-    placement  browser, edge, origin
     capability session.read
     host       "pw:host/session#read"
 }
