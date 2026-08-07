@@ -104,8 +104,29 @@ query Both(id: Int) -> Int
 }
 ";
 
+/// The real effect declarations, so the ontology this exercises is the one the
+/// compiler will use.
+///
+/// Read from `packages/` rather than restated here. A matrix built against a
+/// hand-written copy of the vocabulary would freeze the copy, and step 8 would
+/// then verify that the change did what the test file said instead of what the
+/// platform says.
+fn declarations() -> Vec<String> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    [
+        "packages/pw-std/effects.pw",
+        "packages/pw-platform-web/effects.pw",
+    ]
+    .iter()
+    .map(|p| std::fs::read_to_string(root.join(p)).expect("effect declarations"))
+    .collect()
+}
+
 fn matrix() -> Vec<ComponentContract> {
-    let hirs: Vec<Hir> = [LIB, ROWS]
+    let mut sources = declarations();
+    sources.push(LIB.to_string());
+    sources.push(ROWS.to_string());
+    let hirs: Vec<Hir> = sources
         .iter()
         .map(|s| lower_file(s, &parse_tree(s).green))
         .collect();
@@ -149,7 +170,8 @@ fn the_program_the_matrix_is_built_from_actually_produces_contracts() {
     assert_eq!(
         all.len(),
         6,
-        "six queries, six contracts: {:?}",
+        "six queries, six contracts (the effect declarations are not \
+         components and contribute none): {:?}",
         all.iter().map(|c| &c.component_id).collect::<Vec<_>>()
     );
 }
@@ -163,30 +185,35 @@ fn pure_needs_nothing_and_runs_anywhere() {
 }
 
 #[test]
-fn layout_measure_asks_the_host_for_authority_today() {
-    // **The row step 7 changes.** `layout.measure` is browser-semantic and
-    // `packages/pw-platform-web/effects.pw` declares `capability none` for it —
-    // but `Capability::resolve` reads `World::worlds_for`'s restricted-family
-    // table as "needs a host capability", so the contract asks a host to grant
-    // the layout engine to code whose only crime is being a user interface.
+fn layout_measure_is_browser_placement_and_not_host_authority() {
+    // **The row step 7 changed, and the reason the ruling wanted it.**
+    //
+    // Before: `capabilities {layout.measure}`, importing
+    // `pw:host/layout#measure` — asking a host to grant the layout engine to
+    // code whose only crime is being a user interface. `Capability::resolve`
+    // read `World::worlds_for`'s restricted-family list as "needs a
+    // capability", and that list answers a different question.
+    //
+    // After: no capability and no import. The declaration says
+    // `placement browser, capability none`, and both facts survive: the
+    // placement is unchanged.
     let c = row("Measured");
-    assert_eq!(capabilities(&c), ["layout.measure"]);
+    assert!(capabilities(&c).is_empty(), "{:?}", capabilities(&c));
+    assert!(host_imports(&c).is_empty(), "{:?}", host_imports(&c));
     assert_eq!(
-        host_imports(&c),
-        ["layout.measure = pw:host/layout#measure"]
+        c.allowed_placements,
+        ["browser"],
+        "the ontology changes what authority is asked for, never where code runs"
     );
-    // Placement is already right, and must not move.
-    assert_eq!(c.allowed_placements, ["browser"]);
 }
 
 #[test]
-fn style_mutate_carries_its_argument_into_the_capability_today() {
+fn style_mutate_is_browser_placement_even_carrying_an_argument() {
+    // The same change, on an effect with a type argument — so the reason is
+    // the DECLARATION and not "effects without arguments need no authority".
     let c = row("Styled");
-    assert_eq!(capabilities(&c), ["style.mutate<LayoutAffect>"]);
-    assert_eq!(
-        host_imports(&c),
-        ["style.mutate<LayoutAffect> = pw:host/style#mutate"]
-    );
+    assert!(capabilities(&c).is_empty(), "{:?}", capabilities(&c));
+    assert!(host_imports(&c).is_empty(), "{:?}", host_imports(&c));
     assert_eq!(c.allowed_placements, ["browser"]);
 }
 
@@ -209,12 +236,14 @@ fn a_secret_asks_for_real_authority_and_must_keep_asking() {
     // `secret.read<Payments>`; the corpus declares `secret<C>` with an
     // argument and `secret.read` without one, and this uses what exists.
     //
-    // The interface name is the row step 7 changes WITHOUT changing authority:
-    // `pw:host/secret#use` is formatted from the family and an empty
-    // operation, while the declaration says `pw:host/secrets#get`.
+    // The row where step 7 changed the INTERFACE and not the authority:
+    // `pw:host/secret#use` was formatted from the family and an empty
+    // operation, and the platform's module is `secrets` with a `get`. The
+    // capability is identical, which is what makes this the control proving
+    // the change is about naming rather than about granting.
     let c = row("Secret");
     assert_eq!(capabilities(&c), ["secret<Payments>"]);
-    assert_eq!(host_imports(&c), ["secret<Payments> = pw:host/secret#use"]);
+    assert_eq!(host_imports(&c), ["secret<Payments> = pw:host/secrets#get"]);
     assert_eq!(c.allowed_placements, ["origin"]);
 }
 
@@ -225,10 +254,12 @@ fn measuring_layout_and_reading_the_database_has_nowhere_to_run() {
     // stay one through step 7: the ontology changes what authority is asked
     // for, never where code can run.
     let c = row("Both");
-    assert_eq!(
-        capabilities(&c),
-        ["database.read<Stores>", "layout.measure"]
-    );
+    // `layout.measure` is no longer a capability — but it is still an EFFECT,
+    // and placement solves over effects. This is the assertion that separates
+    // the two: had the solver been reading the capability list, dropping
+    // `layout.measure` from it would have made this body placeable at the
+    // origin, and a browser-only measurement would be scheduled on a server.
+    assert_eq!(capabilities(&c), ["database.read<Stores>"]);
     assert!(
         c.allowed_placements.is_empty(),
         "a body that measures layout and reads the database has no world: {:?}",

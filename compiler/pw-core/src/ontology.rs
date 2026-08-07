@@ -344,6 +344,24 @@ impl Ontology {
         self.by_name.get(name)
     }
 
+    /// The declaration a WRITTEN effect names: `database.read<Stores>` finds
+    /// `database.read`.
+    ///
+    /// The type argument is stripped here and nowhere else, for the same
+    /// reason the dot is read here and nowhere else. A caller holding a row's
+    /// text has one question — which declaration is this — and giving it a way
+    /// to ask means it never has to take the string apart itself.
+    ///
+    /// **Membership, not visibility.** A contract is derived from INFERRED
+    /// effects, which arrive as spellings with no unit attached: the effect
+    /// came from a callee in another module, and "which file wrote this row"
+    /// has no answer by then. [`Ontology::resolve`] is the visibility-checked
+    /// form and takes a unit precisely because it has one.
+    pub fn declared_for(&self, written: &str) -> Option<&EffectDecl> {
+        self.by_name
+            .get(written.split('<').next().unwrap_or(written))
+    }
+
     /// The declaration an instance names.
     pub fn declaration(&self, of: EffectDefId) -> Option<&EffectDecl> {
         self.by_name.values().find(|d| d.def == of)

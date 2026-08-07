@@ -132,18 +132,48 @@ later analysis splits `"database.read"` at the dot.
 
 ### The immediate sequence
 
+The architect's sequence of 2026-08-07, third ruling. Both earlier questions
+are answered: bare generic effects become **invalid** (no implicit wildcard),
+and the ontology's `capability none` is **right** where `worlds_for` disagreed.
+
 ```text
-1  minimal semantic Fact/Provenance infrastructure   DONE — pw-core/provenance.rs
-   first consumer: effect inference's member resolution
-   R-037's chain asserted in tests/causal_evidence.rs
-2  effect ontology slice 2, using it                 DONE — pw-core/ontology.rs
-   EffectPath → EffectDefId → EffectInstance, 16 controls
-3  declare the concrete effects — no wildcards       DONE — 25 declared, 0 undeclared
-4  unknown family / operation / arity diagnostics    BLOCKED on the arity ruling below
-5  `interface_for` becomes declaration-driven   UNBLOCKED, needs its own ruling
-6  metamorphic controls for the effect-propagation headline cases
-7  deployment planning
+1  placement metadata on effect declarations        DONE
+2  complete row → EffectInstance resolution         PARTIAL — resolve() exists,
+                                                    no checker calls it yet
+3  enforce exact generic arity; open a new corpus   NEXT — 21 rows to classify
+   version for the 21 underspecified rows
+4  declare every actually-used concrete effect      DONE — 25, no wildcards
+5  unknown family / operation / argument / arity    after 3
+   diagnostics
+6  the pre-change ComponentContract matrix          DONE — tests/contract_matrix.rs
+7  capability/host mapping declaration-driven       DONE
+8  the post-change matrix; only intended changes    DONE — four rows moved,
+                                                    all four predicted
+9  deployment planning
 ```
+
+**Step 8's result.** Exactly four contract rows changed, and the two controls
+did not:
+
+```text
+layout.measure              {layout.measure}  → {}       import dropped
+style.mutate<LayoutAffect>  {style.mutate<…>} → {}       import dropped
+layout.measure + database   two capabilities  → one      placement unchanged
+secret<Payments>            pw:host/secret#use → pw:host/secrets#get
+                                                          authority unchanged
+database.read<Stores>       unchanged                     (control)
+pure                        unchanged                     (control)
+```
+
+`docs/evidence/E8/component-contracts.json` is byte-identical after
+`just e8-contracts`: the store demo's host imports are `database.read` and
+`database.write`, whose declared `host` clauses match what the old convention
+formatted. Only the over-granted families moved.
+
+The `Both` row is the one that proves the change is about authority and not
+placement: `layout.measure` left the capability set and the body still has
+nowhere to run, because the solver reads EFFECTS. Had it been reading
+capabilities, a browser-only measurement would now be placeable at the origin.
 
 ### Two findings from steps 2 and 3, both needing a ruling
 

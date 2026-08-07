@@ -55,6 +55,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::effects::Inference;
 use crate::hir::{DeclKind, Expr, Hir};
+use crate::ontology::Ontology;
 use crate::placement::{Demand, World, solve};
 use crate::privacy::Label;
 use crate::resolve::Workspace;
@@ -130,9 +131,45 @@ impl Capability {
         effect: &str,
         declared_types: &BTreeSet<String>,
     ) -> Result<Capability, NotACapability> {
+        Capability::resolve_with(effect, declared_types, &Ontology::default())
+    }
+
+    /// [`Capability::resolve`], asking the ontology first.
+    ///
+    /// **Whether an effect needs host authority is a DECLARED fact.** Architect
+    /// ruling, 2026-08-07:
+    ///
+    /// > An ordinary Pleris operation like `layout.measure` doesn't necessarily
+    /// > need to give arbitrary application code a raw DOM capability. […]
+    /// > rather than granting every browser component unrestricted DOM
+    /// > authority merely because it performs UI work.
+    ///
+    /// `World::worlds_for` answers a different question — where an effect is
+    /// *meaningful* — and reading its restricted-family list as "needs a
+    /// capability" is what made `layout.measure` ask a host to grant the layout
+    /// engine. The declaration now decides, and `worlds_for` is consulted only
+    /// when nothing declares the effect.
+    ///
+    /// That fallback is the conservative direction and stays until the
+    /// declarations are reachable from every program: over-stating authority is
+    /// refused work, under-stating it is authority nobody approved. A program
+    /// checked without the platform packages therefore behaves exactly as
+    /// before rather than silently losing its capability set.
+    pub fn resolve_with(
+        effect: &str,
+        declared_types: &BTreeSet<String>,
+        ontology: &Ontology,
+    ) -> Result<Capability, NotACapability> {
         let c = Capability::parse(effect);
-        if World::worlds_for(&c.family).is_none() {
-            return Err(NotACapability::Unrestricted { family: c.family });
+        match ontology.declared_for(effect) {
+            Some(decl) if decl.capability.is_none() => {
+                return Err(NotACapability::Unrestricted { family: c.family });
+            }
+            Some(_) => {}
+            None if World::worlds_for(&c.family).is_none() => {
+                return Err(NotACapability::Unrestricted { family: c.family });
+            }
+            None => {}
         }
         if let Some(a) = &c.argument
             && !declared_types.contains(a)
@@ -406,14 +443,50 @@ fn component_calls(
     out
 }
 
-/// The host interface a capability family is served by.
+/// The host interface and function a capability is served by.
 ///
-/// A NAMING convention, deliberately, and deliberately shallow: the compiler
-/// says which interface a capability would be served by, and the host decides
-/// whether it has one. If this function grew a table of what each interface
-/// provides, the compiler would own the deployment topology twice.
-fn interface_for(family: &str) -> String {
-    format!("pw:host/{family}")
+/// **From the effect's `host` clause**, which is where the mapping is declared:
+///
+/// ```pleris
+/// effect database.read<T> {
+///     capability database.read<T>
+///     host       "pw:host/database#read"
+/// }
+/// ```
+///
+/// It was `format!("pw:host/{family}")` with the operation as the function
+/// name, which happens to produce the identical string for every effect whose
+/// declaration follows that shape — `database.read` and `database.write` among
+/// them, which is why `docs/evidence/E8/component-contracts.json` does not
+/// change. `secret<Payments>` is where they differ: formatted it is
+/// `pw:host/secret#use`, and the platform's module is `secrets` with a `get`.
+///
+/// The convention remains the fallback for an effect nothing declares, so a
+/// program checked without the platform packages keeps its imports rather than
+/// silently losing them.
+///
+/// Still deliberately shallow: the compiler says which interface a capability
+/// would be served by, and the host decides whether it has one. What changed is
+/// only where the name comes from.
+fn interface_for(capability: &Capability, ontology: &Ontology) -> (String, String) {
+    if let Some(host) = ontology
+        .declared_for(&capability.name())
+        .and_then(|d| d.host.as_deref())
+    {
+        // `interface#function`, WIT's own separator. Split here because this is
+        // the boundary that reads the clause — the same discipline `EffectPath`
+        // applies to the dot.
+        if let Some((interface, function)) = host.split_once('#') {
+            return (interface.to_string(), function.to_string());
+        }
+        return (host.to_string(), "use".to_string());
+    }
+    let function = if capability.operation.is_empty() {
+        "use".to_string()
+    } else {
+        capability.operation.clone()
+    };
+    (format!("pw:host/{}", capability.family), function)
 }
 
 /// Derive every component's contract from a checked program.
@@ -431,6 +504,11 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // it compared against was the wrong one.
     let mut inference = Inference::new(sigs, ws);
     inference.run(hirs);
+
+    // What each effect DECLARES about itself: whether it needs host authority,
+    // and which interface serves it. Built once, beside the inference, because
+    // both answer questions about the same rows.
+    let ontology = Ontology::build(hirs);
 
     // Every type the program declares, for resolving a capability's argument.
     // A misspelled `database.read<Stroes>` must be refused here rather than
@@ -535,23 +613,25 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
 
             let capabilities: Vec<Capability> = effects
                 .iter()
-                .filter_map(|e| match Capability::resolve(e, &declared_types) {
-                    Ok(c) => Some(c),
-                    // An unrestricted family needs no host authority. This is
-                    // the only reason an effect may leave no capability behind.
-                    Err(NotACapability::Unrestricted { .. }) => None,
-                    // An unresolvable argument KEEPS the capability.
-                    //
-                    // Dropping it would remove authority the program asked for,
-                    // and the whole point of the direction argument is that
-                    // over-stating is refused work while under-stating is
-                    // authority nobody approved. The mistake surfaces at
-                    // deployment as "the node does not grant
-                    // `database.read<Stroes>`", which is a bad diagnostic —
-                    // making it a build-time one is the next step and is
-                    // recorded in `docs/NEXT.md`, not silently absorbed here.
-                    Err(NotACapability::UnknownArgument { .. }) => Some(Capability::parse(e)),
-                })
+                .filter_map(
+                    |e| match Capability::resolve_with(e, &declared_types, &ontology) {
+                        Ok(c) => Some(c),
+                        // An unrestricted family needs no host authority. This is
+                        // the only reason an effect may leave no capability behind.
+                        Err(NotACapability::Unrestricted { .. }) => None,
+                        // An unresolvable argument KEEPS the capability.
+                        //
+                        // Dropping it would remove authority the program asked for,
+                        // and the whole point of the direction argument is that
+                        // over-stating is refused work while under-stating is
+                        // authority nobody approved. The mistake surfaces at
+                        // deployment as "the node does not grant
+                        // `database.read<Stroes>`", which is a bad diagnostic —
+                        // making it a build-time one is the next step and is
+                        // recorded in `docs/NEXT.md`, not silently absorbed here.
+                        Err(NotACapability::UnknownArgument { .. }) => Some(Capability::parse(e)),
+                    },
+                )
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect();
@@ -576,15 +656,14 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // it; it does not acquire its authority.
             let mut imports: BTreeSet<Import> = capabilities
                 .iter()
-                .map(|c| Import {
-                    interface: interface_for(&c.family),
-                    name: if c.operation.is_empty() {
-                        "use".to_string()
-                    } else {
-                        c.operation.clone()
-                    },
-                    capability: c.name(),
-                    kind: ImportKind::HostCapability,
+                .map(|c| {
+                    let (interface, name) = interface_for(c, &ontology);
+                    Import {
+                        interface,
+                        name,
+                        capability: c.name(),
+                        kind: ImportKind::HostCapability,
+                    }
                 })
                 .collect();
             for dep in component_calls(&inference, unit, hir, id, &components) {
