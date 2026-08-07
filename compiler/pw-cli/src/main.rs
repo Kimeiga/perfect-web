@@ -141,6 +141,9 @@ fn explain_with(
 
         match d.kind {
             DeclKind::Import => continue,
+            DeclKind::Effect => {
+                let _ = writeln!(s, "effect       {name}");
+            }
             DeclKind::Opaque => {
                 let _ = writeln!(s, "opaque type  {name}");
                 let _ = writeln!(

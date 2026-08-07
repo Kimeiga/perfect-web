@@ -74,6 +74,10 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
     match decl.kind {
         DeclKind::Import | DeclKind::Let => Ok(None),
 
+        // An effect DECLARATION is not a computation: it says how an effect
+        // lowers to authority, which is E8's question and not Koka's.
+        DeclKind::Effect => Err("an effect declaration is an ontology entry, not a computation"),
+
         // E6. Neither is a computation Koka could check: a materialization is
         // a scheduling decision the runtime makes and an event is a fact about
         // the world. Skipped with a reason rather than silently, so the

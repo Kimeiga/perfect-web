@@ -90,6 +90,7 @@ fn noun_of(kind: DeclKind) -> &'static str {
         DeclKind::Page => "page",
         DeclKind::Task => "task",
         DeclKind::Event => "event",
+        DeclKind::Effect => "effect",
         DeclKind::Fn => "fn",
         DeclKind::Type | DeclKind::Opaque => "type",
         DeclKind::Let => "let",

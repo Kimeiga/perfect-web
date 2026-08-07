@@ -63,6 +63,7 @@ pub const DECL_STARTERS: &[&str] = &[
     "resource",
     "materialize",
     "event",
+    "effect",
     "replicated",
     "paint",
     "handler_policy",
@@ -162,6 +163,13 @@ const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
 pub const POLICY_KEYWORDS: &[&str] = &[
+    // E8's effect ontology: `capability database.read<T>` and
+    // `host "pw:host/database#read"` inside an `effect` block. Policy clauses
+    // rather than expressions, because `database.read<T>` is a NAME and the
+    // expression grammar reads `<` as a comparison — the same reason a
+    // `materialize` block's policies live inside its braces (E6).
+    "capability",
+    "host",
     "freshness",
     "consistency",
     "cache",
@@ -1657,6 +1665,36 @@ impl<'a> P<'a> {
             }
             self.policies();
             self.body();
+            self.finish();
+            return true;
+        }
+
+        // E8 — `effect database.read<T> { capability .. host .. }`.
+        //
+        // Its own branch, ahead of the generic resource nouns, because it is
+        // the ONE declaration whose name is a dotted path. Architect ruling,
+        // 2026-08-07:
+        //
+        // > Give effect declarations their own path grammar […] That keeps the
+        // > parser change local to the language feature that actually requires
+        // > it. Given everything this project has discovered about syntax
+        // > features accidentally widening unrelated grammar, I would strongly
+        // > prefer that.
+        //
+        // So `type foo.bar` and `fn foo.bar()` stay invalid: `name()` is
+        // untouched and only this branch reaches `dotted_name`.
+        //
+        // The type parameters reuse `type_params` — the same binder
+        // `opaque type Secret<C>` uses — rather than an effect-specific one.
+        if after_vis.kind == Kind::Ident && after_vis_text == "effect" {
+            self.start(K::EffectDecl);
+            if vis {
+                self.bump();
+            }
+            self.bump(); // `effect`
+            self.dotted_name("an effect name");
+            self.type_params();
+            self.materialize_body();
             self.finish();
             return true;
         }

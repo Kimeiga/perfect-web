@@ -67,22 +67,95 @@ unknown operation and unknown argument are all compile errors, legitimate
 non-authority effects stay valid *because they are declared*, and no checker
 contains a hard-coded list of valid family spellings.
 
-### The grammar decision this needs first — NOT YET MADE
+### The grammar decision — MADE, and the form LANDS
+
+Architect ruling, 2026-08-07: **flat dotted**, with an effect-specific
+qualified name.
+
+```pleris
+effect log {
+    capability none
+}
+
+effect database.read<T> {
+    capability database.read<T>
+    host       "pw:host/database#read"
+}
+```
+
+> The declaration should look like the thing that appears in an effect row. […]
+> But implement `database.read` as an effect-specific qualified name, not as a
+> new ability for arbitrary declarations to have dotted names.
+
+**Slice 1 is done** (`tests/effect_declarations.rs`, 9 controls): the form
+parses, lowers to `DeclKind::Effect`, and takes its own `Namespace::Effect` so
+`effect log` and `fn log` coexist. `type foo.bar`, `fn foo.bar()` and
+`query foo.bar` all still fail to parse — asserted, because a local grammar
+change that quietly went global is the thing the ruling warned about.
+
+`capability` and `host` are POLICY clauses, not expressions: `database.read<T>`
+is a name and the expression grammar reads `<` as a comparison, which is the
+same reason a `materialize` block's policies live inside its braces (E6).
+
+### Slice 2 — what remains
+
+1. **Resolve an effect row against the declarations.**
+
+   ```text
+   database.read<Stores>
+     → EffectPath(["database","read"]) + TypeArg("Stores")
+     → EffectDefId + TypeDefId
+     → EffectInstance { effect, args }
+   ```
+
+   Everything downstream consumes `EffectInstance`. **No checker splits
+   `"database.read"` at the dot.**
+
+2. **Declare the vocabulary.** Enumerated below. No wildcards — the ruling is
+   explicit: *"A wildcard is convenient documentation but terrible semantic
+   identity."* `observe.*` and `durable.*` must become their real operations.
+
+3. **The diagnostics.** Unknown family, unknown operation, wrong generic arity
+   — all compile errors, in `PW52xx` beside `PW5200`.
+
+4. **`interface_for` reads the declaration** instead of
+   `format!("pw:host/{family}")`, which is the last hard-coded thing in the
+   capability path.
+
+### The tests the ruling requires before this is "landed"
+
+```text
+effect log                      parses/resolves          slice 1 ✓
+effect database.read<T>         parses/resolves          slice 1 ✓
+database.read<Stores>           resolves decl + argument
+database.read<Stroes>           PW5200                   done
+databse.read<Stores>            unknown effect
+database.reed<Stores>           unknown effect
+database.read                   wrong generic arity
+database.read<A, B>             wrong generic arity
+foo.read<T> vs database.read<T> never confused           slice 1 ✓
+database.read vs database.write distinct EffectDefIds    slice 1 ✓
+```
+
+plus the structural one:
+
+> No downstream semantic analysis discovers an effect by splitting or comparing
+> its dotted spelling.
+
+which is `last-segment-audit.txt` extended to cover effect spellings.
+
+### The remaining grammar questions — ANSWERED
 
 Three questions, each of which changes the parser, and none of which should be
 answered in a hurry:
 
-**1. Dotted effect names.** `effect database.read<T>` names a family and an
-operation. Every existing declaration form takes a simple `Name`, so
-`fn name(&mut self)` in `pw-syntax/src/grammar.rs` would have to accept a dotted
-head — or the form becomes `effect database { operation read<T> { .. } }`,
-which nests and keeps `name()` untouched. The flat spelling matches how effects
-are WRITTEN in rows; the nested one matches how they are grouped.
+**1. Dotted effect names — flat, via `dotted_name` in the effect branch only.**
+Done. `name()` is untouched.
 
-**2. Type parameters on a declaration.** `<T>` is a binder, and no declaration
-form currently binds a type variable — `opaque type Secret<C>` does, so the
-syntax exists; whether the effect form reuses that path or gets its own is
-untested.
+**2. Type parameters — the SAME binder `opaque type Secret<C>` uses.** Done.
+The ruling: *"Don't write an effect-specific generic binder. […] You've already
+learned what happens when one representation retains generic arguments and
+another quietly drops them."*
 
 **3. Where they live.** `pw-std` for `log`/`trace`, `pw-platform-web` for the
 rest. That splits the vocabulary across two packages, which is right — a

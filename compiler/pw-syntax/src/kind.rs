@@ -73,6 +73,8 @@ pub enum SyntaxKind {
     UnionDecl,
     FnDecl,
     ResourceDecl,
+    /// `effect database.read<T> { .. }` — E8's effect ontology.
+    EffectDecl,
     UiDecl,
     LetDecl,
     /// A declaration the parser could not classify. Present so recovery
@@ -299,6 +301,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         UnionDecl,
         FnDecl,
         ResourceDecl,
+        EffectDecl,
         UiDecl,
         LetDecl,
         ErrorDecl,

@@ -81,6 +81,12 @@ fn minimal(kw: &str) -> String {
     if kw == "import" {
         return "module m\n\nimport other\n".to_string();
     }
+    // E8's effect ontology. Its own shape: a dotted name, a type parameter
+    // binder, and a block of policy clauses — no parameter list and no body.
+    if kw == "effect" {
+        return "module m\n\neffect database.read<T> {\n    capability database.read<T>\n}\n"
+            .to_string();
+    }
     if kw == "handler_policy" {
         return "module m\n\nhandler_policy { on_version_mismatch reload }\n".to_string();
     }

@@ -135,6 +135,12 @@ pub enum DeclKind {
     Materialize,
     /// E6 — a typed event a command emits and a materialization listens for.
     Event,
+    /// E8 — `effect database.read<T> { capability .. host .. }`.
+    ///
+    /// The ONE declaration whose name is a dotted path, so that
+    /// `database.read` resolves to a declaration rather than being split at
+    /// the dot by whoever needs it.
+    Effect,
     Task,
     Type,
     Opaque,

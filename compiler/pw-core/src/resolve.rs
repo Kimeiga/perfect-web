@@ -58,6 +58,10 @@ pub enum Namespace {
     /// operations because nothing in a program invokes one: the materializer
     /// decides when it runs, from the graph.
     Ui,
+    /// `effect`. Its own namespace: an effect name appears only in an effect
+    /// row, never in an expression, and `database.read` must not collide with
+    /// a `fn read` or a `type database`.
+    Effect,
     /// `event`. Its own namespace, because an event name appears only in
     /// `emits` and `invalidates_on` — never in an expression — and a
     /// materialization that names an event must not silently resolve to a
@@ -72,10 +76,11 @@ impl Namespace {
     /// such sites, both hand-written, and adding `Event` for E6 fixed one and
     /// left the other — so an event was importable and unresolvable, or the
     /// reverse, depending on which path asked.
-    pub const ALL: [Namespace; 4] = [
+    pub const ALL: [Namespace; 5] = [
         Namespace::Type,
         Namespace::Term,
         Namespace::Ui,
+        Namespace::Effect,
         Namespace::Event,
     ];
 
@@ -93,6 +98,7 @@ impl Namespace {
                 Namespace::Ui
             }
             DeclKind::Event => Namespace::Event,
+            DeclKind::Effect => Namespace::Effect,
             DeclKind::Import | DeclKind::Other => return None,
         })
     }

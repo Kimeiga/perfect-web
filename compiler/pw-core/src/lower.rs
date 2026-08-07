@@ -111,6 +111,8 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
         K::TypeDecl | K::RecordDecl | K::UnionDecl => DeclKind::Type,
         // `view`/`component`/`page` and the resource nouns are distinguished by
         // their leading keyword, which the grammar keeps as a bare token.
+        K::EffectDecl => DeclKind::Effect,
+
         K::UiDecl | K::ResourceDecl => {
             let kw = own_tokens(node)
                 .iter()
@@ -208,6 +210,7 @@ impl Lowerer<'_> {
             K::FnDecl
                 | K::UiDecl
                 | K::ResourceDecl
+                | K::EffectDecl
                 | K::LetDecl
                 | K::TypeDecl
                 | K::RecordDecl
