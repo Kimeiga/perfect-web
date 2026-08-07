@@ -178,6 +178,31 @@ Three things to build against it:
   cart, a promotion and a store's pricing at once, and a field that starts as a
   collection does not need a breaking redesign to hold three.
 
+**The five steps before E7-P proper are done.** The dependency graph is the
+contract:
+
+```text
+server/runtime                     browser runtime
+      \                                /
+       \                              /
+                 pw-protocol
+                /           \
+       pw-resource        pw-document
+```
+
+`pw-document` holds the address vocabulary — `TemplateSchemaId`,
+`InstancePath`, `LocalPartId`, `PartAddress`, `IdentityDomain`, `InstanceToken`
+— without `TemplateIR`, the renderer or any server serialization. `pw-protocol`
+holds `Patch`, `PatchOp`, `CausalBasis`, `StreamFrame`, `Recovery`, the
+protocol version and the decoder, and depends on neither endpoint. Four
+structural tests assert that, with a negative control.
+
+What remains for E7-P: **wire the actual Rust materializer to the actual
+browser runtime through the protocol.** Today the browser talks to a ~200-line
+Node server. A compact Rust development server owning `pw-materialize`,
+`pw-resource`, `pw-render` and `pw-protocol` — with the browser seeing only the
+protocol — removes one temporary semantic adapter from the integration path.
+
 The three identities are separated and built:
 
 ```text

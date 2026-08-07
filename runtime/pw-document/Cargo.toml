@@ -1,0 +1,18 @@
+[package]
+name = "pw-document"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+# The neutral document-address vocabulary. It depends on `pw-resource` for
+# `Partition` and on nothing else — in particular not on `pw-render`, so a
+# browser runtime can speak about document addresses without the server
+# renderer entering its dependency closure.
+
+[dependencies]
+blake3.workspace = true
+pw-resource = { path = "../pw-resource" }
+serde.workspace = true

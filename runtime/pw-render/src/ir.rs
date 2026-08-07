@@ -10,6 +10,11 @@
 
 use serde::{Deserialize, Serialize};
 
+// The address vocabulary is `pw-document`'s. `PartId` is this crate's name for
+// what the document layer calls a `LocalPartId`: the IR is where a part gets
+// its number, and the document layer is where that number becomes an address.
+pub use pw_document::{Anchor, ElementId, LocalPartId as PartId};
+
 /// Where a value sits in the document, which decides how it is escaped.
 ///
 /// Not a hint. Two values with the same bytes in different contexts need
@@ -61,70 +66,6 @@ impl Context {
             Context::Attribute
         }
     }
-}
-
-/// A part's identity within its template.
-///
-/// **Template-scoped and ordinal**, namespaced by [`Template::schema`].
-/// Architect ruling, 2026-08-06:
-///
-/// > semantic identity of entire template + cheap structural identity inside
-/// > that template
-///
-/// not a content hash per part. Two `<span>{price}</span>` parts have identical
-/// IR and are different places in the document, so content identity cannot say
-/// which to patch; adding enough parent context to disambiguate reinvents
-/// structural position at a higher price.
-///
-/// Positional identity is safe here **because E7V already refuses across
-/// schemas**. Local part 3 is never interpreted as local part 3 of an
-/// incompatible template, so a source edit may renumber freely: it also changes
-/// the schema, and a cross-version patch is rejected or migrated.
-///
-/// Assigned by deterministic traversal of the IR, never from source offsets. A
-/// comment or a reflow must not perturb an id unless it changed the structure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct PartId(pub u32);
-
-impl std::fmt::Display for PartId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-/// An element that owns at least one element-local part.
-///
-/// Separate from `PartId` because one element can own several parts — two
-/// dynamic attributes and a handler — and giving each its own comment pair
-/// would cost six nodes to say one thing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct ElementId(pub u32);
-
-impl std::fmt::Display for ElementId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-/// How a part is anchored in the document.
-///
-/// Architect ruling: a `PartId` is a renderer concept and these are two wire
-/// encodings of it, chosen per part KIND rather than one forced onto all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Anchor {
-    /// Comment boundaries: `<!--pw:s3-->` … `<!--pw:e3-->`.
-    ///
-    /// A range can be zero nodes, one text node, twenty `<li>`s or a component
-    /// subtree. An attribute on an element cannot represent any of those, which
-    /// is why conditionals, loops, components and text ranges use comments even
-    /// though they cost two nodes.
-    Range,
-    /// The owning element carries `data-pw`.
-    ///
-    /// For attributes, boolean attributes and handlers, where the thing being
-    /// updated belongs to an element that already exists.
-    Element,
 }
 
 /// One dynamic hole in a template.

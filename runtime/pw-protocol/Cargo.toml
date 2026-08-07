@@ -1,5 +1,5 @@
 [package]
-name = "pw-render"
+name = "pw-protocol"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,8 +7,12 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+# The versioned browser↔server application protocol.
+#
+# It depends on the two IDENTITY crates and on neither endpoint's
+# implementation. A server and a browser runtime both read it; neither owns it.
+
 [dependencies]
-blake3.workspace = true
 pw-document = { path = "../pw-document" }
 pw-resource = { path = "../pw-resource" }
 serde.workspace = true

@@ -363,6 +363,54 @@ impl Graph {
         }
     }
 
+    /// The semantic identity of one entry of a resource.
+    ///
+    /// `logical_key` is supplied by the caller, because a key is a VALUE and
+    /// the compiler knows only the shape. What the compiler does know — which
+    /// declaration, which partition, whether the generation participates — is
+    /// answered here rather than by each consumer reading the node again.
+    ///
+    /// The partition comes from the resource's own declaration: `session` and
+    /// `private` name a principal, and a public resource names none. A caller
+    /// supplies the principal's id, because the compiler cannot know whose
+    /// session it is.
+    pub fn entry_identity(
+        &self,
+        resource: &str,
+        logical_key: &[String],
+        principal: Option<&str>,
+    ) -> Option<EntryIdentitySpec> {
+        let node = self.node(resource)?;
+        let NodeKind::Resource {
+            privacy, partition, ..
+        } = &node.kind
+        else {
+            return None;
+        };
+        let restricted = privacy.as_deref().is_some_and(|v| v != "public")
+            || partition
+                .as_deref()
+                .is_some_and(|v| v.starts_with("private"));
+        let partition = match (restricted, privacy.as_deref(), principal) {
+            (false, _, _) => "public".to_string(),
+            (true, Some("private"), Some(id)) => format!("user:{id}"),
+            (true, _, Some(id)) => format!("session:{id}"),
+            // Restricted and no principal named. The identity would be a
+            // public one, which is the exact confusion `PW5101` exists to
+            // prevent, so there is no identity to give.
+            (true, _, None) => return None,
+        };
+        Some(EntryIdentitySpec {
+            resource: node.path.clone(),
+            logical_key: logical_key.to_vec(),
+            partition,
+            // The generation participates for a SHARED entry, which outlives
+            // the deployment that wrote it. A private entry is re-read per
+            // reader, so its identity does not move when a build does.
+            compatibility: (partition_is_shared(&node.kind)).then(|| self.compatibility.clone()),
+        })
+    }
+
     pub fn node(&self, path: &str) -> Option<&Node> {
         self.nodes.iter().find(|n| n.path == path)
     }
@@ -483,6 +531,25 @@ impl Graph {
     }
 }
 
+/// A resource entry's semantic identity, as the compiler knows it.
+///
+/// Architect ruling, 2026-08-07:
+///
+/// > Do not let E7-P manually construct `EntryIdentity` from its own
+/// > interpretation of graph nodes. There should be one bridge.
+///
+/// This is that bridge's output. It mirrors `pw_resource::EntryIdentity` by
+/// FIELD NAME across ADR-0018's boundary — the compiler does not link a runtime
+/// — so a rename on either side is a contract test failing rather than an
+/// empty identity at run time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EntryIdentitySpec {
+    pub resource: String,
+    pub logical_key: Vec<String>,
+    pub partition: String,
+    pub compatibility: Option<String>,
+}
+
 /// What one materialization's key separates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyAudit {
@@ -503,6 +570,17 @@ pub struct KeyGap {
     pub resource: String,
     pub component: String,
     pub why: String,
+}
+
+/// Is this node's storage shared between readers?
+fn partition_is_shared(kind: &NodeKind) -> bool {
+    match kind {
+        NodeKind::Resource { partition, .. } => partition
+            .as_deref()
+            .is_none_or(|p| !p.starts_with("private")),
+        NodeKind::Materialization { partition, .. } => partition.as_deref() == Some("public"),
+        _ => false,
+    }
 }
 
 fn qualified(module: &str, name: &str) -> String {

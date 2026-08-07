@@ -36,8 +36,11 @@ pub mod escape;
 pub mod identity;
 pub mod ir;
 
-pub use identity::{IdentityDomain, InstanceToken, Partition};
-pub use ir::{Anchor, Chunk, Context, ElementId, Part, PartEntry, PartId, Template};
+pub use identity::{
+    Anchor, ElementId, IdentityDomain, InstanceFrame, InstancePath, InstanceToken, LocalPartId,
+    PartAddress, Partition, TemplateSchemaId,
+};
+pub use ir::{Chunk, Context, Part, PartEntry, PartId, Template};
 
 use std::collections::BTreeMap;
 
@@ -176,10 +179,10 @@ pub struct Env {
     domain: IdentityDomain,
     /// The loop instances enclosing what is being rendered, outermost first.
     ///
-    /// Generic on purpose. A frame comes from a repeatable scope, and today
-    /// that is a keyed `Each`; later it can be a component instance or a
-    /// streamed one without changing the address model.
-    path: Vec<(u32, String)>,
+    /// `pw_document::InstancePath`, not a local tuple: the renderer builds the
+    /// same path a patch will later address, and two representations of it
+    /// would be two answers to "which instance".
+    path: InstancePath,
 }
 
 impl Env {
@@ -222,10 +225,10 @@ impl Env {
         next
     }
 
-    /// Enter a loop instance.
-    fn within(&self, each: PartId, token: &str) -> Env {
+    /// Enter a repeatable scope.
+    fn within(&self, scope: PartId, instance: InstanceToken) -> Env {
         let mut next = self.clone();
-        next.path.push((each.0, token.to_string()));
+        next.path.push(InstanceFrame { scope, instance });
         next
     }
 }
@@ -406,7 +409,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                             });
                         }
                         out.push_str(&format!("<!--pw:s{id}@{token}-->"));
-                        emit(body, &scoped.within(*id, token.as_str()), others, out)?;
+                        emit(body, &scoped.within(*id, token.clone()), others, out)?;
                         out.push_str(&format!("<!--pw:e{id}@{token}-->"));
                     }
                     // An UNKEYED list renders and promises nothing about

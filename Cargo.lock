@@ -251,6 +251,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-document"
+version = "0.0.0"
+dependencies = [
+ "blake3",
+ "pw-resource",
+ "serde",
+]
+
+[[package]]
 name = "pw-fuzz"
 version = "0.0.0"
 dependencies = [
@@ -270,10 +279,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-protocol"
+version = "0.0.0"
+dependencies = [
+ "pw-document",
+ "pw-resource",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pw-render"
 version = "0.0.0"
 dependencies = [
  "blake3",
+ "pw-document",
  "pw-resource",
  "serde",
  "serde_json",
