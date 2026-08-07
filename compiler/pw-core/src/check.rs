@@ -184,6 +184,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // resolves to nothing is the same class of mistake as a name in an
         // expression that does.
         crate::ontology::check_effect_rows(&ontology, &workspace, i, &u.hir, per_unit);
+        // And the declarations themselves: an impact condition naming nothing
+        // makes a facet silently inapplicable.
+        crate::ontology::check_effect_declarations(&ontology, per_unit, i);
     }
 
     // Declaration name → its privacy label, across every unit. A `page` in one

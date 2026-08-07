@@ -147,8 +147,55 @@ later analysis splits `"database.read"` at the dot.
 11  re-run the ComponentContract matrix             DONE
 12  semantic effect facets; phase rules consume     DONE — the family check
     them; delete the family check                    is deleted
-13  deployment planning                             **NEXT**
+13  deployment planning                             see the sequence below
 ```
+
+### The architect's sequence of 2026-08-07, fifth ruling
+
+```text
+1  unresolved facet markers are a build error   DONE — PW5204
+2  canonical policy-keyword coverage guard      DONE — directional, with the
+                                                 mutation that motivated it
+3  session.read: capability + topology, not     NEXT
+   guessed placement
+4  freeze the placement migration matrix
+5  deployment planning on ontology + topology
+6  delete World::worlds_for
+7  boundary-transfer local/remote binding feasibility
+8  WIT generation
+```
+
+**Step 3, specified.** `session.read` declares `placement browser, edge, origin`
+today, derived from `Label::may_hold`'s rule for a session-restricted value.
+That conflates two questions:
+
+```text
+Session<A>      who may observe the value
+session.read    the authority needed to obtain session state
+```
+
+It should declare `capability session.read` and **no intrinsic placement**, and
+the topology should say which nodes provide it. Then the same program gets a
+different feasible deployment under a different topology, which is the point.
+
+Do this BEFORE deleting `worlds_for`, so the migration matrix catches any
+accidental placement movement.
+
+**Step 6's discipline**, per the ruling: freeze current placement results, make
+planning consume ontology + topology only, delete the table, require every
+intended row unchanged, classify any that moved. **No fallback afterwards** — an
+undeclared effect must be diagnosed, not interpreted by legacy placement
+knowledge.
+
+**Step 5's shape**, settled:
+
+```text
+candidate nodes = contract.allowed_placements
+                  ∩ nodes satisfying required_capabilities
+```
+
+`admit(component, node)` stays local; the planner composes those local facts and
+never makes `admit` recursive.
 
 **Nothing in the effect ontology is outstanding.** The chain is:
 

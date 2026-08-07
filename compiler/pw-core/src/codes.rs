@@ -275,6 +275,16 @@ codes! {
         "an effect must name an operation its family declares";
     EFFECT_ARITY_MISMATCH = "PW5203" / effect_arity_mismatch / 1, Capability,
         "an effect must be given exactly the type arguments its declaration binds";
+    // A PLATFORM error rather than an application one: it is the effect
+    // declaration that is wrong, and the program writing the effect is fine.
+    //
+    // `impact layout_write when LayoutAffect` naming nothing is the shape
+    // `LayoutAffect` itself had for three milestones — source that looks
+    // meaningful while the compiler quietly assigns it none. Inert for one
+    // commit, which was better than a spelling fallback and still wrong: a
+    // package could lose an import and a facet would stop applying in silence.
+    UNRESOLVED_IMPACT_MARKER = "PW5204" / unresolved_impact_marker / 1, Capability,
+        "an effect's impact condition must name a type the declaring module can see";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must

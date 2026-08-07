@@ -485,3 +485,147 @@ fn a_family_only_check_cannot_see_a_layout_affecting_write() {
     // the animate/layout rule ever fires.
     assert_eq!(family_of("layout.measure"), "layout");
 }
+
+// --- the two integrity guards ------------------------------------------------
+
+#[test]
+fn an_impact_condition_that_names_nothing_is_a_build_error() {
+    // Architect ruling, 2026-08-07:
+    //
+    // > Silently dropping `impact layout_write when LayoutAffect` because
+    // > `LayoutAffect` failed to resolve recreates the same class of problem
+    // > that `LayoutAffect` already exposed: source looks meaningful, compiler
+    // > quietly assigns it no meaning.
+    //
+    // It was inert for one commit. Inert is better than a textual fallback and
+    // still wrong: a package could lose an import and the facet would stop
+    // applying with nothing said.
+    let broken = "module p\n\nprelude Effect\n\n\
+                  effect style.mutate<T> {\n    \
+                  capability none\n    \
+                  impact     layout_write when NoSuchMarker\n}\n";
+    let found = pw_core::check::check_sources(&[("p.pw".to_string(), broken.to_string())]);
+    let codes: Vec<&str> = found
+        .iter()
+        .flat_map(|(_, ds)| ds.iter().map(|d| d.code))
+        .collect();
+    assert!(codes.contains(&"PW5204"), "{codes:?}");
+
+    // The neighbour: the same declaration with the marker declared here.
+    let ok = "module p\n\nprelude Effect\n\ntype LayoutAffect = LayoutAffect {}\n\n\
+              effect style.mutate<T> {\n    \
+              capability none\n    \
+              impact     layout_write when LayoutAffect\n}\n";
+    let found = pw_core::check::check_sources(&[("p.pw".to_string(), ok.to_string())]);
+    let codes: Vec<&str> = found
+        .iter()
+        .flat_map(|(_, ds)| ds.iter().map(|d| d.code))
+        .collect();
+    assert!(!codes.contains(&"PW5204"), "{codes:?}");
+}
+
+/// **Every policy head written in a package must be one the parser knows.**
+///
+/// Architect ruling, 2026-08-07, after `impact` was written in
+/// `packages/pw-platform-web/effects.pw` for a whole commit while
+/// `POLICY_KEYWORDS` did not contain it:
+///
+/// > That is too dangerous to leave as convention.
+///
+/// An unregistered policy keyword parses as nothing. The clause vanishes, the
+/// declaration still checks clean, and every rule reading that clause quietly
+/// gets an empty answer — the phase rules stopped firing entirely and nothing
+/// errored. It is the policy-clause equivalent of the diagnostic registry.
+///
+/// **Directional**: `POLICY_KEYWORDS` is the source of truth and package source
+/// may only use heads from it. There is deliberately no second list of expected
+/// package policy names to drift against the first.
+#[test]
+fn every_policy_head_written_in_a_package_is_one_the_parser_knows() {
+    let (unknown, scanned) = package_policy_heads();
+    assert!(
+        scanned >= 15,
+        "the scan read {scanned} effect declarations, which is implausibly few"
+    );
+    assert!(
+        unknown.is_empty(),
+        "these policy clauses are written in a package and the parser discards \
+         them, silently:\n  {}\n\n\
+         Add the keyword to `pw_syntax::grammar::POLICY_KEYWORDS`, or fix the \
+         spelling. A clause the parser does not know does not become a `Policy` \
+         node at all, so every rule that reads it sees nothing and says nothing.",
+        unknown.join("\n  ")
+    );
+}
+
+#[test]
+fn the_policy_head_guard_can_detect_an_unknown_clause() {
+    // The control. "No unknown heads" is what a broken scanner says too.
+    let heads =
+        heads_of("module p\n\neffect a.b {\n    capability none\n    impakt layout_write\n}\n");
+    assert!(heads.contains(&"capability".to_string()), "{heads:?}");
+    assert!(
+        heads.contains(&"impakt".to_string()),
+        "the scan must SEE the misspelled head, or it cannot judge it: {heads:?}"
+    );
+    assert!(!pw_syntax::grammar::POLICY_KEYWORDS.contains(&"impakt"));
+}
+
+/// Every clause head inside an `effect { .. }` block, from source text.
+///
+/// From the TEXT rather than from `Policy` nodes, deliberately: an unrecognised
+/// head produces no node, so a scan over the tree would be blind to exactly the
+/// thing this looks for.
+fn heads_of(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    for line in src.lines() {
+        let l = line.trim();
+        if l.is_empty() || l.starts_with("//") {
+            continue;
+        }
+        if depth > 0
+            && let Some(head) = l.split_whitespace().next()
+            && head.chars().all(|c| c.is_alphanumeric() || c == '_')
+            && l != "}"
+        {
+            out.push(head.to_string());
+        }
+        depth += l.matches('{').count() as i32 - l.matches('}').count() as i32;
+        if !l.starts_with("effect ") && depth <= 0 {
+            depth = 0;
+        }
+        if l.starts_with("effect ") && l.ends_with('{') {
+            depth = 1;
+        }
+    }
+    out
+}
+
+fn package_policy_heads() -> (Vec<String>, usize) {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages");
+    let mut unknown = Vec::new();
+    let mut scanned = 0usize;
+    for d in ["pw-std", "pw-platform-web"] {
+        for e in std::fs::read_dir(root.join(d)).expect("package") {
+            let p = e.expect("entry").path();
+            if p.extension().and_then(|x| x.to_str()) != Some("pw") {
+                continue;
+            }
+            let src = std::fs::read_to_string(&p).expect("read");
+            let file = p.file_name().unwrap().to_string_lossy().to_string();
+            scanned += src
+                .lines()
+                .filter(|l| l.trim_start().starts_with("effect "))
+                .count();
+            for head in heads_of(&src) {
+                if !pw_syntax::grammar::POLICY_KEYWORDS.contains(&head.as_str()) {
+                    unknown.push(format!("{file}: `{head}`"));
+                }
+            }
+        }
+    }
+    unknown.sort();
+    unknown.dedup();
+    (unknown, scanned)
+}

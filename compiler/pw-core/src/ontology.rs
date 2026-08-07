@@ -227,11 +227,31 @@ pub struct Impact {
     /// impact is unconditional.
     ///
     /// A `DefId` rather than a name, so matching an instance's argument is
-    /// identity comparison. `Some(None)` — written but unresolvable — makes the
-    /// clause inert rather than matching by spelling: an unresolved marker is
-    /// the `LayoutAffect` situation all over again, and silently falling back
-    /// to text is how it survived three milestones.
-    pub when: Option<Option<DefId>>,
+    /// identity comparison. The written spelling is carried beside it only so
+    /// a diagnostic can name what failed to resolve.
+    ///
+    /// An unresolved marker is a **compile error** — `PW5204`. Architect
+    /// ruling, 2026-08-07:
+    ///
+    /// > Silently dropping `impact layout_write when LayoutAffect` because
+    /// > `LayoutAffect` failed to resolve recreates the same class of problem
+    /// > that `LayoutAffect` already exposed: source looks meaningful, compiler
+    /// > quietly assigns it no meaning.
+    ///
+    /// It was inert for one commit. Inert is better than a textual fallback and
+    /// still wrong: a package could lose an import and the facet would stop
+    /// applying with nothing said.
+    pub when: Option<Marker>,
+}
+
+/// The marker an `impact .. when ..` clause names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Marker {
+    pub written: String,
+    /// `None` when nothing in the declaring module's scope declares it, which
+    /// is `PW5204` and never a spelling match.
+    pub def: Option<DefId>,
+    pub span: Span,
 }
 
 /// **A resolved effect.** What every analysis downstream consumes.
@@ -474,8 +494,7 @@ impl Ontology {
             .iter()
             .filter(|i| match &i.when {
                 None => true,
-                Some(Some(marker)) => args.contains(marker),
-                Some(None) => false,
+                Some(m) => m.def.is_some_and(|marker| args.contains(&marker)),
             })
             .map(|i| i.facet)
             .collect()
@@ -601,13 +620,13 @@ impl Ontology {
             .iter()
             .filter(|i| match &i.when {
                 None => true,
-                Some(Some(marker)) => args
-                    .iter()
-                    .any(|a| matches!(a, TypeArgument::Type { def, .. } if def == marker)),
-                // Written and unresolvable: inert. Falling back to a spelling
-                // match here would rebuild the defect this whole slice exists
-                // to remove.
-                Some(None) => false,
+                // By `DefId`. An unresolved marker contributes nothing AND is
+                // reported as `PW5204` — see `check_effect_declarations`. There
+                // is deliberately no spelling comparison in this expression.
+                Some(m) => m.def.is_some_and(|marker| {
+                    args.iter()
+                        .any(|a| matches!(a, TypeArgument::Type { def, .. } if *def == marker))
+                }),
             })
             .map(|i| i.facet)
             .collect();
@@ -780,9 +799,13 @@ fn impact_clauses(decl: &Decl, ws: &Workspace, unit: usize) -> Vec<Impact> {
             };
             Some(Impact {
                 facet: Facet::named(facet)?,
-                when: marker.map(|m| match ws.resolve_in(unit, Namespace::Type, m) {
-                    Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
-                    _ => None,
+                when: marker.map(|m| Marker {
+                    written: m.to_string(),
+                    def: match ws.resolve_in(unit, Namespace::Type, m) {
+                        Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+                        _ => None,
+                    },
+                    span: p.span.clone(),
                 }),
             })
         })
@@ -841,6 +864,65 @@ fn distance(a: &str, b: &str) -> usize {
         std::mem::swap(&mut prev, &mut row);
     }
     prev[b.len()]
+}
+
+/// Report every effect DECLARATION whose impact condition names nothing.
+///
+/// `PW5204`. Separate from [`check_effect_rows`] because the mistake is in the
+/// declaration, not in any program that writes the effect — a platform package
+/// with this defect silently stops applying a facet, and every application
+/// checked against it looks fine.
+pub fn check_effect_declarations(
+    ontology: &Ontology,
+    out: &mut Vec<crate::diagnostics::Diagnostic>,
+    unit: usize,
+) {
+    use crate::codes;
+    use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
+
+    for decl in ontology.declarations() {
+        if decl.def.0.unit != unit {
+            continue;
+        }
+        for impact in &decl.impacts {
+            let Some(marker) = &impact.when else { continue };
+            if marker.def.is_some() {
+                continue;
+            }
+            out.push(Diagnostic {
+                code: codes::UNRESOLVED_IMPACT_MARKER.id,
+                invariant: codes::UNRESOLVED_IMPACT_MARKER.invariant,
+                reason: "impact_condition_names_nothing",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` conditions `{}` on `{}`, which this module cannot see",
+                    decl.path.text(),
+                    impact.facet.name(),
+                    marker.written
+                ),
+                primary_span: marker.span.clone(),
+                related: vec![Related {
+                    span: marker.span.clone(),
+                    label: format!(
+                        "`{}` names no type here, so the impact would never apply",
+                        marker.written
+                    ),
+                }],
+                explanation: Some(
+                    "An impact condition is matched by resolved identity, never by                      spelling — which is what stops a marker from meaning whatever a                      reader assumes. A marker that resolves to nothing therefore                      matches nothing, and the facet silently stops applying: the                      program still checks clean and a phase rule quietly sees an                      effect with no consequences. That is exactly what                      `style.mutate<LayoutAffect>` did for three milestones while                      `LayoutAffect` was declared nowhere."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: format!(
+                        "import the module that declares `{}`, or declare it here",
+                        marker.written
+                    ),
+                    replacement: None,
+                }],
+            });
+        }
+    }
 }
 
 /// Report every effect row in one unit against the ontology.
