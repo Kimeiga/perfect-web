@@ -4,13 +4,57 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ---
 
-## Now: E8, the remaining half
+## Now: the architect's sequence of 2026-08-07 (second ruling)
 
-`runtime/pw-host` decides admission and audits artifacts. What it does not yet
-do is *run* anything.
+Ten steps. 1 is partly done; 2-10 are not started.
 
-| # | task | acceptance |
+| # | task | state |
 |---|---|---|
+| 1 | Delete program-wide-unique resolution | **partly done** — see below |
+| 2 | Build-time diagnostic for an unresolved capability argument | not started |
+| 3 | Placement consumes `effective_effects` | not started |
+| 4 | The deployment planner abstraction | not started |
+| 5 | Freeze `ComponentBinding` / remote-capable semantics | not started |
+| 6 | Generate WIT worlds from semantic contracts | not started |
+| 7 | Typed linking only from `Granted` | not started |
+| 8 | Run real `add_to_cart` through Wasmtime | not started |
+| 9 | Fuel and memory limits | not started |
+| 10 | Replace `worlds_for` with declared node topology | not started |
+
+### Step 1, what is done and what is not
+
+**Done.** A member resolves through its receiver's type. `Types::of_body` gives
+a callback's parameter the element type of the collection it is applied to;
+`effect_rows` consumes that environment instead of building a narrower one;
+`param_pattern` binds `fn(el)` parameters, which it never did
+(`docs/RISK_QUEUE.md` 35). The program-wide-unique fallback is deleted and the
+corpus is 46/46 without it.
+
+**Not done — two items, both from the ruling.**
+
+1. **The package-declared prelude facility.** Nothing currently needs it: every
+   corpus file imports what it uses. It is a language feature the architect
+   asked for, not a repair, and it should be designed rather than bolted on.
+   Acceptance: `pw-std` declares its prelude in package metadata; the compiler
+   imports it automatically; no name list is hard-coded in a checker.
+
+2. **The structural test that no correctness path performs global last-segment
+   uniqueness lookup.** Nine `rsplit('.')` sites remain in `pw-core`:
+
+   ```text
+   affine.rs:399     check.rs:638      check.rs:1174
+   effects.rs:485    effects.rs:550    koka.rs:314
+   labels.rs:161     layout.rs:347     template_ir.rs:880
+   ```
+
+   `effects.rs:550` is the scoped-and-unique branch and is fine. The other eight
+   are unexamined. The test should be an allow-list in the shape of
+   `name-keyed-allow.txt`, and **each entry needs a reason someone has actually
+   verified** — writing eight reasons without reading eight call sites is the
+   failure this project exists to avoid, so it was left undone rather than
+   filled in.
+
+---|---|---|
 | 1 | Generate a WIT world per `ComponentContract` | the world's imports are exactly `contract.imports`, and `wit-bindgen` accepts it |
 | 2 | Typed linking from a `Granted` | `linkable()`'s list becomes real `Linker` entries; a component whose contract omits an import fails to instantiate, with the engine's own diagnostic |
 | 3 | Run the store's `add_to_cart` as a component | the dev server's command path goes through the host instead of a Rust closure |
