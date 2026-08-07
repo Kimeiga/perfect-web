@@ -43,6 +43,29 @@ What remains for E8 is in `docs/NEXT.md`: WIT world generation, typed linking
 from a `Granted`, running a real command through the host, per-instance fuel and
 memory limits, and retiring `worlds_for` in favour of the declared topology.
 
+**The effect ontology is pulled forward ahead of WIT** (architect ruling,
+2026-08-07), so E8 does not freeze today's stringly effect vocabulary into the
+ABI. Three slices are done:
+
+```text
+1  the declaration form      effect database.read<T> { capability … host … }
+2  resolution                EffectPath → EffectDefId → EffectInstance
+3  the vocabulary            25 effects declared, 0 written and undeclared
+```
+
+`pw-core/ontology.rs` is the only place a dotted effect name is split, and
+`tests/last_segment.rs` fails if a second one appears. It is the first
+production consumer of ADR-0022's semantic provenance: every transition records
+an edge, and a resolution that fails records nothing — which a mutation
+verified, and which was wrong when first written.
+
+**Two open rulings block the rest**, both stated with measured counts in
+`docs/NEXT.md`: which arity `database.read` and `style.mutate` have, since the
+corpus writes each both ways; and whether `capability none` or
+`World::worlds_for` is right about `dom`, `style`, `layout`, `animation` and
+`paint` — they disagree, and the answer changes what every browser-placed
+component asks the host for.
+
 **E7, closed.** The **real store page** is rendered by the own renderer, its
 handlers are authorised by `decide()` before they attach, and a click updates
 only the cart's part while every menu node keeps its identity. A click changes

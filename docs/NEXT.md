@@ -140,7 +140,7 @@ later analysis splits `"database.read"` at the dot.
    EffectPath → EffectDefId → EffectInstance, 16 controls
 3  declare the concrete effects — no wildcards       DONE — 25 declared, 0 undeclared
 4  unknown family / operation / arity diagnostics    BLOCKED on the arity ruling below
-5  `interface_for` becomes declaration-driven
+5  `interface_for` becomes declaration-driven   UNBLOCKED, needs its own ruling
 6  metamorphic controls for the effect-propagation headline cases
 7  deployment planning
 ```
@@ -193,6 +193,35 @@ that "receiver-directed resolution removed the reason the platform needed
 ambient visibility". An effect vocabulary every file writes is a demonstrated
 need for implicit imports, which is the condition the deferral named. Step 4
 cannot be wired without answering it.
+
+### Step 5 is unblocked, and it is not the small change it looks like
+
+`interface_for(family) -> format!("pw:host/{family}")` is the last hard-coded
+thing in the capability path, and every effect now declares the `host` clause
+that replaces it. For `database.read` and `database.write` — the only host
+imports in `docs/evidence/E8/component-contracts.json` — the declared string
+and the formatted one are **identical**, so the evidence does not change and
+would not detect the switch. A test needs an effect where they differ;
+`secret<Payments>` is one (`pw:host/secrets#get` declared,
+`pw:host/secret#use` formatted).
+
+**But making it declaration-driven changes what browser components ask for.**
+`World::worlds_for` restricts twelve families, and `Capability::resolve` treats
+"restricted family" as "needs a host capability" — so `dom.mutate` today emits
+`Import { pw:host/dom, mutate }`, asking a host to grant the document. The
+declarations say `capability none` for `dom`, `style`, `layout`, `animation`
+and `paint`, because those are constrained by PLACEMENT rather than by a grant:
+a component in the browser world has the DOM by being there.
+
+Both cannot be right. The ontology's reading is the one the milestone exists to
+establish — three facts, not one string — but acting on it removes host imports
+from every browser-placed component's contract, which is a change to what the
+compiler tells the host and not a refactor. It wants a ruling and its own
+commit, with the before/after contract sets as evidence.
+
+Deliberately not started: `docs/RISK_QUEUE.md`'s admissibility rule wants the
+instrument before the measurement, and the instrument here is a contract diff
+nobody has generated yet.
 
 ### Slice 2 — what remains
 
