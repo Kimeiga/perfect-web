@@ -67,12 +67,53 @@ unknown operation and unknown argument are all compile errors, legitimate
 non-authority effects stay valid *because they are declared*, and no checker
 contains a hard-coded list of valid family spellings.
 
+### The grammar decision this needs first — NOT YET MADE
+
+Three questions, each of which changes the parser, and none of which should be
+answered in a hurry:
+
+**1. Dotted effect names.** `effect database.read<T>` names a family and an
+operation. Every existing declaration form takes a simple `Name`, so
+`fn name(&mut self)` in `pw-syntax/src/grammar.rs` would have to accept a dotted
+head — or the form becomes `effect database { operation read<T> { .. } }`,
+which nests and keeps `name()` untouched. The flat spelling matches how effects
+are WRITTEN in rows; the nested one matches how they are grouped.
+
+**2. Type parameters on a declaration.** `<T>` is a binder, and no declaration
+form currently binds a type variable — `opaque type Secret<C>` does, so the
+syntax exists; whether the effect form reuses that path or gets its own is
+untested.
+
+**3. Where they live.** `pw-std` for `log`/`trace`, `pw-platform-web` for the
+rest. That splits the vocabulary across two packages, which is right — a
+non-web host has no `dom.mutate` — but the corpus checks the platform packages
+together, so the split is not exercised until something checks one alone.
+
+### The vocabulary that must be declared
+
+From the corpus as it stands, so nothing silently loses its meaning:
+
+```text
+database.read<T>   database.write<T>   database.transaction
+secret.read<T>     secret<T>
+dom.mutate         dom.read            style.mutate<T>
+layout.measure     animation.composite paint.custom
+observe.*          device.location
+network.fetch      cache.read          cache.write
+resource.acquire<T>  resource.release<T>
+durable.*          log                 trace
+```
+
+Roughly twenty-five, and each one wrong is a corpus file that stops meaning what
+it says — `LayoutAffect` (`docs/RISK_QUEUE.md` 37) is what one missing
+declaration already cost.
+
 ### The order to work in
 
 ```text
-1a  repair the two forbidden last-segment sites
-3   placement consumes effective_effects
-    the effect/capability ontology above
+1a  repair the two forbidden last-segment sites          DONE
+3   placement consumes effective_effects                 DONE
+    the effect/capability ontology above                 NEXT — grammar decision first
 4   the remaining unknown-family / unknown-operation diagnostics
 5   deployment planner
 6   boundary-transfer-derived component binding
