@@ -432,6 +432,20 @@ impl Materializer {
         Ok(ids)
     }
 
+    /// Set a state value inside a command's transaction.
+    ///
+    /// Exposed so a caller writes state without composing SQL. The transaction
+    /// is the caller's — this is the write, not the boundary — and a caller
+    /// that reached for `rusqlite` directly would be taking a dependency on
+    /// the store this crate exists to own.
+    pub fn set_state(tx: &rusqlite::Transaction<'_>, name: &str, value: &str) {
+        tx.execute(
+            "INSERT OR REPLACE INTO state (name, value) VALUES (?1, ?2)",
+            params![name, value],
+        )
+        .expect("state write");
+    }
+
     /// Read a state value, for tests that check the state and the outbox agree.
     pub fn state(&self, name: &str) -> Option<String> {
         let db = self.db();

@@ -40,7 +40,12 @@ const parts = JSON.parse(document.getElementById("pw-parts")?.textContent ?? "{}
 
 /** `[[eachPartId, token], ...]` → a stable string key. */
 function addressOf(path, part) {
-  return `${path.map(([e, t]) => `${e}@${t}`).join("/")}|${part}`;
+  // Matches `pw_document::PartAddress::key` exactly. A second spelling would
+  // be a second entry in the index for one location, and a patch aimed at the
+  // other spelling would find nothing — silently, because "no such address" and
+  // "nothing to do" look the same from here.
+  const frames = path.map(([e, t]) => `${e}@${t}`);
+  return `${parts.schema}/${frames.join("/")}|${part}`;
 }
 
 /** address → { element } or { start, end } */
@@ -263,53 +268,131 @@ async function attach() {
   document.documentElement.dataset.pwReady = "1";
 }
 
-// --- the resource subscription -------------------------------------------
+// --- the protocol ---------------------------------------------------------
 //
-// The page holds a VERSION. A response carrying a version no newer than the one
-// held changes nothing — which is what makes a late arrival harmless, and it
-// has to be here rather than in the transport: the transport is what delivers
-// out of order.
+// The browser knows five things: `ResourceEntryId`, `Version`, `PartAddress`,
+// `StreamFrame` and `Patch`. It does not know `EntryKey`, SQLite, outbox rows,
+// compiler graph nodes or anything else the server owns.
+//
+// Held versions are per ENTRY, not per page: `Store(47)` at 8 and
+// `Cart(session_A)` at 14 are two independent facts, and one page version
+// would make either one lie.
 
-let version = 0;
+/**
+ * ResourceEntryId → the version the DOCUMENT reflects.
+ *
+ * Advanced only when a patch is applied. Hearing that newer state exists is a
+ * different fact and lives in `known`.
+ */
+const held = new Map();
+
+/** ResourceEntryId → the newest version the server has told us about. */
+const known = new Map();
+
+/** The addresses the last frame batch updated, for the tests to read. */
+window.__pw.updated = [];
+
+/**
+ * Would applying this basis move any dependency backward?
+ *
+ * Asked over EVERY entry, because a patch derived from a fresh cart and a
+ * stale promotion would show a total computed from state the page has already
+ * moved past. An empty basis has no causal claim and is refused: "no basis" is
+ * not "any basis".
+ */
+function isNewer(basis) {
+  const resources = basis?.resources ?? [];
+  if (resources.length === 0) return false;
+  let advances = false;
+  for (const r of resources) {
+    const current = held.get(r.entry);
+    if (current === undefined) {
+      advances = true;
+    } else if (r.version < current) {
+      return false;
+    } else if (r.version > current) {
+      advances = true;
+    }
+  }
+  return advances;
+}
+
+/** The index key for a `PartAddress`, matching `pw_document::PartAddress::key`. */
+function addressKey(address) {
+  const path = (address.instances ?? []).map((f) => `${f.scope}@${f.instance}`);
+  return `${address.template}/${path.join("/")}|${address.part}`;
+}
+
+function applyFrame(frame) {
+  if (frame.protocol !== undefined && frame.protocol !== 1) {
+    // Incomparable, not different. A frame from another protocol version is
+    // refused before anything it contains is interpreted.
+    log.push(`refused frame: protocol ${frame.protocol}`);
+    return;
+  }
+  switch (frame.frame) {
+    case "resource_changed":
+      // A NOTICE, not an application.
+      //
+      // `held` is what the DOCUMENT reflects, and hearing that newer state
+      // exists does not make the document reflect it. A first version advanced
+      // `held` here, and then the patch that realized the same version
+      // advanced nothing and was refused as stale — the page stayed at 0 while
+      // both frames arrived and both were "handled".
+      //
+      // What a notice is for: a subscriber with no patch coming may refetch,
+      // and one that has already applied a patch learns nothing new.
+      known.set(frame.entry, frame.version);
+      log.push(`resource ${frame.entry.slice(0, 8)} at ${frame.version}`);
+      return;
+
+    case "patch": {
+      if (!isNewer(frame.basis)) {
+        window.__pw.ignored = (window.__pw.ignored ?? 0) + 1;
+        log.push(`ignored a patch that advances nothing`);
+        return;
+      }
+      for (const r of frame.basis.resources) held.set(r.entry, r.version);
+      const key = addressKey(frame.target);
+      const op = frame.operation;
+      if (op.op === "replace_text" && setRange(key, op.text)) {
+        window.__pw.updated.push(key);
+        const at = frame.basis.resources.map((r) => r.version).join(",");
+        log.push(`updated ${key} at version ${at}`);
+      }
+      return;
+    }
+
+    case "recovery":
+      // Never "try anyway".
+      log.push(`recovery: ${JSON.stringify(frame.recovery)}`);
+      return;
+
+    default:
+      log.push(`unknown frame`);
+  }
+}
 
 async function subscribe() {
   for (;;) {
-    let next;
+    let frames;
     try {
-      const response = await fetch(`/resource/Cart?since=${version}`);
-      next = await response.json();
+      const response = await fetch("/stream");
+      frames = await response.json();
     } catch {
       return; // the page is going away
     }
-    if (!receive(next)) {
-    }
+    window.__pw.updated = [];
+    for (const frame of frames) applyFrame(frame);
   }
 }
 
-/**
- * Take a resource value if it is newer than what is held.
- *
- * The version guard lives HERE rather than in the transport, because the
- * transport is what delivers out of order. A subscription that re-established
- * itself, a retried request or a slow response can all arrive after a newer
- * one, and a page that applied whatever arrived last would show an older cart
- * than the server has.
- */
-function receive(next) {
-  if (next.version > version) {
-    version = next.version;
-    apply(next);
-    return true;
-  }
-  log.push(`ignored version ${next.version}, holding ${version}`);
-  window.__pw.ignored = (window.__pw.ignored ?? 0) + 1;
-  return false;
-}
-
-// Exposed so a test can deliver a value out of order. The transport cannot be
+// Exposed so a test can deliver a frame out of order. A transport cannot be
 // made to do that on demand, and the property is about the page's guard rather
 // than about the transport.
-window.__pwTestApply = receive;
+window.__pwTestApply = applyFrame;
+window.__pwHeld = () => Object.fromEntries(held);
+window.__pwKnown = () => Object.fromEntries(known);
 
 /** Update every part whose value the resource carries. */
 function apply(values) {

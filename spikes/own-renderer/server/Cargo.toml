@@ -1,0 +1,23 @@
+[package]
+name = "pw-dev-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# E7-P's development host. NOT E8's production host.
+#
+# Its deletion condition is explicit: E8 replaces it with the
+# capability-constrained production host while preserving the `pw-protocol`
+# browser boundary. Saying that here is what stops a temporary adapter quietly
+# becoming architecture.
+
+[dependencies]
+pw-document = { path = "../../../runtime/pw-document" }
+pw-materialize = { path = "../../../runtime/pw-materialize" }
+pw-protocol = { path = "../../../runtime/pw-protocol" }
+pw-render = { path = "../../../runtime/pw-render" }
+pw-resource = { path = "../../../runtime/pw-resource" }
+serde.workspace = true
+serde_json.workspace = true

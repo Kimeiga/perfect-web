@@ -119,7 +119,9 @@
       "node": "resource",
       "partition": "private",
       "privacy": "session",
-      "key": [],
+      "key": [
+        "session"
+      ],
       "params": [
         "session"
       ]
@@ -224,6 +226,14 @@
       "kind": "reads",
       "key": [
         "id"
+      ]
+    },
+    {
+      "from": "store.page.Cart",
+      "to": "Events.CartChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "session"
       ]
     },
     {

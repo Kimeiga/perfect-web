@@ -251,6 +251,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pw-dev-server"
+version = "0.0.0"
+dependencies = [
+ "pw-document",
+ "pw-materialize",
+ "pw-protocol",
+ "pw-render",
+ "pw-resource",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pw-document"
 version = "0.0.0"
 dependencies = [

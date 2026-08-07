@@ -133,8 +133,12 @@ test.describe("the update touches only what changed", () => {
     const pw = await page.evaluate(() => window.__pw);
     const cart = pw.parts.parts.find((p) => p.value === "cart.line_count");
     // One ADDRESS, not one id: the cart part is outside every loop, so its
-    // instance path is empty and it has exactly one live instance.
-    expect(pw.updated, "exactly the cart's part").toEqual([`|${cart.id}`]);
+    // instance path is empty and it has exactly one live instance. The address
+    // is `PartAddress::key` — schema, path, part — because the browser index
+    // and `pw_document` must spell it the same way or a patch finds nothing.
+    expect(pw.updated, "exactly the cart's part").toEqual([
+      `${pw.parts.schema}/|${cart.id}`,
+    ]);
   });
 
   test("the menu's nodes keep their identity across the update", async ({ page }) => {

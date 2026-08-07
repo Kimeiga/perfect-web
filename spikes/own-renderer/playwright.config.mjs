@@ -1,6 +1,9 @@
-// The own renderer's pages are static files, so the "server" is a file server
-// and nothing else. That is the point of gate 1: no framework runs at request
-// time because there is nothing to run.
+// The own renderer's pages come from a Rust development server that owns
+// `pw-materialize`, `pw-resource`, `pw-render` and `pw-protocol`. The browser
+// sees only the protocol.
+//
+// Not E8's production host: its deletion condition is that E8 replaces it with
+// the capability-constrained one while preserving the `pw-protocol` boundary.
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.PORT ?? 3141);
@@ -15,11 +18,8 @@ export default defineConfig({
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
-  // A ~50-line Node server, not a framework: the pages are files `pw-render`
-  // produced, and the one dynamic route exists because a command has to go
-  // somewhere. A framework here would be a second thing under test.
   webServer: {
-    command: `node server.mjs`,
+    command: `../../target/debug/pw-dev-server dist`,
     env: { PORT: String(PORT) },
     port: PORT,
     reuseExistingServer: false,

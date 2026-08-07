@@ -13,6 +13,7 @@ members = [
     "runtime/pw-resume-wasm",
     "runtime/pw-tasks",
     "spikes/compiler-diagnostic",
+    "spikes/own-renderer/server",
     "tools/corpus-check",
     "tools/fuzz",
 ]

@@ -98,6 +98,7 @@ fi
 # cannot find the browsers this workspace installed, so every engine but the
 # one already present reports "browser not installed" — a harness failure that
 # reads exactly like a renderer failure.
+cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" -p pw-dev-server
 PORT="$PORT" pnpm exec playwright test --reporter=list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -40
 
 {

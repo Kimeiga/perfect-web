@@ -108,27 +108,73 @@ test("a duplicate committed event causes no second transition", async ({ page, r
 });
 
 test("a stale version does not overwrite newer state", async ({ page }) => {
-  // The property an asynchronous subscription creates the need for. Asserted
-  // by feeding the page an OLD version directly: the transport is what
-  // delivers out of order, so the guard has to be in the page.
+  // The property an asynchronous transport creates the need for. Asserted by
+  // feeding the page an OLD frame directly: a transport cannot be made to
+  // deliver out of order on demand, and the guard is the PAGE's — it has to
+  // be, because the transport is what reorders.
   await ready(page);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
 
-  const ignoredBefore = await page.evaluate(() => window.__pw.ignored ?? 0);
-  await page.evaluate(() => {
-    // Version 0 — older than what the page holds after one commit.
-    window.__pwTestApply?.({ "cart.line_count": 99, version: 0 });
-  });
-  await page.waitForTimeout(200);
-  await expect(page.locator("#cart-count"), "the older value is refused").toHaveText("1");
+  const state = await page.evaluate(() => ({
+    held: window.__pwHeld(),
+    parts: window.__pw.parts,
+  }));
+  const [entry, version] = Object.entries(state.held)[0];
+  const cart = state.parts.parts.find((p) => p.value === "cart.line_count");
+  const target = { template: state.parts.schema, instances: [], part: cart.id };
 
-  // And the control: a NEWER version is applied, so the guard is a comparison
-  // rather than a refusal of everything.
-  await page.evaluate(() => {
-    window.__pwTestApply?.({ "cart.line_count": 42, version: 9999 });
+  const frame = (v, text) => ({
+    frame: "patch",
+    protocol: 1,
+    basis: { resources: [{ entry, version: v }] },
+    target,
+    operation: { op: "replace_text", text },
   });
-  await page.waitForTimeout(200);
+
+  await page.evaluate((f) => window.__pwTestApply(f), frame(version - 1, "99"));
+  await page.waitForTimeout(100);
+  await expect(page.locator("#cart-count"), "an older basis is refused").toHaveText("1");
+
+  // The control: a NEWER basis IS applied, so the guard is a comparison
+  // rather than a refusal of everything.
+  await page.evaluate((f) => window.__pwTestApply(f), frame(version + 100, "42"));
+  await page.waitForTimeout(100);
   await expect(page.locator("#cart-count")).toHaveText("42");
-  void ignoredBefore;
+});
+
+test("a frame from another protocol version is refused", async ({ page }) => {
+  // Incomparable, not different — before anything it contains is interpreted.
+  await ready(page);
+  await page.evaluate(() => {
+    window.__pwTestApply({
+      frame: "patch",
+      protocol: 99,
+      basis: { resources: [{ entry: "x", version: 9999 }] },
+      target: { template: "t", instances: [], part: 4 },
+      operation: { op: "replace_text", text: "666" },
+    });
+  });
+  await page.waitForTimeout(100);
+  await expect(page.locator("#cart-count")).toHaveText("0");
+  const log = await page.evaluate(() => window.__pw.log.join("\n"));
+  expect(log).toMatch(/refused frame: protocol 99/);
+});
+
+test("a notice is not an application", async ({ page }) => {
+  // The defect wiring the real materializer found. A `resource_changed` frame
+  // says newer state EXISTS; it does not make the document reflect it. A first
+  // version advanced the held version on the notice, so the patch that
+  // realized the same version advanced nothing and was refused as stale — and
+  // both frames were "handled" while the page stayed at 0.
+  await ready(page);
+  await page.locator("#menu button").first().click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+
+  const state = await page.evaluate(() => ({
+    held: window.__pwHeld(),
+    known: window.__pwKnown(),
+  }));
+  expect(Object.keys(state.known).length, "a notice was received").toBeGreaterThan(0);
+  expect(Object.keys(state.held).length, "and a patch was applied").toBeGreaterThan(0);
 });

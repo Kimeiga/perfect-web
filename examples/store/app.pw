@@ -60,12 +60,25 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
 // `session` modifier gives it is what makes putting it in the shared cache a
 // compile error rather than a leak nobody notices.
 session query Cart(session: SessionId) -> Result<Cart, CartError>
-    freshness     0.seconds
-    consistency   read_your_writes
-    cache         private
-    concurrency   one_per_key
-    on_key_change cancel
-    timeout       2.seconds
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session
+    // Which event concerns this resource. `add_to_cart` declares `invalidates
+    // Cart(..)` — that is the COMMAND saying which cache entry it drops — and
+    // this is the RESOURCE saying which fact about the world it depends on.
+    // They are different statements and the materializer needs the second: it
+    // consumes events, and an event nothing declares an interest in reaches
+    // nothing.
+    //
+    // Without this line the graph was correct and the page never updated: the
+    // event was emitted, committed, drained, and matched no listener. Found by
+    // wiring the real materializer to the browser, which is exactly what the
+    // Node stand-in could not have found.
+    invalidates_on CartChanged(session)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
 {
     Carts.current(session)
 }
