@@ -39,9 +39,17 @@ its WIT world and its component demands fifteen, because Rust `std` on
 `wasm32-wasip2` injects fourteen `wasi:*` interfaces during runtime
 initialization. It is refused, and every one is named.
 
-What remains for E8 is in `docs/NEXT.md`: boundary-transfer binding feasibility,
-WIT world generation, typed linking from a `Granted`, running a real command
-through the host, and per-instance fuel and memory limits.
+What remains for E8 is in `docs/NEXT.md`: WIT world generation, typed linking
+from a `Granted`, running a real command through the host, and per-instance fuel
+and memory limits.
+
+**Boundary transfer is one analysis with two policies.** `pw-core/boundary.rs`
+answers whether a typed value can safely cross; `resume.rs` asks it about a
+capture and `binding.rs` about an interface signature. The facts moved out of
+`resume.rs` rather than being copied — a second `is_remote_capable_type()` is
+the shape this project keeps deleting, and it would have disagreed about
+authority. `BindingSupport { local, remote }` rides on each `Export`, because
+remote capability is a property of an interface edge and not of a component.
 
 **Deployment planning is done.** `runtime/pw-host/src/plan.rs` reads a program's
 contracts and a deployment's topology and says which component may go where,
@@ -443,20 +451,15 @@ incremental           5 unrelated updates -> expensive node evaluated once
 
 ## next three concrete tasks
 
-1. **Boundary-transfer binding feasibility.** The planner records edges and does
-   not classify them: whether a placed edge may be remote is a question about
-   what crosses it. `transfer_profile` and `BindingSupport { local, remote }`
-   are the shape E8's binding design settled on. The synthetic
-   `BrowserOnly A → OriginOnly B` case in `runtime/pw-host/tests/planning.rs` is
-   what exercises it, deliberately — the store demo has no necessarily-remote
-   edge and should not be distorted to manufacture one.
-2. **WIT world generation** from `ComponentContract`. The world's imports must
+1. **WIT world generation** from `ComponentContract`. The world's imports must
    be exactly `contract.imports`, and `wit-bindgen` must accept it. Every input
    is now declaration-driven on both sides, which it was not when this item was
    written.
-3. **Typed linking only from a `Granted`.** `linkable()`'s list becomes real
+2. **Typed linking only from a `Granted`.** `linkable()`'s list becomes real
    `Linker` entries, and a component whose contract omits an import fails to
    instantiate with the engine's own diagnostic rather than ours.
+3. **Run the store's `add_to_cart` as a component**, so the dev server's command
+   path goes through the host instead of a Rust closure.
 
 Linux CI is deferred by operator decision to before E3 (risk R11).
 

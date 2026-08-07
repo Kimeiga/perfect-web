@@ -149,7 +149,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // E7: what the whole program says about a type — is it a resource, and is
     // it produced only by a scoped declaration. Both are needed before any one
     // file can be asked what its handlers may capture.
-    let manifest = crate::resume::Manifest::build(&hirs, &sigs);
+    let manifest = crate::boundary::TypeFacts::build(&hirs, &sigs);
     // E8 step 2: what a capability's type argument may name, PER UNIT.
     //
     // Whole-program until 2026-08-07, which was assumption A-017 and is now
@@ -389,7 +389,7 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     // resolves. Narrower than `check_units` by construction — see below.
     let own = crate::resolve::Workspace::build(&[&unit.hir]);
     let inference = crate::effects::Inference::new(&sigs, &own);
-    let manifest = crate::resume::Manifest::default();
+    let manifest = crate::boundary::TypeFacts::default();
     let routes = std::collections::BTreeSet::new();
     // One unit's own graph. Enough for a single-file caller, and honestly
     // narrower than the whole-program one: an edge to another file's query is
@@ -421,7 +421,7 @@ fn check_unit_with(
     labels: &BTreeMap<crate::resolve::DefId, Label>,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
-    manifest: &crate::resume::Manifest,
+    manifest: &crate::boundary::TypeFacts,
     routes: &std::collections::BTreeSet<String>,
     graph: &crate::graph::Graph,
     // What each effect DECLARES about itself, and the graph its arguments

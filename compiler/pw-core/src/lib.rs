@@ -24,6 +24,8 @@ pub mod affine;
 /// Charter §7.1, §7.10, §8.2 checks that read a type the author wrote.
 /// Distinct from `types`, which is the value-type model itself.
 pub mod annotations;
+pub mod binding;
+pub mod boundary;
 pub mod capability;
 pub mod check;
 pub mod codes;

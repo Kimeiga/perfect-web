@@ -287,6 +287,22 @@ pub struct Export {
     pub name: String,
     /// The declaration kind it came from: `query`, `command`, `page`.
     pub kind: String,
+    /// **How this edge may be bound.** Architect ruling, 2026-08-07:
+    ///
+    /// > Remote capability is a property of an interface edge, not a component:
+    /// > `get(StoreId) -> Result<Store, StoreError>` is probably remotable and
+    /// > `with_transaction(fn(OpenTransaction) -> T)` is not, in the same
+    /// > component.
+    ///
+    /// Which is why it is here and not a seventh field on the contract. A
+    /// per-component answer would have to be the conjunction over its exports,
+    /// making a whole component local because one function holds a handle.
+    ///
+    /// `#[serde(default)]` so a contract written before this field parses: it
+    /// reads as `local: direct, remote: transferable`, which is what the host
+    /// assumed when there was no field at all.
+    #[serde(default)]
+    pub binding: crate::binding::BindingSupport,
 }
 
 /// **What the compiler tells the host about one component.**
@@ -521,6 +537,12 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // both answer questions about the same rows.
     let ontology = Ontology::build_with(hirs, ws);
 
+    // What the program says about each TYPE — is it a resource, is it produced
+    // only by a scoped declaration. The same facts `resume.rs` asks about a
+    // capture, asked here about a signature: one boundary-transfer analysis,
+    // two policies over it.
+    let type_facts = crate::boundary::TypeFacts::build(hirs, sigs);
+
     // Every type the program declares, for resolving a capability's argument.
     // A misspelled `database.read<Stroes>` must be refused here rather than
     // becoming a capability nothing will ever grant.
@@ -699,9 +721,22 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // declaration is the unit; the field is plural because grouping
             // several declarations into one instantiable component is E8's
             // decision to make, not something to foreclose here.
+            //
+            // The binding support is per EXPORT for the same reason: remote
+            // capability is a property of an interface edge, so a component
+            // with a remotable query and a handle-passing helper says so about
+            // each rather than about itself.
+            // From the DECLARATION, not from `Signatures`. That lookup returned
+            // nothing for a `page`, `view` or `component` — `Signatures` covers
+            // `fn`, `query`, `command`, `subscription`, `resource` and `task` —
+            // so every page export fell through to the permissive default and
+            // came out `Transferable`. The right answer for this corpus,
+            // produced by a mechanism unrelated to its types.
+            let binding = crate::binding::binding_support(decl, &type_facts);
             let exports = vec![Export {
                 name: decl.name.clone(),
                 kind: kind.to_string(),
+                binding,
             }];
 
             let abi_schema = schema_of(&component_id, &exports, &capabilities, &allowed_placements);

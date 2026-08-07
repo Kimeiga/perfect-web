@@ -204,6 +204,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
         exports: vec![pw_host::Export {
             name: "Widget".into(),
             kind: "component".into(),
+            binding: pw_host::BindingSupport::default(),
         }],
     };
     let origin_only = ComponentContract {
@@ -216,6 +217,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
         exports: vec![pw_host::Export {
             name: "Store".into(),
             kind: "query".into(),
+            binding: pw_host::BindingSupport::default(),
         }],
     };
 
@@ -244,4 +246,186 @@ fn an_import_naming_nothing_is_dangling_rather_than_silently_ignored() {
     let p = plan(&cs, &full());
     assert!(!p.dangling.is_empty(), "a missing export is reported");
     assert!(!p.is_deployable());
+}
+
+// --- transferability: the other half of an edge ------------------------------
+
+/// Two independent facts, and neither implies the other.
+///
+/// ```text
+/// may the two ends share a node?     placement — this module
+/// may the values cross a boundary?   the types — the compiler
+/// ```
+///
+/// The four combinations are all real, and only one of them is a failure.
+#[test]
+fn placement_and_transferability_are_independent_and_only_one_pair_fails() {
+    // A browser-only importer and an origin-only exporter: the ends cannot
+    // share a node, so the edge is necessarily remote. Whether that is fine
+    // depends entirely on what the exported signature carries.
+    let widget = |target: &str| ComponentContract {
+        component_id: "app.Widget".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "x".into(),
+        required_capabilities: vec![],
+        allowed_placements: vec!["browser".into()],
+        imports: vec![pw_host::Import {
+            interface: format!("pw:app/{target}"),
+            name: "Store".into(),
+            capability: String::new(),
+            kind: pw_host::ImportKind::Component,
+        }],
+        exports: vec![pw_host::Export {
+            name: "Widget".into(),
+            kind: "component".into(),
+            binding: pw_host::BindingSupport::default(),
+        }],
+    };
+    let store = |placements: &[&str], remote: pw_host::RemoteSupport| ComponentContract {
+        component_id: "app.Store".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "y".into(),
+        required_capabilities: vec![],
+        allowed_placements: placements.iter().map(|s| s.to_string()).collect(),
+        imports: vec![],
+        exports: vec![pw_host::Export {
+            name: "Store".into(),
+            kind: "query".into(),
+            binding: pw_host::BindingSupport {
+                local: pw_host::LocalSupport::Direct,
+                remote,
+            },
+        }],
+    };
+    let handle = || pw_host::RemoteSupport::Refused {
+        positions: vec![pw_host::Untransferable {
+            position: "argument 0".into(),
+            ty: Some("OpenTransaction".into()),
+            reason: "the value IS the thing held open".into(),
+        }],
+    };
+
+    // 1. Co-locatable, transferable. Bind it either way.
+    let p = plan(
+        &[
+            widget("app.Store"),
+            store(&["browser", "origin"], pw_host::RemoteSupport::Transferable),
+        ],
+        &full(),
+    );
+    assert!(p.edges[0].can_be_local);
+    assert_eq!(p.edges[0].can_be_remote, Some(true));
+    assert!(p.is_deployable());
+
+    // 2. Co-locatable, NOT transferable. Perfectly ordinary: a same-process
+    //    call passing a handle. The whole reason `LocalSupport` is a separate
+    //    field rather than the other arm of an enum.
+    let p = plan(
+        &[widget("app.Store"), store(&["browser", "origin"], handle())],
+        &full(),
+    );
+    assert!(p.edges[0].can_be_local);
+    assert_eq!(p.edges[0].can_be_remote, Some(false));
+    assert!(p.is_deployable(), "co-location is a binding");
+
+    // 3. Necessarily remote, transferable. Also ordinary: an RPC.
+    let p = plan(
+        &[
+            widget("app.Store"),
+            store(&["origin"], pw_host::RemoteSupport::Transferable),
+        ],
+        &full(),
+    );
+    assert!(!p.edges[0].can_be_local);
+    assert_eq!(p.edges[0].can_be_remote, Some(true));
+    assert!(p.is_deployable(), "a remote edge is a binding");
+
+    // 4. Necessarily remote AND not transferable. The one failure, and it is
+    //    invisible to either fact alone — each of the three cases above shares
+    //    one half with it.
+    let p = plan(
+        &[widget("app.Store"), store(&["origin"], handle())],
+        &full(),
+    );
+    assert!(!p.edges[0].can_be_local);
+    assert_eq!(p.edges[0].can_be_remote, Some(false));
+    assert!(!p.is_deployable(), "no binding exists for this edge");
+    assert_eq!(p.unbindable().len(), 1);
+    assert_eq!(
+        p.unbindable()[0].untransferable[0].ty.as_deref(),
+        Some("OpenTransaction"),
+        "and it names what cannot cross, not just that something cannot"
+    );
+}
+
+#[test]
+fn an_undetermined_signature_does_not_refuse_a_deployment() {
+    // The third answer, and the reason it is not `false`. A position whose type
+    // the compiler could not determine is a build-time gap the author is owed a
+    // diagnostic about. Refusing the deployment for it would report a typing
+    // problem as a topology problem, at the point furthest from the cause.
+    let store = ComponentContract {
+        component_id: "app.Store".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "y".into(),
+        required_capabilities: vec![],
+        allowed_placements: vec!["origin".into()],
+        imports: vec![],
+        exports: vec![pw_host::Export {
+            name: "Store".into(),
+            kind: "query".into(),
+            binding: pw_host::BindingSupport {
+                local: pw_host::LocalSupport::Direct,
+                remote: pw_host::RemoteSupport::Undetermined {
+                    positions: vec![pw_host::Untransferable {
+                        position: "argument 0".into(),
+                        ty: None,
+                        reason: "this build could not determine the type".into(),
+                    }],
+                },
+            },
+        }],
+    };
+    let widget = ComponentContract {
+        component_id: "app.Widget".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "x".into(),
+        required_capabilities: vec![],
+        allowed_placements: vec!["browser".into()],
+        imports: vec![pw_host::Import {
+            interface: "pw:app/app.Store".into(),
+            name: "Store".into(),
+            capability: String::new(),
+            kind: pw_host::ImportKind::Component,
+        }],
+        exports: vec![pw_host::Export {
+            name: "Widget".into(),
+            kind: "component".into(),
+            binding: pw_host::BindingSupport::default(),
+        }],
+    };
+    let p = plan(&[widget, store], &full());
+    assert!(!p.edges[0].can_be_local, "browser-only and origin-only");
+    assert_eq!(p.edges[0].can_be_remote, None, "not false");
+    assert!(p.is_deployable());
+    // ...and it still carries what the compiler could not decide, so a host
+    // that wants to be strict has the material.
+    assert!(!p.edges[0].untransferable.is_empty());
+}
+
+#[test]
+fn every_edge_in_the_store_program_can_be_bound() {
+    // The real contracts, and the control for the synthetic cases above. If the
+    // classification refused something in the demo, `just ci` would be green
+    // and the deployment would not exist.
+    let p = plan(&contracts(), &full());
+    assert!(p.unbindable().is_empty(), "{:?}", p.unbindable());
+    assert!(
+        p.edges.iter().all(|e| e.can_be_remote == Some(true)),
+        "the store's exported signatures carry keys and records: {:?}",
+        p.edges
+            .iter()
+            .filter(|e| e.can_be_remote != Some(true))
+            .collect::<Vec<_>>()
+    );
 }

@@ -20,7 +20,7 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 | 2 | Build-time diagnostic for an unresolved capability argument | **done** — `PW5200`, `Owner::Capability`, 8 controls. Unknown FAMILY and OPERATION still need the declared capability table (E9) |
 | 3 | Placement consumes `effective_effects` | **done** — both discriminating controls, and it found a witness proving an annotation |
 | 4 | The deployment planner abstraction | **done** — `runtime/pw-host/src/plan.rs` |
-| 5 | Freeze `ComponentBinding` / remote-capable semantics | not started — **design settled**, see below |
+| 5 | Freeze `ComponentBinding` / remote-capable semantics | **done** — `pw-core/{boundary,binding}.rs`, `BindingSupport` on each `Export` |
 | 6 | Generate WIT worlds from semantic contracts | not started |
 | 7 | Typed linking only from `Granted` | not started |
 | 8 | Run real `add_to_cart` through Wasmtime | not started |
@@ -161,8 +161,8 @@ later analysis splits `"database.read"` at the dot.
 4  freeze the placement migration matrix        DONE — placement_migration.rs
 5  deployment planning on ontology + topology   DONE — pw-host/src/plan.rs
 6  delete World::worlds_for                     DONE — see below
-7  boundary-transfer local/remote binding feasibility   NEXT
-8  WIT generation
+7  boundary-transfer local/remote binding feasibility   DONE — see below
+8  WIT generation                                       NEXT
 ```
 
 ### Step 6, as it landed
@@ -249,6 +249,58 @@ Three structural gates hold it: `last_segment.rs` (no second place splits an
 effect name), `no_source_file_maps_a_phase_keyword_to_an_effect_spelling` (a
 phase creates an execution context, never an effect), and
 `no_effect_is_written_at_two_different_arities`.
+
+### Step 7, as it landed
+
+One boundary-transfer analysis, two policies over it, per the ruling:
+
+```text
+                  boundary-transfer analysis      pw-core/src/boundary.rs
+                     /                 \
+          resume-capture policy      remote-call policy
+             resume.rs                  binding.rs
+```
+
+`TypeFacts` — is this type a resource, is it produced only by a scoped
+declaration — MOVED out of `resume.rs` rather than being copied.
+`can_cross(profile, context)` is `Proven | Violation | Blocked`, the same three
+answers as `PlacementLookup` and for the same reason.
+
+**Privacy is where the two policies differ, and the difference is principled.**
+A session-scoped value may not enter a resume manifest, because the manifest
+ships with the document and there is no destination to check. It may cross a
+remote call, because there IS one and `World::may_hold` plus the topology
+already decides — a second answer here would be the duplication the module
+exists to prevent.
+
+`BindingSupport { local, remote }` on each `Export`, not a seventh contract
+field: remote capability is a property of an interface edge, so a component
+with a remotable query and a handle-passing helper says so about each. Every
+position is checked in both directions, results and errors separately —
+`recover() -> Result<StoreId, OpenTransaction>` succeeds with a key and fails
+with a handle, and a check reading only the success side calls it remotable.
+
+`plan.rs` composes the two independent facts. Four combinations, one failure:
+
+```text
+co-locatable + transferable      bind it either way
+co-locatable + NOT transferable  a same-process call passing a handle
+necessarily remote + transferable   an RPC
+necessarily remote + NOT           no binding exists — the only failure
+```
+
+**A defect the instrument did not catch and a probe did.** `binding_support`
+looked its signature up through `Signatures`, which covers `fn`, `query`,
+`command`, `subscription`, `resource` and `task` — and not `page`, `view` or
+`component`. Every page export missed the lookup and took the permissive
+default, coming out `Transferable`: the right answer for this corpus, from a
+mechanism with nothing to do with its types. Every test passed. It reads the
+declaration now, which every component kind has. `a_page_returns_nothing_and_
+that_is_not_undetermined` is the guard, and it also fixes the second half —
+`returns: None` means nothing crosses outbound, not that the build could not
+tell.
+
+Evidence: `docs/evidence/E8/binding-feasibility.txt`, via `just e8-binding`.
 
 ### Step 13 — deployment planning
 

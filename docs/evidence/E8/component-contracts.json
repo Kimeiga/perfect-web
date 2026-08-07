@@ -14,7 +14,13 @@
     "exports": [
       {
         "name": "Cart",
-        "kind": "query"
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -33,7 +39,13 @@
     "exports": [
       {
         "name": "Menu",
-        "kind": "query"
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -52,7 +64,13 @@
     "exports": [
       {
         "name": "Order",
-        "kind": "query"
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -71,7 +89,13 @@
     "exports": [
       {
         "name": "Store",
-        "kind": "query"
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -100,7 +124,13 @@
     "exports": [
       {
         "name": "Cart",
-        "kind": "query"
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -129,7 +159,13 @@
     "exports": [
       {
         "name": "Menu",
-        "kind": "query"
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -158,7 +194,13 @@
     "exports": [
       {
         "name": "Store",
-        "kind": "query"
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -203,7 +245,13 @@
     "exports": [
       {
         "name": "StorePage",
-        "kind": "page"
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -232,7 +280,13 @@
     "exports": [
       {
         "name": "add_to_cart",
-        "kind": "command"
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   },
@@ -261,7 +315,13 @@
     "exports": [
       {
         "name": "clear_cart",
-        "kind": "command"
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        }
       }
     ]
   }

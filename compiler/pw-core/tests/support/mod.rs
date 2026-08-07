@@ -76,4 +76,19 @@ effect dom.mutate {
 effect trace {
     capability none
 }
+
+// The affine pair. The type argument is the resource being acquired, so an
+// acquire of one kind and a release of another do not cancel — and so that a
+// type IS a resource because a declaration says `resource.acquire<T>` of it,
+// which is what makes an unserializable capture a declared fact rather than a
+// list in the compiler.
+effect resource.acquire<R> {
+    capability resource.acquire<R>
+    host       \"pw:host/resource#acquire\"
+}
+
+effect resource.release<R> {
+    capability resource.release<R>
+    host       \"pw:host/resource#release\"
+}
 ";

@@ -61,6 +61,10 @@ fn contract(id: &str, placements: &[&str], capabilities: &[&str]) -> ComponentCo
         exports: vec![Export {
             name: "Menu".into(),
             kind: "query".into(),
+            // Bindable either way. These tests are about admission, which
+            // asks nothing about transferability — see `plan.rs` for the
+            // half that does.
+            binding: BindingSupport::default(),
         }],
     }
 }

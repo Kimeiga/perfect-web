@@ -174,6 +174,78 @@ impl Import {
 pub struct Export {
     pub name: String,
     pub kind: String,
+    /// How this edge may be bound. Mirrored by field name, ADR-0018.
+    ///
+    /// `#[serde(default)]` so a contract written before the compiler emitted
+    /// this parses as what the host assumed when there was no field: bindable
+    /// either way.
+    #[serde(default)]
+    pub binding: BindingSupport,
+}
+
+/// **What binding modes an interface edge supports**, as the compiler derived
+/// it from the signature's types.
+///
+/// Two independent answers rather than one enum, on the architect's ruling of
+/// 2026-08-07: `Either` is just both, and an enum forecloses "remote ✓ only
+/// through a host-mediated handle proxy".
+///
+/// A host may narrow this and must not widen it. Whether an edge SHOULD be
+/// remote is the planner's, from placement; whether it CAN be is this, from the
+/// types, and the compiler is the only thing that can see them.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct BindingSupport {
+    pub local: LocalSupport,
+    pub remote: RemoteSupport,
+}
+
+impl Default for BindingSupport {
+    fn default() -> Self {
+        BindingSupport {
+            local: LocalSupport::Direct,
+            remote: RemoteSupport::Transferable,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalSupport {
+    /// A direct call in one address space. Nothing about a type can forbid it;
+    /// whether the two ends may SHARE a node is placement's question, which
+    /// `plan` composes with this.
+    Direct,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum RemoteSupport {
+    /// Every value in the signature can cross, in both directions.
+    Transferable,
+    /// Something in the signature cannot, and each one is named.
+    Refused { positions: Vec<Untransferable> },
+    /// The compiler had no basis to decide — a position whose type that build
+    /// could not determine.
+    ///
+    /// **Not a no and not a yes.** Reading it as "not remotable" silently
+    /// forces co-location for an unrelated typing gap; reading it as remotable
+    /// encodes a guess. `plan` reports it as neither.
+    Undetermined { positions: Vec<Untransferable> },
+}
+
+impl RemoteSupport {
+    pub fn is_transferable(&self) -> bool {
+        matches!(self, RemoteSupport::Transferable)
+    }
+}
+
+/// One position in a signature that cannot cross, and why.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Untransferable {
+    /// `argument 0`, `result`, `error`.
+    pub position: String,
+    pub ty: Option<String>,
+    pub reason: String,
 }
 
 /// The capability→representation mapping this host understands.

@@ -71,6 +71,7 @@ fn contract(imports: Vec<Import>) -> ComponentContract {
         exports: vec![Export {
             name: "lookup".into(),
             kind: "query".into(),
+            binding: BindingSupport::default(),
         }],
     }
 }

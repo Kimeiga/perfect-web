@@ -207,6 +207,30 @@ e8-placement:
      } > docs/evidence/E8/placement-migration.txt
     @tail -5 docs/evidence/E8/placement-migration.txt
 
+# E8 step 7. Boundary transfer: what a typed value costs to cross, and what an
+# interface edge therefore supports.
+#
+# One analysis, two policies. `boundary.rs` answers whether a typed value can
+# safely cross; `resume.rs` asks it about a capture and `binding.rs` about a
+# signature. The evidence is that moving the existing policy onto the shared
+# analysis changed no verdict, and that the new one discriminates.
+e8-binding:
+    @{ echo "E8 step 7 — boundary transfer and binding feasibility"; echo; \
+       echo "produced by: just e8-binding"; echo; \
+       echo "One boundary-transfer analysis with two policies over it, per the"; \
+       echo "ruling. A value that may not enter a resume manifest may well cross"; \
+       echo "a remote call: the manifest ships with the document and has no"; \
+       echo "destination to check, and a remote call has one that placement"; \
+       echo "already checks."; echo; \
+       cargo test -p pw-core --lib boundary 2>&1 | grep -E '^(test |test result)'; \
+       cargo test -p pw-core --lib binding 2>&1 | grep -E '^(test |test result)'; \
+       cargo test -p pw-core --test boundary_matrix 2>&1 | grep -E '^(test |test result)'; \
+       cargo test -p pw-host --test planning 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "and what the store's exports say about themselves:"; echo; \
+       python3 tools/binding-report.py docs/evidence/E8/component-contracts.json; \
+     } > docs/evidence/E8/binding-feasibility.txt
+    @tail -13 docs/evidence/E8/binding-feasibility.txt
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

@@ -610,3 +610,63 @@ component Read() {
     );
     assert_ne!(a.abi_schema, b.abi_schema);
 }
+
+// --- binding support, through the whole contract path ------------------------
+
+/// **An export says what its own signature permits.**
+///
+/// Through `contracts()`, not through `binding::remote_support` directly. The
+/// unit tests in `binding.rs` prove the analysis; this proves it is REACHED —
+/// `binding_support` is looked up by `DefId` and falls back to the permissive
+/// default when no signature is found, so a lookup that silently missed would
+/// mark every export transferable and look exactly like a program whose
+/// signatures all are.
+#[test]
+fn an_export_that_passes_a_handle_is_not_remotely_bindable() {
+    use pw_core::binding::RemoteSupport;
+
+    let program = "\
+module shop.tx
+
+opaque type OpenTransaction = String
+type Store = Store { id: Int }
+type StoreError = StoreError { why: String }
+opaque type StoreId = String
+
+fn begin() -> OpenTransaction !{ resource.acquire<OpenTransaction> } { todo }
+
+command Commit(t: OpenTransaction) -> Int
+    requires SignedIn
+{
+    0
+}
+
+query Lookup(id: StoreId) -> Result<Store, StoreError>
+    freshness   5.minutes
+    consistency snapshot
+    cache       shared
+    key         id
+{
+    todo
+}
+";
+    let refused = one(&[program], "shop.tx.Commit");
+    let RemoteSupport::Refused { positions } = &refused.exports[0].binding.remote else {
+        panic!("{:?}", refused.exports[0].binding);
+    };
+    assert_eq!(positions[0].position, "argument 0");
+    assert_eq!(positions[0].ty.as_deref(), Some("OpenTransaction"));
+
+    // The discriminating half, in the SAME program: a query over a key and a
+    // record is transferable. Without it, the assertion above would also pass
+    // for an analysis that refused everything.
+    let ok = one(&[program], "shop.tx.Lookup");
+    assert_eq!(ok.exports[0].binding.remote, RemoteSupport::Transferable);
+
+    // And local is unaffected in both. Two questions, two fields — an enum
+    // would have to answer them with one word.
+    assert_eq!(
+        refused.exports[0].binding.local,
+        pw_core::binding::LocalSupport::Direct
+    );
+}

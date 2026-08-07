@@ -16,72 +16,34 @@
 //! session-scoped because the query producing it is declared `session`. There
 //! is no list of unserializable types in the compiler, and adding a resource
 //! to a library brings both consequences with it.
+//!
+//! # This module is a POLICY, not an analysis
+//!
+//! Architect ruling, 2026-08-07:
+//!
+//! > Remote-capable is not equivalent to resume-serializable. But they are two
+//! > policies over the same underlying semantic fact: whether a typed value can
+//! > safely cross a boundary. Don't build a second `is_remote_capable_type()`
+//! > beside `is_serializable_capture()`.
+//!
+//! So `boundary.rs` owns [`crate::boundary::TypeFacts`] and
+//! [`crate::boundary::can_cross`]; this module supplies
+//! `Boundary::ResumeCapture` and turns the verdict into the two diagnostics the
+//! corpus names. `binding.rs` supplies `Boundary::RemoteCall` over exactly the
+//! same facts.
+//!
+//! The maps `TypeFacts` holds were declared here until 2026-08-07 and moved
+//! rather than copied — one analysis, or the two would agree until the day one
+//! of them changed.
 
-use std::collections::BTreeMap;
-
+use crate::boundary::{
+    Blocked, Boundary, BoundaryContext, Crossing, Direction, Violation, can_cross,
+};
 use crate::codes;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{Decl, Expr, ExprId, Hir, Span};
 use crate::privacy::Restriction;
 use crate::signatures::Signatures;
-
-/// What the whole program says about a type, gathered once.
-#[derive(Default)]
-pub struct Manifest {
-    /// Types some function acquires as a resource.
-    resources: BTreeMap<String, String>,
-    /// Types produced only by a scoped declaration, with the scope.
-    scoped: BTreeMap<String, Restriction>,
-}
-
-impl Manifest {
-    pub fn build(hirs: &[&Hir], sigs: &Signatures) -> Manifest {
-        let mut m = Manifest::default();
-
-        for (path, sig) in sigs.iter() {
-            for e in &sig.effects {
-                let Some(ty) = e
-                    .strip_prefix("resource.acquire<")
-                    .and_then(|r| r.strip_suffix('>'))
-                else {
-                    continue;
-                };
-                m.resources.insert(ty.to_string(), path.clone());
-            }
-        }
-
-        for hir in hirs {
-            for (_, d) in hir.all_decls() {
-                let Some(vis) = d.visibility.as_deref() else {
-                    continue;
-                };
-                let restriction = match vis {
-                    "session" => Restriction::Session("SessionId".into()),
-                    "user" => Restriction::User("UserId".into()),
-                    "organization" => Restriction::Organization("OrganizationId".into()),
-                    _ => continue,
-                };
-                // `session query Cart(..) -> Result<Cart, CartError>` produces a
-                // `Cart`. The head is the carrier, so the produced type is its
-                // first argument.
-                let produced = match d.ret.as_deref() {
-                    // A scope attaches to a nominal type, so the head is what
-                    // this map is keyed by: `Result<List<X>, E>` scopes `List`,
-                    // the same as before `ret_args` began carrying nesting.
-                    Some("Result") | Some("Option") | Some("List") => d
-                        .ret_args
-                        .first()
-                        .map(|a| a.split('<').next().unwrap_or(a).trim().to_string()),
-                    other => other.map(str::to_string),
-                };
-                if let Some(ty) = produced {
-                    m.scoped.insert(ty, restriction);
-                }
-            }
-        }
-        m
-    }
-}
 
 /// The captures with their spans, for a diagnostic that points at one.
 fn captures_with_spans(
@@ -128,18 +90,26 @@ pub(crate) fn capture_names_and_types(
         .collect()
 }
 
-pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Diagnostic>) {
+pub fn check(
+    hir: &Hir,
+    sigs: &Signatures,
+    facts: &crate::boundary::TypeFacts,
+    out: &mut Vec<Diagnostic>,
+) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
         let at = hir.decl_span(id);
 
-        // The two questions are answered by two different machines, because
-        // they are different questions and a value can pass one and fail the
-        // other:
+        // The two questions are answered from two different facts, because they
+        // are different questions and a value can pass one and fail the other:
         //
         //   can this value be serialized?      -> its TYPE (is it a resource)
         //   may it cross this boundary?        -> its LABEL (is it private)
+        //
+        // Both are now `boundary::can_cross`'s, and the split above is the
+        // reason `TransferProfile` is per-type while the label travels in the
+        // `BoundaryContext`.
         //
         // Reading a capture's type from the declaration's parameter list was
         // the narrow version: it saw `connection: DatabaseConnection` and
@@ -160,8 +130,25 @@ pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Di
             };
             // Build-time artifact agreement: every capture must have a type
             // the manifest can name.
+            //
+            // `Crossing::Blocked` is exactly this — the analysis has no basis
+            // to decide — and asking for it rather than testing `ty.is_some()`
+            // keeps one definition of "this build could not determine the
+            // type". The diagnostic stays here because what a BLOCKED crossing
+            // means for a resume manifest (a schema hash derived from a guess)
+            // is this policy's to say.
             for (name, span, ty) in captures_with_spans(body, &types, *d) {
-                if ty.is_some() {
+                if !matches!(
+                    can_cross(
+                        &facts.profile(ty.as_deref()),
+                        &BoundaryContext {
+                            boundary: Boundary::ResumeCapture,
+                            direction: Direction::Outbound,
+                            label: crate::privacy::Label::public(),
+                        },
+                    ),
+                    Crossing::Blocked(Blocked::UndeterminedSchema)
+                ) {
                     continue;
                 }
                 out.push(Diagnostic {
@@ -196,32 +183,31 @@ pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Di
                 });
             }
 
+            // **One call, two diagnostics.** The union of label and producer
+            // scope, the resource check and their ordering all live in
+            // `boundary.rs` now; what is left here is which message each
+            // verdict earns, which is what makes this a policy rather than a
+            // second analysis.
             for (name, span, expr) in captures(body, *d) {
-                // Serializability, from the type.
-                let resource = types
-                    .of(body, expr)
-                    .and_then(|t| manifest.resources.get(&t).map(|p| (t, p.clone())));
-                if let Some((ty, producer)) = resource {
-                    out.push(unserializable(decl, &name, &ty, &producer, span, &at));
-                    continue;
-                }
-                // Privacy, independently — a serializable value may still be
-                // one the manifest may not carry.
-                //
-                // Two sources, unioned. The LABEL covers a value that says so
-                // in its own type (`Secret<Payments>`) and everything the
-                // dataflow carries it through. The manifest's `scoped` map
-                // covers a type that is private because of the DECLARATION
-                // THAT PRODUCES IT — `Cart` is an ordinary record and is
-                // session-scoped because only a `session query` makes one.
-                // Neither subsumes the other, and using only the first
-                // silently stopped catching R-030.
-                let by_label = labels.label(body, expr).restrictions().next().cloned();
-                let by_producer = types
-                    .of(body, expr)
-                    .and_then(|t| manifest.scoped.get(&t).cloned());
-                if let Some(r) = by_label.or(by_producer) {
-                    out.push(private_value(decl, &name, &r, span, &at));
+                let ty = types.of(body, expr);
+                let verdict = can_cross(
+                    &facts.profile(ty.as_deref()),
+                    &BoundaryContext {
+                        boundary: Boundary::ResumeCapture,
+                        direction: Direction::Outbound,
+                        label: labels.label(body, expr),
+                    },
+                );
+                match verdict {
+                    Crossing::Violation(Violation::Resource { ty, producer }) => {
+                        out.push(unserializable(decl, &name, &ty, &producer, span, &at));
+                    }
+                    Crossing::Violation(Violation::Private { restriction }) => {
+                        out.push(private_value(decl, &name, &restriction, span, &at));
+                    }
+                    // Reported above, against the capture's own span, with the
+                    // schema-hash explanation this boundary needs.
+                    Crossing::Blocked(_) | Crossing::Proven => {}
                 }
             }
         }
