@@ -587,3 +587,65 @@ fn an_event_nothing_listens_for_is_recorded_rather_than_dropped() {
     );
     assert!(m.pending().is_empty(), "and it is still consumed");
 }
+
+// --- E7-P's foundation: one semantic identity, two derivations -----------
+
+#[test]
+fn a_storage_key_is_derived_from_the_shared_identity() {
+    // Architect ruling, 2026-08-06: `EntryIdentity` is the one answer to "which
+    // logical resource entry"; this crate derives a STORAGE representation and
+    // E7-P derives a WIRE one. Neither is the answer.
+    use pw_resource::{EntryIdentity, Partition};
+
+    let identity = EntryIdentity::new(
+        "Resources.Cart",
+        &["session-a"],
+        Partition::Session {
+            id: "session-a".into(),
+        },
+    )
+    .generation("B1");
+
+    let a = EntryKey::from_identity(&identity);
+    let b = EntryKey::from_identity(&identity);
+    assert_eq!(a, b, "one identity, one storage key");
+
+    // Two different identities are two different keys, or the derivation is
+    // constant and the equality above means nothing.
+    let other = EntryIdentity::new(
+        "Resources.Cart",
+        &["session-b"],
+        Partition::Session {
+            id: "session-b".into(),
+        },
+    )
+    .generation("B1");
+    assert_ne!(a, EntryKey::from_identity(&other));
+}
+
+#[test]
+fn the_storage_key_carries_what_the_wire_id_must_not() {
+    // The reason they are two types. A storage key is readable — it names the
+    // session and the resource — and that readability is exactly why it cannot
+    // be what the browser sees.
+    use pw_resource::{DevelopmentIdentityKey, EntryIdentity, Partition, ResourceEntryId};
+
+    let identity = EntryIdentity::new(
+        "Resources.Cart",
+        &["hakan-session-123"],
+        Partition::Session {
+            id: "hakan-session-123".into(),
+        },
+    );
+    let storage = format!("{:?}", EntryKey::from_identity(&identity));
+    let wire = ResourceEntryId::derive(&identity, &DevelopmentIdentityKey);
+
+    assert!(
+        storage.contains("hakan-session-123"),
+        "a storage key is readable in-process: {storage}"
+    );
+    assert!(
+        !wire.as_str().contains("hakan-session-123"),
+        "and the wire id publishes none of it: {wire}"
+    );
+}

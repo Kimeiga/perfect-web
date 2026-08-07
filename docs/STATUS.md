@@ -9,6 +9,12 @@ See `docs/ASSUMPTIONS.md` A-008.
 **numbering:** engineering `E0`–`E15`, public proofs `P0`–`P9`, risk-retirement
 experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 
+**resource entry identity:** one semantic definition
+(`pw_resource::EntryIdentity`), two derivations —
+`pw-materialize::EntryKey` for storage and `ResourceEntryId` for the wire.
+A storage change is not a protocol change, and a test proves it: two storage
+representations of one identity derive the same wire id.
+
 **current milestone:** **E7 — the own renderer.** Tasks 1 and 2 are closed and
 E7-R's vertical slice runs: the **real store page** is rendered by the own
 renderer, its handler is authorised by `decide()` before it attaches, and a

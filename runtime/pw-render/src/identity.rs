@@ -36,33 +36,24 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The privacy partition an entry belongs to, as E6 decides it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "partition")]
-pub enum Partition {
-    /// One entry serves every reader.
-    ///
-    /// The default, and deliberately the *least* separating one: a caller that
-    /// forgets to say gets a domain shared by everyone, which is wrong for a
-    /// private page in the direction that a test notices — two sessions
-    /// rendering identical tokens — rather than in the direction that silently
-    /// breaks a cache.
-    #[default]
-    Public,
-    /// One entry per session.
-    Session { id: String },
-    /// One entry per user.
-    User { id: String },
-}
+/// Which principal an entry belongs to.
+///
+/// Re-exported from `pw-resource`, not defined here. It WAS defined twice —
+/// once for a resource entry and once for an identity domain — which is two
+/// answers to "whose entry is this", and two answers to one question is what
+/// `docs/RISK_QUEUE.md` records diverging five times.
+///
+/// E6 owns the concept; E7 reads it. `Partition::Public` is the default there,
+/// and deliberately the *least* separating one: a caller that forgets gets a
+/// domain shared by everyone, which is wrong for a private page in the
+/// direction a test notices — two sessions rendering identical tokens — rather
+/// than in the direction that silently breaks a cache.
+pub use pw_resource::Partition;
 
-impl Partition {
-    fn canonical(&self) -> String {
-        match self {
-            Partition::Public => "public".to_string(),
-            Partition::Session { id } => format!("session:{id}"),
-            Partition::User { id } => format!("user:{id}"),
-        }
-    }
+/// The partition's canonical text, through the shared type so there is one
+/// spelling. A `match` here would be a second definition wearing another name.
+fn partition_text(p: &Partition) -> String {
+    pw_resource::EntryIdentity::new("", &[], p.clone()).partition_text()
 }
 
 /// What a set of instance tokens is scoped to.
@@ -175,7 +166,7 @@ impl IdentityDomain {
             input.extend_from_slice(bytes);
         };
         field(self.key.as_bytes());
-        field(self.partition.canonical().as_bytes());
+        field(partition_text(&self.partition).as_bytes());
         field(self.compatibility.as_bytes());
         field(&(path.len() as u64).to_le_bytes());
         for (part, token) in path {

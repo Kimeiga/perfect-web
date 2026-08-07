@@ -263,6 +263,7 @@ dependencies = [
 name = "pw-materialize"
 version = "0.0.0"
 dependencies = [
+ "pw-resource",
  "rusqlite",
  "serde",
  "serde_json",
@@ -273,6 +274,7 @@ name = "pw-render"
 version = "0.0.0"
 dependencies = [
  "blake3",
+ "pw-resource",
  "serde",
  "serde_json",
 ]
@@ -281,8 +283,10 @@ dependencies = [
 name = "pw-resource"
 version = "0.0.0"
 dependencies = [
+ "blake3",
  "pw-core",
  "pw-syntax",
+ "serde",
 ]
 
 [[package]]

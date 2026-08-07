@@ -12,6 +12,8 @@ publish = false
 # manifest in `pw-core::hir`.
 
 [dependencies]
+blake3.workspace = true
+serde.workspace = true
 
 # The runtime does NOT depend on the compiler. These are dev-only, so the
 # manifest correspondence can be tested without either crate importing the

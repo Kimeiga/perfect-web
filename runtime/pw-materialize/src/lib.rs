@@ -104,6 +104,27 @@ pub struct EntryKey {
 }
 
 impl EntryKey {
+    /// The storage key for a semantic entry identity.
+    ///
+    /// Architect ruling, 2026-08-06: `EntryIdentity` is the one answer to
+    /// "which logical resource entry", and this crate derives its own
+    /// representation from it rather than being that answer.
+    ///
+    /// Readable on purpose — it never leaves the process, and a storage key a
+    /// person can read is a storage key a person can debug. That readability is
+    /// also exactly why it must not go on the wire: it publishes the session
+    /// and the resource name, and it is free to acquire a shard or a namespace
+    /// without any of that being a protocol change.
+    pub fn from_identity(identity: &pw_resource::EntryIdentity) -> EntryKey {
+        let key: Vec<&str> = identity.logical_key.iter().map(String::as_str).collect();
+        let mut out =
+            EntryKey::new(&identity.resource, &key).with("partition", &identity.partition_text());
+        if let Some(generation) = &identity.compatibility {
+            out = out.with("generation", generation);
+        }
+        out
+    }
+
     pub fn new(fragment: &str, key: &[&str]) -> EntryKey {
         EntryKey {
             fragment: fragment.to_string(),

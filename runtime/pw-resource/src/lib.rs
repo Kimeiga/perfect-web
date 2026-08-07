@@ -15,6 +15,12 @@
 //! slow and flaky, and a flaky concurrency test gets muted rather than fixed.
 //! [`Clock`] is advanced by the test, so every timing property here is exact.
 
+pub mod entry;
+pub use entry::{
+    DeploymentIdentityKey, DevelopmentIdentityKey, EntryIdentity, ExplicitIdentityKey,
+    IdentityKeyProvider, Partition, ResourceEntryId, Version,
+};
+
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};

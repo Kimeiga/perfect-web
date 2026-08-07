@@ -178,6 +178,20 @@ Three things to build against it:
   cart, a promotion and a store's pricing at once, and a field that starts as a
   collection does not need a breaking redesign to hold three.
 
+The three identities are separated and built:
+
+```text
+ResourceEntryId    which data changed      opaque, keyed, 128 bits
+ResourceVersion    which state of it       monotonic, per ENTRY
+PartAddress        where the consequence   IdentityDomain + InstancePath + PartId
+                   appears
+```
+
+`EntryIdentity` in `pw-resource` is the one semantic answer to "which entry";
+`pw-materialize::EntryKey` and `ResourceEntryId` both derive from it. A test
+asserts that two storage representations of one identity yield the SAME wire
+id — which is what proves the protocol does not depend on the materializer.
+
 **Then E7-L**, where Marko is the negative oracle: RQ-1 measured that its
 interaction module loads during initial page load, so the implementation has to
 demonstrably do something the scaffolding does not.
