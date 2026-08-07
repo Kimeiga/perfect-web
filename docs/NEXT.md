@@ -15,7 +15,8 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 
 | # | task | state |
 |---|---|---|
-| 1 | Delete program-wide-unique resolution | **partly done** — see below |
+| 1 | Delete program-wide-unique resolution | **done** — audit landed; prelude deferred by ruling |
+| 1a | Repair the two `forbidden` last-segment sites | not started — ratchet pinned at 2 |
 | 2 | Build-time diagnostic for an unresolved capability argument | **done** — `PW5200`, `Owner::Capability`, 8 controls. Unknown FAMILY and OPERATION still need the declared capability table (E9) |
 | 3 | Placement consumes `effective_effects` | not started |
 | 4 | The deployment planner abstraction | not started |
@@ -25,6 +26,64 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 | 8 | Run real `add_to_cart` through Wasmtime | not started |
 | 9 | Fuel and memory limits | not started |
 | 10 | Replace `worlds_for` with declared node topology | not started |
+
+**Revised 2026-08-07 by ruling: pull the effect/capability ontology forward.**
+
+> Do not wait for full E9 to declare effect families and operations. Pull
+> forward only the effect/capability ontology before E8 hardens WIT.
+
+`PW5200` can catch an unknown ARGUMENT and cannot catch an unknown FAMILY or
+OPERATION, because nothing declares what a family is — `log` and a misspelled
+`databse` are indistinguishable. That distinction must exist before WIT
+generation, and it does NOT need E9's permanent inference algorithm.
+
+A platform-level declaration model, sketched by the architect:
+
+```text
+effect log                { capability none }
+effect database.read<T>   { capability database.read<T>
+                            host_interface pw:host/database#read }
+effect style.mutate<T>    { capability dom.style.mutate<T> }
+```
+
+giving
+
+```text
+source effect spelling → EffectDefId + resolved arguments → EffectInstance
+  → effective_effects(DefId) → optional capability lowering → CapabilityId
+  → ComponentContract → WIT
+```
+
+and separating three facts that are currently one string:
+
+```text
+Effect           something computation does
+Capability       authority required to do it
+Host interface   one ABI representation of that authority
+```
+
+**Not every effect needs a host capability.** After this lands, unknown family,
+unknown operation and unknown argument are all compile errors, legitimate
+non-authority effects stay valid *because they are declared*, and no checker
+contains a hard-coded list of valid family spellings.
+
+### The order to work in
+
+```text
+1a  repair the two forbidden last-segment sites
+3   placement consumes effective_effects
+    the effect/capability ontology above
+4   the remaining unknown-family / unknown-operation diagnostics
+5   deployment planner
+6   boundary-transfer-derived component binding
+7   WIT generation
+8   typed linking from Granted
+9   add_to_cart through Wasmtime
+10  fuel/memory limits and declared topology replacing worlds_for
+```
+
+Full E9 still comes after E8. The point of pulling the ontology forward is to
+stop E8 freezing today's stringly effect vocabulary into the ABI.
 
 ### Step 5's design, ruled 2026-08-07
 
@@ -92,41 +151,41 @@ a callback's parameter the element type of the collection it is applied to;
 (`docs/RISK_QUEUE.md` 35). The program-wide-unique fallback is deleted and the
 corpus is 46/46 without it.
 
-**Not done — two items, both from the ruling.**
+**The two items the ruling named, and where each stands.**
 
-1. **The package-declared prelude facility.** Nothing currently needs it: every
-   corpus file imports what it uses. It is a language feature the architect
-   asked for, not a repair, and it should be designed rather than bolted on.
-   Acceptance: `pw-std` declares its prelude in package metadata; the compiler
-   imports it automatically; no name list is hard-coded in a checker.
+1. **The package-declared prelude — DEFERRED, not outstanding.** Architect
+   ruling, 2026-08-07:
 
-2. **The structural test that no correctness path performs global last-segment
-   uniqueness lookup.** Nine `rsplit('.')` sites remain in `pw-core`:
+   > The prelude facility does not need to be invented just to satisfy an old
+   > checklist item. Since receiver-directed resolution removed the reason the
+   > platform needed ambient visibility, change the status to: prelude design
+   > deferred until Pleris actually has a demonstrated need for implicit
+   > imports. "The language must have a prelude" isn't itself a goal.
 
-   ```text
-   affine.rs:399     check.rs:638      check.rs:1174
-   effects.rs:485    effects.rs:550    koka.rs:314
-   labels.rs:161     layout.rs:347     template_ir.rs:880
-   ```
+   If a need appears, package metadata defines it and it stays tiny — `Bool Int
+   String Option Result List` or similar fundamentals. Implicitly importing a
+   whole web-platform module for convenience is the wrong default.
 
-   `effects.rs:550` is the scoped-and-unique branch and is fine. The other eight
-   are unexamined. The allow-list must record a **CATEGORY**, not prose —
-   architect ruling, 2026-08-07:
+2. **The structural test against global last-segment lookup — DONE.**
 
-   ```text
-   syntax-only spelling operation          allowed
-   diagnostic display                      allowed
-   qualified identity serialization        possibly allowed
-   semantic resolution from last segment   FORBIDDEN
-   ```
+   `compiler/pw-core/last-segment-audit.txt` classifies all nine sites and
+   `tests/last_segment.rs` enforces it: every site needs a category, a stale
+   entry fails, a reason under 40 characters fails, and the scan has its own
+   control.
 
-   Each entry needs a category someone has actually verified. Writing eight
-   classifications without reading eight call sites is the failure this project
-   exists to avoid, so it was left undone rather than filled in.
+   Categories used: two `display`, two `encoding`, two `scoped`, one `syntax`,
+   and **two `forbidden`** — `check.rs`'s privacy-label lookup by bare
+   declaration name, and `labels.rs`'s `declaration_named`. Both resolve
+   meaning from a spelling. The ratchet is pinned at 2 and may only go down.
 
-   **Step 1 closes when this passes**, not before.
+   Repairing them is item **1a** in the table above.
 
----|---|---|
+---
+
+## E8's remaining half, in more detail
+
+| # | task | acceptance |
+|---|---|---|
 | 1 | Generate a WIT world per `ComponentContract` | the world's imports are exactly `contract.imports`, and `wit-bindgen` accepts it |
 | 2 | Typed linking from a `Granted` | `linkable()`'s list becomes real `Linker` entries; a component whose contract omits an import fails to instantiate, with the engine's own diagnostic |
 | 3 | Run the store's `add_to_cart` as a component | the dev server's command path goes through the host instead of a Rust closure |
