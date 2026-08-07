@@ -717,6 +717,44 @@ fn emit_template_command(paths: &[&String], plain: bool) -> ExitCode {
 /// and mirrors the types by field name. Neither links the other, which is what
 /// keeps "the compiler decides what authority code needs, the host decides
 /// whether it exists" a boundary rather than a slogan.
+/// **The WIT package for a checked program: one world per contract.**
+///
+/// Refuses rather than emits when a signature names a type it cannot map — a
+/// world containing a guessed type parses, links, and decodes a value into
+/// something it never was.
+fn emit_wit_command(paths: &[&String]) -> ExitCode {
+    let mut hirs = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        hirs.push(pw_core::lower::lower_file(&src, &parsed.green));
+    }
+    let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = pw_core::signatures::Signatures::build(&ws, &refs);
+    let contracts = pw_core::contract::contracts(&refs, &sigs, &ws);
+    match pw_core::wit::package(&refs, &ws, &contracts) {
+        Ok((text, _)) => {
+            print!("{text}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("pw: cannot generate WIT: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn emit_contracts_command(paths: &[&String], plain: bool) -> ExitCode {
     let mut hirs = Vec::new();
     for path in paths {
@@ -937,11 +975,12 @@ fn run() -> ExitCode {
             | "emit-graph"
             | "emit-contracts"
             | "emit-template"
+            | "emit-wit"
     ) || paths.is_empty()
     {
         eprintln!(
             "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
-             emit-contracts|emit-template> <path.pw>... [--plain]"
+             emit-contracts|emit-template|emit-wit> <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -952,6 +991,7 @@ fn run() -> ExitCode {
         eprintln!("  emit-manifest  print the resource manifests as JSON");
         eprintln!("  emit-graph     print the resource dependency graph (--plain for text)");
         eprintln!("  emit-template  print the checked template IR (--plain for text)");
+        eprintln!("  emit-wit       print a WIT world per component contract");
         return ExitCode::from(2);
     }
 
@@ -969,6 +1009,10 @@ fn run() -> ExitCode {
 
     if cmd == "emit-template" {
         return emit_template_command(&paths, args.iter().any(|a| a == "--plain"));
+    }
+
+    if cmd == "emit-wit" {
+        return emit_wit_command(&paths);
     }
 
     if cmd == "emit-koka" {

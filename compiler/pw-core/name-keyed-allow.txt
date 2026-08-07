@@ -26,4 +26,5 @@ types.rs:by_adt_name         a type name inside one type environment; the enviro
 types.rs:by_opaque_name      same as `by_adt_name`
 ontology.rs:by_name          an effect's dotted name IS its identity: the vocabulary is ONE flat namespace by design, which is what makes `database.read` mean the same thing in every row. Two declarations of one spelling are a conflict, and `conflicts` records them rather than letting the map absorb one
 ontology.rs:conflicts        keyed by the contested spelling, because the spelling is what is contested; the DefIds of every claimant are the value
+wit.rs:known                 a QUALIFIED PATH — `domain.SessionId`, not `SessionId` — which is what makes it safe, and the first version keyed by bare name did merge two declarations into one WIT type. `by_def` beside it is the resolved form and is what every reference goes through; this one exists to answer "is this path emitted"
 ontology.rs:families         a family is NOT a declaration and has no DefId to key by — it exists because operations were declared into it, and `EffectPath::family` is the only thing that produces one

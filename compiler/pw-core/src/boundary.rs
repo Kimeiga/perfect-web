@@ -111,6 +111,13 @@ impl TypeFacts {
     ///
     /// `None` is a type this build could not determine, and it is a real
     /// answer rather than a missing one — see [`Schema::Undetermined`].
+    ///
+    /// **Every nominal component, not just the head.** A scope and a resource
+    /// attach to a nominal type, and `List<OpenTransaction>` carries whatever
+    /// `OpenTransaction` carries: a list of handles is a list of things held
+    /// open here. Reading the head alone looked up `List`, found nothing, and
+    /// called it transferable — which is the permissive direction, and exactly
+    /// the reading that made `secret<Payments>` placeable in the browser.
     pub fn profile(&self, ty: Option<&str>) -> TransferProfile {
         let Some(ty) = ty else {
             return TransferProfile {
@@ -119,15 +126,53 @@ impl TypeFacts {
                 produced_scope: None,
             };
         };
-        // The head, because a scope and a resource attach to a nominal type:
-        // `List<Cart>` carries whatever `Cart` carries. The one place this
-        // module takes a type name apart, for the same reason `ontology.rs` is
-        // the one place an effect name is.
-        let head = ty.split('<').next().unwrap_or(ty).trim();
+        let mut resource = None;
+        let mut produced_scope = None;
+        let mut carrier = None;
+        // The one place this module takes a type name apart, for the same
+        // reason `ontology.rs` is the one place an effect name is.
+        self.walk(ty, &mut |name| {
+            if resource.is_none()
+                && let Some(p) = self.resources.get(name)
+            {
+                resource = Some(p.clone());
+                carrier = Some(name.to_string());
+            }
+            if produced_scope.is_none()
+                && let Some(s) = self.scoped.get(name)
+            {
+                produced_scope = Some(s.clone());
+            }
+        });
         TransferProfile {
-            schema: Schema::Named(head.to_string()),
-            resource: self.resources.get(head).cloned(),
-            produced_scope: self.scoped.get(head).cloned(),
+            // The component that carries the cost, where one does, so a
+            // diagnostic names `OpenTransaction` rather than
+            // `List<OpenTransaction>` — the type the reader has to change is
+            // the one held open.
+            schema: Schema::Named(
+                carrier.unwrap_or_else(|| ty.split('<').next().unwrap_or(ty).trim().to_string()),
+            ),
+            resource,
+            produced_scope,
+        }
+    }
+
+    /// Every nominal name inside a written type, outermost first.
+    fn walk(&self, written: &str, f: &mut impl FnMut(&str)) {
+        let (head, args) = match written.split_once('<') {
+            Some((h, rest)) => (
+                h.trim(),
+                rest.trim_end_matches('>')
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>(),
+            ),
+            None => (written.trim(), Vec::new()),
+        };
+        f(head);
+        for a in args {
+            self.walk(a, f);
         }
     }
 

@@ -17,3 +17,16 @@ pw-syntax = { path = "../pw-syntax" }
 annotate-snippets.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+# E8 gate item: "the world's imports are exactly `contract.imports`, and
+# `wit-bindgen` accepts it". `wit-parser` is the crate `wasm-tools` and
+# `wit-bindgen` are both built on, so the second half is checked by the real
+# parser rather than by a reader written here — a second WIT parser in this
+# repo would be the shape the project keeps deleting, and a particularly bad
+# one: the whole point of emitting WIT is that somebody else's toolchain reads
+# it.
+#
+# A DEV dependency. Generating WIT needs no parser; only proving the output is
+# WIT does.
+[dev-dependencies]
+wit-parser = "0.252.0"

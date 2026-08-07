@@ -58,6 +58,7 @@ pub mod scope;
 pub mod signatures;
 pub mod template_ir;
 pub mod types;
+pub mod wit;
 
 pub use abi::{Decoder, Mode, Value};
 pub use capability::{CapabilityAudit, CapabilityManifest, RuntimeProfile, audit};

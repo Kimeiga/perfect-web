@@ -150,9 +150,23 @@ pub struct Interface {
 
 impl Interface {
     /// From a declaration — the form every component kind has.
+    ///
+    /// The parameter type is reassembled from the head and its arguments, which
+    /// the HIR carries separately. Reading only `p.ty` gave `List` for
+    /// `List<MenuItem>` — which emitted `list` with nothing in it, and, worse,
+    /// looked up `List` rather than `MenuItem` when asking whether a position
+    /// carries a resource. `wit-parser` caught the first; the second was
+    /// invisible.
     pub fn of(decl: &crate::hir::Decl) -> Interface {
         Interface {
-            params: decl.params.iter().map(|p| p.ty.clone()).collect(),
+            params: decl
+                .params
+                .iter()
+                .map(|p| {
+                    p.ty.as_ref()
+                        .map(|head| crate::wit::written(head, &p.ty_args))
+                })
+                .collect(),
             returns: decl.ret.clone(),
             returns_args: decl.ret_args.clone(),
         }

@@ -923,6 +923,7 @@ dependencies = [
  "pw-syntax",
  "serde",
  "serde_json",
+ "wit-parser",
 ]
 
 [[package]]

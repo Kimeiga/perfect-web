@@ -231,6 +231,21 @@ e8-binding:
      } > docs/evidence/E8/binding-feasibility.txt
     @tail -13 docs/evidence/E8/binding-feasibility.txt
 
+# E8 gate task 2. The WIT world per ComponentContract.
+#
+# Checked in for the same reason the contracts are: `pw-host` and any future
+# `wit-bindgen` step read what the compiler actually emits, not a fixture
+# written to agree with it. `tests/wit_worlds.rs` resolves it with `wit-parser`,
+# the crate `wasm-tools` and `wit-bindgen` are both built on.
+e8-wit:
+    @cargo run --quiet -p pw-cli -- emit-wit packages/pw-std/*.pw \
+      packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw \
+      examples/store/*.pw > docs/evidence/E8/store.wit
+    @cargo test --quiet -p pw-core --test wit_worlds 2>&1 | tail -3
+    @printf '  %s worlds, %s types on the ABI\n' \
+      "$(grep -c '^world ' docs/evidence/E8/store.wit)" \
+      "$(grep -cE '^    (record|variant|type) ' docs/evidence/E8/store.wit)"
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

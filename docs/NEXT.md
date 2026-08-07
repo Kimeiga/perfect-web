@@ -21,7 +21,7 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 | 3 | Placement consumes `effective_effects` | **done** — both discriminating controls, and it found a witness proving an annotation |
 | 4 | The deployment planner abstraction | **done** — `runtime/pw-host/src/plan.rs` |
 | 5 | Freeze `ComponentBinding` / remote-capable semantics | **done** — `pw-core/{boundary,binding}.rs`, `BindingSupport` on each `Export` |
-| 6 | Generate WIT worlds from semantic contracts | not started |
+| 6 | Generate WIT worlds from semantic contracts | **done** — `pw emit-wit`, resolved by `wit-parser` |
 | 7 | Typed linking only from `Granted` | not started |
 | 8 | Run real `add_to_cart` through Wasmtime | not started |
 | 9 | Fuel and memory limits | not started |
@@ -162,7 +162,7 @@ later analysis splits `"database.read"` at the dot.
 5  deployment planning on ontology + topology   DONE — pw-host/src/plan.rs
 6  delete World::worlds_for                     DONE — see below
 7  boundary-transfer local/remote binding feasibility   DONE — see below
-8  WIT generation                                       NEXT
+8  WIT generation                                       DONE — see below
 ```
 
 ### Step 6, as it landed
@@ -301,6 +301,46 @@ that_is_not_undetermined` is the guard, and it also fixes the second half —
 tell.
 
 Evidence: `docs/evidence/E8/binding-feasibility.txt`, via `just e8-binding`.
+
+### Step 8, as it landed
+
+`pw emit-wit` writes a WIT package for a checked program: one `world` per
+`ComponentContract`, one `interface <id>-api` per component's exports, and one
+`interface types` holding what those signatures name. Committed at
+`docs/evidence/E8/store.wit` via `just e8-wit` — 10 worlds, 15 types on the ABI.
+
+Both halves of the gate are tested.
+`imports_are_exactly_the_contracts_imports_and_the_projection_inverts` checks
+the first in both directions; `wit_parser_resolves_the_generated_package`
+checks the second with **`wit-parser`**, the crate `wasm-tools` and
+`wit-bindgen` are both built on. A dev-dependency, and already in the lock file
+via wasmtime — a WIT reader written here would be a second implementation of
+somebody else's format, and the format is the entire product.
+
+**The host's WIT is a test fixture, deliberately.** A world imports
+`pw:host/database`, whose signatures the host owns and the compiler must not
+invent. The fixture's existence is the statement: a deployment has to publish a
+WIT package for the capabilities it grants, or these worlds do not resolve.
+`the_resolver_would_reject_a_world_naming_an_interface_nobody_publishes` is the
+control that makes that mean something.
+
+**Two defects the real parser found, both invisible to anything else:**
+
+- Record fields read only `f.ty`, the type HEAD, so `List<MenuItem>` emitted
+  `list` with nothing in it. The same gap was in `Interface::of`, where it was
+  worse and silent: a position typed `List<OpenTransaction>` looked up `List`,
+  found no resource, and came out transferable. `TypeFacts::profile` now walks
+  every nominal component rather than the head.
+- Types were keyed by bare name, so `web.capability.SessionId` and
+  `domain.SessionId` both became `session-id`. `wit-parser` refused the package
+  for a duplicate definition. It refused — a generator that had deduplicated
+  instead would have put one type on the wire where the program has two. Keyed
+  by qualified path now, and every reference resolves through the workspace.
+
+Refusal rather than invention throughout: an unmappable type is `Unmappable`
+and no output, and two names mangling to one identifier is `Collision`. Only
+types an export can transitively reach are emitted, so the platform's
+`Decoder`, `Style` and `ElementRef` stay off the ABI.
 
 ### Step 13 — deployment planning
 
