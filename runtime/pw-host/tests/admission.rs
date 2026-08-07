@@ -398,3 +398,39 @@ fn the_topology_is_data_the_host_owns() {
     assert!(!admit(&c, &t, "edge-lhr", &allowed(&c)).is_admitted());
     assert!(admit(&c, &t, "origin-1", &allowed(&c)).is_admitted());
 }
+
+// --- from a decision to an instantiation ---------------------------------
+
+#[test]
+fn the_linker_is_built_from_the_admission_and_not_from_the_node() {
+    // `docs/evidence/E0/spike-wasmtime-component.txt` already proved the engine
+    // half: a component whose import is withheld from the linker fails to
+    // instantiate, and the diagnostic names the missing interface. What that
+    // spike did not establish is where the linker's CONTENTS come from — it
+    // added one capability by hand.
+    //
+    // Here they come from the decision. The primary node has read AND write; a
+    // component requiring only read gets a linker holding only read, so the
+    // engine's refusal is triggered by the CONTRACT rather than by whatever the
+    // machine happened to be missing.
+    let reader = contract("shop.Menu", &["origin"], &["database.read<Stores>"]);
+    let a = admit(&reader, &topology(), "primary", &allowed(&reader));
+    let granted = Granted::from(&a, &BTreeMap::new()).expect("admitted");
+
+    assert_eq!(linkable(&reader, &granted), ["pw:host/database#read"]);
+    assert!(
+        !linkable(&reader, &granted).contains(&"pw:host/database#write".to_string()),
+        "the node has write; this component's linker must not"
+    );
+}
+
+#[test]
+fn a_component_granted_nothing_gets_an_empty_linker() {
+    // The case where "no ambient authority" is decided. An empty linker means
+    // any import at all fails instantiation — which is what makes a pure
+    // component genuinely pure rather than merely uninteresting.
+    let c = contract("shop.Label", &["browser"], &[]);
+    let granted =
+        Granted::from(&admit(&c, &topology(), "laptop", &[]), &BTreeMap::new()).expect("admitted");
+    assert!(linkable(&c, &granted).is_empty());
+}

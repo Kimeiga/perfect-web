@@ -18,6 +18,31 @@ representations of one identity derive the same wire id.
 **current milestone:** **E8 — the capability host.** E7 is complete; all ten of
 its gate items have evidence under `docs/evidence/E7/`.
 
+**E8-0 is complete** (ADR-0020). The compiler hands the host a six-field
+`ComponentContract` — component_id, abi_schema, required_capabilities,
+allowed_placements, imports, exports — emitted by `pw emit-contracts` as data.
+One contract per DECLARATION, because per module a database query and a browser
+component each inherit the other's capability. A page does not inherit its
+handlers' authority: the store page rendered `on:press={.. => add_to_cart(..)}`
+and therefore required `database.write` **to render** until derivation started
+excluding lambda subtrees.
+
+**E8 is in progress.** `runtime/pw-host` decides admission in three parts —
+topology, placement, artifact audit — and never a fourth. Placement and
+capability are separate checks because they disagree in both directions: a
+read-only replica is an origin node that cannot be written to, and a laptop
+granting `dom.mutate` still may not run origin-only code.
+
+`just e8-host` runs the audit against real components. The adversarial guest is
+the ordinary one: `spikes/wasmtime-component/guest` declares one interface in
+its WIT world and its component demands fifteen, because Rust `std` on
+`wasm32-wasip2` injects fourteen `wasi:*` interfaces during runtime
+initialization. It is refused, and every one is named.
+
+What remains for E8 is in `docs/NEXT.md`: WIT world generation, typed linking
+from a `Granted`, running a real command through the host, per-instance fuel and
+memory limits, and retiring `worlds_for` in favour of the declared topology.
+
 **E7, closed.** The **real store page** is rendered by the own renderer, its
 handlers are authorised by `decide()` before they attach, and a click updates
 only the cart's part while every menu node keeps its identity. A click changes

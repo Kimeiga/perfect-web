@@ -402,6 +402,28 @@ impl Granted {
     }
 }
 
+/// Exactly what a host may install in a component's linker.
+///
+/// The bridge between a decision and an instantiation. `docs/evidence/E0//// spike-wasmtime-component.txt` already proved the engine half — a component
+/// whose import is withheld from the linker fails to instantiate, with a
+/// diagnostic naming the missing interface — so what remained was that the
+/// linker's CONTENTS come from the admission rather than from the node.
+///
+/// Derived from the contract's imports filtered by what was granted, so a host
+/// cannot install an interface for a capability the decision refused, and
+/// cannot install one the node happens to have.
+pub fn linkable(contract: &ComponentContract, granted: &Granted) -> Vec<String> {
+    let mut out: Vec<String> = contract
+        .imports
+        .iter()
+        .filter(|i| granted.handle(&i.capability).is_some())
+        .map(Import::key)
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
 // --- reading a real artifact -------------------------------------------------
 
 #[cfg(feature = "engine")]

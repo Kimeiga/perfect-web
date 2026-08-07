@@ -2,6 +2,59 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+---
+
+## Now: E8, the remaining half
+
+`runtime/pw-host` decides admission and audits artifacts. What it does not yet
+do is *run* anything.
+
+| # | task | acceptance |
+|---|---|---|
+| 1 | Generate a WIT world per `ComponentContract` | the world's imports are exactly `contract.imports`, and `wit-bindgen` accepts it |
+| 2 | Typed linking from a `Granted` | `linkable()`'s list becomes real `Linker` entries; a component whose contract omits an import fails to instantiate, with the engine's own diagnostic |
+| 3 | Run the store's `add_to_cart` as a component | the dev server's command path goes through the host instead of a Rust closure |
+| 4 | Fuel and memory limits per instance | E0's `check:fuel` moved from the spike into `pw-host`, driven by policy rather than a constant |
+| 5 | Retire `worlds_for` in favour of the declared topology | the compiler keeps solving placement; the *table* of which world grants which family comes from a declaration the deployment owns |
+
+**What is already proved** (`just e8-host`, `docs/evidence/E8/`):
+
+- placement and capability are separate checks that disagree in both directions;
+- a capability's type argument is part of what is granted;
+- an admitted instance receives its contract, not the node's capability set;
+- a handle carries nothing about the value behind it, and one instance's handle
+  does nothing in another's hands;
+- the ordinary `std` guest is refused for fourteen `wasi:*` interfaces its WIT
+  world never declared.
+
+---
+
+## Then: E9, the permanent type and effect compiler
+
+The architect's ruling of 2026-08-07 places it after E8 and says why: E8
+*consumes* capabilities and must not define effect semantics. E9 defines them —
+real inference, real ADTs, permanent effect rows, and capability/effect lowering
+into the `ComponentContract` that E8-0 froze. Koka is retained as a differential
+oracle for a while.
+
+Two things E8 found that E9 owns:
+
+- `Inference::known` is keyed by the BARE declaration name, so two declarations
+  called `Cart` in different modules share an effect set
+  (`docs/RISK_QUEUE.md` 34). Contracts avoid it by inferring from the body;
+  nothing else does.
+- The placement solver still reads *declared* effect rows in some callers, while
+  contracts read inferred ones. One of those is wrong.
+
+---
+
+## Then: E10 onward
+
+`docs/MILESTONES.md` has the register: own backends, deployment, the networking
+lab, HTTP/3, Servo, tooling, hardening. None is started.
+
+---
+
 **E1 is closed** on RQ-2's measured Outcome 1. **E1A is algorithmically
 implemented, source integration pending.** **E2 is in progress** and now owns
 body parsing, HIR, and source-to-checker integration — see `docs/MILESTONES.md`.
