@@ -159,11 +159,46 @@ later analysis splits `"database.read"` at the dot.
 3  session.read: capability + topology, not     NEXT
    guessed placement
 4  freeze the placement migration matrix
-5  deployment planning on ontology + topology
-6  delete World::worlds_for
+5  deployment planning on ontology + topology   DONE — pw-host/src/plan.rs
+6  delete World::worlds_for                     NEXT — consumers listed below
 7  boundary-transfer local/remote binding feasibility
 8  WIT generation
 ```
+
+### Step 6, with the migration mapped
+
+`World::grants(capability)` consults the hard-coded `worlds_for` table. The
+ontology declares the same fact per effect and the two agree today —
+`the_ontology_and_worlds_for_agree_about_placement_where_both_speak`. The
+baseline is frozen in `tests/placement_migration.rs`: 30 effect rows plus three
+combinations proving placement is an intersection.
+
+**Six consumers, and the reason this is not a rename:** several have no ontology
+in scope, so the migration is a threading change before it is a deletion.
+
+```text
+placement.rs:71   World::grants           the core — every other caller goes
+                                          through it
+check.rs:1113     row-covers-or-grants    inside a declared-placement check
+check.rs:1177     declared world vs row
+check.rs:2203     effect at render time
+check.rs:2209     the `elsewhere` worlds
+contract.rs:169   the fallback when nothing declares the effect
+effects.rs        forbidden_in's `secret` world test
+```
+
+The shape: `grants` takes a placement lookup the caller supplies from the
+ontology, rather than reading a static table. `Demand` is the natural place to
+carry it, since `solve` already receives one.
+
+**And no fallback afterwards.** `contract.rs:169` is the fallback today —
+an effect nothing declares keeps its `worlds_for` answer. After the deletion an
+undeclared effect must be diagnosed, not interpreted by legacy placement
+knowledge. `PW5201` already exists for exactly that, so the diagnostic is
+written; what changes is that placement stops silently answering.
+
+Acceptance, per the ruling: every row in `placement_migration.rs` unchanged, and
+any row that moves classified explicitly rather than accepted.
 
 **Step 3, specified.** `session.read` declares `placement browser, edge, origin`
 today, derived from `Label::may_hold`'s rule for a session-restricted value.
