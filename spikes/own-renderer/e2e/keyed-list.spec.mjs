@@ -292,10 +292,18 @@ test("the server refuses a move naming an item it does not have", async ({ page 
   expect(body.refused).toMatch(/no item/);
 });
 
-test("two sessions see the same change at their own addresses", async ({ browser }) => {
-  // An instance token is scoped to the document it appears in, so one broadcast
-  // frame cannot address two documents. Each subscriber gets a patch carrying
-  // ITS token — and both pages end up in the same order, from the same event.
+test("two sessions see the same change at the same address", async ({ browser }) => {
+  // ONE patch reaches both readers.
+  //
+  // The menu is `public … cache shared`, so it is materialized as a fragment
+  // in its own PUBLIC identity domain — see `public-fragment.spec.mjs`. One
+  // identity means one set of instance tokens, which means one address, which
+  // means the server derives the patch once.
+  //
+  // The first version of this test asserted the opposite, because the fragment
+  // then inherited each document's session-scoped domain: two readers of one
+  // shared cache entry got different bytes. Both tests pass their own
+  // rendering; only one of them describes a shared cache.
   const a = await browser.newContext();
   const b = await browser.newContext();
   const [pa, pb] = [await a.newPage(), await b.newPage()];
@@ -319,8 +327,7 @@ test("two sessions see the same change at their own addresses", async ({ browser
     ]);
   }
 
-  // And the tokens really do differ, or the assertion above is satisfied by
-  // one shared address that happens to work.
+  // And they moved at the SAME address, which is what makes one patch enough.
   const tokens = await Promise.all(
     [pa, pb].map((p) =>
       p.evaluate(() =>
@@ -336,7 +343,7 @@ test("two sessions see the same change at their own addresses", async ({ browser
     ),
   );
   expect(tokens[0].length).toBeGreaterThan(0);
-  expect(tokens[0], "two documents, two sets of instance tokens").not.toEqual(tokens[1]);
+  expect(tokens[0], "one public fragment, one set of instance tokens").toEqual(tokens[1]);
 
   await a.close();
   await b.close();

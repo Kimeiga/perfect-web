@@ -169,6 +169,7 @@ impl Server {
         let clock = Clock::new();
         let materializer = Materializer::new(clock.clone(), BUILD);
         materializer.declare("store.page.Cart", FragmentPolicy::default());
+        materializer.declare("store.page.Menu", FragmentPolicy::default());
         Server {
             templates,
             clock,
@@ -354,8 +355,60 @@ impl Server {
         .keyed("own-renderer-spike-key")
     }
 
-    fn menu_env(&self, session: &str) -> Env {
-        Env::new().in_domain(self.domain(session))
+    /// The menu fragment's OWN identity domain — public, and the same for
+    /// every reader.
+    ///
+    /// Not the document's. `store.page.Menu` is declared `public … cache
+    /// shared`: one answer for everybody. If its instance tokens came from the
+    /// enclosing document they would be per-session, and two readers of one
+    /// shared cache entry would get different bytes — which is the exact
+    /// composition `IdentityDomain` exists to make unrepresentable, arriving
+    /// through the back door of "the page renders the fragment".
+    fn fragment_domain(&self) -> IdentityDomain {
+        IdentityDomain::document("store.page.Menu(47)", Partition::Public, BUILD)
+            .keyed("own-renderer-spike-key")
+    }
+
+    /// The fragment's render environment.
+    ///
+    /// Takes the items rather than locking for them. Locking here put the menu
+    /// mutex on two points of one call path — the page render and the fragment
+    /// render beneath it — and a non-reentrant mutex against itself is a hang,
+    /// not an error. The lock is taken once, by whoever is about to use the
+    /// list, and passed down.
+    ///
+    /// It must NOT set the materialized fragment either: that is what the PAGE
+    /// splices in, and putting it here made `menu_env` call `menu_fragment`
+    /// call `menu_env` — unbounded recursion that presented as a server which
+    /// accepted connections and answered none.
+    fn menu_env(&self, items: &[(String, String)]) -> Env {
+        Env::new()
+            .set("menu", menu_value(items))
+            .in_domain(self.fragment_domain())
+    }
+
+    /// The menu fragment's bytes, materialized once and reused.
+    ///
+    /// Regenerated only when the entry is stale, and stored in the
+    /// materializer under the PUBLIC entry key. Two readers get the same bytes
+    /// because they are the same bytes — the entry is read, not re-rendered —
+    /// and that is what makes `cache shared` a fact about the system rather
+    /// than a claim about two renders agreeing.
+    fn menu_fragment(&self, items: &[(String, String)]) -> String {
+        let key = self.menu_key();
+        if let Some(entry) = self.materializer.entry(&key)
+            && !entry.stale
+        {
+            return entry.body;
+        }
+        let (template, part) = self.menu_part();
+        let env = self.menu_env(items);
+        let html = pw_render::render_part(template, part, &env, &self.templates)
+            .expect("the menu fragment renders");
+        self.clock.advance(1);
+        self.materializer
+            .regenerate(&key, None, || Ok(html.clone()));
+        html
     }
 
     /// The public entry whose version every menu patch is caused by.
@@ -397,31 +450,42 @@ impl Server {
             op.apply(&mut items)?;
         }
 
-        self.clock.advance(1);
+        // The fragment is re-materialized, in its own domain, once.
         let items = self.menu.lock().expect("menu").clone();
-        let rendered = items
-            .iter()
-            .map(|(id, _)| id.as_str())
-            .collect::<Vec<_>>()
-            .join(",");
+        let (template, part) = self.menu_part();
+        let env = self.menu_env(&items);
+        let html = pw_render::render_part(template, part, &env, &self.templates)
+            .map_err(|b| format!("{b:?}"))?;
+        self.clock.advance(1);
         self.materializer
-            .regenerate(&self.menu_key(), None, || Ok(rendered));
+            .regenerate(&self.menu_key(), None, || Ok(html));
 
         let entry = ResourceEntryId::derive(&menu_identity(), &IDENTITY);
         let version = self.menu_version();
-        let (template, part) = self.menu_part();
-        let target = self.menu_address();
+
+        // ONE patch, for every reader.
+        //
+        // A public fragment has one identity, so its instances have one set of
+        // tokens, so one address reaches every document containing it. The
+        // previous version derived a patch per subscriber because the fragment
+        // inherited each document's domain — which was per-session bytes for a
+        // shared cache entry, dressed up as a broadcast.
+        let operation = op
+            .patch(template, part, &items, &env, &self.templates)
+            .map_err(|b| format!("{b:?}"))?;
+        let target = op.target(
+            &self.menu_address(),
+            part,
+            self.item_name_part(),
+            &env,
+            part,
+        );
 
         let sessions: Vec<String> = queue.keys().cloned().collect();
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!("broadcast {:?} to {sessions:?}", op);
         }
         for session in sessions {
-            let env = self.menu_env(&session);
-            let operation = op
-                .patch(template, part, &items, &env, &self.templates)
-                .map_err(|b| format!("{b:?}"))?;
-            let target = op.target(&target, part, self.item_name_part(), &env, part);
             let waiting = queue.entry(session).or_default();
             waiting.push(StreamFrame::ResourceChanged {
                 protocol: CURRENT,
@@ -495,23 +559,25 @@ impl Server {
             .iter()
             .find(|t| t.name == "StorePage")
             .expect("StorePage");
+        // Both bound BEFORE the chain. A `MutexGuard` produced inside a method
+        // argument lives until the end of the whole STATEMENT, so locking the
+        // menu inside the chain and locking it again inside `menu_fragment`
+        // deadlocked a non-reentrant mutex against itself — presenting as a
+        // request that simply never returned.
+        let items = self.menu.lock().expect("menu").clone();
+        let fragment = self.menu_fragment(&items);
         let env = Env::new()
             .set("store.name", Value::Text("Blue Bottle".into()))
-            .set("menu", menu_value(&self.menu.lock().expect("menu")))
+            .set("menu", menu_value(&items))
+            // The public fragment, EMITTED rather than rendered. Its instance
+            // tokens are the fragment's own, so every reader's document
+            // contains the same bytes and one patch addresses all of them.
+            .materialized(self.menu_part().1, &fragment)
             .set("cart.line_count", Value::Int(self.cart_value(session)))
             // A page, not a materialization: its domain is the route identity
             // and its partition. The generation is carried whatever the
             // partition is — the two are orthogonal.
-            .in_domain(
-                IdentityDomain::document(
-                    "StorePage(47)",
-                    Partition::Session {
-                        id: session.to_string(),
-                    },
-                    BUILD,
-                )
-                .keyed("own-renderer-spike-key"),
-            );
+            .in_domain(self.domain(session));
         pw_render::render(template, &env, &self.templates).expect("the store page renders")
     }
 }
@@ -837,6 +903,26 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 }));
             drop(queue);
             respond_json(&mut stream, 202, &session, fresh, "{}");
+        }
+        // What the materializer holds for the PUBLIC menu entry. Enough to
+        // show that a second reader reads rather than regenerates, and no
+        // more: the storage key never appears, because the browser has no
+        // business knowing how an entry is stored.
+        ("GET", "/menu-entry") => {
+            let identity = menu_identity();
+            let entry = ResourceEntryId::derive(&identity, &IDENTITY);
+            let version = server.menu_version();
+            respond_json(
+                &mut stream,
+                200,
+                &session,
+                fresh,
+                &format!(
+                    "{{\"entry\":\"{entry}\",\"version\":{},\"partition\":\"{}\"}}",
+                    version.0,
+                    identity.partition_text()
+                ),
+            );
         }
         ("GET", "/menu") => {
             let items = server.menu.lock().expect("menu");

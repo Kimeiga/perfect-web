@@ -183,6 +183,15 @@ pub struct Env {
     /// same path a patch will later address, and two representations of it
     /// would be two answers to "which instance".
     path: InstancePath,
+    /// Parts whose markup is already materialized, and the domain each was
+    /// materialized in.
+    ///
+    /// A MATERIALIZED FRAGMENT: bytes computed once and reused by every reader
+    /// entitled to them. The renderer emits them rather than rendering the
+    /// part, which is what makes "shared" mean shared — two readers get the
+    /// same bytes because they are the same bytes, not because two renders
+    /// happened to agree.
+    materialized: BTreeMap<PartId, String>,
 }
 
 impl Env {
@@ -204,6 +213,17 @@ impl Env {
     /// Set the identity domain: who shares an identity with whom.
     pub fn in_domain(mut self, domain: IdentityDomain) -> Env {
         self.domain = domain;
+        self
+    }
+
+    /// Supply a part's markup instead of rendering it.
+    ///
+    /// The bytes must include the part's own anchors — they are what a full
+    /// render would have produced for that part — because a fragment that
+    /// omitted them would be unaddressable, and a fragment that had different
+    /// ones would be addressable at a name nothing else uses.
+    pub fn materialized(mut self, part: PartId, html: &str) -> Env {
+        self.materialized.insert(part, html.to_string());
         self
     }
 
@@ -237,6 +257,50 @@ impl Env {
 ///
 /// `others` is every template that may be reached by a `Component` part. A
 /// component naming a template not in the set is `Blocked`, not skipped.
+/// Render ONE part, anchors included, in this env's domain.
+///
+/// What a materialized fragment is made of. Rendering it separately from the
+/// page is the whole point: the fragment's identity domain is its OWN — a
+/// public fragment is public — and a page that rendered it inline would give
+/// it the page's domain, so two sessions would get two sets of instance
+/// tokens for one shared cache entry.
+pub fn render_part(
+    t: &Template,
+    part: PartId,
+    env: &Env,
+    others: &[Template],
+) -> Result<String, Blocked> {
+    let Some(p) = find_part(&t.chunks, part) else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("no part {part} in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    let mut out = String::new();
+    emit_part(p, env, others, &mut out)?;
+    Ok(out)
+}
+
+fn find_part(chunks: &[Chunk], want: PartId) -> Option<&Part> {
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if p.id() == Some(want) {
+            return Some(p);
+        }
+        let nested = match p {
+            Part::Conditional {
+                then, otherwise, ..
+            } => find_part(then, want).or_else(|| find_part(otherwise, want)),
+            Part::Each { body, .. } => find_part(body, want),
+            _ => None,
+        };
+        if nested.is_some() {
+            return nested;
+        }
+    }
+    None
+}
+
 /// Render ONE instance of a keyed loop, anchors included.
 ///
 /// What a patch carries when it inserts an item: the markup the server would
@@ -255,33 +319,13 @@ pub fn render_instance(
     env: &Env,
     others: &[Template],
 ) -> Result<String, Blocked> {
-    fn find(chunks: &[Chunk], each: PartId) -> Option<&Part> {
-        for c in chunks {
-            let Chunk::Dynamic(p) = c else { continue };
-            if p.id() == Some(each) {
-                return Some(p);
-            }
-            let nested = match p {
-                Part::Conditional {
-                    then, otherwise, ..
-                } => find(then, each).or_else(|| find(otherwise, each)),
-                Part::Each { body, .. } => find(body, each),
-                _ => None,
-            };
-            if nested.is_some() {
-                return nested;
-            }
-        }
-        None
-    }
-
     let Some(Part::Each {
         id,
         binding,
         key,
         body,
         ..
-    }) = find(&t.chunks, each)
+    }) = find_part(&t.chunks, each)
     else {
         return Err(Blocked::UnrepresentedConstruct {
             reason: format!("part {each} is not a keyed loop in `{}`", t.path),
@@ -349,6 +393,16 @@ fn emit(chunks: &[Chunk], env: &Env, others: &[Template], out: &mut String) -> R
 }
 
 fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Result<(), Blocked> {
+    // A materialized part is EMITTED, not rendered. The bytes were produced by
+    // this same renderer in the fragment's own identity domain, and using them
+    // verbatim is the difference between a shared fragment and two renders that
+    // agree today.
+    if let Some(id) = p.id()
+        && let Some(html) = env.materialized.get(&id)
+    {
+        out.push_str(html);
+        return Ok(());
+    }
     match p {
         Part::Blocked { reason, at } => Err(Blocked::UnrepresentedConstruct {
             reason: reason.clone(),
