@@ -39,9 +39,21 @@ its WIT world and its component demands fifteen, because Rust `std` on
 `wasm32-wasip2` injects fourteen `wasi:*` interfaces during runtime
 initialization. It is refused, and every one is named.
 
-What remains for E8 is in `docs/NEXT.md`: typed linking from a `Granted`,
-running a real command through the host, and per-instance fuel and memory
-limits.
+What remains for E8 is in `docs/NEXT.md`: running a real command through the
+host — the store's `add_to_cart` going through a component instead of a Rust
+closure in the dev server.
+
+**Typed linking and resource limits are done, and the engine is what refuses.**
+`engine::instantiate` populates a `Linker` from `linkable()` and from nothing
+else; a contract that omits an import produces no definition, and wasmtime says
+*component imports instance `perfect-web:store/stores@0.1.0`, but a matching
+implementation was not found in the linker*. A pre-flight check comparing lists
+would have been a second implementation of instantiation's own rule.
+`Limits { fuel, memory_bytes, table_elements }` sits beside `Topology` — a
+deployment's declaration rather than a constant in the host. Instantiating the
+minimal guest costs 16,386 fuel, measured rather than assumed, and one byte of
+memory is refused with *memory minimum size of 18 pages exceeds memory limits*.
+Evidence: `docs/evidence/E8/artifact-audit.txt`, via `just e8-host`.
 
 **WIT worlds are generated** (`pw emit-wit`, `just e8-wit`,
 `docs/evidence/E8/store.wit`): one world per `ComponentContract`, whose imports
@@ -458,13 +470,12 @@ incremental           5 unrelated updates -> expensive node evaluated once
 
 ## next three concrete tasks
 
-1. **Typed linking only from a `Granted`.** `linkable()`'s list becomes real
-   `Linker` entries, and a component whose contract omits an import fails to
-   instantiate with the engine's own diagnostic rather than ours.
-2. **Run the store's `add_to_cart` as a component**, so the dev server's command
-   path goes through the host instead of a Rust closure.
-3. **Fuel and memory limits per instance.** E0's `check:fuel` moves from the
-   spike into `pw-host`, driven by policy rather than a constant.
+1. **Run the store's `add_to_cart` as a component**, so the dev server's command
+   path goes through the host instead of a Rust closure. The last E8 gate item,
+   and the one that needs a compiled Pleris component rather than a spike guest.
+2. **E9** — effect rows as a real inference algorithm, with the ontology already
+   in place so the ABI does not have to change under it.
+3. **E10 onward**, per `docs/MILESTONES.md`.
 
 Linux CI is deferred by operator decision to before E3 (risk R11).
 

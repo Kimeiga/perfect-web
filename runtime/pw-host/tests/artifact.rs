@@ -32,7 +32,7 @@
 
 #![cfg(feature = "engine")]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use pw_host::*;
@@ -179,4 +179,226 @@ fn a_component_that_cannot_be_read_is_not_treated_as_importing_nothing() {
     let err = pw_host::engine::imports_of(b"not a wasm component")
         .expect_err("garbage is not a component");
     assert!(!err.is_empty());
+}
+
+// --- typed linking, and the engine's own refusal -----------------------------
+
+/// **A component instantiates with exactly what it was granted, and not
+/// otherwise.**
+///
+/// E8 gate item: *"typed linking only from a `Granted`. A component whose
+/// contract omits an import fails to instantiate, with the engine's own
+/// diagnostic rather than ours."*
+///
+/// Both halves against a real component and a real engine, because the whole
+/// claim is about what wasmtime does — a data-level check would be a second
+/// implementation of instantiation's own rule, and the two would agree until a
+/// component imported something the check did not model.
+#[test]
+fn a_granted_component_instantiates_and_an_ungranted_one_does_not() {
+    let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
+    let bytes = std::fs::read(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}\nrun `just spike-wasmtime` first", path.display()));
+
+    let actual = imports(path);
+    let allowed: Vec<Import> = actual
+        .iter()
+        .map(|i| {
+            let (interface, name) = i.split_once('#').unwrap_or((i.as_str(), "use"));
+            Import {
+                interface: interface.to_string(),
+                name: name.to_string(),
+                capability: "store.read".into(),
+                kind: ImportKind::HostCapability,
+            }
+        })
+        .collect();
+    let c = contract(allowed);
+
+    // Admitted, so it holds `store.read`, so `linkable` covers its one import.
+    let admission = admit(&c, &topology(), "origin-1", &actual);
+    let granted = Granted::from(&admission, &BTreeMap::new()).expect("admitted");
+    let linked = pw_host::engine::instantiate(&bytes, &c, &granted)
+        .unwrap_or_else(|e| panic!("a granted component must instantiate: {e}"));
+    println!("linked: {linked:?}");
+    assert!(!linked.is_empty(), "and something was actually linked");
+
+    // **The refusal.** Same artifact, same node, a contract that does not
+    // require `store.read` — so nothing is granted, so nothing is linked, so
+    // the import is unresolvable. The message is wasmtime's.
+    let mut ungranted = c.clone();
+    ungranted.required_capabilities.clear();
+    let admission = admit(&ungranted, &topology(), "origin-1", &actual);
+    let granted = Granted::from(&admission, &BTreeMap::new()).expect("placement still admits it");
+    assert_eq!(granted.count(), 0, "no capability, no handle");
+    let err = pw_host::engine::instantiate(&bytes, &ungranted, &granted)
+        .expect_err("an unlinked import must not instantiate");
+    println!("refused by the engine: {err}");
+    assert!(
+        err.contains("perfect-web:store/stores"),
+        "and the engine names the import it could not resolve: {err}"
+    );
+}
+
+/// A refused admission cannot be instantiated at all.
+///
+/// The direction that matters most: there is no `Granted` to link from, so
+/// there is nothing to call `instantiate` with. Stated as a test because
+/// "cannot" is a claim about the API's shape, and an `Option` that some caller
+/// unwraps with a default would break it silently.
+#[test]
+fn a_refused_admission_yields_no_granted_to_link_from() {
+    let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
+    let actual = imports(path);
+    let allowed: Vec<Import> = actual
+        .iter()
+        .map(|i| {
+            let (interface, name) = i.split_once('#').unwrap_or((i.as_str(), "use"));
+            Import {
+                interface: interface.to_string(),
+                name: name.to_string(),
+                capability: "store.read".into(),
+                kind: ImportKind::HostCapability,
+            }
+        })
+        .collect();
+    let c = contract(allowed);
+
+    // A node in the wrong world. Placement refuses, and there is no override.
+    let browser = Topology {
+        nodes: vec![Node {
+            name: "laptop".into(),
+            world: "browser".into(),
+            grants: BTreeSet::from(["store.read".to_string()]),
+        }],
+    };
+    let admission = admit(&c, &browser, "laptop", &actual);
+    assert!(!admission.is_admitted());
+    assert!(
+        Granted::from(&admission, &BTreeMap::new()).is_none(),
+        "a refusal yields no capability set, and therefore no linker"
+    );
+}
+
+// --- resource limits, per instance and from policy ---------------------------
+
+/// **A budget the deployment declares, enforced by the engine.**
+///
+/// E8 gate item: *"fuel and memory limits per instance, driven by policy rather
+/// than a constant."* E0's `check:fuel` proved wasmtime enforces a fuel budget.
+/// What a spike cannot say is where the number comes from — and a limit
+/// compiled into the host is one nobody can raise for a component that
+/// legitimately needs more.
+#[test]
+fn an_instance_runs_within_the_budget_its_deployment_declares() {
+    let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
+    let bytes = std::fs::read(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}\nrun `just spike-wasmtime` first", path.display()));
+    let actual = imports(path);
+    let allowed: Vec<Import> = actual
+        .iter()
+        .map(|i| {
+            let (interface, name) = i.split_once('#').unwrap_or((i.as_str(), "use"));
+            Import {
+                interface: interface.to_string(),
+                name: name.to_string(),
+                capability: "store.read".into(),
+                kind: ImportKind::HostCapability,
+            }
+        })
+        .collect();
+    let c = contract(allowed);
+    let admission = admit(&c, &topology(), "origin-1", &actual);
+    let granted = Granted::from(&admission, &BTreeMap::new()).expect("admitted");
+
+    // A generous budget: it instantiates, and the cost is REPORTED rather than
+    // assumed. A host that could not say what an instance spent could not set
+    // the next budget from evidence.
+    let generous = Limits {
+        fuel: Some(10_000_000),
+        memory_bytes: Some(64 * 1024 * 1024),
+        table_elements: Some(10_000),
+    };
+    let out = pw_host::engine::instantiate_within(&bytes, &c, &granted, &generous)
+        .unwrap_or_else(|e| panic!("a generous budget must not refuse: {e}"));
+    let used = out.fuel_used.expect("a fuel budget reports what it spent");
+    println!("instantiation spent {used} fuel");
+    assert!(used > 0, "instantiation is not free");
+
+    // A budget below what instantiation costs. The trap is the engine's, and
+    // the number came from the measurement above rather than from a guess —
+    // which is the whole difference between a policy and a constant.
+    let starved = Limits {
+        fuel: Some(1),
+        ..generous.clone()
+    };
+    let err = pw_host::engine::instantiate_within(&bytes, &c, &granted, &starved)
+        .expect_err("a starved instance must not run");
+    println!("refused for fuel: {err}");
+    assert!(
+        err.to_lowercase().contains("fuel"),
+        "and the engine says why: {err}"
+    );
+
+    // The control that keeps both halves meaningful: unbounded is a real
+    // answer and not the only one that works.
+    let unbounded = pw_host::engine::instantiate_within(&bytes, &c, &granted, &Limits::unbounded())
+        .expect("unbounded instantiates");
+    assert_eq!(
+        unbounded.fuel_used, None,
+        "nothing is metered when nothing is bounded"
+    );
+    assert!(!Limits::unbounded().is_bounded());
+    assert!(generous.is_bounded());
+}
+
+/// A memory ceiling is refused growth, not a crashed host.
+///
+/// The direction charter §7.10 asks for at every boundary: the guest sees an
+/// allocation failure it can handle. A host that aborted would turn one
+/// component's appetite into everyone's outage, which is the thing limits exist
+/// to prevent.
+#[test]
+fn a_memory_ceiling_denies_growth_rather_than_aborting() {
+    let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
+    let bytes = std::fs::read(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}\nrun `just spike-wasmtime` first", path.display()));
+    let actual = imports(path);
+    let allowed: Vec<Import> = actual
+        .iter()
+        .map(|i| {
+            let (interface, name) = i.split_once('#').unwrap_or((i.as_str(), "use"));
+            Import {
+                interface: interface.to_string(),
+                name: name.to_string(),
+                capability: "store.read".into(),
+                kind: ImportKind::HostCapability,
+            }
+        })
+        .collect();
+    let c = contract(allowed);
+    let admission = admit(&c, &topology(), "origin-1", &actual);
+    let granted = Granted::from(&admission, &BTreeMap::new()).expect("admitted");
+
+    // One page. The guest's own memory does not fit, so growth is denied and
+    // instantiation fails — reported, with the engine's words.
+    let cramped = Limits {
+        fuel: None,
+        memory_bytes: Some(1),
+        table_elements: None,
+    };
+    let err = pw_host::engine::instantiate_within(&bytes, &c, &granted, &cramped)
+        .expect_err("one byte of memory is not enough for anything");
+    println!("refused for memory: {err}");
+
+    // And the discriminating half: the same component under a real ceiling runs.
+    // Without this, the assertion above would pass for a limiter that denied
+    // every allocation.
+    let roomy = Limits {
+        fuel: None,
+        memory_bytes: Some(64 * 1024 * 1024),
+        table_elements: None,
+    };
+    pw_host::engine::instantiate_within(&bytes, &c, &granted, &roomy)
+        .expect("64 MiB is enough for the minimal guest");
 }

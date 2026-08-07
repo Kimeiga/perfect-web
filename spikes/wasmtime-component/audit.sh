@@ -40,7 +40,16 @@ echo "$out"
   echo
   echo "And the artifact audit against real components:"
   echo
-  echo "$out" | grep -E "^(minimal guest imports|std guest imports|undeclared):" || true
+  # Unanchored: with `--test-threads=1 --nocapture` a print lands on the
+  # same line as the test name that produced it, which is more useful than
+  # either alone and defeats a `^` anchor.
+  echo "$out" | grep -oE "(minimal guest imports|std guest imports|undeclared).*" || true
+  echo
+  echo "Typed linking, and resource limits per instance. Every refusal below is"
+  echo "the ENGINE's, in its own words - a pre-flight check comparing lists"
+  echo "would be a second implementation of instantiation's own rule:"
+  echo
+  echo "$out" | grep -oE "(linked:|refused by the engine|refused for|instantiation spent).*" | sed 's/^/  /' || true
   echo
   echo "$out" | grep -E "^test |test result:" || true
 } > "$EVIDENCE/artifact-audit.txt"

@@ -52,6 +52,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+pub mod plan;
+
 // --- the compiler's artifact, mirrored --------------------------------------
 //
 // ADR-0018/ADR-0020: field-name mirrors of `pw_core::contract`. This crate does
@@ -115,7 +117,6 @@ pub struct Import {
 /// What class an ACTUAL Wasm import falls into.
 ///
 /// The audit classifies rather than flattening, because each class is
-pub mod plan;
 /// constrained by a different thing: a host capability by the contract's
 /// `required_capabilities` and the node's grants, a component interface by that
 /// component's own contract, and a runtime import by nothing at all — which is
@@ -150,6 +151,102 @@ pub fn classify(contract: &ComponentContract, import: &str) -> ImportClass {
         }
     }
     ImportClass::Runtime
+}
+
+/// **What one instance may consume.**
+///
+/// E8 gate item: *"fuel and memory limits per instance, driven by policy rather
+/// than a constant."* E0's `check:fuel` proved wasmtime enforces both; what a
+/// spike cannot say is where the number comes from. This is that, and it lives
+/// beside `Topology` — part of what a DEPLOYMENT declares, because a budget
+/// compiled into the host is a budget nobody can raise for a component that
+/// legitimately needs more, and nobody can lower for one that does not.
+///
+/// `None` is unbounded, and it is a deliberate value rather than a default:
+/// `Limits::unbounded()` has to be written, so a caller that wants no ceiling
+/// says so.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Limits {
+    /// Execution budget. Exhausting it traps, which is what makes a runaway
+    /// guest a bounded cost rather than an outage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel: Option<u64>,
+    /// Ceiling on linear memory, in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_bytes: Option<usize>,
+    /// Ceiling on table elements — the other growable resource, and the one
+    /// that gets forgotten. A guest denied memory can still exhaust a host
+    /// through indirect-call tables.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub table_elements: Option<usize>,
+}
+
+impl Limits {
+    /// No ceiling on anything. Written out, never defaulted into.
+    pub fn unbounded() -> Limits {
+        Limits::default()
+    }
+
+    pub fn is_bounded(&self) -> bool {
+        self.fuel.is_some() || self.memory_bytes.is_some() || self.table_elements.is_some()
+    }
+}
+
+/// The store data a limited instance runs with.
+///
+/// Public because `Store<T>`'s data type is part of the API surface once a
+/// caller holds one; the fields are wasmtime's own limiter, unchanged.
+#[derive(Debug)]
+pub struct Meter {
+    pub limits: MemoryLimits,
+}
+
+/// Wasmtime's `ResourceLimiter`, driven by [`Limits`].
+///
+/// The fields are public and readable without the `engine` feature, because a
+/// host that has decided a ceiling should be able to report it — the alternative
+/// is a limiter whose contents exist only inside the engine, which is the shape
+/// that makes "what was this instance allowed?" unanswerable after the fact.
+#[derive(Debug, Default)]
+pub struct MemoryLimits {
+    pub memory_bytes: Option<usize>,
+    pub table_elements: Option<usize>,
+}
+
+impl From<&Limits> for Meter {
+    fn from(l: &Limits) -> Meter {
+        Meter {
+            limits: MemoryLimits {
+                memory_bytes: l.memory_bytes,
+                table_elements: l.table_elements,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+impl wasmtime::ResourceLimiter for MemoryLimits {
+    fn memory_growing(
+        &mut self,
+        _current: usize,
+        desired: usize,
+        _maximum: Option<usize>,
+    ) -> wasmtime::Result<bool> {
+        // Refusing growth rather than erroring: the guest sees an allocation
+        // failure it can handle, which is a different and better thing than
+        // the host aborting. Charter §7.10's direction — a boundary reports
+        // rather than crashes.
+        Ok(self.memory_bytes.is_none_or(|max| desired <= max))
+    }
+
+    fn table_growing(
+        &mut self,
+        _current: usize,
+        desired: usize,
+        _maximum: Option<usize>,
+    ) -> wasmtime::Result<bool> {
+        Ok(self.table_elements.is_none_or(|max| desired <= max))
+    }
 }
 
 /// Is this an interface the toolchain injected rather than the program asked
@@ -667,5 +764,179 @@ pub mod engine {
         out.sort();
         out.dedup();
         Ok(out)
+    }
+
+    /// **Instantiate a component with exactly the capabilities it was granted.**
+    ///
+    /// E8 gate item: *"typed linking only from a `Granted`. A component whose
+    /// contract omits an import fails to instantiate, with the engine's own
+    /// diagnostic rather than ours."*
+    ///
+    /// The linker is populated from [`crate::linkable`] and from nothing else.
+    /// That is the whole design:
+    ///
+    /// ```text
+    /// admit()    decides whether this component may run here
+    /// Granted    what it therefore holds
+    /// linkable() which of its imports that satisfies
+    /// this       the linker, and no other source of definitions
+    /// ```
+    ///
+    /// **The engine refuses, not us.** A pre-flight check comparing lists would
+    /// be a second implementation of instantiation's own rule, and the two
+    /// would agree until a component imported something in a way the list did
+    /// not model. An unlinked import is an unresolvable one, and wasmtime says
+    /// so in its own words — which is also the better diagnostic, because it
+    /// names what the artifact asked for rather than what we expected.
+    ///
+    /// Returns the linked import keys on success, so a caller can record what
+    /// was actually supplied.
+    ///
+    /// Runs under [`crate::Limits::unbounded`]. Use [`instantiate_within`] to
+    /// give an instance a budget.
+    pub fn instantiate(
+        bytes: &[u8],
+        contract: &crate::ComponentContract,
+        granted: &crate::Granted,
+    ) -> Result<Vec<String>, String> {
+        instantiate_within(bytes, contract, granted, &crate::Limits::unbounded()).map(|o| o.linked)
+    }
+
+    /// What an instantiation produced, and what it cost.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Instantiated {
+        /// The import keys that were linked, from the granted set and nothing
+        /// else.
+        pub linked: Vec<String>,
+        /// Fuel consumed, where a budget was set.
+        pub fuel_used: Option<u64>,
+    }
+
+    /// **[`instantiate`], within a declared budget.**
+    ///
+    /// E8 gate item: *"fuel and memory limits per instance, driven by policy
+    /// rather than a constant."* E0's `check:fuel` proved wasmtime enforces
+    /// both; what it could not say is where the number comes from. [`Limits`]
+    /// is that, and it travels with the deployment rather than being compiled
+    /// in — a limit hard-coded in the host is a limit nobody can tune for a
+    /// component that legitimately needs more.
+    ///
+    /// [`Limits`]: crate::Limits
+    pub fn instantiate_within(
+        bytes: &[u8],
+        contract: &crate::ComponentContract,
+        granted: &crate::Granted,
+        limits: &crate::Limits,
+    ) -> Result<Instantiated, String> {
+        use std::collections::{BTreeMap, BTreeSet};
+
+        use wasmtime::component::types::ComponentItem;
+        use wasmtime::component::{Component, Linker};
+        use wasmtime::{Config, Engine, Store};
+
+        let mut config = Config::new();
+        config.wasm_component_model(true);
+        // Metering is an ENGINE setting, so it is decided here from the policy
+        // rather than being on always. An engine that consumed fuel for an
+        // unbounded instance would charge for something nobody bounded.
+        config.consume_fuel(limits.fuel.is_some());
+        let engine = Engine::new(&config).map_err(|e| e.to_string())?;
+        let component = Component::new(&engine, bytes).map_err(|e| e.to_string())?;
+
+        let mut linker: Linker<crate::Meter> = Linker::new(&engine);
+        let supplied = crate::linkable(contract, granted);
+
+        // **Grouped by interface, and only the FUNCTIONS.**
+        //
+        // A linker instance is created once per interface — the spike's
+        // `perfect-web:store/stores` exports both `read` and the `store` record,
+        // and defining the instance twice is an error. So is defining a
+        // function for `store`, which is a type: what an interface exports is
+        // read from the COMPONENT's own type here, so the set of things to
+        // define comes from the artifact rather than from the contract's idea
+        // of it.
+        let ty = component.component_type();
+        let mut functions: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (name, item) in ty.imports(&engine) {
+            let ComponentItem::ComponentInstance(instance) = item.ty else {
+                continue;
+            };
+            for (func, kind) in instance.exports(&engine) {
+                if matches!(kind.ty, ComponentItem::ComponentFunc(_)) {
+                    functions
+                        .entry(name.to_string())
+                        .or_default()
+                        .push(func.to_string());
+                }
+            }
+        }
+
+        // One definition per linkable import, and the value behind a capability
+        // is never handed over — the guest gets a function that calls back into
+        // the host, exactly as `Handle` describes. The bodies are stubs here
+        // because what this proves is the LINKING rule; `add_to_cart` running
+        // for real is the next gate item and needs the command path.
+        let wanted: BTreeSet<&str> = supplied.iter().map(String::as_str).collect();
+        for (interface, funcs) in &functions {
+            // Decided before the instance is created, so an interface with
+            // nothing granted gets no instance at all rather than an empty one
+            // the engine might accept.
+            let here: Vec<&String> = funcs
+                .iter()
+                .filter(|f| wanted.contains(format!("{interface}#{f}").as_str()))
+                .collect();
+            if here.is_empty() {
+                continue;
+            }
+            let mut instance = linker
+                .instance(interface)
+                .map_err(|e| format!("{interface}: {e}"))?;
+            for func in here {
+                let name = func.clone();
+                instance
+                    .func_new(func, move |_, _ty, _args, results| {
+                        // **A stub body, and what it stands in for matters.**
+                        // A capability's VALUE lives on the host and never
+                        // enters the guest's memory — `Handle` is the whole
+                        // design. What this proves is the LINKING rule: an
+                        // import the granted set covers gets a definition, and
+                        // one it does not gets none.
+                        //
+                        // `option<T>` because that is what the spike's
+                        // `stores.read` returns. A differently shaped result
+                        // fails when CALLED, not when instantiated, which is
+                        // the right boundary for a rule about instantiation.
+                        let _ = &name;
+                        for slot in results.iter_mut() {
+                            *slot = wasmtime::component::Val::Option(None);
+                        }
+                        Ok(())
+                    })
+                    .map_err(|e| format!("{interface}#{func}: {e}"))?;
+            }
+        }
+
+        let mut store = Store::new(&engine, crate::Meter::from(limits));
+        store.limiter(|m| &mut m.limits);
+        if let Some(fuel) = limits.fuel {
+            store.set_fuel(fuel).map_err(|e| e.to_string())?;
+        }
+
+        // **The refusal, and it is the engine's.** An import with no definition
+        // is unresolvable here, in wasmtime's own words.
+        linker
+            .instantiate(&mut store, &component)
+            .map_err(|e| e.to_string())?;
+
+        let fuel_used = limits.fuel.and_then(|budget| {
+            store
+                .get_fuel()
+                .ok()
+                .map(|left| budget.saturating_sub(left))
+        });
+        Ok(Instantiated {
+            linked: supplied,
+            fuel_used,
+        })
     }
 }

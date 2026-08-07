@@ -11,7 +11,19 @@ Three checks on data (no engine), fifteen more in tests/admission.rs:
 
 And the artifact audit against real components:
 
+minimal guest imports: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
+std guest imports 34 interfaces
 undeclared: ["wasi:cli/environment@0.2.9#get-environment", "wasi:cli/exit@0.2.9#exit", "wasi:cli/stderr@0.2.9#get-stderr", "wasi:cli/stderr@0.2.9#output-stream", "wasi:cli/stdin@0.2.9#get-stdin", "wasi:cli/stdin@0.2.9#input-stream", "wasi:cli/stdout@0.2.9#get-stdout", "wasi:cli/stdout@0.2.9#output-stream", "wasi:cli/terminal-input@0.2.9#terminal-input", "wasi:cli/terminal-output@0.2.9#terminal-output", "wasi:cli/terminal-stderr@0.2.9#get-terminal-stderr", "wasi:cli/terminal-stderr@0.2.9#terminal-output", "wasi:cli/terminal-stdin@0.2.9#get-terminal-stdin", "wasi:cli/terminal-stdin@0.2.9#terminal-input", "wasi:cli/terminal-stdout@0.2.9#get-terminal-stdout", "wasi:cli/terminal-stdout@0.2.9#terminal-output", "wasi:clocks/monotonic-clock@0.2.9#duration", "wasi:clocks/monotonic-clock@0.2.9#pollable", "wasi:clocks/monotonic-clock@0.2.9#subscribe-duration", "wasi:io/error@0.2.9#error", "wasi:io/poll@0.2.9#[method]pollable.block", "wasi:io/poll@0.2.9#poll", "wasi:io/poll@0.2.9#pollable", "wasi:io/streams@0.2.9#[method]output-stream.blocking-flush", "wasi:io/streams@0.2.9#[method]output-stream.check-write", "wasi:io/streams@0.2.9#[method]output-stream.subscribe", "wasi:io/streams@0.2.9#[method]output-stream.write", "wasi:io/streams@0.2.9#error", "wasi:io/streams@0.2.9#input-stream", "wasi:io/streams@0.2.9#output-stream", "wasi:io/streams@0.2.9#pollable", "wasi:io/streams@0.2.9#stream-error"]
+
+Typed linking, and resource limits per instance. Every refusal below is
+the ENGINE's, in its own words - a pre-flight check comparing lists
+would be a second implementation of instantiation's own rule:
+
+  linked: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
+  refused by the engine: component imports instance `perfect-web:store/stores@0.1.0`, but a matching implementation was not found in the linker
+  refused for memory: memory minimum size of 18 pages exceeds memory limits
+  instantiation spent 16386 fuel
+  refused for fuel: wasm trap: all fuel consumed by WebAssembly
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test a_capabilitys_type_argument_is_part_of_what_is_granted ... ok
@@ -38,13 +50,28 @@ test the_std_runtime_import_set_is_refused_wholesale ... ok
 test the_topology_is_data_the_host_owns ... ok
 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test a_component_that_cannot_be_read_is_not_treated_as_importing_nothing ... ok
+test a_granted_component_instantiates_and_an_ungranted_one_does_not ... linked: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
+test a_memory_ceiling_denies_growth_rather_than_aborting ... refused for memory: memory minimum size of 18 pages exceeds memory limits
+test a_refused_admission_yields_no_granted_to_link_from ... ok
+test an_instance_runs_within_the_budget_its_deployment_declares ... instantiation spent 16386 fuel
 test the_declared_component_imports_exactly_what_its_world_says ... minimal guest imports: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
 test the_std_component_is_refused_for_authority_nobody_asked_for ... std guest imports 34 interfaces
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
 test a_capability_survives_the_crossing_with_its_argument ... ok
 test the_compilers_contracts_deserialize_with_every_field_populated ... ok
 test the_real_contracts_drive_a_real_admission ... ok
 test the_store_page_depends_on_components_without_acquiring_their_authority ... ok
 test the_store_page_renders_without_authority_and_its_command_does_not ... ok
 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test a_refused_component_carries_the_reason_from_every_node ... ok
+test a_topology_that_grants_nothing_cannot_host_the_privileged_components ... ok
+test an_edge_whose_ends_share_no_node_is_necessarily_remote ... ok
+test an_import_naming_nothing_is_dangling_rather_than_silently_ignored ... ok
+test an_undetermined_signature_does_not_refuse_a_deployment ... ok
+test can_be_local_is_disjointness_of_candidate_sets ... ok
+test every_edge_in_the_store_program_can_be_bound ... ok
+test placement_and_transferability_are_independent_and_only_one_pair_fails ... ok
+test the_planner_agrees_with_admit_on_every_pair ... ok
+test the_store_program_is_deployable_on_a_topology_that_serves_it ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
