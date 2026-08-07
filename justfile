@@ -156,6 +156,36 @@ golden-both: golden-marko golden-pw
 spike-own-renderer:
     @bash spikes/own-renderer/run.sh
 
+# E8-0. Regenerate the committed compiler→host contracts (ADR-0020).
+#
+# Checked in, so `runtime/pw-host` can be tested against REAL compiler output
+# rather than a fixture written to agree with it — the same reason
+# `store-graph.json` is checked in.
+e8-contracts:
+    @cargo run --quiet -p pw-cli -- emit-contracts packages/pw-std/*.pw \
+      packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw \
+      examples/store/*.pw > docs/evidence/E8/component-contracts.json
+    @{ echo "E8-0 — the compiler→host ComponentContract for the store demo"; echo; \
+       echo "produced by: just e8-contracts"; echo; \
+       echo "One contract per DECLARATION, not per module: least authority, and a new"; \
+       echo "declaration leaves every existing contract byte-identical."; echo; \
+       echo "Note StorePage: rendering needs no authority and runs anywhere. Its"; \
+       echo "handler calls add_to_cart, which needs database.write and runs only at"; \
+       echo "the origin — recorded once, against the thing that performs it."; echo; \
+       cargo run --quiet -p pw-cli -- emit-contracts --plain packages/pw-std/*.pw \
+         packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw \
+         examples/store/*.pw; } > docs/evidence/E8/component-contracts.txt
+    @cargo test --quiet -p pw-host --test contract_mirror 2>&1 | tail -3
+    @echo "  the host reads the compiler's contracts, field for field"
+
+# E8. The artifact audit, against real Wasm components.
+#
+# Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is
+# not part of `just ci` — the DECISIONS it exercises are, in
+# `runtime/pw-host/tests/admission.rs`, and those need no engine.
+e8-host:
+    @bash spikes/wasmtime-component/audit.sh
+
 # E7 gate items 7-10: runtime size, activation CPU, forced synchronous layout,
 # and the large-menu case.
 #

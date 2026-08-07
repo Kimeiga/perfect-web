@@ -1,6 +1,6 @@
 E8-0 — the compiler→host ComponentContract for the store demo
 
-produced by: cargo run -p pw-cli -- emit-contracts --plain <the store program>
+produced by: just e8-contracts
 
 One contract per DECLARATION, not per module: least authority, and a new
 declaration leaves every existing contract byte-identical.

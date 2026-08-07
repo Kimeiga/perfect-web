@@ -1,0 +1,23 @@
+[package]
+name = "pw-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# `wasmtime` is a heavy dependency and it is OPTIONAL here on purpose.
+#
+# Everything the host decides — topology, placement, the import audit — is
+# decided on data, and data does not need a Wasm engine to be checked. Keeping
+# the engine behind a feature means `just ci` proves the decisions and
+# `just e8-host` proves they hold against a real component, rather than the
+# whole workspace paying for an engine most of it never touches.
+[features]
+default = []
+engine = ["dep:wasmtime"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+wasmtime = { version = "47.0.3", optional = true }
