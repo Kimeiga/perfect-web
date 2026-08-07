@@ -176,12 +176,20 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // Declaration name → its privacy label, across every unit. A `page` in one
     // file renders a `session query` declared in another, and that is the
     // corpus's canonical private-in-shared-cache case (assumption A-009).
-    let mut labels: BTreeMap<String, Label> = BTreeMap::new();
-    for u in units {
-        for (_, d) in u.hir.all_decls() {
+    // Keyed by RESOLVED IDENTITY, not by spelling.
+    //
+    // It was `BTreeMap<String, Label>` keyed by bare declaration name, so a
+    // page rendering `Cart` was given the join of EVERY `Cart` in the program.
+    // Joining is the safe direction — an unrelated declaration could only make
+    // a page look more private, never less — which is exactly why it never
+    // produced a visibly wrong answer and stayed in place. It is still
+    // `docs/RISK_QUEUE.md` 34's shape: meaning resolved from a spelling.
+    let mut labels: BTreeMap<crate::resolve::DefId, Label> = BTreeMap::new();
+    for (unit, u) in units.iter().enumerate() {
+        for (id, d) in u.hir.all_decls() {
             let l = label_of(d);
             if !l.is_public() {
-                labels.insert(d.name.clone(), l);
+                labels.insert(crate::resolve::DefId { unit, decl: id.0 }, l);
             }
         }
     }
@@ -390,7 +398,7 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
 #[allow(clippy::too_many_arguments)]
 fn check_unit_with(
     env: &Env,
-    labels: &BTreeMap<String, Label>,
+    labels: &BTreeMap<crate::resolve::DefId, Label>,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
     manifest: &crate::resume::Manifest,
@@ -459,12 +467,14 @@ fn check_unit_with(
             &unit.hir,
             &unit.src,
             labels,
+            inference,
+            at,
             decl,
             inherited.get(&id.0).copied(),
             &mut out,
         );
-        privacy_flow(&unit.hir, sigs, decl, &mut out);
-        privacy_sinks(&unit.hir, sigs, decl, &mut out);
+        privacy_flow(&unit.hir, sigs, id, decl, &mut out);
+        privacy_sinks(&unit.hir, sigs, id, decl, &mut out);
         effect_rows(&unit.hir, sigs, inference, at, id, decl, &mut out);
         crate::capability::capability_arguments(&unit.hir, decl, types, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
@@ -961,7 +971,9 @@ fn name_pair(body: &Body, block: ExprId, keyword: &str) -> Option<(String, crate
 fn privacy_and_placement(
     hir: &Hir,
     src: &str,
-    labels: &BTreeMap<String, Label>,
+    labels: &BTreeMap<crate::resolve::DefId, Label>,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
     decl: &Decl,
     inherited: Option<World>,
     out: &mut Vec<Diagnostic>,
@@ -970,7 +982,7 @@ fn privacy_and_placement(
     // A `page` that is itself unlabelled but renders a `session query` is a
     // session materialization — which is the corpus's canonical case, and is
     // invisible to a rule that only reads the header.
-    let (read, read_from) = reads_label_with_source(hir, labels, decl);
+    let (read, read_from) = reads_label_with_source(hir, labels, inference, at, decl);
     let label = label_of(decl).join(&read);
 
     // 1. A non-public value in a shared cache. Charter §7.8's canonical case.
@@ -1151,7 +1163,9 @@ fn decl_id_of(hir: &Hir, decl: &Decl) -> crate::hir::DeclId {
 /// expects to see, which is how the gap was found.
 fn reads_label_with_source(
     hir: &Hir,
-    labels: &BTreeMap<String, Label>,
+    labels: &BTreeMap<crate::resolve::DefId, Label>,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
     decl: &Decl,
 ) -> (Label, Option<String>) {
     let Some(body_id) = decl.body else {
@@ -1188,19 +1202,24 @@ fn reads_label_with_source(
         if called.is_empty() {
             continue;
         }
-        let short = called.rsplit('.').next().unwrap_or(&called);
-        // The program-wide table first — a page usually renders a query
-        // declared in another file — then this unit's own declarations.
-        let mut found = Label::public();
-        if let Some(l) = labels.get(short) {
-            found = found.join(l);
-        }
-        for (_, other) in hir.all_decls().filter(|(_, o)| o.name == short) {
-            found = found.join(&label_of(other));
-        }
+        // RESOLVED. `Cart` in one module and `Cart` in another are two
+        // declarations with two labels, and taking the join of both made a
+        // page's privacy depend on what an unrelated module happened to call
+        // its own query.
+        //
+        // A name that resolves to nothing contributes nothing — which is the
+        // honest answer, and narrower than the join it replaces. A page reading
+        // a query it never imported is a resolution error, reported as one.
+        let Some(def) = inference.called_from(at, &called) else {
+            continue;
+        };
+        let Some(found) = labels.get(&def).cloned() else {
+            continue;
+        };
         if found.is_public() {
             continue;
         }
+        let short = called.rsplit('.').next().unwrap_or(&called);
         label = label.join(&found);
         if source.is_none() {
             // The nearest enclosing binding, by start offset.
@@ -1257,12 +1276,19 @@ fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::hir::Span)> 
 /// declaration's own label is public. R-006's `trace_capture` returns `()`, so
 /// its body label IS public; the defect is in what it passes along, not in what
 /// it returns.
-fn privacy_sinks(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnostic>) {
+fn privacy_sinks(
+    hir: &Hir,
+    sigs: &Signatures,
+    id: crate::hir::DeclId,
+    decl: &Decl,
+    out: &mut Vec<Diagnostic>,
+) {
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
+    let imports = crate::labels::imported_modules(hir);
     // Labels belong to VALUES. `labels.rs` explains why this is not a map from
     // binding name to restriction any more.
-    let labels = crate::labels::Labels::of_body(sigs, decl, body);
+    let labels = crate::labels::Labels::of_body(sigs, decl, body, hir.module_of(id), &imports);
 
     for id in body.walk() {
         let Expr::Call { callee, args } = body.expr(id) else {
@@ -1367,9 +1393,16 @@ fn sink_level(
     })
 }
 
-fn privacy_flow(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnostic>) {
+fn privacy_flow(
+    hir: &Hir,
+    sigs: &Signatures,
+    id: crate::hir::DeclId,
+    decl: &Decl,
+    out: &mut Vec<Diagnostic>,
+) {
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
+    let imports = crate::labels::imported_modules(hir);
     let label = body_label(body, sigs);
     if label.is_public() {
         return;
@@ -1382,7 +1415,7 @@ fn privacy_flow(hir: &Hir, sigs: &Signatures, decl: &Decl, out: &mut Vec<Diagnos
     // name to restriction, so `let shown = if dry_run { "none" } else { key }`
     // rendered a secret that the rule could not see — the same narrowness the
     // sink rule had, in the one place that had not been migrated with it.
-    let labels = crate::labels::Labels::of_body(sigs, decl, body);
+    let labels = crate::labels::Labels::of_body(sigs, decl, body, hir.module_of(id), &imports);
     for id in body.walk() {
         let Expr::Template { parts, .. } = body.expr(id) else {
             continue;

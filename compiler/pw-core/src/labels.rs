@@ -58,14 +58,30 @@ use crate::signatures::Signatures;
 /// Labels for the values in one body.
 pub struct Labels<'a> {
     sigs: &'a Signatures,
+    /// The module this body is in, and the modules it imports. What an
+    /// unqualified name may resolve to, and nothing wider.
+    module: Option<&'a str>,
+    imports: &'a [String],
     /// Binding name → its label and where it acquired one.
     bindings: BTreeMap<String, (Label, Span)>,
 }
 
 impl<'a> Labels<'a> {
-    pub fn of_body(sigs: &'a Signatures, decl: &Decl, body: &Body) -> Labels<'a> {
+    /// `module` and `imports` say what an unqualified name may resolve to.
+    ///
+    /// Passed in rather than searched for, because "every module in the
+    /// program" is the answer this replaced.
+    pub fn of_body(
+        sigs: &'a Signatures,
+        decl: &Decl,
+        body: &Body,
+        module: Option<&'a str>,
+        imports: &'a [String],
+    ) -> Labels<'a> {
         let mut me = Labels {
             sigs,
+            module,
+            imports,
             bindings: BTreeMap::new(),
         };
 
@@ -149,23 +165,32 @@ impl<'a> Labels<'a> {
         me
     }
 
-    /// A declaration by its bare name, across every module.
+    /// A declaration by its bare name, WITHIN THIS MODULE AND ITS IMPORTS.
     ///
     /// `query Cart(session)` names `Cart`, not `cart.queries.Cart` — the
     /// dependency is on the declaration, and the module it lives in is what
-    /// the import resolved. Ambiguity here resolves to nothing rather than to
-    /// a guess.
+    /// the import resolved.
+    ///
+    /// It used to search every module in the program, returning `None` on
+    /// ambiguity. Unique-or-nothing is safer than picking one, but it still
+    /// answered with a declaration from a module this unit never imported —
+    /// and a unique wrong answer is harder to notice than a contested one.
+    /// Classified `forbidden` in `last-segment-audit.txt` and repaired here.
+    ///
+    /// The qualified path is tried first, because a module's own declaration
+    /// is what an unqualified name means inside it.
     fn declaration_named(&self, name: &str) -> Option<&crate::signatures::Signature> {
-        let mut found = None;
-        for (path, sig) in self.sigs.iter() {
-            if path.rsplit('.').next() == Some(name) {
-                if found.is_some() {
-                    return None;
+        if let Some(m) = self.module {
+            if let Some(sig) = self.sigs.by_path(&format!("{m}.{name}")) {
+                return Some(sig);
+            }
+            for import in self.imports {
+                if let Some(sig) = self.sigs.by_path(&format!("{import}.{name}")) {
+                    return Some(sig);
                 }
-                found = Some(sig);
             }
         }
-        found
+        None
     }
 
     /// Where a binding acquired its label, for the diagnostic's origin span.
@@ -329,4 +354,20 @@ fn dummy() -> Decl {
         body: None,
         children: vec![],
     }
+}
+
+/// The modules a unit imports, for scoping unqualified names.
+///
+/// An `import` declaration's own name is the module it names; the `imports`
+/// field beside it is the list of symbols taken from it, which is a different
+/// question.
+pub fn imported_modules(hir: &crate::hir::Hir) -> Vec<String> {
+    let mut out: Vec<String> = hir
+        .all_decls()
+        .filter(|(_, d)| d.kind == crate::hir::DeclKind::Import)
+        .map(|(_, d)| d.name.clone())
+        .collect();
+    out.sort();
+    out.dedup();
+    out
 }

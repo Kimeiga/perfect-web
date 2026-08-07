@@ -522,6 +522,31 @@ impl<'a> Inference<'a> {
         self.resolved(unit, path)
     }
 
+    /// What a CALL names, preferring the namespace calls live in.
+    ///
+    /// `store.page` can import `domain.{ Cart }` — a type — and
+    /// `cart.queries`, which declares `query Cart`. The general resolver tries
+    /// the type namespace first, so `query Cart(s)` resolved to the record
+    /// definition: `docs/RISK_QUEUE.md` records that shape from E6, where every
+    /// page's dependency on its own query pointed at a type of the same name.
+    ///
+    /// A call is a term. `Ui` is tried after it because a page may render a
+    /// `view` or a `component` by name, and neither is callable.
+    pub fn called_from(&self, unit: usize, path: &str) -> Option<DefId> {
+        use crate::resolve::Namespace;
+        if path.contains('.') {
+            return self.resolved(unit, path);
+        }
+        for ns in [Namespace::Term, Namespace::Ui] {
+            if let Resolution::Local(def) | Resolution::Imported { def, .. } =
+                self.workspace.resolve_in(unit, ns, path)
+            {
+                return Some(def);
+            }
+        }
+        self.resolved(unit, path)
+    }
+
     fn resolved(&self, unit: usize, path: &str) -> Option<DefId> {
         if unit == usize::MAX {
             return None;

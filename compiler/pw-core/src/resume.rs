@@ -147,7 +147,8 @@ pub fn check(hir: &Hir, sigs: &Signatures, manifest: &Manifest, out: &mut Vec<Di
         // so a capture that is a field, a rebinding or a branch is answered
         // the same way as a bare parameter.
         let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
-        let labels = crate::labels::Labels::of_body(sigs, decl, body);
+        let imports = crate::labels::imported_modules(hir);
+        let labels = crate::labels::Labels::of_body(sigs, decl, body, hir.module_of(id), &imports);
 
         for lambda in body.walk() {
             let Expr::Lambda {

@@ -63,6 +63,17 @@ const EXPECTED_TO_PASS: &[(&str, Why, &str)] = &[
          correct. The repaired fixture, which imports `Stores`, is caught.",
     ),
     (
+        "R-004",
+        Why::FixtureDidNotExpressIt,
+        "its old text rendered `Cart` without importing the module that \
+         declares it, so the name resolved to nothing. `docs/CORPUS.md` records \
+         that it was caught *through an ambient module union that E2B removed*; \
+         what kept catching it afterwards was the privacy checker resolving a \
+         label by BARE DECLARATION NAME, which item 1a replaced with resolution \
+         through the workspace. `private_in_shared_cache` is a statement about \
+         a query this page actually reads, and the old text reads nothing.",
+    ),
+    (
         "R-024",
         Why::FixtureDidNotExpressIt,
         "the same shape as R-001: `raw_html` was called without importing \

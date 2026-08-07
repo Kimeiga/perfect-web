@@ -14,24 +14,28 @@
 # `tests/last_segment.rs` requires every site to appear here, and ratchets the
 # number of FORBIDDEN ones so a new one cannot be added quietly.
 #
-# Format: <file>:<line>  <category>  <what it does>
+# Keyed by FILE and the enclosing function, not by line number. `cargo fmt`
+# moved two sites the first time this file was written and the audit went red
+# for no semantic reason — a guard that fails on formatting teaches people to
+# edit the guard.
+#
+# Format: <file>:<fn>  <category>  <what it does>
 #
 # Categories: syntax | display | encoding | scoped | forbidden
 
-affine.rs:399    display    builds the list of function NAMES a repair suggests calling to release an affine value. The names are rendered into a diagnostic, never compared against a declaration.
+affine.rs:release_functions    display    builds the list of function NAMES a repair suggests calling to release an affine value. The names are rendered into a diagnostic, never compared against a declaration.
 
-check.rs:655     scoped     matches a constructor pattern's path against `ctors`, the constructor list OF THE SCRUTINEE'S ADT. `DecodeError.Invalid` and `Invalid` name the same constructor of that one type; the scope is a single ADT, not the program.
+check.rs:to_exhaust_pattern     scoped     matches a constructor pattern's path against `ctors`, the constructor list OF THE SCRUTINEE'S ADT. `DecodeError.Invalid` and `Invalid` name the same constructor of that one type; the scope is a single ADT, not the program.
 
-check.rs:1191    forbidden  privacy labels, resolved by bare declaration name against a PROGRAM-WIDE `BTreeMap<String, Label>` and against every same-named declaration in the unit. This is exactly RISK_QUEUE 34's shape. It JOINS rather than picks, so it over-approximates — an unrelated `Cart` can only make a page look MORE private, never less — which is why it has not produced a wrong answer. It is still resolution by spelling. Repair: resolve the rendered declaration through the workspace, as effect inference now does.
+check.rs:reads_label_with_source    display    the short name a privacy diagnostic attributes the restriction to — "this page is Session BECAUSE of `cart`" — used only when no enclosing binding gives a better one. The label itself was resolved through the workspace two lines above; this is what the message says, not what it decided. Repaired 2026-08-07: it used to BE the resolution.
 
-effects.rs:485   display    the short name for `Via::Helper { helper }`, which describes the chain in a diagnostic: "through `helper`". The `callee` beside it keeps the full path, and the effect itself was already resolved before this line.
+effects.rs:infer_at   display    the short name for `Via::Helper { helper }`, which describes the chain in a diagnostic: "through `helper`". The `callee` beside it keeps the full path, and the effect itself was already resolved before this line.
 
-effects.rs:550   scoped     the scoped-and-unique member branch. Matched against the declarations THIS UNIT can see — its own module and its imports — and two matches means no answer. Never program-wide.
+effects.rs:resolved   scoped     the scoped-and-unique member branch. Matched against the declarations THIS UNIT can see — its own module and its imports — and two matches means no answer. Never program-wide.
 
-koka.rs:314      encoding   emits a constructor name into generated Koka source. Koka is the differential oracle, not a product surface, and its namespace is flat by construction. Nothing reads this back as a pw identity.
+koka.rs:lower_pattern      encoding   emits a constructor name into generated Koka source. Koka is the differential oracle, not a product surface, and its namespace is flat by construction. Nothing reads this back as a pw identity.
 
-labels.rs:161    forbidden  `declaration_named` searches EVERY signature in the program for a last-segment match, returning `None` on ambiguity. Unique-or-nothing is safer than the rule deleted in `3a0f319`, but it still resolves a name against modules this unit never imported. Repair: take the unit and resolve through `Workspace::resolve_path`, as `Inference::resolved` does.
 
-layout.rs:347    encoding   collects `set_*` names from signatures carrying `animation.composite`, to learn which CSS properties are compositor-only. The names ARE the data — `opacity`, `transform` — rather than references to declarations. It does flatten modules, so two modules declaring `set_opacity` contribute one property, which is the correct answer for a property vocabulary.
+layout.rs:compositor_properties    encoding   collects `set_*` names from signatures carrying `animation.composite`, to learn which CSS properties are compositor-only. The names ARE the data — `opacity`, `transform` — rather than references to declarations. It does flatten modules, so two modules declaring `set_opacity` contribute one property, which is the correct answer for a property vocabulary.
 
-template_ir.rs:880  syntax  `{#each menu as item (item.id)}` — takes `id` out of the written key expression. Pure text handling of source syntax; nothing is resolved.
+template_ir.rs:parse_each  syntax  `{#each menu as item (item.id)}` — takes `id` out of the written key expression. Pure text handling of source syntax; nothing is resolved.

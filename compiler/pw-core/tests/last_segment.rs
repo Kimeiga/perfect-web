@@ -13,23 +13,19 @@
 //! fact was plausible for its new owner. 35 is worse — a fixture caught by
 //! spelling alone, for a reason unrelated to what it tested.
 //!
-//! # Why a ratchet rather than zero
+//! # The ratchet is at zero
 //!
-//! Two sites are classified `forbidden` and both are still there:
-//! `check.rs`'s privacy-label lookup and `labels.rs`'s `declaration_named`.
-//! Repairing them is real work with its own controls, and asserting zero today
-//! would mean either deleting this test or leaving the tree red.
-//!
-//! So the count is pinned. A new forbidden site fails immediately; repairing an
-//! existing one fails too, and the fix is to lower the number — which is the
-//! only direction this may move.
+//! It was pinned at two — `check.rs`'s privacy-label lookup and `labels.rs`'s
+//! `declaration_named` — and both were repaired the same day. The number may
+//! only go down, so zero is now the ceiling: a new forbidden site fails
+//! immediately, and there is no longer a stock of them to hide one among.
 
 use std::collections::BTreeMap;
 
 const ALLOWED: &[&str] = &["syntax", "display", "encoding", "scoped", "forbidden"];
 
-/// Known, named, and not to be added to.
-const FORBIDDEN_TODAY: usize = 2;
+/// None left. This may only go down, so it stays at zero.
+const FORBIDDEN_TODAY: usize = 0;
 
 fn audit() -> BTreeMap<String, (String, String)> {
     let text = std::fs::read_to_string(
@@ -48,7 +44,11 @@ fn audit() -> BTreeMap<String, (String, String)> {
         .collect()
 }
 
-/// Every `rsplit('.')` in the crate, as `file.rs:line`.
+/// Every `rsplit('.')` in the crate, as `file.rs:enclosing_fn`.
+///
+/// By FUNCTION rather than by line. The first version keyed on line numbers and
+/// `cargo fmt` moved two sites, turning the audit red for no semantic reason —
+/// and a guard that fails on formatting teaches people to edit the guard.
 fn sites() -> Vec<String> {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut out = Vec::new();
@@ -59,14 +59,27 @@ fn sites() -> Vec<String> {
         }
         let file = path.file_name().unwrap().to_string_lossy().to_string();
         let text = std::fs::read_to_string(&path).expect("read");
-        for (i, line) in text.lines().enumerate() {
+        let mut enclosing = String::from("<top level>");
+        for line in text.lines() {
+            let trimmed = line.trim_start();
+            // The nearest `fn` above, at any indentation: a nested helper is
+            // where the operation actually lives.
+            if let Some(rest) = trimmed
+                .strip_prefix("pub fn ")
+                .or_else(|| trimmed.strip_prefix("pub(crate) fn "))
+                .or_else(|| trimmed.strip_prefix("fn "))
+                && let Some(name) = rest.split(['(', '<']).next()
+            {
+                enclosing = name.trim().to_string();
+            }
             // The operation itself, not a comment mentioning it.
-            if line.contains("rsplit('.')") && !line.trim_start().starts_with("//") {
-                out.push(format!("{file}:{}", i + 1));
+            if trimmed.contains("rsplit('.')") && !trimmed.starts_with("//") {
+                out.push(format!("{file}:{enclosing}"));
             }
         }
     }
     out.sort();
+    out.dedup();
     out
 }
 

@@ -16,7 +16,7 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 | # | task | state |
 |---|---|---|
 | 1 | Delete program-wide-unique resolution | **done** — audit landed; prelude deferred by ruling |
-| 1a | Repair the two `forbidden` last-segment sites | not started — ratchet pinned at 2 |
+| 1a | Repair the two `forbidden` last-segment sites | **done** — ratchet at 0 |
 | 2 | Build-time diagnostic for an unresolved capability argument | **done** — `PW5200`, `Owner::Capability`, 8 controls. Unknown FAMILY and OPERATION still need the declared capability table (E9) |
 | 3 | Placement consumes `effective_effects` | not started |
 | 4 | The deployment planner abstraction | not started |
@@ -173,12 +173,13 @@ corpus is 46/46 without it.
    entry fails, a reason under 40 characters fails, and the scan has its own
    control.
 
-   Categories used: two `display`, two `encoding`, two `scoped`, one `syntax`,
-   and **two `forbidden`** — `check.rs`'s privacy-label lookup by bare
-   declaration name, and `labels.rs`'s `declaration_named`. Both resolve
-   meaning from a spelling. The ratchet is pinned at 2 and may only go down.
+   Categories used: three `display`, two `encoding`, two `scoped`, one
+   `syntax`, and **zero `forbidden`**. The ratchet is at 0, which is now a
+   ceiling: there is no stock of forbidden sites to hide a new one among.
 
-   Repairing them is item **1a** in the table above.
+   The two that were forbidden are repaired (item 1a): `check.rs`'s
+   privacy-label lookup resolves through the workspace and `labels.rs`'s
+   `declaration_named` is scoped to the module and its imports.
 
 ---
 
