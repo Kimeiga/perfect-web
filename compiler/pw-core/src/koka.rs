@@ -78,6 +78,11 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
         // lowers to authority, which is E8's question and not Koka's.
         DeclKind::Effect => Err("an effect declaration is an ontology entry, not a computation"),
 
+        // Nor is a prelude declaration. It says which namespace this package
+        // exports ambiently — a statement about the language environment, with
+        // no term to translate.
+        DeclKind::Prelude => Err("a prelude declaration exports a namespace, not a computation"),
+
         // E6. Neither is a computation Koka could check: a materialization is
         // a scheduling decision the runtime makes and an event is a fact about
         // the world. Skipped with a reason rather than silently, so the

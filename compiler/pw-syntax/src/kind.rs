@@ -75,6 +75,9 @@ pub enum SyntaxKind {
     ResourceDecl,
     /// `effect database.read<T> { .. }` — E8's effect ontology.
     EffectDecl,
+    /// `prelude Effect` — this module's declarations in one namespace are
+    /// visible to every unit in a program that selects this package.
+    PreludeDecl,
     UiDecl,
     LetDecl,
     /// A declaration the parser could not classify. Present so recovery
@@ -302,6 +305,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         FnDecl,
         ResourceDecl,
         EffectDecl,
+        PreludeDecl,
         UiDecl,
         LetDecl,
         ErrorDecl,

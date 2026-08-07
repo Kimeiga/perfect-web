@@ -11,7 +11,7 @@ module generality.sink_helper
 
 import log
 import secrets
-import capability.{ Secret, Payments }
+import capability.{ Payments, Public, Secret }
 
 fn wrap(key: Secret<Payments>) -> Secret<Payments> !{} {
     key

@@ -103,11 +103,25 @@ impl EffectPath {
 
 /// What one type argument turned out to name.
 ///
-/// Four answers, not two, because the difference between them is the whole
-/// value of asking. Modules count, and the reason is in `capability.rs`: the
-/// corpus writes `database.read<Stores>` and `Stores` is a MODULE — the domain
-/// being read. A first version of the capability-argument rule accepted only
-/// types and reported two working corpus files as defective.
+/// **Resolved from where it was written, or not resolved.** Architect ruling,
+/// 2026-08-07:
+///
+/// > Do not extend ambient visibility to effect arguments. […] If `Payments`
+/// > isn't imported or otherwise in scope, that's a source error.
+///
+/// There was a third case, `Unscoped`: the program declares it somewhere and
+/// this unit does not import it. It existed because 31 corpus rows named an
+/// argument they had not imported, and it is gone because those 31 were
+/// repaired rather than accommodated — assumption A-017, retired the same day
+/// it was written. The ruling on why:
+///
+/// > Don't keep a safe-looking fallback simply because it currently prevents
+/// > tests from failing.
+///
+/// Modules count as resolved, and the reason is in `capability.rs`: the corpus
+/// writes `database.read<Stores>` and `Stores` is a MODULE — the domain being
+/// read. A first version of the capability-argument rule accepted only types
+/// and reported two working corpus files as defective.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TypeArgument {
     /// A `type` or `opaque type`, resolved through the workspace from where
@@ -116,18 +130,6 @@ pub enum TypeArgument {
     /// A module this unit can see. An external contract, exactly as an opaque
     /// type is, and one with no `DefId` because a module is not a declaration.
     Module { written: String },
-    /// The program declares it and this unit does not import it.
-    ///
-    /// **Accepted, and recorded as the compromise it is.** `PW5200` has always
-    /// judged an argument against every declaration in the program, and
-    /// `examples/generality/value_exceeds_sink_level/branch-join.pw` writes
-    /// `secret<Payments>` while importing neither `capability` nor `Payments`.
-    /// Tightening this to full visibility would newly reject a working corpus
-    /// file, which is a decision with a diff and not a side effect of building
-    /// the ontology. Named so that decision is visible rather than absent —
-    /// assumption A-009's ambient union, surviving in exactly one place with a
-    /// name on it.
-    Unscoped { written: String },
     /// Nothing in this program declares it. Kept rather than dropped — the
     /// authority the program asked for is not erased by being unresolvable,
     /// and `PW5200` is what makes the mistake visible where it can be repaired.
@@ -139,23 +141,13 @@ impl TypeArgument {
         match self {
             TypeArgument::Type { written, .. }
             | TypeArgument::Module { written }
-            | TypeArgument::Unscoped { written }
             | TypeArgument::Unresolved { written } => written,
         }
     }
 
-    /// Does it name something the program declares? The question `PW5200` asks.
+    /// Did it resolve from where it was written? The question `PW5200` asks.
     pub fn is_resolved(&self) -> bool {
         !matches!(self, TypeArgument::Unresolved { .. })
-    }
-
-    /// Was it reached from where it was written, rather than from the program
-    /// at large?
-    pub fn is_in_scope(&self) -> bool {
-        matches!(
-            self,
-            TypeArgument::Type { .. } | TypeArgument::Module { .. }
-        )
     }
 }
 
@@ -267,13 +259,6 @@ pub struct Ontology {
     /// Derived from the declarations, never written down. A family exists
     /// because something was declared into it.
     families: BTreeMap<String, BTreeSet<String>>,
-    /// What a type argument may name — declared types, opaque types, modules.
-    ///
-    /// A SET, not a name→declaration map. The set answers "does the program
-    /// declare this at all", which is `PW5200`'s question; *which* declaration
-    /// is asked of the workspace from the unit that wrote the row, because a
-    /// name→`DefId` map here would be `docs/RISK_QUEUE.md` 34 rebuilt.
-    argument_names: BTreeSet<String>,
     /// Effect names declared more than once in the checked set.
     ///
     /// Detected rather than absorbed. `by_name` keeps one declaration per
@@ -287,10 +272,12 @@ pub struct Ontology {
 impl Ontology {
     /// Collect every `effect` declaration in the program.
     pub fn build(hirs: &[&Hir]) -> Ontology {
-        let mut out = Ontology {
-            argument_names: crate::capability::capability_argument_names(hirs),
-            ..Ontology::default()
-        };
+        // No program-wide name set. There was one — every type, opaque type
+        // and module in the checked set — and it existed only to distinguish
+        // "declared somewhere" from "declared nowhere". Both are now the same
+        // answer: an argument resolves from where it was written or it does
+        // not resolve.
+        let mut out = Ontology::default();
 
         for (unit, hir) in hirs.iter().enumerate() {
             for (id, decl) in hir.all_decls() {
@@ -511,15 +498,9 @@ impl Ontology {
             })
             .flatten();
 
-        let arg = match in_scope {
-            Some(a) => a,
-            None if self.argument_names.contains(written) => TypeArgument::Unscoped {
-                written: written.to_string(),
-            },
-            None => TypeArgument::Unresolved {
-                written: written.to_string(),
-            },
-        };
+        let arg = in_scope.unwrap_or(TypeArgument::Unresolved {
+            written: written.to_string(),
+        });
         // Recorded either way. That an argument did NOT resolve is a fact
         // about the program, and a graph that only held successes could not
         // distinguish "checked and found" from "never looked".

@@ -17,6 +17,19 @@
 
 module std.effects
 
+// **This package exports its effect vocabulary.** Architect ruling,
+// 2026-08-07:
+//
+// > Effect declarations are ambient only because the selected platform package
+// > explicitly exports them into the Effect prelude. Their arguments are not
+// > ambient.
+//
+// So a program using this platform writes `!{ database.read<Stores> }` without
+// importing anything — but `Stores` still has to be in scope, resolved the way
+// any other name is. Only the Effect namespace is exported; Term, Type, Ui and
+// Event stay exactly as strict as assumption A-009 made them.
+prelude Effect
+
 // The privacy level is the point, and it is a type argument rather than part
 // of the name: `log<Public>` names a sink whose contents anyone may read, so a
 // `Secret<Payments>` reaching it (corpus R-006) is a flow the compiler sees.

@@ -13,6 +13,8 @@
 
 module log
 
+import capability.{ Private, Public }
+
 fn public(message: String) -> () !{ log<Public> } { () }
 
 fn private(message: String) -> () !{ log<Private> } { () }

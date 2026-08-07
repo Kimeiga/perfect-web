@@ -64,6 +64,7 @@ pub const DECL_STARTERS: &[&str] = &[
     "materialize",
     "event",
     "effect",
+    "prelude",
     "replicated",
     "paint",
     "handler_policy",
@@ -1686,6 +1687,29 @@ impl<'a> P<'a> {
         //
         // The type parameters reuse `type_params` — the same binder
         // `opaque type Secret<C>` uses — rather than an effect-specific one.
+        // `prelude Effect` — the package saying which of its namespaces are
+        // ambient. One keyword and one namespace name; no path, because the
+        // module declaring it is the module whose declarations are exported.
+        //
+        // Architect ruling, 2026-08-07, sketched it as `prelude Effect from
+        // web.effects` in a package manifest. Pleris has no manifest format —
+        // a package is a directory of `.pw` files — so the declaration lives
+        // in the module that owns the declarations. Same semantics for the one
+        // case that exists, one fewer invention on the way, and it generalises
+        // to `prelude Type` unchanged. What it cannot express is a package
+        // electing a module it does not own; nothing needs that today, and a
+        // manifest is where it belongs when packages get one.
+        if after_vis.kind == Kind::Ident && after_vis_text == "prelude" {
+            self.start(K::PreludeDecl);
+            if vis {
+                self.bump();
+            }
+            self.bump(); // `prelude`
+            self.name("a namespace name");
+            self.finish();
+            return true;
+        }
+
         if after_vis.kind == Kind::Ident && after_vis_text == "effect" {
             self.start(K::EffectDecl);
             if vis {

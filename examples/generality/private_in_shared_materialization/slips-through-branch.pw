@@ -19,6 +19,7 @@ module generality.materialize_slips_branch
 import domain.{ SessionId }
 import Resources.{ Cart }
 import Events.{ CartChanged }
+import Carts
 
 public query Personalised(session: SessionId) -> Int
     freshness     5.seconds

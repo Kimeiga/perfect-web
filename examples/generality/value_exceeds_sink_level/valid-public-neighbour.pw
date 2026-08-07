@@ -10,6 +10,7 @@ module generality.sink_neighbour
 
 import log
 import Stores
+import capability.{ Public }
 
 fn audit(id: StoreId, dry_run: Bool) -> () !{ log<Public>, database.read<Stores> } {
     let store = Stores.get(id)

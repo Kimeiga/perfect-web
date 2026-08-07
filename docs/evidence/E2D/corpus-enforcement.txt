@@ -1,7 +1,7 @@
 corpus enforcement — every rejected fixture, checked as its own program
 (the shared library, the accepted modules it imports, and the fixture)
 
-44/44 enforce their declared invariant
+46/46 enforce their declared invariant
 
 R-001  enforced                  PW0401 (declared PW0300)
        network request inside view
@@ -91,3 +91,7 @@ R-043  enforced                  PW0404 (declared PW3009)
        containment with cross-boundary layout dependency
 R-044  enforced                  PW5010 (declared PW3010)
        unaudited imperative dom escape
+R-045  enforced                  PW5101
+       private dependency of a shared materialization
+R-046  enforced                  PW5100
+       dependency graph edge to an undeclared target

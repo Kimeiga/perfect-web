@@ -10,6 +10,7 @@ module generality.sink_match
 import log
 import secrets
 import domain.{ OrderState }
+import capability.{ Payments, Public }
 
 fn audit(state: OrderState) -> () !{ log<Public>, secret<Payments> } {
     let token = secrets.payments()

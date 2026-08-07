@@ -260,6 +260,13 @@ fn explain_with(
                     }
                 }
             }
+            // `prelude Effect` — what this package makes ambient. Shown,
+            // because a reader asking "why does this file resolve
+            // `database.read` without importing anything" needs the answer to
+            // be visible somewhere.
+            DeclKind::Prelude => {
+                let _ = writeln!(s, "prelude      {name} namespace exported by this module");
+            }
             DeclKind::Let | DeclKind::Other => {
                 let _ = writeln!(s, "declaration  {name}");
             }

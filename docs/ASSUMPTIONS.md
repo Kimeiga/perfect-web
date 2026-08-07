@@ -315,36 +315,29 @@ natural place for that to change.
 
 ---
 
-## A-017 — a capability's type argument is judged against the whole program
+## A-017 — RETIRED 2026-08-07, one day after it was written
 
-**Assumed since** 2026-08-07 (E8), `pw-core/capability.rs`,
-`pw-core/ontology.rs`'s `TypeArgument::Unscoped`.
+**Was:** a capability's type argument is judged against every declaration in
+the program rather than against what its file imports.
 
-`PW5200` asks whether an effect's type argument names *anything the program
-declares*, not whether the file that wrote it can see the declaration.
-`examples/generality/value_exceeds_sink_level/branch-join.pw` writes
-`secret<Payments>` while importing neither `capability` nor `Payments`, and
-three other corpus files depend on the same latitude.
+**Retired by** the architect's Effect-prelude ruling, which split the question
+the assumption had conflated:
 
-**What this leaves open.** It is assumption A-009's ambient union, surviving in
-one place. A file can name an argument it has no relationship with, and a
-capability's identity therefore depends on the whole checked set rather than on
-one file's imports. Two programs that differ only in which files were passed to
-`pw check` can disagree about whether an argument resolves.
+> Effect names resolve through that prelude; their arguments resolve through
+> ordinary lexical/module visibility.
 
-**Why it is safe to hold now.** The alternative is rejecting working corpus
-programs to satisfy a rule nobody has asked for yet, and the exposure is
-narrow: the argument still has to name a real declaration, so the failure mode
-is a capability that is *correctly identified but reached from too far away* —
-not one that names nothing.
+and, on the fallback the assumption existed to protect:
 
-The compromise is **named rather than absent**: `Ontology::resolve` returns
-`TypeArgument::Unscoped` for exactly this case, distinct from both `Type` and
-`Module`, so the count is measurable and a later tightening has a list to work
-from instead of a search.
+> Don't keep a safe-looking fallback simply because it currently prevents tests
+> from failing.
 
-**Retire when** the effect vocabulary's own visibility question is answered —
-see `docs/NEXT.md`. Every file writing `!{ database.read }` needs the effect
-declarations in scope, and whatever mechanism supplies that (a prelude, package
-metadata, an implicit platform import) supplies it for arguments too. Answering
-one and not the other would leave two visibility rules for one row.
+All 31 occurrences were enumerated and repaired by adding the import each file
+had been doing without — 20 files, including `packages/pw-platform-web/log.pw`
+itself, which declared `log<Public>` while importing neither `capability` nor
+`Public`. `TypeArgument::Unscoped` and the ontology's program-wide name set are
+deleted, so the mode cannot return without someone writing it back.
+
+**What it cost to hold for a day:** nothing, because it was named. The variant
+existed precisely so the occurrences could be counted rather than searched for,
+and retiring it was a list of 31 rather than an investigation. That is the
+argument for naming a compromise instead of leaving it implicit.

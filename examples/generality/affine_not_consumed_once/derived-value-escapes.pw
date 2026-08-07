@@ -9,6 +9,7 @@
 module generality.affine_scope_ok
 
 import Maps
+import browser.{ MapHandle }
 
 let mut last_center: Option<String> = None
 

@@ -24,6 +24,7 @@ module generality.materialize_slips_helper
 import domain.{ SessionId }
 import Resources.{ Cart }
 import Events.{ CartChanged }
+import Carts
 
 // Public by declaration. Session-derived in fact.
 public query Summary(session: SessionId) -> Int

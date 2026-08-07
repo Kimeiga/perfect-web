@@ -367,15 +367,17 @@ fn an_effect_the_unit_does_not_import_is_out_of_scope() {
 }
 
 #[test]
-fn an_argument_the_program_declares_but_the_unit_cannot_see_is_named_unscoped() {
-    // `examples/generality/value_exceeds_sink_level/branch-join.pw` writes
-    // `secret<Payments>` and imports neither `capability` nor `Payments`, and
-    // `PW5200` accepts it because it judges against the whole program.
+fn an_argument_the_unit_cannot_see_does_not_resolve() {
+    // Architect ruling, 2026-08-07: effect names come from the prelude, their
+    // arguments do not.
     //
-    // That compromise is kept — tightening it would newly reject a working
-    // corpus file — and named, so it is a decision with a diff rather than an
-    // absence. A resolved argument and an ambient one must never be the same
-    // value: `A-009`'s union survives in exactly one place, with a label on it.
+    // > If `Payments` isn't imported or otherwise in scope, that's a source
+    // > error.
+    //
+    // This was `TypeArgument::Unscoped` — "the program declares it, this unit
+    // does not import it" — kept because 31 corpus rows relied on it. All 31
+    // were repaired, and A-017 was retired the day after it was written. What
+    // remains is the two-way answer: resolved from here, or not resolved.
     let src = "module app\n\nimport effects\n\nfn f() -> Int !{ database.read<Store> } { 0 }\n";
     let (hirs, ontology) = program(&[EFFECTS, DOMAIN, src]);
     let refs: Vec<&Hir> = hirs.iter().collect();
@@ -384,19 +386,24 @@ fn an_argument_the_program_declares_but_the_unit_cannot_see_is_named_unscoped() 
     let result = ontology.resolve(&ws, 2, &row_entry(&hirs[2]), &mut evidence);
 
     let Ok(Resolved::Operation(instance)) = result else {
-        panic!("the effect itself resolves: {result:?}");
+        panic!("the effect itself resolves through the prelude: {result:?}");
     };
     assert_eq!(
         instance.args,
-        vec![TypeArgument::Unscoped {
+        vec![TypeArgument::Unresolved {
             written: "Store".into()
-        }]
+        }],
+        "`Store` is declared in `Stores`, which this file does not import"
     );
-    assert!(instance.args[0].is_resolved(), "`PW5200` accepts it");
-    assert!(
-        !instance.args[0].is_in_scope(),
-        "and it was not reached from where it was written"
-    );
+    assert!(!instance.args[0].is_resolved());
+
+    // The neighbour, so this is measuring visibility rather than a resolver
+    // that never resolves anything.
+    let (ok, _) = resolve("database.read<Store>");
+    let Ok(Resolved::Operation(ok)) = ok else {
+        panic!("importing `Stores` resolves it");
+    };
+    assert!(ok.args[0].is_resolved());
 }
 
 // --- the ontology itself -----------------------------------------------------

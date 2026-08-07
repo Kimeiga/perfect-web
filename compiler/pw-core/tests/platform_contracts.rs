@@ -315,7 +315,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // ruling — `effect style.mutate<T>` binds a parameter and a use must
     // supply it, so the bare form said "does not invalidate layout" by
     // omission. There was no way to say it positively; now there is.
-    const EXPECTED: u64 = 0x563f_1bb0_e013_54d9;
+    // Changed again 2026-08-07: `std.effects` and `web.effects` gained
+    // `prelude Effect`, and `log.pw` gained `import capability.{ Private,
+    // Public }`. Architect ruling — effect NAMES are ambient because the
+    // package exports them; their ARGUMENTS are not, and `log<Public>` had
+    // been naming a type it never imported.
+    const EXPECTED: u64 = 0x230b_cc94_8538_4f92;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

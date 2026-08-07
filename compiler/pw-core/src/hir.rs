@@ -141,6 +141,10 @@ pub enum DeclKind {
     /// `database.read` resolves to a declaration rather than being split at
     /// the dot by whoever needs it.
     Effect,
+    /// `prelude Effect` — this module exports its declarations in one
+    /// namespace to every unit in the program. The namespace is the `name`.
+    Prelude,
+
     Task,
     Type,
     Opaque,

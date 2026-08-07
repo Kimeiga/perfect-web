@@ -8,6 +8,7 @@ module rules.sink_good
 
 import log
 import Stores
+import capability.{ Public }
 
 fn trace(id: StoreId) -> () !{ log<Public>, database.read<Stores> } {
     let store = Stores.get(id)

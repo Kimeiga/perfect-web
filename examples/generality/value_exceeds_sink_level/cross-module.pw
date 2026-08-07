@@ -10,6 +10,7 @@ module generality.sink_cross_module
 
 import log
 import secrets
+import capability.{ Payments, Public }
 
 fn charge_and_note(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
     log.public(secrets.payments())

@@ -10,6 +10,7 @@ module generality.sink_branch
 
 import log
 import secrets
+import capability.{ Payments, Public }
 
 fn audit(order: OrderId, dry_run: Bool) -> () !{ log<Public>, secret<Payments> } {
     let token = secrets.payments()

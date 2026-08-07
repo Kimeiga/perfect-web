@@ -32,7 +32,7 @@ Generality at freeze:      7/29 invariants generality-tested
 Reproduce: `just ci` for the gate, `just evidence-corpus` for the per-fixture
 table, `just generality` for the second score.
 
-**C1 is frozen. C2 and C3 both opened on 2026-08-06** — see below. A change to
+**C1 is frozen. C2 and C3 both opened on 2026-08-06; C4 opened 2026-08-07** — see below. A change to
 any file under `examples/accepted` or `examples/rejected` opens the next version
 and requires a row in its table plus a recorded reason. The rule exists because the path to 44/44 changed ten
 fixtures, and a reader who does not know that will read the number as stronger
@@ -278,6 +278,69 @@ known gap is not generality-tested. The published triple is asserted, and a
 `NARROW` witness is only admissible where `DIMENSIONS.md` has a `## Known gaps`
 section — otherwise `NARROW` becomes the escape hatch that turns any failing
 witness into an accepted limitation.
+
+---
+
+## C4 — opened 2026-08-07 (E8, on the architect's Effect-prelude ruling)
+
+```text
+Corpus version:            C4
+Accepted programs:         24
+Rejected programs:         46
+Charter categories:        24/24 accepted, 46/46 rejected
+Result:                    24/24 accepted clean, 46/46 rejected enforced
+Wrong-reason catches:      0
+Changed since C3:          3 fixtures (below), imports only
+Generality at open:        30/31 invariants generality-tested, 1 known narrow
+```
+
+### Why it opened
+
+Architect ruling, 2026-08-07:
+
+> Effect names resolve through that prelude; their arguments resolve through
+> ordinary lexical/module visibility. […] If `Payments` isn't imported or
+> otherwise in scope, that's a source error.
+
+and:
+
+> If `secret<Payments>` appears in `branch-join.pw` and `Payments` isn't visible
+> there, the witness was underspecified. Fix the witness. Do **not** weaken
+> Pleris's visibility model to preserve it.
+
+**This is a specification change, not a checker improvement.** Before it, an
+effect's type argument was judged against every declaration in the program;
+after it, against what the file imports. 31 rows across 20 files named an
+argument they had not imported — including `packages/pw-platform-web/log.pw`,
+which declared `log<Public>` while importing neither `capability` nor `Public`.
+The platform library was doing it too.
+
+Three of the 20 files are rejected fixtures, so the version opens.
+
+### C3 → C4: the three fixtures changed
+
+| fixture | change | what it was missing | before | after |
+|---|---|---|---|---|
+| R-006 | `+ import capability.{ Payments, Public }` | `secret<Payments>` and `log<Public>` named types it never imported | `PW5006` | `PW5006` |
+| R-012 | `+ import browser.{ MapHandle }` | `resource.acquire<MapHandle>` named a type it never imported | `PW2005` | `PW2005` |
+| R-026 | `+ import capability.{ Payments }` | `secret<Payments>` named a type it never imported | `PW5003` | `PW5003` |
+
+**No `@expect-error` line changed and no verdict moved.** Each fixture is
+caught for the same code, by the same rule, for the same reason. What changed
+is that the fixture is now a valid Pleris program apart from the defect it
+exists to demonstrate — which is what a rejected fixture is supposed to be.
+
+The other 17 files are generality witnesses, rule fixtures and the platform
+library, none of which is versioned.
+
+### What this did NOT do
+
+It did not make the corpus stricter about the defects it tests. Every one of
+the three was already caught, and would have been caught with or without the
+import. The change is that they were relying on a visibility rule the language
+no longer has — the same shape as the C0 texts recorded as
+`FixtureDidNotExpressIt` in `corpus_history.rs`, caught before it had a chance
+to become one.
 
 ---
 

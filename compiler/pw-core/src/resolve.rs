@@ -99,9 +99,26 @@ impl Namespace {
             }
             DeclKind::Event => Namespace::Event,
             DeclKind::Effect => Namespace::Effect,
-            DeclKind::Import | DeclKind::Other => return None,
+            DeclKind::Import | DeclKind::Prelude | DeclKind::Other => return None,
         })
     }
+}
+
+/// The namespace a `prelude X` declaration names.
+///
+/// Spelled exactly as the variant, because a namespace is a language concept
+/// with one name and an alias would give it two. An unknown word yields `None`
+/// and the declaration exports nothing — the diagnostic for that belongs with
+/// the other unknown-name rules and is not yet written.
+pub fn namespace_named(name: &str) -> Option<Namespace> {
+    Some(match name {
+        "Type" => Namespace::Type,
+        "Term" => Namespace::Term,
+        "Ui" => Namespace::Ui,
+        "Effect" => Namespace::Effect,
+        "Event" => Namespace::Event,
+        _ => return None,
+    })
 }
 
 /// One module in the graph.
@@ -191,6 +208,23 @@ impl ResolveErrorKind {
 pub struct Workspace {
     pub modules: Vec<Module>,
     by_name: BTreeMap<String, usize>,
+    /// Namespace → the modules that export it as a prelude.
+    ///
+    /// Architect ruling, 2026-08-07:
+    ///
+    /// > Pleris should have a package-declared prelude per namespace. For now,
+    /// > introduce an Effect prelude specifically. Effect names resolve through
+    /// > that prelude; their arguments resolve through ordinary lexical/module
+    /// > visibility.
+    ///
+    /// **Per namespace, and declared rather than built in.** An effect name
+    /// appears only in a row and never in an expression, so exporting the
+    /// Effect namespace ambiently costs nothing in the Term, Type or Ui
+    /// namespaces — which stay exactly as strict as assumption A-009 made
+    /// them. A compiler-hardcoded "the web effects are ambient" rule would
+    /// have been the ambient union arriving through a side door; this is a
+    /// package saying what language environment it provides.
+    preludes: BTreeMap<Namespace, Vec<usize>>,
     pub errors: Vec<ResolveError>,
 }
 
@@ -242,6 +276,16 @@ impl Workspace {
                 }
             }
 
+            // `prelude Effect` — this module exports that namespace.
+            let mut exports: Vec<Namespace> = Vec::new();
+            for (_, decl) in hir.all_decls() {
+                if decl.kind == DeclKind::Prelude
+                    && let Some(ns) = namespace_named(&decl.name)
+                {
+                    exports.push(ns);
+                }
+            }
+
             // A workspace with two modules of one name has no single graph.
             if ws.by_name.contains_key(&name) {
                 ws.errors.push(ResolveError {
@@ -249,6 +293,9 @@ impl Workspace {
                     span: 0..0,
                     unit,
                 });
+            }
+            for ns in exports {
+                ws.preludes.entry(ns).or_default().push(ws.modules.len());
             }
             ws.by_name.insert(name.clone(), ws.modules.len());
             ws.modules.push(Module {
@@ -412,6 +459,30 @@ impl Workspace {
                 hits.push((imp.module.clone(), *def));
             }
         }
+        // The PRELUDE, last, and only for the namespace a package exported.
+        //
+        // Last because a local declaration and an explicit import both name
+        // something this file chose; the prelude is what the platform provides
+        // when nothing local applies. Shadowing in that direction is the only
+        // one that cannot surprise a reader of the file.
+        //
+        // Not a fallback across namespaces: `resolve_in(unit, Term, "log")`
+        // consults no prelude unless some package exported `prelude Term`, and
+        // none does. That is what keeps this from being the ambient union in a
+        // new costume — assumption A-009 removed a whole-program search, and
+        // this adds a whole-program search of exactly one namespace, by
+        // declaration.
+        if hits.is_empty()
+            && let Some(exporters) = self.preludes.get(&ns)
+        {
+            for &i in exporters {
+                let m = &self.modules[i];
+                if let Some(def) = m.defines.get(&(ns, name.to_string())) {
+                    hits.push((m.name.clone(), *def));
+                }
+            }
+        }
+
         match hits.len() {
             0 => Resolution::Unresolved,
             1 => Resolution::Imported {

@@ -9,6 +9,7 @@ module generality.sink_record
 
 import log
 import secrets
+import capability.{ Payments, Public }
 
 type Attempt = Attempt { order: OrderId, key: String }
 
