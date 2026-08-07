@@ -1944,7 +1944,7 @@ fn effect_rows(
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
 ) {
-    use crate::effects::{Reuse, forbidden_in, forbidden_in_phase, phase_at};
+    use crate::effects::{Reuse, forbidden_in, forbidden_in_phase};
 
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
@@ -2002,10 +2002,14 @@ fn effect_rows(
     // The frame phase an effect happens in decides what it may do, and that is
     // an ordering question rather than a question of which effects exist.
     for source in &found.sources {
-        let Some(phase) = phase_at(body, &source.span) else {
-            continue;
-        };
-        let Some(why) = forbidden_in_phase(&phase, &source.effect) else {
+        // EVERY enclosing phase, not just the innermost. A `measure { .. }`
+        // opened inside `post_paint { .. }` is still in the post-paint frame,
+        // and R-042 is exactly that program — caught until now only because a
+        // synthesized effect happened to be recorded at the outer phase's span.
+        let Some((phase, why)) = crate::effects::phases_at(body, &source.span)
+            .into_iter()
+            .find_map(|p| forbidden_in_phase(&p, &source.effect).map(|w| (p, w)))
+        else {
             continue;
         };
         if !reported.insert(source.effect.clone()) {

@@ -290,7 +290,7 @@ Rejected programs:         46
 Charter categories:        24/24 accepted, 46/46 rejected
 Result:                    24/24 accepted clean, 46/46 rejected enforced
 Wrong-reason catches:      0
-Changed since C3:          3 fixtures (below), imports only
+Changed since C3:          4 fixtures (below)
 Generality at open:        30/31 invariants generality-tested, 1 known narrow
 ```
 
@@ -308,7 +308,13 @@ and:
 > there, the witness was underspecified. Fix the witness. Do **not** weaken
 > Pleris's visibility model to preserve it.
 
-**This is a specification change, not a checker improvement.** Before it, an
+**Two specification changes, not checker improvements.** The second, added the
+same day: a frame-phase keyword no longer synthesizes an effect. Architect
+ruling — *a phase says WHEN work runs; an effect says what it does* — so
+`measure { .. }` stopped contributing `layout.measure` and R-042 went silent,
+because the effect it tests was never coming from an operation.
+
+The first: before it, an
 effect's type argument was judged against every declaration in the program;
 after it, against what the file imports. 31 rows across 20 files named an
 argument they had not imported — including `packages/pw-platform-web/log.pw`,
@@ -324,6 +330,7 @@ Three of the 20 files are rejected fixtures, so the version opens.
 | R-006 | `+ import capability.{ Payments, Public }` | `secret<Payments>` and `log<Public>` named types it never imported | `PW5006` | `PW5006` |
 | R-012 | `+ import browser.{ MapHandle }` | `resource.acquire<MapHandle>` named a type it never imported | `PW2005` | `PW2005` |
 | R-026 | `+ import capability.{ Payments }` | `secret<Payments>` named a type it never imported | `PW5003` | `PW5003` |
+| R-042 | `self.height()` → `el.height()`, `+ import browser.{ ElementRef }` | `self` had no resolved type, so the member named no declaration and the `layout.measure` the fixture is about came from the `measure` KEYWORD | `PW0402` | `PW0402` |
 
 **No `@expect-error` line changed and no verdict moved.** Each fixture is
 caught for the same code, by the same rule, for the same reason. What changed

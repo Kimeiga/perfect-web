@@ -15,12 +15,20 @@
 module store.analytics
 
 import Telemetry
+import browser.{ ElementRef }
 
-component StorePage(id: StoreId) {
+component StorePage(id: StoreId, el: ElementRef) {
     placement browser
     post_paint {
         // ERROR: forcing layout after paint, in the same frame.
-        let h = measure { self.height() }
+        //
+        // `el.height()` rather than `self.height()`, 2026-08-07: `self` has no
+        // resolved type here, so the member named no declaration and the
+        // `layout.measure` this fixture is about came from the `measure`
+        // keyword rather than from any operation. The keyword no longer
+        // synthesizes effects — a phase says WHEN work runs, not what it does —
+        // and the fixture now performs the read it claims to.
+        let h = measure { el.height() }
         Telemetry.record_height(id, h)
     }
     view { <main><h1>Store</h1></main> }

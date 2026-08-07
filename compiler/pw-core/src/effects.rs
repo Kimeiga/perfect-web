@@ -474,27 +474,21 @@ impl<'a> Inference<'a> {
         }
 
         for id in body.walk() {
-            // A frame-phase keyword carries its own effect (see
-            // `intrinsic_effect`): `measure { .. }` reads geometry by
-            // definition, whatever it calls inside.
-            if let Some((phase, e)) = match body.expr(id) {
-                Expr::Keyword { keyword, .. } => {
-                    intrinsic_effect(keyword).map(|e| (keyword.clone(), e))
-                }
-                _ => None,
-            } {
-                {
-                    out.effects.insert(e.to_string());
-                    out.sources.push(Source {
-                        effect: e.to_string(),
-                        span: body.expr_span(id),
-                        via: Via::Direct {
-                            callee: format!("{phase} {{ .. }}"),
-                        },
-                    });
-                }
-            }
-
+            // **A frame phase says WHEN work runs, not WHAT it does.**
+            //
+            // There was a synthesis here: `measure { .. }` contributed
+            // `layout.measure` and `mutate { .. }` contributed `style.mutate`,
+            // whatever the block contained. Architect ruling, 2026-08-07:
+            //
+            // > A frame-phase block says when this body's work executes. An
+            // > effect says what that work actually does. Those are
+            // > independent.
+            //
+            // So `mutate { pure_computation() }` no longer claims it mutated
+            // style. The phase still constrains placement and still decides
+            // what is legal inside it — `contexts::elsewhere` and
+            // `forbidden_in_phase` — but those read the EXECUTION CONTEXT and
+            // the body's real effects, which they already did.
             let Expr::Call { callee, .. } = body.expr(id) else {
                 continue;
             };
@@ -791,35 +785,36 @@ fn path_of(body: &Body, id: ExprId) -> String {
     }
 }
 
-/// The minimal set of effects the **language** knows, as distinct from what a
-/// library declares.
+/// **The execution context a span sits in: every enclosing frame phase,
+/// innermost first.**
 ///
-/// E2C's deletion gate forbids a checker from knowing what `secrets.payments`
-/// does — that is a library fact and belongs in a signature. A frame phase is
-/// not a library fact: `measure { .. }` is charter §7.5A syntax whose whole
-/// meaning is *this is the phase where geometry may be read*. A language that
-/// did not know that would need a library function to explain its own keyword.
+/// Charter §7.5A gives the frame a shape — measure, then mutate, then paint,
+/// then post-paint — and which phase code is in decides what it may do. That is
+/// an ordering question, not a question of which effects exist. E2D's inference
+/// answers the second; this answers the first.
 ///
-/// The architect's bound on this list: "keep it tiny and explicit". It is four
-/// entries, and each is a phase keyword the grammar already reserves.
-pub fn intrinsic_effect(keyword: &str) -> Option<&'static str> {
-    Some(match keyword {
-        "measure" => "layout.measure",
-        "mutate" => "style.mutate",
-        "post_paint" => "paint.post",
-        "animate" => "animation.composite",
-        _ => return None,
-    })
-}
-
-/// The frame phase a span sits inside, innermost first.
+/// A CHAIN rather than one phase, because phases nest and a nested one does not
+/// escape its parent:
 ///
-/// Charter §7.5A gives the frame a shape: measure, then mutate, then paint,
-/// then post-paint. Which phase code is in decides what it may do — and that is
-/// an ordering question, not a question of *which* effects exist. E2D's
-/// inference answers the second; this answers the first.
-pub fn phase_at(body: &Body, span: &Span) -> Option<String> {
-    let mut best: Option<(usize, String)> = None;
+/// ```text
+/// post_paint {
+///     let h = measure { el.height() }     still in the post-paint frame
+/// }
+/// ```
+///
+/// There is deliberately no `phase_at` returning one phase. There was, every
+/// caller used it, and using it is what made the rule narrow: an inner phase
+/// looked like the whole context. A single-answer variant kept "for
+/// convenience" is an invitation to reintroduce that.
+///
+/// `R-042` is that program. It was caught only because `measure { .. }`
+/// synthesized `layout.measure` at the KEYWORD's own span, which `phase_at`
+/// then attributed to `post_paint` — so the diagnostic was right and the reason
+/// was an artefact of where a made-up effect was recorded. Deleting the
+/// synthesis (architect ruling: a phase says WHEN work runs, not what it does)
+/// made the fixture go silent, which is how the narrowness was found.
+pub fn phases_at(body: &Body, span: &Span) -> Vec<String> {
+    let mut found: Vec<(usize, String)> = Vec::new();
     for id in body.walk() {
         let Expr::Keyword { keyword, .. } = body.expr(id) else {
             continue;
@@ -832,13 +827,11 @@ pub fn phase_at(body: &Body, span: &Span) -> Option<String> {
         }
         let k = body.expr_span(id);
         if k.start <= span.start && span.end <= k.end && k != *span {
-            let width = k.end - k.start;
-            if best.as_ref().is_none_or(|(w, _)| width < *w) {
-                best = Some((width, keyword.clone()));
-            }
+            found.push((k.end - k.start, keyword.clone()));
         }
     }
-    best.map(|(_, k)| k)
+    found.sort_by_key(|(w, _)| *w);
+    found.into_iter().map(|(_, k)| k).collect()
 }
 
 /// May an effect happen in this frame phase?
