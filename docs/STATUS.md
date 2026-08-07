@@ -59,12 +59,25 @@ production consumer of ADR-0022's semantic provenance: every transition records
 an edge, and a resolution that fails records nothing — which a mutation
 verified, and which was wrong when first written.
 
-**Two open rulings block the rest**, both stated with measured counts in
-`docs/NEXT.md`: which arity `database.read` and `style.mutate` have, since the
-corpus writes each both ways; and whether `capability none` or
-`World::worlds_for` is right about `dom`, `style`, `layout`, `animation` and
-`paint` — they disagree, and the answer changes what every browser-placed
-component asks the host for.
+Both earlier rulings are settled and landed. Arity is exact — omission is not a
+wildcard, and all 21 underspecified rows were classified and specified. The
+declarations were right where `World::worlds_for` disagreed: `dom`, `style`,
+`layout`, `animation` and `paint` are placement-constrained rather than
+authority-constrained, and five families stopped asking a host to grant them.
+
+**A package declares which namespace it exports.** `prelude Effect` in
+`web.effects` makes effect NAMES ambient; their ARGUMENTS are not, and a file
+naming one it has not imported is `PW5200`. Assumption A-017 was retired the
+day after it was written — the 31 occurrences it named were repaired rather
+than accommodated, and C4 opened for the three rejected fixtures among them.
+
+`PW5201`, `PW5202` and `PW5203` now report an unknown effect family, an unknown
+operation, and a wrong argument count — the three diagnostics that were
+impossible before anything declared what a family was.
+
+**One substantial change remains before deployment planning**, in
+`docs/NEXT.md` step 7: a frame-phase block says *when* work runs, not *what* it
+does, so `mutate { .. }` must stop synthesizing `style.mutate`.
 
 **E7, closed.** The **real store page** is rendered by the own renderer, its
 handlers are authorised by `decide()` before they attach, and a click updates

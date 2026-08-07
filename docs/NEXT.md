@@ -132,168 +132,85 @@ later analysis splits `"database.read"` at the dot.
 
 ### The immediate sequence
 
-The architect's sequence of 2026-08-07, third ruling. Both earlier questions
-are answered: bare generic effects become **invalid** (no implicit wildcard),
-and the ontology's `capability none` is **right** where `worlds_for` disagreed.
+The architect's sequence of 2026-08-07, **fourth ruling**, which settled the
+blocker rather than deferring to deployment planning.
 
 ```text
-1  placement metadata on effect declarations        DONE
-2  complete row → EffectInstance resolution         PARTIAL — resolve() exists,
-                                                    no checker calls it yet
-3  enforce exact generic arity; open a new corpus   DONE — 21 rows classified,
-   version for the 21 underspecified rows            no version opened (below)
-4  declare every actually-used concrete effect      DONE — 25, no wildcards
-5  unknown family / operation / argument / arity    NEXT — blocked with 2 on
-   diagnostics                                       effect-name visibility
-6  the pre-change ComponentContract matrix          DONE — tests/contract_matrix.rs
-7  capability/host mapping declaration-driven       DONE
-8  the post-change matrix; only intended changes    DONE — four rows moved,
-                                                    all four predicted
-9  deployment planning
+ 1  package-declared Effect prelude                 DONE
+ 2  pw-platform-web exports through it              DONE
+ 3  effect arguments obey normal scope; repair      DONE — 31 rows, 20 files
+    every A-017 case                                       C4 opened
+ 4  delete TypeArgument::Unscoped                   DONE — A-017 retired
+ 5  finish EffectPath → EffectDefId → EffectInstance DONE — wired into check.rs
+ 6  unknown family / operation / arity diagnostics  DONE — PW5201/5202/5203
+ 7  remove frame-phase intrinsic_effect             NEXT — the one substantial
+                                                     semantic change left
+ 8  add database.connect                            DONE
+ 9  database.write becomes database.write<T>        DONE
+10  finish declaration-driven capability/host       DONE
+11  re-run the ComponentContract matrix             DONE
+12  deployment planning                             after 7
 ```
 
-### Step 3's result, and the two things it found
+### The two rulings this sequence turns on
 
-No corpus version opened: none of the 21 rows is under `examples/accepted` or
-`examples/rejected`, and every accepted and rejected verdict is unchanged. That
-was measured rather than assumed — the library's rows are what every fixture's
-inference reads.
+> **Effect declarations are ambient only because the selected platform package
+> explicitly exports them into the Effect prelude. Their arguments are not
+> ambient.**
 
-**`style.mutate` was saying something by omission it had no way to say.** Five
-corpus files distinguish a layout-affecting write via `style.mutate<LayoutAffect>`,
-and the ordinary side of that distinction was the BARE spelling — the implicit
-wildcard, doing real semantic work. `type PaintOnly` names it.
+> **`mutate` is a scheduling context, not shorthand for
+> `style.mutate<LayoutAffect>`.**
 
-**`Database.connect` is the motivating case for `database.read<_>`.** Connecting
-is not reading a domain, and the row is load-bearing anyway: `resource` is not a
-restricted family, so without `database.read` the function is placeable in the
-browser. It says `database.read<Database>` today, which is "touches the
-database" with an argument naming the module that says so. Explicit wildcard
-syntax, or a `database.connect` operation, would both say it properly — a
-ruling, recorded at the site.
+The first is done. The second is step 7.
 
-### Steps 2 and 5 are blocked together, on one question
+### Step 7, specified
 
-The checker does not yet call `Ontology::resolve`, so no `PW52xx` fires for an
-unknown family or operation. Wiring it needs the effect declarations to be IN
-SCOPE where rows are written, and today no corpus file imports `web.effects`.
-
-Three ways out, and they want a ruling:
-
-- a **package-declared prelude**, which the earlier ruling deferred until
-  Pleris had "a demonstrated need for implicit imports" — an effect vocabulary
-  every file writes is that need arriving;
-- **membership rather than visibility** for effect names, as `declared_for`
-  already does for contracts, which extends A-017's compromise from type
-  arguments to effect names;
-- **an implicit platform import** for the effect namespace only, on the grounds
-  that an effect name appears only in a row and never in an expression.
-
-Whichever wins should decide A-017 too. Answering one and not the other leaves
-two visibility rules for one row.
-
-**Step 8's result.** Exactly four contract rows changed, and the two controls
-did not:
+`effects.rs::intrinsic_effect` maps four frame-phase keywords to effect
+spellings, and the ruling is that all four should go:
 
 ```text
-layout.measure              {layout.measure}  → {}       import dropped
-style.mutate<LayoutAffect>  {style.mutate<…>} → {}       import dropped
-layout.measure + database   two capabilities  → one      placement unchanged
-secret<Payments>            pw:host/secret#use → pw:host/secrets#get
-                                                          authority unchanged
-database.read<Stores>       unchanged                     (control)
-pure                        unchanged                     (control)
+"measure"    → layout.measure
+"mutate"     → style.mutate          (and this one now has the wrong arity)
+"post_paint" → paint.post
+"animate"    → animation.composite
 ```
 
-`docs/evidence/E8/component-contracts.json` is byte-identical after
-`just e8-contracts`: the store demo's host imports are `database.read` and
-`database.write`, whose declared `host` clauses match what the old convention
-formatted. Only the over-granted families moved.
+> A frame-phase block says WHEN this body's work executes. An effect says WHAT
+> that work actually does. Those are independent.
 
-The `Both` row is the one that proves the change is about authority and not
-placement: `layout.measure` left the capability set and the body still has
-nowhere to run, because the solver reads EFFECTS. Had it been reading
-capabilities, a browser-only measurement would now be placeable at the origin.
+So `mutate { pure_computation() }` must not claim it mutated style, and
+`measure { pure_computation() }` must not claim it read layout. The effect comes
+from the operations inside the block.
 
-### Two findings from steps 2 and 3, both needing a ruling
-
-**1. The vocabulary above was recalled, and the corpus disagrees.** Measured
-from the lowered effect rows of every `.pw` outside `examples/history/`:
+**Placement still comes from the phase.** `post_paint { pure() }` is
+browser-only because the execution CONTEXT has browser semantics, not because a
+synthesized effect said so. That constraint wants an `ExecutionContext` concept:
 
 ```text
-in the list, in no effect row     cache.read  cache.write  observe.*  durable.*
-in effect rows, not in the list   session.read  device.query
-                                  network.subscribe  unsafe.raw_html
-                                  unsafe.raw_attribute  post_paint
+ExecutionContext   when/where scheduled work exists
+EffectInstance     what the work does
+CapabilityId       authority some effects require
 ```
 
-`observe.resize` and `observe.intersection` are real, but they are the
-`observe resize(self)` keyword form and never appear in a row; `durable` is a
-task modifier. Neither is an effect today. `tests/effect_vocabulary.rs` now
-reads the rows rather than a list, so the next divergence is a failure.
-
-**2. Two effects are written at two arities, and the ruling says that is an
-error.** Also measured:
+The matrix the ruling requires:
 
 ```text
-database.read     19 uses bare      5 uses with an argument
-style.mutate       2 uses bare      7 uses with an argument
+empty mutate                   no style effect
+mutate + PaintOnly operation   style.mutate<PaintOnly>
+mutate + layout write          style.mutate<LayoutAffect>
+measure + pure                 no layout.measure
+measure + geometry read        layout.measure
 ```
 
-The ruling's test list says `database.read` written bare is a wrong-arity
-error. Wiring that diagnostic today reports **21 working corpus rows**, so
-step 4 is blocked on which way this goes, and the count is pinned in
-`ARITY_UNSETTLED` so a third cannot join quietly. The three readings:
+plus the existing phase-order checks, which must not move.
 
-- **the corpus is wrong** — add the argument to 21 rows; `database.read`
-  always names which store;
-- **the bare form is the broader claim**, exactly as a family covers its
-  members one level up, and `Capability::argument` is already `Option`;
-- **they are two effects**, and the bare one means "some unspecified store",
-  which is the weakest and probably wrong.
+**Blast radius to expect.** `forbidden_in_phase`, `phase_at` and the corpus
+fixtures that turn on phase effects — R-042 (`post_paint` may not measure),
+A-022, R-034, R-035 — all read the synthesized spelling today. This is the
+change most likely to open another corpus version, and the matrix should exist
+before it lands, exactly as it did for step 7 of the previous sequence.
 
-Nothing else disagrees: 23 of 25 effects are written at exactly the arity they
-declare, which is what makes these two an inconsistency rather than the normal
-state of the corpus.
-
-**A third thing, not a question but a consequence.** Every corpus file writing
-`!{ database.read }` would need `import web.effects` for the ontology's
-visibility check to resolve it — and the prelude was deferred on the grounds
-that "receiver-directed resolution removed the reason the platform needed
-ambient visibility". An effect vocabulary every file writes is a demonstrated
-need for implicit imports, which is the condition the deferral named. Step 4
-cannot be wired without answering it.
-
-### Step 5 is unblocked, and it is not the small change it looks like
-
-`interface_for(family) -> format!("pw:host/{family}")` is the last hard-coded
-thing in the capability path, and every effect now declares the `host` clause
-that replaces it. For `database.read` and `database.write` — the only host
-imports in `docs/evidence/E8/component-contracts.json` — the declared string
-and the formatted one are **identical**, so the evidence does not change and
-would not detect the switch. A test needs an effect where they differ;
-`secret<Payments>` is one (`pw:host/secrets#get` declared,
-`pw:host/secret#use` formatted).
-
-**But making it declaration-driven changes what browser components ask for.**
-`World::worlds_for` restricts twelve families, and `Capability::resolve` treats
-"restricted family" as "needs a host capability" — so `dom.mutate` today emits
-`Import { pw:host/dom, mutate }`, asking a host to grant the document. The
-declarations say `capability none` for `dom`, `style`, `layout`, `animation`
-and `paint`, because those are constrained by PLACEMENT rather than by a grant:
-a component in the browser world has the DOM by being there.
-
-Both cannot be right. The ontology's reading is the one the milestone exists to
-establish — three facts, not one string — but acting on it removes host imports
-from every browser-placed component's contract, which is a change to what the
-compiler tells the host and not a refactor. It wants a ruling and its own
-commit, with the before/after contract sets as evidence.
-
-Deliberately not started: `docs/RISK_QUEUE.md`'s admissibility rule wants the
-instrument before the measurement, and the instrument here is a contract diff
-nobody has generated yet.
-
-### Slice 2 — what remains
+### Slice 2 — what remains### Slice 2 — what remains
 
 1. **Resolve an effect row against the declarations.**
 
