@@ -48,6 +48,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{Decl, DeclKind, EffectRef, Hir, Span};
+use crate::placement::{ALL_WORLDS, World};
 use crate::provenance::{Evidence, FactId, FactKind, Route};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
 
@@ -237,6 +238,23 @@ pub struct EffectDecl {
     /// no host interface, which is what `capability none` implies and what a
     /// purely local effect wants.
     pub host: Option<String>,
+    /// The `placement` clause: where this effect is *meaningful*, as distinct
+    /// from where it is *authorised*.
+    ///
+    /// Architect ruling, 2026-08-07:
+    ///
+    /// > If an effect has `capability none` we still need to know that
+    /// > `layout.measure` is browser-only. […] For browser-semantic effects
+    /// > with no capability, the declaration itself supplies the placement
+    /// > restriction.
+    ///
+    /// This is the fact `World::worlds_for` holds today as a hard-coded table,
+    /// and the reason its `dom`/`style`/`layout` entries were read as "needs a
+    /// host capability" when they only ever meant "only means anything in a
+    /// browser". Empty means unconstrained — an effect that can happen
+    /// anywhere, which is the right default because a checker must not reject
+    /// what it has not been taught.
+    pub placement: Vec<World>,
     pub span: Span,
 }
 
@@ -300,6 +318,7 @@ impl Ontology {
                         arity: decl.type_params.len(),
                         capability: capability_clause(decl),
                         host: host_clause(decl),
+                        placement: placement_clause(decl),
                         span: hir.decl_span(id),
                     },
                 );
@@ -538,6 +557,31 @@ fn host_clause(decl: &Decl) -> Option<String> {
     let value = decl.policy("host")?.value.trim();
     let value = value.trim_matches('"');
     (!value.is_empty()).then(|| value.to_string())
+}
+
+/// `placement browser` → `[Browser]`; `placement browser, edge, origin` →
+/// three.
+///
+/// A LIST, because `network.fetch` is meaningful anywhere with a request
+/// context and only build time has none. An enum would have forced either a
+/// fourth world named "anywhere with a request" or a table somewhere else
+/// saying which set each keyword abbreviates, and the second is what
+/// `worlds_for` already is.
+///
+/// A word that names no world is dropped rather than guessed at. The
+/// diagnostic for it belongs with the other `PW52xx` unknown-name rules and
+/// is step 5; silently defaulting to "everywhere" here would make a typo into
+/// a widening, which is the wrong direction for a placement constraint.
+fn placement_clause(decl: &Decl) -> Vec<World> {
+    let Some(p) = decl.policy("placement") else {
+        return Vec::new();
+    };
+    p.value
+        .split(',')
+        .map(str::trim)
+        .filter(|w| !w.is_empty())
+        .filter_map(|w| ALL_WORLDS.iter().copied().find(|world| world.name() == w))
+        .collect()
 }
 
 /// The closest declared spelling, when one is close enough to be a typo.

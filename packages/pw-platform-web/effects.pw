@@ -44,6 +44,7 @@ module web.effects
 // ruling specifies; the diagnostic that would enforce it is NOT wired, because
 // wiring it today reports nineteen working corpus rows. See `docs/NEXT.md`.
 effect database.read<T> {
+    placement  origin
     capability database.read<T>
     host       "pw:host/database#read"
 }
@@ -59,6 +60,7 @@ effect database.read<T> {
 // should agree is the same open question as `database.read`'s own arity, and
 // it is one question rather than three.
 effect database.write {
+    placement  origin
     capability database.write
     host       "pw:host/database#write"
 }
@@ -67,6 +69,7 @@ effect database.write {
 // open, which is what makes `resource.acquire<DatabaseTransaction>` and its
 // matching release checkable as an affine pair.
 effect database.transaction {
+    placement  origin
     capability database.transaction
     host       "pw:host/database#transaction"
 }
@@ -77,6 +80,7 @@ effect database.transaction {
 // secret never leaves the origin, and which secret it is decides which
 // component may hold it.
 effect secret<C> {
+    placement  origin
     capability secret<C>
     host       "pw:host/secrets#get"
 }
@@ -84,11 +88,18 @@ effect secret<C> {
 // Reading a secret's VALUE, as distinct from holding the capability. The
 // corpus writes both, and they are not the same authority.
 effect secret.read {
+    placement  origin
     capability secret.read
     host       "pw:host/secrets#read"
 }
 
+// Anywhere with a request context, which is `Label::may_hold`'s rule for a
+// session-restricted value and not `worlds_for`'s — `session` is not in that
+// table at all, so it is unconstrained today. `browser, edge, origin` matches
+// the privacy rule rather than narrowing to origin, because narrowing is a
+// change with a diff and there is no evidence for one.
 effect session.read {
+    placement  browser, edge, origin
     capability session.read
     host       "pw:host/session#read"
 }
@@ -96,11 +107,13 @@ effect session.read {
 // --- network ----------------------------------------------------------------
 
 effect network.fetch {
+    placement  browser, edge, origin
     capability network.fetch
     host       "pw:host/network#fetch"
 }
 
 effect network.subscribe {
+    placement  browser, edge, origin
     capability network.subscribe
     host       "pw:host/network#subscribe"
 }
@@ -111,10 +124,12 @@ effect network.subscribe {
 // browser world's own, and a component placed there has it by being there.
 // Placement is what constrains them — `World::worlds_for` — not a grant.
 effect dom.mutate {
+    placement  browser
     capability none
 }
 
 effect dom.read {
+    placement  browser
     capability none
 }
 
@@ -122,6 +137,7 @@ effect dom.read {
 // during render forces a synchronous reflow, and doing it after paint forces a
 // second layout for a frame nobody will see.
 effect layout.measure {
+    placement  browser
     capability none
 }
 
@@ -132,6 +148,7 @@ effect layout.measure {
 // ARITY IS UNSETTLED, as for `database.read`: 7 uses carry `<LayoutAffect>`
 // and 2 do not.
 effect style.mutate<T> {
+    placement  browser
     capability none
 }
 
@@ -139,12 +156,14 @@ effect style.mutate<T> {
 // property that invalidates layout is a checkable mistake rather than a slow
 // page.
 effect animation.composite {
+    placement  browser
     capability none
 }
 
 // A painter. Charter §7.5A gives it inputs precisely so its result can be
 // replayed and cached, which is only sound if it is a pure function of them.
 effect paint.custom {
+    placement  browser
     capability none
 }
 
@@ -153,10 +172,12 @@ effect paint.custom {
 // row: two spellings for one thing, recorded rather than reconciled here
 // because reconciling them changes what a corpus file says.
 effect paint.post {
+    placement  browser
     capability none
 }
 
 effect post_paint {
+    placement  browser
     capability none
 }
 
@@ -165,11 +186,13 @@ effect post_paint {
 // Real authority, and the reason it is separate from `device.query`: knowing
 // where someone is and knowing what their screen can do are not the same ask.
 effect device.location {
+    placement  browser
     capability device.location
     host       "pw:host/device#location"
 }
 
 effect device.query {
+    placement  browser
     capability device.query
     host       "pw:host/device#query"
 }

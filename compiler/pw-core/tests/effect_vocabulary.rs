@@ -107,6 +107,36 @@ fn written() -> BTreeMap<String, BTreeMap<usize, Vec<String>>> {
 }
 
 #[test]
+fn a_declared_effect_no_program_uses_is_not_an_error() {
+    // Architect correction, 2026-08-07:
+    //
+    // > The corpus-derived effect list should be a LOWER BOUND: every effect
+    // > used by the program must resolve to a declaration — not necessarily
+    // > `declared == used`. Otherwise adding a legitimate platform effect
+    // > before a corpus example exists would perversely make the test fail.
+    //
+    // `paint.post` is already such an effect: `effects.rs`'s `intrinsic_effect`
+    // produces it for a `post_paint { .. }` block and no row writes it. The
+    // direction is asserted rather than assumed, because "every used effect is
+    // declared" and "every declared effect is used" read almost the same and
+    // one of them is wrong.
+    let (_hirs, ontology) = ontology_and_hirs();
+    let used: BTreeSet<String> = written().into_keys().collect();
+    let declared_but_unused: Vec<String> = ontology
+        .declarations()
+        .map(|d| d.path.text())
+        .filter(|n| !used.contains(n))
+        .collect();
+    assert!(
+        !declared_but_unused.is_empty(),
+        "the corpus happens to use every declared effect, so this test is not \
+         currently proving the direction it exists to prove"
+    );
+    // And the suite is still green, which is the actual assertion: nothing
+    // above fails because of these.
+}
+
+#[test]
 fn the_scan_finds_the_rows_it_is_looking_for() {
     // The control. A scan that found nothing would report a fully declared
     // vocabulary, which is what a broken reader says too.
@@ -275,4 +305,118 @@ fn every_other_effect_is_written_at_exactly_the_arity_it_declares() {
         "only {agreed} effects agreed with their declaration, which is too few \
          for this to be measuring anything"
     );
+}
+
+// --- placement: the fact `worlds_for` holds as a table ----------------------
+
+/// Where the ontology and `World::worlds_for` disagree, and why.
+///
+/// Architect ruling, 2026-08-07: the declarations are closer to correct than
+/// `worlds_for`, because that table conflates two questions.
+///
+/// ```text
+/// Effect       what computation does
+/// Capability   authority it must be GRANTED
+/// Placement    where it is meaningful/possible
+/// ```
+///
+/// `worlds_for` answers the third and `Capability::resolve` reads its answer as
+/// the second, which is why `dom.mutate` emits `pw:host/dom#mutate` today —
+/// asking a host to grant the document to code whose only crime is being a
+/// user interface. The declarations say `placement browser, capability none`,
+/// which is both facts stated separately.
+///
+/// This test is the INSTRUMENT for steps 6-8: it measures the divergence
+/// before anything acts on it, so a later contract diff can be attributed to
+/// the ontology rather than to an accident.
+#[test]
+fn the_ontology_and_worlds_for_agree_about_placement_where_both_speak() {
+    use pw_core::placement::World;
+
+    let (_hirs, ontology) = ontology_and_hirs();
+    let mut disagreements: Vec<String> = Vec::new();
+    let mut compared = 0usize;
+
+    for decl in ontology.declarations() {
+        if decl.placement.is_empty() {
+            continue;
+        }
+        let Some(table) = World::worlds_for(decl.path.family()) else {
+            // The table says nothing, so there is nothing to agree with. The
+            // declaration is then the ONLY statement of where the effect is
+            // meaningful, which is the point of adding the clause.
+            continue;
+        };
+        compared += 1;
+        let declared: BTreeSet<World> = decl.placement.iter().copied().collect();
+        let tabled: BTreeSet<World> = table.iter().copied().collect();
+        if declared != tabled {
+            disagreements.push(format!(
+                "{}: declared {:?}, `worlds_for` says {:?}",
+                decl.path.text(),
+                declared.iter().map(|w| w.name()).collect::<Vec<_>>(),
+                tabled.iter().map(|w| w.name()).collect::<Vec<_>>(),
+            ));
+        }
+    }
+
+    assert!(
+        compared >= 10,
+        "only {compared} effects were compared, which is too few for this to \
+         be measuring the table"
+    );
+    assert!(
+        disagreements.is_empty(),
+        "the ontology and `World::worlds_for` disagree about WHERE an effect \
+         is meaningful:\n  {}\n\n\
+         They must agree before `worlds_for` can be deleted — otherwise \
+         deleting it changes placement as well as authority, and the contract \
+         diff in step 8 cannot be attributed.",
+        disagreements.join("\n  ")
+    );
+}
+
+/// The families `worlds_for` restricts that NO declaration claims a capability
+/// for.
+///
+/// This is the whole of step 7's blast radius, measured. Each is a family where
+/// `Capability::resolve` produces a capability today — because the family is in
+/// the table — and where the declaration says `capability none`. Making
+/// `interface_for` declaration-driven removes exactly these host imports and
+/// nothing else.
+#[test]
+fn the_families_that_lose_a_host_import_are_exactly_the_ones_recorded() {
+    use pw_core::placement::World;
+
+    const LOSES_ITS_HOST_IMPORT: &[&str] = &["animation", "dom", "layout", "paint", "style"];
+
+    let (_hirs, ontology) = ontology_and_hirs();
+    let mut found: BTreeSet<String> = BTreeSet::new();
+    for decl in ontology.declarations() {
+        let family = decl.path.family();
+        if World::worlds_for(family).is_some() && decl.capability.is_none() {
+            found.insert(family.to_string());
+        }
+    }
+
+    let expected: BTreeSet<String> = LOSES_ITS_HOST_IMPORT
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    assert_eq!(
+        found, expected,
+        "\nThe set of families that would lose a host import has changed.\n\n\
+         Every family here is one `World::worlds_for` restricts and whose \
+         declaration says `capability none` — placement-constrained rather \
+         than authority-constrained. Step 7 removes their host imports, and \
+         step 8 verifies that ONLY these changed. A family joining or leaving \
+         this list changes what the compiler tells the host.\n"
+    );
+
+    // The control: `database` is restricted AND declares a capability, so it
+    // is not in the list. Without this the assertion above would also pass for
+    // a bug that put every restricted family in the set.
+    assert!(!found.contains("database"), "{found:?}");
+    assert!(!found.contains("secret"), "{found:?}");
+    assert!(!found.contains("network"), "{found:?}");
 }

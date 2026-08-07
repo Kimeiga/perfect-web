@@ -52,7 +52,22 @@ impl World {
     /// Two corpus files were "caught" that way. Right file, wrong reason, and
     /// the coverage number went up while nothing had actually been detected.
     pub fn grants(self, capability: &str) -> bool {
-        let family = capability.split('.').next().unwrap_or(capability);
+        // `crate::effects::family_of`, and NOT a second `split('.')` here.
+        //
+        // It was one, and it stripped no type argument: `secret<Payments>` has
+        // no dot at all, so the "family" was the whole string, `worlds_for`
+        // returned `None`, and **the corpus's most-used secret effect was
+        // placeable in every world including the browser and build time.**
+        // Twelve uses, and it never showed, because `forbidden_in` and
+        // `secret_to_browser` catch a secret reaching the browser through
+        // rules that use `family_of` and strip correctly. Defence in depth hid
+        // a hole in one of the layers.
+        //
+        // Found by `tests/contract_matrix.rs` on its first run — an instrument
+        // built to freeze today's behaviour before changing it, which is what
+        // `docs/RISK_QUEUE.md`'s admissibility rule asks for and why it caught
+        // something the change itself would have quietly repaired.
+        let family = crate::effects::family_of(capability);
         match Self::worlds_for(family) {
             Some(worlds) => worlds.contains(&self),
             None => true,

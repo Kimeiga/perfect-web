@@ -303,7 +303,14 @@ fn the_trusted_platform_contract_is_hashed() {
     //
     // Two declared arities disagree with the corpus and are recorded rather
     // than reconciled — `tests/effect_vocabulary.rs`'s `ARITY_UNSETTLED`.
-    const EXPECTED: u64 = 0x5ee1_d596_cf3f_16f3;
+    //
+    // Changed again 2026-08-07: every effect that has one gained a `placement`
+    // clause. Architect ruling — an effect with `capability none` still needs
+    // somewhere it is meaningful, and for browser-semantic effects the
+    // declaration is the only thing that can say so. This is the fact
+    // `World::worlds_for` holds as a hard-coded table, and moving it here is
+    // what eventually lets that table be deleted rather than relocated.
+    const EXPECTED: u64 = 0x829a_057b_aa9d_3eaa;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
