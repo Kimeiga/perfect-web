@@ -42,6 +42,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 
 use pw_document::{IdentityDomain, LocalPartId, PartAddress, Partition, TemplateSchemaId};
+use pw_host::{Admission, ComponentContract, Granted, Node, Topology, admit};
 use pw_materialize::{Clock, EntryKey, FragmentPolicy, Materializer};
 use pw_protocol::{CURRENT, CausalBasis, Patch, PatchOp, ResourceEntryId, StreamFrame, Version};
 use pw_render::{Env, PartId, Template, Value};
@@ -136,6 +137,21 @@ struct Server {
     dist: std::path::PathBuf,
     /// Frames waiting for each session's subscriber.
     pending: Mutex<BTreeMap<String, Subscriber>>,
+    /// **The compiler's contracts, and the node this server is.**
+    ///
+    /// E8's last gate item asks for the command path to go through the host
+    /// rather than a Rust closure. This is the half that is real today: the
+    /// authority to run a command is DECIDED — `admit` against a topology,
+    /// producing a `Granted` or a refusal — instead of being ambient because
+    /// the function happens to be callable.
+    ///
+    /// What is still a Rust closure is the BODY. Running it as compiled
+    /// Wasm needs a Pleris→component backend, which does not exist: `pw
+    /// emit-koka` covers the pure subset and there is no code generator behind
+    /// it. Saying so here rather than describing this as the finished item is
+    /// the point of `docs/EVIDENCE_LEDGER.md`.
+    contracts: Vec<ComponentContract>,
+    topology: Topology,
 }
 
 /// The semantic identity of one session's cart.
@@ -164,8 +180,65 @@ fn cart_entry(session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(&cart_identity(session), &IDENTITY)
 }
 
+/// **The compiler's contracts, as data.**
+///
+/// Read from `docs/evidence/E8/component-contracts.json`, which `just
+/// e8-contracts` regenerates from the store demo. ADR-0018: neither side links
+/// the other, so this is the artifact and not a call into the compiler.
+///
+/// Panics rather than defaulting to an empty list. An empty list means every
+/// command has no contract and is refused, which looks like a security posture
+/// and is actually a missing file.
+fn contracts() -> Vec<ComponentContract> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../docs/evidence/E8/component-contracts.json");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "{}: {e}\nrun `just e8-contracts` to regenerate the contracts",
+            path.display()
+        )
+    });
+    ComponentContract::from_json(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+/// **The node this dev server is.**
+///
+/// An origin with the four capabilities the store demo's contracts require —
+/// written out rather than derived from those contracts, which is the whole
+/// point: a topology derived from what a program asks for grants everything
+/// every program asks for, and admission becomes a formality.
+///
+/// `docs/evidence/E8/artifact-audit.txt` is the same shape against real
+/// components.
+fn dev_topology() -> Topology {
+    Topology {
+        nodes: vec![Node {
+            name: "dev-origin".to_string(),
+            world: "origin".to_string(),
+            grants: [
+                "database.read<Carts>",
+                "database.read<Menus>",
+                "database.read<Stores>",
+                "database.write<Carts>",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        }],
+    }
+}
+
 impl Server {
     fn new(dist: std::path::PathBuf, templates: Vec<Template>) -> Server {
+        Server::on(dist, templates, dev_topology())
+    }
+
+    /// [`Server::new`], on a topology the caller chooses.
+    ///
+    /// Exists so a test can run the command path against a node that grants
+    /// nothing. A refusal that only ever happens in production is a refusal
+    /// nobody has seen work.
+    fn on(dist: std::path::PathBuf, templates: Vec<Template>, topology: Topology) -> Server {
         let clock = Clock::new();
         let materializer = Materializer::new(clock.clone(), BUILD);
         materializer.declare("store.page.Cart", FragmentPolicy::default());
@@ -178,6 +251,42 @@ impl Server {
             menu: Mutex::new(default_menu()),
             dist,
             pending: Mutex::new(BTreeMap::new()),
+            contracts: contracts(),
+            topology,
+        }
+    }
+
+    /// **May this component run here, and with what?**
+    ///
+    /// One `admit` call, and no other source of truth. The command path calls
+    /// this before doing anything, so authority is decided rather than assumed
+    /// — the difference between a command that is callable and a command that
+    /// is permitted.
+    fn authorise(&self, component_id: &str) -> Result<Granted, String> {
+        let Some(c) = self
+            .contracts
+            .iter()
+            .find(|c| c.component_id == component_id)
+        else {
+            // A command with no contract is not a command this build produced.
+            // Refused rather than run: "I have no record of this" and "this is
+            // fine" must never be the same answer.
+            return Err(format!("no contract for `{component_id}`"));
+        };
+        let node = &self.topology.nodes[0].name;
+        // No artifact to audit — the body is still a Rust closure — so the
+        // audit is given nothing rather than being told everything is fine.
+        // `admit` treats an empty import list as a component that imports
+        // nothing, which is true of a closure.
+        match admit(c, &self.topology, node, &[]) {
+            Admission::Admit { .. } => {
+                let a = admit(c, &self.topology, node, &[]);
+                Granted::from(&a, &BTreeMap::new())
+                    .ok_or_else(|| format!("`{component_id}` was admitted but granted nothing"))
+            }
+            Admission::Refuse(refusals) => Err(format!(
+                "`{component_id}` may not run on `{node}`: {refusals:?}"
+            )),
         }
     }
 
@@ -210,6 +319,15 @@ impl Server {
     /// rolls back, and then neither the state nor the event survives — so the
     /// browser receives nothing, which is the property ADR-0019 exists for.
     fn add_to_cart(&self, session: &str, fail: bool) -> Result<(), String> {
+        // **Authority first, and it can say no.** The contract says this
+        // command needs `database.write<Carts>`; the topology says whether this
+        // node has it. Before this, the command ran because it was callable.
+        let granted = self.authorise("store.page.add_to_cart")?;
+        debug_assert!(
+            granted.handle("database.write<Carts>").is_some(),
+            "the write capability is what this command is for"
+        );
+
         // Read, commit and write under ONE lock.
         //
         // The read used to sit outside it, so two presses landing in the same
@@ -244,6 +362,11 @@ impl Server {
 
     /// `clear_cart`, through the same path as `add_to_cart`.
     fn clear_cart(&self, session: &str) -> Result<(), String> {
+        // Its own contract, its own decision. `clear_cart` requires
+        // `database.write<Carts>` exactly as `add_to_cart` does, and asking
+        // once for both would make one command's authority the other's.
+        let _granted = self.authorise("store.page.clear_cart")?;
+
         let key = session.to_string();
         // The same discipline as `add_to_cart`: the state change and the
         // command commit under one lock, so a clear racing an add cannot land
@@ -1345,4 +1468,99 @@ fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: 
     let _ = stream.flush();
     let mut sink = Vec::new();
     let _ = stream.take(0).read_to_end(&mut sink);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A node that grants nothing at all.
+    fn barren() -> Topology {
+        Topology {
+            nodes: vec![Node {
+                name: "barren".to_string(),
+                world: "origin".to_string(),
+                grants: Default::default(),
+            }],
+        }
+    }
+
+    fn server(topology: Topology) -> Server {
+        Server::on(std::path::PathBuf::from("."), Vec::new(), topology)
+    }
+
+    /// **The command path asks, and a refusal is a refusal.**
+    ///
+    /// E8's last gate item asks for the dev server's command path to go through
+    /// the host. This is the half that is real: `add_to_cart` requires
+    /// `database.write<Carts>` by its CONTRACT, and a node without it cannot
+    /// run the command — the state does not move and no event is queued.
+    ///
+    /// The body is still a Rust closure. Running it as compiled Wasm needs a
+    /// Pleris→component backend, which does not exist.
+    #[test]
+    fn a_command_is_refused_on_a_node_that_does_not_grant_its_capability() {
+        let s = server(barren());
+        let err = s
+            .add_to_cart("session-1", false)
+            .expect_err("a barren node cannot host a write");
+        assert!(
+            err.contains("add_to_cart") && err.contains("barren"),
+            "and it says which command and which node: {err}"
+        );
+        assert_eq!(s.cart_value("session-1"), 0, "the state did not move");
+    }
+
+    /// The discriminating half. Without it the test above passes for a command
+    /// path that refuses everything, which is not a capability system.
+    #[test]
+    fn the_same_command_runs_where_the_capability_exists() {
+        let s = server(dev_topology());
+        s.add_to_cart("session-1", false)
+            .expect("the dev origin grants the write");
+        assert_eq!(s.cart_value("session-1"), 1);
+    }
+
+    /// Each command is authorised on its own contract.
+    ///
+    /// Asking once for the whole program would make one command's authority
+    /// every command's, which is the aggregation `contracts()` emits one
+    /// contract per declaration to avoid.
+    #[test]
+    fn clear_cart_is_authorised_separately() {
+        // The authorisation only. Running `clear_cart` to completion
+        // regenerates the fragment it invalidates, which needs the compiled
+        // template IR — and what this test is about is which contract decides,
+        // not what the renderer does afterwards.
+        let s = server(dev_topology());
+        assert!(s.authorise("store.page.clear_cart").is_ok());
+
+        // The refusal reaches the caller before any state moves, which is why
+        // the barren case CAN run the whole command.
+        let barren = server(barren());
+        let err = barren
+            .clear_cart("session-1")
+            .expect_err("a barren node cannot host a write");
+        assert!(err.contains("clear_cart"), "{err}");
+        assert_eq!(barren.cart_value("session-1"), 0);
+    }
+
+    /// A component the build has no contract for is refused, not run.
+    ///
+    /// "I have no record of this" and "this is fine" must never be the same
+    /// answer — the same fail-closed direction as the artifact audit's
+    /// unparseable import.
+    #[test]
+    fn an_unknown_component_is_refused_rather_than_defaulted() {
+        let s = server(dev_topology());
+        let err = s
+            .authorise("store.page.nothing_declares_this")
+            .expect_err("no contract");
+        assert!(err.contains("no contract"), "{err}");
+
+        // The control: a component that IS in the contracts is authorised, so
+        // the refusal above is about the missing record and not about the
+        // lookup being broken.
+        assert!(s.authorise("store.page.add_to_cart").is_ok());
+    }
 }

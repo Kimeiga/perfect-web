@@ -15,6 +15,10 @@ publish = false
 
 [dependencies]
 pw-document = { path = "../../../runtime/pw-document" }
+# E8's host, in E7-P's dev server. The deletion condition above says E8 replaces
+# this server; until it does, the COMMAND PATH at least stops having ambient
+# authority — `admit` decides, and a refusal is a refusal.
+pw-host = { path = "../../../runtime/pw-host" }
 pw-materialize = { path = "../../../runtime/pw-materialize" }
 pw-protocol = { path = "../../../runtime/pw-protocol" }
 pw-render = { path = "../../../runtime/pw-render" }

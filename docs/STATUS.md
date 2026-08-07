@@ -39,9 +39,18 @@ its WIT world and its component demands fifteen, because Rust `std` on
 `wasm32-wasip2` injects fourteen `wasi:*` interfaces during runtime
 initialization. It is refused, and every one is named.
 
-What remains for E8 is in `docs/NEXT.md`: running a real command through the
-host — the store's `add_to_cart` going through a component instead of a Rust
-closure in the dev server.
+**The command path no longer has ambient authority.** The dev server calls
+`admit` against a declared topology before running a command: `add_to_cart`
+requires `database.write<Carts>` by its own contract, and on a node without it
+the command refuses and the state does not move. Each command is authorised on
+its own contract, so one command's authority is never another's.
+
+**What remains for E8, stated exactly.** The command BODY is still a Rust
+closure. Running it as compiled Wasm needs a Pleris→component backend, and
+there is none — `pw emit-koka` covers the pure subset and no code generator
+sits behind it. That is a milestone of its own rather than a step in this one,
+and `docs/EVIDENCE_LEDGER.md`'s rule is why it is written here instead of the
+gate item being called done.
 
 **Typed linking and resource limits are done, and the engine is what refuses.**
 `engine::instantiate` populates a `Linker` from `linkable()` and from nothing

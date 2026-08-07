@@ -23,7 +23,7 @@ becomes `pleris` rather than `pw` is undecided and purely mechanical —
 | 5 | Freeze `ComponentBinding` / remote-capable semantics | **done** — `pw-core/{boundary,binding}.rs`, `BindingSupport` on each `Export` |
 | 6 | Generate WIT worlds from semantic contracts | **done** — `pw emit-wit`, resolved by `wit-parser` |
 | 7 | Typed linking only from `Granted` | **done** — `engine::instantiate`, the engine refuses |
-| 8 | Run real `add_to_cart` through Wasmtime | not started |
+| 8 | Run real `add_to_cart` through Wasmtime | **partly** — authority decided by `admit`; the BODY needs a Pleris→Wasm backend that does not exist |
 | 9 | Fuel and memory limits | **done** — `Limits`, per instance, from policy |
 | 10 | Replace `worlds_for` with declared node topology | **done** — deleted 2026-08-07; placement is the declaration's own clause |
 
@@ -618,7 +618,7 @@ corpus is 46/46 without it.
 |---|---|---|
 | 1 | Generate a WIT world per `ComponentContract` | the world's imports are exactly `contract.imports`, and `wit-bindgen` accepts it |
 | 2 | Typed linking from a `Granted` | **done.** `engine::instantiate` populates the `Linker` from `linkable()` and nothing else; the ungranted case fails with wasmtime's own words — *component imports instance `perfect-web:store/stores@0.1.0`, but a matching implementation was not found in the linker* |
-| 3 | Run the store's `add_to_cart` as a component | the dev server's command path goes through the host instead of a Rust closure |
+| 3 | Run the store's `add_to_cart` as a component | **partly done, and the remainder is named.** The dev server's command path now calls `admit` against a declared topology before doing anything: `add_to_cart` requires `database.write<Carts>` by its contract, and a node without it refuses — the state does not move. The BODY is still a Rust closure. Running it as compiled Wasm needs a Pleris→component backend, which does not exist: `pw emit-koka` covers the pure subset and there is no code generator behind it |
 | 4 | Fuel and memory limits per instance | **done.** `Limits { fuel, memory_bytes, table_elements }` beside `Topology` — a deployment's declaration, not a constant. Instantiating the minimal guest costs 16,386 fuel, measured; one byte of memory is refused with *memory minimum size of 18 pages exceeds memory limits* |
 | 5 | Retire `worlds_for` in favour of the declared topology | **done 2026-08-07.** The compiler keeps solving placement; where an effect is meaningful comes from its own `placement` clause, and which node grants which capability comes from the deployment's `Topology`. No table in between |
 
