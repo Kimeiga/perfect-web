@@ -4,6 +4,67 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ---
 
+## Now: E9 — the permanent value type checker and effect compiler
+
+E8 closed 2026-08-08 with its gate amended by ruling (ADR-0023). E9's gate,
+**measured before building anything**:
+
+| # | gate item | state |
+|---|---|---|
+| 1 | The own compiler accepts the accepted corpus and rejects the rejected corpus | **met** — 24/24 accepted clean, 46/46 rejected each for its declared invariant |
+| 2 | Differential tests match Koka for the common semantic subset | **thin** — 5 tests in `differential_vs_koka.rs`. They cover the four places ADR-0011 says Koka is WRONG, which is the opposite of a parity claim. See below |
+| 3 | Full store demo builds without Koka | **met** — no crate depends on Koka; `just ci` never invokes it |
+| 4 | Incremental checks fast enough for editor feedback | **met, and not by the route the charter assumed.** See below |
+| 5 | No compiler panic in the current fuzz corpus | **met** — 6 targets, 3,600 executions, 0 findings (`just fuzz`) |
+| 6 | Koka optional as a conformance tool, not a build dependency | **met** — same measurement as 3 |
+
+### Item 4 — measured, and the answer changes the plan
+
+`just e9-latency`, median of 7 in-process runs on the 36-file store program:
+
+```text
+cold      37 ms      the whole program from source text
+edit      37 ms      the same, one file's text changed
+reject    37 ms      with a diagnostic to produce
+```
+
+**There is no query system, so an edit costs a full check — and a full check is
+37 ms.** The cross-cutting task "use incremental compiler queries so edits
+recompute only affected results" is therefore an *optimization*, not a gate
+requirement: the gate asks for editor-feedback latency and the non-incremental
+path already delivers it at this corpus size.
+
+Recorded before any query system exists, which is the point — an instrument that
+arrives with the optimization it measures cannot say what the optimization did.
+The row worth watching is `reject`: editor feedback is worth most when the
+program does not compile, and a checker that is fast only on the happy path
+would be fast exactly when nobody needs it.
+
+**What would change this:** a corpus an order of magnitude larger. The number to
+beat is in `docs/evidence/E9/check-latency.txt`.
+
+### Item 2 — the real gap, and it is not what it looks like
+
+`differential_vs_koka.rs` has five tests and every one of them asserts a
+DIVERGENCE:
+
+```text
+nominal wrappers stay distinct where Koka erases them
+Option and List stay distinct where Koka conflates them
+pw rejects the match Koka accepts under exn
+the result does not depend on any effect row
+```
+
+Those are ADR-0011's findings — the reasons Koka is an effects-only oracle — and
+they are valuable. They are not "differential tests match Koka for the common
+semantic subset", which is a claim about AGREEMENT and has no test at all.
+
+The gate item needs the other direction: programs in the shared subset where
+both must agree, and a control proving the harness can see a disagreement. That
+is E9's first executable task.
+
+---
+
 ## Now: the architect's sequence of 2026-08-07 (second ruling)
 
 Ten steps. 1-4 and 10 are done; 5-9 are E8's remaining work.

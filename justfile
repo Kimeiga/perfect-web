@@ -246,6 +246,27 @@ e8-wit:
       "$(grep -c '^world ' docs/evidence/E8/store.wit)" \
       "$(grep -cE '^    (record|variant|type) ' docs/evidence/E8/store.wit)"
 
+# E9 gate item 4. How long a check takes, and what an edit costs.
+#
+# Measured BEFORE any incremental query system exists, so the optimization can
+# be attributed if one is ever built. The finding is that it may not need to be:
+# a full check of the 36-file store program is already inside editor-feedback
+# territory.
+e9-latency:
+    @{ echo "E9 gate item 4 - check latency"; echo; \
+       echo "produced by: just e9-latency"; echo; \
+       echo "The gate asks for incremental checks fast enough for editor"; \
+       echo "feedback. There is no query system: an edit costs a full check."; \
+       echo "The measurement below is why that has not blocked the gate."; echo; \
+       cargo test -p pw-core --test check_latency -- --nocapture 2>&1 \
+         | grep -E "^(check-latency|test result)"; \
+       echo; echo "Median of 7 runs, in process, on the machine in"; \
+       echo "docs/environment/macbook.md. The rejected row is the one that"; \
+       echo "matters most: editor feedback is worth the most when the program"; \
+       echo "does not compile."; \
+     } > docs/evidence/E9/check-latency.txt
+    @grep -E "^check-latency" docs/evidence/E9/check-latency.txt
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

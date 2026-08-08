@@ -1,0 +1,17 @@
+E9 gate item 4 - check latency
+
+produced by: just e9-latency
+
+The gate asks for incremental checks fast enough for editor
+feedback. There is no query system: an edit costs a full check.
+The measurement below is why that has not blocked the gate.
+
+check-latency cold     37.35 ms
+check-latency edit     36.94 ms   (36 files, no query system: an edit costs a full check)
+check-latency reject   37.36 ms   (clean 37.37 ms)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+Median of 7 runs, in process, on the machine in
+docs/environment/macbook.md. The rejected row is the one that
+matters most: editor feedback is worth the most when the program
+does not compile.

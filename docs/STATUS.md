@@ -17,8 +17,25 @@ representations of one identity derive the same wire id.
 
 **current milestone:** **E9 — the permanent value type checker and algebraic
 effect compiler.** E8 is complete: its gate was **amended** on 2026-08-08 by
-ruling (ADR-0023) and then met. E7 is complete; all ten of its gate items have
-evidence under `docs/evidence/E7/`.
+ruling (ADR-0023) and then met.
+
+**E9's gate was measured before anything was built, and five of its six items
+are already met** — by work done incrementally across E2B, E2C, E2D and E8
+rather than by an E9 rewrite. The corpus passes 24/24 and 46/46; no crate
+depends on Koka; the fuzz corpus finds no panic in 3,600 executions.
+
+Item 4 — *incremental checks fast enough for editor feedback* — is met by a
+route the charter did not assume: there is no query system, so an edit costs a
+full check, **and a full check of the 36-file store program is 37 ms**
+(`just e9-latency`). Incremental queries are an optimization here, not a gate
+requirement. The number was recorded before any query system exists, so one can
+be attributed if it is ever built.
+
+Item 2 is the real gap and is not what its name suggests. `differential_vs_koka`
+has five tests and every one asserts a DIVERGENCE — ADR-0011's findings, the
+reasons Koka is an effects-only oracle. "Differential tests match Koka for the
+common semantic subset" is a claim about AGREEMENT, and it has no test at all.
+That is E9's first executable task.
 
 **E8-0 is complete** (ADR-0020). The compiler hands the host a six-field
 `ComponentContract` — component_id, abi_schema, required_capabilities,
