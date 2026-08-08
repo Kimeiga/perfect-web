@@ -30,6 +30,14 @@ def main() -> int:
             for p in remote.get("positions", []):
                 ty = p.get("ty") or "(undetermined)"
                 print(f"      {p['position']}: {ty} — {p['reason']}")
+            # An obligation is a yes with a condition: the binding must prove
+            # it, and the compiler names exactly what.
+            for o in remote.get("obligations", []):
+                ty = o.get("ty") or "(undetermined)"
+                print(
+                    f"      {o['position']}: {ty} — binding must preserve "
+                    f"{o['principal']}"
+                )
     return 0
 
 

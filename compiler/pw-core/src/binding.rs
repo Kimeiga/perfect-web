@@ -89,22 +89,82 @@ pub enum LocalSupport {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum RemoteSupport {
-    /// Every value in the signature can cross, in both directions.
+    /// Every value in the signature can cross, in both directions, with nothing
+    /// owed by the binding.
     Transferable,
-    /// Something in the signature cannot, and here is each one.
+    /// Something in the signature cannot cross at all, and here is each one.
+    ///
+    /// A resource: the value IS the thing held open, and no binding mechanism
+    /// makes it otherwise.
     Refused { positions: Vec<Untransferable> },
+    /// **It can cross, IF the binding discharges these obligations.**
+    ///
+    /// Architect ruling, 2026-08-08:
+    ///
+    /// > The privacy property belongs to the binding/invocation context. An
+    /// > origin server may handle millions of different sessions; the machine
+    /// > itself isn't "Session A". […] remote binding should eventually carry a
+    /// > privacy obligation such as `preserve principal A`, and the chosen
+    /// > binding mechanism must prove it.
+    ///
+    /// This was `Undetermined` for one commit, which framed a session-scoped
+    /// edge as *the compiler could not tell*. It can tell perfectly well: the
+    /// edge carries `Session<A>`, and a binding that preserves the principal
+    /// may carry it while one that does not may not. That is an obligation on
+    /// the binding, not an absence of information.
+    ///
+    /// A planner may keep such an edge as a CANDIDATE. It must not call a plan
+    /// complete until something discharges the obligation.
+    Conditional { obligations: Vec<Obligation> },
     /// The analysis has no basis to decide — a position whose type this build
     /// could not determine.
     ///
-    /// **Not a no and not a yes.** A host that read this as "not remotable"
-    /// would silently force co-location for a program with an unrelated typing
-    /// gap; one that read it as remotable would encode a guess.
+    /// **Not a no and not a yes**, and distinct from `Conditional`: there is
+    /// nothing here for a binding to prove, because nobody knows what crosses.
     Undetermined { positions: Vec<Untransferable> },
 }
 
+/// What a binding must prove before an edge may carry this signature.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum Obligation {
+    /// The invocation must reach the same principal it left.
+    ///
+    /// `Session<A>` at one end and `Session<A>` at the other — not merely a
+    /// node that may hold *some* session. An origin handles millions of them,
+    /// and `Session<A> → Session<B>` is the failure a node-level answer cannot
+    /// see.
+    PreservePrincipal {
+        /// `Session<SessionId>`, `User<UserId>` — as `Restriction` displays it.
+        principal: String,
+        /// Where in the signature it travels.
+        position: String,
+        ty: Option<String>,
+    },
+}
+
 impl RemoteSupport {
+    /// Nothing owed and nothing refused.
     pub fn is_transferable(&self) -> bool {
         matches!(self, RemoteSupport::Transferable)
+    }
+
+    /// Could this edge be remote at all, given something to discharge what it
+    /// owes?
+    ///
+    /// `Conditional` is a yes with a condition, not a no. A host that read it
+    /// as a refusal would force co-location for every session-scoped query in
+    /// the program.
+    pub fn is_possible(&self) -> bool {
+        !matches!(self, RemoteSupport::Refused { .. })
+    }
+
+    /// What a binding must prove. Empty unless `Conditional`.
+    pub fn obligations(&self) -> &[Obligation] {
+        match self {
+            RemoteSupport::Conditional { obligations } => obligations,
+            _ => &[],
+        }
     }
 }
 
@@ -212,6 +272,7 @@ impl From<&Signature> for Interface {
 pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
     let mut refused: Vec<Untransferable> = Vec::new();
     let mut undetermined: Vec<Untransferable> = Vec::new();
+    let mut owed: Vec<Obligation> = Vec::new();
 
     let mut consider = |position: String, ty: Option<&str>, direction: Direction| {
         let profile = facts.profile(ty);
@@ -251,23 +312,19 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
                              wire schema"
                     .to_string(),
             }),
-            // Restricted, and a build cannot say where the far end is. Not a
-            // refusal — the edge may be perfectly fine between two nodes of one
-            // scope — and not a yes, which is what assuming would make it.
+            // **Restricted: an obligation on the binding, not an absence of
+            // information.** The compiler knows exactly what this carries; what
+            // it cannot know is whether a given binding preserves the principal
+            // — and that is something a binding mechanism proves, not something
+            // a node's world can answer.
             Crossing::Blocked(Blocked::UnknownDestination { carries }) => {
-                undetermined.push(Untransferable {
-                    position,
-                    ty: ty.map(str::to_string),
-                    reason: format!(
-                        "it carries {} and this build cannot establish the \
-                         destination's privacy scope",
-                        carries
-                            .iter()
-                            .map(|r| r.to_string())
-                            .collect::<Vec<_>>()
-                            .join(" and ")
-                    ),
-                })
+                for r in &carries {
+                    owed.push(Obligation::PreservePrincipal {
+                        principal: r.to_string(),
+                        position: position.clone(),
+                        ty: ty.map(str::to_string),
+                    });
+                }
             }
         }
     };
@@ -309,6 +366,9 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
         other => consider("result".to_string(), other, Direction::Outbound),
     }
 
+    // Order is the strength of the answer. A refusal is final; an undetermined
+    // type means nobody knows what crosses, so no obligation over it would mean
+    // anything; an obligation is a yes with a condition.
     if !refused.is_empty() {
         return RemoteSupport::Refused { positions: refused };
     }
@@ -316,6 +376,9 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
         return RemoteSupport::Undetermined {
             positions: undetermined,
         };
+    }
+    if !owed.is_empty() {
+        return RemoteSupport::Conditional { obligations: owed };
     }
     RemoteSupport::Transferable
 }
@@ -439,29 +502,43 @@ page Landing(id: StoreId) {
     }
 
     #[test]
-    fn a_session_scoped_type_is_undetermined_rather_than_remotable() {
-        // **This asserted `Transferable` until 2026-08-08.** Architect ruling:
+    fn a_session_scoped_type_is_conditional_rather_than_remotable() {
+        // **This has now said three things, and the third is the right one.**
         //
-        // > World alone is not enough to establish privacy. Both `Session<A>`
-        // > and `Session<B>` may be permitted to exist in `Browser`, `Edge` or
-        // > `Origin`. But `Session<A> → Session<B>` must still be forbidden.
-        // > […] If the planner cannot establish the destination privacy scope,
-        // > the transfer should be Blocked, not assumed valid.
+        // It asserted `Transferable`, on the reasoning that placement already
+        // decides privacy at a remote boundary. It does not: placement decides
+        // which WORLD, and two different sessions live in the same world.
         //
-        // The old reasoning was that placement already decides privacy at a
-        // remote boundary. It does not: placement decides which WORLD, and two
-        // different sessions live in the same world. A build has no deployment
-        // in evidence, so the honest answer is that it cannot yet tell.
+        // It then asserted `Undetermined`, which framed the edge as one the
+        // compiler could not decide. Architect ruling, 2026-08-08:
+        //
+        // > The privacy property belongs to the binding/invocation context. An
+        // > origin server may handle millions of different sessions; the
+        // > machine itself isn't "Session A".
+        //
+        // The compiler CAN decide: the edge carries `Session<SessionId>`, and a
+        // binding that preserves the principal may carry it. That is an
+        // obligation, and framing it as ignorance loses the fact that the
+        // compiler knows precisely what is owed.
         let support = support_of("read_basket");
-        let RemoteSupport::Undetermined { positions } = &support else {
+        let RemoteSupport::Conditional { obligations } = &support else {
             panic!("{support:?}");
         };
-        assert_eq!(positions[0].position, "result");
-        assert!(
-            positions[0].reason.contains("Session"),
-            "and it names the restriction it carries: {}",
-            positions[0].reason
-        );
+        assert_eq!(obligations.len(), 1);
+        let Obligation::PreservePrincipal {
+            principal,
+            position,
+            ty,
+        } = &obligations[0];
+        assert_eq!(principal, "Session<SessionId>");
+        assert_eq!(position, "result");
+        assert_eq!(ty.as_deref(), Some("Cart"));
+
+        // A yes with a condition, not a no. A host reading it as a refusal
+        // would force co-location for every session-scoped query in the
+        // program.
+        assert!(support.is_possible());
+        assert!(!support.is_transferable());
     }
 
     #[test]

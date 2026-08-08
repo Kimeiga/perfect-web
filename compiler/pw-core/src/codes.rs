@@ -223,6 +223,14 @@ codes! {
     // artifacts within ONE build describing the same handler differently.
     RESUME_ARTIFACT_CONTRACT_MISMATCH = "PW5017" / resume_artifact_contract_mismatch / 1, Privacy,
         "a resume manifest and its handler artifact must describe the same contract";
+    // A region declared private WITHOUT a principal. Architect ruling,
+    // 2026-08-08: `private` means "not globally shareable" and says nothing
+    // about whom it is shareable WITH, so it cannot supply the destination a
+    // privacy flow is checked against. Blocked rather than guessed — mapping
+    // `private` to `Session` let a user-partitioned document accept a session
+    // value, and the reverse, in silence.
+    RESUME_DESTINATION_UNKNOWN = "PW5018" / resume_destination_unknown / 1, Privacy,
+        "a private resumable region must say which principal it is private to";
     DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,

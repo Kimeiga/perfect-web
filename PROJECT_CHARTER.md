@@ -2002,10 +2002,28 @@ handler capture safety
 
 #### Gate
 
+*Amended 2026-08-08 by ruling. Items 2 and 4 were written before ADR-0011 made
+Koka an effects-only oracle and before check latency was measured; both
+specified a technique where the gate wanted an outcome. The originals are kept
+below each replacement so the change is visible rather than silent.*
+
 - The own compiler accepts the validated accepted corpus and rejects the validated rejected corpus.
-- Differential tests match Koka for the common semantic subset.
+- **E9-K — Koka effect-oracle conformance.** For the effect-language subset
+  intentionally shared with Koka, Pleris agrees on higher-order effect
+  propagation, row polymorphism, pure/total computations, and selective effect
+  discharge. Every recorded intentional divergence remains explicitly tested as
+  a divergence.
+  *(was: "differential tests match Koka for the common semantic subset" — an
+  ordinary-application parity claim. Retired: the common subset is empty, and
+  expanding `emit-koka` to manufacture overlap would spend implementation effort
+  making an obsolete test meaningful.)*
 - Full store demo builds without Koka.
-- Incremental checks are fast enough for editor feedback.
+- **Interactive checking remains within the project's editor-feedback latency
+  budget, for representative clean and rejected edits.**
+  *(was: "incremental checks are fast enough for editor feedback", read as
+  requiring incremental queries. A full check of the store program is 37 ms, so
+  the infrastructure has no measurable job yet; a gate specifies the outcome and
+  lets the technique follow the measurement.)*
 - No compiler panic is found in the current fuzz corpus.
 - Koka remains optional as a conformance tool, not a build dependency.
 

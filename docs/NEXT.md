@@ -78,22 +78,34 @@ types declared in `domain.pw`, which `emit-koka` neither emits nor imports.
 not declare is a limitation of the BRIDGE, not a disagreement between the
 languages, and reporting it as one would be a false finding about Koka.
 
-### What that means for gate item 2
+### Gate item 2 — RETIRED and replaced, 2026-08-08 by ruling
 
-It cannot be met by pointing the oracle at the corpus. Three ways forward, and
-this is a question for the architect rather than a choice to take quietly:
+> Do not expand `emit-koka` just to satisfy a historical parity gate. Koka
+> helped answer the research questions we needed it to answer. Pleris no longer
+> needs to resemble Koka broadly enough for ordinary application parity, and
+> pretending otherwise would make the test suite less honest rather than more
+> rigorous.
+
+The empty common subset is not a harness problem. It is evidence the gate went
+obsolete when ADR-0011 made Koka an effects-only oracle. The replacement, now in
+the charter:
+
+> **E9-K — Koka effect-oracle conformance.** For the effect-language subset
+> intentionally shared with Koka, Pleris agrees on higher-order effect
+> propagation, row polymorphism, pure/total computations, and selective effect
+> discharge. Every recorded intentional divergence remains explicitly tested as
+> a divergence.
 
 ```text
-1  make emit-koka multi-module, so a corpus file compiles with its domain
-2  grow examples/koka/ — programs written FOR the subset, differentially tested,
-   and honest that they are not the corpus
-3  retire the item: ADR-0011 already says Koka is an effects-only oracle, and
-   ADR-0015 scopes the backend to a pure subset that the corpus does not live in
+ordinary Pleris corpus        no Koka parity claim
+effect-semantics oracle cases differential against real Koka 3.2.3
+known intentional differences must remain different, for the recorded reason
 ```
 
-(3) has a real argument behind it: the gate was written before ADR-0011 and
-ADR-0015 narrowed what Koka is for. A parity claim over a subset the application
-language does not use is not evidence about the application language.
+`scripts/e9-parity.sh` keeps its controls and its finding; what it no longer
+does is claim the corpus should have compiled. The multi-module backend is NOT
+built — it would have spent implementation effort making an obsolete test
+meaningful.
 
 ### Three defects the harness found on its first run
 

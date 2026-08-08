@@ -113,30 +113,48 @@ pub(crate) fn capture_names_and_types(
 /// Unmarked is `Public`, which is R-030's case: a `view` with no visibility
 /// renders into the shared shell, and a session value in that shell is served
 /// to whoever the shell is served to.
-fn manifest_scope(hir: &Hir, decl: &Decl) -> crate::privacy::Label {
+fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::Label> {
+    // A declared principal. `session`, `user` and `organization` each name WHO
+    // the scope belongs to, which is what a flow relation needs.
     let by_visibility = match decl.visibility.as_deref() {
         Some("session") => Some(Restriction::Session("SessionId".into())),
         Some("user") | Some("private") => Some(Restriction::User("UserId".into())),
         Some("organization") => Some(Restriction::Organization("OrganizationId".into())),
         _ => None,
     };
-    // A `cache private` document is stored per session, so its manifest is
-    // too. Read here rather than in a second place, and joined rather than
-    // chosen: a `session` declaration with `cache private` is both, and
-    // picking one would drop a restriction the other carries.
-    // Through `check.rs::declared_cache`, which reads both places a cache
-    // policy can be written: a `query` puts it in its policy block and a `page`
-    // writes it inside its body. Reading only the policy block here saw no
-    // page at all — the same defect `declared_world` carries a comment about.
-    let by_cache = crate::check::declared_cache(hir, decl)
-        .filter(|(v, _)| v == "private")
-        .map(|_| Restriction::Session("SessionId".into()));
 
-    let mut scope = crate::privacy::Label::public();
-    for r in [by_visibility, by_cache].into_iter().flatten() {
-        scope = scope.join(&crate::privacy::Label::of(r));
+    // **`cache private` names no principal, so it cannot supply one.**
+    //
+    // This mapped `private` to `Session<SessionId>` for one commit. Architect
+    // ruling, 2026-08-08:
+    //
+    // > That's too specific. `private` = not globally shareable;
+    // > `Session<A>` = shareable specifically within session A; `User<U>` =
+    // > shareable specifically with user U. A generic `private` flag doesn't
+    // > contain enough information to invent a principal. […] If only "private"
+    // > is known but no principal/partition can be established, the privacy
+    // > decision should be Blocked, not guessed.
+    //
+    // Inventing `Session` there would have let a user-partitioned document
+    // accept a session value and a session-partitioned one accept a user value,
+    // in both directions, silently.
+    //
+    // Read through `check.rs::declared_cache` because a `query` writes the
+    // policy in its block and a `page` writes it inside its body.
+    let privately_cached =
+        crate::check::declared_cache(hir, decl).is_some_and(|(v, _)| v == "private");
+
+    match (by_visibility, privately_cached) {
+        // A principal is declared. `cache private` beside it adds nothing: it
+        // says the same thing less precisely.
+        (Some(r), _) => Some(crate::privacy::Label::of(r)),
+        // Private, and nothing says to whom. **Not public** — that would let a
+        // session value into a document the author marked private — and not a
+        // guessed principal. No answer.
+        (None, true) => None,
+        // Nothing private about it: the shared shell. R-030's case.
+        (None, false) => Some(crate::privacy::Label::public()),
     }
-    scope
 }
 
 pub fn check(
@@ -253,7 +271,7 @@ pub fn check(
                         boundary: Boundary::Resume,
                         direction: Direction::Outbound,
                         label: labels.label(body, expr),
-                        destination: Some(destination.clone()),
+                        destination: destination.clone(),
                     },
                 );
                 match verdict {
@@ -263,9 +281,16 @@ pub fn check(
                     Crossing::Violation(Violation::Private { restriction }) => {
                         out.push(private_value(decl, &name, &restriction, span, &at));
                     }
+                    // The region is private and names no principal, so there
+                    // is no destination to check against. Reported rather than
+                    // waved through: a manifest whose scope nobody can state is
+                    // one nobody can say is safe.
+                    Crossing::Blocked(Blocked::UnknownDestination { carries }) => {
+                        out.push(unknown_destination(decl, &name, &carries, span, &at));
+                    }
                     // Reported above, against the capture's own span, with the
                     // schema-hash explanation this boundary needs.
-                    Crossing::Blocked(_) | Crossing::Proven => {}
+                    Crossing::Blocked(Blocked::UndeterminedSchema) | Crossing::Proven => {}
                 }
             }
         }
@@ -335,6 +360,61 @@ fn unserializable(
             description: format!(
                 "capture the key that identifies what `{name}` points at, and acquire \
                  the resource again on the other side"
+            ),
+            replacement: None,
+        }],
+    }
+}
+
+/// A private region that names no principal, holding a restricted value.
+///
+/// Architect ruling, 2026-08-08: *"If only 'private' is known but no
+/// principal/partition can be established, the privacy decision should be
+/// Blocked, not guessed."* The repair is to say which principal — which is
+/// information the author has and the compiler does not.
+fn unknown_destination(
+    decl: &Decl,
+    name: &str,
+    carries: &[Restriction],
+    span: Span,
+    at: &Span,
+) -> Diagnostic {
+    let written = carries
+        .iter()
+        .map(|r| r.to_string())
+        .collect::<Vec<_>>()
+        .join(" and ");
+    Diagnostic {
+        code: codes::RESUME_DESTINATION_UNKNOWN.id,
+        invariant: codes::RESUME_DESTINATION_UNKNOWN.invariant,
+        reason: "private_region_names_no_principal",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`{}` is private but does not say to whom, so `{name}` cannot be \
+             checked against it",
+            decl.name
+        ),
+        primary_span: span,
+        related: vec![Related {
+            span: at.clone(),
+            label: format!("`{}` declares the handler", decl.name),
+        }],
+        explanation: Some(format!(
+            "`{name}` carries {written}, and a resume manifest may hold a \
+             restricted value only when the region it ships with carries the \
+             same restriction. `cache private` says this is not globally \
+             shareable; it does not say WHICH session, user or organization it \
+             is shareable within — and those are different destinations that \
+             admit different values. Guessing one would let a user-partitioned \
+             document accept a session value, and the reverse, with nothing \
+             said."
+        )),
+        repairs: vec![Repair {
+            description: format!(
+                "declare the principal — `session {}`, `user {}` — so the \
+                 manifest's destination is stated rather than inferred",
+                decl.name, decl.name
             ),
             replacement: None,
         }],

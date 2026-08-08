@@ -91,6 +91,14 @@ pub struct Edge {
     /// Why the edge cannot be remote, where it cannot, or why the compiler
     /// could not tell. Empty when it can.
     pub untransferable: Vec<crate::Untransferable>,
+    /// **What a remote binding of this edge must prove.**
+    ///
+    /// Non-empty when the callee's signature carries a restricted value:
+    /// `Session<A>` must reach `Session<A>`, and an origin node handling
+    /// millions of sessions cannot answer that. Empty is *nothing owed*, not
+    /// *nothing known* — an undetermined signature has no obligations because
+    /// nobody knows what crosses it.
+    pub obligations: Vec<crate::Obligation>,
 }
 
 impl Edge {
@@ -108,6 +116,16 @@ impl Edge {
     /// no idea what to say about it.
     pub fn is_bindable(&self) -> bool {
         self.can_be_local || self.can_be_remote.unwrap_or(true)
+    }
+
+    /// **Is this edge bound, as opposed to merely bindable?**
+    ///
+    /// An edge with an undischarged obligation that CANNOT be co-located is a
+    /// candidate, not a plan: something has to prove the binding preserves the
+    /// principal, and nothing here can. Co-locatable edges owe nothing, because
+    /// a same-process call does not leave the principal's context.
+    pub fn is_discharged(&self) -> bool {
+        self.can_be_local || self.obligations.is_empty()
     }
 }
 
@@ -131,7 +149,25 @@ impl Plan {
     /// piece, and one a program whose parts cannot be connected however they
     /// are placed.
     pub fn is_deployable(&self) -> bool {
-        self.unplaceable.is_empty() && self.dangling.is_empty() && self.unbindable().is_empty()
+        self.unplaceable.is_empty()
+            && self.dangling.is_empty()
+            && self.unbindable().is_empty()
+            && self.undischarged().is_empty()
+    }
+
+    /// **Edges that owe something no binding here has proved.**
+    ///
+    /// Architect ruling, 2026-08-08: *"Your planner may keep an
+    /// `Undetermined` edge as a candidate, but it must not call a deployment
+    /// plan complete until the binding discharges that obligation."*
+    ///
+    /// A co-locatable edge owes nothing: a same-process call does not leave the
+    /// principal's context. What is left is an edge that must be remote and
+    /// carries a restricted value, and nothing in this plan proves the binding
+    /// preserves the principal — because no binding mechanism has been chosen
+    /// yet. When one is, it discharges these.
+    pub fn undischarged(&self) -> Vec<&Edge> {
+        self.edges.iter().filter(|e| !e.is_discharged()).collect()
     }
 
     /// **Edges with no binding at all.**
@@ -173,10 +209,14 @@ pub fn plan(contracts: &[ComponentContract], topology: &Topology) -> Plan {
             .exports
             .iter()
             .map(|e| &e.binding)
+            // Strongest constraint wins: an importer naming the whole
+            // component may call any of its exports, so the component's answer
+            // is the least permissive one among them.
             .min_by_key(|b| match &b.remote {
                 crate::RemoteSupport::Refused { .. } => 0,
                 crate::RemoteSupport::Undetermined { .. } => 1,
-                crate::RemoteSupport::Transferable => 2,
+                crate::RemoteSupport::Conditional { .. } => 2,
+                crate::RemoteSupport::Transferable => 3,
             })
         {
             supports.insert(format!("pw:app/{}", c.component_id), worst);
@@ -231,6 +271,7 @@ pub fn plan(contracts: &[ComponentContract], topology: &Topology) -> Plan {
                     // it is absent, and the plan reports it as `dangling`.
                     can_be_remote: None,
                     untransferable: Vec::new(),
+                    obligations: Vec::new(),
                 });
                 continue;
             };
@@ -250,10 +291,18 @@ pub fn plan(contracts: &[ComponentContract], topology: &Topology) -> Plan {
             let support = supports
                 .get(&i.key())
                 .or_else(|| supports.get(&i.interface));
+            let mut obligations: Vec<crate::Obligation> = Vec::new();
             let (can_be_remote, untransferable) = match support.map(|s| &s.remote) {
                 Some(crate::RemoteSupport::Transferable) => (Some(true), Vec::new()),
                 Some(crate::RemoteSupport::Refused { positions }) => {
                     (Some(false), positions.clone())
+                }
+                // Possible, and owing something. `Some(true)` because the edge
+                // CAN be remote — a host that read an obligation as a refusal
+                // would force co-location for every session-scoped query.
+                Some(crate::RemoteSupport::Conditional { obligations: owed }) => {
+                    obligations = owed.clone();
+                    (Some(true), Vec::new())
                 }
                 Some(crate::RemoteSupport::Undetermined { positions }) => (None, positions.clone()),
                 // No export entry for this key. A contract from before the
@@ -268,6 +317,7 @@ pub fn plan(contracts: &[ComponentContract], topology: &Topology) -> Plan {
                 can_be_local: here.intersection(&there).next().is_some(),
                 can_be_remote,
                 untransferable,
+                obligations,
             });
         }
     }

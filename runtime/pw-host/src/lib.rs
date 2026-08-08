@@ -317,22 +317,53 @@ pub enum LocalSupport {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum RemoteSupport {
-    /// Every value in the signature can cross, in both directions.
+    /// Every value in the signature can cross, with nothing owed.
     Transferable,
-    /// Something in the signature cannot, and each one is named.
+    /// Something in the signature cannot cross at all, and each one is named.
     Refused { positions: Vec<Untransferable> },
+    /// **It can cross, IF the binding discharges these obligations.**
+    ///
+    /// The privacy property belongs to the binding, not to a node: an origin
+    /// handles millions of sessions, so "this machine is Session A" is not a
+    /// thing that can be true. A plan may keep such an edge as a candidate and
+    /// must not call itself complete until something discharges what it owes.
+    Conditional { obligations: Vec<Obligation> },
     /// The compiler had no basis to decide — a position whose type that build
     /// could not determine.
     ///
-    /// **Not a no and not a yes.** Reading it as "not remotable" silently
-    /// forces co-location for an unrelated typing gap; reading it as remotable
-    /// encodes a guess. `plan` reports it as neither.
+    /// Distinct from `Conditional`: there is nothing for a binding to prove,
+    /// because nobody knows what crosses.
     Undetermined { positions: Vec<Untransferable> },
+}
+
+/// What a binding must prove before an edge may carry a signature.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum Obligation {
+    /// The invocation must reach the same principal it left.
+    PreservePrincipal {
+        principal: String,
+        position: String,
+        ty: Option<String>,
+    },
 }
 
 impl RemoteSupport {
     pub fn is_transferable(&self) -> bool {
         matches!(self, RemoteSupport::Transferable)
+    }
+
+    /// Could this edge be remote at all, given something to discharge what it
+    /// owes? `Conditional` is a yes with a condition, not a no.
+    pub fn is_possible(&self) -> bool {
+        !matches!(self, RemoteSupport::Refused { .. })
+    }
+
+    pub fn obligations(&self) -> &[Obligation] {
+        match self {
+            RemoteSupport::Conditional { obligations } => obligations,
+            _ => &[],
+        }
     }
 }
 

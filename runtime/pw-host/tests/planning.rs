@@ -430,34 +430,177 @@ fn every_edge_in_the_store_program_can_be_bound() {
             .collect::<Vec<_>>()
     );
 
-    // **Some are undetermined, and that is the 2026-08-08 correction working.**
+    // **Some carry an obligation, and that is the 2026-08-08 ruling working.**
     // `Cart` is session-scoped — only a `session query` produces one — and a
-    // build cannot say which session the far end of a remote edge belongs to.
-    // `Session<A> → Session<B>` must be forbidden and `World` cannot see the
-    // difference, so the honest answer is "not yet decidable" rather than
-    // "transferable". Before the correction every one of these said `Some(true)`.
-    let undecided: Vec<&pw_host::plan::Edge> = p
+    // remote binding of an edge that carries it must reach the SAME session.
+    // An origin node handles millions of them, so `World` cannot answer this
+    // and a node-level privacy scope would be the wrong shape: the property
+    // belongs to the binding, not to the machine.
+    //
+    // This asserted `Transferable` first, then `Undetermined`. The third answer
+    // is the right one — the compiler knows exactly what is owed.
+    let owing: Vec<&pw_host::plan::Edge> = p
         .edges
         .iter()
-        .filter(|e| e.can_be_remote.is_none())
+        .filter(|e| !e.obligations.is_empty())
         .collect();
     assert!(
-        !undecided.is_empty(),
+        !owing.is_empty(),
         "the store has session-scoped exports and at least one edge reaches them"
     );
-    assert!(
-        undecided.iter().all(|e| e
-            .untransferable
-            .iter()
-            .any(|u| u.reason.contains("Session"))),
-        "and each says which restriction it carries: {undecided:?}"
-    );
+    for e in &owing {
+        assert_eq!(
+            e.can_be_remote,
+            Some(true),
+            "an obligation is not a refusal"
+        );
+        assert!(
+            e.obligations.iter().any(|o| {
+                let pw_host::Obligation::PreservePrincipal { principal, .. } = o;
+                principal.contains("Session")
+            }),
+            "and it names the principal a binding must preserve: {e:?}"
+        );
+    }
 
-    // The discriminating half: the public exports are still `Some(true)`, so
-    // "undetermined" is not the answer to everything.
+    // The discriminating half: the public exports owe nothing, so "carries an
+    // obligation" is not the answer to everything.
     assert!(
-        p.edges.iter().any(|e| e.can_be_remote == Some(true)),
+        p.edges.iter().any(|e| e.obligations.is_empty()),
         "`Menu` and `Store` carry keys and public records: {:?}",
         p.edges
     );
+
+    // **And every obligation here is discharged by co-location.** A
+    // same-process call does not leave the principal's context, so an edge
+    // whose ends can share a node owes nothing in practice. That is why the
+    // store still plans — and `undischarged` is what would catch it if a
+    // session-scoped edge were ever forced apart.
+    assert!(p.undischarged().is_empty(), "{:?}", p.undischarged());
+    assert!(p.is_deployable());
+}
+
+/// **An obligation nothing discharges is not a complete plan.**
+///
+/// Architect ruling, 2026-08-08: *"Your planner may keep an `Undetermined` edge
+/// as a candidate, but it must not call a deployment plan complete until the
+/// binding discharges that obligation."*
+///
+/// Synthetic, because no edge in the store demo is necessarily remote — the
+/// same reason `an_edge_whose_ends_share_no_node_is_necessarily_remote` is.
+#[test]
+fn a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan() {
+    let widget = ComponentContract {
+        component_id: "app.Widget".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "x".into(),
+        required_capabilities: vec![],
+        allowed_placements: vec!["browser".into()],
+        imports: vec![pw_host::Import {
+            interface: "pw:app/app.Basket".into(),
+            name: "Basket".into(),
+            capability: String::new(),
+            kind: pw_host::ImportKind::Component,
+        }],
+        exports: vec![pw_host::Export {
+            name: "Widget".into(),
+            kind: "component".into(),
+            binding: pw_host::BindingSupport::default(),
+        }],
+    };
+    let basket = ComponentContract {
+        component_id: "app.Basket".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "y".into(),
+        required_capabilities: vec![],
+        // Origin-only, so the edge cannot be co-located and the obligation has
+        // to be discharged by a binding rather than by proximity.
+        allowed_placements: vec!["origin".into()],
+        imports: vec![],
+        exports: vec![pw_host::Export {
+            name: "Basket".into(),
+            kind: "query".into(),
+            binding: pw_host::BindingSupport {
+                local: pw_host::LocalSupport::Direct,
+                remote: pw_host::RemoteSupport::Conditional {
+                    obligations: vec![pw_host::Obligation::PreservePrincipal {
+                        principal: "Session<SessionId>".into(),
+                        position: "result".into(),
+                        ty: Some("Cart".into()),
+                    }],
+                },
+            },
+        }],
+    };
+
+    let p = plan(&[widget, basket], &full());
+    assert!(!p.edges[0].can_be_local, "browser-only and origin-only");
+    assert_eq!(
+        p.edges[0].can_be_remote,
+        Some(true),
+        "an obligation is a yes with a condition, not a refusal"
+    );
+    assert_eq!(p.undischarged().len(), 1);
+    assert!(
+        !p.is_deployable(),
+        "nothing here proves the binding preserves the principal"
+    );
+
+    // **The discriminating half.** The same obligation on a CO-LOCATABLE edge
+    // is discharged: a same-process call does not leave the principal's
+    // context. Without this, the assertion above would hold for a planner that
+    // refused every session-scoped edge, which would make private data
+    // unusable across components.
+    let mut colocatable = basket_colocatable();
+    colocatable.allowed_placements = vec!["browser".into(), "origin".into()];
+    let p = plan(&[widget_for(), colocatable], &full());
+    assert!(p.edges[0].can_be_local);
+    assert!(p.undischarged().is_empty());
+    assert!(p.is_deployable());
+}
+
+fn widget_for() -> ComponentContract {
+    ComponentContract {
+        component_id: "app.Widget".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "x".into(),
+        required_capabilities: vec![],
+        allowed_placements: vec!["browser".into()],
+        imports: vec![pw_host::Import {
+            interface: "pw:app/app.Basket".into(),
+            name: "Basket".into(),
+            capability: String::new(),
+            kind: pw_host::ImportKind::Component,
+        }],
+        exports: vec![pw_host::Export {
+            name: "Widget".into(),
+            kind: "component".into(),
+            binding: pw_host::BindingSupport::default(),
+        }],
+    }
+}
+
+fn basket_colocatable() -> ComponentContract {
+    ComponentContract {
+        component_id: "app.Basket".into(),
+        capability_mapping: pw_host::CAPABILITY_MAPPING,
+        abi_schema: "y".into(),
+        required_capabilities: vec![],
+        allowed_placements: vec!["origin".into()],
+        imports: vec![],
+        exports: vec![pw_host::Export {
+            name: "Basket".into(),
+            kind: "query".into(),
+            binding: pw_host::BindingSupport {
+                local: pw_host::LocalSupport::Direct,
+                remote: pw_host::RemoteSupport::Conditional {
+                    obligations: vec![pw_host::Obligation::PreservePrincipal {
+                        principal: "Session<SessionId>".into(),
+                        position: "result".into(),
+                        ty: Some("Cart".into()),
+                    }],
+                },
+            },
+        }],
+    }
 }

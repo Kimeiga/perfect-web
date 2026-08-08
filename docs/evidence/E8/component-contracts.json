@@ -18,12 +18,13 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "undetermined",
-            "positions": [
+            "kind": "conditional",
+            "obligations": [
               {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
                 "position": "result",
-                "ty": "Cart",
-                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+                "ty": "Cart"
               }
             ]
           }
@@ -135,12 +136,13 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "undetermined",
-            "positions": [
+            "kind": "conditional",
+            "obligations": [
               {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
                 "position": "result",
-                "ty": "Cart",
-                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+                "ty": "Cart"
               }
             ]
           }
@@ -298,12 +300,13 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "undetermined",
-            "positions": [
+            "kind": "conditional",
+            "obligations": [
               {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
                 "position": "result",
-                "ty": "Cart",
-                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+                "ty": "Cart"
               }
             ]
           }
@@ -340,12 +343,13 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "undetermined",
-            "positions": [
+            "kind": "conditional",
+            "obligations": [
               {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
                 "position": "result",
-                "ty": "Cart",
-                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+                "ty": "Cart"
               }
             ]
           }

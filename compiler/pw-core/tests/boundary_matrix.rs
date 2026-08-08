@@ -327,11 +327,22 @@ view Summary(cart: Cart) !{} {
 }
 
 #[test]
-fn a_privately_cached_page_is_a_private_destination_too() {
-    // `cache private` says the document is stored per session, which is the
-    // same fact about where the manifest lands. Read from the policy rather
-    // than only from `visibility`, because a page writes one and not the other.
-    let accepted = codes(&program(
+fn a_private_region_that_names_no_principal_is_blocked_rather_than_guessed() {
+    // **This asserted the opposite for one commit.** `cache private` was mapped
+    // to `Session<SessionId>`, so a privately cached page accepted a session
+    // value. Architect ruling, 2026-08-08:
+    //
+    // > `private` = not globally shareable; `Session<A>` = shareable
+    // > specifically within session A; `User<U>` = shareable specifically with
+    // > user U. A generic `private` flag doesn't contain enough information to
+    // > invent a principal. […] If only "private" is known but no
+    // > principal/partition can be established, the privacy decision should be
+    // > Blocked, not guessed.
+    //
+    // The guess was wrong in both directions at once: a user-partitioned
+    // document would have accepted a session value, and a session-partitioned
+    // one a user value.
+    let found = codes(&program(
         "\
 session query Basket(s: SessionId) -> Result<Cart, CartError>
     cache private
@@ -345,5 +356,52 @@ page Checkout(cart: Cart) {
 }
 ",
     ));
-    assert!(!accepted.contains("PW5007"), "{accepted:?}");
+    assert!(
+        found.contains("PW5018"),
+        "a private page that names no principal cannot be checked against: {found:?}"
+    );
+    // And not reported as an ordinary privacy violation, which would send the
+    // reader to remove the capture rather than to name the principal.
+    assert!(!found.contains("PW5007"), "{found:?}");
+}
+
+#[test]
+fn naming_the_principal_is_the_repair_and_it_works() {
+    // The discriminating half. `session page` states the destination, so the
+    // same capture crosses — which is what makes PW5018 a missing-information
+    // diagnostic rather than a prohibition.
+    let found = codes(&program(
+        "\
+session query Basket(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+
+session page Checkout(cart: Cart) {
+    cache private
+    view { <button on:press={resumable(captures = { cart }) => cart.line_count}>go</button> }
+}
+",
+    ));
+    assert!(!found.contains("PW5018"), "{found:?}");
+    assert!(!found.contains("PW5007"), "{found:?}");
+}
+
+#[test]
+fn a_public_value_crosses_into_a_region_whose_scope_is_unstated() {
+    // The control that keeps PW5018 narrow. A private region with no principal
+    // blocks a RESTRICTED value; a public one flows anywhere, including into a
+    // destination nobody has established. Without this the rule would be
+    // "a private page may not resume", which is not the rule.
+    let found = codes(&program(
+        "\
+page Checkout(id: StoreId) {
+    cache private
+    view { <button on:press={resumable(captures = { id }) => 1}>go</button> }
+}
+",
+    ));
+    assert!(!found.contains("PW5018"), "{found:?}");
+    assert!(!found.contains("PW5007"), "{found:?}");
 }
