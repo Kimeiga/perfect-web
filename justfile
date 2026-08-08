@@ -267,6 +267,14 @@ e9-latency:
      } > docs/evidence/E9/check-latency.txt
     @grep -E "^check-latency" docs/evidence/E9/check-latency.txt
 
+# E9 gate item 2. Differential AGREEMENT with Koka on the common subset.
+#
+# `tests/differential_vs_koka.rs` asserts the four places ADR-0011 says Koka is
+# WRONG. This is the other direction, and its current finding is that the
+# common subset is EMPTY for the corpus — reported rather than made to pass.
+e9-parity:
+    @bash scripts/e9-parity.sh
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

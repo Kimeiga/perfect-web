@@ -59,9 +59,62 @@ Those are ADR-0011's findings — the reasons Koka is an effects-only oracle —
 they are valuable. They are not "differential tests match Koka for the common
 semantic subset", which is a claim about AGREEMENT and has no test at all.
 
-The gate item needs the other direction: programs in the shared subset where
-both must agree, and a control proving the harness can see a disagreement. That
-is E9's first executable task.
+The other direction is now built — `just e9-parity`, `scripts/e9-parity.sh` —
+and **its finding is that the common subset is EMPTY for the corpus.**
+
+```text
+agreed       0
+disagreed    0
+skipped     24    not in the common subset
+```
+
+Both controls fire, so the harness works: a non-exhaustive match under `total`
+and an ill-typed term are each rejected by the real Koka 3.2.3. What it measures
+is a bridge that reaches exactly one hand-curated file. 23 of 24 accepted
+fixtures emit no function body at all, and the one that does — `A-001` — names
+types declared in `domain.pw`, which `emit-koka` neither emits nor imports.
+
+**Counted as skipped, never as a disagreement.** A type the emitted module does
+not declare is a limitation of the BRIDGE, not a disagreement between the
+languages, and reporting it as one would be a false finding about Koka.
+
+### What that means for gate item 2
+
+It cannot be met by pointing the oracle at the corpus. Three ways forward, and
+this is a question for the architect rather than a choice to take quietly:
+
+```text
+1  make emit-koka multi-module, so a corpus file compiles with its domain
+2  grow examples/koka/ — programs written FOR the subset, differentially tested,
+   and honest that they are not the corpus
+3  retire the item: ADR-0011 already says Koka is an effects-only oracle, and
+   ADR-0015 scopes the backend to a pure subset that the corpus does not live in
+```
+
+(3) has a real argument behind it: the gate was written before ADR-0011 and
+ADR-0015 narrowed what Koka is for. A parity claim over a subset the application
+language does not use is not evidence about the application language.
+
+### Three defects the harness found on its first run
+
+All three were invisible while the oracle pointed only at
+`examples/koka/pricing.pw`, which was written to work with it.
+
+- **`type_name` dropped a type's arguments**, so `List<CartLine>` emitted
+  `lines : list` — which Koka rejects for the arity it needs. The **third**
+  instance of read-the-head-and-drop-the-arguments found on 2026-08-08, after
+  `Interface::of` and `wit.rs`'s record fields. Fixed, through the same
+  `wit::written` all three now use.
+- **`type_name` separated on every uppercase character**, so `USD` became
+  `u_s_d` — three type names where the program has one. Visible only once
+  generic arguments were carried through and `Money<USD>` reached it at all.
+  Fixed with the rule `wit::ident` already used.
+- **`emit-koka` is single-module and emits no imports.** Recorded rather than
+  fixed: multi-module lowering is a real piece of work and ADR-0015 scopes the
+  backend deliberately.
+
+`spikes/pw-to-koka` still passes all three of its checks, so the fixes did not
+move the one program the bridge did reach.
 
 ---
 

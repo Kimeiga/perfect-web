@@ -1,0 +1,51 @@
+E9 gate item 2 — differential agreement with Koka
+
+produced by: just e9-parity
+koka: Koka 3.2.3, 01:29:29 Mar 18 2026 (ghc release version)
+
+Every accepted corpus file that lowers to the pure subset (ADR-0015),
+compiled by the real Koka. Both compilers must accept it.
+
+  agreed       0
+  disagreed    0
+  skipped     24   not in the common subset
+
+SKIPPED — counted as skipped, never as agreement. Silence is not parity:
+  A-001-pure-calculation.pw  (types declared in another module; emit-koka is single-module)
+  A-002-exhaustive-order-state-rendering.pw  (no function body in the pure subset)
+  A-003-public-store-query.pw  (no function body in the pure subset)
+  A-004-private-cart-query.pw  (no function body in the pure subset)
+  A-005-idempotent-command.pw  (no function body in the pure subset)
+  A-006-scoped-WebSocket-subscription.pw  (no function body in the pure subset)
+  A-007-map-widget-resource-with-cleanup.pw  (no function body in the pure subset)
+  A-008-streamed-public-recommendations.pw  (no function body in the pure subset)
+  A-009-edge-materialized-menu.pw  (no function body in the pure subset)
+  A-010-origin-only-secret-operation.pw  (no function body in the pure subset)
+  A-011-offline-draft-with-explicit-conflict-policy.pw  (no function body in the pure subset)
+  A-012-decoder-handling-malformed-JSON.pw  (no function body in the pure subset)
+  A-013-build-time-deterministic-page.pw  (no function body in the pure subset)
+  A-014-content-addressed-resumable-handler.pw  (no function body in the pure subset)
+  A-015-phase-scheduled-measure-then-mutate.pw  (no function body in the pure subset)
+  A-016-multiple-measures-share-one-layout-snapshot.pw  (no function body in the pure subset)
+  A-017-batched-layout-affecting-mutations.pw  (no function body in the pure subset)
+  A-018-resize-observation-updates-derived-state.pw  (no function body in the pure subset)
+  A-019-intersection-observation-controls-resource-lifetime.pw  (no function body in the pure subset)
+  A-020-compositor-only-animation.pw  (no function body in the pure subset)
+  A-021-custom-paint-with-declared-inputs.pw  (no function body in the pure subset)
+  A-022-post-paint-non-layout-work.pw  (no function body in the pure subset)
+  A-023-semantically-independent-contained-subtree.pw  (no function body in the pure subset)
+  A-024-audited-imperative-widget-escape.pw  (no function body in the pure subset)
+
+CONTROLS — a run that cannot fail measures nothing
+  B. non-exhaustive match under `total` is rejected by Koka: pass
+  C. ill-typed term is rejected by Koka:                      pass
+
+WHAT THIS IS NOT
+  Not a claim that pw and Koka agree on everything. ADR-0011 records
+  four places they deliberately do not, and tests/differential_vs_koka.rs
+  asserts each. This is the other direction: where the subsets overlap,
+  they must not disagree.
+  Not a semantic equivalence proof. Koka accepting a module says its
+  types and exhaustiveness hold, not that it computes the same values.
+  spikes/pw-to-koka executes one program and compares values; this
+  compiles many and compares verdicts.

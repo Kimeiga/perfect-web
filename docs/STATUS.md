@@ -33,9 +33,20 @@ be attributed if it is ever built.
 
 Item 2 is the real gap and is not what its name suggests. `differential_vs_koka`
 has five tests and every one asserts a DIVERGENCE — ADR-0011's findings, the
-reasons Koka is an effects-only oracle. "Differential tests match Koka for the
-common semantic subset" is a claim about AGREEMENT, and it has no test at all.
-That is E9's first executable task.
+reasons Koka is an effects-only oracle. The AGREEMENT direction is now built
+(`just e9-parity`) and **its finding is that the common subset is empty for the
+corpus**: 23 of 24 accepted fixtures emit no function body, and the one that
+does names types `emit-koka` neither emits nor imports. Both controls fire, so
+the harness works — what it measures is a bridge that reaches one hand-curated
+file. Whether to widen the bridge, grow a subset corpus, or retire the item
+against ADR-0011 and ADR-0015 is a question for the architect, in
+`docs/NEXT.md`.
+
+The harness found three defects on its first run, all invisible while the oracle
+pointed only at the file written for it. Two are fixed — a type's arguments were
+dropped (`List<CartLine>` → `list`, the third instance of that shape found in
+one day) and `USD` mangled to `u_s_d`. The third, single-module lowering, is
+recorded rather than fixed.
 
 **E8-0 is complete** (ADR-0020). The compiler hands the host a six-field
 `ComponentContract` — component_id, abi_schema, required_capabilities,

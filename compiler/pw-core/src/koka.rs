@@ -101,7 +101,20 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
                     let Some(ty) = &f.ty else {
                         return Err("a record field with no declared type");
                     };
-                    s.push_str(&format!("  {} : {}\n", value_name(&f.name), type_name(ty)));
+                    // The head AND its arguments. `f.ty` is the head alone, so
+                    // `List<CartLine>` emitted `lines : list` — which Koka
+                    // rejects, because `list` needs one. The THIRD instance of
+                    // this shape found on 2026-08-08: `Interface::of` dropped
+                    // arguments when asking whether a position carries a
+                    // resource, and `wit.rs`'s record fields emitted `list`
+                    // with nothing in it. Reading a type's head and calling it
+                    // the type is apparently the easiest mistake in this
+                    // codebase to make.
+                    s.push_str(&format!(
+                        "  {} : {}\n",
+                        value_name(&f.name),
+                        type_name(&crate::wit::written(ty, &f.ty_args))
+                    ));
                 }
                 return Ok(Some(s));
             }
@@ -140,8 +153,12 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
                 .params
                 .iter()
                 .map(|p| {
-                    let ty = p.ty.as_deref().unwrap_or("int");
-                    format!("{} : {}", value_name(&p.name), type_name(ty))
+                    // Head and arguments, as above.
+                    let ty = match &p.ty {
+                        Some(head) => crate::wit::written(head, &p.ty_args),
+                        None => "Int".to_string(),
+                    };
+                    format!("{} : {}", value_name(&p.name), type_name(&ty))
                 })
                 .collect();
 
@@ -355,15 +372,39 @@ fn type_name(t: &str) -> String {
         "()" => return "()".into(),
         _ => {}
     }
+    // `List<CartLine>` -> `list<cart_line>`. Koka spells a type application the
+    // same way, so the arguments are mapped and the brackets kept — dropping
+    // them produced `list`, which Koka rejects for the arity it needs.
+    if let Some((head, rest)) = t.split_once('<') {
+        let args: Vec<String> = rest
+            .trim_end_matches('>')
+            .split(',')
+            .map(str::trim)
+            .filter(|a| !a.is_empty())
+            .map(type_name)
+            .collect();
+        if !args.is_empty() {
+            return format!("{}<{}>", type_name(head.trim()), args.join(", "));
+        }
+        return type_name(head.trim());
+    }
+    // Snake case, with a separator only where a word actually starts: after a
+    // lowercase letter or a digit. Separating on EVERY uppercase character
+    // turned `USD` into `u_s_d`, which reads as three type names — visible only
+    // once a generic argument was carried through and `Money<USD>` reached
+    // here at all.
     let mut out = String::new();
-    for (i, c) in t.chars().enumerate() {
+    let mut prev_lower = false;
+    for c in t.chars() {
         if c.is_uppercase() {
-            if i > 0 {
+            if prev_lower {
                 out.push('_');
             }
             out.extend(c.to_lowercase());
+            prev_lower = false;
         } else {
             out.push(c);
+            prev_lower = c.is_lowercase() || c.is_ascii_digit();
         }
     }
     out
