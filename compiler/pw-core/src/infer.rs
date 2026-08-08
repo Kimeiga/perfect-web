@@ -75,7 +75,7 @@ impl<'a> Types<'a> {
 
         for p in &decl.params {
             if let Some(t) = &p.ty {
-                bindings.insert(p.name.clone(), t.clone());
+                bindings.insert(p.name.clone(), t.written());
             }
         }
 
@@ -84,7 +84,7 @@ impl<'a> Types<'a> {
         let mut element_of: BTreeMap<String, String> = BTreeMap::new();
         for p in &decl.params {
             if let Some(head) = &p.ty
-                && let Some(elem) = element_of_written(head, &p.ty_args)
+                && let Some(elem) = element_of_written(head.constructor_head_only(), head.args())
             {
                 element_of.insert(p.name.clone(), elem);
             }

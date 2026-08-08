@@ -257,10 +257,7 @@ impl Types {
             .as_ref()
             .map(|fs| {
                 fs.iter()
-                    .filter_map(|f| {
-                        f.ty.as_ref()
-                            .map(|t| (f.name.clone(), written(t, &f.ty_args)))
-                    })
+                    .filter_map(|f| f.ty.as_ref().map(|t| (f.name.clone(), t.written())))
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
@@ -350,19 +347,6 @@ fn split(written: &str) -> (&str, Vec<&str>) {
                 .collect(),
         ),
         None => (written.trim(), Vec::new()),
-    }
-}
-
-/// A type as written, from the head and arguments the HIR carries separately.
-///
-/// One place, because reading only the head is the mistake `wit-parser` caught:
-/// `List<MenuItem>` is stored as `("List", ["MenuItem"])` and a caller taking
-/// the head alone emits `list`, which is not a WIT type.
-pub(crate) fn written(head: &str, args: &[String]) -> String {
-    if args.is_empty() {
-        head.to_string()
-    } else {
-        format!("{head}<{}>", args.join(", "))
     }
 }
 

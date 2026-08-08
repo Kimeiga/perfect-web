@@ -1,0 +1,22 @@
+# Every `DeclaredType::constructor_head_only()` call site, with the reason it is
+# legitimate. `tests/head_only.rs` fails on one that is not listed here.
+#
+# Architect ruling, 2026-08-08, after the third consumer in one day read a type's
+# head and dropped its arguments:
+#
+#   Preserving generic arguments should be effortless. Discarding them should
+#   require an explicit choice.
+#
+# `DeclaredType` makes `written()` the easy path and gives the discarding one an
+# unpleasant name. This file is the audit of the discards that remain.
+#
+# Format: <file>:<function>  <category>  <reason>
+#
+# Categories:
+#   paired      the arguments are passed alongside, so nothing is discarded
+#   constructor the CONSTRUCTOR itself is the question, not what it carries
+
+infer.rs:of_body            paired       `element_of_written(head, args)` takes both halves; the split is the callee's parameter list, not a discard
+labels.rs:of_body           paired       `label_of_type(head, args)` takes both halves, and `Secret<Payments>` needs the argument to be a label at all
+signatures.rs:build         paired       `label_from_return(head, args)` takes both; `returns` and `returns_args` are two fields of one type by `Signature`'s own shape
+signatures.rs:build         constructor  a member's receiver is its NOMINAL type: `offsetWidth(el: ElementRef)` is a member of `ElementRef`, and a member of `List<X>` belongs to `List` however it is parameterised

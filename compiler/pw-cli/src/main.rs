@@ -179,7 +179,7 @@ fn explain_with(
                         s,
                         "             {}: {}",
                         f.name,
-                        f.ty.as_deref().unwrap_or("?")
+                        f.ty.as_ref().map(|t| t.written()).unwrap_or("?".into())
                     );
                 }
             }
@@ -188,7 +188,10 @@ fn explain_with(
                 let ps: Vec<String> = d
                     .params
                     .iter()
-                    .map(|p| format!("{}: {}", p.name, p.ty.as_deref().unwrap_or("?")))
+                    .map(|p| {
+                        let ty = p.ty.as_ref().map(|t| t.written());
+                        format!("{}: {}", p.name, ty.as_deref().unwrap_or("?"))
+                    })
                     .collect();
                 let _ = writeln!(s, "             ({})", ps.join(", "));
                 if let Some(r) = &d.ret {

@@ -279,8 +279,12 @@ impl Lowerer<'_> {
                         let t = p.children().find(|c| c.kind() == K::TypeRef);
                         Param {
                             name: first_name(&p).unwrap_or_default(),
-                            ty: t.as_ref().map(type_path),
-                            ty_args: t.as_ref().map(type_args).unwrap_or_default(),
+                            // The complete type, built once. `DeclaredType`
+                            // keeps the head and its arguments together, so a
+                            // consumer has to ask for the head alone by name.
+                            ty: t
+                                .as_ref()
+                                .map(|t| crate::hir::DeclaredType::new(type_path(t), type_args(t))),
                             span: span_of(&p),
                         }
                     })
@@ -328,8 +332,9 @@ impl Lowerer<'_> {
                     let t = f.children().find(|c| c.kind() == K::TypeRef);
                     Param {
                         name: first_name(&f).unwrap_or_default(),
-                        ty: t.as_ref().map(type_path),
-                        ty_args: t.as_ref().map(type_args).unwrap_or_default(),
+                        ty: t
+                            .as_ref()
+                            .map(|t| crate::hir::DeclaredType::new(type_path(t), type_args(t))),
                         span: span_of(&f),
                     }
                 })

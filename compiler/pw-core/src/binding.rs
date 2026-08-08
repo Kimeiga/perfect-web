@@ -222,10 +222,10 @@ impl Interface {
             params: decl
                 .params
                 .iter()
-                .map(|p| {
-                    p.ty.as_ref()
-                        .map(|head| crate::wit::written(head, &p.ty_args))
-                })
+                // `written()`, the default path. This read `p.ty` alone and
+                // came out with `List` for `List<OpenTransaction>` — the whole
+                // reason `DeclaredType` exists.
+                .map(|p| p.ty.as_ref().map(|t| t.written()))
                 .collect(),
             returns: decl.ret.clone(),
             returns_args: decl.ret_args.clone(),

@@ -113,7 +113,7 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
                     s.push_str(&format!(
                         "  {} : {}\n",
                         value_name(&f.name),
-                        type_name(&crate::wit::written(ty, &f.ty_args))
+                        type_name(&ty.written())
                     ));
                 }
                 return Ok(Some(s));
@@ -155,7 +155,7 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
                 .map(|p| {
                     // Head and arguments, as above.
                     let ty = match &p.ty {
-                        Some(head) => crate::wit::written(head, &p.ty_args),
+                        Some(t) => t.written(),
                         None => "Int".to_string(),
                     };
                     format!("{} : {}", value_name(&p.name), type_name(&ty))

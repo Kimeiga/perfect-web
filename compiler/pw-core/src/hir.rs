@@ -167,17 +167,94 @@ pub struct Module {
 #[derive(Debug, Clone)]
 pub struct Param {
     pub name: String,
-    /// The type's HEAD: `List` for `List<MenuItem>`.
-    pub ty: Option<String>,
-    /// Its arguments: `["MenuItem"]`.
-    ///
-    /// Carried separately because the head alone cannot answer what an element
-    /// of a collection is, and `{#each xs as x}` needs exactly that. Without
-    /// it a loop binding has no type, which means a resumable handler inside a
-    /// loop has no capture schema — `PW5016` — so the store demo could not use
-    /// one.
-    pub ty_args: Vec<String>,
+    /// The declared type, complete. `None` where the parameter carries no
+    /// annotation.
+    pub ty: Option<DeclaredType>,
     pub span: Span,
+}
+
+pub use type_ref::DeclaredType;
+
+/// **A written type, kept whole.**
+///
+/// Its own module so the fields are private to everything, including the rest
+/// of `hir.rs`. Within one crate a `pub` field is visible everywhere, so a
+/// module boundary is the only thing that makes "you must ask" enforceable.
+///
+/// Architect ruling, 2026-08-08, after the third consumer in one day read a
+/// type's head and dropped its arguments:
+///
+/// > Three independent consumers have now made the same mistake […] and two
+/// > failed permissively. That means the representation itself is too easy to
+/// > misuse. […] Preserving generic arguments should be effortless. Discarding
+/// > them should require an explicit choice.
+///
+/// The three were `Interface::of`, where `List<OpenTransaction>` looked up
+/// `List`, found no resource, and came out remotely transferable; `wit.rs`'s
+/// record fields, which emitted `list` with nothing in it and which
+/// `wit-parser` caught; and `koka.rs`'s `type_name`, which Koka caught. Each
+/// read a `ty` beside a `ty_args` it did not read.
+mod type_ref {
+    /// A type as the program wrote it.
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct DeclaredType {
+        head: String,
+        args: Vec<String>,
+    }
+
+    impl DeclaredType {
+        pub fn new(head: impl Into<String>, args: Vec<String>) -> DeclaredType {
+            DeclaredType {
+                head: head.into(),
+                args,
+            }
+        }
+
+        /// **The whole type, as written.** `List<MenuItem>`.
+        ///
+        /// The default path, and the one every consumer should reach for.
+        pub fn written(&self) -> String {
+            if self.args.is_empty() {
+                self.head.clone()
+            } else {
+                format!("{}<{}>", self.head, self.args.join(", "))
+            }
+        }
+
+        /// The arguments: `["MenuItem"]`.
+        ///
+        /// `{#each xs as x}` needs exactly this — without it a loop binding has
+        /// no type, which means a resumable handler inside a loop has no
+        /// capture schema (`PW5016`), so the store demo could not use one.
+        pub fn args(&self) -> &[String] {
+            &self.args
+        }
+
+        pub fn is_generic(&self) -> bool {
+            !self.args.is_empty()
+        }
+
+        /// **The head, DISCARDING every argument.**
+        ///
+        /// Named to be unpleasant. `List<OpenTransaction>` gives `List`, which
+        /// is not a type and answers no question about what the value carries —
+        /// three separate consumers reached for a field that did this quietly,
+        /// and two of them failed in the permissive direction.
+        ///
+        /// Legitimate only where the CONSTRUCTOR itself is the question: is
+        /// this a `Result`, is this an `Option`. Every call site is listed in
+        /// `compiler/pw-core/head-only-allow.txt` with a reason, and
+        /// `tests/head_only.rs` fails on a new one.
+        pub fn constructor_head_only(&self) -> &str {
+            &self.head
+        }
+    }
+
+    impl std::fmt::Display for DeclaredType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(&self.written())
+        }
+    }
 }
 
 /// One entry of a declaration's policy block: `freshness 30.seconds`.

@@ -517,7 +517,7 @@ fn check_unit_with(
         let mut locals: BTreeMap<String, String> = BTreeMap::new();
         for p in &decl.params {
             if let Some(t) = &p.ty {
-                locals.insert(p.name.clone(), t.clone());
+                locals.insert(p.name.clone(), t.written());
             }
         }
 

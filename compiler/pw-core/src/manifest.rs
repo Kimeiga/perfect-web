@@ -247,7 +247,11 @@ fn manifest_of(decl: &Decl) -> (Manifest, Vec<Unparsed>) {
     let m = Manifest {
         name: decl.name.clone(),
         kind: kind_name(decl.kind).to_string(),
-        key_type: decl.params.iter().filter_map(|p| p.ty.clone()).collect(),
+        key_type: decl
+            .params
+            .iter()
+            .filter_map(|p| p.ty.as_ref().map(|t| t.written()))
+            .collect(),
         result_type,
         error_type,
         privacy,

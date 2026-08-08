@@ -88,7 +88,7 @@ impl<'a> Labels<'a> {
         // A parameter whose written type carries a restriction.
         for p in &decl.params {
             if let Some(ty) = &p.ty
-                && let Some(l) = label_of_type(ty, &[])
+                && let Some(l) = label_of_type(ty.constructor_head_only(), ty.args())
             {
                 me.bindings.insert(p.name.clone(), (l, p.span.clone()));
             }

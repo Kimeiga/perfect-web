@@ -97,9 +97,12 @@ impl Signatures {
                             Signature {
                                 path: format!("{}.{}", decl.name, f.name),
                                 effects: vec![],
-                                label: label_from_return(Some(ty), &[]),
-                                returns: Some(ty.clone()),
-                                returns_args: vec![],
+                                label: label_from_return(
+                                    Some(ty.constructor_head_only()),
+                                    ty.args(),
+                                ),
+                                returns: Some(ty.constructor_head_only().to_string()),
+                                returns_args: ty.args().to_vec(),
                                 params: vec![Some(decl.name.clone())],
                             },
                         );
@@ -128,13 +131,26 @@ impl Signatures {
                     label: label_from_return(decl.ret.as_deref(), &decl.ret_args),
                     returns: decl.ret.clone(),
                     returns_args: decl.ret_args.clone(),
-                    params: decl.params.iter().map(|p| p.ty.clone()).collect(),
+                    params: decl
+                        .params
+                        .iter()
+                        .map(|p| p.ty.as_ref().map(|t| t.written()))
+                        .collect(),
                 };
                 // A function whose first parameter is a declared type reads as
                 // that type's member. `offsetWidth(el: ElementRef)` is what
                 // `anchor.offsetWidth` resolves to, and its row — not a list of
                 // property names in a checker — is what says it measures layout.
-                if let Some(receiver) = decl.params.first().and_then(|p| p.ty.clone()) {
+                // The receiver's own nominal type. `constructor_head_only`
+                // is right here and audited: `offsetWidth(el: ElementRef)` is a
+                // member of `ElementRef`, and a member of `List<X>` belongs to
+                // `List` however it is parameterised.
+                if let Some(receiver) = decl
+                    .params
+                    .first()
+                    .and_then(|p| p.ty.as_ref())
+                    .map(|t| t.constructor_head_only().to_string())
+                {
                     out.by_member
                         .insert((receiver, decl.name.clone()), sig.clone());
                 }
