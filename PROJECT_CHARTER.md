@@ -96,6 +96,16 @@ At the start of each milestone:
 
 Do not claim a milestone is complete merely because code exists. A milestone is complete only when its objective gate passes.
 
+**A gate proves one layer's contract.** Cross-layer end-to-end proofs belong at
+the milestone where both sides of the boundary actually exist (ADR-0023). A gate
+item whose dependency is owned by a *later* milestone is a sequencing mistake:
+amend the gate and record a **deferred integration obligation** in
+`docs/EVIDENCE_LEDGER.md` and in the later milestone's own gate, so neither can
+close without it. Amending a gate for this reason is better evidence discipline
+than building temporary machinery to make the old wording green — but a gate
+item that is merely *hard* is not a candidate, and the "gate must pass" rule
+above is otherwise unchanged.
+
 ### 3.2 Do not ask broad design questions that can be resolved experimentally
 
 Make reasonable assumptions, record them in an ADR, and validate them. Ask the user only when a decision is genuinely subjective, irreversible, expensive, or requires credentials or interactive administrator approval.

@@ -21,9 +21,17 @@ would be a second implementation of instantiation's own rule:
 
   linked: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
   refused by the engine: component imports instance `perfect-web:store/stores@0.1.0`, but a matching implementation was not found in the linker
+  the guest returned: found:store_47:Corner Store
+  ungranted call refused: component imports instance `perfect-web:store/stores@0.1.0`, but a matching implementation was not found in the linker
   refused for memory: memory minimum size of 18 pages exceeds memory limits
   instantiation spent 16386 fuel
   refused for fuel: wasm trap: all fuel consumed by WebAssembly
+
+And the positive control the architect added on 2026-08-08: authority
+USED, not only refused. Everything above shows the host saying no or
+linking; the line naming the guest's return value is the host saying
+yes and the guest receiving the answer - the id is the guest's own
+argument, the name is the host's data.
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test a_capabilitys_type_argument_is_part_of_what_is_granted ... ok
@@ -51,12 +59,13 @@ test the_topology_is_data_the_host_owns ... ok
 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test a_component_that_cannot_be_read_is_not_treated_as_importing_nothing ... ok
 test a_granted_component_instantiates_and_an_ungranted_one_does_not ... linked: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
+test a_granted_guest_calls_the_host_and_receives_its_answer ... the guest returned: found:store_47:Corner Store
 test a_memory_ceiling_denies_growth_rather_than_aborting ... refused for memory: memory minimum size of 18 pages exceeds memory limits
 test a_refused_admission_yields_no_granted_to_link_from ... ok
 test an_instance_runs_within_the_budget_its_deployment_declares ... instantiation spent 16386 fuel
 test the_declared_component_imports_exactly_what_its_world_says ... minimal guest imports: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
 test the_std_component_is_refused_for_authority_nobody_asked_for ... std guest imports 34 interfaces
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
 test a_capability_survives_the_crossing_with_its_argument ... ok
 test the_compilers_contracts_deserialize_with_every_field_populated ... ok
 test the_real_contracts_drive_a_real_admission ... ok

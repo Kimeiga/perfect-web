@@ -28,7 +28,7 @@
 //!
 //! So `boundary.rs` owns [`crate::boundary::TypeFacts`] and
 //! [`crate::boundary::can_cross`]; this module supplies
-//! `Boundary::ResumeCapture` and turns the verdict into the two diagnostics the
+//! `Boundary::Resume` and turns the verdict into the two diagnostics the
 //! corpus names. `binding.rs` supplies `Boundary::RemoteCall` over exactly the
 //! same facts.
 //!
@@ -90,6 +90,55 @@ pub(crate) fn capture_names_and_types(
         .collect()
 }
 
+/// **What the resume manifest for this declaration may hold.**
+///
+/// Architect ruling, 2026-08-08, correcting the first version of the boundary
+/// model:
+///
+/// > A resume manifest *does* have a privacy destination: the privacy
+/// > scope/partition of the document or resumable region containing it. […] We
+/// > explicitly wanted private resumable regions to be possible. Otherwise any
+/// > session-private UI state becomes inherently non-resumable.
+///
+/// So a `session view`'s manifest may hold a `Session<SessionId>` value, and a
+/// `Public` one may not — the difference being the enclosing declaration's own
+/// scope, which is where it was already written.
+///
+/// **Derived from what already decides the question**, and from nothing new: a
+/// declaration's `visibility` is what `check.rs::label_of` reads and what
+/// `TypeFacts` reads to scope a produced type. `cache private` says the same
+/// thing about a page whose entries are per-session, so it is read too — a page
+/// that is cached per session is a document served to one session.
+///
+/// Unmarked is `Public`, which is R-030's case: a `view` with no visibility
+/// renders into the shared shell, and a session value in that shell is served
+/// to whoever the shell is served to.
+fn manifest_scope(hir: &Hir, decl: &Decl) -> crate::privacy::Label {
+    let by_visibility = match decl.visibility.as_deref() {
+        Some("session") => Some(Restriction::Session("SessionId".into())),
+        Some("user") | Some("private") => Some(Restriction::User("UserId".into())),
+        Some("organization") => Some(Restriction::Organization("OrganizationId".into())),
+        _ => None,
+    };
+    // A `cache private` document is stored per session, so its manifest is
+    // too. Read here rather than in a second place, and joined rather than
+    // chosen: a `session` declaration with `cache private` is both, and
+    // picking one would drop a restriction the other carries.
+    // Through `check.rs::declared_cache`, which reads both places a cache
+    // policy can be written: a `query` puts it in its policy block and a `page`
+    // writes it inside its body. Reading only the policy block here saw no
+    // page at all — the same defect `declared_world` carries a comment about.
+    let by_cache = crate::check::declared_cache(hir, decl)
+        .filter(|(v, _)| v == "private")
+        .map(|_| Restriction::Session("SessionId".into()));
+
+    let mut scope = crate::privacy::Label::public();
+    for r in [by_visibility, by_cache].into_iter().flatten() {
+        scope = scope.join(&crate::privacy::Label::of(r));
+    }
+    scope
+}
+
 pub fn check(
     hir: &Hir,
     sigs: &Signatures,
@@ -119,6 +168,9 @@ pub fn check(
         let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
         let imports = crate::labels::imported_modules(hir);
         let labels = crate::labels::Labels::of_body(sigs, decl, body, hir.module_of(id), &imports);
+        // **Where the manifest lands.** A resume manifest ships with its
+        // document, so what it may hold is what that document may hold.
+        let destination = manifest_scope(hir, decl);
 
         for lambda in body.walk() {
             let Expr::Lambda {
@@ -142,9 +194,14 @@ pub fn check(
                     can_cross(
                         &facts.profile(ty.as_deref()),
                         &BoundaryContext {
-                            boundary: Boundary::ResumeCapture,
+                            boundary: Boundary::Resume,
                             direction: Direction::Outbound,
+                            // Public and a public destination, so the only
+                            // verdict this loop can see is the schema one. The
+                            // privacy question is asked once, below, with the
+                            // real label and the real destination.
                             label: crate::privacy::Label::public(),
+                            destination: Some(crate::privacy::Label::public()),
                         },
                     ),
                     Crossing::Blocked(Blocked::UndeterminedSchema)
@@ -193,9 +250,10 @@ pub fn check(
                 let verdict = can_cross(
                     &facts.profile(ty.as_deref()),
                     &BoundaryContext {
-                        boundary: Boundary::ResumeCapture,
+                        boundary: Boundary::Resume,
                         direction: Direction::Outbound,
                         label: labels.label(body, expr),
+                        destination: Some(destination.clone()),
                     },
                 );
                 match verdict {

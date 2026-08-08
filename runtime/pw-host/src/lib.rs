@@ -728,6 +728,10 @@ pub mod engine {
     //! wasmtime-component.txt` measured a guest whose WIT world declares one
     //! import and whose component demands fifteen.
 
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use wasmtime::component::types::ComponentItem;
+
     /// Every instance a component imports, as `interface#name` where the name
     /// is known and `interface` alone otherwise.
     ///
@@ -736,7 +740,6 @@ pub mod engine {
     /// able to produce one.
     pub fn imports_of(bytes: &[u8]) -> Result<Vec<String>, String> {
         use wasmtime::component::Component;
-        use wasmtime::component::types::ComponentItem;
         use wasmtime::{Config, Engine};
 
         let mut config = Config::new();
@@ -812,6 +815,133 @@ pub mod engine {
         pub fuel_used: Option<u64>,
     }
 
+    /// **Instantiate and CALL, with the host answering from behind a handle.**
+    ///
+    /// The positive control the architect asked for on 2026-08-08:
+    ///
+    /// > If you don't yet have a positive guest that actually exercises one
+    /// > granted host interface, I would add that as the last E8 control.
+    ///
+    /// Everything else about E8 shows authority being *refused* or *linked*.
+    /// This shows it being **used**: the guest calls the host function its
+    /// contract permitted, and the value it returns is one only the host could
+    /// have supplied. A capability system that never demonstrates a successful
+    /// call has only ever been observed saying no.
+    ///
+    /// `answers` maps `interface#function` to the value the host returns, and
+    /// is the host's OWN data — the guest receives the answer, never a handle
+    /// to the store behind it.
+    ///
+    /// Returns what the exported function produced.
+    pub fn call_within(
+        bytes: &[u8],
+        contract: &crate::ComponentContract,
+        granted: &crate::Granted,
+        limits: &crate::Limits,
+        answers: &std::collections::BTreeMap<String, String>,
+        export: &str,
+        args: &[wasmtime::component::Val],
+    ) -> Result<Vec<wasmtime::component::Val>, String> {
+        use wasmtime::component::{Component, Linker, Val};
+        use wasmtime::{Config, Engine, Store};
+
+        let mut config = Config::new();
+        config.wasm_component_model(true);
+        config.consume_fuel(limits.fuel.is_some());
+        let engine = Engine::new(&config).map_err(|e| e.to_string())?;
+        let component = Component::new(&engine, bytes).map_err(|e| e.to_string())?;
+
+        let mut linker: Linker<crate::Meter> = Linker::new(&engine);
+        let supplied = crate::linkable(contract, granted);
+        let functions = imported_functions(&engine, &component);
+        let wanted: BTreeSet<&str> = supplied.iter().map(String::as_str).collect();
+
+        for (interface, funcs) in &functions {
+            let here: Vec<&String> = funcs
+                .iter()
+                .filter(|f| wanted.contains(format!("{interface}#{f}").as_str()))
+                .collect();
+            if here.is_empty() {
+                continue;
+            }
+            let mut instance = linker
+                .instance(interface)
+                .map_err(|e| format!("{interface}: {e}"))?;
+            for func in here {
+                let key = format!("{interface}#{func}");
+                let answer = answers.get(&key).cloned();
+                instance
+                    .func_new(func, move |_, _ty, args, results| {
+                        // The host's own value, keyed by what the GUEST asked
+                        // for. It never receives the map, only the answer —
+                        // `Handle`'s whole point, at the call itself.
+                        let asked = match args.first() {
+                            Some(Val::String(s)) => s.clone(),
+                            _ => String::new(),
+                        };
+                        if let Some(slot) = results.first_mut() {
+                            *slot = match &answer {
+                                Some(v) => Val::Option(Some(Box::new(Val::Record(vec![
+                                    ("id".to_string(), Val::String(asked)),
+                                    ("name".to_string(), Val::String(v.clone())),
+                                ])))),
+                                None => Val::Option(None),
+                            };
+                        }
+                        Ok(())
+                    })
+                    .map_err(|e| format!("{key}: {e}"))?;
+            }
+        }
+
+        let mut store = Store::new(&engine, crate::Meter::from(limits));
+        store.limiter(|m| &mut m.limits);
+        if let Some(fuel) = limits.fuel {
+            store.set_fuel(fuel).map_err(|e| e.to_string())?;
+        }
+        let instance = linker
+            .instantiate(&mut store, &component)
+            .map_err(|e| e.to_string())?;
+
+        let func = instance
+            .get_func(&mut store, export)
+            .ok_or_else(|| format!("no export `{export}`"))?;
+        // One result slot. The spike's `lookup` returns a string, and a
+        // component's result arity is part of its type — a caller guessing it
+        // would be reimplementing the type check the engine already does, and
+        // an arity mismatch is reported by `call` in the engine's own words.
+        let mut results = vec![Val::Bool(false)];
+        func.call(&mut store, args, &mut results)
+            .map_err(|e| e.to_string())?;
+        Ok(results)
+    }
+
+    /// Each imported interface's FUNCTION exports, read from the component.
+    ///
+    /// One reader, used by both `instantiate_within` and `call_within`: what an
+    /// interface exports is the artifact's answer, and asking it twice in two
+    /// ways is how the linker and the caller would come to disagree.
+    fn imported_functions(
+        engine: &wasmtime::Engine,
+        component: &wasmtime::component::Component,
+    ) -> BTreeMap<String, Vec<String>> {
+        let ty = component.component_type();
+        let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (name, item) in ty.imports(engine) {
+            let ComponentItem::ComponentInstance(instance) = item.ty else {
+                continue;
+            };
+            for (func, kind) in instance.exports(engine) {
+                if matches!(kind.ty, ComponentItem::ComponentFunc(_)) {
+                    out.entry(name.to_string())
+                        .or_default()
+                        .push(func.to_string());
+                }
+            }
+        }
+        out
+    }
+
     /// **[`instantiate`], within a declared budget.**
     ///
     /// E8 gate item: *"fuel and memory limits per instance, driven by policy
@@ -828,9 +958,6 @@ pub mod engine {
         granted: &crate::Granted,
         limits: &crate::Limits,
     ) -> Result<Instantiated, String> {
-        use std::collections::{BTreeMap, BTreeSet};
-
-        use wasmtime::component::types::ComponentItem;
         use wasmtime::component::{Component, Linker};
         use wasmtime::{Config, Engine, Store};
 

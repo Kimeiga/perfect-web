@@ -402,3 +402,99 @@ fn a_memory_ceiling_denies_growth_rather_than_aborting() {
     pw_host::engine::instantiate_within(&bytes, &c, &granted, &roomy)
         .expect("64 MiB is enough for the minimal guest");
 }
+
+// --- the positive control: authority USED, not only refused ------------------
+
+/// **A granted component calls the host interface it was permitted, and gets
+/// the host's answer.**
+///
+/// Architect ruling, 2026-08-08:
+///
+/// > If you don't yet have a positive guest that actually exercises one granted
+/// > host interface, I would add that as the last E8 control. A tiny
+/// > handwritten Rust/WIT fixture is appropriate because it's testing the host,
+/// > not pretending to be the Pleris backend.
+///
+/// The spike's minimal guest is exactly that fixture: its WIT world declares
+/// one import, its `lookup` calls `stores::read`, and it returns a string
+/// derived from what came back. Everything else in E8 shows authority being
+/// refused or linked; this shows it being **used**, and a capability system
+/// that has only ever been observed saying no has not been observed working.
+#[test]
+fn a_granted_guest_calls_the_host_and_receives_its_answer() {
+    use wasmtime::component::Val;
+
+    let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
+    let bytes = std::fs::read(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}\nrun `just spike-wasmtime` first", path.display()));
+    let actual = imports(path);
+    let allowed: Vec<Import> = actual
+        .iter()
+        .map(|i| {
+            let (interface, name) = i.split_once('#').unwrap_or((i.as_str(), "use"));
+            Import {
+                interface: interface.to_string(),
+                name: name.to_string(),
+                capability: "store.read".into(),
+                kind: ImportKind::HostCapability,
+            }
+        })
+        .collect();
+    let c = contract(allowed);
+    let admission = admit(&c, &topology(), "origin-1", &actual);
+    let granted = Granted::from(&admission, &BTreeMap::new()).expect("admitted");
+
+    // The host's own data, behind the capability. The guest never receives the
+    // map — only the answer to the call it made.
+    let read = actual
+        .iter()
+        .find(|i| i.ends_with("#read"))
+        .expect("the guest imports `read`")
+        .clone();
+    let answers = BTreeMap::from([(read, "Corner Store".to_string())]);
+
+    let out = pw_host::engine::call_within(
+        &bytes,
+        &c,
+        &granted,
+        &Limits {
+            fuel: Some(50_000_000),
+            memory_bytes: Some(64 * 1024 * 1024),
+            table_elements: Some(10_000),
+        },
+        &answers,
+        "lookup",
+        &[Val::String("store_47".into())],
+    )
+    .unwrap_or_else(|e| panic!("a granted guest must be able to call: {e}"));
+
+    let Some(Val::String(s)) = out.first() else {
+        panic!("expected a string, got {out:?}");
+    };
+    println!("the guest returned: {s}");
+    assert_eq!(
+        s, "found:store_47:Corner Store",
+        "the value came THROUGH the host: the id is the guest's argument and \
+         the name is the host's data"
+    );
+
+    // **The same call, ungranted.** Nothing is linked, so the guest cannot be
+    // instantiated to make it — the capability is what made the call possible,
+    // not the code being present.
+    let mut ungranted = c.clone();
+    ungranted.required_capabilities.clear();
+    let admission = admit(&ungranted, &topology(), "origin-1", &actual);
+    let granted = Granted::from(&admission, &BTreeMap::new()).expect("placement admits it");
+    let err = pw_host::engine::call_within(
+        &bytes,
+        &ungranted,
+        &granted,
+        &Limits::unbounded(),
+        &answers,
+        "lookup",
+        &[Val::String("store_47".into())],
+    )
+    .expect_err("an ungranted guest cannot call what it was not linked");
+    println!("ungranted call refused: {err}");
+    assert!(err.contains("perfect-web:store/stores"), "{err}");
+}

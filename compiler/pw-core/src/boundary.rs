@@ -221,31 +221,54 @@ pub struct TransferProfile {
     pub produced_scope: Option<Restriction>,
 }
 
-/// Which boundary, and what a value carries across it.
+/// Which boundary, what a value carries across it, and what the far side may
+/// hold.
 #[derive(Debug, Clone)]
 pub struct BoundaryContext {
     pub boundary: Boundary,
     pub direction: Direction,
-    /// The label of THIS value, from the dataflow that produced it. Unioned
+    /// The label of THIS value, from the dataflow that produced it. Joined
     /// with the profile's `produced_scope` by [`can_cross`]: neither subsumes
     /// the other, and using only the first silently stopped catching R-030.
     pub label: Label,
+    /// **What the destination is permitted to hold.**
+    ///
+    /// Architect ruling, 2026-08-08, correcting this module's first version:
+    ///
+    /// > A resume manifest *does* have a privacy destination: the privacy
+    /// > scope/partition of the document or resumable region containing it.
+    /// > […] We explicitly wanted private resumable regions to be possible.
+    /// > Otherwise any session-private UI state becomes inherently
+    /// > non-resumable.
+    ///
+    /// and, for the other boundary:
+    ///
+    /// > World alone is not enough to establish privacy. Both `Session<A>` and
+    /// > `Session<B>` may be permitted to exist in `Browser`, `Edge` or
+    /// > `Origin`. But `Session<A> → Session<B>` must still be forbidden.
+    ///
+    /// `None` is *the destination scope cannot be established*, which is
+    /// [`Blocked::UnknownDestination`] for anything restricted — blocked, not
+    /// assumed valid. A public value still crosses, because it flows anywhere.
+    pub destination: Option<Label>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Boundary {
-    /// Serialized into the resume manifest, which ships with the document.
+    /// Serialized into a resume manifest, which ships with its document.
     ///
-    /// There is no "where" to check: the manifest inherits the document's
-    /// cacheability, so a private value in it is served to whoever the shell is
-    /// served to. Charter §8.5, §7.8.
-    ResumeCapture,
+    /// The destination is that document's — or that resumable region's —
+    /// privacy scope. Charter §8.5, §7.8: the manifest inherits the document's
+    /// cacheability, so a value in it may be exactly as private as the document
+    /// is and no more.
+    Resume,
     /// Passed across a call between two separately placed components.
     ///
-    /// Privacy is NOT decided here. Whether a session value may cross from one
-    /// node to another is a question about those nodes, which `World::may_hold`
-    /// and the deployment's topology answer — and answering it a second time
-    /// from the type would be the duplication this module exists to prevent.
+    /// The destination is the far end's scope, which the compiler generally
+    /// cannot know: `binding.rs` analyses a signature at build time and a
+    /// deployment is not in evidence. So a restricted type on an edge comes
+    /// back undetermined rather than transferable, and a host that can
+    /// establish the far side may narrow it.
     RemoteCall,
 }
 
@@ -285,15 +308,32 @@ pub enum Violation {
 pub enum Blocked {
     /// No determinable type, so no schema, so no decision.
     UndeterminedSchema,
+    /// The value is restricted and the destination's scope is not known.
+    ///
+    /// **Not a yes.** Architect ruling, 2026-08-08: *"If the planner cannot
+    /// establish the destination privacy scope, the transfer should be
+    /// Blocked, not assumed valid."*
+    UnknownDestination { carries: Vec<Restriction> },
 }
 
 /// **The one decision procedure, and the two policies over it.**
 ///
-/// The shared facts — resource, undetermined schema — decide the same way at
-/// every boundary, because they are properties of the value rather than of the
-/// crossing. Privacy is where the policies differ, and the difference is
-/// principled: the resume manifest has no destination to check against, and a
-/// remote call has one that something else already checks.
+/// Every fact decides the same way at both boundaries — **including privacy**,
+/// which is the correction of 2026-08-08. What differs between the policies is
+/// what each KNOWS about the destination, not what the rule is:
+///
+/// ```text
+/// resume      the document's or region's scope, which the compiler HAS
+/// remote      the far node's scope, which a build generally does NOT
+/// ```
+///
+/// so a session value may enter a session-scoped manifest and may not enter a
+/// public one, and a session value on a remote edge is undetermined until
+/// something can say where it lands.
+///
+/// The first version of this module said the resume manifest "has no
+/// destination to check". That was too strong and contradicted E7V: it would
+/// have made any session-private UI state inherently non-resumable.
 pub fn can_cross(profile: &TransferProfile, ctx: &BoundaryContext) -> Crossing {
     // Order matters, and this order is the existing behaviour: a resource is
     // reported as a resource even where it is also private, because the repair
@@ -311,25 +351,45 @@ pub fn can_cross(profile: &TransferProfile, ctx: &BoundaryContext) -> Crossing {
         });
     }
 
-    match ctx.boundary {
-        Boundary::ResumeCapture => {
-            // Two sources, unioned. The LABEL covers a value that says so in
-            // its own type (`Secret<Payments>`) and everything the dataflow
-            // carries it through. `produced_scope` covers a type that is
-            // private because of the declaration that produces it. Neither
-            // subsumes the other, and using only the first silently stopped
-            // catching R-030.
-            let by_label = ctx.label.restrictions().next().cloned();
-            match by_label.or_else(|| profile.produced_scope.clone()) {
-                Some(restriction) => Crossing::Violation(Violation::Private { restriction }),
-                None => Crossing::Proven,
-            }
-        }
-        // Recorded, not judged. Whether a restricted value may move between
-        // two nodes depends on which nodes, and `World::may_hold` plus the
-        // deployment's topology is where that is decided. A second answer here
-        // would be the pattern this module exists to delete.
-        Boundary::RemoteCall => Crossing::Proven,
+    // **Two sources, JOINED.** The LABEL covers a value that says so in its own
+    // type (`Secret<Payments>`) and everything the dataflow carries it through.
+    // `produced_scope` covers a type that is private because of the declaration
+    // that produces it — `Cart` is an ordinary record and is session-scoped
+    // because only a `session query` makes one. Neither subsumes the other, and
+    // using only the first silently stopped catching R-030.
+    //
+    // Joined rather than "whichever is present", which is what this did: a
+    // value carrying `Secret<Payments>` by label AND a session scope by
+    // producer reported one of them and let the other travel unexamined.
+    let carried = match &profile.produced_scope {
+        Some(r) => ctx.label.join(&Label::of(r.clone())),
+        None => ctx.label.clone(),
+    };
+    if carried.is_public() {
+        // Flows anywhere, including into a destination nobody established.
+        return Crossing::Proven;
+    }
+
+    // **One flow relation — `Label::flows_into` — and not a second one written
+    // here.** `Public → Session<A>` and `Session<A> → Session<A>` pass;
+    // `Session<A> → Public` and `Session<A> → Session<B>` do not. A privacy
+    // rule reimplemented per boundary is how two boundaries come to disagree
+    // about what a session is.
+    match &ctx.destination {
+        Some(dest) if carried.flows_into(dest) => Crossing::Proven,
+        Some(dest) => Crossing::Violation(Violation::Private {
+            // The first restriction the destination does not carry.
+            // `Label::violations` is the existing answer to "why did this flow
+            // fail", so the diagnostic names what the reader has to change.
+            restriction: carried
+                .violations(dest)
+                .into_iter()
+                .next()
+                .expect("a failed flow has at least one violation"),
+        }),
+        None => Crossing::Blocked(Blocked::UnknownDestination {
+            carries: carried.restrictions().cloned().collect(),
+        }),
     }
 }
 
@@ -345,11 +405,12 @@ mod tests {
         }
     }
 
-    fn ctx(boundary: Boundary, label: Label) -> BoundaryContext {
+    fn ctx(boundary: Boundary, label: Label, destination: Option<Label>) -> BoundaryContext {
         BoundaryContext {
             boundary,
             direction: Direction::Outbound,
             label,
+            destination,
         }
     }
 
@@ -363,10 +424,10 @@ mod tests {
             resource: Some("db.begin".into()),
             ..named("OpenTransaction")
         };
-        for boundary in [Boundary::ResumeCapture, Boundary::RemoteCall] {
+        for boundary in [Boundary::Resume, Boundary::RemoteCall] {
             assert!(
                 matches!(
-                    can_cross(&p, &ctx(boundary, Label::public())),
+                    can_cross(&p, &ctx(boundary, Label::public(), Some(Label::public()))),
                     Crossing::Violation(Violation::Resource { .. })
                 ),
                 "{boundary:?}"
@@ -374,22 +435,133 @@ mod tests {
         }
     }
 
-    #[test]
-    fn privacy_is_where_the_two_policies_differ() {
-        // The reason there is one analysis and two policies rather than one of
-        // either. A session value may not enter the resume manifest, because
-        // the manifest ships with the document and there is no destination to
-        // check. It may cross a remote call, because there IS a destination and
-        // `World::may_hold` decides against it.
-        let p = named("Cart");
-        let session = Label::session("SessionId");
+    // --- the four discriminating rows -------------------------------------
+    //
+    // Architect ruling, 2026-08-08. The first version of this module said the
+    // resume manifest "has no destination to check", which made any
+    // session-private UI state inherently non-resumable and contradicted E7V.
+    // These four say what the rule actually is, and the two positive controls
+    // below keep them from passing for a rule that refuses everything.
 
+    #[test]
+    fn resume_session_a_into_session_a_is_allowed() {
+        // A private resumable region. THIS is what the correction restored.
+        assert_eq!(
+            can_cross(
+                &named("Cart"),
+                &ctx(
+                    Boundary::Resume,
+                    Label::session("SessionId"),
+                    Some(Label::session("SessionId")),
+                ),
+            ),
+            Crossing::Proven
+        );
+    }
+
+    #[test]
+    fn resume_session_a_into_public_is_refused() {
+        // R-030's case, and still caught: a manifest that ships with the shared
+        // shell is served to whoever the shell is served to.
         assert!(matches!(
-            can_cross(&p, &ctx(Boundary::ResumeCapture, session.clone())),
+            can_cross(
+                &named("Cart"),
+                &ctx(
+                    Boundary::Resume,
+                    Label::session("SessionId"),
+                    Some(Label::public()),
+                ),
+            ),
+            Crossing::Violation(Violation::Private {
+                restriction: Restriction::Session(_)
+            })
+        ));
+    }
+
+    #[test]
+    fn remote_session_a_into_session_a_is_allowed() {
+        // The same relation at the other boundary. One `flows_into`, not two.
+        assert_eq!(
+            can_cross(
+                &named("Cart"),
+                &ctx(
+                    Boundary::RemoteCall,
+                    Label::session("SessionId"),
+                    Some(Label::session("SessionId")),
+                ),
+            ),
+            Crossing::Proven
+        );
+    }
+
+    #[test]
+    fn remote_session_a_into_session_b_is_refused() {
+        // **The case `World` cannot see.** Both sessions may exist at the
+        // origin, so a rule reading only placement calls this fine.
+        assert!(matches!(
+            can_cross(
+                &named("Cart"),
+                &ctx(
+                    Boundary::RemoteCall,
+                    Label::session("A"),
+                    Some(Label::session("B")),
+                ),
+            ),
             Crossing::Violation(Violation::Private { .. })
         ));
+    }
+
+    #[test]
+    fn public_flows_into_a_restricted_destination_at_both_boundaries() {
+        // The positive control. Without it the four rows above pass for a rule
+        // that refuses every crossing into a scope, which would make a private
+        // page unable to hold a public value.
+        for boundary in [Boundary::Resume, Boundary::RemoteCall] {
+            assert_eq!(
+                can_cross(
+                    &named("Store"),
+                    &ctx(boundary, Label::public(), Some(Label::session("SessionId"))),
+                ),
+                Crossing::Proven,
+                "{boundary:?}"
+            );
+            // ...and into a public one, which is the ordinary case.
+            assert_eq!(
+                can_cross(
+                    &named("Store"),
+                    &ctx(boundary, Label::public(), Some(Label::public())),
+                ),
+                Crossing::Proven,
+                "{boundary:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unknown_destination_blocks_a_restricted_value_and_not_a_public_one() {
+        // Architect ruling: *"If the planner cannot establish the destination
+        // privacy scope, the transfer should be Blocked, not assumed valid."*
+        //
+        // A public value is not blocked, because it flows anywhere including
+        // into a destination nobody has established. Without that half, every
+        // build-time edge in the program would be undetermined and the answer
+        // would carry no information.
+        let restricted = can_cross(
+            &named("Cart"),
+            &ctx(Boundary::RemoteCall, Label::session("SessionId"), None),
+        );
+        assert!(
+            matches!(
+                restricted,
+                Crossing::Blocked(Blocked::UnknownDestination { .. })
+            ),
+            "{restricted:?}"
+        );
         assert_eq!(
-            can_cross(&p, &ctx(Boundary::RemoteCall, session)),
+            can_cross(
+                &named("Store"),
+                &ctx(Boundary::RemoteCall, Label::public(), None)
+            ),
             Crossing::Proven
         );
     }
@@ -404,7 +576,10 @@ mod tests {
             ..named("Cart")
         };
         assert!(matches!(
-            can_cross(&p, &ctx(Boundary::ResumeCapture, Label::public())),
+            can_cross(
+                &p,
+                &ctx(Boundary::Resume, Label::public(), Some(Label::public()))
+            ),
             Crossing::Violation(Violation::Private { .. })
         ));
         // ...and the discriminating half: the same record with no scoped
@@ -413,7 +588,45 @@ mod tests {
         assert_eq!(
             can_cross(
                 &named("Cart"),
-                &ctx(Boundary::ResumeCapture, Label::public())
+                &ctx(Boundary::Resume, Label::public(), Some(Label::public()))
+            ),
+            Crossing::Proven
+        );
+    }
+
+    #[test]
+    fn the_label_and_the_producer_scope_are_joined_rather_than_chosen() {
+        // A value that is `Secret<Payments>` by label AND session-scoped by
+        // producer carries both. This took whichever was present and let the
+        // other travel unexamined — so a destination admitting the session but
+        // not the secret would have accepted it.
+        let p = TransferProfile {
+            produced_scope: Some(Restriction::Session("SessionId".into())),
+            ..named("Receipt")
+        };
+        let session_only = Label::session("SessionId");
+        assert!(
+            matches!(
+                can_cross(
+                    &p,
+                    &ctx(
+                        Boundary::Resume,
+                        Label::secret("Payments"),
+                        Some(session_only)
+                    ),
+                ),
+                Crossing::Violation(Violation::Private {
+                    restriction: Restriction::Secret(_)
+                })
+            ),
+            "the secret is not carried by the destination"
+        );
+        // Both carried: it crosses.
+        let both = Label::secret("Payments").join(&Label::session("SessionId"));
+        assert_eq!(
+            can_cross(
+                &p,
+                &ctx(Boundary::Resume, Label::secret("Payments"), Some(both))
             ),
             Crossing::Proven
         );
@@ -430,9 +643,9 @@ mod tests {
             resource: None,
             produced_scope: None,
         };
-        for boundary in [Boundary::ResumeCapture, Boundary::RemoteCall] {
+        for boundary in [Boundary::Resume, Boundary::RemoteCall] {
             assert_eq!(
-                can_cross(&p, &ctx(boundary, Label::public())),
+                can_cross(&p, &ctx(boundary, Label::public(), Some(Label::public()))),
                 Crossing::Blocked(Blocked::UndeterminedSchema)
             );
         }
@@ -451,7 +664,11 @@ mod tests {
         assert!(matches!(
             can_cross(
                 &p,
-                &ctx(Boundary::ResumeCapture, Label::session("SessionId"))
+                &ctx(
+                    Boundary::Resume,
+                    Label::session("SessionId"),
+                    Some(Label::public())
+                )
             ),
             Crossing::Violation(Violation::Resource { .. })
         ));

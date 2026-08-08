@@ -18,7 +18,14 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "undetermined",
+            "positions": [
+              {
+                "position": "result",
+                "ty": "Cart",
+                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+              }
+            ]
           }
         }
       }
@@ -128,7 +135,14 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "undetermined",
+            "positions": [
+              {
+                "position": "result",
+                "ty": "Cart",
+                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+              }
+            ]
           }
         }
       }
@@ -284,7 +298,14 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "undetermined",
+            "positions": [
+              {
+                "position": "result",
+                "ty": "Cart",
+                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+              }
+            ]
           }
         }
       }
@@ -319,7 +340,14 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "undetermined",
+            "positions": [
+              {
+                "position": "result",
+                "ty": "Cart",
+                "reason": "it carries Session<SessionId> and this build cannot establish the destination's privacy scope"
+              }
+            ]
           }
         }
       }

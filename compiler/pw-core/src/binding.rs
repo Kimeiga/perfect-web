@@ -192,9 +192,23 @@ impl From<&Signature> for Interface {
 ///
 /// The label passed for each position is `Public`: an interface says what TYPES
 /// cross, and which values flow through it is the caller's dataflow, not the
-/// edge's. Privacy at a remote boundary is decided by the two ends' placement
-/// anyway — `Boundary::RemoteCall` records it rather than judging it — so
-/// there is nothing here for a label to change.
+/// edge's. A type's own scope still counts — `TransferProfile::produced_scope`
+/// carries it — so `Cart` is session-scoped here even though no particular
+/// value is in evidence.
+///
+/// **The destination is `None`, and that is the point.** Architect ruling,
+/// 2026-08-08:
+///
+/// > World alone is not enough to establish privacy. Both `Session<A>` and
+/// > `Session<B>` may be permitted to exist in `Browser`, `Edge` or `Origin`.
+/// > But `Session<A> → Session<B>` must still be forbidden. […] If the planner
+/// > cannot establish the destination privacy scope, the transfer should be
+/// > Blocked, not assumed valid.
+///
+/// A build has no deployment in evidence, so it cannot say where a remote edge
+/// lands. A signature carrying a restricted type therefore comes back
+/// [`RemoteSupport::Undetermined`] rather than `Transferable` — the honest
+/// answer, and one a host that CAN establish the far side may narrow.
 pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
     let mut refused: Vec<Untransferable> = Vec::new();
     let mut undetermined: Vec<Untransferable> = Vec::new();
@@ -207,6 +221,8 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
                 boundary: Boundary::RemoteCall,
                 direction,
                 label: Label::public(),
+                // Unknowable at build time. See the doc comment above.
+                destination: None,
             },
         );
         match verdict {
@@ -235,6 +251,24 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
                              wire schema"
                     .to_string(),
             }),
+            // Restricted, and a build cannot say where the far end is. Not a
+            // refusal — the edge may be perfectly fine between two nodes of one
+            // scope — and not a yes, which is what assuming would make it.
+            Crossing::Blocked(Blocked::UnknownDestination { carries }) => {
+                undetermined.push(Untransferable {
+                    position,
+                    ty: ty.map(str::to_string),
+                    reason: format!(
+                        "it carries {} and this build cannot establish the \
+                         destination's privacy scope",
+                        carries
+                            .iter()
+                            .map(|r| r.to_string())
+                            .collect::<Vec<_>>()
+                            .join(" and ")
+                    ),
+                })
+            }
         }
     };
 
@@ -405,13 +439,29 @@ page Landing(id: StoreId) {
     }
 
     #[test]
-    fn a_session_scoped_type_is_still_remotable() {
-        // **The two policies differing, at the point where they differ.**
-        // `Cart` may not enter a resume manifest — R-030 — and may perfectly
-        // well cross a call between two origin nodes. Whether THOSE nodes may
-        // hold it is placement's question, and answering it here from the type
-        // would be a second answer to it.
-        assert_eq!(support_of("read_basket"), RemoteSupport::Transferable);
+    fn a_session_scoped_type_is_undetermined_rather_than_remotable() {
+        // **This asserted `Transferable` until 2026-08-08.** Architect ruling:
+        //
+        // > World alone is not enough to establish privacy. Both `Session<A>`
+        // > and `Session<B>` may be permitted to exist in `Browser`, `Edge` or
+        // > `Origin`. But `Session<A> → Session<B>` must still be forbidden.
+        // > […] If the planner cannot establish the destination privacy scope,
+        // > the transfer should be Blocked, not assumed valid.
+        //
+        // The old reasoning was that placement already decides privacy at a
+        // remote boundary. It does not: placement decides which WORLD, and two
+        // different sessions live in the same world. A build has no deployment
+        // in evidence, so the honest answer is that it cannot yet tell.
+        let support = support_of("read_basket");
+        let RemoteSupport::Undetermined { positions } = &support else {
+            panic!("{support:?}");
+        };
+        assert_eq!(positions[0].position, "result");
+        assert!(
+            positions[0].reason.contains("Session"),
+            "and it names the restriction it carries: {}",
+            positions[0].reason
+        );
     }
 
     #[test]

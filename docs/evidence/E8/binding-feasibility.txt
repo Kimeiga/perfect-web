@@ -9,47 +9,60 @@ destination to check, and a remote call has one that placement
 already checks.
 
 test boundary::tests::a_resource_cannot_cross_either_boundary ... ok
-test boundary::tests::a_scope_from_the_producer_counts_even_when_the_label_is_public ... ok
 test boundary::tests::an_undetermined_schema_is_blocked_and_not_permitted ... ok
 test boundary::tests::a_resource_is_reported_as_a_resource_even_when_it_is_also_private ... ok
-test boundary::tests::privacy_is_where_the_two_policies_differ ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 152 filtered out; finished in 0.00s
+test boundary::tests::public_flows_into_a_restricted_destination_at_both_boundaries ... ok
+test boundary::tests::remote_session_a_into_session_a_is_allowed ... ok
+test boundary::tests::resume_session_a_into_session_a_is_allowed ... ok
+test boundary::tests::an_unknown_destination_blocks_a_restricted_value_and_not_a_public_one ... ok
+test boundary::tests::remote_session_a_into_session_b_is_refused ... ok
+test boundary::tests::resume_session_a_into_public_is_refused ... ok
+test boundary::tests::a_scope_from_the_producer_counts_even_when_the_label_is_public ... ok
+test boundary::tests::the_label_and_the_producer_scope_are_joined_rather_than_chosen ... ok
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.01s
 test binding::tests::an_undetermined_position_is_neither_refused_nor_transferable ... ok
-test binding::tests::an_ordinary_query_is_remotable ... ok
-test binding::tests::a_session_scoped_type_is_still_remotable ... ok
-test binding::tests::the_error_side_is_a_position_of_its_own ... ok
 test binding::tests::local_is_always_direct_and_remote_is_not ... ok
+test binding::tests::the_error_side_is_a_position_of_its_own ... ok
 test binding::tests::a_resource_in_a_result_refuses_it_too ... ok
+test binding::tests::an_ordinary_query_is_remotable ... ok
 test binding::tests::a_resource_in_an_argument_refuses_the_edge ... ok
+test binding::tests::a_session_scoped_type_is_undetermined_rather_than_remotable ... ok
 test binding::tests::a_page_returns_nothing_and_that_is_not_undetermined ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 149 filtered out; finished in 0.01s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.01s
 test a_handler_that_captures_nothing_is_not_a_boundary_question ... ok
 test a_capture_with_no_nameable_type_is_its_own_verdict ... ok
+test a_session_scoped_region_may_resume_a_session_scoped_value ... ok
+test the_same_value_in_a_public_region_is_still_refused ... ok
+test a_privately_cached_page_is_a_private_destination_too ... ok
 test a_resource_capture_is_refused_and_a_key_capture_is_not ... ok
 test a_scoped_producer_makes_its_type_private_and_an_unscoped_one_does_not ... ok
 test the_resume_capture_verdicts_the_corpus_carries ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
 test an_edge_whose_ends_share_no_node_is_necessarily_remote ... ok
 test an_undetermined_signature_does_not_refuse_a_deployment ... ok
-test placement_and_transferability_are_independent_and_only_one_pair_fails ... ok
 test a_refused_component_carries_the_reason_from_every_node ... ok
+test every_edge_in_the_store_program_can_be_bound ... ok
+test placement_and_transferability_are_independent_and_only_one_pair_fails ... ok
 test a_topology_that_grants_nothing_cannot_host_the_privileged_components ... ok
+test the_store_program_is_deployable_on_a_topology_that_serves_it ... ok
 test an_import_naming_nothing_is_dangling_rather_than_silently_ignored ... ok
 test can_be_local_is_disjointness_of_candidate_sets ... ok
-test every_edge_in_the_store_program_can_be_bound ... ok
-test the_store_program_is_deployable_on_a_topology_that_serves_it ... ok
 test the_planner_agrees_with_admit_on_every_pair ... ok
 test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 and what the store's exports say about themselves:
 
-  Resources.Cart           Cart           local=direct   remote=transferable
+  Resources.Cart           Cart           local=direct   remote=undetermined
+      result: Cart — it carries Session<SessionId> and this build cannot establish the destination's privacy scope
   Resources.Menu           Menu           local=direct   remote=transferable
   Resources.Order          Order          local=direct   remote=transferable
   Resources.Store          Store          local=direct   remote=transferable
-  store.page.Cart          Cart           local=direct   remote=transferable
+  store.page.Cart          Cart           local=direct   remote=undetermined
+      result: Cart — it carries Session<SessionId> and this build cannot establish the destination's privacy scope
   store.page.Menu          Menu           local=direct   remote=transferable
   store.page.Store         Store          local=direct   remote=transferable
   store.page.StorePage     StorePage      local=direct   remote=transferable
-  store.page.add_to_cart   add_to_cart    local=direct   remote=transferable
-  store.page.clear_cart    clear_cart     local=direct   remote=transferable
+  store.page.add_to_cart   add_to_cart    local=direct   remote=undetermined
+      result: Cart — it carries Session<SessionId> and this build cannot establish the destination's privacy scope
+  store.page.clear_cart    clear_cart     local=direct   remote=undetermined
+      result: Cart — it carries Session<SessionId> and this build cannot establish the destination's privacy scope

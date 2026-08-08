@@ -109,6 +109,44 @@ The Safari autorun method is acceptable for the properties it can observe. It
 **68 corpus files exist and 0 of them compile.** They are a specification, not a
 demonstration. Any public wording implying otherwise is forbidden until E2.
 
+## Deferred integration obligations
+
+A gate item that cannot be met at its own milestone because its dependency
+belongs to a later one. Recorded here **and** in the later milestone's gate, so
+neither can be closed without it.
+
+Architect ruling, 2026-08-08:
+
+> Milestones should prove one layer's contract independently. Cross-layer
+> end-to-end proofs belong at the milestone where both sides of the boundary
+> actually exist.
+
+| id | obligation | deferred from | owed at | status |
+|---|---|---|---|---|
+| **E10-I** | Compile `add_to_cart` through the production Pleris→component backend and execute it through the E8 host, **with no alternate Rust closure path**. | E8 gate item 5 | **E10 gate** | **open** |
+
+**Why it was deferred, in one line:** E8 cannot honestly require an artifact
+that only E10 knows how to create, and building a temporary backend inside E8 to
+satisfy the old wording would be the duplicated mechanism this project has
+repeatedly had to delete.
+
+**What E8 proved instead**, and it is a complete claim about one layer:
+
+> Given a component contract and a Wasm component artifact, the host can
+> determine what authority it may receive, verify what the final artifact
+> actually imports, link only granted interfaces, constrain its resources, and
+> execute or refuse it accordingly.
+
+**The half that is NOT deferred and did land:** the dev server's command path
+calls `admit` before acting, so `add_to_cart` requires `database.write<Carts>`
+by its own contract and refuses on a node without it. The obligation is about
+the BODY being compiled Pleris, not about the authority decision.
+
+**Closing condition.** E10-I is met when a `.pw`-authored command runs as a
+component through `pw_host::engine::call_within` and the Rust closure path is
+deleted rather than left beside it. "Both work" is not the obligation met; it is
+the obligation avoided.
+
 ## Invalidated — claims the charter made that measurement removed
 
 | claim as originally written | what measurement showed | where |

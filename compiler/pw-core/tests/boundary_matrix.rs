@@ -267,3 +267,83 @@ page P() {
         "{found:?}"
     );
 }
+
+// --- the destination scope, corrected 2026-08-08 -----------------------------
+//
+// Architect ruling:
+//
+// > A resume manifest *does* have a privacy destination: the privacy
+// > scope/partition of the document or resumable region containing it. […] We
+// > explicitly wanted private resumable regions to be possible. Otherwise any
+// > session-private UI state becomes inherently non-resumable.
+//
+// The first version of `boundary.rs` said the manifest had no destination to
+// check, which made every session value a violation. R-030 stayed caught — for
+// a reason one step too strong.
+
+#[test]
+fn a_session_scoped_region_may_resume_a_session_scoped_value() {
+    // **The capability the correction restored, as a program.** The view is
+    // `session`, so its manifest is session-scoped, so a `Cart` may live in it.
+    // Under the old rule this was refused and session-private UI state was
+    // inherently non-resumable.
+    let accepted = codes(&program(
+        "\
+session query Basket(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+
+session view Summary(cart: Cart) !{} {
+    <button on:press={resumable(captures = { cart }) => cart.line_count}>go</button>
+}
+",
+    ));
+    assert!(
+        !accepted.contains("PW5007"),
+        "a session region may hold a session value: {accepted:?}"
+    );
+}
+
+#[test]
+fn the_same_value_in_a_public_region_is_still_refused() {
+    // R-030's shape, and the discriminating half of the test above. The only
+    // difference between the two programs is the word `session` on the view.
+    let refused = codes(&program(
+        "\
+session query Basket(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+
+view Summary(cart: Cart) !{} {
+    <button on:press={resumable(captures = { cart }) => cart.line_count}>go</button>
+}
+",
+    ));
+    assert!(refused.contains("PW5007"), "{refused:?}");
+}
+
+#[test]
+fn a_privately_cached_page_is_a_private_destination_too() {
+    // `cache private` says the document is stored per session, which is the
+    // same fact about where the manifest lands. Read from the policy rather
+    // than only from `visibility`, because a page writes one and not the other.
+    let accepted = codes(&program(
+        "\
+session query Basket(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+
+page Checkout(cart: Cart) {
+    cache private
+    view { <button on:press={resumable(captures = { cart }) => cart.line_count}>go</button> }
+}
+",
+    ));
+    assert!(!accepted.contains("PW5007"), "{accepted:?}");
+}

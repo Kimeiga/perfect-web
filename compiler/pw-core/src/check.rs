@@ -1342,7 +1342,13 @@ fn body_label(body: &Body, sigs: &Signatures) -> Label {
 /// E5 rules that need the body's label, not only the declaration header.
 /// The cache partition a declaration asks for, from either place it can be
 /// written: a `query`'s policy block, or a `page`'s body.
-fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::hir::Span)> {
+/// The cache policy a declaration names, from either place it can be written.
+///
+/// A `query` puts `cache private` in its policy block, before the brace; a
+/// `page` writes it inside its body. `pub(crate)` because `resume.rs` needs the
+/// same answer to know what scope a manifest lands in, and reading it a second
+/// way there is how the two would come to disagree about what a private page is.
+pub(crate) fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::hir::Span)> {
     if let Some(p) = decl.policy("cache") {
         return Some((p.value.trim().to_string(), p.span.clone()));
     }

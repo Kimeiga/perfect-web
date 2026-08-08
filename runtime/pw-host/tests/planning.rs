@@ -420,12 +420,44 @@ fn every_edge_in_the_store_program_can_be_bound() {
     // and the deployment would not exist.
     let p = plan(&contracts(), &full());
     assert!(p.unbindable().is_empty(), "{:?}", p.unbindable());
+    // Nothing is REFUSED: no exported signature carries a resource.
     assert!(
-        p.edges.iter().all(|e| e.can_be_remote == Some(true)),
-        "the store's exported signatures carry keys and records: {:?}",
+        p.edges.iter().all(|e| e.can_be_remote != Some(false)),
+        "{:?}",
         p.edges
             .iter()
-            .filter(|e| e.can_be_remote != Some(true))
+            .filter(|e| e.can_be_remote == Some(false))
             .collect::<Vec<_>>()
+    );
+
+    // **Some are undetermined, and that is the 2026-08-08 correction working.**
+    // `Cart` is session-scoped — only a `session query` produces one — and a
+    // build cannot say which session the far end of a remote edge belongs to.
+    // `Session<A> → Session<B>` must be forbidden and `World` cannot see the
+    // difference, so the honest answer is "not yet decidable" rather than
+    // "transferable". Before the correction every one of these said `Some(true)`.
+    let undecided: Vec<&pw_host::plan::Edge> = p
+        .edges
+        .iter()
+        .filter(|e| e.can_be_remote.is_none())
+        .collect();
+    assert!(
+        !undecided.is_empty(),
+        "the store has session-scoped exports and at least one edge reaches them"
+    );
+    assert!(
+        undecided.iter().all(|e| e
+            .untransferable
+            .iter()
+            .any(|u| u.reason.contains("Session"))),
+        "and each says which restriction it carries: {undecided:?}"
+    );
+
+    // The discriminating half: the public exports are still `Some(true)`, so
+    // "undetermined" is not the answer to everything.
+    assert!(
+        p.edges.iter().any(|e| e.can_be_remote == Some(true)),
+        "`Menu` and `Store` carry keys and public records: {:?}",
+        p.edges
     );
 }

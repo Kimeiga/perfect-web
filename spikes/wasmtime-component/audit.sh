@@ -49,7 +49,13 @@ echo "$out"
   echo "the ENGINE's, in its own words - a pre-flight check comparing lists"
   echo "would be a second implementation of instantiation's own rule:"
   echo
-  echo "$out" | grep -oE "(linked:|refused by the engine|refused for|instantiation spent).*" | sed 's/^/  /' || true
+  echo "$out" | grep -oE "(linked:|refused by the engine|refused for|instantiation spent|the guest returned|ungranted call refused).*" | sed 's/^/  /' || true
+  echo
+  echo "And the positive control the architect added on 2026-08-08: authority"
+  echo "USED, not only refused. Everything above shows the host saying no or"
+  echo "linking; the line naming the guest's return value is the host saying"
+  echo "yes and the guest receiving the answer - the id is the guest's own"
+  echo "argument, the name is the host's data."
   echo
   echo "$out" | grep -E "^test |test result:" || true
 } > "$EVIDENCE/artifact-audit.txt"

@@ -15,8 +15,10 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 A storage change is not a protocol change, and a test proves it: two storage
 representations of one identity derive the same wire id.
 
-**current milestone:** **E8 — the capability host.** E7 is complete; all ten of
-its gate items have evidence under `docs/evidence/E7/`.
+**current milestone:** **E9 — the permanent value type checker and algebraic
+effect compiler.** E8 is complete: its gate was **amended** on 2026-08-08 by
+ruling (ADR-0023) and then met. E7 is complete; all ten of its gate items have
+evidence under `docs/evidence/E7/`.
 
 **E8-0 is complete** (ADR-0020). The compiler hands the host a six-field
 `ComponentContract` — component_id, abi_schema, required_capabilities,
@@ -74,10 +76,19 @@ publish a package for the capabilities it grants.
 **Boundary transfer is one analysis with two policies.** `pw-core/boundary.rs`
 answers whether a typed value can safely cross; `resume.rs` asks it about a
 capture and `binding.rs` about an interface signature. The facts moved out of
-`resume.rs` rather than being copied — a second `is_remote_capable_type()` is
-the shape this project keeps deleting, and it would have disagreed about
-authority. `BindingSupport { local, remote }` rides on each `Export`, because
-remote capability is a property of an interface edge and not of a component.
+`resume.rs` rather than being copied.
+
+**Privacy has a destination at BOTH boundaries** (ruling, 2026-08-08, correcting
+this module's first version). A resume manifest lands in the privacy scope of
+the document or region containing it, so a `session view` may resume a
+session-scoped value and a public one may not — private resumable regions were
+inherently impossible under the first rule, which contradicted E7V. A remote
+call's destination is the far node's scope, which `World` cannot supply: both
+`Session<A>` and `Session<B>` live at the origin, and `Session<A> → Session<B>`
+must still be forbidden. A build has no deployment in evidence, so a restricted
+type on a remote edge is **undetermined rather than transferable** — four of the
+store's ten exports moved, each naming the restriction it carries. One flow
+relation, `Label::flows_into`, decides both.
 
 **Deployment planning is done.** `runtime/pw-host/src/plan.rs` reads a program's
 contracts and a deployment's topology and says which component may go where,

@@ -162,37 +162,43 @@ link.
 `spikes/wasmtime-component/host` (which already computes the actual list) and
 then into the E8 build is the remaining work.
 
-## Milestone ordering, and one place it is wrong
+## Milestone ordering, and one place it was wrong — RULED, 2026-08-08
 
-Not a defect in the code. A defect in the plan, recorded here because
-`docs/MILESTONES.md` reads as a sequence and this item cannot be done in the
-order it appears.
+Not a defect in the code. A defect in the plan, and the architect's ruling turns
+it into a charter correction rather than a workaround.
 
-**E8's fifth gate item — "run the store's `add_to_cart` as a component, so the
-dev server's command path goes through the host instead of a Rust closure" —
-needs a Pleris→Wasm-component backend.** There is none. `pw emit-koka` covers
-the pure subset and no code generator sits behind it. The backend is **E10**
-("own backends"), which is two milestones later.
-
-What has been done instead is the half that does not need one: the command path
-now calls `admit` against a declared topology before acting, so `add_to_cart`
-requires `database.write<Carts>` by its own contract and a node without it
-refuses. That is real, it is tested in both directions, and it is not the gate
-item. The BODY is still a Rust closure.
-
-Three ways out, and choosing between them is the architect's:
+**E8's fifth gate item — "run the store's `add_to_cart` as a component" — needed
+a Pleris→Wasm-component backend that only E10 knows how to build.**
 
 ```text
-1  close E8 on the four items it can meet, and move the fifth to E10
-2  hold E8 open until E10 lands, and work E9 in parallel
-3  build a minimal backend inside E8 for one command, which is E10's
-   design decision taken under a deadline
+E8 host
+    supposedly must execute Pleris-generated Wasm
+                    ↑
+E10 Pleris→Wasm backend
 ```
 
-**The charter's rule — do not start the next milestone until the current one's
-gate passes — makes this blocking rather than cosmetic.** Read strictly, E9
-cannot start. Read as intended, a gate item that depends on a later milestone
-is a sequencing mistake and not a reason to stop.
+> E8 cannot honestly require an artifact that only E10 knows how to create.
+> Building a temporary backend inside E8 would be exactly the sort of duplicated
+> mechanism this project has repeatedly had to delete.
+
+**The gate was amended, not deleted.** E8 now claims what one layer can prove on
+its own, and the end-to-end proof became **E10-I** in `docs/EVIDENCE_LEDGER.md`
+and in E10's own gate — recorded twice so neither can close without it.
+
+> Changing a gate because its dependency belongs to a later milestone is better
+> evidence discipline than building fake machinery just to make the old wording
+> green.
+
+### The charter correction
+
+> **Milestones should prove one layer's contract independently. Cross-layer
+> end-to-end proofs belong at the milestone where both sides of the boundary
+> actually exist.**
+
+The `do not start the next milestone until the gate passes` rule stands
+unchanged. What moved is the gate, and only because it was asking one milestone
+to demonstrate two layers at once.
+
 
 ## Corpus harness rules
 
