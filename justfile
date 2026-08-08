@@ -275,6 +275,32 @@ e9-latency:
 e9-parity:
     @bash scripts/e9-parity.sh
 
+# E9-K — Koka effect-oracle conformance. The gate item that REPLACED corpus
+# parity on 2026-08-08. Both halves: the four shared effect properties asserted
+# on Pleris programs, and the four recorded divergences still tested as
+# divergences.
+e9-oracle:
+    @{ echo "E9-K - Koka effect-oracle conformance"; echo; \
+       echo "produced by: just e9-oracle"; echo; \
+       echo "The Koka half is just rq-row-polymorphism, whose evidence records"; \
+       echo "OUTCOME 1: a clean pass on higher-order effect propagation, with"; \
+       echo "propagation automatic through unannotated generic helpers."; echo; \
+       echo "This is the Pleris half. Conformance is the pair."; echo; \
+       cargo test -p pw-core --test effect_oracle 2>&1 | grep -E '^(test |test result)'; \
+       echo; \
+       echo "And the divergences, which must STAY divergences:"; echo; \
+       cargo test -p pw-core --test differential_vs_koka 2>&1 | grep -E '^(test |test result)'; \
+       echo; \
+       echo "NOT CLAIMED: that ordinary Pleris programs agree with Koka. The"; \
+       echo "corpus-parity gate was retired because the common subset is empty"; \
+       echo "- see docs/evidence/E9/koka-parity.txt, which still runs and still"; \
+       echo "reports that."; \
+       echo "NOT CLAIMED: selective effect discharge. Pleris has no effect"; \
+       echo "handler, and effect_oracle.rs asserts the absence so that adding"; \
+       echo "one forces the conformance pair to be written."; \
+     } > docs/evidence/E9/effect-oracle.txt
+    @grep -E "^test result" docs/evidence/E9/effect-oracle.txt
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

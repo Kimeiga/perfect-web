@@ -1,0 +1,34 @@
+E9-K - Koka effect-oracle conformance
+
+produced by: just e9-oracle
+
+The Koka half is just rq-row-polymorphism, whose evidence records
+OUTCOME 1: a clean pass on higher-order effect propagation, with
+propagation automatic through unannotated generic helpers.
+
+This is the Pleris half. Conformance is the pair.
+
+test every_recorded_divergence_is_still_tested_as_one ... ok
+test selective_discharge_is_not_yet_a_pleris_property ... ok
+test an_empty_row_is_enforced_and_an_omitted_one_is_not_a_loophole ... ok
+test the_same_helper_with_a_pure_callback_is_clean ... ok
+test an_effect_crosses_an_unannotated_generic_helper ... ok
+test one_generic_helper_serves_two_different_effect_rows ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+And the divergences, which must STAY divergences:
+
+test option_and_list_stay_distinct_where_koka_conflates_them ... ok
+test nominal_wrappers_stay_distinct_where_koka_erases_them ... ok
+test pw_rejects_the_match_koka_accepts_under_exn ... ok
+test the_checker_can_distinguish_exhaustive_from_not ... ok
+test the_result_does_not_depend_on_any_effect_row ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+NOT CLAIMED: that ordinary Pleris programs agree with Koka. The
+corpus-parity gate was retired because the common subset is empty
+- see docs/evidence/E9/koka-parity.txt, which still runs and still
+reports that.
+NOT CLAIMED: selective effect discharge. Pleris has no effect
+handler, and effect_oracle.rs asserts the absence so that adding
+one forces the conformance pair to be written.

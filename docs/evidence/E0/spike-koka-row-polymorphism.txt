@@ -1,5 +1,5 @@
 spike: koka-row-polymorphism  (risk-retirement experiment RQ-2)
-generated: 2026-08-05T23:55:22Z
+generated: 2026-08-08T16:00:59Z
 koka: Koka 3.2.3, 01:29:29 Mar 18 2026 (ghc release version)
 host: Darwin arm64
 command: just rq-row-polymorphism

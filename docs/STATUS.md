@@ -15,38 +15,30 @@ experiments `RQ-*`. Never a bare `M`. See `docs/MILESTONES.md`.
 A storage change is not a protocol change, and a test proves it: two storage
 representations of one identity derive the same wire id.
 
-**current milestone:** **E9 — the permanent value type checker and algebraic
-effect compiler.** E8 is complete: its gate was **amended** on 2026-08-08 by
-ruling (ADR-0023) and then met.
+**current milestone:** **E10 — own backends and automatic memory strategy**, and
+it carries **E10-I**: compile `add_to_cart` through the Pleris→component backend
+and run it through the E8 host, with no alternate Rust closure path
+(`docs/EVIDENCE_LEDGER.md`).
 
-**E9's gate was measured before anything was built, and five of its six items
-are already met** — by work done incrementally across E2B, E2C, E2D and E8
-rather than by an E9 rewrite. The corpus passes 24/24 and 46/46; no crate
-depends on Koka; the fuzz corpus finds no panic in 3,600 executions.
+**E9 is complete.** Its gate was amended on 2026-08-08 by ruling — items 2 and 4
+each specified a technique where the gate wanted an outcome — and then met in
+full:
 
-Item 4 — *incremental checks fast enough for editor feedback* — is met by a
-route the charter did not assume: there is no query system, so an edit costs a
-full check, **and a full check of the 36-file store program is 37 ms**
-(`just e9-latency`). Incremental queries are an optimization here, not a gate
-requirement. The number was recorded before any query system exists, so one can
-be attributed if it is ever built.
+```text
+corpus            24/24 accepted clean, 46/46 rejected for their own invariant
+E9-K              four shared effect properties, plus four divergences kept
+no Koka           no crate depends on it; `just ci` never invokes it
+latency           37 ms cold, after an edit, and while producing a diagnostic
+fuzz              3,600 executions, 0 findings
+Koka optional     a conformance tool, not a build dependency
+```
 
-Item 2 is the real gap and is not what its name suggests. `differential_vs_koka`
-has five tests and every one asserts a DIVERGENCE — ADR-0011's findings, the
-reasons Koka is an effects-only oracle. The AGREEMENT direction is now built
-(`just e9-parity`) and **its finding is that the common subset is empty for the
-corpus**: 23 of 24 accepted fixtures emit no function body, and the one that
-does names types `emit-koka` neither emits nor imports. Both controls fire, so
-the harness works — what it measures is a bridge that reaches one hand-curated
-file. Whether to widen the bridge, grow a subset corpus, or retire the item
-against ADR-0011 and ADR-0015 is a question for the architect, in
-`docs/NEXT.md`.
+E9 was largely completed by work pulled forward into E2B, E2C, E2D and E8 rather
+than by a rewrite. That is allowed: a milestone is a gate, not a schedule, and
+rewriting working machinery to match the original ordering would have been the
+opposite of evidence.
 
-The harness found three defects on its first run, all invisible while the oracle
-pointed only at the file written for it. Two are fixed — a type's arguments were
-dropped (`List<CartLine>` → `list`, the third instance of that shape found in
-one day) and `USD` mangled to `u_s_d`. The third, single-module lowering, is
-recorded rather than fixed.
+**E8 is complete**, gate amended 2026-08-08 (ADR-0023).
 
 **E8-0 is complete** (ADR-0020). The compiler hands the host a six-field
 `ComponentContract` — component_id, abi_schema, required_capabilities,
