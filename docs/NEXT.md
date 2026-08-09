@@ -4,6 +4,63 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ---
 
+## Now: E10-A — the first backend slice
+
+Architect ruling, 2026-08-09: **narrow application surface, general backend
+spine.** Compile one real command end-to-end, and build no stage around it.
+
+```text
+checked Pleris HIR
+      ↓
+Backend IR                 DONE — backend/ir.rs
+      ↓
+Wasm core module           NEXT — wasm-encoder, lowering owned here
+      ↓
+ComponentContract + WIT    done (E8)
+      ↓
+Wasm Component
+      ↓
+E8 host                    done
+      ↓
+add_to_cart actually runs  E10-I
+```
+
+**The IR and the HIR→IR lowering are done.** Nothing in either is named: a call
+is a `DefId`, a type is a `DefId`, a host call is the CONTRACT's `CapabilityId`.
+`the_backend_never_decides_from_a_name` is the structural guard.
+`Lowering = Lowered | Unsupported | Blocked` is the ruling's poison discipline —
+`nothing_lowers_silently` is what says an unknown construct cannot become an
+empty instruction list.
+
+### The finding that stopped `add_to_cart`
+
+`examples/store/app.pw` calls `current_session()` and **never imports it**, and
+`pw check` reports nothing — `unresolved_uses` only examines dotted paths whose
+head looks like a module. The backend was the first consumer for which the
+absence is fatal rather than quiet.
+
+**The repair is not applied**, because it is bigger than it looks: with the
+import, `StorePage` requires `session.read` **to render**, which invalidates a
+documented E8 claim. `docs/RISK_QUEUE.md` carries the three questions.
+`add_to_cart_is_blocked_by_an_unresolved_call_in_the_demo` asserts today's state
+and will fail when the demo is repaired, which is the point.
+`a_command_that_imports_what_it_calls_lowers_to_a_host_call` is the proof the
+backend itself works: same shape, nothing missing, one `HostCall` named by the
+contract's capability.
+
+### Next, in order
+
+```text
+1  Wasm encoding of the IR — wasm-encoder, ours to lower
+2  E10-A invocation-region memory (NOT the final memory model)
+3  E10-I, with the ruling's controls, including the structural test
+   that the Rust closure path is GONE
+4  broaden from evidence: Store query, then a pure helper, then a
+   command with branching
+```
+
+---
+
 ## Now: E9 — the permanent value type checker and effect compiler
 
 E8 closed 2026-08-08 with its gate amended by ruling (ADR-0023). E9's gate,

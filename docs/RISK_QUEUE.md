@@ -200,6 +200,70 @@ unchanged. What moved is the gate, and only because it was asking one milestone
 to demonstrate two layers at once.
 
 
+## A bare call to nothing checks clean
+
+Found by the E10-A backend on its first run against the store demo, 2026-08-09.
+
+`examples/store/app.pw` calls `current_session()` and **never imported it.**
+`pw check` reported nothing, `just ci` was green, and the corpus had been in
+that state since E4.
+
+```text
+unresolved_uses    checks a DOTTED path whose head looks like a module
+a bare name        not checked at all
+```
+
+Assumption A-009 says Term names are not ambient — only the Effect namespace is,
+through the platform's `prelude Effect`. So `current_session()` resolved to
+nothing, and nothing said so.
+
+**Why the backend found it and the checker did not:** every analysis upstream
+can produce an answer for a call it cannot resolve — inference contributes no
+effects, privacy contributes no label, placement contributes no constraint — and
+each of those looks exactly like "this call is harmless". A backend cannot emit
+a call to nothing, so it is the first consumer for which the absence is fatal
+rather than merely quiet.
+
+**The import is NOT yet added, and the reason is the finding's real size.**
+Adding `import context.{ current_session }` makes the call resolve — and then
+`StorePage` requires `session.read` **to render**, because it calls
+`current_session()` while building its query key. That invalidates a documented
+E8 claim:
+
+```text
+docs/evidence/E8/component-contracts.txt
+  "Note StorePage: rendering needs no authority and runs anywhere."
+
+runtime/pw-host/tests/contract_mirror.rs
+  the_store_page_renders_without_authority_and_its_command_does_not
+```
+
+Both were TRUE only because the call resolved to nothing. The page does read the
+session while rendering; nothing was measuring it. The knock-on set is at least:
+the committed contracts, the generated WIT and its host fixture, the dev
+server's topology, three `contract_mirror` tests, and the E8 evidence text.
+
+So this is a semantic movement in what the compiler tells the host, not a
+one-line repair, and it is left applied nowhere rather than applied halfway.
+The backend lowering that found it is committed and refuses `add_to_cart` with
+`current_session` unresolved — which is the honest state.
+
+Three questions, and they are the architect's:
+
+```text
+1  is a bare call to an unresolved name an error? (widening `unresolved_uses`
+   may reject corpus files, which is a corpus-version decision)
+2  is "StorePage renders without authority" a claim to correct, or does
+   reading a session key at render time belong somewhere else in the page?
+3  does E8's evidence get regenerated under the corrected program, or does
+   the correction wait for a corpus version?
+```
+
+The shape is the one this file exists for. It is not a wrong answer from a
+wrong mechanism — it is **no question asked at all**, which is the failure mode
+that survives longest, because every test that could have caught it was passing
+for the reason it was designed to.
+
 ## Corpus harness rules
 
 Architect ruling: rejection is insufficient; a program must be rejected **for
