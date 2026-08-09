@@ -248,6 +248,38 @@ one-line repair, and it is left applied nowhere rather than applied halfway.
 The backend lowering that found it is committed and refuses `add_to_cart` with
 `current_session` unresolved — which is the honest state.
 
+### Step 1 was written, validated, and reverted — its SCOPE is the work
+
+`PW0024` (a bare call to an unresolved name is an error) was implemented and
+run. It found `current_session` and nothing else in the store demo, which is
+exactly right.
+
+Against the **accepted corpus** it reported 16 errors over 12 names, and almost
+all of them are the rule being too broad rather than defects:
+
+```text
+release(handle) { .. }        a resource declaration's release CLAUSE
+translate(x, y) / scale(1.0)  CSS transform functions in a style value
+repeat(..)                    CSS grid
+for                           a keyword
+```
+
+These are call-SHAPED syntax, not term calls. The rule needs to run on
+expression-position calls only, and distinguishing those from the constructs
+above is the actual work — it is the same failure the rule itself catches, one
+level up: the right question asked in the wrong place.
+
+Two scoping fixes were already needed and found the same way. A bare call must
+be checked against **both** namespaces, because `Session("")` is a call-shaped
+constructor of an opaque type; checking only `Term` reported every constructor
+in the platform. And `todo`, `resumable`, `query`, `Some`/`None`/`Ok`/`Err` are
+language-supplied and need an explicit list.
+
+So the rule is right and its implementation is not finished. Reverted rather
+than landed over-broad or weakened to fit — weakening it is what the ruling
+forbids, and landing it over-broad is how a real rule gets reverted by somebody
+else later.
+
 Three questions, and they are the architect's:
 
 ```text
