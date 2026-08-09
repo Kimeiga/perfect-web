@@ -264,10 +264,39 @@ repeat(..)                    CSS grid
 for                           a keyword
 ```
 
-These are call-SHAPED syntax, not term calls. The rule needs to run on
-expression-position calls only, and distinguishing those from the constructs
-above is the actual work — it is the same failure the rule itself catches, one
-level up: the right question asked in the wrong place.
+These are call-SHAPED syntax, not term calls. It is the same failure the rule
+itself catches, one level up: the right question asked in the wrong place.
+
+**Scoped from the grammar's own table, the count goes 16 → 11.** Excluding
+`pw_syntax::grammar::POLICY_KEYWORDS` removes `release`, `acquire` and `draw` —
+read from the grammar rather than from a list written in `check.rs`, which is
+`one_parser.rs`'s discipline applied to a checker.
+
+The remaining eleven split into two clean classes, and only one is a false
+positive:
+
+```text
+POLICY VALUES — the last scoping class, not defects
+  conflict merge_by_field(..)      A-011
+  identity content_address(..)     A-014
+  transform: scale(1.0) -> ..      A-020
+  translate(x, y) in a style value A-015
+  repeat(..)                       CSS grid
+
+GENUINELY UNRESOLVED — the same defect as `current_session`
+  current_consumer()               A-005
+  add_to_cart(..)                  a handler body
+  include_markdown(..)             a build-time page
+```
+
+A policy's KEYWORD is excluded and its call-shaped VALUE is not: `conflict` is in
+the table, `merge_by_field` is what follows it. Both lower into the body
+expression tree, so the checker cannot currently tell a declarative policy
+expression from a term call.
+
+**That is the remaining work, and it is one class rather than four.** Once a
+policy value is distinguishable, the rule reports only real defects — and there
+are at least three more of them in the accepted corpus besides the store's.
 
 Two scoping fixes were already needed and found the same way. A bare call must
 be checked against **both** namespaces, because `Session("")` is a call-shaped
