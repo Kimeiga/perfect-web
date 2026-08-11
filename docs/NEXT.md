@@ -69,8 +69,11 @@ capabilities rather than by matching a spelling.
    (`optimistic cart.add(..)`, `rollback cart.remove(..)`) are
    executable code nothing has ever parsed.
 2  Regenerate the E8 evidence against every movement C5 caused
-3  A resolved-program invariant: the backend takes a program that
-   resolved and checked, rather than re-deriving that it did
+3  DONE 2026-08-10 — `backend::lower::Checked`. A resolved-program
+   invariant carried by a type with a private field, not a convention:
+   `program` takes `Checked`, and `Checked::of` runs the checker on the
+   same units. It found three of this file's own controls measuring the
+   backend against programs `pw check` rejects.
 4  Wasm encoding of the IR — wasm-encoder, ours to lower
 5  E10-A invocation-region memory (NOT the final memory model)
 6  E10-I, with the ruling's controls, including the structural test

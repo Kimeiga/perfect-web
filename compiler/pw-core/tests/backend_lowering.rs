@@ -13,7 +13,7 @@
 //! `nothing_lowers_silently` is what says that cannot happen.
 
 use pw_core::backend::ir::{Instr, Lowering, Type};
-use pw_core::backend::lower::{Context, program};
+use pw_core::backend::lower::{Checked, Context, program};
 use pw_core::contract::contracts;
 use pw_core::hir::Hir;
 use pw_core::lower::lower_file;
@@ -53,19 +53,67 @@ fn store() -> Vec<(String, String)> {
 
 struct Built {
     hirs: Vec<Hir>,
+    units: Vec<pw_core::check::Unit>,
 }
 
 impl Built {
+    /// A synthetic program, on top of the platform packages.
+    ///
+    /// Without them `database.write<Cart>` is `PW5201 unknown effect family`,
+    /// and `Checked` refuses — which is the invariant working. These three
+    /// controls had been measuring the backend against programs `pw check`
+    /// rejects, and nothing said so until the precondition became a parameter.
+    fn synthetic(src: &str) -> Built {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut files = Vec::new();
+        for dir in ["packages/pw-std", "packages/pw-platform-web"] {
+            let mut ps: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(dir))
+                .unwrap_or_else(|e| panic!("{dir}: {e}"))
+                .map(|e| e.expect("entry").path())
+                .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+                .collect();
+            ps.sort();
+            for p in ps {
+                files.push((
+                    p.file_name().unwrap().to_string_lossy().to_string(),
+                    std::fs::read_to_string(&p).expect("read"),
+                ));
+            }
+        }
+        files.push((
+            "domain.pw".to_string(),
+            std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain.pw"),
+        ));
+        files.push(("t.pw".to_string(), src.to_string()));
+        Built::new(&files)
+    }
+
     fn new(files: &[(String, String)]) -> Built {
+        let units: Vec<pw_core::check::Unit> = files
+            .iter()
+            .map(|(path, src)| pw_core::check::Unit {
+                path: path.clone(),
+                src: src.clone(),
+                hir: lower_file(src, &parse_tree(src).green),
+            })
+            .collect();
         Built {
             hirs: files
                 .iter()
                 .map(|(_, s)| lower_file(s, &parse_tree(s).green))
                 .collect(),
+            units,
         }
     }
 }
 
+/// **Everything the backend is asked to lower has checked first.**
+///
+/// `Checked::of` runs the checker on the same units and refuses to produce a
+/// context if it reported an error, so the tests below cannot accidentally
+/// measure the backend against a program `pw check` would reject. That
+/// precondition is the architect's step 10, and it is a parameter rather than
+/// a convention — see `backend::lower::Checked`.
 fn lowered(
     built: &Built,
 ) -> (
@@ -82,7 +130,13 @@ fn lowered(
         sigs: &sigs,
         contracts: &cs,
     };
-    program(&cx)
+    let checked = Checked::of(&built.units, cx).unwrap_or_else(|ds| {
+        panic!(
+            "the program does not check, so the backend must not see it: {:?}",
+            ds.iter().map(|d| (d.code, &d.message)).collect::<Vec<_>>()
+        )
+    });
+    program(&checked)
 }
 
 /// **The real `add_to_cart` lowers**, which is E10-A's subject.
@@ -162,7 +216,7 @@ command Add(id: Id) -> Result<Cart, CartError>
     write(id)
 }
 ";
-    let built = Built::new(&[("t.pw".to_string(), src.to_string())]);
+    let built = Built::synthetic(src);
     let (p, refusals) = lowered(&built);
     let f = p
         .functions
@@ -227,7 +281,7 @@ command Pure(id: Id) -> Int
     double(1)
 }
 ";
-    let built = Built::new(&[("t.pw".to_string(), src.to_string())]);
+    let built = Built::synthetic(src);
     let (p, refusals) = lowered(&built);
     let f = p
         .functions
@@ -301,7 +355,7 @@ command Weird(id: Id) -> Result<Cart, CartError>
     id |> todo
 }
 ";
-    let built = Built::new(&[("t.pw".to_string(), src.to_string())]);
+    let built = Built::synthetic(src);
     let (p, refusals) = lowered(&built);
     assert!(
         p.functions.is_empty(),
@@ -360,5 +414,88 @@ fn the_backend_never_decides_from_a_name() {
          project to resolve by spelling, and the first three each cost a \
          milestone.",
         offenders.join("\n  ")
+    );
+}
+
+/// **The backend cannot be handed a program that did not check.**
+///
+/// Architect ruling, 2026-08-10, step 10: *enforce resolved/checked program
+/// input before E10.*
+///
+/// `Checked::of` is the only way to obtain what `program` takes, and it runs
+/// the checker. This asserts the refusal directly, because the guarantee is
+/// otherwise invisible: every other test in this file passes through it and
+/// none of them would notice if it stopped refusing.
+///
+/// It found three on its first run. `a_command_that_imports_what_it_calls…`,
+/// `a_call_that_needs_no_authority…` and
+/// `a_construct_outside_the_supported_set…` were each built without the
+/// platform packages, so `database.write<Cart>` was `PW5201 unknown effect
+/// family` — three controls measuring the backend against programs `pw check`
+/// rejects. They now build on the real platform.
+#[test]
+fn a_program_that_does_not_check_never_reaches_the_backend() {
+    // A bare call to a name nothing declares — the shape of all four defects
+    // this milestone repaired, and `PW0021` since 2026-08-10.
+    let src = "\
+module m
+
+command Add(id: Int) -> Int
+    requires SignedIn
+{
+    vanished(id)
+}
+";
+    let built = Built::new(&[("t.pw".to_string(), src.to_string())]);
+    let refs: Vec<&Hir> = built.hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let cs = contracts(&refs, &sigs, &ws);
+    let cx = Context {
+        hirs: &refs,
+        ws: &ws,
+        sigs: &sigs,
+        contracts: &cs,
+    };
+    let refused = Checked::of(&built.units, cx).err().unwrap_or_else(|| {
+        panic!(
+            "the backend accepted a program calling a name that does not \
+             exist — which is precisely how `add_to_cart` came to be blocked \
+             by a defect no earlier stage reported"
+        )
+    });
+    assert!(
+        refused.iter().any(|d| d.code == "PW0021"),
+        "and it refused for the right reason: {:?}",
+        refused.iter().map(|d| d.code).collect::<Vec<_>>()
+    );
+
+    // The discriminating half: the same program with the callee declared is
+    // accepted, so the gate reacts to the defect and not to the shape.
+    let ok = "\
+module m
+
+fn vanished(n: Int) -> Int !{} { n }
+
+command Add(id: Int) -> Int
+    requires SignedIn
+{
+    vanished(id)
+}
+";
+    let built = Built::new(&[("t.pw".to_string(), ok.to_string())]);
+    let refs: Vec<&Hir> = built.hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let cs = contracts(&refs, &sigs, &ws);
+    let cx = Context {
+        hirs: &refs,
+        ws: &ws,
+        sigs: &sigs,
+        contracts: &cs,
+    };
+    assert!(
+        Checked::of(&built.units, cx).is_ok(),
+        "declaring the callee did not satisfy the gate"
     );
 }

@@ -46,6 +46,63 @@ use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Span};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
 use crate::signatures::Signatures;
 
+/// **Proof that the program being lowered resolved and checked.**
+///
+/// Architect ruling, 2026-08-10, step 10: *enforce resolved/checked program
+/// input before E10.*
+///
+/// The reason is E10-A's founding finding. `examples/store/app.pw` called
+/// `current_session()` and imported nothing, every upstream analysis produced
+/// an answer for it — no effects, no label, no constraint, no capability — and
+/// each of those answers is what a harmless call produces too. The backend was
+/// the first consumer for which the absence was fatal, and it found out by
+/// failing to emit rather than by being told.
+///
+/// So the precondition is carried by a **type with a private field**. The only
+/// way to obtain a `Checked` is `Checked::of`, which runs the checker on the
+/// same units, and `program` takes one. A caller cannot hand the backend an
+/// unresolved program by forgetting a step: there is no step to forget.
+///
+/// It is deliberately not a `bool` on `Context`, and not a documented
+/// convention. Both are things a caller can be wrong about, which is the shape
+/// of every entry in `docs/RISK_QUEUE.md`.
+pub struct Checked<'a> {
+    cx: Context<'a>,
+}
+
+impl<'a> Checked<'a> {
+    /// Run the checker, and return the context only if it produced no errors.
+    ///
+    /// `units` must be the same program `cx` was built from — the borrow makes
+    /// that checkable at the call site rather than assumed, because a proof
+    /// about a different program is the coincidental correctness of ADR-0022.
+    pub fn of(
+        units: &[crate::check::Unit],
+        cx: Context<'a>,
+    ) -> Result<Checked<'a>, Vec<crate::diagnostics::Diagnostic>> {
+        assert_eq!(
+            units.len(),
+            cx.hirs.len(),
+            "the checked units and the lowering context describe different \
+             programs, so the proof would be about neither"
+        );
+        let errors: Vec<crate::diagnostics::Diagnostic> = crate::check::check_units(units)
+            .into_iter()
+            .flat_map(|(_, ds)| ds)
+            .filter(|d| d.severity == crate::diagnostics::Severity::Error)
+            .collect();
+        if errors.is_empty() {
+            Ok(Checked { cx })
+        } else {
+            Err(errors)
+        }
+    }
+
+    pub fn context(&self) -> &Context<'a> {
+        &self.cx
+    }
+}
+
 /// What the lowering needs from upstream, gathered once.
 pub struct Context<'a> {
     pub hirs: &'a [&'a Hir],
@@ -160,7 +217,12 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
 /// Returns the functions that lowered and the refusals, both — a program where
 /// half the declarations are outside E10-A's supported set is the ordinary
 /// case, and reporting only the successes would make the backend look finished.
-pub fn program(cx: &Context<'_>) -> (Program, Vec<Lowering<Function>>) {
+/// **Lower a program that checked.**
+///
+/// Takes `Checked`, not `Context`. See the type's docstring: the precondition
+/// is the parameter, so it cannot be skipped.
+pub fn program(checked: &Checked<'_>) -> (Program, Vec<Lowering<Function>>) {
+    let cx = checked.context();
     let mut out = Program::default();
     let mut refusals = Vec::new();
     for (unit, hir) in cx.hirs.iter().enumerate() {

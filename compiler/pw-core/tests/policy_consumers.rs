@@ -34,7 +34,8 @@
 //! 3  placement               SEES IT   Poll narrows to `origin`
 //! 4  call graph              blind     no call edges from either position
 //! 5  capability derivation   SEES IT   the CONTRACT requires it
-//! 6  backend lowering        latent    pages do not lower in E10-A
+//! 6  backend lowering        gated     this program does not check, and
+//!                                      `Checked::of` is what `program` takes
 //! ```
 //!
 //! Four of six, and one of the four is the artifact the host grants authority
@@ -348,17 +349,26 @@ fn the_call_graph_sees_neither_position() {
 
 // --- 6 ----------------------------------------------------------------------
 
-/// **Backend lowering: latent, not absent.**
+/// **Backend lowering: the question does not reach it, and now cannot.**
 ///
-/// `lower.rs` walks bodies with no notion of position either — but E10-A's
-/// supported set is what `add_to_cart` needs, and a `page` is not in it. So the
-/// backend has never been asked. That is a fact about E10-A's scope and not
-/// about the backend's discrimination, and the difference matters: widening the
-/// backend to pages before the split lands would emit instructions for policy
-/// values.
+/// `lower.rs` walks bodies with no notion of position either, so the answer for
+/// this row would be the same as the other five. Two things stop it being
+/// asked, and they are different in kind:
+///
+/// ```text
+/// E10-A's supported set        a `page` is not in it — a scope decision
+/// Checked::of                  this program does not check — a gate
+/// ```
+///
+/// The second is the architect's step 10, landed 2026-08-10. The probe below
+/// deliberately contains `PW0401` and `PW5001` — it exists to measure them —
+/// so the backend cannot be handed it at all. Widening the backend to pages
+/// before the `PolicyExpr` split lands would still be wrong; what changed is
+/// that it would be wrong about a program that checks, rather than about this
+/// one.
 #[test]
-fn the_backend_has_not_been_asked_yet() {
-    use pw_core::backend::lower::{Context, program};
+fn the_backend_is_never_handed_this_program() {
+    use pw_core::backend::lower::{Checked, Context};
     let built = Built::new();
     let refs = built.refs();
     let ws = Workspace::build(&refs);
@@ -370,11 +380,23 @@ fn the_backend_has_not_been_asked_yet() {
         sigs: &sigs,
         contracts: &cs,
     };
-    let (p, _) = program(&cx);
+    let units: Vec<pw_core::check::Unit> = files()
+        .into_iter()
+        .zip(built.hirs.iter())
+        .map(|((path, src), hir)| pw_core::check::Unit {
+            path,
+            src,
+            hir: hir.clone(),
+        })
+        .collect();
+    let refused = Checked::of(&units, cx)
+        .err()
+        .expect("the probe renders a page that performs a database read");
     assert!(
-        !p.functions.iter().any(|f| f.export == "Poll"),
-        "a page lowered. The policy-value question is now live in the backend \
-         too, and this test is measuring something else than it claims."
+        refused.iter().any(|d| d.code == "PW0401"),
+        "and for the reason the rows above are about — a page performing what a \
+         POLICY VALUE spells: {:?}",
+        refused.iter().map(|d| d.code).collect::<Vec<_>>()
     );
 }
 
