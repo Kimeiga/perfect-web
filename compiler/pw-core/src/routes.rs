@@ -20,6 +20,22 @@ pub fn table(hirs: &[&Hir]) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for hir in hirs {
         for (_, decl) in hir.all_decls() {
+            // **The policy first, the body scan second** — the same order
+            // `declared_world` and `declared_cache` use, and for the same
+            // reason. `route "/stores/{id}"` was a bare `Name` pair in a page's
+            // executable body until 2026-08-11, when UI declarations began
+            // parsing their policies inside their braces (architect ruling,
+            // policy values leave the executable body tree). This reader was
+            // the one that still looked only in the body, and `R-023` lost its
+            // catch: with no route table, every link is checked against
+            // nothing.
+            if let Some(p) = decl.policy("route") {
+                let v = p.value.trim();
+                if !v.is_empty() {
+                    out.insert(v.trim_matches('"').to_string());
+                    continue;
+                }
+            }
             let Some(body_id) = decl.body else { continue };
             let body = hir.body(body_id);
             let Expr::Block { stmts } = body.expr(body.root) else {

@@ -23,9 +23,9 @@ import build.{ include_markdown, WorkspaceFile }
 // choose anything.
 page Terms() !{ build.input.read<WorkspaceFile> } {
     placement build
-    privacy Public
-    cache shared
-    revision content_hash
+    privacy   Public
+    cache     shared
+    revision  content_hash
 
     view {
         <main>

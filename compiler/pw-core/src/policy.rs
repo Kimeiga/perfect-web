@@ -114,6 +114,10 @@ pub enum Domain {
     Body,
     /// A CSS length: `intrinsic_height 24.px`.
     Length,
+    /// A route pattern: `route "/stores/{id}"`. Not a `Str`: its holes name the
+    /// declaration's parameters, and charter §8.2 checks every internal link
+    /// against the set of these.
+    RoutePattern,
     /// A declaration this program defines, named for attribution:
     /// `attributes_forced_layout_to VendorMap`.
     DeclRef,
@@ -213,6 +217,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "privacy" => Domain::LabelCtor,
         "capability" => Domain::EffectRef,
         "host" => Domain::Str,
+        "route" => Domain::RoutePattern,
         "impact" => Domain::Word(&[
             "layout_read",
             "layout_write",
@@ -371,6 +376,7 @@ mod tests {
             "emits",
             "requires",
             "placement",
+            "route",
             "privacy",
             "capability",
             "host",

@@ -17,7 +17,7 @@ import clock
 
 page Landing() {
     placement build
-    cache shared
+    cache     shared
 
     view {
         <main>

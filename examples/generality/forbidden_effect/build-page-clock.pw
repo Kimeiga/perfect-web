@@ -1,11 +1,22 @@
 // @status: GENERAL
 // @invariant: forbidden_effect
 // @dimension: indirect invalid — reuse makes it wrong, not the kind
+//
+// Reuse is declared as `partition public` rather than `placement build` since
+// 2026-08-11. Both make the output reused, and `reuse_of` reads either — but
+// once UI declarations parsed their policies inside their braces the pinned
+// world became VISIBLE to `declared_world`, and the placement solver added a
+// second, correct diagnostic: `clock.wall` is not grantable at build time. A
+// witness must exercise one invariant, and this one is about reuse.
+//
+// That the pin was previously invisible is the finding, and it is recorded in
+// `docs/RISK_QUEUE.md`: `PW5005` could not fire for any page or component,
+// because `placement` in a UI body was two unrelated bare names.
 module generality.forbid_build_clock
 
 import clock
 
 page Landing() !{ clock.wall } {
-    placement build
+    partition public
     view { <main><p>Generated at {clock.now_wall()}</p></main> }
 }

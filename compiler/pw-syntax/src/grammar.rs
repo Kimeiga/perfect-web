@@ -195,6 +195,12 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "optimistic",
     "rollback",
     "placement",
+    // Charter §8.2. A page's route was a bare `Name` pair in its executable
+    // body until 2026-08-11, and `routes::table` read it from there. Once UI
+    // declarations parsed their policies inside their braces it became an
+    // UNKNOWN policy — which is the parser saying, correctly, that a clause it
+    // is being asked to classify is not in its vocabulary.
+    "route",
     "privacy",
     "storage",
     "offline",
@@ -1129,8 +1135,24 @@ impl<'a> P<'a> {
     }
 
     fn block_expr(&mut self) {
+        self.block_expr_with(false);
+    }
+
+    /// The same block, optionally reading POLICY CLAUSES first.
+    ///
+    /// One block parser, not two. `policy_block_body` was a second, simplified
+    /// loop written for `materialize`, whose bodies are policies and nothing
+    /// else; pointing UI declarations at it on 2026-08-11 lost the nested `fn`
+    /// branch and the labelled-statement branch, and `A-017` and `A-022` were
+    /// rejected for effects their frame phases permit. The parser that decides
+    /// what a `.pw` program means is one parser (E6F), and this is the same
+    /// lesson inside a single file.
+    fn block_expr_with(&mut self, policies_first: bool) {
         self.start(K::BlockExpr);
         self.bump(); // `{`
+        if policies_first {
+            self.policies();
+        }
         let mut guard = 0;
         while !self.at(Kind::RBrace) && !self.at_eof() {
             guard += 1;
@@ -1438,7 +1460,19 @@ impl<'a> P<'a> {
             return false;
         }
         let head = self.cur_text();
-        if POLICY_KEYWORDS.contains(&head) || DECL_STARTERS.contains(&head) {
+        // A STATEMENT keyword begins a statement, never a policy. Needed once
+        // UI declarations started parsing their policies inside the braces
+        // (2026-08-11): `animate pulse { .. }` sits after `placement browser`
+        // in `A-020`, and without this it was reported as an unknown policy.
+        //
+        // The three tables must not overlap in interpretation. That is the
+        // same lesson as `measure` being both a phase keyword and a callable
+        // name — `docs/RISK_QUEUE.md` — arriving from the other direction.
+        if POLICY_KEYWORDS.contains(&head)
+            || DECL_STARTERS.contains(&head)
+            || STMT_KEYWORDS.contains(&head)
+            || UI_NOUNS.contains(&head)
+        {
             return false;
         }
         // A value must follow, on this line.
@@ -1517,6 +1551,15 @@ impl<'a> P<'a> {
                     && self.newline_ahead()
                     && (POLICY_KEYWORDS.contains(&self.cur_text())
                         || DECL_STARTERS.contains(&self.cur_text())
+                        // A STATEMENT ends this clause too. Needed from
+                        // 2026-08-11, when UI declarations began writing their
+                        // policies inside their braces: `placement browser`
+                        // is followed by `frame { .. }` in `A-017`, and
+                        // without this the value swallowed `frame` and the
+                        // phase block stopped being a phase block — so a
+                        // component was rejected for effects its phases permit.
+                        || STMT_KEYWORDS.contains(&self.cur_text())
+                        || UI_NOUNS.contains(&self.cur_text())
                         // An UNKNOWN head ends this clause too. Without it the
                         // value loop swallows the next line — `capability none`
                         // followed by `impakt layout_write` became one policy
@@ -1549,50 +1592,23 @@ impl<'a> P<'a> {
         self.finish();
     }
 
-    /// A `materialize` block: policy clauses, then whatever else the block has.
+    /// A block whose POLICY CLAUSES are inside its braces.
     ///
-    /// `materialize` is the one declaration whose policies live INSIDE its
-    /// braces — corpus A-009 and R-017 both write them that way, and they are
-    /// the specification. Parsing the block as an ordinary expression body read
-    /// `placement` and `edge` as two unrelated bare names, so a fragment that
-    /// declared where it runs, what it depends on and which events concern it
-    /// produced a node with **no policy at all**. An empty dependency list is
-    /// indistinguishable from "depends on nothing", so the E6 graph would have
-    /// shown a fragment nothing invalidates and no rule would have objected.
-    ///
-    /// After the policies the rest of the block is parsed normally, because
-    /// R-017 puts a `view { .. }` there and its wall-clock read has to be
-    /// visible to the effect checker.
-    fn materialize_body(&mut self) {
+    /// `materialize` has written them that way since E6 — corpus A-009 and
+    /// R-017 are the specification — and UI declarations joined it on
+    /// 2026-08-11, when policy values left the executable body tree (architect
+    /// ruling). `page StorePage(id) { placement origin  cache private  .. }`
+    /// used to lower `placement` and `origin` as two unrelated bare names, and
+    /// `tests/policy_consumers.rs` measured what that cost: four of six
+    /// analyses could not tell a policy value from a term.
+    fn policy_block_body(&mut self) {
         if !self.at(Kind::LBrace) {
             return;
         }
         self.start(K::Body);
-        self.start(K::BlockExpr);
-        self.bump(); // `{`
-        self.policies();
-        let mut guard = 0;
-        while !self.at(Kind::RBrace) && !self.at_eof() {
-            guard += 1;
-            if guard > 20_000 {
-                self.error("PW0099", "block made no progress");
-                break;
-            }
-            let before = self.pos;
-            self.expr(0);
-            self.eat(Kind::Comma);
-            self.eat(Kind::Semi);
-            if self.pos == before {
-                self.bump(); // never spin
-            }
-        }
-        if !self.eat(Kind::RBrace) {
-            self.error("PW0006", "unclosed block, expected `}`");
-        }
-        self.finish();
+        self.block_expr_with(true);
         self.finish();
     }
-
     fn decl(&mut self) -> bool {
         if self.at_kw("module") || self.at_kw("import") {
             let is_module = self.at_kw("module");
@@ -1779,7 +1795,19 @@ impl<'a> P<'a> {
                 self.effect_row();
             }
             self.policies();
-            self.body();
+            // **A UI declaration's policies are inside its braces too.**
+            //
+            // `page StorePage(id) { placement origin  cache private  .. }`.
+            // They were parsed as ordinary expressions until 2026-08-11, so
+            // `placement` and `origin` were two unrelated bare names in the
+            // executable body — and `tests/policy_consumers.rs` measured what
+            // that cost: four of six analyses could not tell a policy value
+            // from a term, and a page's declared AUTHORITY moved because of
+            // what one spelled.
+            //
+            // Architect ruling, 2026-08-11: policy values leave the executable
+            // body tree. Same mechanism `materialize` has used since E6.
+            self.policy_block_body();
             self.finish();
             return true;
         }
@@ -1832,7 +1860,7 @@ impl<'a> P<'a> {
             self.bump(); // `effect`
             self.dotted_name("an effect name");
             self.type_params();
-            self.materialize_body();
+            self.policy_block_body();
             self.finish();
             return true;
         }
@@ -1854,7 +1882,7 @@ impl<'a> P<'a> {
             }
             self.policies();
             if materialize {
-                self.materialize_body();
+                self.policy_block_body();
             } else {
                 self.body();
             }

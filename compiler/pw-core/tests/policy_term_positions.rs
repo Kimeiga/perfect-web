@@ -125,6 +125,12 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         ("depends_on", "Store(id), Menu(id)"),
         ("depends_on", "Summary(session)"),
         ("emits", "CartChanged(current_session())"),
+        // New 2026-08-11: `privacy Public` on `A-013`'s page. It was two bare
+        // names in the executable body until UI declarations began parsing
+        // their policies inside their braces, so this list could not see it —
+        // which is the list doing its job, not a new defect. `privacy` is a
+        // `LabelCtor` and `Public` is a nullary one.
+        ("privacy", "Public"),
         ("invalidates", "Cart(current_session())"),
         ("invalidates", "Order(order)"),
         ("invalidates_on", "CartChanged(session)"),

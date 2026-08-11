@@ -1,5 +1,5 @@
-//! **Which analyses currently see a value written in POLICY position, frozen
-//! before `PolicyExpr` is separated from `TermExpr`.**
+//! **Which analyses see a value written in POLICY position — measured before
+//! the split, and re-measured after it.**
 //!
 //! Architect ruling, 2026-08-10:
 //!
@@ -22,31 +22,46 @@
 //! ```
 //!
 //! A consumer that distinguishes the two positions gives `Poll` and `Term`
-//! different answers. Every consumer measured below gives them the **same**
-//! answer, which is the finding: today there is no policy position — there is
-//! only a body, and a policy value is an expression in it.
+//! different answers.
 //!
-//! # The answer, as measured
+//! # Before the split, 2026-08-10
+//!
+//! Every consumer gave them the **same** answer. There was no policy position:
+//! there was only a body, and a policy value was an expression in it.
 //!
 //! ```text
-//! 1  effect inference        SEES IT   Poll gains `database.read<Carts>`
-//! 2  privacy                 SEES IT   PW5001 fires on a policy value
-//! 3  placement               SEES IT   Poll narrows to `origin`
-//! 4  call graph              blind     no call edges from either position
-//! 5  capability derivation   SEES IT   the CONTRACT requires it
-//! 6  backend lowering        gated     this program does not check, and
-//!                                      `Checked::of` is what `program` takes
+//! 1  effect inference        SAW IT    Poll gained `database.read<Carts>`
+//! 2  privacy                 SAW IT    PW5001 fired on a policy value
+//! 3  placement               SAW IT    Poll narrowed to `origin`
+//! 4  call graph              blind
+//! 5  capability derivation   SAW IT    the CONTRACT required it
+//! 6  backend lowering        gated
 //! ```
 //!
-//! Four of six, and one of the four is the artifact the host grants authority
-//! from. `PW0401` — *a page may not perform this* — fires because of what a
-//! **policy value** spells.
+//! Four of six, and one of the four is the artifact a host grants authority
+//! from. `PW0401` — *a page may not perform this* — fired because of what a
+//! **policy value** spelled.
 //!
-//! # This file asserts today's values, so the split turns it red
+//! # After the split, 2026-08-11
 //!
-//! Deliberately, and for the same reason `unresolved_provenance.rs` does. Each
-//! row that moves when `PolicyExpr` lands is a behaviour change to classify;
-//! each row that does not is equally informative.
+//! ```text
+//! 1  effect inference        blind     Poll performs nothing
+//! 2  privacy                 blind     PW5001 fires on the RENDERED page only
+//! 3  placement               blind     Poll is unconstrained
+//! 4  call graph              blind     unchanged
+//! 5  capability derivation   blind     the contract requires nothing
+//! 6  backend lowering        gated     unchanged
+//! ```
+//!
+//! Architect ruling: policy values leave the executable body tree. A UI
+//! declaration now parses its policies inside its braces, the way
+//! `materialize` has since E6, so `key helper(a)` is a `Policy` on the
+//! declaration rather than two bare names in the body.
+//!
+//! **Every row that moved, moved to `blind`, and the control rows did not
+//! move**: `Term` — the same call, rendered — still contributes everything it
+//! did. That is what says the split separated the positions rather than
+//! silencing the analyses.
 
 use std::collections::BTreeSet;
 
@@ -187,9 +202,9 @@ fn contract<'a>(cs: &'a [ComponentContract], id: &str) -> &'a ComponentContract 
 
 // --- 1 ----------------------------------------------------------------------
 
-/// **Effect inference sees policy values, and cannot tell them from terms.**
+/// **Effect inference no longer sees policy values, and still sees terms.**
 #[test]
-fn effect_inference_sees_a_call_written_in_policy_position() {
+fn effect_inference_does_not_see_a_call_written_in_policy_position() {
     let built = Built::new();
     let refs = built.refs();
     let ws = Workspace::build(&refs);
@@ -207,13 +222,19 @@ fn effect_inference_sees_a_call_written_in_policy_position() {
         inf.effective_effects(unit, hir, id)
     };
 
-    assert_eq!(
-        of("Poll"),
-        ["database.read<Carts>"],
-        "TODAY: `key helper(a)` is a policy value, and inference charges the \
-         page for the effect of running it"
+    assert!(
+        of("Poll").is_empty(),
+        "`key helper(a)` is a policy value; the page does not perform it. It \
+         read `database.read<Carts>` until 2026-08-11. Got {:?}",
+        of("Poll")
     );
-    assert_eq!(of("Term"), ["database.read<Carts>"], "the control");
+    assert_eq!(
+        of("Term"),
+        ["database.read<Carts>"],
+        "**the control, and it did not move**: the same call, rendered, still \
+         contributes. Without this the row above would pass for an inference \
+         that stopped working"
+    );
     assert!(
         of("Neither").is_empty(),
         "and the discriminator: without the call, nothing"
@@ -222,7 +243,7 @@ fn effect_inference_sees_a_call_written_in_policy_position() {
 
 // --- 2 ----------------------------------------------------------------------
 
-/// **Privacy sees them too, and reaches a real refusal.**
+/// **Privacy no longer sees them, and still reaches a real refusal.**
 ///
 /// `PW5001` is charter §7.8's canonical case — a non-public value in a shared
 /// cache. `PrivPolicy` never renders the session query; it merely names it in a
@@ -233,7 +254,7 @@ fn effect_inference_sees_a_call_written_in_policy_position() {
 /// conclusion drawn from what a declaration reads is drawn from policy values
 /// as well.
 #[test]
-fn a_privacy_refusal_fires_because_of_a_policy_value() {
+fn a_privacy_refusal_no_longer_fires_because_of_a_policy_value() {
     let fs = files();
     let out = check_sources(&fs);
     let codes: Vec<(String, String)> = out
@@ -245,33 +266,40 @@ fn a_privacy_refusal_fires_because_of_a_policy_value() {
     let fired = |page: &str, code: &str| codes.iter().any(|(c, m)| c == code && m.contains(page));
 
     assert!(
-        fired("PrivPolicy", "PW5001"),
-        "TODAY: naming a session query in a POLICY VALUE makes the page \
-         private. Got {codes:?}"
+        !fired("PrivPolicy", "PW5001"),
+        "naming a session query in a POLICY VALUE no longer makes the page \
+         private. It did until 2026-08-11. Got {codes:?}"
     );
-    assert!(fired("PrivTerm", "PW5001"), "the control");
+    assert!(
+        fired("PrivTerm", "PW5001"),
+        "**the control, and it did not move**: the page that RENDERS the \
+         session query is still refused. Without this the row above would pass \
+         for a privacy rule that stopped running: {codes:?}"
+    );
     assert!(
         !fired("PrivNeither", "PW5001"),
         "and the discriminator: the same page without the call is not refused"
     );
 
-    // The effect side of the same walk, for completeness: a page is refused for
-    // performing an effect its POLICY value performs.
+    // The effect side of the same walk. `a page may not do this` fired for a
+    // policy value too, and now fires only for the rendered one.
     assert!(
-        fired("Poll", "PW0401") && fired("Term", "PW0401"),
-        "`a page may not do this` fires for a policy value: {codes:?}"
+        !fired("Poll", "PW0401"),
+        "a page is not refused for what a policy value spells: {codes:?}"
     );
+    assert!(fired("Term", "PW0401"), "and is, for what it renders");
 }
 
 // --- 3 and 5 ----------------------------------------------------------------
 
-/// **Placement and capability derivation, which is the row that matters most.**
+/// **Placement and capability derivation, which was the row that mattered
+/// most.**
 ///
 /// `required_capabilities` is what a host grants authority from (ADR-0018), and
 /// `allowed_placements` is where the component may run. Both move because of a
 /// value written in policy position.
 #[test]
-fn the_contract_requires_a_capability_because_of_a_policy_value() {
+fn the_contract_no_longer_requires_a_capability_for_a_policy_value() {
     let built = Built::new();
     let refs = built.refs();
     let ws = Workspace::build(&refs);
@@ -282,22 +310,33 @@ fn the_contract_requires_a_capability_because_of_a_policy_value() {
     let term = contract(&cs, "probe.Term");
     let neither = contract(&cs, "probe.Neither");
 
-    assert_eq!(
-        caps(poll),
-        BTreeSet::from(["database.read<Carts>".to_string()]),
-        "TODAY: the DECLARED AUTHORITY of a component includes what its policy \
-         values would need if they were executed"
+    assert!(
+        caps(poll).is_empty(),
+        "the DECLARED AUTHORITY of a component no longer includes what its \
+         policy values would need if they were executed. It did until \
+         2026-08-11 — and this is the artifact a host grants authority from. \
+         Got {:?}",
+        caps(poll)
     );
-    assert_eq!(caps(term), caps(poll), "identical to the control");
+    assert_eq!(
+        caps(term),
+        BTreeSet::from(["database.read<Carts>".to_string()]),
+        "**the control, and it did not move**"
+    );
     assert!(caps(neither).is_empty(), "the discriminator");
 
     assert_eq!(
         poll.allowed_placements,
-        ["origin"],
-        "and placement narrows with it — `database.read` is origin-only, so a \
-         policy value decides where the page may run"
+        ["build", "browser", "edge", "origin"],
+        "and placement is unconstrained with it — a policy value no longer \
+         decides where the page may run"
     );
-    assert_eq!(term.allowed_placements, poll.allowed_placements);
+    assert_eq!(
+        term.allowed_placements,
+        ["origin"],
+        "while the rendered call still narrows to where `database.read` is \
+         granted"
+    );
     assert_eq!(
         neither.allowed_placements,
         ["build", "browser", "edge", "origin"],
@@ -411,18 +450,19 @@ fn the_backend_is_never_handed_this_program() {
 /// nothing for a `Keyword`, so the page is silently effect-free.
 ///
 /// This is the fifth spelling-based resolution defect in the project and the
-/// first one in the parser. It is recorded here because it is what the
-/// architect's *exactly-one-semantic-owner* gate has to answer for:
-/// `Expr::Keyword` is the bucket a call falls into when nothing claims it, and
-/// membership is decided by a word list.
+/// first one in the parser. **It is still unrepaired**, and it is measured here
+/// in a TERM position: `key measure(a)` is a policy value now, so the original
+/// probe no longer reaches an expression at all — which is the split working,
+/// and would have quietly retired this measurement with it.
 #[test]
 fn a_call_is_a_call_or_a_keyword_depending_on_its_spelling() {
     use pw_core::hir::Expr;
 
     let shape = |name: &str| -> String {
         let src = format!(
-            "module m\n\nfn {name}(n: Int) -> Int !{{ database.read<Carts> }} {{ todo }}\n\n\
-             page P(a: Int) {{\n    key {name}(a)\n\n    view {{\n        <p>hi</p>\n    }}\n}}\n"
+            "module m\n\ntype Carts = Carts {{ n: Int }}\n\n\
+             fn {name}(n: Int) -> Int !{{ database.read<Carts> }} {{ todo }}\n\n\
+             page P(a: Int) {{\n    view {{\n        <p>{{{name}(a)}}</p>\n    }}\n}}\n"
         );
         let hir = lower_file(&src, &parse_tree(&src).green);
         let (_, d) = hir.all_decls().find(|(_, d)| d.name == "P").expect("P");
@@ -450,7 +490,7 @@ fn a_call_is_a_call_or_a_keyword_depending_on_its_spelling() {
         let src = format!(
             "module m\n\ntype Carts = Carts {{ n: Int }}\n\n\
              fn {name}(n: Int) -> Int !{{ database.read<Carts> }} {{ todo }}\n\n\
-             page P(a: Int) {{\n    key {name}(a)\n\n    view {{\n        <p>hi</p>\n    }}\n}}\n"
+             page P(a: Int) {{\n    view {{\n        <p>{{{name}(a)}}</p>\n    }}\n}}\n"
         );
         let hir = lower_file(&src, &parse_tree(&src).green);
         let refs = vec![&hir];
