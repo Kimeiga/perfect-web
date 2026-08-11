@@ -59,7 +59,7 @@ capabilities rather than by matching a spelling.
 ### Next, in order
 
 ```text
-1  PolicyExpr / TermExpr — the HALF THAT REMAINS. Declaration-level
+1  DONE 2026-08-11. PolicyExpr / TermExpr — the half that remained. Declaration-level
    policy values are typed by domain and the executable ones are real
    terms (`hir::Policy::term`, ADR-0024). What is still in the
    executable body tree is the BODY-EMBEDDED policy statement: a page's
@@ -71,7 +71,7 @@ capabilities rather than by matching a spelling.
    table it must be driven by. `Domain::Body` — `acquire`, `release`,
    `draw` — must STAY executable, and its binder must start binding
    (`a_for_loop_is_syntax_that_binds_and_a_policy_block_is_not_yet`).
-2  Regenerate the E8 evidence against every movement C5 caused
+2  DONE — E8 evidence regenerated against C5 and C6
 3  DONE 2026-08-10 — `backend::lower::Checked`. A resolved-program
    invariant carried by a type with a private field, not a convention:
    `program` takes `Checked`, and `Checked::of` runs the checker on the
@@ -81,8 +81,9 @@ capabilities rather than by matching a spelling.
 5  E10-A invocation-region memory (NOT the final memory model)
 6  E10-I, with the ruling's controls, including the structural test
    that the Rust closure path is GONE
-7  E10-P: the contract's placement demand takes the real privacy
-   label (blocked on 1)
+7  DONE 2026-08-11 — E10-P closed. `contract.rs` calls
+   `check::declaration_label`. A `session query` was placeable at
+   build time and is not.
 8  broaden from evidence: Store query, then a pure helper, then a
    command with branching
 ```

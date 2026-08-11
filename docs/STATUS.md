@@ -44,20 +44,34 @@ sequence the architect set out was worked through in order:
 ```text
 A  ratify current_consumer -> current_session                      DONE
 B  MatchReport: Proven | NonExhaustive | Blocked                   DONE
-D  optimistic/rollback as real EmbeddedTerm nodes                  DONE
+D  optimistic as a real transition (ADR-0025)                      DONE
 E  do NOT inject `cart` — expose the unresolved binding            DONE
 F  `for` becomes real syntax with bindings                         DONE
-C  PolicyExpr / TermExpr: policy values leave the body tree        NEXT
-G  re-run the policy-consumer matrix                               after C
-H  close E10-P                                                     after C
-I  Wasm encoding, invocation-region memory, E10-I                  open
+C  policy values leave the executable body tree                    DONE
+G  re-run the policy-consumer matrix                               DONE
+H  close E10-P                                                     DONE
+I  Wasm encoding, invocation-region memory, E10-I                  NEXT
 ```
 
-`D` and `E` landed together and are the sharpest result: `optimistic
-cart.add(item, quantity)` had never been parsed, and `cart` is bound by
-nothing. It is now reported. The binder is a lambda — `optimistic cart =>
-cart.add(..)` — recorded as **ADR-0024 (Proposed)**, since the architect locked
-the semantic requirement and left the surface syntax open.
+**The policy-consumer matrix, re-measured after the split:**
+
+```text
+1 effect inference       SAW IT -> blind
+2 privacy                SAW IT -> blind
+3 placement              SAW IT -> blind
+5 capability derivation  SAW IT -> blind
+4 call graph             blind     unchanged
+6 backend                gated     unchanged
+```
+
+Every row that moved, moved to `blind`, and **no control row moved**: the same
+call rendered still contributes its effect, its capability and its placement.
+
+**ADR-0025** replaced the never-accepted ADR-0024. An optimistic clause names
+the resource ENTRY it updates, binds its current value, and applies a **pure**
+transition; there is no written `rollback`, because the platform restores the
+value it held and a written inverse is generally false. Corpus **C6** carries
+it, and it is the first version to retire an invariant.
 
 Four findings the audits produced, each recorded in `docs/RISK_QUEUE.md`:
 
