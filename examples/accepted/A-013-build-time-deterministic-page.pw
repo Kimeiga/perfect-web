@@ -10,8 +10,18 @@
 
 module marketing.terms
 
-// !{} plus build-known inputs => the placement solver chooses Build.
-page Terms() !{} {
+// 2026-08-10: `include_markdown` was called and declared nowhere, so the page
+// claimed build-time determinism against silence — nothing constrained where it
+// could run, and its contract permitted the browser. It is now a tracked build
+// input: reading it performs `build.input.read<WorkspaceFile>`, which is
+// `placement build`, so the determinism claim is carried by an effect rather
+// than by an absence.
+import build.{ include_markdown, WorkspaceFile }
+
+// A build-known input plus a row that excludes the clock and randomness => the
+// placement solver has a reason to choose Build, rather than no reason to
+// choose anything.
+page Terms() !{ build.input.read<WorkspaceFile> } {
     placement build
     privacy Public
     cache shared

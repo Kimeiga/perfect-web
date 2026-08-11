@@ -16,6 +16,12 @@ import Carts
 import Menu
 // E6: the cache entry this command drops has to be a resource that exists.
 import Resources.{ Cart }
+// 2026-08-10: the body called `current_consumer()`, which is declared nowhere,
+// and passed it where `Carts.add` takes a `SessionId`. Two independent pieces
+// of evidence say this call site is the session — `Carts.add(s: SessionId, ..)`
+// and this command's own `invalidates Cart(current_session())` — so the repair
+// is the name, not a new platform operation.
+import context.{ current_session }
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
@@ -32,5 +38,5 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     if !available {
         return Err(CartError.ItemUnavailable(item))
     }
-    Carts.add(current_consumer(), item, quantity)
+    Carts.add(current_session(), item, quantity)
 }

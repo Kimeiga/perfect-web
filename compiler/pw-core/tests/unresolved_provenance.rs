@@ -113,21 +113,45 @@ fn caps(c: &ComponentContract) -> BTreeSet<String> {
 
 // --- the four rows -----------------------------------------------------------
 
-/// **A-005 — `current_consumer()` in a command body.**
+/// **A-005 — `current_consumer()` in a command body. REPAIRED.**
 ///
-/// The fixture's subject is idempotency, and its body reads a consumer identity
-/// that names nothing. The command's declared authority today is whatever
-/// `Carts.add` contributes and nothing from the unresolved call.
+/// ```text
+/// add_to_cart   {database.write<Carts>}   ->   {+ session.read}
+/// placements    origin                          unchanged
+/// ```
+///
+/// # The repair is the name, and this is a deviation to record
+///
+/// The architect expected a new platform operation:
+///
+/// > `current_consumer()` — likely another invocation-context operation. Give
+/// > it a real semantic declaration rather than merely adding the spelling to a
+/// > prelude exemption.
+///
+/// Two independent pieces of evidence say this call site is the **session**:
+/// `Carts.add(s: SessionId, ..)` is what it feeds, and the command's own
+/// `invalidates Cart(current_session())` says which cache entry it drops. A
+/// consumer identity in one and a session in the other would be two different
+/// carts.
+///
+/// So no `current_consumer` was declared. Inventing a platform operation to
+/// justify a name that the types say is wrong would be ADR-0022's coincidental
+/// correctness in reverse: a real declaration built to make a mistaken call
+/// site typecheck. `ConsumerId` does exist in the domain and A-011 uses it — if
+/// a consumer-scoped context operation is wanted, it should be added where
+/// something needs it.
 #[test]
-fn a005_idempotent_command_before_repair() {
+fn a005_idempotent_command_after_repair() {
     let cs = contracts_for(&["examples/accepted/A-005-idempotent-command.pw"]);
     let c = of(&cs, "cart.commands.add_to_cart");
     assert_eq!(
         caps(c),
-        BTreeSet::from(["database.write<Carts>".to_string()]),
-        "TODAY. `current_consumer()` resolves to nothing and contributes \
-         nothing. If it turns out to be a platform operation with a session or \
-         user effect, this row moves and the movement is the finding."
+        BTreeSet::from([
+            "database.write<Carts>".to_string(),
+            "session.read".to_string()
+        ]),
+        "the write it always had, plus the session read it was doing without \
+         saying"
     );
     assert_eq!(c.allowed_placements, ["origin"]);
 }
@@ -168,13 +192,32 @@ fn a014_content_addressed_handler_before_repair() {
     );
 }
 
-/// **A-013 — `include_markdown("..")` in a build-time page.**
+/// **A-013 — `include_markdown("..")` in a build-time page. REPAIRED.**
 ///
-/// Reading a file at build time is plausibly a real platform operation with a
-/// real effect. Today it contributes nothing, so the page claims build-time
-/// determinism without anything checking what it reads.
+/// ```text
+/// Terms   caps {}                              -> {build.input.read<WorkspaceFile>}
+///         placements everywhere -> ["build"]      (by the CONTRACT repair)
+///                               -> ["build"]      (now also by the EFFECT)
+/// ```
+///
+/// Two repairs land on this row and they are independent. The placement moved
+/// first because `contract.rs` stopped discarding the author's pin. The
+/// capability moved second, and it is the one that matters: the page is now
+/// confined to build time **by what it does**, not by what it declares.
+///
+/// Architect ruling, 2026-08-10:
+///
+/// > `include_markdown` should not be an exempt compiler spelling, and I would
+/// > not model it as an unrestricted ordinary filesystem read. It is a
+/// > **tracked build input operation**. […] tracked source input read ≠ ambient
+/// > filesystem I/O.
+///
+/// So `effect build.input.read<T>` is `placement build`, and the page's
+/// determinism claim is carried by an effect instead of by an absence. Remove
+/// the pin and the answer would still be `build`, which is what says the claim
+/// is now measured rather than asserted.
 #[test]
-fn a013_build_time_page_before_repair() {
+fn a013_build_time_page_after_repair() {
     let cs = contracts_for(&["examples/accepted/A-013-build-time-deterministic-page.pw"]);
     let c = cs
         .iter()
@@ -185,31 +228,16 @@ fn a013_build_time_page_before_repair() {
                 cs.iter().map(|c| &c.component_id).collect::<Vec<_>>()
             )
         });
-    assert!(
-        caps(c).is_empty(),
-        "TODAY: nothing. If `include_markdown` becomes a build-time platform \
-         operation it will contribute an effect, and a page declaring \
-         `placement build` will have to satisfy the determinism rule against a \
-         real read rather than against silence. Got {:?}",
-        caps(c)
+    assert_eq!(
+        caps(c),
+        BTreeSet::from(["build.input.read<WorkspaceFile>".to_string()]),
+        "the page's authority is the build input it reads"
     );
-    // MOVED, 2026-08-10, and not by the resolution repair this file is about.
-    //
-    // It read `["build", "browser", "edge", "origin"]` — placeable everywhere,
-    // including the browser, for a page whose subject is build-time
-    // determinism. The evidence-reachability audit found why: `contract.rs`
-    // discarded the author's pinned world when building its placement demand,
-    // so `placement build` reached the checker and never reached the artifact.
-    //
-    // Classification: this row moved because the CONTRACT was repaired, not
-    // because the program changed. `include_markdown` still resolves to
-    // nothing, and the capability assertion above is still the before-state of
-    // the repair this file exists for.
     assert_eq!(
         c.allowed_placements,
         ["build"],
-        "the pin now reaches the artifact — but nothing yet checks that what \
-         the page READS is build-known, which is the `include_markdown` ruling"
+        "and it can only be produced at build time, which is now derived from \
+         the effect rather than accepted from the pin"
     );
 }
 
@@ -292,24 +320,19 @@ fn every_frozen_row_is_derived_from_a_call_that_resolves_to_nothing() {
     // The four programs, and the name each one calls into the void. Listed here
     // rather than re-derived, so this file states its own subject: if a repair
     // lands and this list is stale, the test that reads it fails.
-    // `examples/store/app.pw` / `current_session` was the fourth entry and is
-    // REPAIRED — see `store_page_after_repair` for the classification. It is
-    // named here rather than deleted so the list reads as a work-list with one
-    // item struck through, not as a list that was always three long.
-    const UNRESOLVED: &[(&str, &str)] = &[
-        (
-            "examples/accepted/A-005-idempotent-command.pw",
-            "current_consumer",
-        ),
-        (
-            "examples/accepted/A-014-content-addressed-resumable-handler.pw",
-            "add_to_cart",
-        ),
-        (
-            "examples/accepted/A-013-build-time-deterministic-page.pw",
-            "include_markdown",
-        ),
-    ];
+    // Three of the four are REPAIRED, each differently, and each classified in
+    // the test above it:
+    //
+    //     current_session    an import; the declaration already existed
+    //     current_consumer   the NAME was wrong; the types said so
+    //     include_markdown   a new tracked build-input operation
+    //
+    // They are named here rather than deleted so this reads as a work-list with
+    // items struck through, not as a list that was always one long.
+    const UNRESOLVED: &[(&str, &str)] = &[(
+        "examples/accepted/A-014-content-addressed-resumable-handler.pw",
+        "add_to_cart",
+    )];
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (file, name) in UNRESOLVED {
         let src =

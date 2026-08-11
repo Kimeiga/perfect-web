@@ -1,0 +1,41 @@
+// @corpus: platform
+// @id: PLATFORM-build
+// @category: platform — tracked build inputs
+// @charter: §9.3, §7.9
+// @milestone: E10
+//
+// The operations a build-time page may use to read its inputs.
+//
+// Architect ruling, 2026-08-10:
+//
+//   allowed at build time:
+//       declared/tracked build inputs
+//
+//   forbidden or specially modeled:
+//       arbitrary fs reads, current time, randomness, network state,
+//       undeclared environment
+//
+// `include_markdown` was called by `examples/accepted/A-013` and declared
+// nowhere. The page claimed build-time determinism while reading a file that
+// nothing tracked, and the claim held only because the call named nothing —
+// so the placement solver had no effect to constrain and put the page in every
+// world including the browser.
+
+module build
+
+// The resource a build input read is scoped to. A platform concept, declared
+// here rather than in the application's domain: `build.input.read<WorkspaceFile>`
+// is authority over the workspace, and a program cannot widen it by declaring
+// its own type of the same name.
+type WorkspaceFile = WorkspaceFile { path: String }
+
+// A workspace file, read at build time and recorded as a build input.
+//
+// **The path must be statically knowable.** The ruling is explicit that dynamic
+// arbitrary path lookup stays closed until there is a concrete need: a build
+// input the build graph cannot name before running is not a tracked input.
+// Enforcing that is a checker, and it is recorded in `docs/NEXT.md` rather than
+// implied by this signature.
+fn include_markdown(path: String) -> String !{ build.input.read<WorkspaceFile> } {
+    ""
+}

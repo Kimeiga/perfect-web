@@ -239,17 +239,20 @@ fn nothing_call_shaped_is_unowned_except_the_known_defects() {
     let by_owner = ownership();
     let unowned = by_owner.get(&Owner::Unowned).cloned().unwrap_or_default();
     let expected: BTreeSet<String> = [
-        // A platform/invocation-context operation, declared nowhere.
+        // The last one. An ordinary application reference from a deferred
+        // handler, which should become a component DEPENDENCY rather than
+        // smuggle `database.write<Carts>` into rendering code — and that
+        // depends on a `view` having a contract to depend from, which is the
+        // architect's step 8.
         //
-        // `current_session` was here until 2026-08-10. The repair was one
-        // import — `context.pw` had declared it since E2C — and it is the
-        // shape the architect ruled `current_consumer` should also take.
-        "current_consumer",
-        // A tracked build input, per the ruling. Declared nowhere.
-        "include_markdown",
-        // An ordinary application reference from a deferred handler, which
-        // should become a component dependency rather than smuggle
-        // `database.write<Carts>` into rendering code.
+        // Three left on 2026-08-10, each repaired differently:
+        //
+        //     current_session    an import; the declaration already existed
+        //     current_consumer   the NAME was wrong; `Carts.add` takes a
+        //                        SessionId and the command invalidates a
+        //                        session-keyed cache entry
+        //     include_markdown   a new tracked build-input operation with
+        //                        `placement build`
         "add_to_cart",
     ]
     .iter()

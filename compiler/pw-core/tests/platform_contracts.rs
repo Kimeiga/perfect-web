@@ -337,7 +337,14 @@ fn the_trusted_platform_contract_is_hashed() {
     // `session.read` says what authority reads session state; deriving the
     // second from the first was a guess. Topology decides where a session
     // provider exists.
-    const EXPECTED: u64 = 0x998d_aca0_ffce_9b73;
+    // Changed again 2026-08-10: `effect build.input.read<T>` is new, and
+    // `packages/pw-platform-web/build.pw` declares `include_markdown` and
+    // `WorkspaceFile`. Architect ruling — `include_markdown` is a tracked build
+    // input operation, not an exempt compiler spelling and not an unrestricted
+    // filesystem read. `placement build` is what carries A-013's determinism
+    // claim; before this the call named nothing and the page's contract
+    // permitted the browser.
+    const EXPECTED: u64 = 0x7606d48e24b0eb45;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

@@ -306,3 +306,27 @@ effect unsafe.raw_html {
 effect unsafe.raw_attribute {
     capability none
 }
+
+// --- build inputs ---------------------------------------------------------------
+
+// Architect ruling, 2026-08-10, on `include_markdown`:
+//
+// > It is a **tracked build input operation**. […] The important distinction
+// > is: tracked source input read ≠ ambient filesystem I/O. A deterministic
+// > build is allowed to depend on input files. What it must not do is silently
+// > depend on ambient state that the build graph doesn't know about.
+//
+// So this is not a filesystem read with the restrictions filed off. It is
+// origin-of-truth for a build dependency: the file becomes an explicit input,
+// its digest participates in the artifact's identity, and a build that reads it
+// is reproducible because the input is named.
+//
+// `placement build` is the whole point. A page that performs this can only be
+// produced at build time — which is what makes A-013's determinism claim mean
+// something, rather than being satisfied by an unresolved call contributing
+// nothing.
+effect build.input.read<T> {
+    placement  build
+    capability build.input.read<T>
+    host       "pw:host/build#input-read"
+}
