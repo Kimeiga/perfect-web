@@ -141,13 +141,13 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         ("invalidates_on", "MenuChanged(id), StoreChanged(id)"),
         ("invalidates_on", "StoreChanged(consumer)"),
         ("invalidates_on", "StoreChanged(id)"),
-        ("optimistic", "cart.add(item, quantity)"),
-        ("optimistic", "cart.remove(item)"),
+        ("optimistic", "cart => cart.add(item, quantity)"),
+        ("optimistic", "cart => cart.remove(item)"),
         ("requires", "SignedIn"),
         ("requires", "SignedIn, OwnsOrder(order)"),
-        ("rollback", "cart.remove(item)"),
-        ("rollback", "cart.restore(item)"),
-        ("rollback", "cart.remove(item, quantity)"),
+        ("rollback", "cart => cart.remove(item)"),
+        ("rollback", "cart => cart.restore(item)"),
+        ("rollback", "cart => cart.remove(item, quantity)"),
     ]
     .iter()
     .map(|(a, b)| (a.to_string(), b.to_string()))
@@ -165,49 +165,65 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
     );
 }
 
-/// **`optimistic` and `rollback` are whole terms, and `cart` is nothing.**
+/// **`optimistic` and `rollback` are parsed now, and their binder is explicit.**
 ///
 /// The sharpest row, isolated so it cannot be lost in the list. Both spellings
-/// name `cart`, and the two declarations that write them are `module
-/// store.page` and `module cart.commands` — the second's own module name
-/// begins with `cart`, which is a namespace and not a value either.
+/// named `cart`, and nothing bound it — not a module, not an import, not a
+/// parameter, not a local. Nothing had ever parsed them, so nothing had asked.
+///
+/// Architect ruling, 2026-08-10:
+///
+/// > Do **not** fix it with `if policy == optimistic: inject magic variable
+/// > named "cart"`. That recreates ambient framework convention inside the
+/// > compiler. […] Every identifier visible inside optimistic/rollback code
+/// > must arise from ordinary lexical scope or from an explicit binder in the
+/// > construct itself.
+///
+/// So the value is a lambda and its parameter is the binder — ADR-0024. The
+/// compiler supplies nothing.
 #[test]
-fn the_two_client_side_terms_name_something_that_does_not_exist() {
+fn the_two_client_side_terms_are_terms_with_an_explicit_binder() {
     assert_eq!(domain_of("optimistic"), Some(Domain::Term));
     assert_eq!(domain_of("rollback"), Some(Domain::Term));
 
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for rel in [
-        "examples/store/app.pw",
-        "examples/accepted/A-005-idempotent-command.pw",
-    ] {
-        let src = std::fs::read_to_string(root.join(rel)).unwrap_or_else(|e| panic!("{rel}: {e}"));
-        assert!(src.contains("optimistic    cart.add("), "{rel}");
-        // Nothing brings `cart` into scope. An import would; a parameter would;
-        // a `let` in the same body would. The command's body binds nothing.
-        assert!(
-            !src.contains("import cart") && !src.contains("{ cart }"),
-            "{rel} now imports `cart` — the two terms may resolve, and the \
-             frozen list above has to be reclassified"
-        );
-    }
-
-    // And the HIR agrees that the value is text: a policy has a `String`, not
-    // an `ExprId`. Asserted through the public type so the finding cannot
-    // quietly stop being true.
     let src = std::fs::read_to_string(root.join("examples/store/app.pw")).expect("store");
     let hir = lower_file(&src, &parse_tree(&src).green);
     let (_, add) = hir
         .all_decls()
         .find(|(_, d)| d.name == "add_to_cart")
         .expect("add_to_cart");
+
+    // The value is an EXPRESSION now, not text a consumer would have to parse.
     let opt = add.policy("optimistic").expect("optimistic");
-    assert_eq!(opt.value.trim(), "cart.add(item, quantity)");
+    let term = opt.term.expect("`optimistic` lowered to a term");
+    let body = hir.body(add.body.expect("body"));
     assert!(
-        add.body.is_some(),
-        "the command has a body, so the difference is not that policies come \
-         from a bodiless declaration — the body IS lowered, and this value is \
-         not part of it"
+        matches!(body.expr(term), pw_core::hir::Expr::Lambda { .. }),
+        "the binder is the lambda's parameter: {:?}",
+        body.expr(term)
+    );
+
+    // Its spans point into the FILE, not into the value's own text. A sub-parse
+    // starts at zero, so without the shift a diagnostic about `cart` would
+    // underline the first few columns of the module declaration.
+    let span = body.expr_span(term);
+    assert_eq!(
+        &src[span.clone()],
+        "cart => cart.add(item, quantity)",
+        "span {span:?}"
+    );
+
+    // And the compiler still binds nothing on its own: remove the binder and
+    // `cart` is unresolved.
+    let without = src.replace("optimistic    cart => cart.add", "optimistic    cart.add");
+    let out = pw_core::check::check_sources(&[("app.pw".to_string(), without)]);
+    assert!(
+        out.iter()
+            .flat_map(|(_, ds)| ds)
+            .any(|d| d.code == "PW0021" && d.message.contains("cart")),
+        "removing the binder must expose `cart`, not fall back to a magic \
+         binding named after the policy"
     );
 }
 

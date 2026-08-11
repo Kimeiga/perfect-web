@@ -262,7 +262,75 @@ fn unresolved_uses(
         // A declaration can call itself and its siblings.
         in_scope.extend(hir.all_decls().map(|(_, d)| d.name.clone()));
 
-        for id in body.walk() {
+        // **The body, PLUS every embedded policy term.**
+        //
+        // Architect ruling, 2026-08-10:
+        //
+        // > Being inside a policy never exempts an executable term from
+        // > resolution. […] There should not be a separate
+        // > "optimistic-expression resolver."
+        //
+        // A policy term is not reachable from `body.root` — deliberately, so
+        // the declaration's effect row does not absorb code that runs in
+        // another execution context — so it is added here by name rather than
+        // found by walking. It is the SAME rule below, not a second one.
+        //
+        // And the scope is the ordinary one. Architect ruling, same day:
+        //
+        // > Do not fix it with `if policy == optimistic: inject magic variable
+        // > named "cart"`. That recreates ambient framework convention inside
+        // > the compiler.
+        //
+        // So `optimistic cart.add(..)` reports `cart` as unresolved, which is
+        // the true state of the program: nothing binds it.
+        let mut reachable = body.walk();
+        for (policy, term) in decl.policy_terms() {
+            reachable.extend(body.walk_from(term));
+
+            // **Every name inside an embedded term must come from somewhere.**
+            //
+            // Architect ruling, 2026-08-10, locking the semantic requirement
+            // while leaving the surface syntax open:
+            //
+            // > Every identifier visible inside optimistic/rollback code must
+            // > arise from ordinary lexical scope or from an explicit binder in
+            // > the construct itself. No special-name lookup.
+            //
+            // The rule is narrow to embedded terms on purpose. A body is full
+            // of names that are markup, policy words and keywords, and
+            // reporting all of them is the over-broad rule that was reverted
+            // twice. An embedded term is different: it is executable code with
+            // no ambient scope, so every name in it is a use.
+            // The term's OWN binders, and only its own: `optimistic cart =>
+            // ..` binds `cart` for that value and not for `rollback`.
+            let mut term_scope = in_scope.clone();
+            term_scope.extend(crate::resolve::local_bindings_from(body, term));
+
+            for nid in body.walk_from(term) {
+                let Expr::Name(n) = body.expr(nid) else {
+                    continue;
+                };
+                if term_scope.contains(n)
+                    || crate::resolve::INTRINSIC_CALLS.contains(&n.as_str())
+                    || !matches!(
+                        workspace.resolve(unit, n),
+                        crate::resolve::Resolution::Unresolved
+                    )
+                {
+                    continue;
+                }
+                out.push(unresolved_in_policy_term(
+                    hir,
+                    decl,
+                    body,
+                    nid,
+                    n,
+                    &policy.name,
+                ));
+            }
+        }
+
+        for id in reachable {
             let Expr::Call { callee, .. } = body.expr(id) else {
                 continue;
             };
@@ -345,6 +413,45 @@ fn unresolved_uses(
         }
     }
     out
+}
+
+/// A name inside an `optimistic` or `rollback` term that nothing binds.
+fn unresolved_in_policy_term(
+    hir: &Hir,
+    decl: &Decl,
+    body: &Body,
+    id: ExprId,
+    name: &str,
+    policy: &str,
+) -> Diagnostic {
+    Diagnostic {
+        code: crate::codes::UNRESOLVED_NAME.id,
+        invariant: crate::codes::UNRESOLVED_NAME.invariant,
+        reason: "unresolved_in_policy_term",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!("`{name}` does not resolve"),
+        primary_span: body.expr_span(id),
+        related: vec![Related {
+            span: hir.decl_span(decl_id_of(hir, decl)),
+            label: format!("written in `{policy}` on `{}`", decl.name),
+        }],
+        explanation: Some(format!(
+            "An `{policy}` value is executable code: it runs on the client, and \
+             its names come from lexical scope like any other term's. `{name}` \
+             is not a parameter, not a local, and not a declaration this file \
+             can see.\n\nThis value was kept as unparsed text until \
+             2026-08-10, so nothing had ever asked. Making it a term means it \
+             is checked like a term — no ambient binding is supplied because \
+             the policy is spelled `{policy}`."
+        )),
+        repairs: vec![Repair {
+            description: format!(
+                "bind `{name}` explicitly, or write a value whose names are in scope"
+            ),
+            replacement: None,
+        }],
+    }
 }
 
 /// Does this bare call name something nothing in the language owns?
@@ -1252,6 +1359,7 @@ fn privacy_and_placement(
             let cache = crate::hir::Policy {
                 name: "cache".to_string(),
                 value: cache_value,
+                term: None,
                 span: cache_span,
             };
             let needed = label.required_cache_partitions();

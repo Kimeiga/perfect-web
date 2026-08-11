@@ -23,7 +23,7 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
-    optimistic    cart.add(item, quantity)
+    optimistic    cart => cart.add(item, quantity)
     // ERROR: no `rollback` declared.
     invalidates   Cart(current_session())
 {

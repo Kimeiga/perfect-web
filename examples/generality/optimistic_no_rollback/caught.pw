@@ -15,7 +15,7 @@ command remove_from_cart(item: MenuItemId)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
-    optimistic    cart.remove(item)
+    optimistic    cart => cart.remove(item)
     invalidates   Cart(current_session())
 {
     Carts.clear(current_session(), item)

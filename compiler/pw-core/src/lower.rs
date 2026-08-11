@@ -256,14 +256,27 @@ impl Lowerer<'_> {
             span_of(node),
         ));
 
+        // The policies are taken back out of the declaration, lowered against
+        // the body's arena, and put back. A policy whose domain is executable
+        // code needs an `ExprId`, and that arena does not exist until the body
+        // is built.
+        let mut policies = std::mem::take(
+            &mut self
+                .hir
+                .decls
+                .get_mut(id.index())
+                .expect("just allocated")
+                .policies,
+        );
         let (body, children) = match node.children().find(|c| c.kind() == K::Body) {
-            Some(b) => self.body(id, &b),
+            Some(b) => self.body(id, &b, &mut policies),
             None => (None, Vec::new()),
         };
         // Internal invariant, not a claim about the program: `id` was
         // returned by `alloc` four lines up and arenas do not shrink. No `.pw`
         // source can make this absent.
         let d = self.hir.decls.get_mut(id.index()).expect("just allocated");
+        d.policies = policies;
         d.body = body;
         d.children = children;
         Some(id)
@@ -383,6 +396,7 @@ impl Lowerer<'_> {
                         Policy {
                             name,
                             value,
+                            term: None,
                             span: span_of(&p),
                         }
                     })
@@ -473,7 +487,16 @@ impl Lowerer<'_> {
     }
 
     /// Lower a `Body` node, hoisting any nested declarations out of it.
-    fn body(&mut self, owner: DeclId, node: &SyntaxNode) -> (Option<BodyId>, Vec<DeclId>) {
+    ///
+    /// `policies` are lowered into the SAME arena, so a policy whose domain is
+    /// executable code gets a real expression with real spans — see
+    /// [`Self::policy_terms`].
+    fn body(
+        &mut self,
+        owner: DeclId,
+        node: &SyntaxNode,
+        policies: &mut [Policy],
+    ) -> (Option<BodyId>, Vec<DeclId>) {
         let Some(block) = node.children().find(|c| c.kind() == K::BlockExpr) else {
             return (None, Vec::new());
         };
@@ -489,6 +512,7 @@ impl Lowerer<'_> {
 
         let mut b = BodyBuilder::default();
         let root = self.block(&mut b, &block);
+        self.policy_terms(&mut b, policies);
         let body = Body {
             owner,
             exprs: b.exprs,
@@ -501,6 +525,64 @@ impl Lowerer<'_> {
             Some(BodyId(self.hir.bodies.alloc(body, span_of(node)))),
             children,
         )
+    }
+
+    /// **A policy value that is executable code becomes an expression.**
+    ///
+    /// Architect ruling, 2026-08-10:
+    ///
+    /// > `optimistic` and `rollback` are different: their contents are actual
+    /// > Pleris programs and must go through the full normal semantic pipeline.
+    ///
+    /// Which heads those are is `crate::policy`'s answer — one table, not a
+    /// second list here. The expression is allocated in the declaration's own
+    /// arena but is **not reachable from `root`**, deliberately: it is a term,
+    /// so name resolution must see it, and it runs in a different execution
+    /// context, so the declaration's effect row must not absorb it.
+    /// `Body::policy_terms` is how a consumer asks for them by name rather than
+    /// finding them by walking.
+    ///
+    /// Spans are offset back into the file. The sub-parse sees only the value
+    /// text, so without this a diagnostic would underline column 3 of whatever
+    /// line happened to be there.
+    fn policy_terms(&mut self, b: &mut BodyBuilder, policies: &mut [Policy]) {
+        for p in policies.iter_mut() {
+            if crate::policy::domain_of(&p.name) != Some(crate::policy::Domain::Term) {
+                continue;
+            }
+            if p.value.trim().is_empty() {
+                continue;
+            }
+            // Where the value starts in the file: the policy's span covers
+            // `<head> <value>`, and the head plus the whitespace after it is
+            // what precedes the value.
+            let whole = &self.src[p.span.clone()];
+            let offset = p.span.start
+                + whole
+                    .find(&p.value)
+                    .unwrap_or_else(|| p.name.len().min(whole.len()));
+            let parsed = pw_syntax::parse_expr(&p.value);
+            let Some(expr) = parsed.green.children().find(|c| is_expr(c.kind())) else {
+                continue;
+            };
+            // Lowered by a `Lowerer` over the VALUE's text, because `span_of`
+            // reads a node's range and the sub-parse's ranges start at zero.
+            // Then every span it allocated is moved back into the file — one
+            // shift over the arena suffix, rather than a second span
+            // convention that every node kind would have to honour.
+            let before = (b.exprs.len(), b.pats.len(), b.types.len(), b.nodes.len());
+            let mut sub = Lowerer {
+                hir: std::mem::take(&mut self.hir),
+                src: &p.value,
+            };
+            let id = sub.expr(b, &expr);
+            self.hir = std::mem::take(&mut sub.hir);
+            b.exprs.shift_spans_from(before.0, offset);
+            b.pats.shift_spans_from(before.1, offset);
+            b.types.shift_spans_from(before.2, offset);
+            b.nodes.shift_spans_from(before.3, offset);
+            p.term = Some(id);
+        }
     }
 
     fn block(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> ExprId {

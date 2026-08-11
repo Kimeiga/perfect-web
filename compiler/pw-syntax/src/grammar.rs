@@ -1932,6 +1932,50 @@ pub fn parse_tree(src: &str) -> Parse {
     P::new(src).run()
 }
 
+/// **Parse one expression, standalone.**
+///
+/// The same expression grammar `parse_tree` uses — there is one parser
+/// (E6F), and a second reader of Pleris expressions is exactly what that
+/// milestone existed to remove.
+///
+/// Written for policy values whose domain is executable code:
+/// `optimistic cart.add(item, quantity)` is a term, and the declaration-level
+/// policy grammar keeps a policy's value as TEXT. Until 2026-08-10 nothing had
+/// ever parsed those, so two real client-side calls naming something that does
+/// not exist had never been examined.
+///
+/// The returned tree is rooted at `K::SourceFile` with the expression as its
+/// only child, so every consumer that walks a tree works unchanged. Spans are
+/// relative to `src` and the caller offsets them — see
+/// `pw_core::lower`'s policy-term lowering.
+pub fn parse_expr(src: &str) -> Parse {
+    let mut p = P::new(src);
+    p.b.start(K::SourceFile);
+    if !p.at_eof() {
+        p.expr(0);
+    }
+    while !p.at_eof() {
+        p.fuel += 1;
+        if p.fuel > 200_000 {
+            p.error("PW0099", "parser made no progress");
+            break;
+        }
+        // Anything after the first expression is a second value in a position
+        // that takes one. Reported rather than dropped: a policy whose value
+        // is `a b` means something the compiler does not understand, and
+        // silence would make it mean nothing at all.
+        p.start(K::ErrorExpr);
+        p.error("PW0103", "a policy value is one expression");
+        p.bump();
+        p.finish();
+    }
+    p.b.finish_node();
+    Parse {
+        green: SyntaxNode::new_root(p.b.finish()),
+        errors: p.errors,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

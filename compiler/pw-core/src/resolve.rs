@@ -607,6 +607,16 @@ pub const VALUE_DOMAIN_CALLS: &[&str] = &[
 /// checker report the program's own locals as undeclared — which is how a
 /// checker like this becomes noise and gets turned off.
 pub fn local_bindings(body: &crate::hir::Body) -> BTreeSet<String> {
+    local_bindings_from(body, body.root)
+}
+
+/// The same collection, rooted at an arbitrary expression.
+///
+/// For an embedded policy term. `optimistic cart => cart.add(..)` binds `cart`
+/// for that term and nothing else — a binder in `optimistic` is not in scope in
+/// `rollback`, and computing one set over the whole declaration would make it
+/// so.
+pub fn local_bindings_from(body: &crate::hir::Body, root: crate::hir::ExprId) -> BTreeSet<String> {
     use crate::hir::{Expr, Node, Pattern};
     let mut out = BTreeSet::new();
 
@@ -633,7 +643,7 @@ pub fn local_bindings(body: &crate::hir::Body) -> BTreeSet<String> {
         }
     }
 
-    for id in body.walk() {
+    for id in body.walk_from(root) {
         match body.expr(id) {
             Expr::Let { pat: Some(p), .. } => pattern_names(body, *p, &mut out),
             Expr::Lambda { params, .. } => {

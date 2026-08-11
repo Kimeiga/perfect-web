@@ -261,18 +261,47 @@ fn no_call_lambda_or_match_in_the_tree_is_lost_in_lowering() {
 }
 
 #[test]
-fn every_allocated_expression_is_reachable_from_the_root() {
+fn every_allocated_expression_has_exactly_one_named_root() {
     // Orphans mean a subtree was lowered but never attached. A checker that
     // walks from the root would miss it, while a test that iterates the arena
     // would not notice — so this compares the two.
+    //
+    // **There is now one deliberate second root, and it is named here rather
+    // than exempted.** A policy whose domain is executable code — `optimistic`,
+    // `rollback` — lowers its value into the same arena and is reachable from
+    // `Policy::term`, NOT from `Body::root`. Architect ruling, 2026-08-10: such
+    // a value is a real term and must be resolved like one, and it runs in a
+    // different execution context, so the declaration's effect row must not
+    // absorb it. Reachable-from-root would have given the second for free with
+    // the first.
+    //
+    // The invariant is unchanged in substance: nothing is allocated that no
+    // named root reaches. Widening it to "or anywhere" would be the weakening
+    // this test exists to prevent.
     for path in corpus() {
         let src = std::fs::read_to_string(&path).expect("read");
         let p = parse_tree(&src);
         let hir = lower_file(&src, &p.green);
         let name = path.file_name().unwrap().to_string_lossy();
 
+        // Which body belongs to which declaration, so a policy term can be
+        // attributed to the arena it was allocated in.
+        let mut roots: std::collections::HashMap<usize, Vec<ExprId>> =
+            std::collections::HashMap::new();
+        for (_, d) in hir.all_decls() {
+            let Some(b) = d.body else { continue };
+            roots
+                .entry(b.index())
+                .or_default()
+                .extend(d.policy_terms().map(|(_, t)| t));
+        }
+
         for (bi, body, _) in hir.bodies.iter() {
-            let reachable: std::collections::HashSet<ExprId> = body.walk().into_iter().collect();
+            let mut reachable: std::collections::HashSet<ExprId> =
+                body.walk().into_iter().collect();
+            for t in roots.get(&bi).into_iter().flatten() {
+                reachable.extend(body.walk_from(*t));
+            }
             let orphans: Vec<_> = body
                 .exprs()
                 .filter(|(id, _, _)| !reachable.contains(id))
@@ -291,6 +320,55 @@ fn every_allocated_expression_is_reachable_from_the_root() {
             );
         }
     }
+}
+
+/// **A policy term is NOT reachable from the body's root**, and that is the
+/// property the execution-context separation rests on.
+///
+/// Without this, `every_allocated_expression_has_exactly_one_named_root` above
+/// would pass just as happily for a lowering that attached policy terms to the
+/// block — and every body-walking analysis would silently start charging a
+/// command for code that runs on the client.
+#[test]
+fn an_embedded_policy_term_is_not_reachable_from_the_body_root() {
+    let src = "\
+module m
+
+type Cart = Cart { n: Int }
+type CartError = CartError { why: String }
+opaque type MenuItemId = String
+
+command add(item: MenuItemId) -> Result<Cart, CartError>
+    requires   SignedIn
+    optimistic cart => cart.add(item)
+    rollback   cart => cart.remove(item)
+{
+    todo
+}
+";
+    let hir = lower(src);
+    let (_, d) = hir.all_decls().find(|(_, d)| d.name == "add").expect("add");
+    let body = hir.body(d.body.expect("body"));
+
+    let terms: Vec<ExprId> = d.policy_terms().map(|(_, t)| t).collect();
+    assert_eq!(terms.len(), 2, "both policies lowered a term");
+
+    let from_root: std::collections::HashSet<ExprId> = body.walk().into_iter().collect();
+    for t in &terms {
+        assert!(
+            !from_root.contains(t),
+            "a policy term is reachable from the body root, so every walk now \
+             sees client-side code as part of the command"
+        );
+    }
+
+    // And it IS reachable from the policy, so nothing is lost.
+    assert!(
+        body.walk_from(terms[0])
+            .iter()
+            .any(|id| matches!(body.expr(*id), pw_core::hir::Expr::Call { .. })),
+        "the term is a real expression tree"
+    );
 }
 
 #[test]

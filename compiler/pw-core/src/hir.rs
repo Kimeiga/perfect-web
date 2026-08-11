@@ -102,6 +102,18 @@ impl<T> Arena<T> {
         self.nodes.get(i)
     }
 
+    /// Move every span from `from` onward by `offset` bytes.
+    ///
+    /// For a sub-parse. A policy value whose domain is executable code is
+    /// parsed from its own text, so its spans start at zero; without this a
+    /// diagnostic about `optimistic cart.add(..)` would underline the first
+    /// few columns of the file.
+    pub fn shift_spans_from(&mut self, from: usize, offset: usize) {
+        for s in self.spans.iter_mut().skip(from) {
+            *s = (s.start + offset)..(s.end + offset);
+        }
+    }
+
     pub fn get_mut(&mut self, i: usize) -> Option<&mut T> {
         self.nodes.get_mut(i)
     }
@@ -269,6 +281,22 @@ pub struct Policy {
     /// Everything after the keyword, trimmed. Empty when the policy is a bare
     /// word such as `offline`.
     pub value: String,
+    /// **The value as an expression**, when this policy's domain is executable
+    /// code — `optimistic` and `rollback` (`crate::policy::Domain::Term`).
+    ///
+    /// Architect ruling, 2026-08-10:
+    ///
+    /// > `optimistic` and `rollback` are different: their contents are actual
+    /// > Pleris programs and must go through the full normal semantic
+    /// > pipeline.
+    ///
+    /// It points into the OWNING DECLARATION'S body arena, and is deliberately
+    /// **not reachable from that body's root**. It is a term, so name
+    /// resolution must see it; it runs in a different execution context — on
+    /// the client, before the round trip — so the declaration's effect row must
+    /// not absorb it. Reachable-from-root would have given the second for free
+    /// along with the first.
+    pub term: Option<ExprId>,
     pub span: Span,
 }
 
@@ -334,6 +362,15 @@ impl Decl {
     /// The value of a named policy, if the declaration declares it.
     pub fn policy(&self, name: &str) -> Option<&Policy> {
         self.policies.iter().find(|p| p.name == name)
+    }
+
+    /// Every policy value that is a real term, with the policy that holds it.
+    ///
+    /// The explicit way to reach an embedded term. A consumer that should see
+    /// them asks; one that should not, does not — and neither finds them by
+    /// accident, because they are not reachable from the body's root.
+    pub fn policy_terms(&self) -> impl Iterator<Item = (&Policy, ExprId)> {
+        self.policies.iter().filter_map(|p| p.term.map(|t| (p, t)))
     }
 }
 
