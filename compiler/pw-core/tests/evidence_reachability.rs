@@ -50,6 +50,13 @@
 //! Missing      no observer capable of answering this claim exists at all
 //! ```
 //!
+//! **`Unqueryable` is currently empty.** Both rows that held it were
+//! exhaustiveness fixtures, and `check::match_analysis` — `Proven |
+//! NonExhaustive | Blocked` — closed them on 2026-08-10. A-012 turned out not
+//! to contain a `match` at all, which the audit caught the moment the analysis
+//! became observable: it had been classified against an observer that could
+//! never have answered for it.
+//!
 //! # This file freezes today's verdicts
 //!
 //! Same discipline as `unresolved_provenance.rs` and `policy_consumers.rs`. A
@@ -58,6 +65,7 @@
 
 use std::collections::BTreeSet;
 
+use pw_core::check::{MatchOutcome, match_analysis};
 use pw_core::contract::{ComponentContract, contracts};
 use pw_core::effects::Inference;
 use pw_core::graph::Graph;
@@ -87,6 +95,11 @@ enum Observer {
     Resume,
     Dependency,
     Exhaustiveness,
+    /// The claim is that external data enters by DECODING rather than by
+    /// casting — an absence, like `EffectAbsence`, and admissible for the same
+    /// reason: `PW0601` demonstrably fires on `R-009`, so silence here is an
+    /// answer rather than an unexercised rule.
+    CastAbsence,
     /// Nothing in the compiler records this kind of fact yet.
     None_,
 }
@@ -94,6 +107,15 @@ enum Observer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Reach {
     Witnessed,
+    /// An observer exists inside the compiler and cannot be asked from
+    /// outside, so an audit can only see the absence of a diagnostic.
+    ///
+    /// **Currently empty.** Both rows that held it — A-002 and A-012 — were
+    /// closed on 2026-08-10 by exposing `check::match_analysis`. Kept because
+    /// the class is real and the next analysis added without an observable
+    /// result belongs in it; deleting it would make that a `Missing` row and
+    /// lose the distinction between *nothing can answer* and *nothing may ask*.
+    #[allow(dead_code)]
     Unqueryable,
     Missing,
 }
@@ -112,10 +134,12 @@ const CLAIMS: &[(&str, Observer, Reach, &str)] = &[
         Reach::Witnessed,
         "a pure calculation performs nothing",
     ),
+    // Moved `Unqueryable` → `Witnessed` when `check::match_analysis` exposed
+    // the outcome. Its match is `Proven`, and now says so.
     (
         "A-002",
         Observer::Exhaustiveness,
-        Reach::Unqueryable,
+        Reach::Witnessed,
         "every order state is rendered",
     ),
     (
@@ -173,11 +197,17 @@ const CLAIMS: &[(&str, Observer, Reach, &str)] = &[
         "an offline draft's conflict policy is explicit rather than \
          last-write-wins",
     ),
+    // A-012 has no `match` at all. It was classified `Exhaustiveness` /
+    // `Unqueryable` on 2026-08-10 and that was WRONG in a way the audit itself
+    // caught: exposing `match_analysis` turned the row red, because the
+    // analysis reports nothing for a fixture with nothing to analyse. Its
+    // subject is `?` propagation and typed errors, and the half that can be
+    // witnessed is that nothing is cast.
     (
         "A-012",
-        Observer::Exhaustiveness,
-        Reach::Unqueryable,
-        "a decoder handles malformed input",
+        Observer::CastAbsence,
+        Reach::Witnessed,
+        "external data enters by decoding, and nothing is cast",
     ),
     // Moved `Missing` → `Witnessed` when `contract.rs` stopped discarding the
     // author's pinned world. What is witnessed is the pin, not the derivation
@@ -261,6 +291,8 @@ const CLAIMS: &[(&str, Observer, Reach, &str)] = &[
 
 struct Program {
     hirs: Vec<Hir>,
+    /// Every file, in the order the `hirs` were built from them.
+    sources: Vec<String>,
     src: String,
 }
 
@@ -299,6 +331,7 @@ impl Program {
                 .iter()
                 .map(|s| lower_file(s, &parse_tree(s).green))
                 .collect(),
+            sources: files,
             src,
         }
     }
@@ -375,6 +408,29 @@ fn interrogate(p: &Program) -> BTreeSet<Observer> {
         answered.insert(Observer::Dependency);
     }
 
+    // Exhaustiveness — the analysis reached a CONCLUSION about some match in
+    // this fixture. `Blocked` is not an answer, which is the whole point of the
+    // three-state outcome: it means the analysis did not run.
+    // The WHOLE program, not the fixture alone: `OrderState` is declared in
+    // `examples/domain.pw`, and a scrutinee whose type this unit cannot see is
+    // `Blocked` — correctly, and it is not the question being asked.
+    let units: Vec<pw_core::check::Unit> = p
+        .sources
+        .iter()
+        .enumerate()
+        .map(|(i, src)| pw_core::check::Unit {
+            path: format!("{i}.pw"),
+            src: src.clone(),
+            hir: lower_file(src, &parse_tree(src).green),
+        })
+        .collect();
+    if match_analysis(&units)
+        .iter()
+        .any(|m| !matches!(m.outcome, MatchOutcome::Blocked { .. }))
+    {
+        answered.insert(Observer::Exhaustiveness);
+    }
+
     // Resume — a manifest was generated.
     if !pw_core::resume_artifacts::generate(&p.src, hir, &sigs, "dev").is_empty() {
         answered.insert(Observer::Resume);
@@ -406,14 +462,19 @@ fn every_accepted_fixture_has_the_reachability_the_table_records() {
             // Silence, with the control above standing behind it.
             Observer::EffectAbsence if !answered.contains(&Observer::Effect) => Reach::Witnessed,
             Observer::EffectAbsence => Reach::Missing,
+            Observer::CastAbsence if !answered.contains(&Observer::CastAbsence) => Reach::Witnessed,
+            Observer::CastAbsence => Reach::Missing,
             // Nothing records this kind of fact, so there is nothing to query.
             Observer::None_ => Reach::Missing,
-            // The exhaustiveness algorithm runs inside `check` and returns
-            // early on `Proven`. `exhaust::check_match` is public but the HIR→
-            // pattern lowering it needs is not, so an audit cannot ask whether
-            // a match was proved — only whether a diagnostic appeared, which is
-            // also what a checker that never ran produces.
-            Observer::Exhaustiveness => Reach::Unqueryable,
+            // Queryable since 2026-08-10. `check::match_analysis` returns
+            // `Proven | NonExhaustive | Blocked` for every match in the
+            // program, and the diagnostic is a projection of it — so an audit
+            // can assert a POSITIVE proof instead of inferring one from the
+            // absence of an error.
+            Observer::Exhaustiveness if answered.contains(&Observer::Exhaustiveness) => {
+                Reach::Witnessed
+            }
+            Observer::Exhaustiveness => Reach::Missing,
             o if answered.contains(o) => Reach::Witnessed,
             _ => Reach::Missing,
         };
@@ -463,6 +524,7 @@ view Button(label: String) !{} {
         .collect();
     let p = Program {
         hirs,
+        sources: files.clone(),
         src: src.to_string(),
     };
 
@@ -512,6 +574,7 @@ component Button(label: String) {
         .collect();
     let p = Program {
         hirs,
+        sources: files.clone(),
         src: with_contract.to_string(),
     };
     let answered = interrogate(&p);
@@ -614,5 +677,144 @@ fn the_contract_carries_the_placement_its_author_pinned() {
         c.allowed_placements,
         ["origin"],
         "an unpinned component's placement still comes from what it performs"
+    );
+}
+
+// --- the exhaustiveness observer, with the controls the ruling required -------
+
+/// **All three outcomes are reachable, and `Blocked` is not a proof.**
+///
+/// Architect ruling, 2026-08-10:
+///
+/// > I would require controls for all three states: exhaustive match → Proven;
+/// > non-exhaustive match → NonExhaustive + witness; ill-formed / semantically
+/// > blocked match → Blocked.
+///
+/// Before `check::match_analysis` existed, only the middle one was observable —
+/// as a diagnostic — and the other two were both *no diagnostic*.
+#[test]
+fn the_exhaustiveness_analysis_reports_all_three_outcomes() {
+    let analyse = |src: &str| -> Vec<MatchOutcome> {
+        let units = vec![pw_core::check::Unit {
+            path: "t.pw".to_string(),
+            src: src.to_string(),
+            hir: lower_file(src, &parse_tree(src).green),
+        }];
+        match_analysis(&units)
+            .into_iter()
+            .map(|m| m.outcome)
+            .collect()
+    };
+
+    let proven = "\
+module m
+
+type State = | Draft | Sent
+
+fn f(s: State) -> Int {
+    match s {
+        Draft => 1
+        Sent => 2
+    }
+}
+";
+    assert_eq!(analyse(proven), [MatchOutcome::Proven]);
+
+    let missing = "\
+module m
+
+type State = | Draft | Sent
+
+fn f(s: State) -> Int {
+    match s {
+        Draft => 1
+    }
+}
+";
+    let out = analyse(missing);
+    let [MatchOutcome::NonExhaustive { missing }] = out.as_slice() else {
+        panic!("{out:?}")
+    };
+    assert_eq!(missing, &["Sent".to_string()], "and it names the witness");
+
+    // Blocked: the scrutinee's type is not one this program declares, so the
+    // analysis has no matrix to build. **Not** a proof, and not a violation.
+    let blocked = "\
+module m
+
+fn f(s: Int) -> Int {
+    match s {
+        1 => 1
+    }
+}
+";
+    assert!(
+        matches!(analyse(blocked).as_slice(), [MatchOutcome::Blocked { .. }]),
+        "{:?}",
+        analyse(blocked)
+    );
+}
+
+/// **The structural control the ruling asked for.**
+///
+/// > An implementation that simply stops calling exhaustiveness analysis must
+/// > make the evidence audit fail rather than turn every accepted match into
+/// > apparent success.
+///
+/// The audit asks `match_analysis` for a conclusion. If the analysis stopped
+/// running, every match would come back `Blocked` — or the list would be empty
+/// — and A-002's row would go `Missing`, which is a red test. This asserts the
+/// mechanism directly: a program with a real match must produce a real
+/// conclusion, and the count must match the number of matches written.
+#[test]
+fn an_analysis_that_stops_running_cannot_look_like_success() {
+    let p = Program::for_fixture("A-002");
+    let units: Vec<pw_core::check::Unit> = p
+        .sources
+        .iter()
+        .enumerate()
+        .map(|(i, src)| pw_core::check::Unit {
+            path: format!("{i}.pw"),
+            src: src.clone(),
+            hir: lower_file(src, &parse_tree(src).green),
+        })
+        .collect();
+    let reports = match_analysis(&units);
+
+    let proven: Vec<&pw_core::check::MatchAnalysis> = reports
+        .iter()
+        .filter(|m| m.outcome == MatchOutcome::Proven)
+        .collect();
+    assert_eq!(
+        proven.len(),
+        1,
+        "A-002 writes exactly one match and it is proved exhaustive: {:?}",
+        reports
+            .iter()
+            .map(|m| (&m.declaration, &m.outcome))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(proven[0].declaration, "OrderStatus");
+    assert_eq!(proven[0].scrutinee_type.as_deref(), Some("OrderState"));
+
+    // And the number of conclusions equals the number of matches written, so a
+    // silently skipped match cannot pass as a program with none.
+    // Counted from the source, ignoring comment lines. A-002 writes its match
+    // inside markup — `{match state {` — so the marker is the keyword followed
+    // by a scrutinee, not the start of a line.
+    let written = p
+        .sources
+        .iter()
+        .map(|s| {
+            s.lines()
+                .filter(|l| !l.trim_start().starts_with("//"))
+                .filter(|l| l.contains("match ") && l.trim_end().ends_with('{'))
+                .count()
+        })
+        .sum::<usize>();
+    assert_eq!(
+        reports.len(),
+        written,
+        "every `match` in the program produced a conclusion"
     );
 }

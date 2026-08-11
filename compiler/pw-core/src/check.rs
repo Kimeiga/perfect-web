@@ -621,6 +621,144 @@ fn check_unit_with(
     out
 }
 
+/// **What the exhaustiveness analysis concluded about one `match`.**
+///
+/// Architect ruling, 2026-08-10:
+///
+/// > I would make diagnostics a **projection of an analysis result**, not the
+/// > only observable result. […] Now the audit can assert **positive proof**
+/// > rather than infer it from silence.
+///
+/// The hole this closes, found by `tests/evidence_reachability.rs`: A-002 and
+/// A-012 are exhaustiveness fixtures, and the only thing observable about them
+/// from outside was the *absence* of a diagnostic — which is also what a
+/// checker that never ran produces. Both were classified `Unqueryable`.
+///
+/// `Blocked` is the variant that makes the difference. It is not a violation
+/// and emphatically not a proof: it says the analysis produced no answer, and
+/// it is what every early return in `analyse_match` became.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MatchOutcome {
+    /// The analysis ran and every value is covered.
+    Proven,
+    /// The analysis ran and these values are not.
+    NonExhaustive { missing: Vec<String> },
+    /// The analysis did not run. Never read this as coverage.
+    Blocked { reason: String },
+}
+
+/// One `match`, with what the analysis concluded and where it is.
+#[derive(Debug, Clone)]
+pub struct MatchAnalysis {
+    /// The declaration the match is written in.
+    pub declaration: String,
+    /// The scrutinee's type as the program declares it, when it has one.
+    pub scrutinee_type: Option<String>,
+    pub span: crate::hir::Span,
+    pub outcome: MatchOutcome,
+}
+
+/// **Every `match` in the program, and what was concluded about it.**
+///
+/// The same walk `check_unit` does, so a `match` that reaches the checker
+/// reaches this and vice versa. A separate walk here would let the two disagree
+/// about which matches exist, and the disagreement would be invisible: an
+/// audit would report a proof for a match no rule examined.
+pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
+    let env = Env::build(units);
+    let mut out = Vec::new();
+    for unit in units {
+        for (_, decl) in unit.hir.all_decls() {
+            let Some(body_id) = decl.body else { continue };
+            let body = unit.hir.body(body_id);
+            let mut locals: BTreeMap<String, String> = BTreeMap::new();
+            for p in &decl.params {
+                if let Some(t) = &p.ty {
+                    locals.insert(p.name.clone(), t.written());
+                }
+            }
+            for id in body.walk() {
+                if let Expr::Match { scrutinee, arms } = body.expr(id) {
+                    out.push(analyse_match(
+                        &env, &decl.name, body, id, *scrutinee, arms, &locals,
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The analysis, with no diagnostics in it.
+#[allow(clippy::too_many_arguments)]
+fn analyse_match(
+    env: &Env,
+    declaration: &str,
+    body: &Body,
+    match_id: ExprId,
+    scrutinee: ExprId,
+    arms: &[hir::MatchArm],
+    locals: &BTreeMap<String, String>,
+) -> MatchAnalysis {
+    let span = body.expr_span(match_id);
+    let blocked = |reason: &str, ty: Option<String>| MatchAnalysis {
+        declaration: declaration.to_string(),
+        scrutinee_type: ty,
+        span: span.clone(),
+        outcome: MatchOutcome::Blocked {
+            reason: reason.to_string(),
+        },
+    };
+
+    // Only a bare name whose type is declared. No guessing (see module docs) —
+    // and each of these was a bare `return` until 2026-08-10, which is exactly
+    // the silence the audit could not tell from a proof.
+    let Expr::Name(n) = body.expr(scrutinee) else {
+        return blocked(
+            "the scrutinee is not a bare name, so its type is unknown here",
+            None,
+        );
+    };
+    let Some(ty_name) = locals.get(n) else {
+        return blocked("the scrutinee's type is not declared in this body", None);
+    };
+    let Some(adt_id) = env.adt_of(ty_name) else {
+        return blocked(
+            "the scrutinee's type is not an algebraic data type this program declares",
+            Some(ty_name.clone()),
+        );
+    };
+    let ctors = &env.ctor_names[ty_name];
+    let lowered: Vec<Arm> = arms
+        .iter()
+        .map(|a| Arm {
+            pattern: to_exhaust_pattern(body, a.pat, ctors),
+            span: body.pat_span(a.pat),
+        })
+        .collect();
+
+    let report = exhaust::check_match(env.program(), &Type::Adt(adt_id), &lowered);
+    let outcome = match report.outcome() {
+        crate::outcome::Outcome::Proven(_) => MatchOutcome::Proven,
+        crate::outcome::Outcome::Blocked(bs) => MatchOutcome::Blocked {
+            reason: format!("{bs:?}"),
+        },
+        crate::outcome::Outcome::Violation(_) => MatchOutcome::NonExhaustive {
+            missing: report
+                .missing
+                .iter()
+                .map(|w| exhaust::render_witness(env.program(), &Type::Adt(adt_id), w))
+                .collect(),
+        },
+    };
+    MatchAnalysis {
+        declaration: declaration.to_string(),
+        scrutinee_type: Some(ty_name.clone()),
+        span,
+        outcome,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn exhaustiveness(
     env: &Env,
@@ -632,6 +770,14 @@ fn exhaustiveness(
     locals: &BTreeMap<String, String>,
     out: &mut Vec<Diagnostic>,
 ) {
+    // **The verdict comes from `analyse_match`, not from a second run.**
+    //
+    // Architect ruling, 2026-08-10: a diagnostic is a projection of an analysis
+    // result. Deriving it twice would let the report an audit reads and the
+    // error a developer reads disagree, and the disagreement would be silent —
+    // which is `docs/RISK_QUEUE.md`'s most common shape.
+    let analysis = analyse_match(env, "", body, match_id, scrutinee, arms, locals);
+
     // Only a bare name whose type is declared. No guessing (see module docs).
     let Expr::Name(n) = body.expr(scrutinee) else {
         return;
@@ -709,24 +855,14 @@ fn exhaustiveness(
         });
     }
 
-    let report = exhaust::check_match(env.program(), &Type::Adt(adt_id), &lowered);
-    match report.outcome() {
-        // Nothing missing, and the analysis actually ran.
-        crate::outcome::Outcome::Proven(_) => return,
-        // No answer. The reason is already reported by whichever phase found
-        // it — `PW0603` above, for the arity case — and saying it twice would
-        // turn one defect into two. What must NOT happen is returning here as
-        // though the match had been proved exhaustive, which is what
-        // `is_exhaustive()` did.
-        crate::outcome::Outcome::Blocked(_) => return,
-        crate::outcome::Outcome::Violation(_) => {}
-    }
-
-    let missing: Vec<String> = report
-        .missing
-        .iter()
-        .map(|w| exhaust::render_witness(env.program(), &Type::Adt(adt_id), w))
-        .collect();
+    // A `Blocked` analysis produced NO ANSWER. The reason is already reported
+    // by whichever phase found it — `PW0603` above, for the arity case — and
+    // saying it twice would turn one defect into two. What must not happen is
+    // treating it as a proof of exhaustiveness, which is what `is_exhaustive()`
+    // did before `Outcome` existed.
+    let MatchOutcome::NonExhaustive { missing } = &analysis.outcome else {
+        return;
+    };
 
     let span = body.expr_span(match_id);
     out.push(Diagnostic {
@@ -764,7 +900,7 @@ fn exhaustiveness(
             .collect(),
     });
 
-    let _ = unit;
+    let _ = (unit, &lowered);
 }
 
 /// HIR pattern → the usefulness algorithm's pattern.
