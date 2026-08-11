@@ -6,8 +6,14 @@
 // `resumable(captures = ..)`, or to a record being captured, would catch this.
 module generality.resume_public_ok
 
-import domain.{ Store }
+import domain.{ Store, StoreId }
 import store.queries
+
+// 2026-08-10: PW0021 learned to examine bare calls. A witness that calls a
+// name nothing declares is invalid evidence by the corpus's own rule, so the
+// callee is declared here — the witness stays self-contained and its subject
+// is unchanged.
+fn open(id: StoreId) -> () !{} { todo }
 
 view StoreCard(store: Store) !{} {
     <section aria-label="Store">

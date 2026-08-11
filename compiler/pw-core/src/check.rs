@@ -268,6 +268,27 @@ fn unresolved_uses(
             };
             let path = path_of(body, *callee);
             let Some((head, _)) = path.split_once('.') else {
+                // **A BARE call.**
+                //
+                // Examined here since 2026-08-10, and not before — which is why
+                // four accepted programs called names that do not exist and
+                // checked clean since E4. Every analysis produces an answer for
+                // a call it cannot resolve: inference contributes no effects,
+                // privacy no label, placement no constraint, the contract no
+                // capability. Each of those is indistinguishable from *this
+                // call is harmless*.
+                //
+                // The subject is narrow on purpose. Two earlier attempts at
+                // this rule reported sixteen and then eleven corpus errors and
+                // were reverted rather than landed over-broad, because a
+                // call-shaped construct can have real meaning that resolution
+                // does not supply: a language constructor, a policy operator, a
+                // CSS value function. `tests/semantic_ownership.rs` is the gate
+                // that made the class small enough to report — it names every
+                // owner, and the residue it leaves is what this reports.
+                if bare_call_is_unowned(workspace, unit, &path, &in_scope) {
+                    out.push(unresolved_bare_call(hir, decl, body, id, &path));
+                }
                 continue;
             };
             // Only a head that looks like a module: either the workspace has
@@ -324,6 +345,74 @@ fn unresolved_uses(
         }
     }
     out
+}
+
+/// Does this bare call name something nothing in the language owns?
+///
+/// The owners, in the order `tests/semantic_ownership.rs` establishes them:
+/// lexical scope, a declaration the unit can see, language syntax, a policy
+/// head or operator, a value domain. A name none of those claims is a name the
+/// author wrote and the compiler never gave meaning to.
+fn bare_call_is_unowned(
+    workspace: &crate::resolve::Workspace,
+    unit: usize,
+    path: &str,
+    in_scope: &std::collections::BTreeSet<String>,
+) -> bool {
+    use crate::resolve::Resolution;
+
+    if in_scope.contains(path)
+        || crate::resolve::INTRINSIC_CALLS.contains(&path)
+        || crate::resolve::VALUE_DOMAIN_CALLS.contains(&path)
+    {
+        return false;
+    }
+    // A policy head, or an operator under one. `merge_by_field(..)` and
+    // `content_address(..)` lower into the body as ordinary calls today; the
+    // `PolicyExpr` split is what will stop them doing so, and until it lands
+    // reporting them would be reporting a policy value as a missing function.
+    if crate::policy::domain_of(path).is_some()
+        || ["retry", "reconnect", "conflict", "identity"]
+            .iter()
+            .any(|h| crate::policy::operator(h, path).is_some())
+    {
+        return false;
+    }
+    // A privacy label constructor: `privacy User(consumer)`.
+    if matches!(path, "Session" | "User" | "Organization" | "Device") {
+        return false;
+    }
+    matches!(workspace.resolve(unit, path), Resolution::Unresolved)
+}
+
+fn unresolved_bare_call(hir: &Hir, decl: &Decl, body: &Body, id: ExprId, path: &str) -> Diagnostic {
+    Diagnostic {
+        code: crate::codes::UNRESOLVED_NAME.id,
+        invariant: crate::codes::UNRESOLVED_NAME.invariant,
+        reason: "unresolved_bare_call",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!("`{path}` does not resolve"),
+        primary_span: body.expr_span(id),
+        related: vec![Related {
+            span: hir.decl_span(decl_id_of(hir, decl)),
+            label: format!("called inside `{}`", decl.name),
+        }],
+        explanation: Some(format!(
+            "`{path}` names nothing this file can see. Assumption A-009: term \
+             names are not ambient — only the Effect namespace is — so a \
+             function must be declared here or brought in by an explicit \
+             import.\n\nA call that resolves to nothing is not caught by \
+             anything downstream. Inference contributes no effects for it, \
+             privacy no label, placement no constraint and the contract no \
+             capability, and each of those answers is what a harmless call \
+             produces too."
+        )),
+        repairs: vec![Repair {
+            description: format!("import the module that declares `{path}`, or declare it here"),
+            replacement: None,
+        }],
+    }
 }
 
 /// A resolution failure, as a diagnostic.

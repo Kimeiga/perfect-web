@@ -19,6 +19,14 @@ fn create(container: Element, center: String) -> Result<MapHandle, MapError>
     todo
 }
 
+// The centre a map opens on when the caller has none. Declared here rather
+// than assumed: `R-012` called `default_center()` and imported nothing, so the
+// fixture whose subject is a leaked resource also called a name that did not
+// exist — found by PW0021 on the day it learned to examine bare calls.
+fn default_center() -> String !{} {
+    ""
+}
+
 fn destroy(handle: MapHandle) -> ()
     !{ dom.mutate, resource.release<MapHandle> }
 {

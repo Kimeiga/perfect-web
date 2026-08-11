@@ -4,6 +4,11 @@
 module generality.inert_span
 
 import domain.{ MenuItemId }
+// 2026-08-10: PW0021 learned to examine bare calls. A witness that calls a
+// name nothing declares is invalid evidence by the corpus's own rule, so the
+// callee is declared here — the witness stays self-contained and its subject
+// is unchanged.
+fn add_to_cart(item: MenuItemId) -> () !{} { todo }
 
 view AddButton(item: MenuItemId) !{} {
     <span class="btn" on:keydown={() => add_to_cart(item)}>Add</span>

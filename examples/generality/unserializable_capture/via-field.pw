@@ -12,6 +12,12 @@ import Database
 
 type AdminSession = AdminSession { connection: DatabaseConnection }
 
+// 2026-08-10: PW0021 learned to examine bare calls. A witness that calls a
+// name nothing declares is invalid evidence by the corpus's own rule, so the
+// callee is declared here — the witness stays self-contained and its subject
+// is unchanged.
+fn flush(c: DatabaseConnection) -> () !{} { todo }
+
 view AdminPanel(session: AdminSession) !{} {
     <button on:press={resumable(captures = { session.connection }) => flush(session.connection)}>
         Flush

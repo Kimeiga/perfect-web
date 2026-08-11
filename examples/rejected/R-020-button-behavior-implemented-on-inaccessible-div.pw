@@ -13,6 +13,13 @@
 
 module cart.add_view
 
+// 2026-08-10: PW0021 learned to examine bare calls. This fixture called
+// `add_to_cart` and `PositiveInt` and imported neither, so a fixture whose
+// subject is an inaccessible element was carrying two silent resolution
+// defects as well.
+import domain.{ MenuItemId, PositiveInt }
+import cart.commands.{ add_to_cart }
+
 view AddButton(item: MenuItemId) !{} {
     // ERROR: interactive behavior on a non-interactive element.
     <div class="btn" on:press={() => add_to_cart(item, PositiveInt(1))}>

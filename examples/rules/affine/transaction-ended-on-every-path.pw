@@ -8,6 +8,9 @@ module rules.affine_paths
 
 import Carts
 import Database
+// 2026-08-10: PW0021 learned to examine bare calls, and a rule fixture that
+// calls a name nothing declares is not the clean program it claims to be.
+import context.{ current_session }
 
 command clear_cart() -> Result<(), CartError>
     requires SignedIn

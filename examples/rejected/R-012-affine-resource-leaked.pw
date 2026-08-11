@@ -13,6 +13,7 @@
 
 module store.map_leak
 
+import Maps.{ default_center }
 import Maps
 import browser.{ MapHandle }
 

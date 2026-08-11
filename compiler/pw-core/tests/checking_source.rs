@@ -612,7 +612,11 @@ fn the_structured_concurrency_rules_run_on_real_bodies() {
         "a component-scoped observation must be accepted: {:?}",
         check_sources(&[("ok.pw".into(), ok.into())])[0].1
     );
-    let plain = "module m\nview V() !{} {\n    task.spawn(work) { g() }\n}\n";
+    // `g` is declared: since 2026-08-10 a bare call to a name nothing declares
+    // is `PW0021`, and a control that tripped it would be measuring the wrong
+    // rule.
+    let plain =
+        "module m\nfn g() -> () !{} { todo }\nview V() !{} {\n    task.spawn(work) { g() }\n}\n";
     assert!(
         check_sources(&[("p.pw".into(), plain.into())])[0]
             .1

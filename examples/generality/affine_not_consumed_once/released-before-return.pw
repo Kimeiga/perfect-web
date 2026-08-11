@@ -10,6 +10,11 @@ module generality.affine_paths_ok
 
 import Carts
 import Database
+// 2026-08-10: PW0021 learned to examine bare calls. A witness that calls a
+// name nothing declares is invalid evidence by the corpus's own rule, so the
+// callee is declared here — the witness stays self-contained and its subject
+// is unchanged.
+import context.{ current_session }
 
 command clear_cart() -> Result<(), CartError>
     requires SignedIn

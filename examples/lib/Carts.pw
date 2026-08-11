@@ -25,6 +25,13 @@ fn add(s: SessionId, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, Ca
     todo
 }
 
+// Placing the order. Declared here because `R-030` called it and imported
+// nothing — the fixture whose subject is private data in a resume manifest was
+// also calling a name that did not exist.
+fn checkout(id: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> } {
+    todo
+}
+
 fn clear(s: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> } {
     todo
 }

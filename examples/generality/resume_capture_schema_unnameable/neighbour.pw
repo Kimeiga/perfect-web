@@ -11,6 +11,12 @@ module generality.schema_nameable
 
 import domain.{ Store, StoreId }
 
+// 2026-08-10: PW0021 learned to examine bare calls. A witness that calls a
+// name nothing declares is invalid evidence by the corpus's own rule, so the
+// callee is declared here — the witness stays self-contained and its subject
+// is unchanged.
+fn refresh(s: Store, id: StoreId) -> () !{} { todo }
+
 view Panel(store: Store) !{} {
     let held = store
     <button on:press={resumable(captures = { held, store.id }) => refresh(held, store.id)}>

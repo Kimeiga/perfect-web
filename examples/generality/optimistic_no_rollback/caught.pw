@@ -5,6 +5,11 @@ module generality.optimistic_remove
 
 import Carts
 import Resources.{ Cart }
+// 2026-08-10: PW0021 learned to examine bare calls. A witness that calls a
+// name nothing declares is invalid evidence by the corpus's own rule, so the
+// callee is declared here — the witness stays self-contained and its subject
+// is unchanged.
+import context.{ current_session }
 
 command remove_from_cart(item: MenuItemId)
     -> Result<Cart, CartError>
@@ -13,5 +18,5 @@ command remove_from_cart(item: MenuItemId)
     optimistic    cart.remove(item)
     invalidates   Cart(current_session())
 {
-    Carts.clear(current_consumer(), item)
+    Carts.clear(current_session(), item)
 }

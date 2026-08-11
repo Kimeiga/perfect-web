@@ -15,6 +15,9 @@ module cart.commands
 
 import Carts
 import Resources.{ Cart }
+// See A-005, which this fixture is the rejected twin of: the body called
+// `current_consumer()` and passed it where `Carts.add` takes a `SessionId`.
+import context.{ current_session }
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
@@ -24,5 +27,5 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     // ERROR: no `rollback` declared.
     invalidates   Cart(current_session())
 {
-    Carts.add(current_consumer(), item, quantity)
+    Carts.add(current_session(), item, quantity)
 }

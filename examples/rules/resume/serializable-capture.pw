@@ -7,6 +7,10 @@ module rules.resume_good
 
 import domain.{ StoreId }
 
+// 2026-08-10: PW0021 learned to examine bare calls, and a rule fixture that
+// calls a name nothing declares is not the clean program it claims to be.
+fn refresh(id: StoreId) -> () !{} { todo }
+
 view Panel(store_id: StoreId) !{} {
     <button on:press={resumable(captures = { store_id }) => refresh(store_id)}>
         Refresh

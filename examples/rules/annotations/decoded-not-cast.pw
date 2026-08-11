@@ -7,6 +7,13 @@
 module rules.decode_good
 
 import decode
+import decode.{ Decoder }
+
+// 2026-08-10: PW0021 learned to examine bare calls, and this fixture called
+// `store_decoder()` while declaring nothing of that name. Declared here, so
+// the control is a program that resolves rather than one that happened not to
+// be examined.
+fn store_decoder() -> Decoder !{} { todo }
 
 fn parse(raw: Unknown) -> Result<Store, DecodeError> !{} {
     decode.run(store_decoder(), raw)

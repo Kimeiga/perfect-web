@@ -15,6 +15,10 @@ module cart.write
 
 import Carts
 import Database
+// 2026-08-10: PW0021 learned to examine bare calls, and this fixture was
+// calling a name it never imported. A rejected fixture must isolate ONE
+// defect; a second, silent one made it evidence for less than it claimed.
+import context.{ current_session }
 
 command clear_cart() -> Result<(), CartError>
     requires SignedIn

@@ -563,6 +563,46 @@ impl Module {
 /// bindings, and loop variables.
 ///
 /// Collected per body rather than per expression because a `let` is visible to
+/// **Call-shaped forms the language provides rather than a module.**
+///
+/// A name here is not unresolved; it is owned by the grammar. Kept beside
+/// resolution rather than inside the checker so that
+/// `tests/semantic_ownership.rs` and `unresolved_uses` consult ONE list — two
+/// lists would agree until one of them was extended.
+///
+/// `for` is here under protest and is tracked in `docs/RISK_QUEUE.md`:
+/// `for (i, v) in xs { .. }` lowers to `Expr::Call` with the callee
+/// `Name("for")`, which is a parse defect. Classified rather than ignored, so
+/// that repairing the parse removes this entry instead of silently changing a
+/// count.
+pub const INTRINSIC_CALLS: &[&str] = &[
+    "Ok",
+    "Err",
+    "Some",
+    "None",
+    "resumable",
+    "for",
+    "todo",
+    "self",
+];
+
+/// **Functions of the CSS value domain.**
+///
+/// `translate(box.x, y)` produces a transform and its arguments are lengths.
+/// A value domain, not a term namespace — per the architect's ruling that a
+/// call-shaped policy or value expression gets contextual resolution rather
+/// than exclusion. The contextual half is `crate::policy`; this is the list of
+/// spellings that domain owns.
+pub const VALUE_DOMAIN_CALLS: &[&str] = &[
+    "translate",
+    "scale",
+    "rotate",
+    "repeat",
+    "minmax",
+    "calc",
+    "var",
+];
+
 /// everything after it in the block, and getting that wrong would make the use
 /// checker report the program's own locals as undeclared — which is how a
 /// checker like this becomes noise and gets turned off.
