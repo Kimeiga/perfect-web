@@ -961,7 +961,7 @@ fn label_of(decl: &Decl) -> Label {
 /// `component` writes `placement browser` inside its body. Reading only the
 /// policy block missed every component — which is the charter's opening
 /// example, a database read inside a browser-placed component.
-fn declared_world(hir: &Hir, decl: &Decl) -> Option<World> {
+pub(crate) fn declared_world(hir: &Hir, decl: &Decl) -> Option<World> {
     if let Some(p) = decl.policy("placement") {
         let v = p.value.trim();
         if let Some(w) = ALL_WORLDS.iter().copied().find(|w| w.name() == v) {

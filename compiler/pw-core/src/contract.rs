@@ -677,14 +677,30 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                 .into_iter()
                 .collect();
 
-            // Placements from E5's solver, given the same demand every other
-            // caller builds. Not re-derived from the capability list: the
-            // solver also weighs privacy labels, and a second derivation here
-            // would agree until a label mattered.
+            // Placements from E5's solver, given the demand `check.rs` builds
+            // for the same declaration. Not re-derived from the capability
+            // list: a second derivation would agree until an input mattered.
+            //
+            // It did not build the same demand. Until the evidence-reachability
+            // audit asked which observer could witness A-013's build-time
+            // claim, this passed `declared: None` — so the author's pinned
+            // world reached the CHECKER and never reached the ARTIFACT. A page
+            // written `placement build` shipped a contract permitting the
+            // browser, the edge and the origin, and a host reading it would
+            // have granted any of them. `declared_world` is `check.rs`'s own
+            // derivation, called rather than repeated.
+            //
+            // The label half is still wrong and is deliberately left alone:
+            // the join of what a body reads is computed by walking the body,
+            // and `tests/policy_consumers.rs` freezes the fact that a body
+            // walk today cannot tell a policy value from a term. Wiring it in
+            // before that split would give the contract's placement a second
+            // channel from policy values. Carried as E10-P in
+            // `docs/EVIDENCE_LEDGER.md`.
             let demand = Demand {
                 effects: effects.clone(),
                 label: Label::public(),
-                declared: None,
+                declared: crate::check::declared_world(hir, decl),
             };
             // A `Blocked` effect leaves this EMPTY, and empty is the contract's
             // existing word for "no node may run this". The host refuses it

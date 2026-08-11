@@ -193,10 +193,23 @@ fn a013_build_time_page_before_repair() {
          real read rather than against silence. Got {:?}",
         caps(c)
     );
+    // MOVED, 2026-08-10, and not by the resolution repair this file is about.
+    //
+    // It read `["build", "browser", "edge", "origin"]` — placeable everywhere,
+    // including the browser, for a page whose subject is build-time
+    // determinism. The evidence-reachability audit found why: `contract.rs`
+    // discarded the author's pinned world when building its placement demand,
+    // so `placement build` reached the checker and never reached the artifact.
+    //
+    // Classification: this row moved because the CONTRACT was repaired, not
+    // because the program changed. `include_markdown` still resolves to
+    // nothing, and the capability assertion above is still the before-state of
+    // the repair this file exists for.
     assert_eq!(
         c.allowed_placements,
-        ["build", "browser", "edge", "origin"],
-        "and it is currently placeable everywhere, because nothing constrains it"
+        ["build"],
+        "the pin now reaches the artifact — but nothing yet checks that what \
+         the page READS is build-known, which is the `include_markdown` ruling"
     );
 }
 

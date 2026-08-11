@@ -179,11 +179,15 @@ const CLAIMS: &[(&str, Observer, Reach, &str)] = &[
         Reach::Unqueryable,
         "a decoder handles malformed input",
     ),
+    // Moved `Missing` → `Witnessed` when `contract.rs` stopped discarding the
+    // author's pinned world. What is witnessed is the pin, not the derivation
+    // the fixture's header claims — see
+    // `the_contract_carries_the_placement_its_author_pinned`.
     (
         "A-013",
         Observer::Placement,
-        Reach::Missing,
-        "a page whose inputs are build-known is produced at build time",
+        Reach::Witnessed,
+        "a page pinned to build time carries that pin into its contract",
     ),
     (
         "A-014",
@@ -533,35 +537,38 @@ component Button(label: String) {
 /// pinned world. So `pw check` refuses a bad placement correctly, while the
 /// **artifact a host grants placement from** ignores both inputs.
 ///
-/// The consequence, frozen below: A-013 declares `placement build` and its
-/// contract permits the browser, the edge and the origin. A-015, A-020 and
-/// A-023 declare `placement browser` and their contracts permit build time.
+/// The consequence, before the repair: A-013 declared `placement build` and its
+/// contract permitted the browser, the edge and the origin. A-015, A-020 and
+/// A-023 declared `placement browser` and their contracts permitted build time.
 ///
 /// This is the `secret<Payments>` row from `docs/RISK_QUEUE.md` again — one
-/// fact derived twice, agreeing until an input mattered — and it is why the
-/// four `Missing` §7.5A rows above are `Missing`: their subject is *where and
-/// when* work runs, and the artifact that would say so is not being told.
+/// fact derived twice, agreeing until an input mattered.
+///
+/// # Repaired, half of it
+///
+/// `contract.rs` now calls `check.rs`'s own `declared_world` rather than
+/// passing `None`. **The label half is deliberately still wrong**: the join of
+/// what a body reads is computed by walking the body, and
+/// `tests/policy_consumers.rs` freezes the fact that a body walk cannot today
+/// tell a policy value from a term. Wiring it in first would give the
+/// contract's placement a second channel from policy values.
+///
+/// # What this does NOT establish
+///
+/// A-013's header says *`!{}` plus build-known inputs => the placement solver
+/// chooses Build*. The solver does not choose Build. The author pinned it, the
+/// effect set is empty, and nothing objected. Reachability is not correctness:
+/// the observer now answers, and what it answers is weaker than the fixture
+/// claims. Closing that gap is the `include_markdown` ruling — a tracked build
+/// input with a real effect — not this repair.
 #[test]
-fn the_contract_ignores_the_placement_its_author_pinned() {
-    let cases = [
-        ("A-013", "build", vec!["build", "browser", "edge", "origin"]),
-        (
-            "A-015",
-            "browser",
-            vec!["build", "browser", "edge", "origin"],
-        ),
-        (
-            "A-020",
-            "browser",
-            vec!["build", "browser", "edge", "origin"],
-        ),
-        (
-            "A-023",
-            "browser",
-            vec!["build", "browser", "edge", "origin"],
-        ),
-    ];
-    for (id, pinned, expected) in cases {
+fn the_contract_carries_the_placement_its_author_pinned() {
+    for (id, pinned) in [
+        ("A-013", "build"),
+        ("A-015", "browser"),
+        ("A-020", "browser"),
+        ("A-023", "browser"),
+    ] {
         let p = Program::for_fixture(id);
         assert!(
             p.src.contains(&format!("placement {pinned}")),
@@ -577,11 +584,35 @@ fn the_contract_ignores_the_placement_its_author_pinned() {
             .find(|c| c.component_id.starts_with(&format!("{module}.")))
             .unwrap_or_else(|| panic!("no contract for {id}"));
         assert_eq!(
-            c.allowed_placements, expected,
-            "TODAY, and it is WRONG: {id} pins `placement {pinned}` and its \
-             contract permits {:?}. When the demand is repaired this row moves \
-             to `[{pinned}]` and the movement is the finding.",
-            c.allowed_placements
+            c.allowed_placements,
+            [pinned],
+            "{id} pins `placement {pinned}`, so the artifact a host reads must \
+             say so too"
         );
     }
+
+    // **The discriminator.** Without it this passes for a contract that returned
+    // the pinned world and ignored the effects — which would let a component
+    // pin `browser` while performing `database.read` and ship a contract
+    // agreeing with it. A-003 pins nothing and its placement is still derived.
+    let p = Program::for_fixture("A-003");
+    assert!(
+        !p.src
+            .lines()
+            .any(|l| l.trim_start().starts_with("placement ")),
+        "A-003 now pins a placement, so it no longer discriminates"
+    );
+    let refs = p.refs();
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let cs = contracts(&refs, &sigs, &ws);
+    let c = cs
+        .iter()
+        .find(|c| c.component_id == "store.queries.Store")
+        .expect("A-003");
+    assert_eq!(
+        c.allowed_placements,
+        ["origin"],
+        "an unpinned component's placement still comes from what it performs"
+    );
 }
