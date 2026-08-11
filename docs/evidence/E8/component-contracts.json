@@ -2,10 +2,9 @@
   {
     "component_id": "Resources.Cart",
     "capability_mapping": 1,
-    "abi_schema": "65933ef1a76eff17",
+    "abi_schema": "3e0f5c38c9673c3a",
     "required_capabilities": [],
     "allowed_placements": [
-      "build",
       "browser",
       "edge",
       "origin"

@@ -124,7 +124,7 @@ Architect ruling, 2026-08-08:
 | id | obligation | deferred from | owed at | status |
 |---|---|---|---|---|
 | **E10-I** | Compile `add_to_cart` through the production Pleris→component backend and execute it through the E8 host, **with no alternate Rust closure path**. | E8 gate item 5 | **E10 gate** | **open** |
-| **E10-P** | Give `ComponentContract`'s placement demand the declaration's real privacy label, not `Label::public()`. Half the demand was repaired on 2026-08-10 (the author's pinned world); the label half is blocked on the `PolicyExpr`/`TermExpr` split, because the label is the join of what a body READS and a body walk cannot today tell a policy value from a term (`tests/policy_consumers.rs`). | evidence-reachability audit, 2026-08-10 | **E10 gate** | **open** |
+| **E10-P** | Give `ComponentContract`'s placement demand the declaration's real privacy label, not `Label::public()`. | evidence-reachability audit, 2026-08-10 | E10 gate | **closed 2026-08-11** — `contract.rs` calls `check::declaration_label`, the checker's own derivation. The visible result: a `session query` was placeable at build time, and is not. `tests/evidence_reachability.rs::a_session_scoped_query_is_not_placeable_at_build_time` |
 
 **Why it was deferred, in one line:** E8 cannot honestly require an artifact
 that only E10 knows how to create, and building a temporary backend inside E8 to

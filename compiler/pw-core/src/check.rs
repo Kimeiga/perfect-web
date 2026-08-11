@@ -1333,7 +1333,7 @@ fn to_diagnostic(v: ScopeViolation, clause: Option<String>) -> Diagnostic {
 /// Conservative on purpose: an unlabelled declaration is treated as public, so
 /// the checker can only *under*-restrict a value it was never told about. It
 /// cannot invent a restriction and reject a legal program.
-fn label_of(decl: &Decl) -> Label {
+pub(crate) fn label_of(decl: &Decl) -> Label {
     // The parameters are the charter §7.8 type names — `Session<SessionId>`,
     // not `Session<Cart>`. A label names *what* a value is scoped to, not which
     // declaration produced it, and the corpus declares the former as the text
@@ -1638,6 +1638,33 @@ fn decl_id_of(hir: &Hir, decl: &Decl) -> crate::hir::DeclId {
 /// A diagnostic that says "this page is Session" is true and unhelpful; the
 /// author needs to know it was `cart`. The corpus declares that name as text it
 /// expects to see, which is how the gap was found.
+/// **The label a DECLARATION carries: its own, joined with everything its body
+/// reads.**
+///
+/// Distinct from `body_label` below, which is a resume-manifest question about
+/// one body's captures.
+///
+/// One derivation, two readers. `check.rs` uses it to refuse a non-public value
+/// in a shared cache; `contract.rs` uses it to build the placement demand. It
+/// passed `Label::public()` there until 2026-08-11 — see E10-P in
+/// `docs/EVIDENCE_LEDGER.md` — four lines under a comment saying the solver
+/// weighs privacy labels.
+///
+/// The deferral was deliberate and is now discharged: the label is the join of
+/// what a body READS, and until policy values left the executable body tree a
+/// body walk could not tell one from a term. Wiring it in first would have
+/// given the contract's placement a second channel from policy values.
+pub(crate) fn declaration_label(
+    hir: &Hir,
+    labels: &BTreeMap<crate::resolve::DefId, Label>,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
+    decl: &Decl,
+) -> Label {
+    let (read, _) = reads_label_with_source(hir, labels, inference, at, decl);
+    label_of(decl).join(&read)
+}
+
 fn reads_label_with_source(
     hir: &Hir,
     labels: &BTreeMap<crate::resolve::DefId, Label>,

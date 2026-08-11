@@ -818,3 +818,83 @@ fn an_analysis_that_stops_running_cannot_look_like_success() {
         "every `match` in the program produced a conclusion"
     );
 }
+
+// --- E10-P -------------------------------------------------------------------
+
+/// **The contract's placement demand carries the declaration's real privacy
+/// label.**
+///
+/// Architect ruling, 2026-08-11:
+///
+/// > I would require the placement contract and checker to consume the **same
+/// > computed body label** after the split. That eliminates the current dual
+/// > answer.
+///
+/// It passed `Label::public()` until then, four lines under a comment saying
+/// the solver weighs privacy labels — the other half of the defect this file
+/// found on its first run. The deferral was deliberate: the label is the join
+/// of what a body READS, and until policy values left the executable body tree
+/// a body walk could not tell one from a term.
+///
+/// The visible consequence, and the reason a session label belongs in the
+/// demand at all: **a session-scoped query was placeable at build time.** There
+/// is no session at build time. Its contract said a build node could run it.
+#[test]
+fn a_session_scoped_query_is_not_placeable_at_build_time() {
+    let p = Program::for_fixture("A-004");
+    let refs = p.refs();
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let cs = contracts(&refs, &sigs, &ws);
+
+    let cart = cs
+        .iter()
+        .find(|c| c.component_id == "cart.queries.Cart")
+        .unwrap_or_else(|| {
+            panic!(
+                "{:?}",
+                cs.iter().map(|c| &c.component_id).collect::<Vec<_>>()
+            )
+        });
+    assert!(
+        !cart.allowed_placements.iter().any(|w| w == "build"),
+        "a `session query` cannot be produced at build time: {:?}",
+        cart.allowed_placements
+    );
+
+    // The discriminating half. Without it this passes for a contract that
+    // excludes `build` from everything. `A-013`'s page is PUBLIC and reads a
+    // tracked build input, so build time is exactly where it belongs — a
+    // placement no label may take away.
+    let terms = Program::for_fixture("A-013");
+    let refs = terms.refs();
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let cs2 = contracts(&refs, &sigs, &ws);
+    let page = cs2
+        .iter()
+        .find(|c| c.exports.iter().any(|e| e.kind == "page"))
+        .expect("A-013's page");
+    assert_eq!(
+        page.allowed_placements,
+        ["build"],
+        "a public build-time page still places at build"
+    );
+
+    // And the label reaches the demand through the CHECKER's own derivation,
+    // not a second one: `contract.rs` calls `check::declaration_label`. Asserted
+    // structurally, because two derivations agreeing today is exactly how this
+    // defect survived — see `docs/RISK_QUEUE.md`.
+    let src = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/contract.rs"),
+    )
+    .expect("contract.rs");
+    assert!(
+        src.contains("crate::check::declaration_label("),
+        "the contract must consume the checker's label, not compute its own"
+    );
+    assert!(
+        !src.contains("label: Label::public()"),
+        "the placement demand must not be handed a public label unconditionally"
+    );
+}

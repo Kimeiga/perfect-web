@@ -596,6 +596,26 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
         })
         .collect();
 
+    // Declaration identity → its privacy label, across every unit. Built with
+    // `check::label_of`, the same function the checker uses, so the two cannot
+    // drift. Keyed by RESOLVED IDENTITY: `Cart` in one module and `Cart` in
+    // another are two declarations with two labels.
+    let labels: BTreeMap<crate::resolve::DefId, Label> = hirs
+        .iter()
+        .enumerate()
+        .flat_map(|(unit, hir)| {
+            hir.all_decls()
+                .filter_map(|(id, d)| {
+                    let l = crate::check::label_of(d);
+                    if l.is_public() {
+                        return None;
+                    }
+                    Some((crate::resolve::DefId { unit, decl: id.0 }, l))
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -708,16 +728,19 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // have granted any of them. `declared_world` is `check.rs`'s own
             // derivation, called rather than repeated.
             //
-            // The label half is still wrong and is deliberately left alone:
-            // the join of what a body reads is computed by walking the body,
-            // and `tests/policy_consumers.rs` freezes the fact that a body
-            // walk today cannot tell a policy value from a term. Wiring it in
-            // before that split would give the contract's placement a second
-            // channel from policy values. Carried as E10-P in
-            // `docs/EVIDENCE_LEDGER.md`.
+            // The label half was `Label::public()` until 2026-08-11 — E10-P —
+            // and the deferral was deliberate: the label is the join of what a
+            // body READS, and until policy values left the executable body tree
+            // a body walk could not tell one from a term. Wiring it in first
+            // would have given the contract's placement a second channel from
+            // policy values.
+            //
+            // `check::body_label` is the checker's own derivation, called
+            // rather than repeated, so the artifact and the diagnostic cannot
+            // disagree about how private a component is.
             let demand = Demand {
                 effects: effects.clone(),
-                label: Label::public(),
+                label: crate::check::declaration_label(hir, &labels, &inference, unit, decl),
                 declared: crate::check::declared_world(hir, decl),
             };
             // A `Blocked` effect leaves this EMPTY, and empty is the contract's

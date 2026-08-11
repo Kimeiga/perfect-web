@@ -14,8 +14,8 @@ This note said rendering needs no authority and runs anywhere until
 2026-08-10. It was true of a page whose current_session() call named
 nothing. See docs/CORPUS.md C5 and tests/unresolved_provenance.rs.
 
-Resources.Cart  abi 65933ef1a76eff17
-  runs at   build, browser, edge, origin
+Resources.Cart  abi 3e0f5c38c9673c3a
+  runs at   browser, edge, origin
   exports   query Cart
 
 Resources.Menu  abi 295b1410021b7731
