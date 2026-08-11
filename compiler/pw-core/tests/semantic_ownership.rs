@@ -86,20 +86,14 @@ enum Owner {
 
 /// Constructors and forms the language provides rather than a module.
 ///
-/// `for` is here under protest: `for (i, v) in values.enumerate() { .. }`
-/// lowers to `Expr::Call` with the callee `Name("for")`, which is a parse
-/// defect and not an intrinsic call. It is classified rather than excluded so
-/// that fixing the parse moves a row here instead of silently changing a count.
-const INTRINSIC: &[&str] = &[
-    "Ok",
-    "Err",
-    "Some",
-    "None",
-    "resumable",
-    "for",
-    "todo",
-    "self",
-];
+/// `for` was here under protest until 2026-08-10 — `for (i, v) in xs { .. }`
+/// lowered to `Expr::Call` with the callee `Name("for")` — and is gone because
+/// the parse was repaired rather than grandfathered. Architect ruling: *syntax
+/// must remain syntax; terms must remain terms.*
+///
+/// The list is the compiler's own, so a spelling cannot be exempt here and
+/// reportable there.
+const INTRINSIC: &[&str] = pw_core::resolve::INTRINSIC_CALLS;
 
 /// The CSS value functions the corpus uses. A value domain, not a term
 /// namespace: `translate(box.x, y)` produces a transform, and its arguments are
@@ -358,18 +352,23 @@ fn every_owner_class_actually_claims_something() {
     );
 }
 
-/// **A `for` loop and a policy block do not bind their binders.**
+/// **A `for` loop is syntax, and it binds. A policy block's binder still does
+/// not.**
 ///
-/// `for badge in badges { badge.style.set_width(unit) }` — `badge` is not a
-/// binding, because the loop is an `Expr::Call` and its "arguments" are not
-/// patterns. Same for `draw(ctx) { ctx.rect(..) }`: `ctx` is bound by nothing.
+/// The loop was `Expr::Call { callee: Name("for") }` until 2026-08-10, with two
+/// consequences: every analysis that walks calls saw a call to something no
+/// program declares, and the loop variable was introduced by nothing — so
+/// `for badge in badges { badge.style.set_width(u) }` reported `badge` as an
+/// undeclared name.
 ///
-/// So `resolve::local_bindings` — which every use-checker consults — is missing
-/// two binding forms, and the names they bind look like undeclared ones. It
-/// handles `{#each xs as x}` correctly, which is what says the gap is these two
-/// forms rather than the function.
+/// The policy-block half remains. `draw(ctx) { ctx.rect(..) }` binds `ctx` by
+/// nothing, because `draw` is a policy head whose value is a `Domain::Body` and
+/// the grammar still reads it as a call followed by a block. That is the
+/// `PolicyExpr` split's work, and this test is what will say when it lands.
 #[test]
-fn a_loop_and_a_policy_block_do_not_bind_their_binders() {
+fn a_for_loop_is_syntax_that_binds_and_a_policy_block_is_not_yet() {
+    use pw_core::hir::Expr;
+
     let src = "\
 module m
 
@@ -383,13 +382,42 @@ fn f(xs: List<Int>) -> Int {
     let (_, d) = hir.all_decls().find(|(_, d)| d.name == "f").expect("f");
     let body = hir.body(d.body.expect("body"));
     assert!(
-        !local_bindings(body).contains("x"),
-        "TODAY: the loop variable is not a binding. When the parser gains a \
-         loop form this fails, and `badge.style.set_width` / `ctx.rect` move \
-         from `Member` to `Local` in the gate above."
+        body.walk()
+            .iter()
+            .any(|id| matches!(body.expr(*id), Expr::For { .. })),
+        "the loop is a loop, not a call"
+    );
+    assert!(
+        !body.walk().iter().any(|id| matches!(
+            body.expr(*id),
+            Expr::Call { callee, .. } if path_of(body, *callee) == "for"
+        )),
+        "and nothing calls `for`"
+    );
+    assert!(
+        local_bindings(body).contains("x"),
+        "and the loop variable is a binding"
     );
 
-    // The control: the binding form the parser DOES handle.
+    // The tuple form binds BOTH names, which is what says the binder is a
+    // pattern rather than a single identifier the parser special-cased.
+    let tuple = "\
+module m
+
+fn f(xs: List<Int>) -> Int {
+    for (i, v) in xs.enumerate() {
+        v
+    }
+}
+";
+    let hir = lower_file(tuple, &parse_tree(tuple).green);
+    let (_, d) = hir.all_decls().find(|(_, d)| d.name == "f").expect("f");
+    let body = hir.body(d.body.expect("body"));
+    let names = local_bindings(body);
+    assert!(names.contains("i") && names.contains("v"), "{names:?}");
+
+    // The control that was already correct, so the repair is attributable to
+    // the loop and not to `local_bindings`.
     let each = "\
 module m
 
@@ -402,10 +430,28 @@ view V(xs: List<Int>) !{} {
     let hir = lower_file(each, &parse_tree(each).green);
     let (_, d) = hir.all_decls().find(|(_, d)| d.name == "V").expect("V");
     let body = hir.body(d.body.expect("body"));
+    assert!(local_bindings(body).contains("x"));
+
+    // And the half the repair has not reached.
+    let policy = "\
+module m
+
+paint P(w: Float) !{ paint.custom } {
+    inputs w
+
+    draw(ctx) {
+        ctx.rect(w)
+    }
+}
+";
+    let hir = lower_file(policy, &parse_tree(policy).green);
+    let (_, d) = hir.all_decls().find(|(_, d)| d.name == "P").expect("P");
+    let body = hir.body(d.body.expect("body"));
     assert!(
-        local_bindings(body).contains("x"),
-        "`{{#each}}` binds its name, so the gap above is these two forms and \
-         not `local_bindings` itself"
+        !local_bindings(body).contains("ctx"),
+        "TODAY: a policy block's binder is bound by nothing. When the \
+         `PolicyExpr` split reaches `Domain::Body`, this fails and `ctx.rect` \
+         moves from `Member` to `Local` in the gate above."
     );
 }
 

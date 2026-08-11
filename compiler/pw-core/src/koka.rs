@@ -320,6 +320,10 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
         Expr::Cast { .. } => return Err("a cast"),
         Expr::Interpolated { .. } => return Err("an interpolated string"),
         Expr::Error => return Err("an expression that did not parse"),
+        // A loop is not in the pure subset ADR-0015 exports. It was reachable
+        // here as a `Call` until 2026-08-10, which would have emitted a Koka
+        // call to a function named `for`.
+        Expr::For { .. } => return Err("a loop is not in the exported subset"),
     })
 }
 

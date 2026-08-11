@@ -646,6 +646,11 @@ pub fn local_bindings(body: &crate::hir::Body) -> BTreeSet<String> {
                     pattern_names(body, a.pat, &mut out);
                 }
             }
+            // `for x in xs { .. }` binds `x` for its body. Missing until
+            // 2026-08-10, because the loop was a `Call` and an argument list
+            // introduces no scope — so `for badge in badges { badge.width() }`
+            // reported `badge` as an undeclared name.
+            Expr::For { pat: Some(p), .. } => pattern_names(body, *p, &mut out),
             // A `{#each xs as x (k)}` binds `x` for its children.
             Expr::Template { roots, .. } => {
                 for n in body.walk_markup(roots) {

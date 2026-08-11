@@ -121,6 +121,13 @@ pub enum SyntaxKind {
     IfExpr,
     MatchExpr,
     MatchArm,
+    /// `for x in xs { .. }` — a pattern, an iterable, and a body.
+    ///
+    /// It was a `CallExpr` whose callee was the name `for` until 2026-08-10,
+    /// so every analysis that walks calls saw a call to something that does
+    /// not exist, and the loop variable was bound by nothing. Architect
+    /// ruling: *syntax must remain syntax; terms must remain terms.*
+    ForExpr,
     BinaryExpr,
     /// `raw as Store`. Its right operand is a TYPE, not an expression, which
     /// is why it is not a `BinaryExpr` — a checker asking "what is being cast
@@ -343,6 +350,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         IfExpr,
         MatchExpr,
         MatchArm,
+        ForExpr,
         BinaryExpr,
         CastExpr,
         UnaryExpr,

@@ -677,6 +677,34 @@ impl Lowerer<'_> {
                 b.expr(Expr::If { cond, then, els }, span)
             }
 
+            K::ForExpr => {
+                // `pattern`, `iterable`, `body` — the pattern first, because
+                // the grammar emits it first and a consumer that guessed by
+                // shape would confuse `for x in xs` with `for (i, v) in xs`.
+                let kids: Vec<_> = node.children().collect();
+                let pat = kids
+                    .first()
+                    .filter(|c| is_pattern(c.kind()))
+                    .map(|c| self.pattern(b, c));
+                let rest: Vec<&SyntaxNode> = kids.iter().filter(|c| is_expr(c.kind())).collect();
+                let iterable = match rest.first() {
+                    Some(c) => self.expr(b, c),
+                    None => b.expr(Expr::Error, span.clone()),
+                };
+                let body = match rest.get(1) {
+                    Some(c) => self.expr(b, c),
+                    None => b.expr(Expr::Error, span.clone()),
+                };
+                b.expr(
+                    Expr::For {
+                        pat,
+                        iterable,
+                        body,
+                    },
+                    span,
+                )
+            }
+
             K::MatchExpr => {
                 let mut kids = node.children().peekable();
                 let scrutinee = match kids.peek().filter(|c| c.kind() != K::MatchArm) {
@@ -1244,6 +1272,7 @@ fn is_expr(k: K) -> bool {
             | K::LetStmt
             | K::IfExpr
             | K::MatchExpr
+            | K::ForExpr
             | K::BinaryExpr
             | K::CastExpr
             | K::UnaryExpr

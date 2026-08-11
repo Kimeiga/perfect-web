@@ -468,6 +468,7 @@ impl Body {
                 v.extend(arms.iter().map(|a| a.body));
                 v
             }
+            Expr::For { iterable, body, .. } => vec![*iterable, *body],
             Expr::Record { fields, .. } => fields.iter().filter_map(|f| f.value).collect(),
             Expr::List { items } => items.clone(),
             Expr::Let { init, .. } => init.iter().copied().collect(),
@@ -630,6 +631,19 @@ pub enum Expr {
     Match {
         scrutinee: ExprId,
         arms: Vec<MatchArm>,
+    },
+    /// `for x in xs { .. }`.
+    ///
+    /// **The pattern binds.** It was `Call { callee: Name("for") }` until
+    /// 2026-08-10, which had two consequences: every analysis that walks calls
+    /// saw a call to something no program declares, and the loop variable was
+    /// introduced by nothing — so `for badge in badges { badge.width() }` made
+    /// `badge` look like an undeclared name. Architect ruling: *syntax must
+    /// remain syntax; terms must remain terms.*
+    For {
+        pat: Option<PatternId>,
+        iterable: ExprId,
+        body: ExprId,
     },
     Record {
         /// `None` for a bare `{ a: 1 }` with no type name in front.

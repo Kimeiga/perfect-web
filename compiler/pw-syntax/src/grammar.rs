@@ -783,6 +783,9 @@ impl<'a> P<'a> {
                 if self.at_kw("match") {
                     return self.match_expr();
                 }
+                if self.at_kw("for") {
+                    return self.for_expr();
+                }
                 if self.at_kw("let") {
                     return self.let_stmt();
                 }
@@ -1284,6 +1287,32 @@ impl<'a> P<'a> {
             if self.at(Kind::LBrace) {
                 self.block_expr();
             }
+        }
+        self.finish();
+    }
+
+    /// `for x in xs { .. }`, `for (i, v) in xs.enumerate() { .. }`.
+    ///
+    /// The binder is a PATTERN, so the tuple form binds two names and every
+    /// consumer that collects bindings finds them. Written as its own node
+    /// rather than left as a call: a loop is control flow, and
+    /// `resolve::local_bindings` cannot introduce a scope from an argument
+    /// list.
+    fn for_expr(&mut self) {
+        self.start(K::ForExpr);
+        self.bump(); // for
+        self.pattern();
+        // `in` is a contextual keyword here; without it the loop is still a
+        // loop with a missing iterable, which is a better tree to report on
+        // than a call.
+        if self.at_kw("in") {
+            self.bump();
+        } else {
+            self.error("PW0102", "expected `in` after the loop binding");
+        }
+        self.expr(0);
+        if self.at(Kind::LBrace) {
+            self.block_expr();
         }
         self.finish();
     }
