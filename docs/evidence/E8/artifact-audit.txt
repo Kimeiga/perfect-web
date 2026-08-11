@@ -65,13 +65,14 @@ test a_refused_admission_yields_no_granted_to_link_from ... ok
 test an_instance_runs_within_the_budget_its_deployment_declares ... instantiation spent 16386 fuel
 test the_declared_component_imports_exactly_what_its_world_says ... minimal guest imports: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
 test the_std_component_is_refused_for_authority_nobody_asked_for ... std guest imports 34 interfaces
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
 test a_capability_survives_the_crossing_with_its_argument ... ok
 test the_compilers_contracts_deserialize_with_every_field_populated ... ok
 test the_real_contracts_drive_a_real_admission ... ok
 test the_store_page_depends_on_components_without_acquiring_their_authority ... ok
-test the_store_page_renders_without_authority_and_its_command_does_not ... ok
+test the_store_page_does_not_inherit_its_handlers_authority ... ok
 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan ... ok
 test a_refused_component_carries_the_reason_from_every_node ... ok
 test a_topology_that_grants_nothing_cannot_host_the_privileged_components ... ok
 test an_edge_whose_ends_share_no_node_is_necessarily_remote ... ok
@@ -82,5 +83,5 @@ test every_edge_in_the_store_program_can_be_bound ... ok
 test placement_and_transferability_are_independent_and_only_one_pair_fails ... ok
 test the_planner_agrees_with_admit_on_every_pair ... ok
 test the_store_program_is_deployable_on_a_topology_that_serves_it ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

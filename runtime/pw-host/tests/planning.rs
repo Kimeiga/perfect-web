@@ -34,11 +34,17 @@ fn full() -> Topology {
             Node {
                 name: "origin-1".into(),
                 world: "origin".into(),
+                // `session.read` joined on 2026-08-10, when the store gained
+                // the `import context.{ current_session }` it had been missing
+                // since E4. The page builds a query key from the session, so
+                // it reads the session to render, and a node that does not
+                // publish `session.read` cannot host it.
                 grants: BTreeSet::from([
                     "database.read<Carts>".to_string(),
                     "database.read<Menus>".to_string(),
                     "database.read<Stores>".to_string(),
                     "database.write<Carts>".to_string(),
+                    "session.read".to_string(),
                 ]),
             },
         ],
@@ -82,11 +88,24 @@ fn a_topology_that_grants_nothing_cannot_host_the_privileged_components() {
     );
     // And a component needing no authority still places, so "unplaceable" is
     // not the answer to everything.
+    //
+    // `StorePage` was this control until 2026-08-10, when the store's missing
+    // `current_session` import was repaired: the page requires `session.read`
+    // and is refused on a barren node too, correctly. `Resources.Menu`
+    // requires nothing, which is what the control needs.
     assert!(
+        p.placements.iter().any(|pl| pl.is_placeable()),
+        "a component requiring nothing still places: {:?}",
         p.placements
             .iter()
-            .any(|pl| pl.component.contains("StorePage") && pl.is_placeable()),
-        "the page renders anywhere"
+            .map(|pl| (&pl.component, pl.is_placeable()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        p.unplaceable.iter().any(|c| c.contains("StorePage")),
+        "and the page, which now reads the session to render, is refused too: \
+         {:?}",
+        p.unplaceable
     );
 }
 

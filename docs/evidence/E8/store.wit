@@ -135,6 +135,7 @@ world store-page-store {
 }
 
 world store-page-store-page {
+    import pw:host/session;
     import store-page-add-to-cart-api;
     import store-page-cart-api;
     import store-page-clear-cart-api;
@@ -145,11 +146,13 @@ world store-page-store-page {
 
 world store-page-add-to-cart {
     import pw:host/database;
+    import pw:host/session;
     export store-page-add-to-cart-api;
 }
 
 world store-page-clear-cart {
     import pw:host/database;
+    import pw:host/session;
     export store-page-clear-cart-api;
 }
 

@@ -223,12 +223,14 @@
   {
     "component_id": "store.page.StorePage",
     "capability_mapping": 1,
-    "abi_schema": "fc9b014826c42a8b",
-    "required_capabilities": [],
+    "abi_schema": "d803b26130c7cf49",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
     "allowed_placements": [
-      "build",
-      "browser",
-      "edge",
       "origin"
     ],
     "imports": [
@@ -256,6 +258,12 @@
         "interface": "pw:app/store.page.clear_cart",
         "name": "clear_cart",
         "kind": "component"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -274,12 +282,16 @@
   {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "a809c7313f7a7740",
+    "abi_schema": "667b06541a47fc42",
     "required_capabilities": [
       {
         "family": "database",
         "operation": "write",
         "argument": "Carts"
+      },
+      {
+        "family": "session",
+        "operation": "read"
       }
     ],
     "allowed_placements": [
@@ -290,6 +302,12 @@
         "interface": "pw:host/database",
         "name": "write",
         "capability": "database.write<Carts>",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
         "kind": "host_capability"
       }
     ],
@@ -317,12 +335,16 @@
   {
     "component_id": "store.page.clear_cart",
     "capability_mapping": 1,
-    "abi_schema": "0d616e1b3bc2bdba",
+    "abi_schema": "a3bcfeb6f0683204",
     "required_capabilities": [
       {
         "family": "database",
         "operation": "write",
         "argument": "Carts"
+      },
+      {
+        "family": "session",
+        "operation": "read"
       }
     ],
     "allowed_placements": [
@@ -333,6 +355,12 @@
         "interface": "pw:host/database",
         "name": "write",
         "capability": "database.write<Carts>",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
         "kind": "host_capability"
       }
     ],

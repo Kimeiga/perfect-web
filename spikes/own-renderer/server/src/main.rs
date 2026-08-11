@@ -203,7 +203,7 @@ fn contracts() -> Vec<ComponentContract> {
 
 /// **The node this dev server is.**
 ///
-/// An origin with the four capabilities the store demo's contracts require —
+/// An origin with the five capabilities the store demo's contracts require —
 /// written out rather than derived from those contracts, which is the whole
 /// point: a topology derived from what a program asks for grants everything
 /// every program asks for, and admission becomes a formality.
@@ -220,6 +220,13 @@ fn dev_topology() -> Topology {
                 "database.read<Menus>",
                 "database.read<Stores>",
                 "database.write<Carts>",
+                // 2026-08-10. The store gained the `import context.{
+                // current_session }` it had been missing since E4, so the page
+                // and both commands read the session. A dev origin that does
+                // not publish it refuses all three — which is admission
+                // working, and is what this list not being derived from the
+                // contracts is for.
+                "session.read",
             ]
             .iter()
             .map(|s| s.to_string())

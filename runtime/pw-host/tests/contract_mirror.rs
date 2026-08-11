@@ -110,20 +110,45 @@ fn a_capability_survives_the_crossing_with_its_argument() {
 }
 
 #[test]
-fn the_store_page_renders_without_authority_and_its_command_does_not() {
+fn the_store_page_does_not_inherit_its_handlers_authority() {
     // ADR-0020's least-authority decision, checked against the real artifact
     // rather than against a fixture written to agree with it.
+    //
+    // **This test asserted that the page requires NOTHING until 2026-08-10.**
+    // That was true of a page whose `current_session()` call named nothing:
+    // `examples/store/app.pw` never imported it, and every analysis produced
+    // the answer a harmless call produces. The page builds a query key from
+    // the session, so it reads the session to render, and now says so.
+    //
+    // The separation the test is about is unchanged and is now measured
+    // properly: the page requires what IT performs, and not what its DEFERRED
+    // HANDLER performs. A page requiring nothing at all would have satisfied
+    // the old assertion without demonstrating any separation.
     let page = find("store.page.StorePage");
-    assert!(
-        page.required_capabilities.is_empty(),
-        "rendering the store page needs no capability, got {:?}",
-        page.required_capabilities
+    let names: Vec<String> = page
+        .required_capabilities
+        .iter()
+        .map(|c| c.name())
+        .collect();
+    assert_eq!(
+        names,
+        ["session.read"],
+        "the page requires exactly what rendering performs"
     );
 
     let command = find("store.page.add_to_cart");
+    let command_names: Vec<String> = command
+        .required_capabilities
+        .iter()
+        .map(|c| c.name())
+        .collect();
     assert!(
-        !command.required_capabilities.is_empty(),
-        "and the command that writes does"
+        command_names.contains(&"database.write<Carts>".to_string()),
+        "the handler writes: {command_names:?}"
+    );
+    assert!(
+        !names.contains(&"database.write<Carts>".to_string()),
+        "and the page does not inherit it"
     );
     assert_eq!(command.allowed_placements, ["origin"]);
 }
@@ -152,20 +177,34 @@ fn the_real_contracts_drive_a_real_admission() {
                 // The bare spellings were here until the ontology made
                 // `database.write` generic, and this test going red is what
                 // that change looks like from the host's side.
+                //
+                // `session.read` joined the list on 2026-08-10, when the store
+                // gained the `import context.{ current_session }` it had been
+                // missing since E4. A node that does not publish it cannot run
+                // the page — which is the admission decision working, not a
+                // test detail.
                 grants: BTreeSet::from([
                     "database.read<Carts>".to_string(),
                     "database.read<Menus>".to_string(),
                     "database.read<Stores>".to_string(),
                     "database.write<Carts>".to_string(),
+                    "session.read".to_string(),
                 ]),
             },
         ],
     };
 
+    // The page reads the session to build a query key, so it runs where a
+    // session provider exists. It was admitted on the laptop until 2026-08-10,
+    // and that was a page whose `current_session()` call named nothing.
     let page = find("store.page.StorePage");
     assert!(
-        admit(&page, &topology, "laptop", &[]).is_admitted(),
-        "a page with no capability requirement renders on a browser node"
+        admit(&page, &topology, "origin-1", &[]).is_admitted(),
+        "the page runs on a node that grants what it requires"
+    );
+    assert!(
+        !admit(&page, &topology, "laptop", &[]).is_admitted(),
+        "and not on one that does not — the browser node grants no session.read"
     );
 
     let command = find("store.page.add_to_cart");
@@ -189,8 +228,13 @@ fn the_real_contracts_drive_a_real_admission() {
 #[test]
 fn the_store_page_depends_on_components_without_acquiring_their_authority() {
     // The architect's ruling made concrete on real compiler output. The page
-    // reads three queries and triggers two commands; two of those components
-    // need `database.read` or `database.write`. The page needs neither.
+    // reads three queries and triggers two commands; those components need
+    // `database.read` and `database.write`. The page needs NEITHER — it needs
+    // `session.read`, which is what IT performs.
+    //
+    // Until 2026-08-10 this asserted the page held no host capability at all.
+    // A component that requires nothing demonstrates no separation: it would
+    // satisfy the claim whether or not authority propagated.
     let page = find("store.page.StorePage");
 
     let deps: Vec<String> = page
@@ -203,11 +247,20 @@ fn the_store_page_depends_on_components_without_acquiring_their_authority() {
         deps.len() >= 3,
         "the page depends on the components it reads and calls: {deps:?}"
     );
-    assert!(
-        page.imports.iter().all(|i| i.kind == ImportKind::Component),
-        "and holds no host capability of its own"
+    let host: Vec<String> = page
+        .required_capabilities
+        .iter()
+        .map(|c| c.name())
+        .collect();
+    assert_eq!(
+        host,
+        ["session.read"],
+        "the page holds exactly the authority its own body needs"
     );
-    assert!(page.required_capabilities.is_empty());
+    assert!(
+        !host.iter().any(|c| c.starts_with("database.")),
+        "and none of what the components it depends on need: {host:?}"
+    );
 
     // The components it depends on DO need authority — recorded against them.
     let menu = find("store.page.Menu");

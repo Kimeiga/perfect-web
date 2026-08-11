@@ -5,9 +5,14 @@ produced by: just e8-contracts
 One contract per DECLARATION, not per module: least authority, and a new
 declaration leaves every existing contract byte-identical.
 
-Note StorePage: rendering needs no authority and runs anywhere. Its
-handler calls add_to_cart, which needs database.write and runs only at
-the origin — recorded once, against the thing that performs it.
+Note StorePage: it requires session.read — it builds a query key from
+the session, so it reads the session to RENDER — and it does NOT
+require database.write<Carts>, which its deferred handler performs.
+Authority is recorded once, against the thing that performs it.
+
+This note said rendering needs no authority and runs anywhere until
+2026-08-10. It was true of a page whose current_session() call named
+nothing. See docs/CORPUS.md C5 and tests/unresolved_provenance.rs.
 
 Resources.Cart  abi 65933ef1a76eff17
   runs at   build, browser, edge, origin
@@ -43,24 +48,30 @@ store.page.Store  abi 4aedcc2febb0861f
   host      pw:host/database#read  (database.read<Stores>)
   exports   query Store
 
-store.page.StorePage  abi fc9b014826c42a8b
-  runs at   build, browser, edge, origin
+store.page.StorePage  abi d803b26130c7cf49
+  runs at   origin
+  needs     session.read
   component pw:app/store.page.Cart#Cart
   component pw:app/store.page.Menu#Menu
   component pw:app/store.page.Store#Store
   component pw:app/store.page.add_to_cart#add_to_cart
   component pw:app/store.page.clear_cart#clear_cart
+  host      pw:host/session#read  (session.read)
   exports   page StorePage
 
-store.page.add_to_cart  abi a809c7313f7a7740
+store.page.add_to_cart  abi 667b06541a47fc42
   runs at   origin
   needs     database.write<Carts>
+  needs     session.read
   host      pw:host/database#write  (database.write<Carts>)
+  host      pw:host/session#read  (session.read)
   exports   command add_to_cart
 
-store.page.clear_cart  abi 0d616e1b3bc2bdba
+store.page.clear_cart  abi a3bcfeb6f0683204
   runs at   origin
   needs     database.write<Carts>
+  needs     session.read
   host      pw:host/database#write  (database.write<Carts>)
+  host      pw:host/session#read  (session.read)
   exports   command clear_cart
 

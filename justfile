@@ -174,9 +174,13 @@ e8-contracts:
        echo "produced by: just e8-contracts"; echo; \
        echo "One contract per DECLARATION, not per module: least authority, and a new"; \
        echo "declaration leaves every existing contract byte-identical."; echo; \
-       echo "Note StorePage: rendering needs no authority and runs anywhere. Its"; \
-       echo "handler calls add_to_cart, which needs database.write and runs only at"; \
-       echo "the origin — recorded once, against the thing that performs it."; echo; \
+       echo "Note StorePage: it requires session.read — it builds a query key from"; \
+       echo "the session, so it reads the session to RENDER — and it does NOT"; \
+       echo "require database.write<Carts>, which its deferred handler performs."; \
+       echo "Authority is recorded once, against the thing that performs it."; echo; \
+       echo "This note said rendering needs no authority and runs anywhere until"; \
+       echo "2026-08-10. It was true of a page whose current_session() call named"; \
+       echo "nothing. See docs/CORPUS.md C5 and tests/unresolved_provenance.rs."; echo; \
        cargo run --quiet -p pw-cli -- emit-contracts --plain packages/pw-std/*.pw \
          packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw \
          examples/store/*.pw; } > docs/evidence/E8/component-contracts.txt
