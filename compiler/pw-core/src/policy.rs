@@ -71,10 +71,21 @@ pub enum Domain {
     EventRef,
     /// A predicate over the caller: `requires SignedIn, OwnsOrder(order)`.
     PredicateRef,
-    /// **Executable code.** `optimistic cart.add(item, quantity)` runs, on the
-    /// client, before the round trip. The only domain whose values are terms
-    /// in the ordinary sense.
-    Term,
+    /// **An optimistic transition.** `optimistic Cart(current_session()) as
+    /// cart => cart.add(item, quantity)` — a resource ENTRY, a binder for its
+    /// current value, and a pure expression producing the speculative one.
+    ///
+    /// Architect ruling, 2026-08-11 (ADR-0025): it identifies an entry rather
+    /// than a value of a type, because two entries can share a type; and it has
+    /// no written inverse, because the platform restores the value it held and
+    /// a hand-written inverse is generally false.
+    Transition,
+    /// **Written by nobody.** `rollback` was a policy until 2026-08-11 and is
+    /// now derived: the runtime restores the resource value it held before the
+    /// speculative one. A source that writes it is reported rather than
+    /// ignored — an author who describes an inverse is describing something the
+    /// platform will not use.
+    Derived,
     /// A named operator with a signature: `retry bounded_exponential(max = 3)`.
     Operator(&'static [Op]),
     /// An effect as written, type argument included: `capability
@@ -211,7 +222,8 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         ]),
 
         // --- executable
-        "optimistic" | "rollback" => Domain::Term,
+        "optimistic" => Domain::Transition,
+        "rollback" => Domain::Derived,
 
         // --- operators
         "retry" | "reconnect" => Domain::Operator(RETRY_OPS),
@@ -260,7 +272,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
 pub fn carries_terms(head: &str) -> bool {
     matches!(
         domain_of(head),
-        Some(Domain::Term)
+        Some(Domain::Transition)
             | Some(Domain::Body)
             | Some(Domain::ResourceRef)
             | Some(Domain::EventRef)
@@ -449,7 +461,6 @@ mod tests {
     fn only_executable_positions_carry_terms() {
         for head in [
             "optimistic",
-            "rollback",
             "emits",
             "invalidates",
             "requires",
@@ -459,6 +470,11 @@ mod tests {
         ] {
             assert!(carries_terms(head), "{head} holds executable code");
         }
+        assert!(
+            !carries_terms("rollback"),
+            "`rollback` is written by nobody since ADR-0025 — the platform \
+             restores the value it held"
+        );
         for head in [
             "cache",
             "key",

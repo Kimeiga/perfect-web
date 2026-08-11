@@ -1,0 +1,24 @@
+// @status: GENERAL
+// @invariant: optimistic_not_pure
+// @dimension: indirect invalid — a different effect, in a different command
+//
+// The invariant was `optimistic_no_rollback` until 2026-08-11, when ADR-0025
+// retired it: the platform restores the value it held rather than replaying a
+// written inverse. What replaced it is what makes that restoration meaningful.
+module generality.optimistic_reads
+
+import Carts
+import Resources.{ Cart }
+import context.{ current_session }
+
+command remove_from_cart(item: MenuItemId)
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    // A READ, not a write, and in a different command from `R-029`'s: the
+    // invariant is about any effect, not about one family.
+    optimistic    Cart(current_session()) as cart => Carts.current(current_session())
+    invalidates   Cart(current_session())
+{
+    Carts.clear(current_session())
+}

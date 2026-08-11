@@ -28,6 +28,22 @@ fn add(s: SessionId, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, Ca
 // Placing the order. Declared here because `R-030` called it and imported
 // nothing — the fixture whose subject is private data in a resume manifest was
 // also calling a name that did not exist.
+// **A pure transition**, for an optimistic update.
+//
+// Declared 2026-08-11, when `optimistic` became a real transition (ADR-0025)
+// and the corpus's `cart.add(item, quantity)` turned out to call a member
+// `Cart` does not have — `Cart` is a record of `lines`, and the effect the
+// analysis attributed to it came from THIS module's `add` through the
+// last-segment member fallback. A 3-argument origin write standing in for a
+// 2-argument client-side transformation.
+//
+// `!{}` is the point: an optimistic transition runs on the client and is
+// discarded by restoring the value that was held, so it may not perform
+// anything an externally visible effect would leave behind.
+fn with_line(cart: Cart, item: MenuItemId, quantity: PositiveInt) -> Cart !{} {
+    cart
+}
+
 fn checkout(id: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> } {
     todo
 }

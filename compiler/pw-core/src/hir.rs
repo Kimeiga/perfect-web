@@ -281,8 +281,8 @@ pub struct Policy {
     /// Everything after the keyword, trimmed. Empty when the policy is a bare
     /// word such as `offline`.
     pub value: String,
-    /// **The value as an expression**, when this policy's domain is executable
-    /// code — `optimistic` and `rollback` (`crate::policy::Domain::Term`).
+    /// **The value as a transition**, when this policy's domain is one —
+    /// `optimistic` (`crate::policy::Domain::Transition`).
     ///
     /// Architect ruling, 2026-08-10:
     ///
@@ -290,14 +290,46 @@ pub struct Policy {
     /// > Pleris programs and must go through the full normal semantic
     /// > pipeline.
     ///
-    /// It points into the OWNING DECLARATION'S body arena, and is deliberately
-    /// **not reachable from that body's root**. It is a term, so name
-    /// resolution must see it; it runs in a different execution context — on
-    /// the client, before the round trip — so the declaration's effect row must
-    /// not absorb it. Reachable-from-root would have given the second for free
-    /// along with the first.
-    pub term: Option<ExprId>,
+    /// and 2026-08-11, on what the value must identify:
+    ///
+    /// > An optimistic clause identifies a resource entry and binds its current
+    /// > value; its body is an ordinary Pleris transition expression.
+    ///
+    /// Both expressions point into the OWNING DECLARATION'S body arena, and
+    /// neither is reachable from that body's root. They are terms, so name
+    /// resolution must see them; they run in a different execution context —
+    /// on the client, before the round trip — so the declaration's effect row
+    /// must not absorb them. Reachable-from-root would have given the second
+    /// for free along with the first.
+    pub transition: Option<Transition>,
     pub span: Span,
+}
+
+/// **An optimistic transition: which entry, its current value, and the change.**
+///
+/// ```text
+/// optimistic Cart(current_session()) as cart => cart.add(item, quantity)
+///            └────── target ───────┘    └ b ┘   └────── body ──────────┘
+/// ```
+///
+/// `target` is a resource ENTRY, not a type. Architect ruling, 2026-08-11: two
+/// entries can have the same type — `Cart(session A)` and `Cart(session B)` —
+/// so a transition that named only `Cart` would not say what it was updating.
+///
+/// There is deliberately no inverse. The platform restores the value it held,
+/// which it knows exactly; a hand-written `rollback` describes an inverse that
+/// is generally false. See ADR-0025.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Transition {
+    /// The resource entry being speculatively updated.
+    pub target: ExprId,
+    /// The name bound to the entry's current value, in the body only.
+    pub binder: String,
+    pub binder_span: Span,
+    /// Current value → speculative value. Pure: its execution context permits
+    /// no effects, because an externally visible effect cannot be undone by
+    /// restoring a resource value.
+    pub body: ExprId,
 }
 
 /// One constructor of a `type T = | A | B(X)` declaration.
@@ -364,13 +396,15 @@ impl Decl {
         self.policies.iter().find(|p| p.name == name)
     }
 
-    /// Every policy value that is a real term, with the policy that holds it.
+    /// Every policy value that is a transition, with the policy that holds it.
     ///
     /// The explicit way to reach an embedded term. A consumer that should see
     /// them asks; one that should not, does not — and neither finds them by
     /// accident, because they are not reachable from the body's root.
-    pub fn policy_terms(&self) -> impl Iterator<Item = (&Policy, ExprId)> {
-        self.policies.iter().filter_map(|p| p.term.map(|t| (p, t)))
+    pub fn transitions(&self) -> impl Iterator<Item = (&Policy, &Transition)> {
+        self.policies
+            .iter()
+            .filter_map(|p| p.transition.as_ref().map(|t| (p, t)))
     }
 }
 

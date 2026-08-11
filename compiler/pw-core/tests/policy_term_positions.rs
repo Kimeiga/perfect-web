@@ -23,12 +23,16 @@
 //! ```
 //!
 //! That is real client-side code — it runs before the round trip, and the
-//! rollback runs if the command fails. `cart` is not a module, not an import,
-//! and not a binding in either declaration that writes it. Two calls into the
-//! void, in `examples/store/app.pw` and `examples/accepted/A-005`, checking
-//! clean since E4 for a reason distinct from the four in
+//! rollback ran if the command failed. `cart` was not a module, not an import,
+//! and not a binding in either declaration that wrote it. Two calls into the
+//! void, checking clean since E4 for a reason distinct from the four in
 //! `unresolved_provenance.rs`: those resolve to nothing, and these were never
 //! anything the compiler could resolve.
+//!
+//! Both are repaired (ADR-0025). `optimistic` names the resource ENTRY it
+//! updates and binds its current value; `rollback` is written by nobody,
+//! because the platform restores the value it held and a written inverse is
+//! generally false.
 //!
 //! # Why the list is frozen rather than merely printed
 //!
@@ -141,13 +145,20 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         ("invalidates_on", "MenuChanged(id), StoreChanged(id)"),
         ("invalidates_on", "StoreChanged(consumer)"),
         ("invalidates_on", "StoreChanged(id)"),
-        ("optimistic", "cart => cart.add(item, quantity)"),
-        ("optimistic", "cart => cart.remove(item)"),
+        (
+            "optimistic",
+            "Cart(current_session()) as cart => Carts.add(current_session(), item, quantity)",
+        ),
+        (
+            "optimistic",
+            "Cart(current_session()) as cart => Carts.current(current_session())",
+        ),
+        (
+            "optimistic",
+            "Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)",
+        ),
         ("requires", "SignedIn"),
         ("requires", "SignedIn, OwnsOrder(order)"),
-        ("rollback", "cart => cart.remove(item)"),
-        ("rollback", "cart => cart.restore(item)"),
-        ("rollback", "cart => cart.remove(item, quantity)"),
     ]
     .iter()
     .map(|(a, b)| (a.to_string(), b.to_string()))
@@ -165,26 +176,30 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
     );
 }
 
-/// **`optimistic` and `rollback` are parsed now, and their binder is explicit.**
+/// **An `optimistic` clause names an entry, binds its value, and transforms
+/// it — and there is no written inverse.**
 ///
-/// The sharpest row, isolated so it cannot be lost in the list. Both spellings
-/// named `cart`, and nothing bound it — not a module, not an import, not a
-/// parameter, not a local. Nothing had ever parsed them, so nothing had asked.
+/// The sharpest row, isolated so it cannot be lost in the list. It read
+/// `optimistic cart.add(item, quantity)` with `cart` bound by nothing, and
+/// nothing had ever parsed it.
 ///
-/// Architect ruling, 2026-08-10:
+/// Architect ruling, 2026-08-11 (ADR-0025):
 ///
-/// > Do **not** fix it with `if policy == optimistic: inject magic variable
-/// > named "cart"`. That recreates ambient framework convention inside the
-/// > compiler. […] Every identifier visible inside optimistic/rollback code
-/// > must arise from ordinary lexical scope or from an explicit binder in the
-/// > construct itself.
+/// > An optimistic clause identifies a resource entry and binds its current
+/// > value; its body is an ordinary Pleris transition expression.
 ///
-/// So the value is a lambda and its parameter is the binder — ADR-0024. The
-/// compiler supplies nothing.
+/// A bare lambda said what transformation to perform and not which entry it
+/// applies to, and `Cart(session A)` and `Cart(session B)` are different
+/// objects of the same type.
 #[test]
-fn the_two_client_side_terms_are_terms_with_an_explicit_binder() {
-    assert_eq!(domain_of("optimistic"), Some(Domain::Term));
-    assert_eq!(domain_of("rollback"), Some(Domain::Term));
+fn an_optimistic_clause_has_a_target_a_binder_and_a_transition() {
+    assert_eq!(domain_of("optimistic"), Some(Domain::Transition));
+    assert_eq!(
+        domain_of("rollback"),
+        Some(Domain::Derived),
+        "`rollback` is written by nobody: the platform restores the value it \
+         held, and a hand-written inverse describes a different operation"
+    );
 
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let src = std::fs::read_to_string(root.join("examples/store/app.pw")).expect("store");
@@ -193,36 +208,33 @@ fn the_two_client_side_terms_are_terms_with_an_explicit_binder() {
         .all_decls()
         .find(|(_, d)| d.name == "add_to_cart")
         .expect("add_to_cart");
-
-    // The value is an EXPRESSION now, not text a consumer would have to parse.
-    let opt = add.policy("optimistic").expect("optimistic");
-    let term = opt.term.expect("`optimistic` lowered to a term");
     let body = hir.body(add.body.expect("body"));
-    assert!(
-        matches!(body.expr(term), pw_core::hir::Expr::Lambda { .. }),
-        "the binder is the lambda's parameter: {:?}",
-        body.expr(term)
-    );
 
-    // Its spans point into the FILE, not into the value's own text. A sub-parse
-    // starts at zero, so without the shift a diagnostic about `cart` would
-    // underline the first few columns of the module declaration.
-    let span = body.expr_span(term);
+    let (_, t) = add.transitions().next().expect("an optimistic transition");
+    assert_eq!(t.binder, "cart");
+
+    // Three pieces of meaning, each with a span in the FILE. A sub-parse starts
+    // at zero, so without the shift a diagnostic would underline the first few
+    // columns of the module declaration.
+    assert_eq!(&src[body.expr_span(t.target)], "Cart(current_session())");
+    assert_eq!(&src[t.binder_span.clone()], "cart");
     assert_eq!(
-        &src[span.clone()],
-        "cart => cart.add(item, quantity)",
-        "span {span:?}"
+        &src[body.expr_span(t.body)],
+        "Carts.with_line(cart, item, quantity)"
     );
 
-    // And the compiler still binds nothing on its own: remove the binder and
-    // `cart` is unresolved.
-    let without = src.replace("optimistic    cart => cart.add", "optimistic    cart.add");
+    // And the compiler binds nothing on its own: drop the binder and `cart` is
+    // an unresolved name rather than something supplied by the keyword.
+    let without = src.replace(
+        "Cart(current_session()) as cart =>",
+        "Cart(current_session()) as _c =>",
+    );
     let out = pw_core::check::check_sources(&[("app.pw".to_string(), without)]);
     assert!(
         out.iter()
             .flat_map(|(_, ds)| ds)
             .any(|d| d.code == "PW0021" && d.message.contains("cart")),
-        "removing the binder must expose `cart`, not fall back to a magic \
+        "renaming the binder must expose `cart`, not fall back to a magic \
          binding named after the policy"
     );
 }

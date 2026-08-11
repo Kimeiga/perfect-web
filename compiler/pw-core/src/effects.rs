@@ -459,11 +459,21 @@ impl<'a> Inference<'a> {
 
     /// What one body performs, resolving unqualified calls within `unit`.
     pub fn infer_at(&self, unit: usize, body: &Body) -> Inferred {
+        self.infer_rooted(unit, body, body.root)
+    }
+
+    /// The same inference, over one subtree.
+    ///
+    /// For an embedded transition. `optimistic Cart() as cart => ..` is a
+    /// separate execution root (ADR-0025) with its own effect row, checked
+    /// against its own context's restrictions — so it needs to be inferred
+    /// independently of the declaration's body rather than as part of it.
+    pub fn infer_rooted(&self, unit: usize, body: &Body, root: ExprId) -> Inferred {
         let mut out = Inferred::default();
         // Lambdas are visited through their enclosing call, so the reason can
         // say *which* function the callback was handed to.
         let mut inside_callback: BTreeMap<ExprId, String> = BTreeMap::new();
-        for id in body.walk() {
+        for id in body.walk_from(root) {
             if let Expr::Call { callee, args } = body.expr(id) {
                 let name = path_of(body, *callee);
                 for a in args {
@@ -474,7 +484,7 @@ impl<'a> Inference<'a> {
             }
         }
 
-        for id in body.walk() {
+        for id in body.walk_from(root) {
             // **A frame phase says WHEN work runs, not WHAT it does.**
             //
             // There was a synthesis here: `measure { .. }` contributed

@@ -1,10 +1,40 @@
 # ADR-0024 — `optimistic` and `rollback` bind their subject with a lambda
 
-**Status:** Proposed — awaiting the project architect's ratification of the
-*surface syntax*. The semantic requirement below is already ruled and is not in
-question.
+**Status:** **Rejected — superseded by [ADR-0025](ADR-0025-an-optimistic-clause-targets-a-resource-entry.md), never accepted.**
 
-**Date:** 2026-08-10
+Kept as the record of a proposal and why it was wrong. The architect's reasoning
+about the second half — that a written inverse is generally false — is the more
+valuable half of this document, and it belongs somewhere that is not pretending
+it was always the plan.
+
+**Date:** 2026-08-10, rejected 2026-08-11
+
+## What the architect rejected
+
+Two things, and the second more strongly than the first:
+
+> `optimistic cart => cart.add(item, quantity)` tells us **what transformation
+> to perform**, but not **which resource entry is being transformed.** […] Two
+> entries can have the same type: `Cart(session A)`, `Cart(session B)`.
+
+and:
+
+> "an optimistic transition is a function from the current value to the next,
+> and rollback is its inverse" — the first half is excellent. The second is
+> generally false.
+>
+> Suppose the cart initially contains `Apple × 3` and optimistically
+> `add Apple × 2 → Apple × 5`. A hand-written `rollback cart => cart.remove(apple)`
+> doesn't necessarily restore `Apple × 3`. Even `subtract(2)` can fail to
+> reproduce prior state once there are concurrent updates, normalization rules,
+> server reconciliation, derived fields.
+>
+> And Pleris already knows the exact pre-optimistic resource value/version.
+> Making the programmer describe the inverse is precisely the kind of redundant
+> mechanism the project is trying to eliminate.
+
+What survived: the ordinary lambda as the transition, independent lexical scope
+per clause, and the named term root separate from the command body.
 
 ## The ruling this implements
 

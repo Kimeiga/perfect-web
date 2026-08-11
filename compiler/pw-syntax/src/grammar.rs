@@ -1932,6 +1932,68 @@ pub fn parse_tree(src: &str) -> Parse {
     P::new(src).run()
 }
 
+/// **Parse an optimistic clause, standalone.**
+///
+/// ```text
+/// Cart(current_session()) as cart => cart.add(item, quantity)
+/// └─ the resource ENTRY ─┘    └ its ┘   └── the transition ──┘
+///                          current value
+/// ```
+///
+/// Architect ruling, 2026-08-11:
+///
+/// > An optimistic clause identifies a resource entry and binds its current
+/// > value; its body is an ordinary Pleris transition expression.
+///
+/// The target is parsed at a binding power above `as` (which is 9), so the cast
+/// operator does not absorb the binder — `Cart(..) as cart` is a resource
+/// binding, not a cast to a type called `cart`.
+///
+/// Which policy heads take this shape is `pw_core::policy`'s answer. This is
+/// the grammar; the table lives where the rest of the policy vocabulary does.
+pub fn parse_transition_clause(src: &str) -> Parse {
+    let mut p = P::new(src);
+    p.b.start(K::SourceFile);
+    p.b.start(K::TransitionClause);
+    if !p.at_eof() {
+        // The resource entry. Above `as`'s power so the cast rule is not
+        // reached; see `P::expr`.
+        p.expr(10);
+        if p.at_kw("as") {
+            p.bump();
+            p.name("a name for the resource's current value");
+        } else {
+            p.error(
+                "PW0104",
+                "expected `as <name>` — an optimistic clause binds the \
+                 resource's current value",
+            );
+        }
+        if p.eat(Kind::FatArrow) {
+            p.expr(0);
+        } else {
+            p.error("PW0105", "expected `=>` and a transition expression");
+        }
+    }
+    while !p.at_eof() {
+        p.fuel += 1;
+        if p.fuel > 200_000 {
+            p.error("PW0099", "parser made no progress");
+            break;
+        }
+        p.start(K::ErrorExpr);
+        p.error("PW0103", "an optimistic clause is one transition");
+        p.bump();
+        p.finish();
+    }
+    p.b.finish_node();
+    p.b.finish_node();
+    Parse {
+        green: SyntaxNode::new_root(p.b.finish()),
+        errors: p.errors,
+    }
+}
+
 /// **Parse one expression, standalone.**
 ///
 /// The same expression grammar `parse_tree` uses — there is one parser

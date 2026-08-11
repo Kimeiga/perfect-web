@@ -121,6 +121,17 @@ pub enum SyntaxKind {
     IfExpr,
     MatchExpr,
     MatchArm,
+    /// `Cart(current_session()) as cart => cart.add(item, quantity)` — the
+    /// value of an `optimistic` clause.
+    ///
+    /// Three children in order: the resource ENTRY being speculatively
+    /// updated, the `Name` binding its current value, and the transition.
+    /// Architect ruling, 2026-08-11: an optimistic clause identifies a resource
+    /// entry and binds its current value; its body is an ordinary Pleris
+    /// transition expression. A bare lambda said what transformation to
+    /// perform and not which entry it applies to, and two entries of one type
+    /// — `Cart(session A)` and `Cart(session B)` — are different objects.
+    TransitionClause,
     /// `for x in xs { .. }` — a pattern, an iterable, and a body.
     ///
     /// It was a `CallExpr` whose callee was the name `for` until 2026-08-10,
@@ -350,6 +361,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         IfExpr,
         MatchExpr,
         MatchArm,
+        TransitionClause,
         ForExpr,
         BinaryExpr,
         CastExpr,

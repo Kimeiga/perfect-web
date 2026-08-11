@@ -396,7 +396,7 @@ impl Lowerer<'_> {
                         Policy {
                             name,
                             value,
-                            term: None,
+                            transition: None,
                             span: span_of(&p),
                         }
                     })
@@ -527,19 +527,19 @@ impl Lowerer<'_> {
         )
     }
 
-    /// **A policy value that is executable code becomes an expression.**
+    /// **A policy value that is a transition becomes one.**
     ///
-    /// Architect ruling, 2026-08-10:
+    /// Architect ruling, 2026-08-11 (ADR-0025):
     ///
-    /// > `optimistic` and `rollback` are different: their contents are actual
-    /// > Pleris programs and must go through the full normal semantic pipeline.
+    /// > An optimistic clause identifies a resource entry and binds its current
+    /// > value; its body is an ordinary Pleris transition expression.
     ///
-    /// Which heads those are is `crate::policy`'s answer — one table, not a
-    /// second list here. The expression is allocated in the declaration's own
-    /// arena but is **not reachable from `root`**, deliberately: it is a term,
-    /// so name resolution must see it, and it runs in a different execution
-    /// context, so the declaration's effect row must not absorb it.
-    /// `Body::policy_terms` is how a consumer asks for them by name rather than
+    /// Which heads take this shape is `crate::policy`'s answer — one table, not
+    /// a second list here. Both expressions are allocated in the declaration's
+    /// own arena and are **not reachable from `root`**, deliberately: they are
+    /// terms, so name resolution must see them, and they run in a different
+    /// execution context, so the declaration's effect row must not absorb them.
+    /// `Decl::transitions` is how a consumer asks for them by name rather than
     /// finding them by walking.
     ///
     /// Spans are offset back into the file. The sub-parse sees only the value
@@ -547,7 +547,7 @@ impl Lowerer<'_> {
     /// line happened to be there.
     fn policy_terms(&mut self, b: &mut BodyBuilder, policies: &mut [Policy]) {
         for p in policies.iter_mut() {
-            if crate::policy::domain_of(&p.name) != Some(crate::policy::Domain::Term) {
+            if crate::policy::domain_of(&p.name) != Some(crate::policy::Domain::Transition) {
                 continue;
             }
             if p.value.trim().is_empty() {
@@ -561,27 +561,47 @@ impl Lowerer<'_> {
                 + whole
                     .find(&p.value)
                     .unwrap_or_else(|| p.name.len().min(whole.len()));
-            let parsed = pw_syntax::parse_expr(&p.value);
-            let Some(expr) = parsed.green.children().find(|c| is_expr(c.kind())) else {
+            let parsed = pw_syntax::parse_transition_clause(&p.value);
+            let Some(clause) = parsed
+                .green
+                .children()
+                .find(|c| c.kind() == K::TransitionClause)
+            else {
                 continue;
             };
+            let exprs: Vec<SyntaxNode> = clause.children().filter(|c| is_expr(c.kind())).collect();
+            let (Some(target_node), Some(body_node)) = (exprs.first(), exprs.get(1)) else {
+                continue;
+            };
+            let Some(name_node) = clause.children().find(|c| c.kind() == K::Name) else {
+                continue;
+            };
+
             // Lowered by a `Lowerer` over the VALUE's text, because `span_of`
             // reads a node's range and the sub-parse's ranges start at zero.
             // Then every span it allocated is moved back into the file — one
-            // shift over the arena suffix, rather than a second span
-            // convention that every node kind would have to honour.
+            // shift over the arena suffix, rather than a second span convention
+            // every node kind would have to honour.
             let before = (b.exprs.len(), b.pats.len(), b.types.len(), b.nodes.len());
             let mut sub = Lowerer {
                 hir: std::mem::take(&mut self.hir),
                 src: &p.value,
             };
-            let id = sub.expr(b, &expr);
+            let target = sub.expr(b, target_node);
+            let body = sub.expr(b, body_node);
             self.hir = std::mem::take(&mut sub.hir);
             b.exprs.shift_spans_from(before.0, offset);
             b.pats.shift_spans_from(before.1, offset);
             b.types.shift_spans_from(before.2, offset);
             b.nodes.shift_spans_from(before.3, offset);
-            p.term = Some(id);
+
+            let bs = span_of(&name_node);
+            p.transition = Some(crate::hir::Transition {
+                target,
+                binder: text(&p.value, &name_node).trim().to_string(),
+                binder_span: (bs.start + offset)..(bs.end + offset),
+                body,
+            });
         }
     }
 

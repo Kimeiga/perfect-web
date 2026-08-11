@@ -33,7 +33,7 @@ Reproduce: `just ci` for the gate, `just evidence-corpus` for the per-fixture
 table, `just generality` for the second score.
 
 **C1 is frozen. C2 and C3 both opened on 2026-08-06; C4 opened 2026-08-07; C5 opened
-2026-08-10** — see below. A change to
+2026-08-10; C6 opened 2026-08-11** — see below. A change to
 any file under `examples/accepted` or `examples/rejected` opens the next version
 and requires a row in its table plus a recorded reason. The rule exists because the path to 44/44 changed ten
 fixtures, and a reader who does not know that will read the number as stronger
@@ -443,3 +443,77 @@ were calling names that did not exist.
 It did not change what any rejected fixture is about, and it did not weaken any
 rule to accommodate a fixture. The one verdict that moved, moved because the
 witness was invalid evidence and was replaced by a valid one.
+
+---
+
+## C6 — opened 2026-08-11 (E10, on the architect's optimistic-transition ruling)
+
+```text
+Corpus version:            C6
+Accepted programs:         24
+Rejected programs:         46
+Charter categories:        24/24 accepted, 46/46 rejected
+Result:                    24/24 accepted clean, 46/46 rejected enforced
+Changed since C5:          5 files, and ONE INVARIANT RETIRED
+```
+
+### Why it opened
+
+**A rejected fixture's invariant was retired**, which no previous version has
+done. ADR-0025:
+
+> "an optimistic transition is a function from the current value to the next,
+> and rollback is its inverse" — the first half is excellent. The second is
+> generally false. […] Pleris already knows the exact pre-optimistic resource
+> value/version. Making the programmer describe the inverse is precisely the
+> kind of redundant mechanism the project is trying to eliminate.
+
+`optimistic_no_rollback` said an optimistic transition must declare how it is
+reversed. It is gone. A cart holding `Apple × 3`, optimistically `+2`, is
+`Apple × 5`, and a written `remove(apple)` does not restore `Apple × 3`.
+
+What replaced it is what makes automatic restoration meaningful:
+`optimistic_not_pure`. The transition runs on the client and is abandoned by
+restoring the value that was held, and an externally visible effect cannot be
+abandoned that way.
+
+### C5 → C6
+
+| fixture | change | before | after |
+|---|---|---|---|
+| store | `optimistic Cart(current_session()) as cart => Carts.with_line(..)`, `rollback` deleted | clean | clean |
+| A-005 | the same | clean | clean |
+| R-029 | **subject changed**: the impure transition, not the missing rollback | `PW0327` *optimistic without rollback* | `PW0330` *optimistic not pure* |
+| `generality/optimistic_no_rollback/` | renamed `optimistic_not_pure/`, both witnesses rewritten | — | — |
+| `examples/lib/Carts.pw` | `+ fn with_line(cart, item, quantity) -> Cart !{}` | — | — |
+
+**R-029's `@category` is unchanged** — *optimistic state with no rollback path* —
+because the failure mode is unchanged: an optimistic update that cannot be
+cleanly abandoned leaves the UI permanently inconsistent with the server. Only
+the mechanism moved. The `@rule` and `@invariant` both changed and the header
+records why.
+
+`PW0327` was **reused rather than retired**: same code, same declaration,
+opposite verdict. It required a `rollback`; it now refuses one. A reader looking
+the code up finds what replaced it instead of a dead entry.
+
+### The finding the repair exposed
+
+`optimistic cart.add(item, quantity)` called a member `Cart` does not have —
+`Cart` is a record of `lines` — and the `database.write<Carts>` the analysis
+attributed to it came from `Carts.add` through `effects::resolved`'s scoped
+last-segment member fallback. A three-argument origin write standing in for a
+two-argument client-side transformation.
+
+Nothing was wrong with the fallback's own rule, which is scoped-and-unique and
+exists for `it.style.set_padding`. What was wrong is that the corpus depended on
+it for a call that should never have resolved. `Carts.with_line` is the pure
+`Cart -> Cart` the transition actually needed, and it is declared `!{}`.
+
+### The declaration-level coverage floor moved 4 → 3
+
+Recorded here because a floor going down is the shape `docs/RISK_QUEUE.md`
+warns about. `R-029` was caught by `rules.rs`, which reads declaration HEADERS;
+its new defect is an effect question that only `check.rs` can answer. The
+compensating assertion is in `rules::corpus_tests`: R-029 must still be caught,
+by the whole checker, for its declared code.

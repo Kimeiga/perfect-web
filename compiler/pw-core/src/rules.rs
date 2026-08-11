@@ -282,21 +282,39 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
         );
     }
 
-    // --- PW0305: optimistic without rollback --------------------------------
-    if let Some(o) = policy(policies, "optimistic")
-        && policy(policies, "rollback").is_none()
-    {
+    // --- PW0327: `rollback` is derived, not written -------------------------
+    //
+    // Architect ruling, 2026-08-11 (ADR-0025), retiring the rule this code
+    // used to be:
+    //
+    // > "an optimistic transition is a function from the current value to the
+    // > next, and rollback is its inverse" — the first half is excellent. The
+    // > second is generally false.
+    //
+    // A cart holding `Apple x 3`, optimistically `+2`, is `Apple x 5`; a
+    // hand-written `remove(apple)` does not restore `Apple x 3`, and even
+    // `subtract(2)` fails once there are concurrent updates, normalization, or
+    // derived fields. The platform knows the exact value it held, so requiring
+    // the author to describe an inverse was requiring a description of
+    // something the runtime will not use.
+    //
+    // The code is REUSED rather than retired, because its subject is the same
+    // declaration and a reader looking it up should find what replaced it.
+    if let Some(r) = policy(policies, "rollback") {
         out.push(
             err(
                 "PW0327",
-                "an optimistic transition must declare its rollback",
-                format!("`{name}` declares an optimistic transition with no rollback path"),
-                o.span.clone(),
+                "an optimistic transition's reversal is derived, not written",
+                format!("`{name}` declares a `rollback`"),
+                r.span.clone(),
             )
             .explain(
-                "a rejected mutation would leave the UI permanently inconsistent with the server",
+                "the platform restores the resource value it held before the speculative one, \
+                 which it knows exactly. A written inverse describes a different operation: \
+                 reversing `add(2)` with `remove(..)` does not restore the previous value once \
+                 there are concurrent updates, normalization, or derived fields",
             )
-            .repair("add a `rollback` clause describing how the optimistic change is reversed"),
+            .repair("delete the `rollback` clause"),
         );
     }
 
@@ -459,11 +477,13 @@ mod tests {
     }
 
     #[test]
-    fn optimistic_without_rollback_is_rejected() {
-        let bad =
-            "module c\ncommand add(i: ItemId) -> Cart\n    optimistic cart.add(i)\n{\n    0\n}\n";
+    fn a_written_rollback_is_rejected_and_an_optimistic_alone_is_not() {
+        // The inversion of the rule this code used to carry, and it is a real
+        // inversion rather than a deletion: `optimistic` alone was the error
+        // and is now correct; `rollback` was required and is now refused.
+        let bad = "module c\ncommand add(i: ItemId) -> Cart\n    optimistic Cart() as c => c.add(i)\n    rollback c => c.remove(i)\n{\n    0\n}\n";
         assert!(codes(bad).contains(&"PW0327"));
-        let good = "module c\ncommand add(i: ItemId) -> Cart\n    optimistic cart.add(i)\n    rollback cart.remove(i)\n{\n    0\n}\n";
+        let good = "module c\ncommand add(i: ItemId) -> Cart\n    optimistic Cart() as c => c.add(i)\n{\n    0\n}\n";
         assert!(!codes(good).contains(&"PW0327"));
     }
 
@@ -644,13 +664,78 @@ mod corpus_tests {
         }
         // E2 checks declaration HEADERS only. The rest need body parsing (E2
         // continuation), effect checking (E1), or privacy/placement solving (E5).
+        //
+        // **The floor moved from 4 to 3 on 2026-08-11, and it is a movement to
+        // record rather than a regression.** `R-029` was caught here for
+        // `optimistic` without `rollback`; ADR-0025 retired that invariant —
+        // the platform restores the value it held, so a written inverse
+        // describes a different operation — and the fixture now carries
+        // `optimistic_not_pure`, which is an EFFECT question. `check.rs`
+        // catches it, `rules.rs` cannot, and a header rule that could would be
+        // guessing at what a call performs.
+        //
+        // A floor going down is the shape `docs/RISK_QUEUE.md` warns about, so
+        // the compensating assertion is below: R-029 is still caught, by the
+        // whole checker, for its declared code.
         assert!(
-            caught >= 4,
+            caught >= 3,
             "declaration-level coverage regressed: {caught}/{total} rejected files caught"
         );
         assert!(
             total >= 40,
             "expected the full rejected corpus, saw {total}"
+        );
+
+        // The fixture that left this count is still caught, by the checker as
+        // a whole. Without this, lowering the floor would be indistinguishable
+        // from losing a catch.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut files: Vec<(String, String)> = Vec::new();
+        for d in [
+            "packages/pw-std",
+            "packages/pw-platform-web",
+            "examples/lib",
+        ] {
+            let mut ps: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(d))
+                .expect("dir")
+                .map(|e| e.expect("entry").path())
+                .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+                .collect();
+            ps.sort();
+            for p in ps {
+                files.push((
+                    p.file_name().unwrap().to_string_lossy().to_string(),
+                    std::fs::read_to_string(&p).expect("read"),
+                ));
+            }
+        }
+        files.push((
+            "domain.pw".to_string(),
+            std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain"),
+        ));
+        let r029 = std::fs::read_dir(root.join("examples/rejected"))
+            .expect("rejected")
+            .map(|e| e.expect("entry").path())
+            .find(|p| {
+                p.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("R-029")
+            })
+            .expect("R-029");
+        files.push((
+            "R-029.pw".to_string(),
+            std::fs::read_to_string(&r029).expect("read"),
+        ));
+        let codes: Vec<&str> = crate::check::check_sources(&files)
+            .iter()
+            .flat_map(|(_, ds)| ds.iter())
+            .map(|d| d.code)
+            .collect();
+        assert!(
+            codes.contains(&"PW0330"),
+            "R-029 left the declaration-level count and must still be caught \
+             for its declared invariant: {codes:?}"
         );
     }
 }

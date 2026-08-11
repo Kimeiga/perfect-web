@@ -102,8 +102,7 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
-    optimistic    cart => cart.add(item, quantity)
-    rollback      cart => cart.remove(item)
+    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
     invalidates   Cart(current_session())
     emits         CartChanged(current_session())
 {

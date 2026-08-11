@@ -293,7 +293,7 @@ fn every_allocated_expression_has_exactly_one_named_root() {
             roots
                 .entry(b.index())
                 .or_default()
-                .extend(d.policy_terms().map(|(_, t)| t));
+                .extend(d.transitions().flat_map(|(_, t)| [t.target, t.body]));
         }
 
         for (bi, body, _) in hir.bodies.iter() {
@@ -340,8 +340,7 @@ opaque type MenuItemId = String
 
 command add(item: MenuItemId) -> Result<Cart, CartError>
     requires   SignedIn
-    optimistic cart => cart.add(item)
-    rollback   cart => cart.remove(item)
+    optimistic Cart(item) as cart => cart
 {
     todo
 }
@@ -350,8 +349,11 @@ command add(item: MenuItemId) -> Result<Cart, CartError>
     let (_, d) = hir.all_decls().find(|(_, d)| d.name == "add").expect("add");
     let body = hir.body(d.body.expect("body"));
 
-    let terms: Vec<ExprId> = d.policy_terms().map(|(_, t)| t).collect();
-    assert_eq!(terms.len(), 2, "both policies lowered a term");
+    let terms: Vec<ExprId> = d
+        .transitions()
+        .flat_map(|(_, t)| [t.target, t.body])
+        .collect();
+    assert_eq!(terms.len(), 2, "the target and the transition both lowered");
 
     let from_root: std::collections::HashSet<ExprId> = body.walk().into_iter().collect();
     for t in &terms {

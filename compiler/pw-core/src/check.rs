@@ -187,6 +187,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // And the declarations themselves: an impact condition naming nothing
         // makes a facet silently inapplicable.
         crate::ontology::check_effect_declarations(&ontology, per_unit, i);
+        // E10, ADR-0025: an optimistic transition is a separate execution root
+        // with its own effect row, and its context permits none.
+        optimistic_transitions_are_pure(&inference, i, &u.hir, per_unit);
     }
 
     // Declaration name → its privacy label, across every unit. A `page` in one
@@ -262,7 +265,7 @@ fn unresolved_uses(
         // A declaration can call itself and its siblings.
         in_scope.extend(hir.all_decls().map(|(_, d)| d.name.clone()));
 
-        // **The body, PLUS every embedded policy term.**
+        // **The body, PLUS every embedded transition.**
         //
         // Architect ruling, 2026-08-10:
         //
@@ -270,63 +273,53 @@ fn unresolved_uses(
         // > resolution. […] There should not be a separate
         // > "optimistic-expression resolver."
         //
-        // A policy term is not reachable from `body.root` — deliberately, so
+        // A transition is not reachable from `body.root` — deliberately, so
         // the declaration's effect row does not absorb code that runs in
         // another execution context — so it is added here by name rather than
         // found by walking. It is the SAME rule below, not a second one.
-        //
-        // And the scope is the ordinary one. Architect ruling, same day:
-        //
-        // > Do not fix it with `if policy == optimistic: inject magic variable
-        // > named "cart"`. That recreates ambient framework convention inside
-        // > the compiler.
-        //
-        // So `optimistic cart.add(..)` reports `cart` as unresolved, which is
-        // the true state of the program: nothing binds it.
         let mut reachable = body.walk();
-        for (policy, term) in decl.policy_terms() {
-            reachable.extend(body.walk_from(term));
+        for (policy, t) in decl.transitions() {
+            reachable.extend(body.walk_from(t.target));
+            reachable.extend(body.walk_from(t.body));
 
-            // **Every name inside an embedded term must come from somewhere.**
+            // **Every name inside a transition must come from somewhere.**
             //
-            // Architect ruling, 2026-08-10, locking the semantic requirement
-            // while leaving the surface syntax open:
+            // Architect ruling, 2026-08-10, locking the semantic requirement:
             //
             // > Every identifier visible inside optimistic/rollback code must
             // > arise from ordinary lexical scope or from an explicit binder in
             // > the construct itself. No special-name lookup.
             //
-            // The rule is narrow to embedded terms on purpose. A body is full
-            // of names that are markup, policy words and keywords, and
-            // reporting all of them is the over-broad rule that was reverted
-            // twice. An embedded term is different: it is executable code with
-            // no ambient scope, so every name in it is a use.
-            // The term's OWN binders, and only its own: `optimistic cart =>
-            // ..` binds `cart` for that value and not for `rollback`.
-            let mut term_scope = in_scope.clone();
-            term_scope.extend(crate::resolve::local_bindings_from(body, term));
+            // The binder is the clause's own — `as cart` — and it is in scope
+            // in the BODY only. The target is evaluated before the binding
+            // exists, so `Cart(cart)` names nothing, which is correct.
+            let mut in_body = in_scope.clone();
+            in_body.insert(t.binder.clone());
+            in_body.extend(crate::resolve::local_bindings_from(body, t.body));
 
-            for nid in body.walk_from(term) {
-                let Expr::Name(n) = body.expr(nid) else {
-                    continue;
-                };
-                if term_scope.contains(n)
-                    || crate::resolve::INTRINSIC_CALLS.contains(&n.as_str())
-                    || !matches!(
-                        workspace.resolve(unit, n),
-                        crate::resolve::Resolution::Unresolved
-                    )
-                {
-                    continue;
+            for (root, scope) in [(t.target, &in_scope), (t.body, &in_body)] {
+                for nid in body.walk_from(root) {
+                    let Expr::Name(n) = body.expr(nid) else {
+                        continue;
+                    };
+                    if scope.contains(n)
+                        || crate::resolve::INTRINSIC_CALLS.contains(&n.as_str())
+                        || !matches!(
+                            workspace.resolve(unit, n),
+                            crate::resolve::Resolution::Unresolved
+                        )
+                    {
+                        continue;
+                    }
+                    out.push(unresolved_in_policy_term(
+                        hir,
+                        decl,
+                        body,
+                        nid,
+                        n,
+                        &policy.name,
+                    ));
                 }
-                out.push(unresolved_in_policy_term(
-                    hir,
-                    decl,
-                    body,
-                    nid,
-                    n,
-                    &policy.name,
-                ));
             }
         }
 
@@ -413,6 +406,71 @@ fn unresolved_uses(
         }
     }
     out
+}
+
+/// **An optimistic transition performs nothing.**
+///
+/// Architect ruling, 2026-08-11 (ADR-0025):
+///
+/// > The desired shape is `Cart → Cart`, not `Cart → arbitrary client program
+/// > with arbitrary effects`. […] That gives automatic rollback meaningful
+/// > semantics. An arbitrary externally visible effect cannot generally be
+/// > undone by restoring the resource value.
+///
+/// The transition is its own execution root, so its row is inferred
+/// independently of the declaration's body — `infer_rooted`. Neither absorbs
+/// the other's effects, which is what makes this checkable at all: a
+/// transition merged into the command's row would be indistinguishable from
+/// the command performing them itself.
+fn optimistic_transitions_are_pure(
+    inference: &crate::effects::Inference<'_>,
+    unit: usize,
+    hir: &Hir,
+    out: &mut Vec<Diagnostic>,
+) {
+    for (_, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        for (policy, t) in decl.transitions() {
+            let inferred = inference.infer_rooted(unit, body, t.body);
+            if inferred.effects.is_empty() {
+                continue;
+            }
+            let performed: Vec<String> = inferred.effects.iter().cloned().collect();
+            out.push(Diagnostic {
+                code: crate::codes::OPTIMISTIC_NOT_PURE.id,
+                invariant: crate::codes::OPTIMISTIC_NOT_PURE.invariant,
+                reason: "optimistic_transition_performs_effects",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}`'s optimistic transition performs {}",
+                    decl.name,
+                    performed.join(", ")
+                ),
+                primary_span: body.expr_span(t.body),
+                related: vec![Related {
+                    span: policy.span.clone(),
+                    label: "declared here".to_string(),
+                }],
+                explanation: Some(
+                    "An optimistic transition is a pure function from a resource's current \
+                     value to its speculative one. It runs on the client, before the round \
+                     trip, and is discarded if the command fails — and the platform discards \
+                     it by restoring the value it held. An externally visible effect cannot \
+                     be undone that way, so a transition that performs one has no defined \
+                     behaviour on rejection."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "move the effect into the command's body, which runs once and \
+                                  authoritatively"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
 }
 
 /// A name inside an `optimistic` or `rollback` term that nothing binds.
@@ -1359,7 +1417,7 @@ fn privacy_and_placement(
             let cache = crate::hir::Policy {
                 name: "cache".to_string(),
                 value: cache_value,
-                term: None,
+                transition: None,
                 span: cache_span,
             };
             let needed = label.required_cache_partitions();

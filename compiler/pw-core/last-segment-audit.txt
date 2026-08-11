@@ -29,7 +29,7 @@ check.rs:to_exhaust_pattern     scoped     matches a constructor pattern's path 
 
 check.rs:reads_label_with_source    display    the short name a privacy diagnostic attributes the restriction to — "this page is Session BECAUSE of `cart`" — used only when no enclosing binding gives a better one. The label itself was resolved through the workspace two lines above; this is what the message says, not what it decided. Repaired 2026-08-07: it used to BE the resolution.
 
-effects.rs:infer_at   display    the short name for `Via::Helper { helper }`, which describes the chain in a diagnostic: "through `helper`". The `callee` beside it keeps the full path, and the effect itself was already resolved before this line.
+effects.rs:infer_rooted    display    the short name for `Via::Helper { helper }`, which describes the chain in a diagnostic: "through `helper`". The `callee` beside it keeps the full path, and the effect itself was already resolved before this line. Was `infer_at` until 2026-08-11; the walk gained a root parameter so a transition can be inferred over its own subtree (ADR-0025), because `optimistic Cart() as cart => ..` is a separate execution root and inferring it as part of the enclosing body would make a client-side transition indistinguishable from the command performing it.
 
 effects.rs:resolved   scoped     the scoped-and-unique member branch. Matched against the declarations THIS UNIT can see — its own module and its imports — and two matches means no answer. Never program-wide.
 

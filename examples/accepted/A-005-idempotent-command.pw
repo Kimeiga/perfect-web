@@ -28,8 +28,7 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     requires      SignedIn
     idempotent_by InteractionId
     transaction   serializable
-    optimistic    cart => cart.add(item, quantity)
-    rollback      cart => cart.remove(item, quantity)
+    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
     invalidates   Cart(current_session())
     retry         transport_only(max = 2, jitter = true)
 {

@@ -144,8 +144,15 @@ codes! {
 
     STALE_KEY_POLICY = "PW0325" / stale_key_policy / 1, DeclarationRules,
         "a keyed query must say what happens when its key changes";
-    OPTIMISTIC_NO_ROLLBACK = "PW0327" / optimistic_no_rollback / 1, DeclarationRules,
-        "an optimistic transition must declare a rollback path";
+    // Renamed 2026-08-11 (ADR-0025). It required a written `rollback`; it now
+    // refuses one, because the platform restores the value it held and a
+    // hand-written inverse describes a different operation. Same code, same
+    // declaration, opposite verdict — a reader looking it up finds what
+    // replaced it rather than a dead entry.
+    WRITTEN_ROLLBACK = "PW0327" / written_rollback / 1, DeclarationRules,
+        "an optimistic transition's reversal is derived, not written";
+    OPTIMISTIC_NOT_PURE = "PW0330" / optimistic_not_pure / 1, DeclarationRules,
+        "an optimistic transition must be a pure function of the resource's value";
     CACHE_NO_INVALIDATION = "PW0200" / cache_no_invalidation / 1, DeclarationRules,
         "a shared cache should declare how it is invalidated";
 
