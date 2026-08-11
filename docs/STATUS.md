@@ -36,9 +36,28 @@ sequence the architect set out was worked through in order:
 8  a `view` gets a contract         src/contract.rs                DONE
 9  corpus C5, E8 evidence regenerated                              DONE
 10 resolved-program invariant       backend::lower::Checked        DONE
-3  PolicyExpr / TermExpr in HIR                                    NEXT
-11 Wasm encoding, invocation-region memory, E10-I                  open
 ```
+
+**The architect's second sequence, 2026-08-10**, after ratifying the
+`current_consumer` deviation:
+
+```text
+A  ratify current_consumer -> current_session                      DONE
+B  MatchReport: Proven | NonExhaustive | Blocked                   DONE
+D  optimistic/rollback as real EmbeddedTerm nodes                  DONE
+E  do NOT inject `cart` — expose the unresolved binding            DONE
+F  `for` becomes real syntax with bindings                         DONE
+C  PolicyExpr / TermExpr: policy values leave the body tree        NEXT
+G  re-run the policy-consumer matrix                               after C
+H  close E10-P                                                     after C
+I  Wasm encoding, invocation-region memory, E10-I                  open
+```
+
+`D` and `E` landed together and are the sharpest result: `optimistic
+cart.add(item, quantity)` had never been parsed, and `cart` is bound by
+nothing. It is now reported. The binder is a lambda — `optimistic cart =>
+cart.add(..)` — recorded as **ADR-0024 (Proposed)**, since the architect locked
+the semantic requirement and left the surface syntax open.
 
 Four findings the audits produced, each recorded in `docs/RISK_QUEUE.md`:
 

@@ -59,15 +59,18 @@ capabilities rather than by matching a spelling.
 ### Next, in order
 
 ```text
-1  PolicyExpr / TermExpr in the HIR — step 3 of the architect's
-   sequence, and the only one not yet done. `src/policy.rs` is the
-   table it must be driven by; `tests/policy_consumers.rs` is the
-   before-state every consumer has to be compared against. Build
-   `EmbeddedTerm` from the start, with the operator's signature saying
-   which arguments ARE terms — the 27 values in
-   `tests/policy_term_positions.rs` are the work-list, and two of them
-   (`optimistic cart.add(..)`, `rollback cart.remove(..)`) are
-   executable code nothing has ever parsed.
+1  PolicyExpr / TermExpr — the HALF THAT REMAINS. Declaration-level
+   policy values are typed by domain and the executable ones are real
+   terms (`hir::Policy::term`, ADR-0024). What is still in the
+   executable body tree is the BODY-EMBEDDED policy statement: a page's
+   `placement origin` / `cache private`, a `handler_policy { .. }`, a
+   `replicated { .. }`. Those lower as flat `Name` siblings, which is
+   what `tests/policy_consumers.rs` measured — four of six consumers
+   cannot tell them from terms. It needs the grammar to emit a
+   `PolicyList` inside a UI declaration's body; `src/policy.rs` is the
+   table it must be driven by. `Domain::Body` — `acquire`, `release`,
+   `draw` — must STAY executable, and its binder must start binding
+   (`a_for_loop_is_syntax_that_binds_and_a_policy_block_is_not_yet`).
 2  Regenerate the E8 evidence against every movement C5 caused
 3  DONE 2026-08-10 — `backend::lower::Checked`. A resolved-program
    invariant carried by a type with a private field, not a convention:
@@ -84,23 +87,37 @@ capabilities rather than by matching a spelling.
    command with branching
 ```
 
-### Two parser defects the audits found, neither yet repaired
+### Parser defects the audits found
 
 ```text
-for (i, v) in xs { .. }    lowers to Expr::Call, callee Name("for"),
-                           and binds nothing — so the loop variable
-                           looks like an undeclared name
+for (i, v) in xs { .. }    FIXED 2026-08-10 — K::ForExpr, and the
+                           pattern binds
 measure(el)                lowers to Expr::Keyword because `measure`
                            is in STMT_KEYWORDS, and a Keyword
                            contributes no effects — so the same call
                            charges a page for a database read or for
                            nothing, depending on the callee's spelling
+draw(ctx) { .. }           the policy block's binder binds nothing;
+                           belongs to the PolicyExpr split
 ```
 
-Both are in `docs/RISK_QUEUE.md`. Both are worked around by name in
-`resolve::INTRINSIC_CALLS` and by classification in
-`tests/semantic_ownership.rs`, so repairing the parse removes an entry
-rather than silently changing a count.
+`measure` is in `docs/RISK_QUEUE.md` and is unrepaired. It is the twin of
+the `for` defect from the other direction — there syntax was promoted to
+a call, here a call is demoted to syntax — and both are decided by a word
+list rather than by what the callee is.
+
+### Two obligations recorded rather than implied
+
+```text
+ADR-0024   nothing checks that an `optimistic` lambda's parameter is
+           the resource the command returns. An optimistic transition
+           over the wrong resource is a bug the compiler should catch.
+ADR-0024   `optimistic` / `rollback` are EXECUTION CONTEXTS — placement
+           browser, before the round trip and after a failure. The model
+           does not exist, so an embedded term is resolved and excluded
+           from the declaration's effect row. When it lands, the term's
+           effects attach to the context rather than to nothing.
+```
 
 ---
 
