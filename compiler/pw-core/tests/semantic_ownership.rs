@@ -228,21 +228,22 @@ fn is_label_constructor(name: &str) -> bool {
 
 // --- the gate ----------------------------------------------------------------
 
-/// **The `Unowned` class is exactly the four calls already frozen elsewhere.**
+/// **The `Unowned` class is exactly the calls already frozen elsewhere.**
 ///
 /// This is the result that makes `PW0024` implementable. Once every other
-/// class has an owner named, what is left is not a taxonomy problem — it is
-/// four names that do not exist, in four files, and each gets a different
-/// repair per the architect's ruling.
+/// class has an owner named, what is left is not a taxonomy problem — it is a
+/// handful of names that do not exist, and each gets a different repair per the
+/// architect's ruling. It was four; `current_session` is repaired.
 #[test]
-fn nothing_call_shaped_is_unowned_except_the_four_known_defects() {
+fn nothing_call_shaped_is_unowned_except_the_known_defects() {
     let by_owner = ownership();
     let unowned = by_owner.get(&Owner::Unowned).cloned().unwrap_or_default();
     let expected: BTreeSet<String> = [
-        // Platform/invocation-context operations. `current_session` IS declared
-        // — `packages/pw-platform-web/context.pw` — and the store never imports
-        // it. `current_consumer` is declared nowhere.
-        "current_session",
+        // A platform/invocation-context operation, declared nowhere.
+        //
+        // `current_session` was here until 2026-08-10. The repair was one
+        // import — `context.pw` had declared it since E2C — and it is the
+        // shape the architect ruled `current_consumer` should also take.
         "current_consumer",
         // A tracked build input, per the ruling. Declared nowhere.
         "include_markdown",

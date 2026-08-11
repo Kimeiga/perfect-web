@@ -213,12 +213,28 @@ fn a013_build_time_page_before_repair() {
     );
 }
 
-/// **The store — `current_session()` in a page and two commands.**
+/// **The store — `current_session()` in a page and two commands. REPAIRED.**
 ///
-/// The row the architect already ruled on: `StorePage` claims to render without
-/// authority, and that is true only because the call names nothing.
+/// The row the architect ruled on first, and the classification of its
+/// movement:
+///
+/// ```text
+/// StorePage     {}                        -> {session.read}
+/// add_to_cart   {database.write<Carts>}   -> {+ session.read}
+/// clear_cart    {database.write<Carts>}   -> {+ session.read}
+/// placements    origin                       unchanged
+/// ```
+///
+/// The repair is one line — `import context.{ current_session }` — and
+/// `packages/pw-platform-web/context.pw` had declared the function since E2C.
+/// Nothing was invented; a name that already existed was brought into scope.
+///
+/// **What moved is a claim, not a spelling.** `StorePage` renders by building
+/// a query key from the session, so it reads the session to render. The E8
+/// evidence saying a page renders without authority described a page whose
+/// call named nothing. That is the whole reason the matrix was frozen first.
 #[test]
-fn store_page_before_repair() {
+fn store_page_after_repair() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut extra: Vec<String> = Vec::new();
     for e in std::fs::read_dir(root.join("examples/store")).expect("store") {
@@ -235,21 +251,31 @@ fn store_page_before_repair() {
     let cs = contracts_for(&refs);
 
     let page = of(&cs, "store.page.StorePage");
-    assert!(
-        caps(page).is_empty(),
-        "TODAY, and it is WRONG: the page calls `current_session()` while \
-         building its query key, so it reads the session to render. The \
-         contract says otherwise only because the call names nothing. Got {:?}",
-        caps(page)
+    assert_eq!(
+        caps(page),
+        BTreeSet::from(["session.read".to_string()]),
+        "the page reads the session to render, and now says so"
     );
+    assert_eq!(page.allowed_placements, ["origin"]);
 
     let add = of(&cs, "store.page.add_to_cart");
     assert_eq!(
         caps(add),
-        BTreeSet::from(["database.write<Carts>".to_string()]),
-        "TODAY: the write and not the session read. Expected to gain \
-         `session.read` on repair — verified by applying the import, which \
-         produced exactly two host calls in the backend IR."
+        BTreeSet::from([
+            "database.write<Carts>".to_string(),
+            "session.read".to_string()
+        ]),
+        "the write AND the session read — which is what the backend saw as two \
+         host calls before the import was applied"
+    );
+
+    // The discriminator. `Menu` is on the same page, in the same module, and
+    // calls no context operation — so the movement above is attributable to
+    // the repair rather than to something that moved every contract.
+    assert_eq!(
+        caps(of(&cs, "store.page.Menu")),
+        BTreeSet::from(["database.read<Menus>".to_string()]),
+        "an unrelated query in the same module did not move"
     );
 }
 
@@ -266,6 +292,10 @@ fn every_frozen_row_is_derived_from_a_call_that_resolves_to_nothing() {
     // The four programs, and the name each one calls into the void. Listed here
     // rather than re-derived, so this file states its own subject: if a repair
     // lands and this list is stale, the test that reads it fails.
+    // `examples/store/app.pw` / `current_session` was the fourth entry and is
+    // REPAIRED — see `store_page_after_repair` for the classification. It is
+    // named here rather than deleted so the list reads as a work-list with one
+    // item struck through, not as a list that was always three long.
     const UNRESOLVED: &[(&str, &str)] = &[
         (
             "examples/accepted/A-005-idempotent-command.pw",
@@ -279,7 +309,6 @@ fn every_frozen_row_is_derived_from_a_call_that_resolves_to_nothing() {
             "examples/accepted/A-013-build-time-deterministic-page.pw",
             "include_markdown",
         ),
-        ("examples/store/app.pw", "current_session"),
     ];
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (file, name) in UNRESOLVED {

@@ -26,6 +26,18 @@ module store.page
 import Stores
 import Carts
 import Menus
+// The invocation context. `current_session()` was called and never imported
+// from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
+// dotted paths whose head looks like a module, and a bare call to nothing
+// contributes nothing to every analysis — which is indistinguishable from a
+// call that is harmless. The backend was the first consumer for which the
+// absence was fatal.
+//
+// Adding it is not a formality. `current_session` performs `session.read`, so
+// `StorePage` now requires the session to RENDER, and the E8 evidence saying a
+// page renders without authority moved with it. That was the architect's
+// ruling and the reason the repair waited for a frozen matrix.
+import context.{ current_session }
 import domain.{ StoreId, Store, StoreError, SessionId, Cart, CartError,
     MenuItem, MenuItemId, PositiveInt }
 import Events.{ CartChanged }

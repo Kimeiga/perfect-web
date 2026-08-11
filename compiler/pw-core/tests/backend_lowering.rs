@@ -85,45 +85,59 @@ fn lowered(
     program(&cx)
 }
 
-/// **`add_to_cart` does not lower, and the reason is a defect in the demo the
-/// backend was the first thing to find.**
+/// **The real `add_to_cart` lowers**, which is E10-A's subject.
 ///
-/// `examples/store/app.pw` calls `current_session()` and never imports it.
-/// Assumption A-009 says Term names are not ambient — only the Effect namespace
-/// is — so the call resolves to nothing, and `pw check` reports nothing because
-/// `unresolved_uses` only examines dotted paths whose head looks like a module.
+/// It did not, for one commit, and the reason was a defect in the demo the
+/// backend was the first thing to find: `examples/store/app.pw` called
+/// `current_session()` and never imported it. Assumption A-009 says Term names
+/// are not ambient, so the call resolved to nothing — and `pw check` reported
+/// nothing, because `unresolved_uses` only examines dotted paths whose head
+/// looks like a module.
 ///
 /// Every analysis upstream can produce an answer for a call it cannot resolve:
 /// inference contributes no effects, privacy no label, placement no constraint.
 /// Each of those looks exactly like *this call is harmless*. A backend cannot
-/// emit a call to nothing, so it is the first consumer for which the absence is
-/// fatal rather than quiet.
+/// emit a call to nothing, so it was the first consumer for which the absence
+/// was fatal rather than quiet.
 ///
-/// **The repair is not applied**, because it is larger than it looks: with the
-/// import, `StorePage` requires `session.read` **to render**, which invalidates
-/// a documented E8 claim. `docs/RISK_QUEUE.md` carries the three questions that
-/// decision needs.
+/// The repair was one import, and it moved a documented E8 claim with it —
+/// `StorePage` requires `session.read` to render. See
+/// `tests/unresolved_provenance.rs::store_page_after_repair`.
 ///
-/// So this test asserts the state as it is. When the demo is repaired it will
-/// fail, which is the point — the repair should be a visible act.
+/// **Two host calls, not one.** The first version of this test expected one and
+/// was wrong: the command reads the session and writes the cart, and the
+/// backend was right.
 #[test]
-fn add_to_cart_is_blocked_by_an_unresolved_call_in_the_demo() {
+fn the_real_add_to_cart_lowers_to_two_host_calls() {
     let built = Built::new(&store());
     let (p, refusals) = lowered(&built);
 
-    assert!(
-        !p.functions.iter().any(|f| f.export == "add_to_cart"),
-        "`add_to_cart` lowered — the demo's missing `import context.{{ \
-         current_session }}` was repaired. Read `docs/RISK_QUEUE.md`: applying \
-         it also makes `StorePage` require `session.read` to render, and the \
-         E8 evidence saying otherwise has to move with it."
-    );
+    let f = p
+        .functions
+        .iter()
+        .find(|f| f.export == "add_to_cart")
+        .unwrap_or_else(|| {
+            panic!(
+                "`add_to_cart` did not lower: {:?}",
+                refusals.iter().map(|r| r.to_string()).collect::<Vec<_>>()
+            )
+        });
 
-    let why: Vec<String> = refusals.iter().map(|r| r.to_string()).collect();
-    assert!(
-        why.iter().any(|w| w.contains("current_session")),
-        "and the backend names what it could not resolve: {why:?}"
-    );
+    let mut host: Vec<String> = f.blocks[0]
+        .instrs
+        .iter()
+        .filter_map(|i| match i {
+            Instr::HostCall { capability, .. } => Some(capability.name()),
+            _ => None,
+        })
+        .collect();
+    host.sort();
+    assert_eq!(host, ["database.write<Carts>", "session.read"]);
+
+    // Named by the CONTRACT's capabilities, not by matching a spelling.
+    let mut declared: Vec<String> = f.capabilities.iter().map(|c| c.name()).collect();
+    declared.sort();
+    assert_eq!(declared, host, "the function carries the contract's set");
 }
 
 /// **The lowering itself works**, on a program that does import what it calls.

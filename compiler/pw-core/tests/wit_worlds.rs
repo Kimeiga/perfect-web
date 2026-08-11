@@ -86,6 +86,18 @@ interface database {
     connect: func() -> bool;
     transaction: func() -> bool;
 }
+
+/// The invocation context. Added on 2026-08-10, when `examples/store/app.pw`
+/// gained the `import context.{ current_session }` it had been missing since
+/// E4 — so the store's worlds began importing `pw:host/session` and stopped
+/// resolving against a host that does not publish it.
+///
+/// That is this stand-in doing its job. A capability a component requires and
+/// a deployment does not grant is a deployment that cannot run it, and the WIT
+/// resolve is where that becomes visible rather than a runtime link failure.
+interface session {
+    read: func() -> string;
+}
 ";
 
 #[test]
