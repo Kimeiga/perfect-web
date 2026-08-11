@@ -48,6 +48,7 @@ pub mod marko;
 pub mod ontology;
 pub mod outcome;
 pub mod placement;
+pub mod policy;
 pub mod privacy;
 pub mod provenance;
 pub mod resolve;
