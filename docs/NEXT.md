@@ -32,32 +32,72 @@ is a `DefId`, a type is a `DefId`, a host call is the CONTRACT's `CapabilityId`.
 `nothing_lowers_silently` is what says an unknown construct cannot become an
 empty instruction list.
 
-### The finding that stopped `add_to_cart`
+### The finding that stopped `add_to_cart` — repaired 2026-08-10
 
-`examples/store/app.pw` calls `current_session()` and **never imports it**, and
-`pw check` reports nothing — `unresolved_uses` only examines dotted paths whose
-head looks like a module. The backend was the first consumer for which the
-absence is fatal rather than quiet.
+`examples/store/app.pw` called `current_session()` and **never imported it**,
+and `pw check` reported nothing: `unresolved_uses` only examined dotted paths
+whose head looks like a module. The backend was the first consumer for which the
+absence was fatal rather than quiet.
 
-**The repair is not applied**, because it is bigger than it looks: with the
-import, `StorePage` requires `session.read` **to render**, which invalidates a
-documented E8 claim. `docs/RISK_QUEUE.md` carries the three questions.
-`add_to_cart_is_blocked_by_an_unresolved_call_in_the_demo` asserts today's state
-and will fail when the demo is repaired, which is the point.
-`a_command_that_imports_what_it_calls_lowers_to_a_host_call` is the proof the
-backend itself works: same shape, nothing missing, one `HostCall` named by the
-contract's capability.
+It was one of four, and the repair took a whole sequence of the architect's
+because resolving a name that never existed can move much more than name
+checking. Everything below is done and every movement is classified in the
+frozen matrices:
+
+```text
+tests/policy_consumers.rs       which analyses see a POLICY value    4 of 6 do
+tests/evidence_reachability.rs  can each fixture witness its claim   9 of 24 could not
+src/policy.rs                   what a policy head's value MEANS     34 heads
+tests/semantic_ownership.rs     who owns each call-shaped thing      Unowned = 0
+src/check.rs                    PW0021 examines bare calls           23 more found
+```
+
+`the_real_add_to_cart_lowers_to_two_host_calls` is the result:
+`session.read` and `database.write<Carts>`, named by the contract's
+capabilities rather than by matching a spelling.
 
 ### Next, in order
 
 ```text
-1  Wasm encoding of the IR — wasm-encoder, ours to lower
-2  E10-A invocation-region memory (NOT the final memory model)
-3  E10-I, with the ruling's controls, including the structural test
+1  PolicyExpr / TermExpr in the HIR — step 3 of the architect's
+   sequence, and the only one not yet done. `src/policy.rs` is the
+   table it must be driven by; `tests/policy_consumers.rs` is the
+   before-state every consumer has to be compared against. Build
+   `EmbeddedTerm` from the start, with the operator's signature saying
+   which arguments ARE terms — the 27 values in
+   `tests/policy_term_positions.rs` are the work-list, and two of them
+   (`optimistic cart.add(..)`, `rollback cart.remove(..)`) are
+   executable code nothing has ever parsed.
+2  Regenerate the E8 evidence against every movement C5 caused
+3  A resolved-program invariant: the backend takes a program that
+   resolved and checked, rather than re-deriving that it did
+4  Wasm encoding of the IR — wasm-encoder, ours to lower
+5  E10-A invocation-region memory (NOT the final memory model)
+6  E10-I, with the ruling's controls, including the structural test
    that the Rust closure path is GONE
-4  broaden from evidence: Store query, then a pure helper, then a
+7  E10-P: the contract's placement demand takes the real privacy
+   label (blocked on 1)
+8  broaden from evidence: Store query, then a pure helper, then a
    command with branching
 ```
+
+### Two parser defects the audits found, neither yet repaired
+
+```text
+for (i, v) in xs { .. }    lowers to Expr::Call, callee Name("for"),
+                           and binds nothing — so the loop variable
+                           looks like an undeclared name
+measure(el)                lowers to Expr::Keyword because `measure`
+                           is in STMT_KEYWORDS, and a Keyword
+                           contributes no effects — so the same call
+                           charges a page for a database read or for
+                           nothing, depending on the callee's spelling
+```
+
+Both are in `docs/RISK_QUEUE.md`. Both are worked around by name in
+`resolve::INTRINSIC_CALLS` and by classification in
+`tests/semantic_ownership.rs`, so repairing the parse removes an entry
+rather than silently changing a count.
 
 ---
 

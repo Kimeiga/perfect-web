@@ -18,7 +18,38 @@ representations of one identity derive the same wire id.
 **current milestone:** **E10 — own backends and automatic memory strategy**, and
 it carries **E10-I**: compile `add_to_cart` through the Pleris→component backend
 and run it through the E8 host, with no alternate Rust closure path
-(`docs/EVIDENCE_LEDGER.md`).
+(`docs/EVIDENCE_LEDGER.md`). It also carries **E10-P** — give the contract's
+placement demand the declaration's real privacy label, blocked on the
+`PolicyExpr`/`TermExpr` split.
+
+**2026-08-10 — semantic ownership.** `add_to_cart` now lowers to Backend IR
+with two host calls, and the corpus opened **C5** (`docs/CORPUS.md`). The
+sequence the architect set out was worked through in order:
+
+```text
+1  policy-value consumer audit      tests/policy_consumers.rs      DONE, frozen
+2  evidence-reachability audit      tests/evidence_reachability.rs DONE, frozen
+4  policy registry, stable op ids   src/policy.rs                  DONE
+5  exactly-one-semantic-owner       tests/semantic_ownership.rs    DONE, Unowned = 0
+6  PW0021 examines bare calls       src/check.rs                   DONE
+7  the four unresolved calls        each repaired by what it IS    DONE
+8  a `view` gets a contract         src/contract.rs                DONE
+3  PolicyExpr / TermExpr in HIR                                    NEXT
+9  regenerate E8 evidence                                          open
+10 resolved-program invariant                                      open
+11 Wasm encoding, invocation-region memory, E10-I                  open
+```
+
+Four findings the audits produced, each recorded in `docs/RISK_QUEUE.md`:
+
+- a **policy value** contributes capabilities to a real contract, narrows
+  placement and fires `PW0401` — four of six consumers cannot tell a policy
+  value from a term;
+- **nine of twenty-four** accepted fixtures could not witness their own claim;
+- `contract.rs` discarded the author's pinned placement, so a page written
+  `placement build` shipped a contract permitting the browser — repaired;
+- a `for` loop lowers as `Expr::Call` with the callee `Name("for")`, and binds
+  nothing, so its loop variable looks like an undeclared name.
 
 **E9 is complete.** Its gate was amended on 2026-08-08 by ruling — items 2 and 4
 each specified a technique where the gate wanted an outcome — and then met in

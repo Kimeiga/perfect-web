@@ -32,7 +32,8 @@ Generality at freeze:      7/29 invariants generality-tested
 Reproduce: `just ci` for the gate, `just evidence-corpus` for the per-fixture
 table, `just generality` for the second score.
 
-**C1 is frozen. C2 and C3 both opened on 2026-08-06; C4 opened 2026-08-07** — see below. A change to
+**C1 is frozen. C2 and C3 both opened on 2026-08-06; C4 opened 2026-08-07; C5 opened
+2026-08-10** — see below. A change to
 any file under `examples/accepted` or `examples/rejected` opens the next version
 and requires a row in its table plus a recorded reason. The rule exists because the path to 44/44 changed ten
 fixtures, and a reader who does not know that will read the number as stronger
@@ -328,7 +329,7 @@ Three of the 20 files are rejected fixtures, so the version opens.
 | fixture | change | what it was missing | before | after |
 |---|---|---|---|---|
 | R-006 | `+ import capability.{ Payments, Public }` | `secret<Payments>` and `log<Public>` named types it never imported | `PW5006` | `PW5006` |
-| R-012 | `+ import browser.{ MapHandle }` | `resource.acquire<MapHandle>` named a type it never imported | `PW2005` | `PW2005` |
+| R-012 | `+ import browser.{ MapHandle }` | `resource.acquire<MapHandle>` named a type it never imported | `PW0310` | `PW0310` |
 | R-026 | `+ import capability.{ Payments }` | `secret<Payments>` named a type it never imported | `PW5003` | `PW5003` |
 | R-042 | `self.height()` → `el.height()`, `+ import browser.{ ElementRef }` | `self` had no resolved type, so the member named no declaration and the `layout.measure` the fixture is about came from the `measure` KEYWORD | `PW0402` | `PW0402` |
 
@@ -364,3 +365,81 @@ To open it:
    fixture C1 measured.
 3. Re-run all three commands and record the new figures here.
 4. Say in the commit message which measurement changed and why.
+
+---
+
+## C5 — opened 2026-08-10 (E10, on the architect's semantic-ownership ruling)
+
+```text
+Corpus version:            C5
+Accepted programs:         24
+Rejected programs:         46
+Charter categories:        24/24 accepted, 46/46 rejected
+Result:                    24/24 accepted clean, 46/46 rejected enforced
+Wrong-reason catches:      1 found and repaired (below)
+Changed since C4:          6 rejected fixtures, 4 accepted, 1 witness verdict
+Unowned call-shaped constructs: 0
+```
+
+### Why it opened
+
+`PW0021` had never examined a **bare** call. `unresolved_uses` reads
+`path.split_once('.')` and returns if there is no dot, so a call to a name
+nothing declares was not merely unreported — it was never asked about. Four
+accepted programs had been calling into the void since E4, and the reason
+nothing noticed is that every analysis produces an answer for a call it cannot
+resolve, and each answer is what a harmless call produces too.
+
+Architect ruling, 2026-08-10:
+
+> Every semantic use in accepted code has an owner. […] Never: call-shaped
+> thing → nobody owns it → analyses see nothing. Provenance answers *why did
+> the compiler conclude this?* Semantic ownership answers *did the compiler
+> ever assign meaning to what the author wrote?*
+
+The rule could only land once the residue was small. Two earlier attempts
+reported sixteen and then eleven corpus errors and were reverted;
+`tests/semantic_ownership.rs` names every other owner — language constructors,
+declared-union constructors, policy operators, CSS value functions, members of
+an unresolved receiver — and leaves a residue of four.
+
+### C4 → C5: the fixtures changed
+
+| fixture | change | what it was missing | before | after |
+|---|---|---|---|---|
+| A-005 | `current_consumer()` → `current_session()`, `+ import context` | the NAME was wrong: `Carts.add` takes a `SessionId` and the command invalidates a session-keyed entry | clean | clean, `+ session.read` |
+| A-013 | `+ import build.{ include_markdown, WorkspaceFile }`, row `!{ build.input.read<WorkspaceFile> }` | `include_markdown` was declared nowhere, so a build-determinism claim held against silence | clean | clean, `+ build.input.read<WorkspaceFile>`, placement `build` |
+| A-014 | `+ import cart.commands.{ add_to_cart }` | the deferred handler's callee was attributed to nobody | clean, **no contract** | clean, a `view` contract with a component dependency |
+| store | `+ import context.{ current_session }` | called in a page and two commands, imported nowhere | clean | clean, `+ session.read` on three components |
+| R-011 | `+ import context` | `current_session` | `PW0309` | `PW0309` |
+| R-012 | `+ import Maps.{ default_center }` (and the declaration) | `default_center` | `PW0310` | `PW0310` |
+| R-020 | `+ import domain`, `+ import cart.commands` | `add_to_cart`, `PositiveInt` | `PW0318` | `PW0318` |
+| R-029 | `current_consumer()` → `current_session()`, `+ import context` | A-005's rejected twin, same defect | `PW0327` | `PW0327` |
+| R-030 | `+ import Carts.{ checkout }` (and the declaration) | `checkout` | `PW0328` | `PW0328` |
+| R-043 | none — `var(--x)` is a CSS value function, now declared as one | the compiler's vocabulary, not the fixture | `PW3009` | `PW3009` |
+
+**No `@expect-error` line changed and no rejected verdict moved.** Every
+rejected fixture is caught for the same code, by the same rule, for the same
+reason. What changed is that each is now a valid Pleris program apart from the
+defect it exists to demonstrate.
+
+### The wrong-reason catch
+
+`examples/generality/resume_capture_schema_unnameable/caught.pw` was caught, and
+for the wrong reason. It read `let derived = helper(store_id)` with `helper`
+declared nowhere — so `derived` had no type, so its schema was unnameable. The
+invariant's subject is a type that **cannot** be named; what was being exercised
+was a call that did not exist. Declaring `helper` with a return type made the
+witness go silent, which is what surfaced it. It is now an anonymous record,
+which is the shape the invariant is about and depends on no resolution failure.
+
+Sixteen generality witnesses and three rule fixtures were repaired the same way.
+Neither set is versioned, but the count is recorded because it is the size of
+the hole: twenty-three programs across three corpora that exist to be evidence
+were calling names that did not exist.
+
+### What this did NOT do
+
+It did not change what any rejected fixture is about, and it did not weaken any
+rule to accommodate a fixture. The one verdict that moved, moved because the
+witness was invalid evidence and was replaced by a valid one.
