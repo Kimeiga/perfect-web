@@ -34,9 +34,9 @@ sequence the architect set out was worked through in order:
 6  PW0021 examines bare calls       src/check.rs                   DONE
 7  the four unresolved calls        each repaired by what it IS    DONE
 8  a `view` gets a contract         src/contract.rs                DONE
+9  corpus C5, E8 evidence regenerated                              DONE
+10 resolved-program invariant       backend::lower::Checked        DONE
 3  PolicyExpr / TermExpr in HIR                                    NEXT
-9  regenerate E8 evidence                                          open
-10 resolved-program invariant                                      open
 11 Wasm encoding, invocation-region memory, E10-I                  open
 ```
 
@@ -50,6 +50,13 @@ Four findings the audits produced, each recorded in `docs/RISK_QUEUE.md`:
   `placement build` shipped a contract permitting the browser — repaired;
 - a `for` loop lowers as `Expr::Call` with the callee `Name("for")`, and binds
   nothing, so its loop variable looks like an undeclared name.
+
+**Twenty-three more unresolved calls** were found the moment `PW0021` learned to
+examine bare calls — six rejected fixtures carrying a second silent defect, all
+sixteen affected generality witnesses, and three rule fixtures declared clean.
+One was a **wrong-reason catch**: `resume_capture_schema_unnameable/caught.pw`
+was caught because its callee did not exist, not because its capture's type
+could not be named.
 
 **E9 is complete.** Its gate was amended on 2026-08-08 by ruling — items 2 and 4
 each specified a technique where the gate wanted an outcome — and then met in
