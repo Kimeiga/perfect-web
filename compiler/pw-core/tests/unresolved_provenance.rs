@@ -156,39 +156,123 @@ fn a005_idempotent_command_after_repair() {
     assert_eq!(c.allowed_placements, ["origin"]);
 }
 
-/// **A-014 — `add_to_cart(..)` inside a resumable handler.**
+/// **A-014 — `add_to_cart(..)` inside a resumable handler. REPAIRED.**
 ///
-/// The row with no capability column, and the reason is worth recording: A-014
-/// declares a `view`, and a view produces **no contract at all** —
-/// `component_kind` covers query, command, page and component. So the
-/// before-state here is not "requires nothing"; it is "there is nothing to ask".
+/// The row that had no capability column at all, because a `view` produced no
+/// contract — so its before-state was not *requires nothing* but *there is
+/// nothing to ask*, and the E8-0 property it read as evidence for was not being
+/// exercised by it in either direction.
 ///
-/// That makes the fixture's own subject unmeasurable from the contract side.
-/// It is a content-addressed resumable handler, and the handler calls a name
-/// that resolves to nothing — so whatever authority `add_to_cart` would carry
-/// is attributed to no one, and the E8-0 property it looks like evidence for
-/// (a page does not inherit its handler's authority) is not being exercised.
+/// Two repairs, and both were needed:
+///
+/// ```text
+/// component_kind gains `view`      there is now something to ask
+/// A-014 imports add_to_cart        there is now an answer
+/// ```
+///
+/// The result is the architecture the ruling asked for:
+///
+/// ```text
+/// store.add_button.AddToCartButton   caps {}
+///                                    imports pw:app/cart.commands.add_to_cart
+/// cart.commands.add_to_cart          caps {database.write<Carts>, session.read}
+/// ```
+///
+/// The view does **not** inherit the command's authority. It declares a
+/// component dependency on it, identified by resolved identity — which is
+/// exactly what the architect specified, and the opposite of `view requires
+/// database.write<Carts>`.
 #[test]
-fn a014_content_addressed_handler_before_repair() {
-    let cs = contracts_for(&["examples/accepted/A-014-content-addressed-resumable-handler.pw"]);
+fn a014_content_addressed_handler_after_repair() {
+    // A-005 too: it declares the command A-014 imports. The dependency is
+    // between two fixtures, which is what makes it a component dependency
+    // rather than a local call.
+    let cs = contracts_for(&[
+        "examples/accepted/A-005-idempotent-command.pw",
+        "examples/accepted/A-014-content-addressed-resumable-handler.pw",
+    ]);
+    let view = of(&cs, "store.add_button.AddToCartButton");
+
     assert!(
-        !cs.iter()
-            .any(|c| c.component_id.starts_with("store.add_button")),
-        "TODAY: a `view` produces no contract, so this fixture contributes no          capability claim in either direction. If `view` ever becomes a          component kind, this row gains a capability column and the handler's          unresolved `add_to_cart` becomes visible as an absence. Got {:?}",
-        cs.iter().map(|c| &c.component_id).collect::<Vec<_>>()
+        caps(view).is_empty(),
+        "the view renders and holds no authority: {:?}",
+        caps(view)
+    );
+    assert_eq!(
+        view.imports
+            .iter()
+            .map(|i| i.interface.as_str())
+            .collect::<Vec<_>>(),
+        ["pw:app/cart.commands.add_to_cart"],
+        "and its handler's reference is a component DEPENDENCY"
     );
 
-    // And the call itself. Asserted on the source, because there is no derived
-    // artifact to read it from — which is the finding.
+    // The other half of the separation: the authority is recorded once, against
+    // the thing that performs it. Without this the assertion above would also
+    // pass for a program where nobody requires the write.
+    assert_eq!(
+        caps(of(&cs, "cart.commands.add_to_cart")),
+        BTreeSet::from([
+            "database.write<Carts>".to_string(),
+            "session.read".to_string()
+        ]),
+        "the command carries what the view does not"
+    );
+}
+
+/// **The page-level witness the ruling asked to be kept separate.**
+///
+/// > Because the documented claim specifically says *a page* does not inherit
+/// > its handler's authority, I'd also retain or create an actual **page-level
+/// > witness** for that claim rather than quietly substituting a view.
+///
+/// `StorePage` renders `on:press={resumable(..) => add_to_cart(..)}` where
+/// `add_to_cart` is a command in its own module requiring
+/// `database.write<Carts>`. The page requires `session.read` — which it does
+/// need, to build its query key — and not the write.
+///
+/// Stated as its own test rather than left implicit in the store's contract,
+/// because an incidental fact nobody asserts is exactly what A-014 turned out
+/// to be.
+#[test]
+fn a_page_does_not_inherit_its_handlers_authority() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let src = std::fs::read_to_string(
-        root.join("examples/accepted/A-014-content-addressed-resumable-handler.pw"),
-    )
-    .expect("A-014");
-    assert!(src.contains("add_to_cart("), "the handler calls it");
+    let mut extra: Vec<String> = Vec::new();
+    for e in std::fs::read_dir(root.join("examples/store")).expect("store") {
+        let p = e.expect("entry").path();
+        if p.extension().is_some_and(|x| x == "pw") {
+            extra.push(format!(
+                "examples/store/{}",
+                p.file_name().unwrap().to_string_lossy()
+            ));
+        }
+    }
+    extra.sort();
+    let refs: Vec<&str> = extra.iter().map(String::as_str).collect();
+    let cs = contracts_for(&refs);
+
+    let page = of(&cs, "store.page.StorePage");
+    let handler = of(&cs, "store.page.add_to_cart");
+
     assert!(
-        !src.contains("import cart") && !src.contains("{ add_to_cart }"),
-        "and imports it from nowhere"
+        caps(handler).contains("database.write<Carts>"),
+        "the handler writes: {:?}",
+        caps(handler)
+    );
+    assert!(
+        !caps(page).contains("database.write<Carts>"),
+        "and the page that renders the button does NOT: {:?}",
+        caps(page)
+    );
+
+    // The discriminator. A page requiring nothing at all would satisfy the
+    // assertion above without proving any separation — this one requires
+    // exactly what it performs while rendering, and nothing the deferred
+    // handler performs.
+    assert_eq!(
+        caps(page),
+        BTreeSet::from(["session.read".to_string()]),
+        "the page requires what IT does, which is read the session to build a          query key"
     );
 }
 
@@ -309,47 +393,79 @@ fn store_page_after_repair() {
 
 // --- the property that makes the matrix worth freezing ------------------------
 
-/// **Nothing above is a statement that these programs are correct.**
+/// **The work-list is empty, and that is the claim this file now makes.**
 ///
-/// Every row is a value derived, in part, from a call that names nothing — and
-/// each analysis that contributed to it did so by contributing NOTHING. The
-/// matrix exists so that after the repair, a row that did not move is as
-/// interesting as one that did.
+/// Every row above was a value derived, in part, from a call that named
+/// nothing — and each analysis that contributed to it did so by contributing
+/// NOTHING. Four programs, four repairs, no two alike:
+///
+/// ```text
+/// current_session    an import; `context.pw` had declared it since E2C
+/// current_consumer   the NAME was wrong; the types said which one belonged
+/// include_markdown   a new tracked build-input operation, `placement build`
+/// add_to_cart        an import, plus `view` becoming a component kind so
+///                    there was a contract for the dependency to live in
+/// ```
+///
+/// This test is what stops the list from silently regrowing.
 #[test]
-fn every_frozen_row_is_derived_from_a_call_that_resolves_to_nothing() {
-    // The four programs, and the name each one calls into the void. Listed here
-    // rather than re-derived, so this file states its own subject: if a repair
-    // lands and this list is stale, the test that reads it fails.
-    // Three of the four are REPAIRED, each differently, and each classified in
-    // the test above it:
-    //
-    //     current_session    an import; the declaration already existed
-    //     current_consumer   the NAME was wrong; the types said so
-    //     include_markdown   a new tracked build-input operation
-    //
-    // They are named here rather than deleted so this reads as a work-list with
-    // items struck through, not as a list that was always one long.
-    const UNRESOLVED: &[(&str, &str)] = &[(
-        "examples/accepted/A-014-content-addressed-resumable-handler.pw",
-        "add_to_cart",
-    )];
+fn no_accepted_program_calls_a_name_it_does_not_import() {
+    use pw_core::resolve::{Resolution, local_bindings};
+
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for (file, name) in UNRESOLVED {
-        let src =
-            std::fs::read_to_string(root.join(file)).unwrap_or_else(|e| panic!("{file}: {e}"));
-        assert!(
-            src.contains(&format!("{name}(")),
-            "{file} no longer calls `{name}` — the matrix above is describing a \
-             program that has changed, and its rows are no longer the \
-             before-state of anything"
-        );
-        // And it is still unimported. A repair adds an import or a declaration;
-        // either way this stops holding, and the row above has to be
-        // reclassified rather than silently kept.
-        assert!(
-            !src.contains(&format!("{{ {name} }}")) && !src.contains(&format!("{name} }}")),
-            "{file} now imports `{name}`. Reclassify the frozen row: what did \
-             its effects, capabilities, label and placement become?"
-        );
+    let mut files = library();
+    let mut names: Vec<String> = files.iter().map(|(n, _)| n.clone()).collect();
+    let mut accepted: Vec<std::path::PathBuf> = std::fs::read_dir(root.join("examples/accepted"))
+        .expect("accepted")
+        .map(|e| e.expect("entry").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+        .collect();
+    accepted.sort();
+    for p in accepted {
+        names.push(p.file_name().unwrap().to_string_lossy().to_string());
+        files.push((
+            p.file_name().unwrap().to_string_lossy().to_string(),
+            std::fs::read_to_string(&p).expect("read"),
+        ));
     }
+    let hirs: Vec<Hir> = files
+        .iter()
+        .map(|(_, s)| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+
+    // The four names, by their spelling, since that is what a regression would
+    // reintroduce. `tests/semantic_ownership.rs` is the general form of this
+    // question; here it is pinned to the specific history.
+    const REPAIRED: &[&str] = &[
+        "current_session",
+        "current_consumer",
+        "include_markdown",
+        "add_to_cart",
+    ];
+    let mut broken = Vec::new();
+    for (unit, hir) in refs.iter().enumerate() {
+        for (_, d) in hir.all_decls() {
+            let Some(bid) = d.body else { continue };
+            let body = hir.body(bid);
+            let locals = local_bindings(body);
+            for id in body.walk() {
+                let pw_core::hir::Expr::Call { callee, .. } = body.expr(id) else {
+                    continue;
+                };
+                let path = pw_core::infer::path_of(body, *callee);
+                if !REPAIRED.contains(&path.as_str()) || locals.contains(&path) {
+                    continue;
+                }
+                if matches!(ws.resolve_path(unit, &path), Resolution::Unresolved) {
+                    broken.push(format!("{}: {path}", names[unit]));
+                }
+            }
+        }
+    }
+    assert!(
+        broken.is_empty(),
+        "a repaired name is being called without being imported again: {broken:?}"
+    );
 }

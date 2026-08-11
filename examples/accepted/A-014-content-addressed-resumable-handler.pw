@@ -11,6 +11,17 @@
 module store.add_button
 
 import domain.{ MenuItemId, PositiveInt }
+// The command the deferred handler invokes. It was called and never imported,
+// so from E7 until 2026-08-10 the authority it carries was attributed to
+// nobody — and the fixture read as evidence that a view does not inherit its
+// handler's authority while there was nothing to inherit and no contract to
+// say so either way.
+//
+// Architect ruling, 2026-08-10:
+//
+//   The handler's reference to `add_to_cart` should become a component import
+//   identified by DefId, not `view requires database.write<Carts>`.
+import cart.commands.{ add_to_cart }
 
 view AddToCartButton(item: MenuItemId, available: Bool) !{} {
     // The handler captures `item` (an immutable opaque id) and nothing else.

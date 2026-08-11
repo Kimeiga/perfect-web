@@ -381,12 +381,30 @@ pub fn audit(contract: &ComponentContract, actual: &[String]) -> Audit {
 ///
 /// A type or an import declaration has no authority to describe, and a plain
 /// `fn` is compiled into its callers rather than instantiated on its own.
+///
+/// # `view` was missing, and its absence was reading as an answer
+///
+/// Architect ruling, 2026-08-10:
+///
+/// > A top-level `view` is executable semantic code: it can render, contain
+/// > captures, contain deferred handlers, acquire effects, and have placement
+/// > constraints. So I would not normalize `view → no ComponentContract` as
+/// > intentional. Unless `view` were explicitly defined as nothing more than an
+/// > inline syntactic macro — which it clearly isn't in the current language —
+/// > it should have a semantic contract.
+///
+/// The evidence-reachability audit is what forced this. A-014 was being read as
+/// evidence that a page does not inherit its handler's authority, and it
+/// declares a `view` — so there was no contract, and its before-state was not
+/// *requires nothing* but *there is nothing to ask*. An absence that reads as a
+/// claim is worse than a wrong claim, because nothing disagrees with it.
 fn component_kind(kind: DeclKind) -> Option<&'static str> {
     Some(match kind {
         DeclKind::Query => "query",
         DeclKind::Command => "command",
         DeclKind::Page => "page",
         DeclKind::Component => "component",
+        DeclKind::View => "view",
         _ => return None,
     })
 }

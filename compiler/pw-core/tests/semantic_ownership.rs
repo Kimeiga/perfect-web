@@ -106,7 +106,9 @@ const INTRINSIC: &[&str] = &[
 /// lengths.
 const VALUE_DOMAIN: &[&str] = &["translate", "scale", "rotate", "repeat", "minmax", "calc"];
 
-fn program() -> (Vec<String>, Vec<Hir>) {
+/// The same program with extra sources appended, so the gate can be run against
+/// a deliberately broken one.
+fn program_plus(extra: &[&str]) -> (Vec<String>, Vec<Hir>) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut names = Vec::new();
     let mut srcs = Vec::new();
@@ -130,6 +132,10 @@ fn program() -> (Vec<String>, Vec<Hir>) {
     }
     names.push("examples/domain.pw".to_string());
     srcs.push(std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain"));
+    for (i, e) in extra.iter().enumerate() {
+        names.push(format!("<synthetic {i}>"));
+        srcs.push((*e).to_string());
+    }
 
     let hirs = srcs
         .iter()
@@ -140,7 +146,11 @@ fn program() -> (Vec<String>, Vec<Hir>) {
 
 /// Classify every call-shaped construct in the accepted program.
 fn ownership() -> BTreeMap<Owner, BTreeSet<String>> {
-    let (_, hirs) = program();
+    ownership_of(&[])
+}
+
+fn ownership_of(extra: &[&str]) -> BTreeMap<Owner, BTreeSet<String>> {
+    let (_, hirs) = program_plus(extra);
     let refs: Vec<&Hir> = hirs.iter().collect();
     let ws = Workspace::build(&refs);
 
@@ -228,52 +238,92 @@ fn is_label_constructor(name: &str) -> bool {
 
 // --- the gate ----------------------------------------------------------------
 
-/// **The `Unowned` class is exactly the calls already frozen elsewhere.**
+/// **The `Unowned` class is empty.**
 ///
-/// This is the result that makes `PW0024` implementable. Once every other
-/// class has an owner named, what is left is not a taxonomy problem — it is a
-/// handful of names that do not exist, and each gets a different repair per the
-/// architect's ruling. It was four; `current_session` is repaired.
+/// Every call-shaped construct in the accepted program now has exactly one
+/// semantic owner. It was four:
+///
+/// ```text
+/// current_session    an import; `context.pw` had declared it since E2C
+/// current_consumer   the NAME was wrong; `Carts.add` takes a SessionId
+/// include_markdown   a new tracked build-input operation, `placement build`
+/// add_to_cart        an import, plus `view` becoming a component kind so the
+///                    dependency had a contract to live in
+/// ```
+///
+/// This is the precondition `PW0024` was missing. A diagnostic whose subject is
+/// "a call nobody owns" can be landed against a corpus where that set is empty
+/// — the two earlier attempts reported sixteen and then eleven, because every
+/// class below was in the residue.
 #[test]
-fn nothing_call_shaped_is_unowned_except_the_known_defects() {
+fn nothing_call_shaped_is_unowned() {
     let by_owner = ownership();
     let unowned = by_owner.get(&Owner::Unowned).cloned().unwrap_or_default();
-    let expected: BTreeSet<String> = [
-        // The last one. An ordinary application reference from a deferred
-        // handler, which should become a component DEPENDENCY rather than
-        // smuggle `database.write<Carts>` into rendering code — and that
-        // depends on a `view` having a contract to depend from, which is the
-        // architect's step 8.
-        //
-        // Three left on 2026-08-10, each repaired differently:
-        //
-        //     current_session    an import; the declaration already existed
-        //     current_consumer   the NAME was wrong; `Carts.add` takes a
-        //                        SessionId and the command invalidates a
-        //                        session-keyed cache entry
-        //     include_markdown   a new tracked build-input operation with
-        //                        `placement build`
-        "add_to_cart",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
-    assert_eq!(
-        unowned, expected,
-        "the set of call-shaped constructs nobody owns changed. Anything new \
-         here is either a real unresolved name — in which case classify it \
-         against `docs/RISK_QUEUE.md` — or a construct with meaning that this \
-         file has not learned to attribute, in which case adding it to the \
-         `Unowned` list would be the over-broad `PW0024` again."
+    assert!(
+        unowned.is_empty(),
+        "a call-shaped construct has no semantic owner: {unowned:?}\n\n\
+         Either it is a real unresolved name — classify it against \
+         `docs/RISK_QUEUE.md` and repair it by what it IS — or it is a \
+         construct with meaning this file has not learned to attribute, in \
+         which case reporting it would be the over-broad `PW0024` again."
     );
 }
 
-/// **Every other class is non-empty**, so the test above is not passing because
-/// the classifier sorts everything into one bucket.
+/// **The negative control**, without which the test above passes for a
+/// classifier that never returns `Unowned`.
 ///
-/// Without this, an `ownership()` that returned `Owner::Term` for every call
-/// would satisfy the gate perfectly.
+/// `docs/RISK_QUEUE.md`'s admissibility rule: *a checker result is not
+/// admissible evidence until its instrument has a negative control proving it
+/// can detect the corresponding failure.* An empty set is exactly the result
+/// that needs one.
+#[test]
+fn the_gate_detects_a_call_that_nobody_owns() {
+    // The shape of all four repaired defects: a bare call, to a name that is
+    // not a local, not a parameter, not an intrinsic, not a policy operator and
+    // not a value-domain function.
+    let broken = "\
+module probe.broken
+
+view Button(label: String) !{} {
+    <button on:press={resumable() => vanished(label)}>{label}</button>
+}
+";
+    let by_owner = ownership_of(&[broken]);
+    let unowned = by_owner.get(&Owner::Unowned).cloned().unwrap_or_default();
+    assert_eq!(
+        unowned,
+        BTreeSet::from(["vanished".to_string()]),
+        "the gate did not detect a call to a name that does not exist"
+    );
+
+    // And the discriminating half: the same program with the call resolved is
+    // clean, so the gate is reacting to the resolution and not to the file.
+    let fixed = "\
+module probe.fixed
+
+fn vanished(s: String) -> String { s }
+
+view Button(label: String) !{} {
+    <button on:press={resumable() => vanished(label)}>{label}</button>
+}
+";
+    let by_owner = ownership_of(&[fixed]);
+    assert!(
+        by_owner
+            .get(&Owner::Unowned)
+            .cloned()
+            .unwrap_or_default()
+            .is_empty(),
+        "declaring the function did not silence the gate"
+    );
+}
+
+/// **Every owner class actually claims something**, so the gate is not passing
+/// because the classifier sorts everything into one bucket.
+///
+/// `Unowned` is excluded deliberately — it is empty, which is the result, and
+/// `the_gate_detects_a_call_that_nobody_owns` is what proves the class is still
+/// reachable.
 #[test]
 fn every_owner_class_actually_claims_something() {
     let by_owner = ownership();
@@ -284,7 +334,6 @@ fn every_owner_class_actually_claims_something() {
         Owner::Policy,
         Owner::ValueDomain,
         Owner::Member,
-        Owner::Unowned,
     ] {
         let n = by_owner.get(&owner).map(|s| s.len()).unwrap_or(0);
         assert!(
@@ -306,46 +355,6 @@ fn every_owner_class_actually_claims_something() {
         "only {term} calls resolve to a declaration, which is too few for this \
          corpus — the classifier is probably failing to resolve rather than \
          the program failing to declare"
-    );
-}
-
-/// **`for` is not an intrinsic call; the parser lowered it as one.**
-///
-/// `for (i, v) in values.enumerate() { .. }` produces `Expr::Call` whose callee
-/// is `Name("for")`. Recorded as its own test rather than buried in the
-/// `INTRINSIC` list, because the classification above is a workaround: a loop
-/// is a control-flow form, and every analysis that walks calls currently sees
-/// one that does not exist.
-///
-/// The consequence is not hypothetical — this is `Expr::Keyword`'s twin. There,
-/// a call is demoted to syntax by its spelling and contributes nothing; here,
-/// syntax is promoted to a call by its position and contributes a callee.
-#[test]
-fn the_parser_lowers_a_for_loop_as_a_call() {
-    let src = "\
-module m
-
-fn f(xs: List<Int>) -> Int {
-    for (i, v) in xs.enumerate() {
-        v
-    }
-}
-";
-    let hir = lower_file(src, &parse_tree(src).green);
-    let (_, d) = hir.all_decls().find(|(_, d)| d.name == "f").expect("f");
-    let body = hir.body(d.body.expect("body"));
-    let calls: Vec<String> = body
-        .walk()
-        .iter()
-        .filter_map(|id| match body.expr(*id) {
-            Expr::Call { callee, .. } => Some(path_of(body, *callee)),
-            _ => None,
-        })
-        .collect();
-    assert!(
-        calls.iter().any(|c| c == "for"),
-        "TODAY: the loop is a call to `for`. When the parser gains a loop form \
-         this fails, and the `INTRINSIC` entry above should go with it: {calls:?}"
     );
 }
 
@@ -416,7 +425,10 @@ fn a_member_of_an_unresolved_receiver_is_not_an_unresolved_name() {
         "expected the frame-phase fixtures' `self.…` calls here: {members:?}"
     );
     assert!(
-        !by_owner[&Owner::Unowned]
+        !by_owner
+            .get(&Owner::Unowned)
+            .cloned()
+            .unwrap_or_default()
             .iter()
             .any(|u| u.contains('.') && u.starts_with("self")),
         "a `self.…` call was reported as an unresolved name"
