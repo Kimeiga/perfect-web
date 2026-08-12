@@ -153,6 +153,8 @@ codes! {
         "an optimistic transition's reversal is derived, not written";
     OPTIMISTIC_NOT_PURE = "PW0330" / optimistic_not_pure / 1, DeclarationRules,
         "an optimistic transition must be a pure function of the resource's value";
+    OPTIMISTIC_TARGET_MISMATCH = "PW0331" / optimistic_target_mismatch / 1, DeclarationRules,
+        "an optimistic transition must produce the value type of the resource it targets";
     CACHE_NO_INVALIDATION = "PW0200" / cache_no_invalidation / 1, DeclarationRules,
         "a shared cache should declare how it is invalidated";
 

@@ -118,10 +118,36 @@ command performing the effect itself. `Inference::infer_rooted` is the entry
 point; `hir::Transition` holds two `ExprId`s that no walk from `Body::root`
 reaches.
 
+## Target selection and state transformation are separate computations
+
+Architect ruling, 2026-08-11, and it is load-bearing:
+
+> The purity requirement belongs to the transformation. The target selector may
+> legitimately need context to identify the entry — `current_session()` is the
+> obvious example — without making the actual state transformation effectful.
+> So don't accidentally implement
+> `effects(target) ∪ effects(transition) must be {}`.
+
+```text
+target      independently checked in its target-selection context;
+            `session.read` is legitimate there
+
+transition  binder type  = target value type
+            result type  = target value type
+            effect row   = pure
+```
+
+`PW0330` infers from the transition alone; `PW0331` asks the target one
+question — which resource, and what value does it hold — and never looks at its
+effects. The store's own clause is the proof: its target reads the session and
+is accepted.
+
+This will matter more once the resource partition supplies the session
+principal automatically, at which point the target loses that read and the
+transition is unaffected.
+
 ## What is NOT decided here
 
-- **The transition's return type is not checked against the target's value
-  type.** It must be, and it is recorded in `docs/NEXT.md`.
 - **`ExecutionContext` is not a type yet.** The purity restriction is applied
   directly rather than derived from a context declaring `placement browser` and
   an empty allowed-effect set. When the context model lands, this rule should be

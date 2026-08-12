@@ -265,3 +265,145 @@ fn every_term_position_is_a_real_policy() {
         assert!(!heads.contains(h), "`{h}` should not carry terms");
     }
 }
+
+// --- ADR-0025's type relation ------------------------------------------------
+
+/// **The transition produces the value type of the resource it targets.**
+///
+/// Architect ruling, 2026-08-11, treating this as blocking before codegen:
+///
+/// ```text
+/// target              ResourceEntry<Cart>
+/// binder `cart`       Cart
+/// transition result   Cart
+/// ```
+///
+/// # Target selection and state transformation are separate
+///
+/// > The purity requirement belongs to the transformation. The target selector
+/// > may legitimately need context to identify the entry — `current_session()`
+/// > is the obvious example — without making the actual state transformation
+/// > effectful. So don't accidentally implement
+/// > `effects(target) ∪ effects(transition) must be {}`.
+///
+/// The store's own clause is the proof: its target performs `session.read` and
+/// is accepted, while a transition performing anything is not.
+#[test]
+fn the_target_may_read_context_and_the_transition_may_not() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut files: Vec<(String, String)> = Vec::new();
+    for d in [
+        "packages/pw-std",
+        "packages/pw-platform-web",
+        "examples/lib",
+    ] {
+        let mut ps: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(d))
+            .expect("dir")
+            .map(|e| e.expect("entry").path())
+            .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+            .collect();
+        ps.sort();
+        for p in ps {
+            files.push((
+                p.file_name().unwrap().to_string_lossy().to_string(),
+                std::fs::read_to_string(&p).expect("read"),
+            ));
+        }
+    }
+    files.push((
+        "domain.pw".to_string(),
+        std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain"),
+    ));
+
+    let codes = |extra: &str| -> Vec<String> {
+        let mut fs = files.clone();
+        fs.push(("t.pw".to_string(), extra.to_string()));
+        pw_core::check::check_sources(&fs)
+            .iter()
+            .flat_map(|(_, ds)| ds.iter())
+            .map(|d| d.code.to_string())
+            .collect()
+    };
+
+    const HEAD: &str = "\
+module t
+
+import Carts
+import Resources.{ Cart }
+import context.{ current_session }
+import domain.{ MenuItemId, PositiveInt, CartError }
+
+fn count(c: Cart) -> Int !{} { 0 }
+";
+
+    // Accepted: the TARGET reads the session — it has to, to name the entry —
+    // and the transition is pure and produces a `Cart`.
+    let ok = format!(
+        "{HEAD}
+command good(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
+    requires   SignedIn
+    optimistic Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
+{{
+    Carts.add(current_session(), item, quantity)
+}}
+"
+    );
+    let got = codes(&ok);
+    assert!(
+        got.is_empty(),
+        "a context-reading target with a pure transition is legal: {got:?}"
+    );
+
+    // Refused: the TRANSITION performs something.
+    let impure = format!(
+        "{HEAD}
+command bad(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
+    requires   SignedIn
+    optimistic Cart(current_session()) as cart => Carts.current(current_session())
+{{
+    Carts.add(current_session(), item, quantity)
+}}
+"
+    );
+    assert!(
+        codes(&impure).contains(&"PW0330".to_string()),
+        "{:?}",
+        codes(&impure)
+    );
+
+    // Refused: the transition is pure and produces the wrong type.
+    let mistyped = format!(
+        "{HEAD}
+command bad(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
+    requires   SignedIn
+    optimistic Cart(current_session()) as cart => count(cart)
+{{
+    Carts.add(current_session(), item, quantity)
+}}
+"
+    );
+    let got = codes(&mistyped);
+    assert!(got.contains(&"PW0331".to_string()), "{got:?}");
+    assert!(
+        !got.contains(&"PW0330".to_string()),
+        "and NOT for purity — `count` performs nothing. The two rules must be \
+         independently attributable: {got:?}"
+    );
+
+    // Refused: the target is not a resource at all.
+    let no_resource = format!(
+        "{HEAD}
+command bad(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
+    requires   SignedIn
+    optimistic count as cart => cart
+{{
+    Carts.add(current_session(), item, quantity)
+}}
+"
+    );
+    assert!(
+        codes(&no_resource).contains(&"PW0331".to_string()),
+        "{:?}",
+        codes(&no_resource)
+    );
+}

@@ -318,6 +318,18 @@ impl<'a> Types<'a> {
     /// declaration parameters alone. A callback parameter typed here — `el` in
     /// `items |> List.map(fn(el) ..)` — is invisible to a second construction,
     /// and `el.getBoundingClientRect()` then resolves through nothing.
+    /// Introduce a binding this body's own text does not declare.
+    ///
+    /// For a named execution root whose binder comes from its header rather
+    /// than from a `let` or a parameter: `optimistic Cart(..) as cart => ..`
+    /// binds `cart` to the target resource's VALUE type, and nothing in the
+    /// body says so. Added rather than inferred, because the type comes from
+    /// the resource the clause targets — see ADR-0025.
+    pub fn with_binding(mut self, name: &str, ty: &str) -> Types<'a> {
+        self.bindings.insert(name.to_string(), ty.to_string());
+        self
+    }
+
     pub fn bindings(&self) -> &BTreeMap<String, String> {
         &self.bindings
     }

@@ -441,21 +441,29 @@ fn the_backend_is_never_handed_this_program() {
 
 // --- the finding that nearly cost the measurement ----------------------------
 
-/// **An identifier-led call is a `Call` or a `Keyword` depending on how it is
-/// spelled** — and only one of the two contributes anything.
+/// **A keyword spelling selects a production only when the tokens match it.**
 ///
-/// `helper(a)` lowers to `Expr::Call`. `measure(a)`, written in exactly the
-/// same position, lowers to `Expr::Keyword { keyword: "measure" }`, because
-/// `measure` is in the parser's statement-keyword set. Inference contributes
-/// nothing for a `Keyword`, so the page is silently effect-free.
+/// Architect ruling, 2026-08-11, treating this as blocking before codegen:
 ///
-/// This is the fifth spelling-based resolution defect in the project and the
-/// first one in the parser. **It is still unrepaired**, and it is measured here
-/// in a TERM position: `key measure(a)` is a policy value now, so the original
-/// probe no longer reaches an expression at all — which is the split working,
-/// and would have quietly retired this measurement with it.
+/// > `measure(el)` must parse as the ordinary call expression grammar and then
+/// > resolve normally. […] It must never gain or lose semantics merely because
+/// > its spelling appears in `STMT_KEYWORDS`.
+///
+/// It did. `helper(a)` lowered to `Expr::Call` and performed what it called;
+/// `measure(a)`, in the same position, lowered to `Expr::Keyword` and performed
+/// nothing, because `measure` is a frame-phase keyword. The twin of the `for`
+/// defect from the other direction — there syntax was promoted to a call by its
+/// position, here a call was demoted to syntax by its spelling.
+///
+/// The discriminator the ruling names, all three rows:
+///
+/// ```text
+/// measure { .. }        phase node        a block is not part of a call
+/// measure(el)           Call              and resolves normally
+/// unknown measure(el)   PW0021            or does not resolve at all
+/// ```
 #[test]
-fn a_call_is_a_call_or_a_keyword_depending_on_its_spelling() {
+fn a_keyword_spelling_does_not_change_a_calls_category() {
     use pw_core::hir::Expr;
 
     let shape = |name: &str| -> String {
@@ -480,12 +488,41 @@ fn a_call_is_a_call_or_a_keyword_depending_on_its_spelling() {
     assert_eq!(shape("helper"), "Call");
     assert_eq!(
         shape("measure"),
-        "Keyword",
-        "TODAY: the same syntax in the same position lowers to a different \
-         node because of the callee's spelling"
+        "Call",
+        "a statement keyword followed by an argument list and NO block is an \
+         ordinary call"
     );
 
-    // And the consequence, so this is a defect report rather than a curiosity.
+    // And the same spelling with a block keeps the phase production, which is
+    // what says the repair discriminates on the tokens rather than deleting
+    // the keyword.
+    let phased = "\
+module m
+
+import browser.{ ElementRef }
+
+component C(el: ElementRef) {
+    placement browser
+
+    frame {
+        let h = measure { el.bounds() }
+    }
+
+    view { <p /> }
+}
+";
+    let hir = lower_file(phased, &parse_tree(phased).green);
+    let (_, d) = hir.all_decls().find(|(_, d)| d.name == "C").expect("C");
+    let body = hir.body(d.body.expect("body"));
+    assert!(
+        body.walk().iter().any(|id| matches!(
+            body.expr(*id),
+            Expr::Keyword { keyword, .. } if keyword == "measure"
+        )),
+        "`measure {{ .. }}` is still a phase"
+    );
+
+    // The consequence, which is why this was blocking: the effect row.
     let effects_of = |name: &str| -> Vec<String> {
         let src = format!(
             "module m\n\ntype Carts = Carts {{ n: Int }}\n\n\
@@ -503,10 +540,33 @@ fn a_call_is_a_call_or_a_keyword_depending_on_its_spelling() {
     };
 
     assert_eq!(effects_of("helper"), ["database.read<Carts>"]);
+    assert_eq!(
+        effects_of("measure"),
+        ["database.read<Carts>"],
+        "renaming the helper to a word the parser knows no longer makes the \
+         page's authority disappear"
+    );
+
+    // And the third row: a call to a name nothing declares is `PW0021`,
+    // whatever it is spelled.
+    let missing = "\
+module m
+
+page P(a: Int) {
+    view {
+        <p>{measure(a)}</p>
+    }
+}
+";
+    let out = pw_core::check::check_sources(&[("t.pw".to_string(), missing.to_string())]);
     assert!(
-        effects_of("measure").is_empty(),
-        "TODAY: renaming the helper to a word the parser knows makes the page's \
-         authority disappear. Neither answer is derived from what the callee \
-         is; both are derived from how it is spelled."
+        out.iter()
+            .flat_map(|(_, ds)| ds)
+            .any(|d| d.code == "PW0021" && d.message.contains("measure")),
+        "an undeclared `measure(a)` is an unresolved term: {:?}",
+        out.iter()
+            .flat_map(|(_, ds)| ds)
+            .map(|d| (d.code, &d.message))
+            .collect::<Vec<_>>()
     );
 }

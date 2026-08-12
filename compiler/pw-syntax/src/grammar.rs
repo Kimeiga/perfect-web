@@ -795,7 +795,7 @@ impl<'a> P<'a> {
                 if self.at_kw("let") {
                     return self.let_stmt();
                 }
-                if STMT_KEYWORDS.contains(&self.cur_text()) {
+                if STMT_KEYWORDS.contains(&self.cur_text()) && !self.at_ordinary_call() {
                     return self.keyword_stmt();
                 }
                 if self.at_kw("fn") && self.nth_is(1, Kind::LParen) {
@@ -1205,6 +1205,54 @@ impl<'a> P<'a> {
     /// One syntactic shape covering the body-level statement family. Their
     /// semantics are staged: recognising them is E2's job, checking them is E4
     /// and E7's.
+    /// **Is this statement keyword's token sequence an ordinary call?**
+    ///
+    /// Architect ruling, 2026-08-11:
+    ///
+    /// > A keyword spelling may select a syntactic production only when the
+    /// > tokens actually match that production. […] `measure(el)` must parse as
+    /// > the ordinary call expression grammar and then resolve normally. It
+    /// > must never gain or lose semantics merely because its spelling appears
+    /// > in `STMT_KEYWORDS`.
+    ///
+    /// The twin of the `for` defect, from the other direction. There, syntax was
+    /// promoted to a call by its position; here a call was demoted to syntax by
+    /// its spelling — and `Expr::Keyword` contributes no effects, so
+    /// `measure(el)` performed nothing while `helper(el)` beside it performed a
+    /// layout read.
+    ///
+    /// The discriminator is exactly the ruling's: `kw ( .. )` with **no block
+    /// after the closing paren** is a call. `measure { .. }` keeps the phase
+    /// production, because a block is not part of any call. `release(h) { .. }`
+    /// keeps it too, for the same reason — the block is what makes it a
+    /// statement rather than an invocation.
+    fn at_ordinary_call(&self) -> bool {
+        if !self.nth_is(1, Kind::LParen) {
+            return false;
+        }
+        // Walk to the matching `)` and look at what follows. Counting rather
+        // than assuming one level: `measure(f(x))` closes twice.
+        let mut i = 1;
+        let mut depth = 0i32;
+        loop {
+            match self.nth(i).kind {
+                Kind::LParen => depth += 1,
+                Kind::RParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return self.nth(i + 1).kind != Kind::LBrace;
+                    }
+                }
+                Kind::Eof => return false,
+                _ => {}
+            }
+            i += 1;
+            if i > 4_000 {
+                return false;
+            }
+        }
+    }
+
     fn keyword_stmt(&mut self) {
         self.start(K::LetStmt);
         self.bump(); // the keyword

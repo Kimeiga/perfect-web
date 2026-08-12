@@ -190,6 +190,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // E10, ADR-0025: an optimistic transition is a separate execution root
         // with its own effect row, and its context permits none.
         optimistic_transitions_are_pure(&inference, i, &u.hir, per_unit);
+        optimistic_transitions_agree_with_their_target(&sigs, &workspace, &hirs, i, per_unit);
     }
 
     // Declaration name → its privacy label, across every unit. A `page` in one
@@ -470,6 +471,200 @@ fn optimistic_transitions_are_pure(
                 }],
             });
         }
+    }
+}
+
+/// **The transition produces the value type of the resource it targets.**
+///
+/// Architect ruling, 2026-08-11, treating this as blocking before codegen:
+///
+/// ```text
+/// target              ResourceEntry<Cart>
+/// binder `cart`       Cart
+/// transition result   Cart
+/// ```
+///
+/// # Target selection and state transformation are different computations
+///
+/// The ruling is explicit that these must not be conflated:
+///
+/// > The purity requirement belongs to the transformation. The target selector
+/// > may legitimately need context to identify the entry — `current_session()`
+/// > is the obvious example — without making the actual state transformation
+/// > effectful. So don't accidentally implement
+/// > `effects(target) ∪ effects(transition) must be {}`.
+///
+/// So `optimistic_transitions_are_pure` infers from `t.body` alone, and this
+/// function does not look at the target's effects at all. It asks the target
+/// one question — which resource, and what is its value type — and then asks
+/// the transition whether it produces that.
+fn optimistic_transitions_agree_with_their_target(
+    sigs: &Signatures,
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+    out: &mut Vec<Diagnostic>,
+) {
+    let hir = hirs[unit];
+    for (_, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let module = hir.module_of(decl_id_of(hir, decl)).map(str::to_string);
+        for (policy, t) in decl.transitions() {
+            // The target names a resource. `Cart(current_session())` — the
+            // callee, not the argument.
+            let Expr::Call { callee, .. } = body.expr(t.target) else {
+                out.push(target_is_not_a_resource_entry(
+                    decl,
+                    body,
+                    t,
+                    policy,
+                    "it is not a resource applied to a key",
+                ));
+                continue;
+            };
+            let path = path_of(body, *callee);
+            let Some(value_ty) = resource_value_type(sigs, workspace, hirs, unit, &path) else {
+                out.push(target_is_not_a_resource_entry(
+                    decl,
+                    body,
+                    t,
+                    policy,
+                    &format!("`{path}` is not a resource this file can see"),
+                ));
+                continue;
+            };
+
+            // The binder IS the target's value type; the transition must
+            // produce it. Seeded rather than inferred — nothing in the body
+            // says what `cart` is, because the clause's header does.
+            let types = crate::infer::Types::of_body(sigs, decl, body, module.as_deref())
+                .with_binding(&t.binder, &value_ty);
+            let Some(produced) = types.of(body, t.body) else {
+                // No answer is not a violation. `docs/RISK_QUEUE.md`: an
+                // analysis that could not run must not be read as a proof, and
+                // it must not be read as a refutation either.
+                continue;
+            };
+            if produced == value_ty {
+                continue;
+            }
+            out.push(Diagnostic {
+                code: crate::codes::OPTIMISTIC_TARGET_MISMATCH.id,
+                invariant: crate::codes::OPTIMISTIC_TARGET_MISMATCH.invariant,
+                reason: "optimistic_transition_type_mismatch",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}`'s optimistic transition produces `{produced}`, but it targets a \
+                     resource whose value is `{value_ty}`",
+                    decl.name
+                ),
+                primary_span: body.expr_span(t.body),
+                related: vec![Related {
+                    span: body.expr_span(t.target),
+                    label: format!("this resource holds `{value_ty}`"),
+                }],
+                explanation: Some(format!(
+                    "An optimistic transition replaces the value the client is displaying, and \
+                     the platform abandons it by restoring the value it held. Both are \
+                     `{value_ty}`. A transition producing `{produced}` would put something else \
+                     in that entry, and there would be nothing meaningful to restore."
+                )),
+                repairs: vec![Repair {
+                    description: format!("produce a `{value_ty}` from `{}`", t.binder),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+}
+
+/// The VALUE a resource holds: `Cart` for `query Cart(..) -> Result<Cart, E>`.
+///
+/// The `Ok` side, because that is what the client displays and what an
+/// optimistic transition replaces. A `Result` in the entry would make the
+/// speculative value a different shape from the held one.
+fn resource_value_type(
+    sigs: &Signatures,
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+    path: &str,
+) -> Option<String> {
+    use crate::resolve::{Namespace, Resolution};
+    // **A bare name resolves in the TERM namespace**, not in whichever
+    // namespace answers first.
+    //
+    // A resource is a data operation and lives there. `examples/store/app.pw`
+    // declares `session query Cart(..)` and also imports `domain.{ Cart }` —
+    // the type — so a namespace-agnostic lookup finds the type and reports the
+    // program's own resource as one the file cannot see. Two declarations, one
+    // spelling, two namespaces: exactly what `Namespace` exists for.
+    //
+    // A QUALIFIED path keeps its qualifier. Taking the last segment here would
+    // have been `docs/RISK_QUEUE.md` 34 in a new place: `Resources.Cart` and
+    // `store.page.Cart` are two resources, and an optimistic clause targeting
+    // one must not be typechecked against the other.
+    let resolution = match path.contains('.') {
+        true => workspace.resolve_path(unit, path),
+        false => workspace.resolve_in(unit, Namespace::Term, path),
+    };
+    let def = match resolution {
+        Resolution::Local(def) | Resolution::Imported { def, .. } => def,
+        _ => return None,
+    };
+    let _ = sigs;
+    // The WHOLE program. `A-005` writes `optimistic Cart(..)` and imports
+    // `Resources.{ Cart }`, so a lookup restricted to this unit would report
+    // every cross-module resource as one the file cannot see — which is the
+    // shape of half the defects this milestone found.
+    let decl = crate::resolve::declaration(hirs, def)?;
+    if !matches!(
+        decl.kind,
+        DeclKind::Query | DeclKind::Resource | DeclKind::Subscription
+    ) {
+        return None;
+    }
+    match decl.ret.as_deref() {
+        Some("Result") => decl.ret_args.first().cloned(),
+        Some(other) => Some(other.to_string()),
+        None => None,
+    }
+}
+
+fn target_is_not_a_resource_entry(
+    decl: &Decl,
+    body: &Body,
+    t: &crate::hir::Transition,
+    policy: &crate::hir::Policy,
+    why: &str,
+) -> Diagnostic {
+    Diagnostic {
+        code: crate::codes::OPTIMISTIC_TARGET_MISMATCH.id,
+        invariant: crate::codes::OPTIMISTIC_TARGET_MISMATCH.invariant,
+        reason: "optimistic_target_is_not_a_resource_entry",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!(
+            "`{}`'s optimistic clause targets no resource: {why}",
+            decl.name
+        ),
+        primary_span: body.expr_span(t.target),
+        related: vec![Related {
+            span: policy.span.clone(),
+            label: "declared here".to_string(),
+        }],
+        explanation: Some(
+            "An optimistic clause names the resource ENTRY it speculatively updates — \
+             `Cart(current_session())`, not `Cart`. Two entries can have the same type, so a \
+             clause that named only a type would not say which one it changed."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "name a declared resource and the key that selects its entry".to_string(),
+            replacement: None,
+        }],
     }
 }
 
