@@ -54,10 +54,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use pw_core::hir::ExprId;
 use pw_core::hir::{DeclKind, Expr, Hir};
 use pw_core::infer::path_of;
 use pw_core::lower::lower_file;
-use pw_core::resolve::{Resolution, Workspace, local_bindings};
+use pw_core::resolve::{Resolution, Workspace, local_bindings, local_bindings_from};
 use pw_syntax::parse_tree;
 
 /// Who claims a call-shaped construct.
@@ -102,6 +103,16 @@ const VALUE_DOMAIN: &[&str] = &["translate", "scale", "rotate", "repeat", "minma
 
 /// The same program with extra sources appended, so the gate can be run against
 /// a deliberately broken one.
+/// The corpus, read and lowered ONCE.
+///
+/// `ownership_of` used to rebuild it per call, and the controls below call it
+/// five times — 179 seconds for one test. A gate slow enough to be skipped is a
+/// gate that stops running.
+fn corpus_program() -> &'static (Vec<String>, Vec<Hir>) {
+    static ONCE: std::sync::OnceLock<(Vec<String>, Vec<Hir>)> = std::sync::OnceLock::new();
+    ONCE.get_or_init(|| program_plus(&[]))
+}
+
 fn program_plus(extra: &[&str]) -> (Vec<String>, Vec<Hir>) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut names = Vec::new();
@@ -144,8 +155,12 @@ fn ownership() -> BTreeMap<Owner, BTreeSet<String>> {
 }
 
 fn ownership_of(extra: &[&str]) -> BTreeMap<Owner, BTreeSet<String>> {
-    let (_, hirs) = program_plus(extra);
-    let refs: Vec<&Hir> = hirs.iter().collect();
+    let (_, base) = corpus_program();
+    let extras: Vec<Hir> = extra
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = base.iter().chain(extras.iter()).collect();
     let ws = Workspace::build(&refs);
 
     // Every type the program declares, so a constructor can be told from a
@@ -163,53 +178,72 @@ fn ownership_of(extra: &[&str]) -> BTreeMap<Owner, BTreeSet<String>> {
         for (_, d) in hir.all_decls() {
             let Some(bid) = d.body else { continue };
             let body = hir.body(bid);
-            let locals = local_bindings(body);
             let params: BTreeSet<String> = d.params.iter().map(|p| p.name.clone()).collect();
 
-            for id in body.walk() {
-                let Expr::Call { callee, .. } = body.expr(id) else {
-                    continue;
-                };
-                let path = path_of(body, *callee);
-                if path.is_empty() {
-                    continue;
-                }
-                let head = path.split('.').next().unwrap_or_default();
-                let last = path.rsplit('.').next().unwrap_or_default();
+            // **The body, PLUS every named execution root.**
+            //
+            // A block policy's contents left `body.root` on 2026-08-11, and a
+            // gate that walked only from the root would have stopped examining
+            // `draw(ctx) { .. }` and `release(h) { .. }` entirely — so an
+            // unowned call could hide in exactly the place this milestone just
+            // gave a name to.
+            //
+            // Each root brings its OWN binders, which is what makes `ctx.rect`
+            // a `Local` member rather than a call on an unresolved receiver.
+            let mut trees: Vec<(Vec<ExprId>, BTreeSet<String>)> =
+                vec![(body.walk(), local_bindings(body))];
+            for (_, root) in d.term_roots() {
+                let mut scope = local_bindings_from(body, root.root);
+                scope.extend(root.binders.iter().map(|(n, _)| n.clone()));
+                trees.push((body.walk_from(root.root), scope));
+            }
 
-                let owner = if !matches!(ws.resolve_path(unit, &path), Resolution::Unresolved) {
-                    Owner::Term
-                } else if INTRINSIC.contains(&path.as_str()) {
-                    Owner::Intrinsic
-                } else if types.contains(head) && path.contains('.') {
-                    Owner::Constructor
-                } else if pw_core::policy::domain_of(last).is_some()
-                    || pw_core::policy::domain_of(head).is_some()
-                    || is_policy_operator(last)
-                    || is_label_constructor(last)
-                {
-                    Owner::Policy
-                } else if VALUE_DOMAIN.contains(&last) {
-                    Owner::ValueDomain
-                } else if locals.contains(head) || params.contains(head) || head == "self" {
-                    if path.contains('.') {
+            for (ids, locals) in trees {
+                for id in ids {
+                    let Expr::Call { callee, .. } = body.expr(id) else {
+                        continue;
+                    };
+                    let path = path_of(body, *callee);
+                    if path.is_empty() {
+                        continue;
+                    }
+                    let head = path.split('.').next().unwrap_or_default();
+                    let last = path.rsplit('.').next().unwrap_or_default();
+
+                    let owner = if !matches!(ws.resolve_path(unit, &path), Resolution::Unresolved) {
+                        Owner::Term
+                    } else if INTRINSIC.contains(&path.as_str()) {
+                        Owner::Intrinsic
+                    } else if types.contains(head) && path.contains('.') {
+                        Owner::Constructor
+                    } else if pw_core::policy::domain_of(last).is_some()
+                        || pw_core::policy::domain_of(head).is_some()
+                        || is_policy_operator(last)
+                        || is_label_constructor(last)
+                    {
+                        Owner::Policy
+                    } else if VALUE_DOMAIN.contains(&last) {
+                        Owner::ValueDomain
+                    } else if locals.contains(head) || params.contains(head) || head == "self" {
+                        if path.contains('.') {
+                            Owner::Member
+                        } else {
+                            Owner::Local
+                        }
+                    } else if path.contains('.') && !ws.sees_module(unit, head) {
+                        // A dotted path whose head names no module and no type is a
+                        // member access on a value. What is missing is the
+                        // RECEIVER's type, not the name — and `unresolved_uses`
+                        // already reports the case where the head does look like a
+                        // module. Two of these are here because the parser never
+                        // bound the receiver: see
+                        // `a_loop_and_a_policy_block_do_not_bind_their_binders`.
                         Owner::Member
                     } else {
-                        Owner::Local
-                    }
-                } else if path.contains('.') && !ws.sees_module(unit, head) {
-                    // A dotted path whose head names no module and no type is a
-                    // member access on a value. What is missing is the
-                    // RECEIVER's type, not the name — and `unresolved_uses`
-                    // already reports the case where the head does look like a
-                    // module. Two of these are here because the parser never
-                    // bound the receiver: see
-                    // `a_loop_and_a_policy_block_do_not_bind_their_binders`.
-                    Owner::Member
-                } else {
-                    Owner::Unowned
-                };
-                out.entry(owner).or_default().insert(path);
+                        Owner::Unowned
+                    };
+                    out.entry(owner).or_default().insert(path);
+                }
             }
         }
     }
@@ -288,6 +322,57 @@ view Button(label: String) !{} {
         unowned,
         BTreeSet::from(["vanished".to_string()]),
         "the gate did not detect a call to a name that does not exist"
+    );
+
+    // **And inside a block policy**, which left `body.root` on 2026-08-11. A
+    // gate that walked only from the root would report this program clean —
+    // so an unowned call could hide in exactly the construct this milestone
+    // just gave a name to.
+    let in_a_block = "\
+module probe.painter
+
+paint P(w: Float) !{ paint.custom } {
+    inputs w
+
+    draw(ctx) {
+        vanished(w)
+    }
+}
+";
+    let by_owner = ownership_of(&[in_a_block]);
+    assert_eq!(
+        by_owner.get(&Owner::Unowned).cloned().unwrap_or_default(),
+        BTreeSet::from(["vanished".to_string()]),
+        "the gate must reach a block policy's contents"
+    );
+
+    // And the block's own binder is in scope there: `ctx.rect(..)` is a member
+    // call on a bound value, not a call on an unresolved receiver.
+    let bound = "\
+module probe.painter_ok
+
+paint P(w: Float) !{ paint.custom } {
+    inputs w
+
+    draw(ctx) {
+        ctx.rect(w)
+    }
+}
+";
+    let by_owner = ownership_of(&[bound]);
+    assert!(
+        by_owner
+            .get(&Owner::Unowned)
+            .cloned()
+            .unwrap_or_default()
+            .is_empty(),
+        "a call on the block's own binder is owned: {:?}",
+        by_owner.get(&Owner::Unowned)
+    );
+    assert!(
+        by_owner[&Owner::Member].contains("ctx.rect"),
+        "and it is a MEMBER of the bound value: {:?}",
+        by_owner[&Owner::Member]
     );
 
     // And the discriminating half: the same program with the call resolved is
