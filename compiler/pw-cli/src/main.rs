@@ -275,6 +275,35 @@ fn explain_with(
             }
         }
 
+        // **Every policy, whatever the declaration kind.**
+        //
+        // Charter §14 M4's gate is that a policy the compiler knows about is
+        // visible here, and the arms above cover the kinds that had policies
+        // when it was written. `replicated` and `paint` gained theirs on
+        // 2026-08-11, when data-operation declarations began parsing their
+        // clauses inside their braces — and `A-011`'s six and `A-021`'s two
+        // became invisible the moment they became real.
+        //
+        // Kept as a sweep after the match rather than a ninth arm: a new
+        // declaration kind should not be able to hide its policies by being
+        // new. The `printed` guard is what stops the arms above double-printing.
+        if !matches!(
+            d.kind,
+            DeclKind::Query
+                | DeclKind::Command
+                | DeclKind::Subscription
+                | DeclKind::Resource
+                | DeclKind::Materialize
+                | DeclKind::Task
+                | DeclKind::View
+                | DeclKind::Component
+                | DeclKind::Page
+        ) {
+            for p in &d.policies {
+                let _ = writeln!(s, "             {:<14} {}", p.name, p.value);
+            }
+        }
+
         let span = hir.decl_span(id);
         let _ = writeln!(s, "             at bytes {}..{}", span.start, span.end);
         let line = source[..span.start.min(source.len())]
