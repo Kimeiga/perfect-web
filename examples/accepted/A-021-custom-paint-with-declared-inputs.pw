@@ -12,7 +12,7 @@ module store.rating_spark
 paint RatingSpark(values: List<Float>, width: Float, height: Float) !{ paint.custom } {
     // Declared inputs only. No document access, no geometry reads: the painter
     // receives its size rather than measuring it.
-    inputs values, width, height
+    inputs   values, width, height
     isolated true
 
     draw(ctx) {

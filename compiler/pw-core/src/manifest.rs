@@ -397,7 +397,7 @@ mod tests {
                 policies: vec![crate::hir::Policy {
                     name: "consistency".into(),
                     value: v.into(),
-                    transition: None,
+                    roots: Vec::new(),
                     span: 0..0,
                 }],
                 imports: vec![],

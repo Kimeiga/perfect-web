@@ -1143,7 +1143,7 @@ mod tests {
             policies: vec![crate::hir::Policy {
                 name: "capability".into(),
                 value: "database.read<T>".into(),
-                transition: None,
+                roots: Vec::new(),
                 span: 0..0,
             }],
             ..bare()
@@ -1157,7 +1157,7 @@ mod tests {
             policies: vec![crate::hir::Policy {
                 name: "capability".into(),
                 value: "none".into(),
-                transition: None,
+                roots: Vec::new(),
                 span: 0..0,
             }],
             ..bare()
@@ -1174,7 +1174,7 @@ mod tests {
             policies: vec![crate::hir::Policy {
                 name: "host".into(),
                 value: "\"pw:host/database#read\"".into(),
-                transition: None,
+                roots: Vec::new(),
                 span: 0..0,
             }],
             ..bare()

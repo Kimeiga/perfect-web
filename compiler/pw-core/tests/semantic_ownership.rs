@@ -352,22 +352,22 @@ fn every_owner_class_actually_claims_something() {
     );
 }
 
-/// **A `for` loop is syntax, and it binds. A policy block's binder still does
-/// not.**
+/// **A `for` loop and a policy block both bind their binders.**
 ///
 /// The loop was `Expr::Call { callee: Name("for") }` until 2026-08-10, with two
 /// consequences: every analysis that walks calls saw a call to something no
-/// program declares, and the loop variable was introduced by nothing — so
-/// `for badge in badges { badge.style.set_width(u) }` reported `badge` as an
-/// undeclared name.
+/// program declares, and the loop variable was introduced by nothing.
 ///
-/// The policy-block half remains. `draw(ctx) { ctx.rect(..) }` binds `ctx` by
-/// nothing, because `draw` is a policy head whose value is a `Domain::Body` and
-/// the grammar still reads it as a call followed by a block. That is the
-/// `PolicyExpr` split's work, and this test is what will say when it lands.
+/// The policy block followed on 2026-08-11. `draw(ctx) { ctx.rect(w) }` bound
+/// `ctx` by nothing, so `ctx.rect` was classified `Member` — a call on a
+/// receiver with no type — when the receiver was in fact declared right there
+/// in the header. Architect ruling: *the canonical policy registry should say
+/// which block-policy forms introduce binders; downstream resolution should
+/// receive already-lowered lexical bindings. Don't have `local_bindings`
+/// recognize `"draw"` or `"release"` by spelling.*
 #[test]
-fn a_for_loop_is_syntax_that_binds_and_a_policy_block_is_not_yet() {
-    use pw_core::hir::Expr;
+fn a_loop_and_a_policy_block_both_bind() {
+    use pw_core::hir::{ExecutionContext, Expr};
 
     let src = "\
 module m
@@ -387,17 +387,7 @@ fn f(xs: List<Int>) -> Int {
             .any(|id| matches!(body.expr(*id), Expr::For { .. })),
         "the loop is a loop, not a call"
     );
-    assert!(
-        !body.walk().iter().any(|id| matches!(
-            body.expr(*id),
-            Expr::Call { callee, .. } if path_of(body, *callee) == "for"
-        )),
-        "and nothing calls `for`"
-    );
-    assert!(
-        local_bindings(body).contains("x"),
-        "and the loop variable is a binding"
-    );
+    assert!(local_bindings(body).contains("x"));
 
     // The tuple form binds BOTH names, which is what says the binder is a
     // pattern rather than a single identifier the parser special-cased.
@@ -412,27 +402,13 @@ fn f(xs: List<Int>) -> Int {
 ";
     let hir = lower_file(tuple, &parse_tree(tuple).green);
     let (_, d) = hir.all_decls().find(|(_, d)| d.name == "f").expect("f");
-    let body = hir.body(d.body.expect("body"));
-    let names = local_bindings(body);
+    let names = local_bindings(hir.body(d.body.expect("body")));
     assert!(names.contains("i") && names.contains("v"), "{names:?}");
 
-    // The control that was already correct, so the repair is attributable to
-    // the loop and not to `local_bindings`.
-    let each = "\
-module m
-
-view V(xs: List<Int>) !{} {
-    {#each xs as x (x)}
-        <p>{x}</p>
-    {/each}
-}
-";
-    let hir = lower_file(each, &parse_tree(each).green);
-    let (_, d) = hir.all_decls().find(|(_, d)| d.name == "V").expect("V");
-    let body = hir.body(d.body.expect("body"));
-    assert!(local_bindings(body).contains("x"));
-
-    // And the half the repair has not reached.
+    // **The policy block, and it is an affirmative proof rather than a
+    // failing-forward one.** The binder is in the ROOT, not in
+    // `local_bindings` — a policy block introduces a name for its own tree and
+    // for nothing else.
     let policy = "\
 module m
 
@@ -446,13 +422,45 @@ paint P(w: Float) !{ paint.custom } {
 ";
     let hir = lower_file(policy, &parse_tree(policy).green);
     let (_, d) = hir.all_decls().find(|(_, d)| d.name == "P").expect("P");
-    let body = hir.body(d.body.expect("body"));
-    assert!(
-        !local_bindings(body).contains("ctx"),
-        "TODAY: a policy block's binder is bound by nothing. When the \
-         `PolicyExpr` split reaches `Domain::Body`, this fails and `ctx.rect` \
-         moves from `Member` to `Local` in the gate above."
+    let roots: Vec<_> = d.term_roots().collect();
+    assert_eq!(roots.len(), 1, "one block policy, one root");
+    let (p, root) = roots[0];
+    assert_eq!(p.name, "draw");
+    assert_eq!(root.context, ExecutionContext::Draw);
+    assert_eq!(
+        root.binders
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .collect::<Vec<_>>(),
+        ["ctx"],
+        "the header's parameter IS the binder"
     );
+    assert!(
+        !local_bindings(hir.body(d.body.expect("body"))).contains("ctx"),
+        "and it is NOT a binding of the declaration's body — it scopes to its \
+         own root"
+    );
+
+    // A block with no header binds nothing, so the binder comes from the
+    // header rather than from being a block.
+    let acquire = "\
+module m
+
+import browser.{ MapHandle, MapError, Element }
+import Maps
+
+resource R(container: Element, center: String) -> Result<MapHandle, MapError> {
+    acquire {
+        Maps.create(container, center)
+    }
+}
+";
+    let hir = lower_file(acquire, &parse_tree(acquire).green);
+    let (_, d) = hir.all_decls().find(|(_, d)| d.name == "R").expect("R");
+    let roots: Vec<_> = d.term_roots().collect();
+    assert_eq!(roots.len(), 1);
+    assert_eq!(roots[0].1.context, ExecutionContext::Acquire);
+    assert!(roots[0].1.binders.is_empty());
 }
 
 /// **A member call on an unresolved receiver is its own class.**

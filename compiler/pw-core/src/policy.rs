@@ -265,6 +265,30 @@ pub fn domain_of(head: &str) -> Option<Domain> {
     })
 }
 
+/// **The execution context a block policy's contents run in.**
+///
+/// Architect ruling, 2026-08-11: the policy operator's identity selects the
+/// form, and downstream resolution receives already-lowered lexical bindings.
+/// Nothing recognises `"draw"` or `"release"` by spelling to decide what a
+/// block introduces — this table does, once.
+///
+/// `Draw`, `Acquire` and `Release` get no new legality rules; they carry only
+/// the semantics they already had. What changes is that their contents are
+/// attributed to their own root rather than to whatever declaration happens to
+/// enclose them.
+pub fn execution_context(head: &str) -> Option<crate::hir::ExecutionContext> {
+    use crate::hir::ExecutionContext as X;
+    match domain_of(head)? {
+        Domain::Body => Some(match head {
+            "draw" => X::Draw,
+            "acquire" => X::Acquire,
+            "release" => X::Release,
+            _ => return None,
+        }),
+        _ => None,
+    }
+}
+
 /// Every policy head whose value is, or contains, **executable code**.
 ///
 /// This is the list `PW0024` has to consult. A name written in one of these

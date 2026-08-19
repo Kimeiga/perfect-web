@@ -23,7 +23,7 @@ materialize MenuFragment(id: StoreId) {
     partition      public
     depends_on     Store(id), Menu(id)
     invalidates_on MenuChanged(id),
-    InventoryChanged(id, _item: MenuItemId)
+        InventoryChanged(id, _item: MenuItemId)
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good

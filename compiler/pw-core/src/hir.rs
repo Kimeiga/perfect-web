@@ -281,8 +281,18 @@ pub struct Policy {
     /// Everything after the keyword, trimmed. Empty when the policy is a bare
     /// word such as `offline`.
     pub value: String,
-    /// **The value as a transition**, when this policy's domain is one —
-    /// `optimistic` (`crate::policy::Domain::Transition`).
+    /// **The named execution roots this policy owns.**
+    ///
+    /// `optimistic Cart(..) as cart => ..` owns two: the target selector and
+    /// the transition. They are separate computations with separate contexts
+    /// (ADR-0025), so they are separate roots rather than one tree with a
+    /// special case inside it.
+    ///
+    /// Architect ruling, 2026-08-11, generalizing what the special case had
+    /// already proved:
+    ///
+    /// > Your special-cased transition has already proved the abstraction. Make
+    /// > it the first instance rather than leaving it exceptional.
     ///
     /// Architect ruling, 2026-08-10:
     ///
@@ -295,41 +305,113 @@ pub struct Policy {
     /// > An optimistic clause identifies a resource entry and binds its current
     /// > value; its body is an ordinary Pleris transition expression.
     ///
-    /// Both expressions point into the OWNING DECLARATION'S body arena, and
-    /// neither is reachable from that body's root. They are terms, so name
-    /// resolution must see them; they run in a different execution context —
-    /// on the client, before the round trip — so the declaration's effect row
-    /// must not absorb them. Reachable-from-root would have given the second
-    /// for free along with the first.
-    pub transition: Option<Transition>,
+    /// Every root points into the OWNING DECLARATION'S body arena, and none is
+    /// reachable from that body's root. They are terms, so name resolution must
+    /// see them; they run in a different execution context, so the
+    /// declaration's effect row must not absorb them. Reachable-from-root would
+    /// have given the second for free along with the first.
+    pub roots: Vec<TermRoot>,
     pub span: Span,
 }
 
-/// **An optimistic transition: which entry, its current value, and the change.**
+/// **Where an expression tree runs.**
 ///
-/// ```text
-/// optimistic Cart(current_session()) as cart => cart.add(item, quantity)
-///            └────── target ───────┘    └ b ┘   └────── body ──────────┘
-/// ```
+/// Architect ruling, 2026-08-11:
 ///
-/// `target` is a resource ENTRY, not a type. Architect ruling, 2026-08-11: two
-/// entries can have the same type — `Cart(session A)` and `Cart(session B)` —
-/// so a transition that named only `Cart` would not say what it was updating.
+/// > A `TermRoot` should own an expression tree, its lexical binders, and its
+/// > initial `ExecutionContext`. […] That gives the compiler one invariant:
+/// > **every executable expression belongs to exactly one named execution
+/// > root.**
 ///
-/// There is deliberately no inverse. The platform restores the value it held,
-/// which it knows exactly; a hand-written `rollback` describes an inverse that
-/// is generally false. See ADR-0025.
+/// Nested constructs — a frame phase — still push onto the context stack; they
+/// do not become separate roots. A root is where a *tree* begins.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ExecutionContext {
+    /// The declaration's own body: a command, a query, a rendered view.
+    Declaration,
+    /// Selecting which resource entry an optimistic clause targets.
+    ///
+    /// Its own context because it is not the state transformation. It may read
+    /// invocation context to name the entry — `Cart(current_session())` — and
+    /// that is exactly what the transformation may not do (ADR-0025).
+    TargetSelection,
+    /// `optimistic .. => ..` — on the client, before the round trip.
+    OptimisticTransition,
+    /// `draw(ctx) { .. }` — a painter.
+    Draw,
+    /// `acquire { .. }` — a resource's acquisition.
+    Acquire,
+    /// `release(h) { .. }` — a resource's release.
+    Release,
+}
+
+impl ExecutionContext {
+    /// The world this context runs in, where it has one.
+    pub fn placement(self) -> Option<&'static str> {
+        match self {
+            ExecutionContext::OptimisticTransition | ExecutionContext::Draw => Some("browser"),
+            _ => None,
+        }
+    }
+
+    /// **May a tree in this context perform effects?**
+    ///
+    /// `false` for an optimistic transition, and the reason is the whole of
+    /// ADR-0025: the platform abandons a speculative value by restoring the one
+    /// it held, and an externally visible effect cannot be abandoned that way.
+    ///
+    /// A context policy rather than a rule keyed on the policy's spelling —
+    /// architect ruling, 2026-08-11: *the existing verdict remains; the
+    /// mechanism becomes general.* `Draw`, `Acquire` and `Release` deliberately
+    /// get no new legality rules here; they carry only the semantics they
+    /// already had.
+    pub fn permits_effects(self) -> bool {
+        !matches!(self, ExecutionContext::OptimisticTransition)
+    }
+
+    /// **Do this root's effects belong to the declaration that owns it?**
+    ///
+    /// `true` for a painter's `draw`, a resource's `acquire` and `release`:
+    /// those blocks ARE the declaration's work, and they were statements in its
+    /// body until they became roots. Preserving that is the migration being
+    /// faithful — architect ruling, 2026-08-11: *for `Draw`, `Acquire`, and
+    /// `Release`, don't invent new legality rules now; encode only the
+    /// semantics/rules they already have.*
+    ///
+    /// `false` for an optimistic clause. It runs on the client at a different
+    /// time, and a command whose row absorbed it would be indistinguishable
+    /// from one that performed the transition itself.
+    pub fn contributes_to_declaration(self) -> bool {
+        matches!(
+            self,
+            ExecutionContext::Draw | ExecutionContext::Acquire | ExecutionContext::Release
+        )
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            ExecutionContext::Declaration => "the declaration body",
+            ExecutionContext::TargetSelection => "an optimistic clause's target",
+            ExecutionContext::OptimisticTransition => "an optimistic transition",
+            ExecutionContext::Draw => "a painter's draw block",
+            ExecutionContext::Acquire => "a resource's acquire block",
+            ExecutionContext::Release => "a resource's release block",
+        }
+    }
+}
+
+/// **One named execution root: a tree, its binders, and where it runs.**
+///
+/// The binders are the root's OWN — `optimistic Cart(..) as cart => ..` binds
+/// `cart` for the transition and for nothing else. Downstream resolution
+/// receives them already lowered; nothing recognises a policy by spelling to
+/// decide what a block introduces.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Transition {
-    /// The resource entry being speculatively updated.
-    pub target: ExprId,
-    /// The name bound to the entry's current value, in the body only.
-    pub binder: String,
-    pub binder_span: Span,
-    /// Current value → speculative value. Pure: its execution context permits
-    /// no effects, because an externally visible effect cannot be undone by
-    /// restoring a resource value.
-    pub body: ExprId,
+pub struct TermRoot {
+    pub context: ExecutionContext,
+    /// Names this root introduces, with their spans.
+    pub binders: Vec<(String, Span)>,
+    pub root: ExprId,
 }
 
 /// One constructor of a `type T = | A | B(X)` declaration.
@@ -396,15 +478,46 @@ impl Decl {
         self.policies.iter().find(|p| p.name == name)
     }
 
-    /// Every policy value that is a transition, with the policy that holds it.
+    /// **Every named execution root this declaration owns**, other than its
+    /// body.
     ///
-    /// The explicit way to reach an embedded term. A consumer that should see
+    /// The explicit way to reach an embedded tree. A consumer that should see
     /// them asks; one that should not, does not — and neither finds them by
     /// accident, because they are not reachable from the body's root.
-    pub fn transitions(&self) -> impl Iterator<Item = (&Policy, &Transition)> {
+    pub fn term_roots(&self) -> impl Iterator<Item = (&Policy, &TermRoot)> {
         self.policies
             .iter()
-            .filter_map(|p| p.transition.as_ref().map(|t| (p, t)))
+            .flat_map(|p| p.roots.iter().map(move |r| (p, r)))
+    }
+
+    /// The roots of one context.
+    pub fn roots_in(
+        &self,
+        context: ExecutionContext,
+    ) -> impl Iterator<Item = (&Policy, &TermRoot)> {
+        self.term_roots().filter(move |(_, r)| r.context == context)
+    }
+
+    /// An optimistic clause as its two roots, paired.
+    ///
+    /// The target and the transition belong to one policy and are separate
+    /// computations; every rule about them needs both, and pairing them here
+    /// keeps a caller from matching them up by position.
+    pub fn optimistic_clauses(&self) -> Vec<(&Policy, &TermRoot, &TermRoot)> {
+        self.policies
+            .iter()
+            .filter_map(|p| {
+                let target = p
+                    .roots
+                    .iter()
+                    .find(|r| r.context == ExecutionContext::TargetSelection)?;
+                let transition = p
+                    .roots
+                    .iter()
+                    .find(|r| r.context == ExecutionContext::OptimisticTransition)?;
+                Some((p, target, transition))
+            })
+            .collect()
     }
 }
 

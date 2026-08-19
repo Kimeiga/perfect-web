@@ -260,6 +260,50 @@ fn no_call_lambda_or_match_in_the_tree_is_lost_in_lowering() {
     );
 }
 
+/// **Every executable expression belongs to exactly one named execution root.**
+///
+/// Architect ruling, 2026-08-11, stating the invariant the `TermRoot` model
+/// exists for:
+///
+/// > A `TermRoot` should own an expression tree, its lexical binders, and its
+/// > initial `ExecutionContext`. […] Never: call-shaped thing → nobody owns it
+/// > → analyses see nothing.
+///
+/// **Exactly one**, not at least one. A tree reachable from two roots would be
+/// inferred twice and attributed to both contexts, which is the failure the
+/// separation exists to prevent: an optimistic transition merged into a
+/// command's row is indistinguishable from the command performing it.
+#[test]
+fn no_expression_belongs_to_two_named_roots() {
+    for path in corpus() {
+        let src = std::fs::read_to_string(&path).expect("read");
+        let hir = lower_file(&src, &parse_tree(&src).green);
+        let name = path.file_name().unwrap().to_string_lossy();
+
+        for (_, d) in hir.all_decls() {
+            let Some(b) = d.body else { continue };
+            let body = hir.body(b);
+            let mut owner: std::collections::HashMap<ExprId, &'static str> =
+                std::collections::HashMap::new();
+            for id in body.walk() {
+                owner.insert(id, "the declaration body");
+            }
+            for (_, root) in d.term_roots() {
+                for id in body.walk_from(root.root) {
+                    if let Some(first) = owner.insert(id, root.context.name()) {
+                        panic!(
+                            "{name}: `{}` — an expression is reachable from both {first} and \
+                             {}, so its effects would be attributed to both",
+                            d.name,
+                            root.context.name()
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn every_allocated_expression_has_exactly_one_named_root() {
     // Orphans mean a subtree was lowered but never attached. A checker that
@@ -293,7 +337,7 @@ fn every_allocated_expression_has_exactly_one_named_root() {
             roots
                 .entry(b.index())
                 .or_default()
-                .extend(d.transitions().flat_map(|(_, t)| [t.target, t.body]));
+                .extend(d.term_roots().map(|(_, r)| r.root));
         }
 
         for (bi, body, _) in hir.bodies.iter() {
@@ -349,11 +393,23 @@ command add(item: MenuItemId) -> Result<Cart, CartError>
     let (_, d) = hir.all_decls().find(|(_, d)| d.name == "add").expect("add");
     let body = hir.body(d.body.expect("body"));
 
-    let terms: Vec<ExprId> = d
-        .transitions()
-        .flat_map(|(_, t)| [t.target, t.body])
-        .collect();
-    assert_eq!(terms.len(), 2, "the target and the transition both lowered");
+    let terms: Vec<ExprId> = d.term_roots().map(|(_, r)| r.root).collect();
+    assert_eq!(
+        terms.len(),
+        2,
+        "the target and the transition are two NAMED ROOTS, not one tree with a \
+         special case inside it (ADR-0025)"
+    );
+    let contexts: Vec<pw_core::hir::ExecutionContext> =
+        d.term_roots().map(|(_, r)| r.context).collect();
+    assert_eq!(
+        contexts,
+        [
+            pw_core::hir::ExecutionContext::TargetSelection,
+            pw_core::hir::ExecutionContext::OptimisticTransition
+        ],
+        "and each carries its own context"
+    );
 
     let from_root: std::collections::HashSet<ExprId> = body.walk().into_iter().collect();
     for t in &terms {

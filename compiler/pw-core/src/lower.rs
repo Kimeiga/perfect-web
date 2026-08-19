@@ -387,16 +387,23 @@ impl Lowerer<'_> {
                         // rest — with the run of alignment spaces collapsed,
                         // because `freshness      30.seconds` and
                         // `freshness 30.seconds` declare the same policy.
-                        let (name, value) = match trimmed.split_once(char::is_whitespace) {
-                            Some((n, v)) => {
-                                (n.to_string(), pw_syntax::collapse_policy_whitespace(v))
-                            }
-                            None => (trimmed.to_string(), String::new()),
-                        };
+                        // The head ends at whitespace OR at `(`. A block policy
+                        // is written `draw(ctx) { .. }` with no space, and
+                        // splitting on whitespace alone made the head
+                        // `draw(ctx)` — a name `crate::policy` does not know,
+                        // so the clause had no domain and no execution context.
+                        let head_end = trimmed
+                            .find(|c: char| c.is_whitespace() || c == '(')
+                            .unwrap_or(trimmed.len());
+                        let (name, rest) = trimmed.split_at(head_end);
+                        let (name, value) = (
+                            name.to_string(),
+                            pw_syntax::collapse_policy_whitespace(rest.trim_start()),
+                        );
                         Policy {
                             name,
                             value,
-                            transition: None,
+                            roots: Vec::new(),
                             span: span_of(&p),
                         }
                     })
@@ -513,6 +520,7 @@ impl Lowerer<'_> {
         let mut b = BodyBuilder::default();
         let root = self.block(&mut b, &block);
         self.policy_terms(&mut b, policies);
+        self.policy_blocks(&mut b, &block, policies);
         let body = Body {
             owner,
             exprs: b.exprs,
@@ -525,6 +533,51 @@ impl Lowerer<'_> {
             Some(BodyId(self.hir.bodies.alloc(body, span_of(node)))),
             children,
         )
+    }
+
+    /// **A block policy's contents become a named root with its own binders.**
+    ///
+    /// `draw(ctx) { ctx.rect(w) }`, `release(handle) { Maps.destroy(handle) }`.
+    /// Architect ruling, 2026-08-11: the header introduces real lexical
+    /// binders, and downstream resolution receives them already lowered.
+    ///
+    /// The block lives in the declaration's own syntax tree, so its spans are
+    /// already file-relative — unlike a transition, which is parsed from the
+    /// policy's value text and has to be shifted back.
+    fn policy_blocks(&mut self, b: &mut BodyBuilder, block: &SyntaxNode, policies: &mut [Policy]) {
+        let Some(list) = block.children().find(|c| c.kind() == K::PolicyList) else {
+            return;
+        };
+        let nodes: Vec<SyntaxNode> = list.children().filter(|c| c.kind() == K::Policy).collect();
+        for (p, node) in policies.iter_mut().zip(nodes) {
+            let Some(context) = crate::policy::execution_context(&p.name) else {
+                continue;
+            };
+            let Some(body_node) = node.children().find(|c| c.kind() == K::BlockExpr) else {
+                continue;
+            };
+            // The header's parameters ARE the binders. Read from the
+            // `ParamList` the grammar built, not from the value's text.
+            let binders: Vec<(String, crate::hir::Span)> = node
+                .children()
+                .find(|c| c.kind() == K::ParamList)
+                .map(|l| {
+                    l.children()
+                        .filter(|c| c.kind() == K::Param)
+                        .filter_map(|param| {
+                            let name = param.children().find(|c| c.kind() == K::Name)?;
+                            Some((text(self.src, &name).trim().to_string(), span_of(&name)))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let root = self.expr(b, &body_node);
+            p.roots.push(crate::hir::TermRoot {
+                context,
+                binders,
+                root,
+            });
+        }
     }
 
     /// **A policy value that is a transition becomes one.**
@@ -595,13 +648,26 @@ impl Lowerer<'_> {
             b.types.shift_spans_from(before.2, offset);
             b.nodes.shift_spans_from(before.3, offset);
 
+            // **Two roots, not one tree with a special case inside it.**
+            //
+            // Architect ruling, 2026-08-11: the target selector and the state
+            // transformation are different computations with different
+            // contexts. The target may read invocation state to name the entry;
+            // the transformation may not perform anything at all.
             let bs = span_of(&name_node);
-            p.transition = Some(crate::hir::Transition {
-                target,
-                binder: text(&p.value, &name_node).trim().to_string(),
-                binder_span: (bs.start + offset)..(bs.end + offset),
-                body,
-            });
+            let binder = text(&p.value, &name_node).trim().to_string();
+            p.roots = vec![
+                crate::hir::TermRoot {
+                    context: crate::hir::ExecutionContext::TargetSelection,
+                    binders: Vec::new(),
+                    root: target,
+                },
+                crate::hir::TermRoot {
+                    context: crate::hir::ExecutionContext::OptimisticTransition,
+                    binders: vec![(binder, (bs.start + offset)..(bs.end + offset))],
+                    root: body,
+                },
+            ];
         }
     }
 

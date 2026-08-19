@@ -53,6 +53,21 @@ H  close E10-P                                                     DONE
 I  Wasm encoding, invocation-region memory, E10-I                  NEXT
 ```
 
+**The final pre-codegen semantic slice, 2026-08-11:**
+
+```text
+1  TermRoot + ExecutionContext, generalizing Transition            DONE
+2  block-policy headers introduce real lexical binders             DONE
+3  `measure {}` is syntax; `measure(..)` is a call                 DONE
+4  optimistic target / binder / result type agreement              DONE
+```
+
+Every executable expression now belongs to **exactly one named execution
+root**, each with a context. `draw(ctx)`, `acquire`, `release` and the
+optimistic transition are roots; `PW0330`'s purity verdict is a context policy
+rather than a special case; and `no_expression_belongs_to_two_named_roots`
+is the invariant.
+
 **The policy-consumer matrix, re-measured after the split:**
 
 ```text

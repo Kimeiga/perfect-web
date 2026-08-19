@@ -169,8 +169,14 @@ impl Fmt {
 
         // Policy alignment: pad after the policy's name so every value in the
         // list begins at the same column.
+        // A BLOCK policy is not aligned. `acquire { .. }` and
+        // `release(handle) { .. }` are headers followed by a block, not a name
+        // followed by a value in a column, and padding them produced
+        // `acquire   {`. Since 2026-08-11 they are real declarations of a named
+        // execution root, and they read like one.
         if let Some(width) = self.pad.last().copied().filter(|_| {
             parent.kind() == K::Policy
+                && !has_block(parent)
                 && first_significant(parent).is_some_and(|f| f.text_range() == t.text_range())
         }) {
             for _ in text.chars().count()..width {
@@ -337,13 +343,18 @@ impl Fmt {
 ///
 /// The corpus aligns all 8 of its policy blocks, with no exceptions, but two
 /// files use different padding. A formatter has to pick one rule; this is it.
+/// Does this policy own a block? `acquire { .. }`, `draw(ctx) { .. }`.
+fn has_block(policy: &SyntaxNode) -> bool {
+    policy.children().any(|c| c.kind() == K::BlockExpr)
+}
+
 fn policy_column(list: &SyntaxNode) -> usize {
     // The grammar keeps a policy keyword as a bare token, not a `Name` node.
     // Looking for a `Name` found nothing, so every column came out as 1 and the
     // alignment silently did not happen — the output still parsed, was still
     // idempotent, and was still wrong.
     list.children()
-        .filter(|c| c.kind() == K::Policy)
+        .filter(|c| c.kind() == K::Policy && !has_block(c))
         .filter_map(|p| first_significant(&p))
         .map(|t| t.text().chars().count())
         .max()
@@ -365,6 +376,13 @@ fn is_indent_scope(k: K) -> bool {
     matches!(
         k,
         K::BlockExpr
+            // A policy VALUE that spans lines. `conflict merge_by_field(\n
+            // notes = .., ..)` is raw tokens inside the policy — there is no
+            // `ArgList` node to indent from — so without this its continuation
+            // lines came back flush with the policy head. Harmless until
+            // 2026-08-11, when `replicated` began parsing its clauses as
+            // policies and `A-011` stopped being canonically formatted.
+            | K::Policy
             | K::MatchExpr
             | K::ArgList
             | K::ParamList

@@ -684,11 +684,26 @@ impl<'a> Inference<'a> {
         let decl = hir.decl(id);
         match decl.body {
             Some(body) => {
-                let mut out: Vec<String> = self
-                    .infer_at(unit, hir.body(body))
-                    .effects
-                    .into_iter()
-                    .collect();
+                let b = hir.body(body);
+                let mut out: Vec<String> = self.infer_at(unit, b).effects.into_iter().collect();
+                // **Plus the named roots that ARE this declaration's work.**
+                //
+                // A painter's `draw` block and a resource's `acquire`/`release`
+                // blocks were body statements until 2026-08-11 and their
+                // effects were the declaration's. They are roots now — so that
+                // their binders scope and their contents are attributed — and
+                // this is what keeps the migration faithful.
+                //
+                // An optimistic clause is deliberately excluded: it runs on the
+                // client at a different time, and a command whose row absorbed
+                // it would be indistinguishable from one performing the
+                // transition itself.
+                for (_, root) in decl.term_roots() {
+                    if !root.context.contributes_to_declaration() {
+                        continue;
+                    }
+                    out.extend(self.infer_rooted(unit, b, root.root).effects);
+                }
                 out.sort();
                 out.dedup();
                 out

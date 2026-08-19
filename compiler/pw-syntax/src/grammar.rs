@@ -160,6 +160,17 @@ fn is_decl_kind(k: K) -> bool {
     )
 }
 
+/// Words that begin an EXPRESSION. Never a policy head, and never a policy
+/// value's continuation.
+///
+/// The fourth table that must not overlap in interpretation. Needed once
+/// declarations began reading their policies inside their braces
+/// (2026-08-11): a `materialize` whose first statement is `if ..` reported
+/// *unknown policy `if`*, because nothing said that `if` starts an expression.
+const EXPR_KEYWORDS: &[&str] = &[
+    "if", "elif", "else", "match", "let", "for", "fn", "return", "true", "false",
+];
+
 const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
@@ -1151,7 +1162,7 @@ impl<'a> P<'a> {
         self.start(K::BlockExpr);
         self.bump(); // `{`
         if policies_first {
-            self.policies();
+            self.policies(true);
         }
         let mut guard = 0;
         while !self.at(Kind::RBrace) && !self.at_eof() {
@@ -1226,6 +1237,32 @@ impl<'a> P<'a> {
     /// production, because a block is not part of any call. `release(h) { .. }`
     /// keeps it too, for the same reason — the block is what makes it a
     /// statement rather than an invocation.
+    /// `( .. ) {` — a parameter list followed by a block, at a policy head.
+    fn at_block_policy_header(&self) -> bool {
+        if !self.at(Kind::LParen) {
+            return false;
+        }
+        let mut i = 0;
+        let mut depth = 0i32;
+        loop {
+            match self.nth(i).kind {
+                Kind::LParen => depth += 1,
+                Kind::RParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return self.nth(i + 1).kind == Kind::LBrace;
+                    }
+                }
+                Kind::Eof => return false,
+                _ => {}
+            }
+            i += 1;
+            if i > 4_000 {
+                return false;
+            }
+        }
+    }
+
     fn at_ordinary_call(&self) -> bool {
         if !self.nth_is(1, Kind::LParen) {
             return false;
@@ -1520,6 +1557,7 @@ impl<'a> P<'a> {
             || DECL_STARTERS.contains(&head)
             || STMT_KEYWORDS.contains(&head)
             || UI_NOUNS.contains(&head)
+            || EXPR_KEYWORDS.contains(&head)
         {
             return false;
         }
@@ -1539,7 +1577,17 @@ impl<'a> P<'a> {
         ) && !self.nth_starts_line(1)
     }
 
-    fn policies(&mut self) {
+    /// `in_block` — are we already inside the declaration's braces?
+    ///
+    /// It decides whether a bare `{` after a policy head opens a BLOCK POLICY
+    /// or the declaration's own body. In header position it is always the
+    /// body: `query Store(id) ..\n    offline\n{ .. }` ends its last policy at
+    /// the brace, and reading that as `offline { .. }` swallowed the whole
+    /// declaration body into a flag's value.
+    ///
+    /// The `( .. ) {` form is unambiguous in either position, because a
+    /// declaration's body never follows a parameter list at a policy head.
+    fn policies(&mut self, in_block: bool) {
         let known = self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text());
         if !known && !self.at_unknown_policy() {
             return;
@@ -1560,8 +1608,31 @@ impl<'a> P<'a> {
             }
             self.start(if unknown { K::UnknownPolicy } else { K::Policy });
             self.bump(); // keyword
+
+            // **A BLOCK policy: `acquire { .. }`, `release(h) { .. }`,
+            // `draw(ctx) { .. }`.**
+            //
+            // Architect ruling, 2026-08-11: a block policy's header introduces
+            // real lexical binders, and downstream resolution should receive
+            // them already lowered — nothing should recognise `"draw"` or
+            // `"release"` by spelling to decide what a block binds.
+            //
+            // Detected from the TOKENS, not from a table: an optional parameter
+            // list followed by `{`. That is the same rule the `measure` repair
+            // established — a spelling selects a production only when the
+            // tokens match it — so `retry bounded_exponential(max = 3)` is not
+            // one, because no block follows.
+            if (in_block && self.at(Kind::LBrace)) || self.at_block_policy_header() {
+                if self.at(Kind::LParen) {
+                    self.param_list();
+                }
+                if self.at(Kind::LBrace) {
+                    self.block_expr();
+                }
+                self.finish();
+                continue;
+            }
             let mut depth = 0i32;
-            let mut took_value = false;
             while !self.at_eof() {
                 let k = self.cur();
                 if depth == 0 && k == Kind::LBrace {
@@ -1593,8 +1664,14 @@ impl<'a> P<'a> {
                 // is still ahead of `pos`. A hand-rolled backwards scan looked
                 // before that whitespace, always answered false, and silently
                 // disabled the rule for two corpus fixtures.
-                if took_value
-                    && depth == 0
+                // `took_value` is deliberately NOT required when the next
+                // token starts a new LINE. A policy value never begins on the
+                // line after its head, so `affine` followed by `acquire { .. }`
+                // has no value — and requiring one made the flag swallow the
+                // head that followed it, which deleted `acquire` and `release`
+                // from `A-007` entirely. The guard exists for `cache private`,
+                // where `private` is on the SAME line.
+                if depth == 0
                     && k == Kind::Ident
                     && self.newline_ahead()
                     && (POLICY_KEYWORDS.contains(&self.cur_text())
@@ -1608,6 +1685,7 @@ impl<'a> P<'a> {
                         // component was rejected for effects its phases permit.
                         || STMT_KEYWORDS.contains(&self.cur_text())
                         || UI_NOUNS.contains(&self.cur_text())
+                        || EXPR_KEYWORDS.contains(&self.cur_text())
                         // An UNKNOWN head ends this clause too. Without it the
                         // value loop swallows the next line — `capability none`
                         // followed by `impakt layout_write` became one policy
@@ -1618,7 +1696,6 @@ impl<'a> P<'a> {
                 {
                     break;
                 }
-                took_value = true;
                 match k {
                     Kind::LParen | Kind::LBracket | Kind::LAngle => depth += 1,
                     Kind::RParen | Kind::RBracket | Kind::RAngle => depth -= 1,
@@ -1842,7 +1919,7 @@ impl<'a> P<'a> {
             if self.at(Kind::Bang) {
                 self.effect_row();
             }
-            self.policies();
+            self.policies(false);
             // **A UI declaration's policies are inside its braces too.**
             //
             // `page StorePage(id) { placement origin  cache private  .. }`.
@@ -1928,12 +2005,15 @@ impl<'a> P<'a> {
             if self.at(Kind::Bang) {
                 self.effect_row();
             }
-            self.policies();
-            if materialize {
-                self.policy_block_body();
-            } else {
-                self.body();
-            }
+            self.policies(false);
+            // Every data-operation noun reads its policies inside its braces
+            // too, since 2026-08-11. `resource StoreMap(..) { placement browser
+            // affine  acquire { .. }  release(h) { .. } }` wrote four policies
+            // there and every one of them was a bare name in the executable
+            // body — `affine` a `Name`, `acquire` a call-shaped statement whose
+            // block bound nothing.
+            self.policy_block_body();
+            let _ = materialize;
             self.finish();
             return true;
         }

@@ -189,7 +189,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         crate::ontology::check_effect_declarations(&ontology, per_unit, i);
         // E10, ADR-0025: an optimistic transition is a separate execution root
         // with its own effect row, and its context permits none.
-        optimistic_transitions_are_pure(&inference, i, &u.hir, per_unit);
+        named_roots_respect_their_context(&inference, i, &u.hir, per_unit);
         optimistic_transitions_agree_with_their_target(&sigs, &workspace, &hirs, i, per_unit);
     }
 
@@ -279,11 +279,10 @@ fn unresolved_uses(
         // another execution context — so it is added here by name rather than
         // found by walking. It is the SAME rule below, not a second one.
         let mut reachable = body.walk();
-        for (policy, t) in decl.transitions() {
-            reachable.extend(body.walk_from(t.target));
-            reachable.extend(body.walk_from(t.body));
+        for (policy, root) in decl.term_roots() {
+            reachable.extend(body.walk_from(root.root));
 
-            // **Every name inside a transition must come from somewhere.**
+            // **Every name inside a named root must come from somewhere.**
             //
             // Architect ruling, 2026-08-10, locking the semantic requirement:
             //
@@ -291,36 +290,35 @@ fn unresolved_uses(
             // > arise from ordinary lexical scope or from an explicit binder in
             // > the construct itself. No special-name lookup.
             //
-            // The binder is the clause's own — `as cart` — and it is in scope
-            // in the BODY only. The target is evaluated before the binding
-            // exists, so `Cart(cart)` names nothing, which is correct.
-            let mut in_body = in_scope.clone();
-            in_body.insert(t.binder.clone());
-            in_body.extend(crate::resolve::local_bindings_from(body, t.body));
+            // The binders are the ROOT's own, so they scope to it and nothing
+            // else. An optimistic clause's target is a separate root with no
+            // binders — it is evaluated before the binding exists, so
+            // `Cart(cart)` names nothing, which is correct.
+            let mut scope = in_scope.clone();
+            scope.extend(root.binders.iter().map(|(n, _)| n.clone()));
+            scope.extend(crate::resolve::local_bindings_from(body, root.root));
 
-            for (root, scope) in [(t.target, &in_scope), (t.body, &in_body)] {
-                for nid in body.walk_from(root) {
-                    let Expr::Name(n) = body.expr(nid) else {
-                        continue;
-                    };
-                    if scope.contains(n)
-                        || crate::resolve::INTRINSIC_CALLS.contains(&n.as_str())
-                        || !matches!(
-                            workspace.resolve(unit, n),
-                            crate::resolve::Resolution::Unresolved
-                        )
-                    {
-                        continue;
-                    }
-                    out.push(unresolved_in_policy_term(
-                        hir,
-                        decl,
-                        body,
-                        nid,
-                        n,
-                        &policy.name,
-                    ));
+            for nid in body.walk_from(root.root) {
+                let Expr::Name(n) = body.expr(nid) else {
+                    continue;
+                };
+                if scope.contains(n)
+                    || crate::resolve::INTRINSIC_CALLS.contains(&n.as_str())
+                    || !matches!(
+                        workspace.resolve(unit, n),
+                        crate::resolve::Resolution::Unresolved
+                    )
+                {
+                    continue;
                 }
+                out.push(unresolved_in_policy_term(
+                    hir,
+                    decl,
+                    body,
+                    nid,
+                    n,
+                    &policy.name,
+                ));
             }
         }
 
@@ -423,7 +421,7 @@ fn unresolved_uses(
 /// the other's effects, which is what makes this checkable at all: a
 /// transition merged into the command's row would be indistinguishable from
 /// the command performing them itself.
-fn optimistic_transitions_are_pure(
+fn named_roots_respect_their_context(
     inference: &crate::effects::Inference<'_>,
     unit: usize,
     hir: &Hir,
@@ -432,8 +430,14 @@ fn optimistic_transitions_are_pure(
     for (_, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        for (policy, t) in decl.transitions() {
-            let inferred = inference.infer_rooted(unit, body, t.body);
+        // **Every root, asked its own context's question.** Not a rule keyed on
+        // the policy's spelling: the context says whether effects are permitted
+        // there, and `optimistic` is currently the only one that says no.
+        for (policy, root) in decl.term_roots() {
+            if root.context.permits_effects() {
+                continue;
+            }
+            let inferred = inference.infer_rooted(unit, body, root.root);
             if inferred.effects.is_empty() {
                 continue;
             }
@@ -449,7 +453,7 @@ fn optimistic_transitions_are_pure(
                     decl.name,
                     performed.join(", ")
                 ),
-                primary_span: body.expr_span(t.body),
+                primary_span: body.expr_span(root.root),
                 related: vec![Related {
                     span: policy.span.clone(),
                     label: "declared here".to_string(),
@@ -510,14 +514,14 @@ fn optimistic_transitions_agree_with_their_target(
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
         let module = hir.module_of(decl_id_of(hir, decl)).map(str::to_string);
-        for (policy, t) in decl.transitions() {
+        for (policy, target, transition) in decl.optimistic_clauses() {
             // The target names a resource. `Cart(current_session())` — the
             // callee, not the argument.
-            let Expr::Call { callee, .. } = body.expr(t.target) else {
+            let Expr::Call { callee, .. } = body.expr(target.root) else {
                 out.push(target_is_not_a_resource_entry(
                     decl,
                     body,
-                    t,
+                    target,
                     policy,
                     "it is not a resource applied to a key",
                 ));
@@ -528,7 +532,7 @@ fn optimistic_transitions_agree_with_their_target(
                 out.push(target_is_not_a_resource_entry(
                     decl,
                     body,
-                    t,
+                    target,
                     policy,
                     &format!("`{path}` is not a resource this file can see"),
                 ));
@@ -538,9 +542,11 @@ fn optimistic_transitions_agree_with_their_target(
             // The binder IS the target's value type; the transition must
             // produce it. Seeded rather than inferred — nothing in the body
             // says what `cart` is, because the clause's header does.
-            let types = crate::infer::Types::of_body(sigs, decl, body, module.as_deref())
-                .with_binding(&t.binder, &value_ty);
-            let Some(produced) = types.of(body, t.body) else {
+            let mut types = crate::infer::Types::of_body(sigs, decl, body, module.as_deref());
+            for (name, _) in &transition.binders {
+                types = types.with_binding(name, &value_ty);
+            }
+            let Some(produced) = types.of(body, transition.root) else {
                 // No answer is not a violation. `docs/RISK_QUEUE.md`: an
                 // analysis that could not run must not be read as a proof, and
                 // it must not be read as a refutation either.
@@ -560,9 +566,9 @@ fn optimistic_transitions_agree_with_their_target(
                      resource whose value is `{value_ty}`",
                     decl.name
                 ),
-                primary_span: body.expr_span(t.body),
+                primary_span: body.expr_span(transition.root),
                 related: vec![Related {
-                    span: body.expr_span(t.target),
+                    span: body.expr_span(target.root),
                     label: format!("this resource holds `{value_ty}`"),
                 }],
                 explanation: Some(format!(
@@ -572,7 +578,14 @@ fn optimistic_transitions_agree_with_their_target(
                      in that entry, and there would be nothing meaningful to restore."
                 )),
                 repairs: vec![Repair {
-                    description: format!("produce a `{value_ty}` from `{}`", t.binder),
+                    description: format!(
+                        "produce a `{value_ty}` from `{}`",
+                        transition
+                            .binders
+                            .first()
+                            .map(|(n, _)| n.as_str())
+                            .unwrap_or("the bound value")
+                    ),
                     replacement: None,
                 }],
             });
@@ -636,7 +649,7 @@ fn resource_value_type(
 fn target_is_not_a_resource_entry(
     decl: &Decl,
     body: &Body,
-    t: &crate::hir::Transition,
+    target: &crate::hir::TermRoot,
     policy: &crate::hir::Policy,
     why: &str,
 ) -> Diagnostic {
@@ -650,7 +663,7 @@ fn target_is_not_a_resource_entry(
             "`{}`'s optimistic clause targets no resource: {why}",
             decl.name
         ),
-        primary_span: body.expr_span(t.target),
+        primary_span: body.expr_span(target.root),
         related: vec![Related {
             span: policy.span.clone(),
             label: "declared here".to_string(),
@@ -1612,7 +1625,7 @@ fn privacy_and_placement(
             let cache = crate::hir::Policy {
                 name: "cache".to_string(),
                 value: cache_value,
-                transition: None,
+                roots: Vec::new(),
                 span: cache_span,
             };
             let needed = label.required_cache_partitions();
@@ -2630,6 +2643,25 @@ fn effect_rows(
         }
     }
     let mut found = inference.infer_in_at(at, body, &types);
+
+    // **Plus the named roots that ARE this declaration's work.**
+    //
+    // A painter's `draw` block and a resource's `acquire`/`release` blocks
+    // became named roots on 2026-08-11 so their headers could bind. They are
+    // not reachable from `body.root`, and every rule below reads `found` — so
+    // without this, `R-041`'s `dom.mutate` inside a painter stopped being seen
+    // by the rule whose whole subject it is.
+    //
+    // An optimistic clause is excluded by `contributes_to_declaration`: it runs
+    // on the client at a different time.
+    for (_, root) in decl.term_roots() {
+        if !root.context.contributes_to_declaration() {
+            continue;
+        }
+        found
+            .sources
+            .extend(inference.infer_rooted(at, body, root.root).sources);
+    }
 
     // Work that runs somewhere else does not contribute its effects here.
     // ONE model (`contexts.rs`) rather than a list of syntax exceptions: a

@@ -85,14 +85,20 @@ fn corpus() -> Vec<(String, String)> {
     out
 }
 
-/// `(head, value)` for every declaration-level policy in a term position.
+/// `(head, value)` for every term-carrying policy whose value **nothing has
+/// parsed**.
+///
+/// A policy that owns a lowered `TermRoot` is excluded: its contents are an
+/// expression tree with binders and an execution context, which is the
+/// opposite of what this list is about. The list therefore shrinks as the
+/// split progresses, and what remains is exactly the work left.
 fn term_positions() -> BTreeSet<(String, String)> {
     let mut out = BTreeSet::new();
     for (_, src) in corpus() {
         let hir: Hir = lower_file(&src, &parse_tree(&src).green);
         for (_, decl) in hir.all_decls() {
             for p in &decl.policies {
-                if carries_terms(&p.name) {
+                if carries_terms(&p.name) && p.roots.is_empty() {
                     out.insert((p.name.clone(), p.value.trim().to_string()));
                 }
             }
@@ -125,6 +131,11 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         ("depends_on", "Store(id), Menu(id)"),
         ("depends_on", "Summary(session)"),
         ("emits", "CartChanged(current_session())"),
+        // `privacy User(consumer)` on `A-011`, and `privacy Public` on
+        // `A-013`'s page. Both were bare names in the executable body until UI
+        // and data-operation declarations began parsing their policies inside
+        // their braces.
+        ("privacy", "User(consumer)"),
         // New 2026-08-11: `privacy Public` on `A-013`'s page. It was two bare
         // names in the executable body until UI declarations began parsing
         // their policies inside their braces, so this list could not see it —
@@ -151,18 +162,9 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         ("invalidates_on", "MenuChanged(id), StoreChanged(id)"),
         ("invalidates_on", "StoreChanged(consumer)"),
         ("invalidates_on", "StoreChanged(id)"),
-        (
-            "optimistic",
-            "Cart(current_session()) as cart => Carts.add(current_session(), item, quantity)",
-        ),
-        (
-            "optimistic",
-            "Cart(current_session()) as cart => Carts.current(current_session())",
-        ),
-        (
-            "optimistic",
-            "Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)",
-        ),
+        // `optimistic` left this list on 2026-08-11: its clauses are parsed
+        // into two named roots with a binder and a context, so they are no
+        // longer values nothing has looked at. What remains is what remains.
         ("requires", "SignedIn"),
         ("requires", "SignedIn, OwnsOrder(order)"),
     ]
@@ -216,16 +218,29 @@ fn an_optimistic_clause_has_a_target_a_binder_and_a_transition() {
         .expect("add_to_cart");
     let body = hir.body(add.body.expect("body"));
 
-    let (_, t) = add.transitions().next().expect("an optimistic transition");
-    assert_eq!(t.binder, "cart");
+    let clauses = add.optimistic_clauses();
+    let (_, target, transition) = clauses.first().expect("an optimistic clause");
+    assert_eq!(
+        transition
+            .binders
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .collect::<Vec<_>>(),
+        ["cart"],
+        "the transition binds the entry's current value"
+    );
+    assert!(
+        target.binders.is_empty(),
+        "and the target does not — it is evaluated before the binding exists"
+    );
 
     // Three pieces of meaning, each with a span in the FILE. A sub-parse starts
     // at zero, so without the shift a diagnostic would underline the first few
     // columns of the module declaration.
-    assert_eq!(&src[body.expr_span(t.target)], "Cart(current_session())");
-    assert_eq!(&src[t.binder_span.clone()], "cart");
+    assert_eq!(&src[body.expr_span(target.root)], "Cart(current_session())");
+    assert_eq!(&src[transition.binders[0].1.clone()], "cart");
     assert_eq!(
-        &src[body.expr_span(t.body)],
+        &src[body.expr_span(transition.root)],
         "Carts.with_line(cart, item, quantity)"
     );
 
