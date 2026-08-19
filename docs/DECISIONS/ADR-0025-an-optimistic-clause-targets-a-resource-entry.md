@@ -148,10 +148,11 @@ transition is unaffected.
 
 ## What is NOT decided here
 
-- **`ExecutionContext` is not a type yet.** The purity restriction is applied
-  directly rather than derived from a context declaring `placement browser` and
-  an empty allowed-effect set. When the context model lands, this rule should be
-  one instance of it — the same lesson as the frame phases.
+- ~~**`ExecutionContext` is not a type yet.**~~ **It is, since 2026-08-11.**
+  `hir::ExecutionContext` and `hir::TermRoot` are the general model, and the
+  purity verdict is `ExecutionContext::permits_effects` rather than a rule keyed
+  on the word `optimistic`. An optimistic transition is now the first instance
+  of the abstraction rather than the exception that proved it.
 - **The implicit form `Cart()`** is accepted by the grammar but nothing yet
   supplies the session partition, so the corpus writes the key.
 

@@ -510,6 +510,15 @@ exists for `it.style.set_padding`. What was wrong is that the corpus depended on
 it for a call that should never have resolved. `Carts.with_line` is the pure
 `Cart -> Cart` the transition actually needed, and it is declared `!{}`.
 
+### Reformatted, 2026-08-11
+
+`A-007`, `A-009`, `A-011` and `A-021` are canonically formatted differently
+now, and no verdict moved. Their clauses became real policies when
+data-operation declarations began parsing their policies inside their braces, so
+they are column-aligned like every other policy block — and a multi-line policy
+value keeps its indentation, which `A-009`'s `invalidates_on` continuation had
+been missing since E6.
+
 ### The declaration-level coverage floor moved 4 → 3
 
 Recorded here because a floor going down is the shape `docs/RISK_QUEUE.md`

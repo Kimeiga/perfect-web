@@ -60,7 +60,13 @@ I  Wasm encoding, invocation-region memory, E10-I                  NEXT
 2  block-policy headers introduce real lexical binders             DONE
 3  `measure {}` is syntax; `measure(..)` is a call                 DONE
 4  optimistic target / binder / result type agreement              DONE
+5  re-run C6, the ownership gate, the consumer matrix, E10-P
+   and the ADR-0025 controls                                       DONE
 ```
+
+**The gate is closed.** Architect ruling: stop semantic cleanup and encode, and
+do not expand the semantic scope again unless the encoder exposes another
+concrete defect. Wasm encoding is the only thing left in E10-A.
 
 Every executable expression now belongs to **exactly one named execution
 root**, each with a context. `draw(ctx)`, `acquire`, `release` and the

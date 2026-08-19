@@ -6,6 +6,27 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ## Now: E10-A — the first backend slice
 
+**The pre-codegen semantic gate closed on 2026-08-11.** Architect ruling: stop
+semantic cleanup and encode, and *do not expand the semantic scope again unless
+the encoder exposes another concrete defect.*
+
+```text
+1  TermRoot + ExecutionContext, generalizing Transition        DONE
+2  block-policy headers introduce real lexical binders         DONE
+3  `measure {}` is syntax; `measure(..)` is a call             DONE
+4  optimistic target / binder / result type agreement          DONE
+5  re-run C6, the ownership gate, the consumer matrix,
+   E10-P and the ADR-0025 controls                             DONE
+6  Wasm encoding                                               NEXT
+```
+
+The reason those four and not arbitrary cleanup, in the architect's words:
+`draw(ctx)` contained a name with no binder, `measure(el)` could have its
+syntactic category changed by spelling, and an optimistic transition could
+return the wrong resource type — all cases where the Backend IR would otherwise
+faithfully encode a program whose meaning the front end never established.
+
+
 Architect ruling, 2026-08-09: **narrow application surface, general backend
 spine.** Compile one real command end-to-end, and build no stage around it.
 
