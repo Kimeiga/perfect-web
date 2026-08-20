@@ -16,8 +16,8 @@
 //!
 //! A generated world imports `store:data/carts`, which the DEPLOYMENT owns. The
 //! compiler does not know its signatures and must not invent them — ADR-0018's
-//! boundary — so a resolve test has to supply them. [`PLATFORM_WIT`] and
-//! [`APPLICATION_WIT`] below are that stand-in, and their existence is the
+//! boundary — so a resolve test has to supply them. `support::PLATFORM_WIT` and
+//! `support::APPLICATION_WIT` below are that stand-in, and their existence is the
 //! statement: **a deployment must publish a WIT package for the operations it
 //! supplies, or these worlds do not resolve.** Writing them here rather than
 //! generating them is what keeps that a requirement on the host instead of a
@@ -25,7 +25,7 @@
 //!
 //! There are **two** packages, and the split is deliberate: `pw:host` is the
 //! platform's and every Pleris deployment publishes it; `store:data` is this
-//! application's own. See [`APPLICATION_WIT`].
+//! application's own. See `support::APPLICATION_WIT`.
 //!
 //! It said *the capabilities it grants* until 2026-08-20. A capability
 //! authorizes an operation and does not identify one, and the Wasm encoder is
@@ -40,6 +40,8 @@ use pw_core::resolve::Workspace;
 use pw_core::signatures::Signatures;
 use pw_core::wit;
 use pw_syntax::parse_tree;
+
+mod support;
 
 /// The store demo: the platform packages, the shared library, and the app.
 fn program() -> Vec<String> {
@@ -77,89 +79,6 @@ fn generated() -> (String, Vec<wit::World>, Vec<ComponentContract>) {
     let cs = contracts(&refs, &sigs, &ws);
     let (text, worlds) = wit::package(&refs, &ws, &cs).expect("the store demo generates");
     (text, worlds, cs)
-}
-
-/// **The PLATFORM's WIT** — `pw:host`, which every Pleris deployment publishes.
-///
-/// Hand-written, and that is the point: these are the host's signatures and the
-/// compiler has no business deciding them.
-///
-/// Rewritten 2026-08-20. It used to publish `database` with `read`/`write`,
-/// because a component's imports were derived from its CAPABILITIES — and the
-/// Wasm encoder proved that cannot work: `Carts.add(s, item, qty)` and
-/// `Carts.clear(s)` both require `database.write<Carts>` and have different
-/// ABIs, so one `write` could not have both signatures. A capability authorizes
-/// an operation and does not identify one: `database.write<Carts>` is still the
-/// authority a deployment grants; the operation is what it publishes.
-const PLATFORM_WIT: &str = "\
-package pw:host;
-
-/// The invocation context. Added on 2026-08-10, when `examples/store/app.pw`
-/// gained the `import context.{ current_session }` it had been missing since
-/// E4 — so the store's worlds began importing `pw:host/session` and stopped
-/// resolving against a host that does not publish it.
-///
-/// That is this stand-in doing its job. A capability a component requires and
-/// a deployment does not grant is a deployment that cannot run it, and the WIT
-/// resolve is where that becomes visible rather than a runtime link failure.
-interface session {
-    read: func() -> string;
-}
-";
-
-/// **The APPLICATION's WIT** — `store:data`, which only the store's deployment
-/// publishes.
-///
-/// A second package, and the split is the substance. Architect ruling,
-/// 2026-08-20:
-///
-/// > `pw:host/carts#add` wrongly implies Pleris defines a universal carts API.
-/// > […] Do **not** let `pw:host/carts` become the permanent standard-library
-/// > design merely because it was the first thing that made the demo
-/// > executable.
-///
-/// These operations were in `pw:host` until then, which said that a cart is a
-/// Pleris platform facility. It is not: it is this application's data access,
-/// externally implemented today. `Import::owner` records the same distinction
-/// inside the contract, and `docs/NEXT.md` carries the follow-up — these may
-/// become compiled Pleris over a narrower platform primitive.
-///
-/// The grouping into interfaces is an ABI/package-layout decision — `add` and
-/// `clear` could equally live in one `carts` interface or two — and it does not
-/// determine the capability semantics.
-const APPLICATION_WIT: &str = "\
-package store:data;
-
-interface carts {
-    current: func(session: string) -> string;
-    add: func(session: string, item: string, quantity: s64) -> string;
-    clear: func(session: string) -> string;
-}
-
-interface stores {
-    get: func(id: string) -> string;
-}
-
-interface menus {
-    %for-store: func(store: string) -> string;
-}
-";
-
-/// Lay out a WIT directory the way `push_dir` expects: the package under test
-/// at the root, and every package it depends on under `deps/`.
-///
-/// Both dependency packages, always. A deployment that publishes the platform's
-/// operations and not the application's is one the store cannot run, and that
-/// has to be visible here rather than at instantiation.
-fn wit_dir(name: &str, app: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(name);
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("deps/host")).expect("temp dir");
-    std::fs::create_dir_all(dir.join("deps/store-data")).expect("temp dir");
-    std::fs::write(dir.join("app.wit"), app).expect("write");
-    std::fs::write(dir.join("deps/host/host.wit"), PLATFORM_WIT).expect("write");
-    std::fs::write(dir.join("deps/store-data/store-data.wit"), APPLICATION_WIT).expect("write");
-    dir
 }
 
 #[test]
@@ -273,7 +192,7 @@ fn wit_parser_resolves_the_generated_package() {
     // interface must be found, and every world must be well-formed.
     let (text, _, _) = generated();
 
-    let dir = wit_dir("pw-wit-worlds", &text);
+    let dir = support::wit_dir("pw-wit-worlds", &text);
     let mut resolve = wit_parser::Resolve::new();
     let result = resolve.push_dir(&dir);
     let _ = std::fs::remove_dir_all(&dir);
@@ -304,7 +223,7 @@ fn the_resolver_would_reject_a_world_naming_an_interface_nobody_publishes() {
     // package means nothing unless it would refuse a broken one — and the
     // specific breakage that matters is an import the host does not publish,
     // because that is what a compiler inventing a host interface would produce.
-    let dir = wit_dir(
+    let dir = support::wit_dir(
         "pw-wit-worlds-control",
         "package pw:app@0.1.0;\n\nworld w {\n    import pw:host/nobody-publishes-this;\n}\n",
     );

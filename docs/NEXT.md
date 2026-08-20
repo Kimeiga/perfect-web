@@ -46,7 +46,7 @@ menu — each step's evidence is what makes the next one readable.
 1  ownership: platform-defined vs host-supplied              DONE
 2  the operation→capability audit, as three separate layers   DONE
 3  freeze the signature/authority mutation controls           DONE
-4  Canonical ABI adapters from checked callable signatures    NEXT
+4  Canonical ABI adapters from checked callable signatures  BLOCKED
 5  component wrapping, via UPSTREAM wasm-tools                 —
 6  validate with an independent component parser               —
 7  instantiate through the E8 linker                           —
@@ -54,6 +54,50 @@ menu — each step's evidence is what makes the next one readable.
 9  delete the Rust closure path; close E10-I                   —
 10 then investigate replacing external `Carts.add`             —
 ```
+
+### Step 4 is blocked on a model question the ABI exposed
+
+**A host operation's ABI is derived twice and nothing compares the two.**
+
+```text
+                        the contract fixes            the deployment publishes
+store:data/carts#add    (SessionId, MenuItemId,       (string, string, s64)
+                         PositiveInt)                  -> string
+                         -> Result<Cart, CartError>
+pw:host/session#read    () -> Session<SessionId>      () -> string
+```
+
+All six of the store's host operations disagree, and every gate stays green —
+the WIT resolve does not take the contract as an input, the artifact audit
+compares names, and `contract::consistent` compares capabilities. Not a
+regression: the contract gained `signature` on 2026-08-20, so until then there
+was nothing to compare.
+
+**The Canonical ABI does not expose this — it hides it.** The two flatten to
+the *same* core signature: `(SessionId) -> Result<Cart, CartError>` and
+`(string) -> string` both give `[Pointer, Length, Pointer]` with a return
+pointer and no core result, because `SessionId` is a `string` alias and both
+results exceed the flat limit. All six coincide. So no core-level check can
+find it — the disagreement lives entirely in the component types, where the
+host lifts three pointers as a `string` while the guest meant a
+`result<cart, cart-error>`: the same bytes read as different shapes, no trap,
+no diagnostic.
+
+The adapters cannot be written until it is settled which derivation is
+authoritative, because they must lift and lower exactly one of them.
+**The answer appears to differ by
+`Import::owner`** — for `store:data/*` the application declared the operation
+in Pleris, so the compiler arguably should emit that WIT; for `pw:host/*` the
+platform publishes it and the Pleris declaration is a claim to be checked
+against it. That the ownership distinction decides this is why step 1 came
+first.
+
+Pinned by `tests/canonical_abi.rs`; `docs/RISK_QUEUE.md` carries the
+classification. **With the architect.**
+
+Everything the Canonical ABI needs regardless of the answer — a linear memory,
+`cabi_realloc`, and the invocation region the temporaries live in — is
+independent of it and is where the work continues meanwhile.
 
 **Step 5 is a constraint, not a convenience.** Architect ruling:
 
