@@ -32,15 +32,23 @@ add_to_cart   HostCall database.write<Carts> [session, item, quantity]
 clear_cart    HostCall database.write<Carts> [session]
 ```
 
-**A capability is not a function.** `Instr::HostCall` carries the capability the
-enclosing contract requires and the arguments of the Pleris function that needed
-it — and `Carts.add(s, item, qty)` and `Carts.clear(s)` are two functions
-requiring one authority. A core import has one signature.
+**A capability is not a function** — and the model was repaired on the
+architect's ruling of 2026-08-20. `Instr::ImportCall` names an `ImportId`;
+`CallableImport` carries the ABI and a set of capabilities; a host binding is
+explicit declaration metadata. All five store functions encode now.
 
-Per the ruling, the encoder refuses rather than mis-encodes, and this is with
-the architect rather than repaired inline. `docs/RISK_QUEUE.md` carries the
-classification; `tests/wasm_encoding.rs` pins the state and goes red on the
-repair.
+**Next: the Canonical ABI layer, then component wrapping, then E10-I.** Two
+things are recorded rather than done:
+
+```text
+Carts.add is host-bound, and that may not be where it belongs — it is
+application data access in an example library, marked as the minimum that
+let the store encode
+
+E8's audit does not yet check that a component holds the capabilities its
+operations require. The contract carries both facts now, so the check is
+expressible; it is not written.
+```
 
 The reason those four and not arbitrary cleanup, in the architect's words:
 `draw(ctx)` contained a name with no binder, `measure(el)` could have its

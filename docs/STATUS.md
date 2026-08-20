@@ -68,12 +68,19 @@ I  Wasm encoding, invocation-region memory, E10-I                  NEXT
 core module `wasmparser` validates; three of the store's five functions encode.
 
 **The encoder found its first defect on its first run**, as the architect
-predicted it would: `add_to_cart` and `clear_cart` both call
-`database.write<Carts>`, with three arguments and one. A capability names
-authority, not a function — `Instr::HostCall` carries the capability and the
-*Pleris* function's arguments — and a core import has one signature. The
-encoder refuses rather than mis-encodes, and the question is with the
-architect.
+predicted it would, and the model was repaired on their ruling of 2026-08-20:
+
+> **A capability authorizes an operation. It does not identify the operation.**
+
+`Instr::ImportCall` names an `ImportId` — interface plus operation, an identity
+that survives past this compiler. A `CallableImport` carries the ABI and a SET
+of required capabilities. A host implementation is explicit declaration
+metadata — `host "pw:host/carts#add"` — never inferred from a `todo` body or
+from an effect row.
+
+**All five store functions encode**, and `wasmparser` validates the module.
+`pw:host/carts#add` takes three arguments and `pw:host/carts#clear` takes one:
+two callables, one authority, both valid.
 
 Every executable expression now belongs to **exactly one named execution
 root**, each with a context. `draw(ctx)`, `acquire`, `release` and the
