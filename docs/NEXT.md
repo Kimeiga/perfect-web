@@ -17,8 +17,30 @@ the encoder exposes another concrete defect.*
 4  optimistic target / binder / result type agreement          DONE
 5  re-run C6, the ownership gate, the consumer matrix,
    E10-P and the ADR-0025 controls                             DONE
-6  Wasm encoding                                               NEXT
+6  Wasm encoding                                               STARTED
 ```
+
+**The first encoding slice, 2026-08-19.** `backend/wasm.rs` emits a core module
+— types, imports, functions, exports, code — and `wasmparser` validates it.
+Three of the store's five functions encode.
+
+`add_to_cart` does **not**, and the reason is the first concrete defect the
+encoder exposed:
+
+```text
+add_to_cart   HostCall database.write<Carts> [session, item, quantity]
+clear_cart    HostCall database.write<Carts> [session]
+```
+
+**A capability is not a function.** `Instr::HostCall` carries the capability the
+enclosing contract requires and the arguments of the Pleris function that needed
+it — and `Carts.add(s, item, qty)` and `Carts.clear(s)` are two functions
+requiring one authority. A core import has one signature.
+
+Per the ruling, the encoder refuses rather than mis-encodes, and this is with
+the architect rather than repaired inline. `docs/RISK_QUEUE.md` carries the
+classification; `tests/wasm_encoding.rs` pins the state and goes red on the
+repair.
 
 The reason those four and not arbitrary cleanup, in the architect's words:
 `draw(ctx)` contained a name with no binder, `measure(el)` could have its

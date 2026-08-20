@@ -64,9 +64,16 @@ I  Wasm encoding, invocation-region memory, E10-I                  NEXT
    and the ADR-0025 controls                                       DONE
 ```
 
-**The gate is closed.** Architect ruling: stop semantic cleanup and encode, and
-do not expand the semantic scope again unless the encoder exposes another
-concrete defect. Wasm encoding is the only thing left in E10-A.
+**The gate is closed**, and Wasm encoding has started. `backend/wasm.rs` emits a
+core module `wasmparser` validates; three of the store's five functions encode.
+
+**The encoder found its first defect on its first run**, as the architect
+predicted it would: `add_to_cart` and `clear_cart` both call
+`database.write<Carts>`, with three arguments and one. A capability names
+authority, not a function — `Instr::HostCall` carries the capability and the
+*Pleris* function's arguments — and a core import has one signature. The
+encoder refuses rather than mis-encodes, and the question is with the
+architect.
 
 Every executable expression now belongs to **exactly one named execution
 root**, each with a context. `draw(ctx)`, `acquire`, `release` and the

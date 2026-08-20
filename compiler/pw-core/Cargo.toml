@@ -18,6 +18,17 @@ annotate-snippets.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+# E10-A — core Wasm encoding. `wasm-encoder` is the encoder half of the
+# `wasm-tools` pair whose parser half (`wit-parser`, `wasmparser`) this crate
+# already trusts to check its output, so the two sides of every E10 gate come
+# from one upstream.
+#
+# Verified against crates.io on 2026-08-19: 0.257.1 is the newest published
+# version of `wasm-encoder`, `wasmparser` and `wit-parser` alike. `wit-parser`
+# moves to it here so the three cannot drift — they are released in lockstep and
+# a mixed set is a set nobody upstream tests.
+wasm-encoder = "0.257.1"
+
 # E8 gate item: "the world's imports are exactly `contract.imports`, and
 # `wit-bindgen` accepts it". `wit-parser` is the crate `wasm-tools` and
 # `wit-bindgen` are both built on, so the second half is checked by the real
@@ -29,4 +40,9 @@ serde_json.workspace = true
 # A DEV dependency. Generating WIT needs no parser; only proving the output is
 # WIT does.
 [dev-dependencies]
-wit-parser = "0.252.0"
+wit-parser = "0.257.1"
+
+# The validator, for proving the encoder's output is a well-formed module. A
+# module this repo declares valid is worth nothing; one the parser `wasmtime`
+# is built on accepts is evidence.
+wasmparser = "0.257.1"

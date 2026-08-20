@@ -38,8 +38,8 @@
 use std::collections::BTreeMap;
 
 use super::ir::{
-    Block, BlockId, CapabilityId, Const, Function, Instr, Lowering, Program, Shape, Terminator,
-    Type, TypeDef, ValueId,
+    Block, BlockId, CapabilityId, Const, Function, HostImport, Instr, Lowering, Program, Shape,
+    Terminator, Type, TypeDef, ValueId,
 };
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Span};
@@ -111,6 +111,44 @@ pub struct Context<'a> {
     /// The contracts, which already decided which capabilities each declaration
     /// requires. **Read, never re-derived.**
     pub contracts: &'a [ComponentContract],
+}
+
+/// **The host functions this program imports, read off the contracts.**
+///
+/// One per capability, deduplicated: two functions calling
+/// `database.write<Carts>` import it once. Which interface serves a capability
+/// is `contract::contracts`' answer — derived from the effect's own
+/// declaration — and reading it here rather than working it out again is what
+/// makes the E8 audit a comparison rather than a tautology.
+///
+/// A capability with no import in any contract is **dropped, loudly**: it is
+/// carried in `Function::capabilities` and appears nowhere here, so
+/// `every_capability_a_function_calls_has_an_import` fails rather than the
+/// encoder emitting a call to an import that does not exist.
+fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<HostImport> {
+    let mut wanted: BTreeMap<String, CapabilityId> = BTreeMap::new();
+    for f in &p.functions {
+        for c in &f.capabilities {
+            wanted.insert(c.name(), c.clone());
+        }
+    }
+    let mut out = Vec::new();
+    for (name, capability) in wanted {
+        let Some(i) = cx
+            .contracts
+            .iter()
+            .flat_map(|c| c.imports.iter())
+            .find(|i| i.capability == name)
+        else {
+            continue;
+        };
+        out.push(HostImport {
+            capability,
+            interface: i.interface.clone(),
+            name: i.name.clone(),
+        });
+    }
+    out
 }
 
 /// Lower one declaration.
@@ -237,6 +275,7 @@ pub fn program(checked: &Checked<'_>) -> (Program, Vec<Lowering<Function>>) {
         }
     }
     out.types = type_defs(cx, &out);
+    out.imports = host_imports(cx, &out);
     (out, refusals)
 }
 

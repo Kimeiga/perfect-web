@@ -257,6 +257,27 @@ pub struct Program {
     pub functions: Vec<Function>,
     /// Nominal types the functions use, in dependency order.
     pub types: Vec<TypeDef>,
+    /// **The host functions this program imports, as the CONTRACT names them.**
+    ///
+    /// Carried rather than derived, for the reason `Function::export` is:
+    /// `contract::contracts` decided which interface serves a capability, from
+    /// the effect's own declaration, and an encoder that worked it out again
+    /// would be the second derivation this project keeps deleting. The E8 audit
+    /// compares the built artifact's imports against the contract — so if the
+    /// encoder invented the name, the audit would be comparing a guess with
+    /// itself.
+    pub imports: Vec<HostImport>,
+}
+
+/// One host function a program imports, by the capability it serves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostImport {
+    /// The capability this import exists for: `database.write<Carts>`.
+    pub capability: CapabilityId,
+    /// `pw:host/database` — the interface, as the effect declares it.
+    pub interface: String,
+    /// `write` — the function within it.
+    pub name: String,
 }
 
 /// A nominal type's shape, resolved.
