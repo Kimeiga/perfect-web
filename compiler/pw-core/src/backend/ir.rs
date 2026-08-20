@@ -152,17 +152,21 @@ pub enum Instr {
         args: Vec<ValueId>,
         ty: Type,
     },
-    /// **A call across the capability boundary.**
+    /// **A call to something this component does not contain.**
     ///
-    /// Separate from `Call` because it is a different kind of thing, not a
-    /// call that happens to be external: the host decides whether it may
-    /// happen at all, `Granted` is what makes it linkable, and the E8 audit
-    /// compares the artifact's imports against exactly these. Flattening the
-    /// two would make "which of my calls need authority" a question somebody
-    /// answers by looking at names again.
-    HostCall {
+    /// Separate from `Call` because it is a different kind of thing, not a call
+    /// that happens to be external: the implementation comes from somewhere
+    /// else, that somewhere is named by an `ImportId` the artifact carries, and
+    /// the E8 audit compares the built thing's imports against exactly these.
+    ///
+    /// It was `HostCall { capability }` until 2026-08-20, and that was the
+    /// model error the encoder found: a capability authorizes an operation and
+    /// does not identify one, so two functions sharing an authority had one
+    /// import with two ABIs. The authority is now a property of the IMPORT, not
+    /// of the call.
+    ImportCall {
         result: ValueId,
-        capability: CapabilityId,
+        import: ImportId,
         args: Vec<ValueId>,
         ty: Type,
     },
@@ -187,7 +191,7 @@ impl Instr {
         match self {
             Instr::Const { result, .. }
             | Instr::Call { result, .. }
-            | Instr::HostCall { result, .. }
+            | Instr::ImportCall { result, .. }
             | Instr::Construct { result, .. }
             | Instr::Project { result, .. } => *result,
         }
@@ -197,7 +201,7 @@ impl Instr {
         match self {
             Instr::Const { ty, .. }
             | Instr::Call { ty, .. }
-            | Instr::HostCall { ty, .. }
+            | Instr::ImportCall { ty, .. }
             | Instr::Construct { ty, .. }
             | Instr::Project { ty, .. } => ty,
         }
@@ -266,18 +270,89 @@ pub struct Program {
     /// compares the built artifact's imports against the contract — so if the
     /// encoder invented the name, the audit would be comparing a guess with
     /// itself.
-    pub imports: Vec<HostImport>,
+    pub imports: Vec<CallableImport>,
 }
 
-/// One host function a program imports, by the capability it serves.
+/// **A callable this component depends on, with the ABI to call it.**
+///
+/// Architect ruling, 2026-08-20, after the encoder proved the previous model
+/// wrong:
+///
+/// > **A capability authorizes an operation. It does not identify the
+/// > operation.** So `database.write<Carts>` must never be used as the callable
+/// > import identity.
+///
+/// `Carts.add(s, item, qty)` and `Carts.clear(s)` both require
+/// `database.write<Carts>` and have different ABIs. An import keyed on the
+/// capability had no signature it could honestly carry, and the first thing the
+/// validator said was *"expected i32 but nothing on stack"*.
+///
+/// Four separate facts, kept separate:
+///
+/// ```text
+/// CapabilityId       authority
+/// ImportId           callable operation identity
+/// BackendSignature   callable ABI
+/// interface          physical/component-model grouping
+/// ```
+///
+/// The grouping is an ABI/package-layout decision and must not determine the
+/// capability semantics — the same distinction E8 already draws between
+/// semantic component granularity and physical bundling.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HostImport {
-    /// The capability this import exists for: `database.write<Carts>`.
-    pub capability: CapabilityId,
-    /// `pw:host/database` — the interface, as the effect declares it.
+pub struct CallableImport {
+    pub id: ImportId,
+    /// The source declaration this is, for provenance. A compiler-internal
+    /// identity: deliberately NOT what the component boundary depends on,
+    /// because a `DefId` does not survive past this compiler.
+    pub callee: DefId,
+    /// How the implementation is supplied.
+    pub binding: ImportBinding,
+    /// The complete checked ABI. **This is what the encoder reads** — a
+    /// signature it derived from call sites would be a second answer to a
+    /// question the front end settled, and the arity conflict is what happens
+    /// when there is no first answer.
+    pub signature: BackendSignature,
+    /// Authority required to invoke it. A **set**: an operation may need
+    /// several, and one capability may authorize many operations — proven by
+    /// `Carts.add` and `Carts.clear` sharing `database.write<Carts>`.
+    ///
+    /// May be empty. An operation can be placement-constrained and need no
+    /// authority at all, which is already true of the browser-semantic effects.
+    pub required_capabilities: Vec<CapabilityId>,
+}
+
+/// A callable import's identity, stable across the component boundary.
+///
+/// The interface and the operation within it — `pw:host/carts` and `add`. Not a
+/// `DefId`: this is what a WIT world and a built artifact name, and it has to
+/// mean something to a toolchain that never saw this compiler.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ImportId {
     pub interface: String,
-    /// `write` — the function within it.
     pub name: String,
+}
+
+impl ImportId {
+    pub fn qualified(&self) -> String {
+        format!("{}#{}", self.interface, self.name)
+    }
+}
+
+/// How a callable import's implementation is supplied.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImportBinding {
+    /// The host or platform provides it, as the declaration says.
+    Host,
+    /// Another component exports it.
+    Component,
+}
+
+/// A callable's ABI, as the checker established it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendSignature {
+    pub params: Vec<Type>,
+    pub result: Type,
 }
 
 /// A nominal type's shape, resolved.
@@ -431,14 +506,17 @@ mod tests {
     }
 
     #[test]
-    fn a_host_call_is_not_an_ordinary_call() {
+    fn an_import_call_is_not_an_ordinary_call() {
         // They are different kinds of thing, not one with a flag. The E8 audit
-        // compares the artifact's imports against exactly the host ones, and a
-        // flattened representation would make "which calls need authority" a
-        // question somebody answers by reading names.
-        let host = Instr::HostCall {
+        // compares the artifact's imports against exactly these, and a
+        // flattened representation would make "which calls come from outside"
+        // a question somebody answers by reading names.
+        let imported = Instr::ImportCall {
             result: ValueId(0),
-            capability: CapabilityId(crate::contract::Capability::parse("database.write<Carts>")),
+            import: ImportId {
+                interface: "pw:host/carts".into(),
+                name: "add".into(),
+            },
             args: vec![],
             ty: Type::Unit,
         };
@@ -448,11 +526,34 @@ mod tests {
             args: vec![],
             ty: Type::Unit,
         };
-        assert!(matches!(host, Instr::HostCall { .. }));
+        assert!(matches!(imported, Instr::ImportCall { .. }));
         assert!(matches!(ordinary, Instr::Call { .. }));
-        let Instr::HostCall { capability, .. } = &host else {
+        let Instr::ImportCall { import, .. } = &imported else {
             unreachable!()
         };
-        assert_eq!(capability.name(), "database.write<Carts>");
+        assert_eq!(import.qualified(), "pw:host/carts#add");
+    }
+
+    /// **A call carries no authority.** The capability is a property of the
+    /// IMPORT, and this is the type-level statement of the 2026-08-20 ruling:
+    /// a capability authorizes an operation and does not identify one.
+    #[test]
+    fn authority_lives_on_the_import_and_not_on_the_call() {
+        let src = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/backend/ir.rs"),
+        )
+        .expect("ir.rs");
+        let decl = src
+            .split("pub enum Instr {")
+            .nth(1)
+            .expect("the Instr enum")
+            .split("\n}")
+            .next()
+            .expect("its body");
+        assert!(
+            !decl.contains("capability: CapabilityId"),
+            "no instruction may carry a capability: an import does"
+        );
+        assert!(decl.contains("import: ImportId"));
     }
 }

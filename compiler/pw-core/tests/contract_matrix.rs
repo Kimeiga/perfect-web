@@ -49,13 +49,19 @@ module Stores
 
 type Store = Store { id: Int }
 
-fn get(id: Int) -> Store !{ database.read<Stores> } { Store { id: id } }
+// **Host-bound, explicitly.** An effect row is not a host binding — architect
+// ruling, 2026-08-20. `get` and `payment_key` are the two rows that must keep
+// asking for real authority, so they say where their implementations come from
+// rather than having it inferred from what they perform.
+fn get(id: Int) -> Store !{ database.read<Stores> }
+    host \"pw:host/database#read\"
 
 fn measure_it(id: Int) -> Int !{ layout.measure } { 0 }
 
 fn set_width(id: Int) -> Int !{ style.mutate<LayoutAffect> } { 0 }
 
-fn payment_key() -> Int !{ secret<Payments> } { 0 }
+fn payment_key() -> Int !{ secret<Payments> }
+    host \"pw:host/secrets#get\"
 
 type LayoutAffect = LayoutAffect {}
 

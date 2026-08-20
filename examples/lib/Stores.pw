@@ -13,9 +13,23 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
     RecommendationError, PaymentError, TrackingError }
 import browser.{ Element, MapHandle, MapError }
 
-fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
-    todo
-}
+// **The platform supplies these.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > Host implementation is explicit declaration metadata, never inferred from
+// > a missing/`todo` body or from the effect row.
+//
+// So each carries a `host` binding naming the operation the platform provides,
+// and has no body: `todo` means *there is not an implementation here*, and it
+// must not secretly mean *the platform supplies an FFI implementation*.
+//
+// The operation is per FUNCTION, not per capability. `add` and `clear` both
+// require `database.write<Carts>` and have different ABIs — which is the model
+// error the Wasm encoder found, and the reason a capability may never be a
+// callable identity.
+fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> }
+    host "pw:host/stores#get"
 
 // `find` may not find one, and says so in its type. `get` is the form that
 // fails loudly; this is the form whose absence is a value.

@@ -16,7 +16,23 @@ module context
 
 import capability.{ Session, User, Organization }
 
-fn current_session() -> Session<SessionId> !{ session.read } { Session("") }
+// **The platform supplies these.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > Host implementation is explicit declaration metadata, never inferred from
+// > a missing/`todo` body or from the effect row.
+//
+// So each carries a `host` binding naming the operation the platform provides,
+// and has no body: `todo` means *there is not an implementation here*, and it
+// must not secretly mean *the platform supplies an FFI implementation*.
+//
+// The operation is per FUNCTION, not per capability. `add` and `clear` both
+// require `database.write<Carts>` and have different ABIs — which is the model
+// error the Wasm encoder found, and the reason a capability may never be a
+// callable identity.
+fn current_session() -> Session<SessionId> !{ session.read }
+    host "pw:host/session#read"
 
 fn current_user() -> User<UserId> !{ session.read } { User("") }
 

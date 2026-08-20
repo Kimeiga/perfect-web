@@ -35,8 +35,15 @@ mod support;
 const PROGRAM: &str = "\
 module shop.origin
 
-fn read_stores() -> Int !{ database.read<Stores> } { 0 }
-fn write_stores() -> Int !{ database.write<Stores> } { 0 }
+// **Host-bound, explicitly.** An effect row is not a host binding — architect
+// ruling, 2026-08-20, after the Wasm encoder found that a capability cannot be
+// a callable identity. A `fn` with a row and no `host` policy is ordinary
+// compiled Pleris however privileged it is, so these say where they come from.
+fn read_stores() -> Int !{ database.read<Stores> }
+    host \"pw:host/database#read\"
+
+fn write_stores() -> Int !{ database.write<Stores> }
+    host \"pw:host/database#write\"
 
 public query Menu(id: Int) -> Int
     freshness   5.minutes
@@ -57,7 +64,8 @@ command Restock(id: Int) -> Int
 const BROWSER_ONLY: &str = "\
 module shop.view
 
-fn paint(x: Int) -> Int !{ dom.mutate } { x }
+fn paint(x: Int) -> Int !{ dom.mutate }
+    host \"pw:host/dom#mutate\"
 
 component Badge() {
     paint(1)
@@ -422,8 +430,8 @@ fn the_schema_ignores_formatting_and_notices_authority() {
     );
 
     let widened = PROGRAM.replace(
-        "fn read_stores() -> Int !{ database.read<Stores> } { 0 }",
-        "fn read_stores() -> Int !{ database.read<Stores>, secret<Payments> } { 0 }",
+        "fn read_stores() -> Int !{ database.read<Stores> }",
+        "fn read_stores() -> Int !{ database.read<Stores>, secret<Payments> }",
     );
     let widened = one(&[&widened], "shop.origin.Menu");
     assert_ne!(

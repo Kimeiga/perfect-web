@@ -1899,6 +1899,17 @@ impl<'a> P<'a> {
             if self.at(Kind::Bang) {
                 self.effect_row();
             }
+            // **A `fn` may carry policies.**
+            //
+            // `host "pw:host/carts#add"` is how a declaration says the platform
+            // supplies its implementation. Architect ruling, 2026-08-20:
+            //
+            // > Host implementation is explicit declaration metadata, never
+            // > inferred from a missing/`todo` body or from the effect row.
+            //
+            // Read in HEADER position: a `fn`'s body is its implementation, and
+            // a host-bound one has none, so there is no brace to be inside.
+            self.policies(false);
             self.body();
             self.finish();
             return true;

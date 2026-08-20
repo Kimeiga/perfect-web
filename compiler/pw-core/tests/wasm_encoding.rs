@@ -100,32 +100,21 @@ fn validate(bytes: &[u8]) -> Result<(), String> {
 
 // --- the gate ----------------------------------------------------------------
 
-/// **The module validates, and `add_to_cart` does not encode — for a reason
-/// that is a real finding.**
+/// **The real `add_to_cart` encodes, and the module validates.**
 ///
-/// Architect ruling, 2026-08-19, on what to do when this happens:
+/// It did not, for one commit, and the reason was a model error the encoder
+/// found on its first run: `Instr::HostCall` was keyed on a CAPABILITY, and
+/// `add_to_cart` and `clear_cart` both call `database.write<Carts>` with three
+/// arguments and one. `wasmparser` said *"expected i32 but nothing on stack"*.
 ///
-/// > Treat the encoder almost adversarially. Give it `Checked` IR, make it
-/// > refuse anything it cannot faithfully represent, and let the first real
-/// > component tell us what the next missing backend primitive actually is.
+/// Architect ruling, 2026-08-20:
 ///
-/// It told us immediately. **A capability is not a function.**
+/// > **A capability authorizes an operation. It does not identify the
+/// > operation.** So `database.write<Carts>` must never be used as the callable
+/// > import identity.
 ///
-/// ```text
-/// add_to_cart   HostCall database.write<Carts> [session, item, quantity]
-/// clear_cart    HostCall database.write<Carts> [session]
-/// ```
-///
-/// One authority, two argument lists — because the two calls go through
-/// `Carts.add(s, item, qty)` and `Carts.clear(s)`, which are different Pleris
-/// functions that both require `database.write<Carts>`. `Instr::HostCall`
-/// carries the *capability the enclosing contract requires* and the *arguments
-/// of the Pleris function that needed it*, and a core import has one signature.
-///
-/// Encoding it against the first arity found produced a module `wasmparser`
-/// rejected with *"expected i32 but nothing on stack"*. The encoder refuses
-/// instead — the module is still valid, it simply has fewer functions — and
-/// `docs/RISK_QUEUE.md` carries the classification.
+/// An import is now a `CallableImport` with an `ImportId`, a signature taken
+/// from the callee's own declaration, and a SET of required capabilities.
 #[test]
 fn the_store_encodes_to_a_valid_core_module() {
     let p = store_program();
@@ -138,29 +127,67 @@ fn the_store_encodes_to_a_valid_core_module() {
         )
     });
 
-    // What DID encode: the three queries, each of whose capability is reached
-    // through exactly one Pleris function. That is the encoder working.
     let exports = exported_names(&bytes);
-    for want in ["Menu", "Store", "Cart"] {
+    for want in ["Menu", "Store", "Cart", "add_to_cart", "clear_cart"] {
         assert!(
             exports.contains(&want.to_string()),
             "`{want}` encodes: {exports:?}"
         );
     }
+    assert!(
+        refusals.is_empty(),
+        "nothing in the store refuses to encode: {:?}",
+        refusals.iter().map(|r| r.to_string()).collect::<Vec<_>>()
+    );
+}
 
-    // And what did not, with the reason.
-    let why: Vec<String> = refusals.iter().map(|r| r.to_string()).collect();
-    assert!(
-        !exports.contains(&"add_to_cart".to_string()),
-        "TODAY: `add_to_cart` does not encode. When `HostCall` names the \
-         FUNCTION rather than only the authority, this fails — and that is the \
-         repair, not a regression."
-    );
-    assert!(
-        why.iter()
-            .any(|w| w.contains("called with [1, 3] arguments")),
-        "and the refusal names the real defect rather than the symptom: {why:?}"
-    );
+/// **The control the ruling asked to be frozen: same capability, two
+/// callables, both valid.**
+///
+/// > `Carts.add` / `Carts.clear` — same capability, different signatures →
+/// > **two callable imports**, both valid.
+///
+/// This is the whole finding, as a positive proof rather than a refusal.
+#[test]
+fn one_capability_authorizes_two_callables_with_different_abis() {
+    let p = store_program();
+
+    let add = p
+        .imports
+        .iter()
+        .find(|i| i.id.qualified() == "pw:host/carts#add")
+        .expect("Carts.add is an import");
+    let clear = p
+        .imports
+        .iter()
+        .find(|i| i.id.qualified() == "pw:host/carts#clear")
+        .expect("Carts.clear is an import");
+
+    // Different ABIs.
+    assert_eq!(add.signature.params.len(), 3);
+    assert_eq!(clear.signature.params.len(), 1);
+    assert_ne!(add.signature, clear.signature);
+
+    // One authority.
+    let caps = |i: &pw_core::backend::ir::CallableImport| -> Vec<String> {
+        i.required_capabilities.iter().map(|c| c.name()).collect()
+    };
+    assert_eq!(caps(add), ["database.write<Carts>"]);
+    assert_eq!(caps(clear), ["database.write<Carts>"]);
+
+    // And both are real imports of the built module, with their own types.
+    let (bytes, _) = wasm::module(&p);
+    let names = imported_names(&bytes);
+    assert!(names.contains(&("pw:host/carts".to_string(), "add".to_string())));
+    assert!(names.contains(&("pw:host/carts".to_string(), "clear".to_string())));
+
+    // The signature the encoder used is the CALLABLE's, not one derived from a
+    // call site: `clear_cart` calls `clear` with one argument and `add_to_cart`
+    // calls `add` with three, and a shared import would have had to be one or
+    // the other.
+    let arities = imported_arities(&bytes);
+    assert_eq!(arities.get("pw:host/carts#add"), Some(&3));
+    assert_eq!(arities.get("pw:host/carts#clear"), Some(&1));
 }
 
 /// **The module's imports are exactly the contract's**, name for name.
@@ -182,7 +209,7 @@ fn the_modules_imports_are_the_contracts_imports() {
     let mut allowed: Vec<(String, String)> = p
         .imports
         .iter()
-        .map(|i| (i.interface.clone(), i.name.clone()))
+        .map(|i| (i.id.interface.clone(), i.id.name.clone()))
         .collect();
     allowed.sort();
     allowed.dedup();
@@ -210,7 +237,11 @@ fn the_modules_imports_are_the_contracts_imports() {
 #[test]
 fn every_capability_a_function_calls_has_an_import() {
     let p = store_program();
-    let declared: Vec<String> = p.imports.iter().map(|i| i.capability.name()).collect();
+    let declared: Vec<String> = p
+        .imports
+        .iter()
+        .flat_map(|i| i.required_capabilities.iter().map(|c| c.name()))
+        .collect();
     let mut missing = Vec::new();
     for f in &p.functions {
         for c in &f.capabilities {
@@ -320,6 +351,39 @@ fn the_encoder_never_decides_from_a_name() {
 }
 
 // --- reading the bytes back --------------------------------------------------
+
+/// How many parameters each import's type declares, read back from the bytes.
+fn imported_arities(bytes: &[u8]) -> std::collections::BTreeMap<String, usize> {
+    let mut types: Vec<usize> = Vec::new();
+    let mut out = std::collections::BTreeMap::new();
+    for payload in wasmparser::Parser::new(0).parse_all(bytes) {
+        match payload {
+            Ok(wasmparser::Payload::TypeSection(s)) => {
+                for g in s.into_iter().flatten() {
+                    for t in g.into_types() {
+                        types.push(match t.composite_type.inner {
+                            wasmparser::CompositeInnerType::Func(f) => f.params().len(),
+                            _ => 0,
+                        });
+                    }
+                }
+            }
+            Ok(wasmparser::Payload::ImportSection(s)) => {
+                for i in s.into_imports() {
+                    let i = i.expect("import");
+                    if let wasmparser::TypeRef::Func(t) = i.ty {
+                        out.insert(
+                            format!("{}#{}", i.module, i.name),
+                            types.get(t as usize).copied().unwrap_or(0),
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
 
 fn exported_names(bytes: &[u8]) -> Vec<String> {
     let mut out = Vec::new();

@@ -158,11 +158,17 @@ fn lowered(
 /// `StorePage` requires `session.read` to render. See
 /// `tests/unresolved_provenance.rs::store_page_after_repair`.
 ///
-/// **Two host calls, not one.** The first version of this test expected one and
-/// was wrong: the command reads the session and writes the cart, and the
+/// **Two import calls, not one.** The first version of this test expected one
+/// and was wrong: the command reads the session and writes the cart, and the
 /// backend was right.
+///
+/// They are keyed on the CALLABLE — `pw:host/session#read` and
+/// `pw:host/carts#add` — not on the capability. Architect ruling, 2026-08-20,
+/// after the Wasm encoder proved a capability cannot be a callable identity:
+/// `Carts.add` and `Carts.clear` share `database.write<Carts>` and have
+/// different ABIs.
 #[test]
-fn the_real_add_to_cart_lowers_to_two_host_calls() {
+fn the_real_add_to_cart_lowers_to_two_import_calls() {
     let built = Built::new(&store());
     let (p, refusals) = lowered(&built);
 
@@ -181,17 +187,24 @@ fn the_real_add_to_cart_lowers_to_two_host_calls() {
         .instrs
         .iter()
         .filter_map(|i| match i {
-            Instr::HostCall { capability, .. } => Some(capability.name()),
+            Instr::ImportCall { import, .. } => Some(import.qualified()),
             _ => None,
         })
         .collect();
     host.sort();
-    assert_eq!(host, ["database.write<Carts>", "session.read"]);
+    assert_eq!(
+        host,
+        ["pw:host/carts#add", "pw:host/session#read"],
+        "the two callables it invokes, by the identity the ARTIFACT will carry"
+    );
 
-    // Named by the CONTRACT's capabilities, not by matching a spelling.
+    // And the authority, which is a separate fact: two callables, and one of
+    // them shares its capability with `Carts.clear`. Architect ruling,
+    // 2026-08-20: a capability authorizes an operation and does not identify
+    // one.
     let mut declared: Vec<String> = f.capabilities.iter().map(|c| c.name()).collect();
     declared.sort();
-    assert_eq!(declared, host, "the function carries the contract's set");
+    assert_eq!(declared, ["database.write<Carts>", "session.read"]);
 }
 
 /// **The lowering itself works**, on a program that does import what it calls.
@@ -199,8 +212,22 @@ fn the_real_add_to_cart_lowers_to_two_host_calls() {
 /// The same shape as `add_to_cart` — a command whose body calls a function
 /// declaring a capability the contract requires — with nothing missing. This is
 /// what says the test above is about the DEMO and not about the backend.
+/// **An effectful Pleris function is an ordinary call, not a host import.**
+///
+/// The control the architect named as the one that proves the conflation was
+/// actually removed rather than a field added. Ruling, 2026-08-20:
+///
+/// > An effectful function can perfectly well be ordinary compiled Pleris. […]
+/// > `ordinary Pleris fn with !{ database.write<Carts> }` → remains a normal
+/// > `Call`, **not** a host import.
+///
+/// Until then, `write` here lowered to a host call, because the rule was *"the
+/// callee's declared row contains a capability the enclosing contract
+/// requires"*. It has no `host` binding, so it is compiled Pleris however
+/// effectful it is — and the capability it needs is a separate fact that has
+/// not moved.
 #[test]
-fn a_command_that_imports_what_it_calls_lowers_to_a_host_call() {
+fn an_effectful_function_without_a_host_binding_is_an_ordinary_call() {
     let src = "\
 module m
 
@@ -237,22 +264,77 @@ command Add(id: Id) -> Result<Cart, CartError>
     assert!(matches!(**ok, Type::Nominal(_)));
     assert!(matches!(**err, Type::Nominal(_)));
 
-    // **The host call**, named by the capability the CONTRACT derived — not by
-    // matching `write` against a list of privileged spellings.
-    let host: Vec<String> = f.blocks[0]
+    // **No import.** `write` is compiled here.
+    let imports: Vec<String> = f.blocks[0]
         .instrs
         .iter()
         .filter_map(|i| match i {
-            Instr::HostCall { capability, .. } => Some(capability.name()),
+            Instr::ImportCall { import, .. } => Some(import.qualified()),
             _ => None,
         })
         .collect();
-    assert_eq!(host, ["database.write<Cart>"]);
+    assert!(
+        imports.is_empty(),
+        "an effect row is not a host binding: {imports:?}"
+    );
+    assert!(
+        f.blocks[0]
+            .instrs
+            .iter()
+            .any(|i| matches!(i, Instr::Call { .. })),
+        "it is an ordinary call: {:?}",
+        f.blocks[0].instrs
+    );
+    assert!(
+        p.imports.is_empty(),
+        "and the program imports nothing: {:?}",
+        p.imports
+            .iter()
+            .map(|i| i.id.qualified())
+            .collect::<Vec<_>>()
+    );
+
+    // And the AUTHORITY is unchanged — that fact never depended on where the
+    // implementation comes from.
     assert!(
         f.capabilities
             .iter()
             .any(|c| c.name() == "database.write<Cart>"),
-        "and the function carries the contract's set, not a second derivation"
+        "the function still requires what its body performs"
+    );
+
+    // The discriminating half: the same declaration WITH a host binding is an
+    // import. One line of difference, and it is the declaration's own metadata.
+    let bound = src.replace(
+        "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> } { todo }",
+        "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> }\n    host \"pw:host/carts#write\"",
+    );
+    let built = Built::synthetic(&bound);
+    let (p, _) = lowered(&built);
+    let f = p.functions.iter().find(|f| f.export == "Add").expect("Add");
+    let imports: Vec<String> = f.blocks[0]
+        .instrs
+        .iter()
+        .filter_map(|i| match i {
+            Instr::ImportCall { import, .. } => Some(import.qualified()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(imports, ["pw:host/carts#write"]);
+    assert_eq!(
+        p.imports.len(),
+        1,
+        "and the program declares it once, with its own signature"
+    );
+    assert_eq!(p.imports[0].signature.params.len(), 1);
+    assert_eq!(
+        p.imports[0]
+            .required_capabilities
+            .iter()
+            .map(|c| c.name())
+            .collect::<Vec<_>>(),
+        ["database.write<Cart>"],
+        "the authority is a property of the IMPORT, not of the call"
     );
 }
 
@@ -301,7 +383,7 @@ command Pure(id: Id) -> Int
         !f.blocks[0]
             .instrs
             .iter()
-            .any(|i| matches!(i, Instr::HostCall { .. })),
+            .any(|i| matches!(i, Instr::ImportCall { .. })),
         "and nothing here asks the host for anything: {:?}",
         f.blocks[0].instrs
     );

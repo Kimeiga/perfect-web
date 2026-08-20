@@ -56,7 +56,7 @@ use wasm_encoder::{
     Module, TypeSection, ValType,
 };
 
-use super::ir::{CapabilityId, Const, Instr, Program, Terminator, Type, ValueId};
+use super::ir::{Const, Instr, Program, Terminator, Type, ValueId};
 
 /// **What an encoding produced, and never silently nothing.**
 ///
@@ -154,35 +154,26 @@ pub fn module(p: &Program) -> (Vec<u8>, Vec<Encoding<()>>) {
     let mut type_of_sig: BTreeMap<(Vec<ValType>, Vec<ValType>), u32> = BTreeMap::new();
     let mut next_type = 0u32;
 
-    // A host import's signature is not knowable from the capability alone —
-    // that is the Canonical ABI's answer and it lives in the next stage. Here
-    // every host function takes the handles its call site passes and returns
-    // one, which is what the invocation-region model makes true.
-    let mut ambiguous: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-    // Counted rather than taken from `p.imports.len()`: a refused import is not
-    // emitted, and a function index computed from the declared count would name
-    // whatever sits at that slot. The validator caught exactly that — "exported
-    // function index out of bounds".
+    // Counted rather than taken from `p.imports.len()`: an import the encoder
+    // did not emit would leave every function index one too high, and the
+    // validator caught exactly that — "exported function index out of bounds".
     let mut emitted = 0usize;
-    for (i, imp) in p.imports.iter().enumerate() {
-        let arities = host_arities(p, &imp.capability);
-        if arities.len() > 1 {
-            // **A capability is not a function, and this is where that shows.**
-            //
-            // `database.write<Carts>` is reached through `Carts.add(s, item,
-            // qty)` and `Carts.clear(s)` — two Pleris functions, one authority,
-            // two argument lists. A core import has ONE signature, so there is
-            // no honest number to put here.
-            //
-            // Refused rather than encoded against the first arity found, which
-            // is what produced a module the validator rejected with "expected
-            // i32 but nothing on stack". See `docs/RISK_QUEUE.md`.
-            ambiguous.insert(imp.capability.name(), arities);
-            continue;
-        }
-        let arity = arities.first().copied().unwrap_or(0);
-        let params: Vec<ValType> = vec![ValType::I32; arity];
-        let results = vec![ValType::I32];
+
+    // **Each import's signature is the CALLABLE's**, read off
+    // `CallableImport::signature`, which `lower.rs` took from the callee's own
+    // declaration. Architect ruling, 2026-08-20:
+    //
+    // > Then the encoder's entire job is mechanical: ImportId → signature →
+    // > Wasm function type. No inference from capability. No name lookup. No
+    // > inspecting effects.
+    //
+    // It was derived from CALL SITES until then, because the import was keyed
+    // on a capability and a capability has no ABI. `Carts.add` and
+    // `Carts.clear` share `database.write<Carts>`, so there was no single arity
+    // to derive — and the validator said so.
+    for imp in p.imports.iter() {
+        let params: Vec<ValType> = imp.signature.params.iter().map(repr).collect();
+        let results = vec![repr(&imp.signature.result)];
         let key = (params.clone(), results.clone());
         let ty = *type_of_sig.entry(key).or_insert_with(|| {
             types.ty().function(params.clone(), results.clone());
@@ -191,24 +182,12 @@ pub fn module(p: &Program) -> (Vec<u8>, Vec<Encoding<()>>) {
             t
         });
         imports.import(
-            &imp.interface,
-            &imp.name,
+            &imp.id.interface,
+            &imp.id.name,
             wasm_encoder::EntityType::Function(ty),
         );
-        import_of.insert(imp.capability.name(), emitted as u32);
+        import_of.insert(imp.id.qualified(), emitted as u32);
         emitted += 1;
-        let _ = i;
-    }
-    for (name, arities) in &ambiguous {
-        refusals.push(Encoding::Blocked {
-            why: format!(
-                "`{name}` is called with {arities:?} arguments at different sites. A capability \
-                 names AUTHORITY, not a function: `Instr::HostCall` carries the capability the \
-                 enclosing contract requires and the arguments of the Pleris function that \
-                 needed it, and two functions can need one capability. A core import has one \
-                 signature"
-            ),
-        });
     }
 
     // Then the program's own functions, each with its own signature.
@@ -250,31 +229,6 @@ pub fn module(p: &Program) -> (Vec<u8>, Vec<Encoding<()>>) {
     m.section(&exports);
     m.section(&code);
     (m.finish(), refusals)
-}
-
-/// **Every distinct argument count this capability is called with.**
-///
-/// More than one means the program cannot be encoded, and the encoder says so
-/// rather than picking one. Read off the IR rather than decided — a signature
-/// invented here would be a second answer to a question the front end is
-/// supposed to have settled, and the point of this function is that the front
-/// end has not settled it.
-fn host_arities(p: &Program, cap: &CapabilityId) -> Vec<usize> {
-    let mut out: Vec<usize> = p
-        .functions
-        .iter()
-        .flat_map(|f| f.blocks.iter())
-        .flat_map(|b| b.instrs.iter())
-        .filter_map(|i| match i {
-            Instr::HostCall {
-                capability, args, ..
-            } if capability == cap => Some(args.len()),
-            _ => None,
-        })
-        .collect();
-    out.sort_unstable();
-    out.dedup();
-    out
 }
 
 /// One function's body.
@@ -328,21 +282,21 @@ fn body(f: &super::ir::Function, import_of: &BTreeMap<String, u32>) -> Encoding<
 
     for i in &entry.instrs {
         match i {
-            Instr::HostCall {
+            Instr::ImportCall {
                 result,
-                capability,
+                import,
                 args,
                 ..
             } => {
-                let Some(&idx) = import_of.get(&capability.name()) else {
-                    // The capability is in the function's list and nothing put
-                    // an import there. Refused rather than encoded against
-                    // index 0, which would call whatever happened to be first.
+                let Some(&idx) = import_of.get(&import.qualified()) else {
+                    // The IR calls an import the program does not declare.
+                    // Refused rather than encoded against index 0, which would
+                    // call whatever happened to be first.
                     return Encoding::Blocked {
                         why: format!(
                             "`{}` calls `{}` and the program declares no import for it",
                             f.export,
-                            capability.name()
+                            import.qualified()
                         ),
                     };
                 };
@@ -356,7 +310,7 @@ fn body(f: &super::ir::Function, import_of: &BTreeMap<String, u32>) -> Encoding<
                                 why: format!(
                                     "`{}` passes {a:?} to `{}` and nothing defines it",
                                     f.export,
-                                    capability.name()
+                                    import.qualified()
                                 ),
                             };
                         }
@@ -447,7 +401,7 @@ fn instr_type(i: &Instr) -> &Type {
     match i {
         Instr::Const { ty, .. }
         | Instr::Call { ty, .. }
-        | Instr::HostCall { ty, .. }
+        | Instr::ImportCall { ty, .. }
         | Instr::Construct { ty, .. }
         | Instr::Project { ty, .. } => ty,
     }

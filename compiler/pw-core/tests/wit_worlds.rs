@@ -14,13 +14,17 @@
 //!
 //! # The host package is a fixture, deliberately
 //!
-//! A generated world imports `pw:host/database`, which the HOST owns. The
-//! compiler does not know its signatures and must not invent them — ADR-0018's
-//! boundary — so a resolve test has to supply them. `HOST_WIT` below is that
-//! stand-in, and its existence is the statement: **a deployment must publish a
-//! WIT package for the capabilities it grants, or these worlds do not resolve.**
+//! A generated world imports `pw:host/carts`, which the HOST owns. The compiler
+//! does not know its signatures and must not invent them — ADR-0018's boundary
+//! — so a resolve test has to supply them. `HOST_WIT` below is that stand-in,
+//! and its existence is the statement: **a deployment must publish a WIT
+//! package for the operations it supplies, or these worlds do not resolve.**
 //! Writing it here rather than generating it is what keeps that a requirement
 //! on the host instead of a guess by the compiler.
+//!
+//! It said *the capabilities it grants* until 2026-08-20. A capability
+//! authorizes an operation and does not identify one, and the Wasm encoder is
+//! what proved a deployment must publish the second.
 
 use std::collections::BTreeSet;
 
@@ -73,18 +77,37 @@ fn generated() -> (String, Vec<wit::World>, Vec<ComponentContract>) {
 /// **The host's WIT, as a deployment would have to publish it.**
 ///
 /// Hand-written, and that is the point: these are the host's signatures and the
-/// compiler has no business deciding them. The store demo needs one interface.
+/// compiler has no business deciding them.
 const HOST_WIT: &str = "\
 package pw:host;
 
-/// The database capability, as a deployment grants it. `database.read<Stores>`
-/// and `database.write<Carts>` are the CAPABILITY names the contract carries;
-/// the ABI shape here is the host's own.
-interface database {
-    read: func(domain: string, key: string) -> option<string>;
-    write: func(domain: string, key: string, value: string) -> bool;
-    connect: func() -> bool;
-    transaction: func() -> bool;
+/// **One interface per operation group, and one function per OPERATION.**
+///
+/// Rewritten 2026-08-20. It used to publish `database` with `read`/`write`,
+/// because a component's imports were derived from its CAPABILITIES — and the
+/// Wasm encoder proved that cannot work: `Carts.add(s, item, qty)` and
+/// `Carts.clear(s)` both require `database.write<Carts>` and have different
+/// ABIs, so one `write` could not have both signatures.
+///
+/// Architect ruling, 2026-08-20: a capability authorizes an operation and does
+/// not identify one. `database.write<Carts>` is still the authority a
+/// deployment grants; `pw:host/carts#add` is the callable it publishes.
+///
+/// The grouping into interfaces is an ABI/package-layout decision — `add` and
+/// `clear` could equally live in one `carts` interface or two — and it does not
+/// determine the capability semantics.
+interface carts {
+    current: func(session: string) -> string;
+    add: func(session: string, item: string, quantity: s64) -> string;
+    clear: func(session: string) -> string;
+}
+
+interface stores {
+    get: func(id: string) -> string;
+}
+
+interface menus {
+    %for-store: func(store: string) -> string;
 }
 
 /// The invocation context. Added on 2026-08-10, when `examples/store/app.pw`

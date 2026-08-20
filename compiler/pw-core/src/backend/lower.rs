@@ -35,11 +35,11 @@
 //! keeps that honest: the refusal names the construct, so widening the backend
 //! is a visible act rather than a fixture that started passing.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
-    Block, BlockId, CapabilityId, Const, Function, HostImport, Instr, Lowering, Program, Shape,
-    Terminator, Type, TypeDef, ValueId,
+    BackendSignature, Block, BlockId, CallableImport, CapabilityId, Const, Function, ImportBinding,
+    ImportId, Instr, Lowering, Program, Shape, Terminator, Type, TypeDef, ValueId,
 };
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Span};
@@ -113,42 +113,109 @@ pub struct Context<'a> {
     pub contracts: &'a [ComponentContract],
 }
 
-/// **The host functions this program imports, read off the contracts.**
+/// **The callables this program imports, with the ABI to call each.**
 ///
-/// One per capability, deduplicated: two functions calling
-/// `database.write<Carts>` import it once. Which interface serves a capability
-/// is `contract::contracts`' answer — derived from the effect's own
-/// declaration — and reading it here rather than working it out again is what
-/// makes the E8 audit a comparison rather than a tautology.
+/// One per `ImportId` the IR actually references, and the signature comes from
+/// the CALLEE's declaration — not from a call site, and not from the capability.
+/// Architect ruling, 2026-08-20:
 ///
-/// A capability with no import in any contract is **dropped, loudly**: it is
-/// carried in `Function::capabilities` and appears nowhere here, so
-/// `every_capability_a_function_calls_has_an_import` fails rather than the
-/// encoder emitting a call to an import that does not exist.
-fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<HostImport> {
-    let mut wanted: BTreeMap<String, CapabilityId> = BTreeMap::new();
+/// > A capability authorizes an operation. It does not identify the operation.
+///
+/// `Carts.add` and `Carts.clear` share `database.write<Carts>` and have
+/// different ABIs, which is what made the previous capability-keyed model
+/// unencodable. Here they are two imports, both valid, each with its own
+/// signature and both requiring the same authority.
+///
+/// `required_capabilities` is a SET and may be empty: an operation can need
+/// several authorities, one authority can serve many operations, and an
+/// operation can be placement-constrained while needing none.
+fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
+    // Every import the lowered code actually calls.
+    let mut wanted: BTreeSet<ImportId> = BTreeSet::new();
     for f in &p.functions {
-        for c in &f.capabilities {
-            wanted.insert(c.name(), c.clone());
+        for b in &f.blocks {
+            for i in &b.instrs {
+                if let Instr::ImportCall { import, .. } = i {
+                    wanted.insert(import.clone());
+                }
+            }
         }
     }
+
     let mut out = Vec::new();
-    for (name, capability) in wanted {
-        let Some(i) = cx
-            .contracts
-            .iter()
-            .flat_map(|c| c.imports.iter())
-            .find(|i| i.capability == name)
-        else {
-            continue;
-        };
-        out.push(HostImport {
-            capability,
-            interface: i.interface.clone(),
-            name: i.name.clone(),
-        });
+    for (unit, hir) in cx.hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            let Some(import) = crate::backend::host_binding(decl) else {
+                continue;
+            };
+            if !wanted.contains(&import) {
+                continue;
+            }
+            let def = crate::resolve::DefId { unit, decl: id.0 };
+            let Some(signature) = signature_of(cx, unit, decl) else {
+                continue;
+            };
+            out.push(CallableImport {
+                id: import,
+                callee: def,
+                binding: ImportBinding::Host,
+                signature,
+                // The authority the OPERATION requires, from its own declared
+                // row. Not from the enclosing component's contract: a component
+                // must hold what the operation needs, and reading the
+                // requirement off the holder would make that check circular.
+                required_capabilities: decl
+                    .declared_effects
+                    .as_deref()
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|e| capability_for(cx, &e.written))
+                    .collect(),
+            });
+        }
     }
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    out.dedup_by(|a, b| a.id == b.id);
     out
+}
+
+/// A declaration's ABI, from its own parameters and return type.
+fn signature_of(cx: &Context<'_>, unit: usize, decl: &Decl) -> Option<BackendSignature> {
+    let mut params = Vec::new();
+    for p in &decl.params {
+        let written = p.ty.as_ref()?;
+        let span = p.span.clone();
+        match ty_written(cx, unit, &written.written(), &span) {
+            Lowering::Lowered(t) => params.push(t),
+            _ => return None,
+        }
+    }
+    let result = match &decl.ret {
+        Some(head) => {
+            let written = crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone());
+            match ty_written(cx, unit, &written.written(), &decl.name_span) {
+                Lowering::Lowered(t) => t,
+                _ => return None,
+            }
+        }
+        None => Type::Unit,
+    };
+    Some(BackendSignature { params, result })
+}
+
+/// The capability an effect requires, as the CONTRACTS derived it.
+///
+/// Matched by the effect's written form against a capability's name — the two
+/// strings the ontology produced from one declaration. Read rather than
+/// re-derived: `Capability::resolve` already answered this, and answering it
+/// again here would be the second derivation.
+fn capability_for(cx: &Context<'_>, written: &str) -> Option<CapabilityId> {
+    cx.contracts
+        .iter()
+        .flat_map(|c| c.required_capabilities.iter())
+        .find(|c| c.name() == written)
+        .cloned()
+        .map(CapabilityId)
 }
 
 /// Lower one declaration.
@@ -196,7 +263,6 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         next_value: 0,
         instrs: Vec::new(),
         locals: BTreeMap::new(),
-        capabilities: &capabilities,
     };
 
     // Parameters first, so a body naming one finds it.
@@ -416,7 +482,6 @@ struct Lower<'a> {
     next_value: u32,
     instrs: Vec<Instr>,
     locals: BTreeMap<String, ValueId>,
-    capabilities: &'a [CapabilityId],
 }
 
 impl<'a> Lower<'a> {
@@ -450,41 +515,53 @@ impl<'a> Lower<'a> {
     /// asks the wrong module and finds nothing. That blocked every command in
     /// the store.
     fn ty_written_in(&self, unit: usize, written: &str, span: &Span) -> Lowering<Type> {
-        let (head, args) = split(written);
-        if let Some(p) = primitive(head) {
-            return Lowering::Lowered(p);
-        }
-        let arg = |i: usize| -> Lowering<Type> {
-            match args.get(i) {
-                Some(a) => self.ty_written_in(unit, a, span),
-                None => Lowering::Unsupported {
-                    construct: "a carrier with no argument",
-                    span: span.clone(),
-                    reason: format!("`{head}` needs a type argument and was written bare"),
-                },
-            }
-        };
-        match head {
-            "Result" => match (arg(0), arg(1)) {
-                (Lowering::Lowered(a), Lowering::Lowered(b)) => {
-                    Lowering::Lowered(Type::Result(Box::new(a), Box::new(b)))
-                }
-                (Lowering::Lowered(_), other) | (other, _) => other.map(|_: Type| unreachable!()),
-            },
-            "Option" => arg(0).map(|a| Type::Option(Box::new(a))),
-            "List" => arg(0).map(|a| Type::List(Box::new(a))),
-            _ => match self.cx.ws.resolve_in(unit, Namespace::Type, head) {
-                Resolution::Local(def) | Resolution::Imported { def, .. } => {
-                    Lowering::Lowered(Type::Nominal(def))
-                }
-                _ => Lowering::Blocked {
-                    why: format!("`{head}` names no type this program declares"),
-                    span: span.clone(),
-                },
-            },
-        }
+        ty_written(self.cx, unit, written, span)
     }
+}
 
+/// **What a written type is, resolved in one unit.**
+///
+/// A free function because two callers need it and neither may have its own:
+/// `Lower::ty_written_in` while lowering a body, and `signature_of` while
+/// reading a host operation's ABI off its declaration. A second copy is how the
+/// two come to disagree about what `Result<Cart, CartError>` is.
+fn ty_written(cx: &Context<'_>, unit: usize, written: &str, span: &Span) -> Lowering<Type> {
+    let (head, args) = split(written);
+    if let Some(p) = primitive(head) {
+        return Lowering::Lowered(p);
+    }
+    let arg = |i: usize| -> Lowering<Type> {
+        match args.get(i) {
+            Some(a) => ty_written(cx, unit, a, span),
+            None => Lowering::Unsupported {
+                construct: "a carrier with no argument",
+                span: span.clone(),
+                reason: format!("`{head}` needs a type argument and was written bare"),
+            },
+        }
+    };
+    match head {
+        "Result" => match (arg(0), arg(1)) {
+            (Lowering::Lowered(a), Lowering::Lowered(b)) => {
+                Lowering::Lowered(Type::Result(Box::new(a), Box::new(b)))
+            }
+            (Lowering::Lowered(_), other) | (other, _) => other.map(|_: Type| unreachable!()),
+        },
+        "Option" => arg(0).map(|a| Type::Option(Box::new(a))),
+        "List" => arg(0).map(|a| Type::List(Box::new(a))),
+        _ => match cx.ws.resolve_in(unit, Namespace::Type, head) {
+            Resolution::Local(def) | Resolution::Imported { def, .. } => {
+                Lowering::Lowered(Type::Nominal(def))
+            }
+            _ => Lowering::Blocked {
+                why: format!("`{head}` names no type this program declares"),
+                span: span.clone(),
+            },
+        },
+    }
+}
+
+impl<'a> Lower<'a> {
     fn expr(&mut self, body: &Body, e: ExprId) -> Lowering<ValueId> {
         let span = body.expr_span(e);
         match body.expr(e) {
@@ -608,7 +685,18 @@ impl<'a> Lower<'a> {
         // other through a map E2C builds from resolved declarations. Reading
         // the last segment would be the third thing, and it is the one
         // `last_segment.rs` forbids.
-        let resolved = match self.cx.ws.resolve_in(self.unit, Namespace::Term, &path) {
+        //
+        // A DOTTED path goes through `resolve_path`, which checks the module is
+        // visible and the member exists. It was not asked before 2026-08-20,
+        // because the old classification keyed on the effect row and did not
+        // need the callee's identity — so `Menus.for_store` had a signature and
+        // no `DefId`, and nothing noticed until the identity became the thing
+        // that decides.
+        let resolution = match path.contains('.') {
+            true => self.cx.ws.resolve_path(self.unit, &path),
+            false => self.cx.ws.resolve_in(self.unit, Namespace::Term, &path),
+        };
+        let resolved = match resolution {
             Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
             _ => None,
         };
@@ -639,21 +727,36 @@ impl<'a> Lower<'a> {
 
         let def = resolved;
 
-        // **Does this call cross the capability boundary?** The callee's own
-        // declared row says what it performs; the enclosing contract says what
-        // authority the enclosing declaration was granted. A call whose callee
-        // performs a capability the contract requires is the host call.
-        let performs: Vec<&CapabilityId> = self
-            .capabilities
-            .iter()
-            .filter(|c| sig.effects.iter().any(|e| effect_is(e, &c.0)))
-            .collect();
+        // **Where does this callee's implementation come from?**
+        //
+        // Architect ruling, 2026-08-20, deleting the rule that used to be here:
+        //
+        // > "The callee's declared effect row contains a capability required by
+        // > this component, therefore it is a HostCall." Delete that
+        // > classification. An effectful function can perfectly well be
+        // > ordinary compiled Pleris.
+        //
+        // Three independent facts, and the old rule collapsed the first into
+        // the third:
+        //
+        // ```text
+        // implementation   local Pleris / another component / the host
+        // effects          database.write<Carts>, session.read, ..
+        // authority        the capabilities those effects require
+        // ```
+        //
+        // So the question is the DECLARATION's, not the effect row's: a `fn`
+        // with a `host "pw:host/carts#add"` policy is supplied externally, and
+        // one without is compiled here however effectful it is.
+        let binding = resolved
+            .and_then(|d| crate::resolve::declaration(self.cx.hirs, d))
+            .and_then(crate::backend::host_binding);
 
         let result = self.fresh();
-        match performs.first() {
-            Some(cap) => self.instrs.push(Instr::HostCall {
+        match binding {
+            Some(import) => self.instrs.push(Instr::ImportCall {
                 result,
-                capability: (*cap).clone(),
+                import,
                 args: lowered,
                 ty,
             }),
@@ -679,16 +782,6 @@ impl<'a> Lower<'a> {
         }
         Lowering::Lowered(result)
     }
-}
-
-/// Does this written effect correspond to this capability?
-///
-/// Compared through the CONTRACT's own parse, so the two spellings cannot
-/// drift: `Capability::parse` is what produced the capability in the first
-/// place, and asking it again is asking the same function rather than writing a
-/// second matcher.
-fn effect_is(effect: &str, cap: &crate::contract::Capability) -> bool {
-    crate::contract::Capability::parse(effect) == *cap
 }
 
 fn construct_name(e: &Expr) -> &'static str {

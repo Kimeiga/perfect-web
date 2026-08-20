@@ -122,9 +122,22 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/database",
-        "name": "read",
+        "interface": "pw:host/carts",
+        "name": "current",
         "capability": "database.read<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            "SessionId"
+          ],
+          "result": "Result<Cart, CartError>"
+        },
         "kind": "host_capability"
       }
     ],
@@ -165,9 +178,22 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/database",
-        "name": "read",
+        "interface": "pw:host/menus",
+        "name": "for-store",
         "capability": "database.read<Menus>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Menus"
+          }
+        ],
+        "signature": {
+          "params": [
+            "StoreId"
+          ],
+          "result": "Result<List<MenuItemId>, StoreError>"
+        },
         "kind": "host_capability"
       }
     ],
@@ -200,9 +226,22 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/database",
-        "name": "read",
+        "interface": "pw:host/stores",
+        "name": "get",
         "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            "StoreId"
+          ],
+          "result": "Result<Store, StoreError>"
+        },
         "kind": "host_capability"
       }
     ],
@@ -262,6 +301,16 @@
         "interface": "pw:host/session",
         "name": "read",
         "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": "Session<SessionId>"
+        },
         "kind": "host_capability"
       }
     ],
@@ -298,15 +347,40 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/database",
-        "name": "write",
+        "interface": "pw:host/carts",
+        "name": "add",
         "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            "SessionId",
+            "MenuItemId",
+            "PositiveInt"
+          ],
+          "result": "Result<Cart, CartError>"
+        },
         "kind": "host_capability"
       },
       {
         "interface": "pw:host/session",
         "name": "read",
         "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": "Session<SessionId>"
+        },
         "kind": "host_capability"
       }
     ],
@@ -351,15 +425,38 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/database",
-        "name": "write",
+        "interface": "pw:host/carts",
+        "name": "clear",
         "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            "SessionId"
+          ],
+          "result": "Result<Cart, CartError>"
+        },
         "kind": "host_capability"
       },
       {
         "interface": "pw:host/session",
         "name": "read",
         "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": "Session<SessionId>"
+        },
         "kind": "host_capability"
       }
     ],

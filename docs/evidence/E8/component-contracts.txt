@@ -33,19 +33,19 @@ Resources.Store  abi 67b9938482d95947
 store.page.Cart  abi 37cb9e8b9dc1738c
   runs at   origin
   needs     database.read<Carts>
-  host      pw:host/database#read  (database.read<Carts>)
+  host      pw:host/carts#current  (database.read<Carts>)
   exports   query Cart
 
 store.page.Menu  abi 60058db28f2ab607
   runs at   origin
   needs     database.read<Menus>
-  host      pw:host/database#read  (database.read<Menus>)
+  host      pw:host/menus#for-store  (database.read<Menus>)
   exports   query Menu
 
 store.page.Store  abi 4aedcc2febb0861f
   runs at   origin
   needs     database.read<Stores>
-  host      pw:host/database#read  (database.read<Stores>)
+  host      pw:host/stores#get  (database.read<Stores>)
   exports   query Store
 
 store.page.StorePage  abi d803b26130c7cf49
@@ -63,7 +63,7 @@ store.page.add_to_cart  abi 667b06541a47fc42
   runs at   origin
   needs     database.write<Carts>
   needs     session.read
-  host      pw:host/database#write  (database.write<Carts>)
+  host      pw:host/carts#add  (database.write<Carts>)
   host      pw:host/session#read  (session.read)
   exports   command add_to_cart
 
@@ -71,7 +71,7 @@ store.page.clear_cart  abi a3bcfeb6f0683204
   runs at   origin
   needs     database.write<Carts>
   needs     session.read
-  host      pw:host/database#write  (database.write<Carts>)
+  host      pw:host/carts#clear  (database.write<Carts>)
   host      pw:host/session#read  (session.read)
   exports   command clear_cart
 

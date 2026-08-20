@@ -344,7 +344,13 @@ fn the_trusted_platform_contract_is_hashed() {
     // filesystem read. `placement build` is what carries A-013's determinism
     // claim; before this the call named nothing and the page's contract
     // permitted the browser.
-    const EXPECTED: u64 = 0x7606d48e24b0eb45;
+    // Changed again 2026-08-20: `current_session` carries
+    // `host "pw:host/session#read"` and has no body. Architect ruling — host
+    // implementation is explicit declaration metadata, never inferred from a
+    // missing or `todo` body or from the effect row. The Wasm encoder found
+    // why: a capability authorizes an operation and does not identify one, so
+    // the binding has to name the callable.
+    const EXPECTED: u64 = 0x01053ad39f22afaf;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

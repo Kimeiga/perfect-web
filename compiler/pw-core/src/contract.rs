@@ -243,8 +243,35 @@ pub struct Import {
     /// Present so the audit's refusal can say *why*: "this module imports
     /// `pw:host/database#read`, and nothing in its effect row asks for
     /// `database.read`" is actionable; "undeclared import" is not.
+    ///
+    /// **One of possibly several.** See `capabilities` — this field is the
+    /// first of them, kept because the audit's message reads better with one
+    /// name and because a host that only ever saw one should not have to
+    /// change to keep working.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub capability: String,
+    /// **Every capability invoking this operation requires.**
+    ///
+    /// Architect ruling, 2026-08-20:
+    ///
+    /// > Don't encode `HostCall { capability }` as though every operation has
+    /// > one authority. […] operation → zero or more capabilities; capability →
+    /// > zero or more operations. No 1:1 assumption in either direction.
+    ///
+    /// May be empty: an operation can be placement-constrained and need no
+    /// authority at all, which is already true of the browser-semantic effects.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<Capability>,
+    /// **The ABI, for a host operation.**
+    ///
+    /// Carried so that one answer reaches the whole chain — contract → Backend
+    /// IR → core Wasm import types → WIT → the E8 artifact audit. The encoder
+    /// derived it from CALL SITES until 2026-08-20, and `Carts.add` and
+    /// `Carts.clear` sharing `database.write<Carts>` is what proved that could
+    /// not work: the two have different ABIs and there was no single arity to
+    /// derive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<Signature>,
     /// What kind of dependency this is.
     ///
     /// Architect ruling, 2026-08-07:
@@ -258,6 +285,19 @@ pub struct Import {
     /// look privileged.
     #[serde(default)]
     pub kind: ImportKind,
+}
+
+/// A host operation's ABI, as the checker established it.
+///
+/// Written types rather than resolved ids: the contract is a DATA ARTIFACT
+/// (ADR-0018) that a host reads without linking this compiler, and a `DefId`
+/// means nothing outside it.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Signature {
+    /// Parameter types, as written: `["SessionId", "MenuItemId", "PositiveInt"]`.
+    pub params: Vec<String>,
+    /// The result type, as written.
+    pub result: String,
 }
 
 /// Where an import's implementation comes from, and therefore what constrains
@@ -409,6 +449,85 @@ fn component_kind(kind: DeclKind) -> Option<&'static str> {
     })
 }
 
+/// **The host operations this declaration's body calls.**
+///
+/// One import per CALLABLE, with the ABI and the authority read off the
+/// operation's own declaration. Architect ruling, 2026-08-20: a capability
+/// authorizes an operation and does not identify one, so the import cannot be
+/// keyed on the capability — `Carts.add` and `Carts.clear` share
+/// `database.write<Carts>` and differ in arity.
+///
+/// `backend::host_binding` is the one reader of the `host` policy, used here
+/// and by lowering, so the contract and the IR cannot disagree about which
+/// callables a component depends on.
+fn host_calls(
+    inference: &Inference<'_>,
+    hirs: &[&Hir],
+    unit: usize,
+    hir: &Hir,
+    id: crate::hir::DeclId,
+) -> Vec<Import> {
+    let Some(body_id) = hir.decl(id).body else {
+        return Vec::new();
+    };
+    let body = hir.body(body_id);
+    let mut out = Vec::new();
+    let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
+    for expr in body.walk() {
+        let Expr::Call { callee, .. } = body.expr(expr) else {
+            continue;
+        };
+        let path = crate::infer::path_of(body, *callee);
+        if path.is_empty() {
+            continue;
+        }
+        let Some(def) = inference.resolved_from(unit, &path) else {
+            continue;
+        };
+        let Some(decl) = crate::resolve::declaration(hirs, def) else {
+            continue;
+        };
+        let Some(op) = crate::backend::host_binding(decl) else {
+            continue;
+        };
+        if !seen.insert((op.interface.clone(), op.name.clone())) {
+            continue;
+        }
+        let caps: Vec<Capability> = decl
+            .declared_effects
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|e| Capability::parse(&e.written))
+            .collect();
+        out.push(Import {
+            interface: op.interface,
+            name: op.name,
+            capability: caps.first().map(|c| c.name()).unwrap_or_default(),
+            capabilities: caps,
+            signature: Some(Signature {
+                params: decl
+                    .params
+                    .iter()
+                    .map(|p| {
+                        p.ty.as_ref()
+                            .map(|t| t.written())
+                            .unwrap_or_else(|| "?".to_string())
+                    })
+                    .collect(),
+                result: match &decl.ret {
+                    Some(head) => {
+                        crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone()).written()
+                    }
+                    None => "()".to_string(),
+                },
+            }),
+            kind: ImportKind::HostCapability,
+        });
+    }
+    out
+}
+
 /// The other components this declaration's body calls.
 ///
 /// Resolved, so `Cart` in one module and `Cart` in another are two
@@ -479,6 +598,8 @@ fn component_calls(
                 interface: format!("pw:app/{component}"),
                 name: name.clone(),
                 capability: String::new(),
+                capabilities: Vec::new(),
+                signature: None,
                 kind: ImportKind::Component,
             });
         }
@@ -486,52 +607,6 @@ fn component_calls(
     out.sort();
     out.dedup();
     out
-}
-
-/// The host interface and function a capability is served by.
-///
-/// **From the effect's `host` clause**, which is where the mapping is declared:
-///
-/// ```pleris
-/// effect database.read<T> {
-///     capability database.read<T>
-///     host       "pw:host/database#read"
-/// }
-/// ```
-///
-/// It was `format!("pw:host/{family}")` with the operation as the function
-/// name, which happens to produce the identical string for every effect whose
-/// declaration follows that shape — `database.read` and `database.write` among
-/// them, which is why `docs/evidence/E8/component-contracts.json` does not
-/// change. `secret<Payments>` is where they differ: formatted it is
-/// `pw:host/secret#use`, and the platform's module is `secrets` with a `get`.
-///
-/// The convention remains the fallback for an effect nothing declares, so a
-/// program checked without the platform packages keeps its imports rather than
-/// silently losing them.
-///
-/// Still deliberately shallow: the compiler says which interface a capability
-/// would be served by, and the host decides whether it has one. What changed is
-/// only where the name comes from.
-fn interface_for(capability: &Capability, ontology: &Ontology) -> (String, String) {
-    if let Some(host) = ontology
-        .declared_for(&capability.name())
-        .and_then(|d| d.host.as_deref())
-    {
-        // `interface#function`, WIT's own separator. Split here because this is
-        // the boundary that reads the clause — the same discipline `EffectPath`
-        // applies to the dot.
-        if let Some((interface, function)) = host.split_once('#') {
-            return (interface.to_string(), function.to_string());
-        }
-        return (host.to_string(), "use".to_string());
-    }
-    let function = if capability.operation.is_empty() {
-        "use".to_string()
-    } else {
-        capability.operation.clone()
-    };
-    (format!("pw:host/{}", capability.family), function)
 }
 
 /// Derive every component's contract from a checked program.
@@ -757,17 +832,19 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // Host authority, and component dependencies, in one list but
             // never one CLASS. A page that calls a privileged query depends on
             // it; it does not acquire its authority.
-            let mut imports: BTreeSet<Import> = capabilities
-                .iter()
-                .map(|c| {
-                    let (interface, name) = interface_for(c, &ontology);
-                    Import {
-                        interface,
-                        name,
-                        capability: c.name(),
-                        kind: ImportKind::HostCapability,
-                    }
-                })
+            //
+            // **A host import is a CALLABLE, not a capability.** Architect
+            // ruling, 2026-08-20, after the Wasm encoder found the conflation:
+            //
+            // > A capability authorizes an operation. It does not identify the
+            // > operation.
+            //
+            // `Carts.add` and `Carts.clear` both require `database.write<Carts>`
+            // and have different ABIs, so an import keyed on the capability had
+            // no signature it could carry. Each host operation the body calls
+            // is its own import, with its own ABI and its own authority set.
+            let mut imports: BTreeSet<Import> = host_calls(&inference, hirs, unit, hir, id)
+                .into_iter()
                 .collect();
             for dep in component_calls(&inference, unit, hir, id, &components) {
                 imports.insert(dep);
