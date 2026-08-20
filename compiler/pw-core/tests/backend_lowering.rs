@@ -163,7 +163,7 @@ fn lowered(
 /// backend was right.
 ///
 /// They are keyed on the CALLABLE — `pw:host/session#read` and
-/// `pw:host/carts#add` — not on the capability. Architect ruling, 2026-08-20,
+/// `store:data/carts#add` — not on the capability. Architect ruling, 2026-08-20,
 /// after the Wasm encoder proved a capability cannot be a callable identity:
 /// `Carts.add` and `Carts.clear` share `database.write<Carts>` and have
 /// different ABIs.
@@ -194,7 +194,7 @@ fn the_real_add_to_cart_lowers_to_two_import_calls() {
     host.sort();
     assert_eq!(
         host,
-        ["pw:host/carts#add", "pw:host/session#read"],
+        ["pw:host/session#read", "store:data/carts#add"],
         "the two callables it invokes, by the identity the ARTIFACT will carry"
     );
 
@@ -307,7 +307,7 @@ command Add(id: Id) -> Result<Cart, CartError>
     // import. One line of difference, and it is the declaration's own metadata.
     let bound = src.replace(
         "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> } { todo }",
-        "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> }\n    host \"pw:host/carts#write\"",
+        "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> }\n    host \"store:data/carts#write\"",
     );
     let built = Built::synthetic(&bound);
     let (p, _) = lowered(&built);
@@ -320,7 +320,7 @@ command Add(id: Id) -> Result<Cart, CartError>
             _ => None,
         })
         .collect();
-    assert_eq!(imports, ["pw:host/carts#write"]);
+    assert_eq!(imports, ["store:data/carts#write"]);
     assert_eq!(
         p.imports.len(),
         1,

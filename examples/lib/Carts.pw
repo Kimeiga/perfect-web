@@ -13,7 +13,21 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
     RecommendationError, PaymentError, TrackingError }
 import browser.{ Element, MapHandle, MapError }
 
-// **The platform supplies these.**
+// **`store:data`, not `pw:host`.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > `pw:host/carts#add` looks like Pleris itself defines a universal carts
+// > API. It doesn't. […] Do not let `pw:host/carts` become the permanent
+// > standard-library design merely because it was the first thing that made
+// > the demo executable.
+//
+// These are the STORE's data operations, externally implemented for now and
+// expected to become compiled Pleris over narrower platform primitives. The
+// package name is the ownership assertion, and the contract records it as
+// `owner: external` beside `pw:host/session#read`'s `owner: platform`.
+//
+// **Supplied externally today.**
 //
 // Architect ruling, 2026-08-20:
 //
@@ -29,14 +43,14 @@ import browser.{ Element, MapHandle, MapError }
 // error the Wasm encoder found, and the reason a capability may never be a
 // callable identity.
 fn current(s: SessionId) -> Result<Cart, CartError> !{ database.read<Carts> }
-    host "pw:host/carts#current"
+    host "store:data/carts#current"
 
 fn is_empty(s: SessionId) -> Bool !{ database.read<Carts> } {
     todo
 }
 
 fn add(s: SessionId, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write<Carts> }
-    host "pw:host/carts#add"
+    host "store:data/carts#add"
 
 // Placing the order. Declared here because `R-030` called it and imported
 // nothing — the fixture whose subject is private data in a resume manifest was
@@ -62,4 +76,4 @@ fn checkout(id: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> }
 }
 
 fn clear(s: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> }
-    host "pw:host/carts#clear"
+    host "store:data/carts#clear"

@@ -678,3 +678,279 @@ query Lookup(id: StoreId) -> Result<Store, StoreError>
         pw_core::binding::LocalSupport::Direct
     );
 }
+
+// --- the callable-operation layer -------------------------------------------
+
+/// **Every operation's authority is held by the component that calls it.**
+///
+/// Architect ruling, 2026-08-20, adding this as its own layer between the
+/// artifact audit and admission:
+///
+/// ```text
+/// artifact audit        did you import only the operations your contract names?
+/// contract consistency  does your contract possess every authority those
+///                       operations require?
+/// admission             does this node actually grant that authority?
+/// ```
+///
+/// Controls A and D of the four the ruling froze.
+#[test]
+fn an_operations_authority_must_be_held_by_its_caller() {
+    use pw_core::contract::consistent;
+
+    // A — the operation requires `database.read<Stores>` and the component
+    // holds it.
+    let c = one(&[PROGRAM], "shop.origin.Menu");
+    assert!(
+        consistent(&c).is_satisfied(),
+        "{:?} vs {:?}",
+        c.imports,
+        c.required_capabilities
+    );
+    assert!(
+        !c.imports.is_empty() && !c.required_capabilities.is_empty(),
+        "and it is not vacuous: there is an operation and there is authority"
+    );
+
+    // D — the discriminator that forced the whole model. Two callables, one
+    // capability, different ABIs, both accepted independently.
+    let src = "\
+module shop.two
+
+fn add(session: Int, item: Int, quantity: Int) -> Int !{ database.write<Stores> }
+    host \"store:data/carts#add\"
+
+fn clear(session: Int) -> Int !{ database.write<Stores> }
+    host \"store:data/carts#clear\"
+
+command Both(id: Int) -> Int
+    requires SignedIn
+{
+    add(id, id, id) + clear(id)
+}
+";
+    let c = one(&[src], "shop.two.Both");
+    let mut keys: Vec<String> = c.imports.iter().map(|i| i.key()).collect();
+    keys.sort();
+    assert_eq!(keys, ["store:data/carts#add", "store:data/carts#clear"]);
+
+    let sig = |k: &str| -> usize {
+        c.imports
+            .iter()
+            .find(|i| i.key() == k)
+            .and_then(|i| i.signature.as_ref())
+            .map(|s| s.params.len())
+            .unwrap_or_else(|| panic!("no signature for {k}"))
+    };
+    assert_eq!(sig("store:data/carts#add"), 3);
+    assert_eq!(sig("store:data/carts#clear"), 1);
+
+    // One authority, and the component holds it once.
+    for i in &c.imports {
+        assert_eq!(
+            i.capabilities.iter().map(|x| x.name()).collect::<Vec<_>>(),
+            ["database.write<Stores>"]
+        );
+    }
+    assert!(consistent(&c).is_satisfied());
+}
+
+/// **B — an operation whose authority the component does not hold is refused.**
+///
+/// The negative control. Built by removing the capability from the contract
+/// rather than by writing a program the checker would reject earlier, because
+/// the subject is the CONSISTENCY relation and not the effect pipeline.
+#[test]
+fn an_operation_whose_authority_is_not_held_is_refused() {
+    use pw_core::contract::consistent;
+
+    let mut c = one(&[PROGRAM], "shop.origin.Menu");
+    assert!(consistent(&c).is_satisfied(), "it starts consistent");
+
+    c.required_capabilities.clear();
+    let verdict = consistent(&c);
+    assert!(!verdict.is_satisfied(), "{verdict:?}");
+    let pw_core::contract::Audit::Undeclared(missing) = verdict else {
+        unreachable!()
+    };
+    assert!(
+        missing.iter().any(|m| m.contains("database.read<Stores>")),
+        "and it names the authority the operation needs: {missing:?}"
+    );
+}
+
+/// **C — an operation requiring nothing is satisfied by a component holding
+/// nothing.**
+///
+/// The case that must survive. A browser-semantic operation is
+/// placement-constrained and needs no capability, and a rule written as
+/// equality rather than ⊆ would refuse it.
+#[test]
+fn an_operation_that_needs_no_authority_is_consistent_with_none() {
+    use pw_core::contract::consistent;
+
+    let c = one(&[BROWSER_ONLY], "shop.view.Badge");
+    assert!(
+        c.required_capabilities.is_empty(),
+        "{:?}",
+        c.required_capabilities
+    );
+    assert!(consistent(&c).is_satisfied());
+
+    // And it really has an operation, so the emptiness is not why it passes.
+    assert!(
+        c.imports.iter().any(|i| i.key() == "pw:host/dom#mutate"),
+        "{:?}",
+        c.imports.iter().map(|i| i.key()).collect::<Vec<_>>()
+    );
+}
+
+/// **The component may require MORE than its imports do.**
+///
+/// > because a component can have required authority whose use isn't
+/// > represented by a particular callable import shape, and we shouldn't force
+/// > the ABI to become the definition of semantic effects.
+///
+/// So the relation is ⊆ and not equality, and this is what says so: adding an
+/// unrelated capability to the contract keeps it consistent.
+#[test]
+fn a_component_may_hold_authority_no_import_uses() {
+    use pw_core::contract::{Capability, consistent};
+
+    let mut c = one(&[PROGRAM], "shop.origin.Menu");
+    c.required_capabilities
+        .push(Capability::parse("secret<Payments>"));
+    assert!(
+        consistent(&c).is_satisfied(),
+        "a component's authority is not defined by its ABI"
+    );
+}
+
+/// **Same `interface#operation`, wrong ABI → rejected.**
+///
+/// The mutation control the ruling asked for, and it mutates only the
+/// SIGNATURE — the `ImportId` is preserved exactly, so every other layer stays
+/// satisfied:
+///
+/// ```text
+/// audit(identity)        satisfied — the name is the one the contract names
+/// consistent(authority)  satisfied — the capabilities are untouched
+/// abi(shape)             REFUSED
+/// ```
+///
+/// That is the whole reason it is a separate function. An artifact that imports
+/// the right operation with the wrong type validates as Wasm, resolves as a
+/// world, and passes an identity audit; the arguments are simply read as the
+/// wrong shape at the boundary. Architect ruling, 2026-08-20: *"that becomes
+/// important immediately for the Component Model."*
+#[test]
+fn an_operation_with_the_declared_name_and_a_different_abi_is_refused() {
+    use pw_core::contract::{Signature, abi, consistent};
+
+    // An operation that actually takes arguments — `PROGRAM`'s `read_stores()`
+    // takes none, and dropping a parameter from an empty list is a mutation
+    // that mutates nothing.
+    let src = "\
+module shop.abi
+
+fn add(session: Int, item: Int, quantity: Int) -> Int !{ database.write<Stores> }
+    host \"store:data/carts#add\"
+
+command Add(id: Int) -> Int
+    requires SignedIn
+{
+    add(id, id, id)
+}
+";
+    let c = one(&[src], "shop.abi.Add");
+    let key = c.imports[0].key();
+    let declared = c.imports[0]
+        .signature
+        .clone()
+        .unwrap_or_else(|| panic!("{key} has no declared ABI, so this proves nothing"));
+    assert_eq!(declared.params.len(), 3, "the shape being mutated");
+
+    // The artifact that agrees: satisfied.
+    assert_eq!(
+        abi(&c, &[(key.clone(), declared.clone())]),
+        Audit::Satisfied
+    );
+
+    // The artifact that dropped a parameter: refused, with both shapes named.
+    let mut fewer = declared.clone();
+    fewer.params.pop();
+    let verdict = abi(&c, &[(key.clone(), fewer.clone())]);
+    assert!(!verdict.is_satisfied(), "{verdict:?}");
+    let Audit::Undeclared(wrong) = verdict else {
+        unreachable!()
+    };
+    assert_eq!(wrong.len(), 1);
+    assert!(
+        wrong[0].contains(&key) && wrong[0].contains(&declared.render()),
+        "the refusal names the operation and the ABI the contract fixed: {wrong:?}"
+    );
+
+    // And the result type alone is enough, with the arity identical.
+    let other_result = Signature {
+        params: declared.params.clone(),
+        result: format!("Not{}", declared.result),
+    };
+    assert!(
+        !abi(&c, &[(key.clone(), other_result)]).is_satisfied(),
+        "an ABI differs in its result as much as in its parameters"
+    );
+
+    // **The discriminator.** The mutation is invisible to the other two
+    // layers — which is what makes this check load-bearing rather than a
+    // second spelling of the identity audit.
+    assert_eq!(audit(&c, std::slice::from_ref(&key)), Audit::Satisfied);
+    assert!(consistent(&c).is_satisfied());
+
+    // An operation the contract declares no ABI for is NOT checked. A contract
+    // that has not said and a contract that agrees must not be the same
+    // verdict, so this reports nothing rather than a spurious match.
+    let mut quiet = c.clone();
+    quiet.imports[0].signature = None;
+    assert_eq!(abi(&quiet, &[(key, fewer)]), Audit::Satisfied);
+}
+
+/// **Who DEFINES an operation is recorded, separately from who implements it.**
+///
+/// Architect ruling, 2026-08-20: *"the host process currently provides the
+/// implementation" is a deployment fact; it doesn't need to collapse their
+/// semantic ownership.*
+#[test]
+fn platform_operations_are_distinguished_from_application_ones() {
+    use pw_core::contract::Ownership;
+
+    let src = "\
+module shop.mixed
+
+fn ctx() -> Int !{ session.read }
+    host \"pw:host/session#read\"
+
+fn rows(id: Int) -> Int !{ database.read<Stores> }
+    host \"store:data/stores#get\"
+
+command Uses(id: Int) -> Int
+    requires SignedIn
+{
+    ctx() + rows(id)
+}
+";
+    let c = one(&[src], "shop.mixed.Uses");
+    let owner = |k: &str| {
+        c.imports
+            .iter()
+            .find(|i| i.key() == k)
+            .map(|i| i.owner)
+            .unwrap_or_else(|| panic!("no import {k}"))
+    };
+    assert_eq!(owner("pw:host/session#read"), Ownership::Platform);
+    assert_eq!(
+        owner("store:data/stores#get"),
+        Ownership::External,
+        "an application repository method is not a Pleris platform primitive \
+         merely because the host implements it today"
+    );
+}

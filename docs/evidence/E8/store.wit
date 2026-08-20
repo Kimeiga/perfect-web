@@ -120,17 +120,17 @@ world resources-store {
 }
 
 world store-page-cart {
-    import pw:host/carts;
+    import store:data/carts;
     export store-page-cart-api;
 }
 
 world store-page-menu {
-    import pw:host/menus;
+    import store:data/menus;
     export store-page-menu-api;
 }
 
 world store-page-store {
-    import pw:host/stores;
+    import store:data/stores;
     export store-page-store-api;
 }
 
@@ -145,14 +145,14 @@ world store-page-store-page {
 }
 
 world store-page-add-to-cart {
-    import pw:host/carts;
     import pw:host/session;
+    import store:data/carts;
     export store-page-add-to-cart-api;
 }
 
 world store-page-clear-cart {
-    import pw:host/carts;
     import pw:host/session;
+    import store:data/carts;
     export store-page-clear-cart-api;
 }
 

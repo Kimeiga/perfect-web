@@ -37,18 +37,53 @@ architect's ruling of 2026-08-20. `Instr::ImportCall` names an `ImportId`;
 `CallableImport` carries the ABI and a set of capabilities; a host binding is
 explicit declaration metadata. All five store functions encode now.
 
-**Next: the Canonical ABI layer, then component wrapping, then E10-I.** Two
-things are recorded rather than done:
+### The locked order, 2026-08-20
+
+The architect's sequence for the rest of E10-A and E10-I. It is an order, not a
+menu — each step's evidence is what makes the next one readable.
 
 ```text
-Carts.add is host-bound, and that may not be where it belongs — it is
-application data access in an example library, marked as the minimum that
-let the store encode
-
-E8's audit does not yet check that a component holds the capabilities its
-operations require. The contract carries both facts now, so the check is
-expressible; it is not written.
+1  ownership: platform-defined vs host-supplied              DONE
+2  the operation→capability audit, as three separate layers   DONE
+3  freeze the signature/authority mutation controls           DONE
+4  Canonical ABI adapters from checked callable signatures    NEXT
+5  component wrapping, via UPSTREAM wasm-tools                 —
+6  validate with an independent component parser               —
+7  instantiate through the E8 linker                           —
+8  run the `.pw` `add_to_cart`                                 —
+9  delete the Rust closure path; close E10-I                   —
+10 then investigate replacing external `Carts.add`             —
 ```
+
+**Step 5 is a constraint, not a convenience.** Architect ruling:
+
+> Do **not** hand-implement the Component Model binary format. Pleris owns the
+> lowering facts; upstream owns the component-format encoding.
+
+Step 6 is what makes step 5 checkable: a component this repo wrote and this repo
+parsed proves the two agree, which is not the claim.
+
+### E10 follow-up: `store:data/carts#*` should probably not stay external
+
+`Carts.add`, `Carts.clear`, `Carts.current`, `Stores.get` and `Menus.for-store`
+are marked host-supplied. That was the minimum that let the store encode, and
+the ownership field now records that they are the **application's** operations
+rather than the platform's — but it does not make them the right design.
+
+Architect ruling, 2026-08-20:
+
+> Do **not** let `pw:host/carts` become the permanent standard-library design
+> merely because it was the first thing that made the demo executable.
+
+The likely answer is that `Carts.add` is **compiled Pleris** calling a narrower
+platform data primitive, so the application's cart semantics live in the
+application and the platform publishes something smaller and more general. That
+is step 10 above: it happens after `add_to_cart` runs end to end, because until
+then there is no way to tell a design improvement from a change that broke the
+only executable path.
+
+Deferred deliberately, and not blocking: the current arrangement is honest about
+what it is, which is what step 1 bought.
 
 The reason those four and not arbitrary cleanup, in the architect's words:
 `draw(ctx)` contained a name with no binder, `measure(el)` could have its

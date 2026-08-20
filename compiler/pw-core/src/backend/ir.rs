@@ -342,8 +342,19 @@ impl ImportId {
 /// How a callable import's implementation is supplied.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ImportBinding {
-    /// The host or platform provides it, as the declaration says.
-    Host,
+    /// **The Pleris platform defines it and the host implements it.**
+    /// `pw:host/session#read`. Platform ABI-stability expectations apply.
+    PlatformHost,
+    /// **The deployment supplies it, and the semantics are the
+    /// application's.** `store:data/carts#add`.
+    ///
+    /// Architect ruling, 2026-08-20: *"The host process currently provides the
+    /// implementation" is a deployment fact; it doesn't need to collapse their
+    /// semantic ownership.* An application repository method is externally
+    /// implemented today and is expected to become compiled Pleris over
+    /// narrower platform data primitives — recorded in `docs/NEXT.md` so
+    /// `pw:host/carts` cannot become the standard library by default.
+    External,
     /// Another component exports it.
     Component,
 }

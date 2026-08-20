@@ -16,7 +16,21 @@ import browser.{ Element, MapHandle, MapError }
 // The public menu: the same for every reader, which is what makes a shared
 // cache correct for it (E4's store demo).
 
-// **The platform supplies these.**
+// **`store:data`, not `pw:host`.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > `pw:host/carts#add` looks like Pleris itself defines a universal carts
+// > API. It doesn't. […] Do not let `pw:host/carts` become the permanent
+// > standard-library design merely because it was the first thing that made
+// > the demo executable.
+//
+// These are the STORE's data operations, externally implemented for now and
+// expected to become compiled Pleris over narrower platform primitives. The
+// package name is the ownership assertion, and the contract records it as
+// `owner: external` beside `pw:host/session#read`'s `owner: platform`.
+//
+// **Supplied externally today.**
 //
 // Architect ruling, 2026-08-20:
 //
@@ -32,7 +46,7 @@ import browser.{ Element, MapHandle, MapError }
 // error the Wasm encoder found, and the reason a capability may never be a
 // callable identity.
 fn for_store(store: StoreId) -> Result<List<MenuItemId>, StoreError> !{ database.read<Menus> }
-    host "pw:host/menus#for-store"
+    host "store:data/menus#for-store"
 
 // Partitioned by user rather than by organization. Declared so a challenge
 // witness can vary the PARTITION without varying anything else.

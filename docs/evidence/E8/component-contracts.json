@@ -122,7 +122,7 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/carts",
+        "interface": "store:data/carts",
         "name": "current",
         "capability": "database.read<Carts>",
         "capabilities": [
@@ -138,6 +138,7 @@
           ],
           "result": "Result<Cart, CartError>"
         },
+        "owner": "external",
         "kind": "host_capability"
       }
     ],
@@ -178,7 +179,7 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/menus",
+        "interface": "store:data/menus",
         "name": "for-store",
         "capability": "database.read<Menus>",
         "capabilities": [
@@ -194,6 +195,7 @@
           ],
           "result": "Result<List<MenuItemId>, StoreError>"
         },
+        "owner": "external",
         "kind": "host_capability"
       }
     ],
@@ -226,7 +228,7 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/stores",
+        "interface": "store:data/stores",
         "name": "get",
         "capability": "database.read<Stores>",
         "capabilities": [
@@ -242,6 +244,7 @@
           ],
           "result": "Result<Store, StoreError>"
         },
+        "owner": "external",
         "kind": "host_capability"
       }
     ],
@@ -275,26 +278,31 @@
       {
         "interface": "pw:app/store.page.Cart",
         "name": "Cart",
+        "owner": "external",
         "kind": "component"
       },
       {
         "interface": "pw:app/store.page.Menu",
         "name": "Menu",
+        "owner": "external",
         "kind": "component"
       },
       {
         "interface": "pw:app/store.page.Store",
         "name": "Store",
+        "owner": "external",
         "kind": "component"
       },
       {
         "interface": "pw:app/store.page.add_to_cart",
         "name": "add_to_cart",
+        "owner": "external",
         "kind": "component"
       },
       {
         "interface": "pw:app/store.page.clear_cart",
         "name": "clear_cart",
+        "owner": "external",
         "kind": "component"
       },
       {
@@ -311,6 +319,7 @@
           "params": [],
           "result": "Session<SessionId>"
         },
+        "owner": "platform",
         "kind": "host_capability"
       }
     ],
@@ -347,7 +356,24 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/carts",
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": "Session<SessionId>"
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/carts",
         "name": "add",
         "capability": "database.write<Carts>",
         "capabilities": [
@@ -365,22 +391,7 @@
           ],
           "result": "Result<Cart, CartError>"
         },
-        "kind": "host_capability"
-      },
-      {
-        "interface": "pw:host/session",
-        "name": "read",
-        "capability": "session.read",
-        "capabilities": [
-          {
-            "family": "session",
-            "operation": "read"
-          }
-        ],
-        "signature": {
-          "params": [],
-          "result": "Session<SessionId>"
-        },
+        "owner": "external",
         "kind": "host_capability"
       }
     ],
@@ -425,7 +436,24 @@
     ],
     "imports": [
       {
-        "interface": "pw:host/carts",
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": "Session<SessionId>"
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/carts",
         "name": "clear",
         "capability": "database.write<Carts>",
         "capabilities": [
@@ -441,22 +469,7 @@
           ],
           "result": "Result<Cart, CartError>"
         },
-        "kind": "host_capability"
-      },
-      {
-        "interface": "pw:host/session",
-        "name": "read",
-        "capability": "session.read",
-        "capabilities": [
-          {
-            "family": "session",
-            "operation": "read"
-          }
-        ],
-        "signature": {
-          "params": [],
-          "result": "Session<SessionId>"
-        },
+        "owner": "external",
         "kind": "host_capability"
       }
     ],

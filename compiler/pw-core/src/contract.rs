@@ -272,6 +272,16 @@ pub struct Import {
     /// derive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signature: Option<Signature>,
+    /// **Who defines this operation**, as distinct from who implements it
+    /// today.
+    ///
+    /// Architect ruling, 2026-08-20: *"the host process currently provides the
+    /// implementation" is a deployment fact; it doesn't need to collapse their
+    /// semantic ownership.* `pw:host/session#read` is a platform facility with
+    /// platform ABI-stability expectations; `store:data/carts#add` is the
+    /// application's own, externally implemented for now.
+    #[serde(default)]
+    pub owner: Ownership,
     /// What kind of dependency this is.
     ///
     /// Architect ruling, 2026-08-07:
@@ -287,6 +297,19 @@ pub struct Import {
     pub kind: ImportKind,
 }
 
+/// Who defines an operation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Ownership {
+    /// The Pleris platform. `pw:host/…`.
+    Platform,
+    /// The application or its deployment. Everything else — and the default,
+    /// because assuming an unlabelled operation is the platform's would be the
+    /// generous direction.
+    #[default]
+    External,
+}
+
 /// A host operation's ABI, as the checker established it.
 ///
 /// Written types rather than resolved ids: the contract is a DATA ARTIFACT
@@ -298,6 +321,15 @@ pub struct Signature {
     pub params: Vec<String>,
     /// The result type, as written.
     pub result: String,
+}
+
+impl Signature {
+    /// `(SessionId, MenuItemId) -> Cart`. For a refusal message, so a
+    /// disagreement about an ABI reads as two shapes rather than two debug
+    /// dumps.
+    pub fn render(&self) -> String {
+        format!("({}) -> {}", self.params.join(", "), self.result)
+    }
 }
 
 /// Where an import's implementation comes from, and therefore what constrains
@@ -396,6 +428,104 @@ impl Audit {
     }
 }
 
+/// **Does the artifact's ABI for each operation match the one the contract
+/// fixed?**
+///
+/// The second question in the artifact-audit layer, and deliberately not folded
+/// into [`audit`]. That one decides *identity* — "did you import only the
+/// operations your contract names?" — and it is satisfied by an artifact that
+/// imports `store:data/carts#add` no matter what type it gives it.
+///
+/// Architect ruling, 2026-08-20:
+///
+/// > I would also mutate only the operation's signature while preserving its
+/// > `ImportId`: `same interface#operation / wrong ABI → rejected`. That becomes
+/// > important immediately for the Component Model.
+///
+/// It matters there because a component's import is a *name plus a type*, and
+/// two builds can agree on every name while disagreeing about what crosses.
+/// Nothing downstream would notice: the module validates, the world resolves,
+/// and [`audit`] is satisfied — the arguments are simply read as the wrong
+/// shape.
+///
+/// An operation the contract declares no signature for is **not** checked
+/// rather than assumed to match. That is a contract that has not said, and a
+/// silent pass here would make "the contract fixed this ABI" indistinguishable
+/// from "the contract is quiet about it".
+pub fn abi(contract: &ComponentContract, actual: &[(String, Signature)]) -> Audit {
+    let declared: BTreeMap<String, &Signature> = contract
+        .imports
+        .iter()
+        .filter_map(|i| i.signature.as_ref().map(|s| (i.key(), s)))
+        .collect();
+    let mut wrong: Vec<String> = actual
+        .iter()
+        .filter_map(|(key, sig)| match declared.get(key) {
+            Some(want) if *want != sig => Some(format!(
+                "{key}: the contract fixes {}, the artifact declares {}",
+                want.render(),
+                sig.render()
+            )),
+            // Present with no declared ABI, or absent from the contract
+            // entirely — the second is `audit`'s refusal to make, and making it
+            // here too would report one defect as two.
+            _ => None,
+        })
+        .collect();
+    wrong.sort();
+    wrong.dedup();
+    match wrong.is_empty() {
+        true => Audit::Satisfied,
+        false => Audit::Undeclared(wrong),
+    }
+}
+
+/// **Does this contract possess the authority its own operations require?**
+///
+/// A separate layer from the artifact audit and from admission. Architect
+/// ruling, 2026-08-20:
+///
+/// ```text
+/// artifact audit        "Did you import only the operations your contract names?"
+/// contract consistency  "Does your contract possess every authority those
+///                        operations require?"
+/// admission             "Does this node actually grant that authority?"
+/// ```
+///
+/// > Do not combine those into one check.
+///
+/// The relation is **⊆, never equality**:
+///
+/// > because a component can have required authority whose use isn't
+/// > represented by a particular callable import shape, and we shouldn't force
+/// > the ABI to become the definition of semantic effects.
+///
+/// So a component may require more than its imports do — the semantic pipeline
+/// is responsible for why — and it may never require less. An operation
+/// requiring nothing is satisfied by a component holding nothing, which is the
+/// case the browser-semantic effects already need.
+pub fn consistent(contract: &ComponentContract) -> Audit {
+    let held: BTreeSet<String> = contract
+        .required_capabilities
+        .iter()
+        .map(|c| c.name())
+        .collect();
+    let mut missing = Vec::new();
+    for i in &contract.imports {
+        for c in &i.capabilities {
+            if !held.contains(&c.name()) {
+                missing.push(format!("{} requires {}", i.key(), c.name()));
+            }
+        }
+    }
+    missing.sort();
+    missing.dedup();
+    match missing.is_empty() {
+        true => Audit::Satisfied,
+        false => Audit::Undeclared(missing),
+    }
+}
+
 /// **The rule.** Actual imports ⊆ allowed imports.
 ///
 /// Fail-closed by construction: the allowed set is what the contract lists, and
@@ -460,12 +590,15 @@ fn component_kind(kind: DeclKind) -> Option<&'static str> {
 /// `backend::host_binding` is the one reader of the `host` policy, used here
 /// and by lowering, so the contract and the IR cannot disagree about which
 /// callables a component depends on.
+#[allow(clippy::too_many_arguments)]
 fn host_calls(
     inference: &Inference<'_>,
     hirs: &[&Hir],
     unit: usize,
     hir: &Hir,
     id: crate::hir::DeclId,
+    declared_types: &BTreeSet<String>,
+    ontology: &Ontology,
 ) -> Vec<Import> {
     let Some(body_id) = hir.decl(id).body else {
         return Vec::new();
@@ -487,22 +620,36 @@ fn host_calls(
         let Some(decl) = crate::resolve::declaration(hirs, def) else {
             continue;
         };
-        let Some(op) = crate::backend::host_binding(decl) else {
+        // **The one canonical definition**, the same one `backend::lower`
+        // consumes. The types are carried as WRITTEN here because a contract is
+        // a data artifact (ADR-0018) and a `DefId` means nothing outside this
+        // compiler, so the closure returns `Type::Unit` and the written forms
+        // are read off the declaration below.
+        let Some(callable) = crate::backend::callable_of(
+            decl,
+            def,
+            |_| Some(crate::backend::ir::Type::Unit),
+            |effect| match Capability::resolve(effect, declared_types, ontology) {
+                Ok(c) => Some(c),
+                // An unrestricted family needs no host authority. The ONE place
+                // that decides, and both readers of a callable consult it.
+                Err(NotACapability::Unrestricted { .. }) => None,
+                Err(_) => Some(Capability::parse(effect)),
+            },
+        ) else {
             continue;
         };
-        if !seen.insert((op.interface.clone(), op.name.clone())) {
+        if !seen.insert((callable.id.interface.clone(), callable.id.name.clone())) {
             continue;
         }
-        let caps: Vec<Capability> = decl
-            .declared_effects
-            .as_deref()
-            .unwrap_or_default()
+        let caps: Vec<Capability> = callable
+            .required_capabilities
             .iter()
-            .map(|e| Capability::parse(&e.written))
+            .map(|c| c.0.clone())
             .collect();
         out.push(Import {
-            interface: op.interface,
-            name: op.name,
+            interface: callable.id.interface,
+            name: callable.id.name,
             capability: caps.first().map(|c| c.name()).unwrap_or_default(),
             capabilities: caps,
             signature: Some(Signature {
@@ -522,6 +669,10 @@ fn host_calls(
                     None => "()".to_string(),
                 },
             }),
+            owner: match callable.binding {
+                crate::backend::ir::ImportBinding::PlatformHost => Ownership::Platform,
+                _ => Ownership::External,
+            },
             kind: ImportKind::HostCapability,
         });
     }
@@ -600,6 +751,12 @@ fn component_calls(
                 capability: String::new(),
                 capabilities: Vec::new(),
                 signature: None,
+                // **Decided, not defaulted.** A dependency on another
+                // application component is the application's, so it is
+                // `External` for the same reason `store:data/carts#add` is —
+                // Pleris did not define it. The two are told apart by `kind`,
+                // which is the question `owner` is not answering.
+                owner: Ownership::External,
                 kind: ImportKind::Component,
             });
         }
@@ -843,9 +1000,10 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // and have different ABIs, so an import keyed on the capability had
             // no signature it could carry. Each host operation the body calls
             // is its own import, with its own ABI and its own authority set.
-            let mut imports: BTreeSet<Import> = host_calls(&inference, hirs, unit, hir, id)
-                .into_iter()
-                .collect();
+            let mut imports: BTreeSet<Import> =
+                host_calls(&inference, hirs, unit, hir, id, &declared_types, &ontology)
+                    .into_iter()
+                    .collect();
             for dep in component_calls(&inference, unit, hir, id, &components) {
                 imports.insert(dep);
             }

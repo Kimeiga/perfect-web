@@ -38,8 +38,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
-    BackendSignature, Block, BlockId, CallableImport, CapabilityId, Const, Function, ImportBinding,
-    ImportId, Instr, Lowering, Program, Shape, Terminator, Type, TypeDef, ValueId,
+    Block, BlockId, CallableImport, CapabilityId, Const, Function, ImportId, Instr, Lowering,
+    Program, Shape, Terminator, Type, TypeDef, ValueId,
 };
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Span};
@@ -145,77 +145,41 @@ fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
     let mut out = Vec::new();
     for (unit, hir) in cx.hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
-            let Some(import) = crate::backend::host_binding(decl) else {
+            let def = crate::resolve::DefId { unit, decl: id.0 };
+            // **The one canonical definition.** `contract.rs` calls the same
+            // function on the same declaration, so the artifact a host reads
+            // and the IR the encoder consumes cannot disagree about a
+            // callable's ABI or its authority.
+            let Some(callable) = crate::backend::callable_of(
+                decl,
+                def,
+                |written| match ty_written(cx, unit, written, &decl.name_span) {
+                    Lowering::Lowered(t) => Some(t),
+                    _ => None,
+                },
+                // The CONTRACT's answer, not a second derivation: whether an
+                // effect needs authority is the ontology's, and the contracts
+                // already asked. Read off the capability sets they carry.
+                |effect| {
+                    cx.contracts
+                        .iter()
+                        .flat_map(|c| c.imports.iter())
+                        .flat_map(|i| i.capabilities.iter())
+                        .find(|c| c.name() == effect)
+                        .cloned()
+                },
+            ) else {
                 continue;
             };
-            if !wanted.contains(&import) {
+            if !wanted.contains(&callable.id) {
                 continue;
             }
-            let def = crate::resolve::DefId { unit, decl: id.0 };
-            let Some(signature) = signature_of(cx, unit, decl) else {
-                continue;
-            };
-            out.push(CallableImport {
-                id: import,
-                callee: def,
-                binding: ImportBinding::Host,
-                signature,
-                // The authority the OPERATION requires, from its own declared
-                // row. Not from the enclosing component's contract: a component
-                // must hold what the operation needs, and reading the
-                // requirement off the holder would make that check circular.
-                required_capabilities: decl
-                    .declared_effects
-                    .as_deref()
-                    .unwrap_or_default()
-                    .iter()
-                    .filter_map(|e| capability_for(cx, &e.written))
-                    .collect(),
-            });
+            out.push(callable);
         }
     }
     out.sort_by(|a, b| a.id.cmp(&b.id));
     out.dedup_by(|a, b| a.id == b.id);
     out
-}
-
-/// A declaration's ABI, from its own parameters and return type.
-fn signature_of(cx: &Context<'_>, unit: usize, decl: &Decl) -> Option<BackendSignature> {
-    let mut params = Vec::new();
-    for p in &decl.params {
-        let written = p.ty.as_ref()?;
-        let span = p.span.clone();
-        match ty_written(cx, unit, &written.written(), &span) {
-            Lowering::Lowered(t) => params.push(t),
-            _ => return None,
-        }
-    }
-    let result = match &decl.ret {
-        Some(head) => {
-            let written = crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone());
-            match ty_written(cx, unit, &written.written(), &decl.name_span) {
-                Lowering::Lowered(t) => t,
-                _ => return None,
-            }
-        }
-        None => Type::Unit,
-    };
-    Some(BackendSignature { params, result })
-}
-
-/// The capability an effect requires, as the CONTRACTS derived it.
-///
-/// Matched by the effect's written form against a capability's name — the two
-/// strings the ontology produced from one declaration. Read rather than
-/// re-derived: `Capability::resolve` already answered this, and answering it
-/// again here would be the second derivation.
-fn capability_for(cx: &Context<'_>, written: &str) -> Option<CapabilityId> {
-    cx.contracts
-        .iter()
-        .flat_map(|c| c.required_capabilities.iter())
-        .find(|c| c.name() == written)
-        .cloned()
-        .map(CapabilityId)
 }
 
 /// Lower one declaration.

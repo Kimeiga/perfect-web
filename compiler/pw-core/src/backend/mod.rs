@@ -64,7 +64,7 @@ pub mod wasm;
 /// contract → Backend IR → core Wasm imports → WIT → the E8 artifact audit.
 pub fn host_binding(decl: &crate::hir::Decl) -> Option<ir::ImportId> {
     let p = decl.policy("host")?;
-    // `host "pw:host/carts#add"` — the same spelling an `effect` declaration
+    // `host "pw:host/session#read"` — the same spelling an `effect` declaration
     // uses for the interface serving it, and parsed the same way.
     let raw = p.value.trim().trim_matches('"');
     let (interface, name) = raw.split_once('#')?;
@@ -74,5 +74,88 @@ pub fn host_binding(decl: &crate::hir::Decl) -> Option<ir::ImportId> {
     Some(ir::ImportId {
         interface: interface.to_string(),
         name: name.to_string(),
+    })
+}
+
+/// **The WIT package the Pleris platform itself owns.**
+///
+/// Architect ruling, 2026-08-20:
+///
+/// > `pw:host/carts#add` looks like Pleris itself defines a universal carts
+/// > API. It doesn't. […] Do not let `pw:host/carts` become the permanent
+/// > standard-library design merely because it was the first thing that made
+/// > the demo executable.
+///
+/// So ownership is read from the package the author WROTE, exactly as a WIT
+/// package name is an ownership assertion everywhere else. `pw:host/session#read`
+/// is a platform facility with platform ABI-stability expectations;
+/// `store:data/carts#add` is the store's own data layer, externally implemented
+/// today and eventually replaceable by compiled Pleris.
+///
+/// Not a spelling-based resolution: the package IS the identity, and this reads
+/// it rather than guessing from a function's name.
+pub const PLATFORM_PACKAGE: &str = "pw:host";
+
+/// **One canonical callable definition, consumed by both the contract and the
+/// backend.**
+///
+/// Architect ruling, 2026-08-20:
+///
+/// ```text
+/// operation declaration
+///        ↓
+/// CallableImport
+///       ↙   ↘
+/// contract   backend
+/// ```
+///
+/// > not: operation declaration → contract guess / backend guess. You've spent
+/// > multiple milestones eliminating the second pattern.
+///
+/// It was the second pattern for one commit: `contract::host_calls` and
+/// `backend::lower::host_imports` each built the facts from the declaration,
+/// and they would have agreed until one of them learned something.
+/// `ty` resolves a written type; `capability` says what authority an effect
+/// requires, and returns `None` for one that requires none.
+///
+/// Both are passed in rather than decided here. Whether `dom.mutate` needs a
+/// host capability is the ONTOLOGY's answer — `capability none` on the effect's
+/// own declaration — and a second derivation in the backend is what put a
+/// capability on a browser operation that needs none.
+pub fn callable_of(
+    decl: &crate::hir::Decl,
+    callee: crate::resolve::DefId,
+    ty: impl Fn(&str) -> Option<ir::Type>,
+    capability: impl Fn(&str) -> Option<crate::contract::Capability>,
+) -> Option<ir::CallableImport> {
+    let id = host_binding(decl)?;
+    let binding = match id.interface == PLATFORM_PACKAGE
+        || id.interface.starts_with(&format!("{PLATFORM_PACKAGE}/"))
+    {
+        true => ir::ImportBinding::PlatformHost,
+        false => ir::ImportBinding::External,
+    };
+    let mut params = Vec::new();
+    for p in &decl.params {
+        params.push(ty(&p.ty.as_ref()?.written())?);
+    }
+    let result = match &decl.ret {
+        Some(head) => {
+            ty(&crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone()).written())?
+        }
+        None => ir::Type::Unit,
+    };
+    Some(ir::CallableImport {
+        id,
+        callee,
+        binding,
+        signature: ir::BackendSignature { params, result },
+        required_capabilities: decl
+            .declared_effects
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|e| capability(&e.written).map(ir::CapabilityId))
+            .collect(),
     })
 }

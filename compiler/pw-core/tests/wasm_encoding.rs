@@ -155,12 +155,12 @@ fn one_capability_authorizes_two_callables_with_different_abis() {
     let add = p
         .imports
         .iter()
-        .find(|i| i.id.qualified() == "pw:host/carts#add")
+        .find(|i| i.id.qualified() == "store:data/carts#add")
         .expect("Carts.add is an import");
     let clear = p
         .imports
         .iter()
-        .find(|i| i.id.qualified() == "pw:host/carts#clear")
+        .find(|i| i.id.qualified() == "store:data/carts#clear")
         .expect("Carts.clear is an import");
 
     // Different ABIs.
@@ -178,16 +178,62 @@ fn one_capability_authorizes_two_callables_with_different_abis() {
     // And both are real imports of the built module, with their own types.
     let (bytes, _) = wasm::module(&p);
     let names = imported_names(&bytes);
-    assert!(names.contains(&("pw:host/carts".to_string(), "add".to_string())));
-    assert!(names.contains(&("pw:host/carts".to_string(), "clear".to_string())));
+    assert!(names.contains(&("store:data/carts".to_string(), "add".to_string())));
+    assert!(names.contains(&("store:data/carts".to_string(), "clear".to_string())));
 
     // The signature the encoder used is the CALLABLE's, not one derived from a
     // call site: `clear_cart` calls `clear` with one argument and `add_to_cart`
     // calls `add` with three, and a shared import would have had to be one or
     // the other.
     let arities = imported_arities(&bytes);
-    assert_eq!(arities.get("pw:host/carts#add"), Some(&3));
-    assert_eq!(arities.get("pw:host/carts#clear"), Some(&1));
+    assert_eq!(arities.get("store:data/carts#add"), Some(&3));
+    assert_eq!(arities.get("store:data/carts#clear"), Some(&1));
+}
+
+/// **Mutate only the ABI and the module stops validating.**
+///
+/// The same control as `component_contract`'s, one layer down. That one proves
+/// the AUDIT would catch a substituted artifact; this proves the ENCODER
+/// genuinely reads `CallableImport::signature` rather than recomputing an arity
+/// that happens to agree with it.
+///
+/// The distinction is not academic. The encoder derived arities from call sites
+/// until 2026-08-20, and every test above would still have passed — because for
+/// a program where each operation is called one way, a derived arity and a
+/// declared one are the same number. Removing a parameter from the declaration
+/// while leaving the call site alone is what separates them: a signature-driven
+/// encoder emits a 2-parameter import and a call pushing 3, and `wasmparser`
+/// refuses it.
+#[test]
+fn an_import_whose_declared_abi_disagrees_with_its_call_site_does_not_validate() {
+    let p = store_program();
+    let (bytes, _) = wasm::module(&p);
+    validate(&bytes).expect("it validates before the mutation");
+
+    let mut mutated = p.clone();
+    let add = mutated
+        .imports
+        .iter_mut()
+        .find(|i| i.id.qualified() == "store:data/carts#add")
+        .expect("Carts.add is an import");
+    assert_eq!(add.signature.params.len(), 3, "the shape being mutated");
+    add.signature.params.pop();
+
+    // The IDENTITY is untouched, which is the point of the mutation.
+    assert!(
+        mutated
+            .imports
+            .iter()
+            .any(|i| i.id.qualified() == "store:data/carts#add")
+    );
+
+    let (bytes, _) = wasm::module(&mutated);
+    let err = validate(&bytes)
+        .expect_err("a call pushing three arguments to a two-parameter import is not valid Wasm");
+    assert!(
+        err.contains("type mismatch"),
+        "and it is refused for the ABI, not incidentally: {err}"
+    );
 }
 
 /// **The module's imports are exactly the contract's**, name for name.

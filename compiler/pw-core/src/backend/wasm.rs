@@ -12,8 +12,9 @@
 //! # What this file is NOT allowed to decide
 //!
 //! ```text
-//! which calls need authority     the IR already says: HostCall vs Call
-//! which interface serves one     Program::imports, from the CONTRACT
+//! which calls leave the module   the IR already says: ImportCall vs Call
+//! which operation one names      the ImportCall's own ImportId
+//! what an operation's ABI is     CallableImport::signature, from the CONTRACT
 //! what a name resolves to        every callee is a DefId
 //! what a type is                 every type is a Type, nominals by DefId
 //! where anything runs            not this layer's question at all
@@ -145,9 +146,10 @@ pub fn module(p: &Program) -> (Vec<u8>, Vec<Encoding<()>>) {
 
     // **The import table, in the order `Program::imports` gives it.**
     //
-    // Index `i` of that list is core function index `i`, which is what makes
-    // `HostCall` encodable at all: the capability names an entry the contract
-    // put there. A missing capability is a refusal below, never index 0.
+    // Index `i` of that list is core function index `i`, and an `ImportCall`
+    // finds its entry by `ImportId` — the operation the contract named. An
+    // operation the program does not declare is a refusal below, never index 0,
+    // which would call whatever happened to be first.
     let mut import_of: BTreeMap<String, u32> = BTreeMap::new();
     let mut types = TypeSection::new();
     let mut imports = ImportSection::new();
