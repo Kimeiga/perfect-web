@@ -2,104 +2,63 @@
 //
 // One world per ComponentContract. A world's imports are exactly the
 // contract's imports, projected onto interfaces — see pw-core/src/wit.rs.
+//
+// The host packages are HERE, generated, because the Pleris declaration is
+// the ABI authority for every operation this program declares. Architect
+// ruling, 2026-08-20: a deployment IMPLEMENTS this interface; it does not
+// independently specify what the interface means. One interface has one
+// ABI authority, never a Pleris signature plus a hand-authored WIT one
+// with a comparison keeping them synchronized.
 
 package pw:app@0.1.0;
 
-interface types {
-    type domain-store-id = string;
-    type domain-menu-item-id = string;
-    type domain-session-id = string;
-    type domain-order-id = string;
-    record domain-menu-item {
-        id: domain-menu-item-id,
-        name: string,
-    }
-    type domain-positive-int = s64;
-    record domain-money {
-        minor-units: s64,
-    }
-    record domain-store-hours {
-        opens-minute: s64,
-        closes-minute: s64,
-    }
-    record domain-store {
-        id: domain-store-id,
-        name: string,
-        hours: domain-store-hours,
-    }
-    variant domain-store-error {
-        not-found,
-        unavailable,
-        decode-failed(string),
-    }
-    record domain-cart-line {
-        item-id: domain-menu-item-id,
-        quantity: domain-positive-int,
-        unit-price: domain-money,
-    }
-    record domain-cart {
-        lines: list<domain-cart-line>,
-    }
-    variant domain-cart-error {
-        item-unavailable(domain-menu-item-id),
-        quantity-too-large,
-        cart-expired,
-    }
-    record domain-order-progress {
-        stage-label: string,
-    }
-    record domain-order-failure {
-        label: string,
-    }
-}
-
 interface resources-cart-api {
-    use types.{domain-cart, domain-cart-error, domain-session-id};
+    use pw:types/types.{domain-cart, domain-cart-error, domain-session-id};
     cart: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
 }
 
 interface resources-menu-api {
-    use types.{domain-menu-item, domain-store-error, domain-store-id};
+    use pw:types/types.{domain-menu-item, domain-store-error, domain-store-id};
     menu: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
 }
 
 interface resources-order-api {
-    use types.{domain-order-failure, domain-order-id, domain-order-progress};
+    use pw:types/types.{domain-order-failure, domain-order-id, domain-order-progress};
     order: func(arg0: domain-order-id) -> result<domain-order-progress, domain-order-failure>;
 }
 
 interface resources-store-api {
-    use types.{domain-store, domain-store-error, domain-store-id};
+    use pw:types/types.{domain-store, domain-store-error, domain-store-id};
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
 }
 
 interface store-page-cart-api {
-    use types.{domain-cart, domain-cart-error, domain-session-id};
+    use pw:types/types.{domain-cart, domain-cart-error, domain-session-id};
     cart: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
 }
 
 interface store-page-menu-api {
-    use types.{domain-menu-item, domain-store-error, domain-store-id};
+    use pw:types/types.{domain-menu-item, domain-store-error, domain-store-id};
     menu: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
 }
 
 interface store-page-store-api {
-    use types.{domain-store, domain-store-error, domain-store-id};
+    use pw:types/types.{domain-store, domain-store-error, domain-store-id};
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
 }
 
 interface store-page-store-page-api {
-    use types.{domain-store-id};
+    use pw:types/types.{domain-store-id};
     store-page: func(arg0: domain-store-id);
 }
 
 interface store-page-add-to-cart-api {
-    use types.{domain-cart, domain-cart-error, domain-menu-item-id, domain-positive-int};
+    use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item-id, domain-positive-int};
     add-to-cart: func(arg0: domain-menu-item-id, arg1: domain-positive-int) -> result<domain-cart, domain-cart-error>;
 }
 
 interface store-page-clear-cart-api {
-    use types.{domain-cart, domain-cart-error};
+    use pw:types/types.{domain-cart, domain-cart-error};
     clear-cart: func() -> result<domain-cart, domain-cart-error>;
 }
 
@@ -154,5 +113,81 @@ world store-page-clear-cart {
     import pw:host/session;
     import store:data/carts;
     export store-page-clear-cart-api;
+}
+
+package pw:types {
+    interface types {
+        type capability-session = string;
+        type capability-session-id = string;
+        type domain-store-id = string;
+        type domain-menu-item-id = string;
+        type domain-session-id = string;
+        type domain-order-id = string;
+        record domain-menu-item {
+            id: domain-menu-item-id,
+            name: string,
+        }
+        type domain-positive-int = s64;
+        record domain-money {
+            minor-units: s64,
+        }
+        record domain-store-hours {
+            opens-minute: s64,
+            closes-minute: s64,
+        }
+        record domain-store {
+            id: domain-store-id,
+            name: string,
+            hours: domain-store-hours,
+        }
+        variant domain-store-error {
+            not-found,
+            unavailable,
+            decode-failed(string),
+        }
+        record domain-cart-line {
+            item-id: domain-menu-item-id,
+            quantity: domain-positive-int,
+            unit-price: domain-money,
+        }
+        record domain-cart {
+            lines: list<domain-cart-line>,
+        }
+        variant domain-cart-error {
+            item-unavailable(domain-menu-item-id),
+            quantity-too-large,
+            cart-expired,
+        }
+        record domain-order-progress {
+            stage-label: string,
+        }
+        record domain-order-failure {
+            label: string,
+        }
+    }
+}
+
+package pw:host {
+    interface session {
+        use pw:types/types.{capability-session, capability-session-id};
+        read: func() -> capability-session-id;
+    }
+}
+
+package store:data {
+    interface carts {
+        use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item-id, domain-positive-int, domain-session-id};
+        add: func(arg0: domain-session-id, arg1: domain-menu-item-id, arg2: domain-positive-int) -> result<domain-cart, domain-cart-error>;
+        clear: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
+        current: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
+    }
+    interface menus {
+        use pw:types/types.{domain-menu-item-id, domain-store-error, domain-store-id};
+        for-store: func(arg0: domain-store-id) -> result<list<domain-menu-item-id>, domain-store-error>;
+    }
+    interface stores {
+        use pw:types/types.{domain-store, domain-store-error, domain-store-id};
+        get: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
+    }
 }
 

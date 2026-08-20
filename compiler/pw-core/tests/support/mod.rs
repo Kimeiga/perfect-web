@@ -97,92 +97,29 @@ effect resource.release<R> {
 }
 ";
 
-// --- the deployment's WIT ----------------------------------------------------
-//
-// Moved here from `tests/wit_worlds.rs` on 2026-08-20, when a second test
-// binary needed it. One copy: a stand-in for the deployment's own published
-// signatures is exactly the artifact that must not exist twice, since two
-// copies can disagree and each would look authoritative in its own file.
+// --- the WIT directory ------------------------------------------------------
 
-/// **The PLATFORM's WIT** — `pw:host`, which every Pleris deployment publishes.
+/// Lay out a WIT directory the way `push_dir` expects.
 ///
-/// Hand-written, and that is the point: these are the host's signatures and the
-/// compiler has no business deciding them.
+/// **One file, and no `deps/`.** It wrote hand-authored `pw:host` and
+/// `store:data` packages until 2026-08-20, when the architect ruled that the
+/// Pleris declaration is the ABI authority for every operation this program
+/// declares:
 ///
-/// Rewritten 2026-08-20. It used to publish `database` with `read`/`write`,
-/// because a component's imports were derived from its CAPABILITIES — and the
-/// Wasm encoder proved that cannot work: `Carts.add(s, item, qty)` and
-/// `Carts.clear(s)` both require `database.write<Carts>` and have different
-/// ABIs, so one `write` could not have both signatures. A capability authorizes
-/// an operation and does not identify one: `database.write<Carts>` is still the
-/// authority a deployment grants; the operation is what it publishes.
-pub const PLATFORM_WIT: &str = "\
-package pw:host;
-
-/// The invocation context. Added on 2026-08-10, when `examples/store/app.pw`
-/// gained the `import context.{ current_session }` it had been missing since
-/// E4 — so the store's worlds began importing `pw:host/session` and stopped
-/// resolving against a host that does not publish it.
+/// > The deployment implements the emitted interface. It does not
+/// > independently specify what that interface means.
 ///
-/// That is this stand-in doing its job. A capability a component requires and
-/// a deployment does not grant is a deployment that cannot run it, and the WIT
-/// resolve is where that becomes visible rather than a runtime link failure.
-interface session {
-    read: func() -> string;
-}
-";
-
-/// **The APPLICATION's WIT** — `store:data`, which only the store's deployment
-/// publishes.
+/// So the generator emits those packages itself, nested in the same file, and a
+/// stand-in beside them would be the second authority the ruling deleted — the
+/// resolver says so directly: *package `pw:host` is defined in two different
+/// locations*.
 ///
-/// A second package, and the split is the substance. Architect ruling,
-/// 2026-08-20:
-///
-/// > `pw:host/carts#add` wrongly implies Pleris defines a universal carts API.
-/// > […] Do **not** let `pw:host/carts` become the permanent standard-library
-/// > design merely because it was the first thing that made the demo
-/// > executable.
-///
-/// These operations were in `pw:host` until then, which said that a cart is a
-/// Pleris platform facility. It is not: it is this application's data access,
-/// externally implemented today. `Import::owner` records the same distinction
-/// inside the contract, and `docs/NEXT.md` carries the follow-up — these may
-/// become compiled Pleris over a narrower platform primitive.
-///
-/// The grouping into interfaces is an ABI/package-layout decision — `add` and
-/// `clear` could equally live in one `carts` interface or two — and it does not
-/// determine the capability semantics.
-pub const APPLICATION_WIT: &str = "\
-package store:data;
-
-interface carts {
-    current: func(session: string) -> string;
-    add: func(session: string, item: string, quantity: s64) -> string;
-    clear: func(session: string) -> string;
-}
-
-interface stores {
-    get: func(id: string) -> string;
-}
-
-interface menus {
-    %for-store: func(store: string) -> string;
-}
-";
-
-/// Lay out a WIT directory the way `push_dir` expects: the package under test
-/// at the root, and every package it depends on under `deps/`.
-///
-/// Both dependency packages, always. A deployment that publishes the platform's
-/// operations and not the application's is one the store cannot run, and that
-/// has to be visible here rather than at instantiation.
+/// A deployment still writes an implementation by hand. What it no longer
+/// writes is the signature.
 pub fn wit_dir(name: &str, app: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(name);
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("deps/host")).expect("temp dir");
-    std::fs::create_dir_all(dir.join("deps/store-data")).expect("temp dir");
+    std::fs::create_dir_all(&dir).expect("temp dir");
     std::fs::write(dir.join("app.wit"), app).expect("write");
-    std::fs::write(dir.join("deps/host/host.wit"), PLATFORM_WIT).expect("write");
-    std::fs::write(dir.join("deps/store-data/store-data.wit"), APPLICATION_WIT).expect("write");
     dir
 }

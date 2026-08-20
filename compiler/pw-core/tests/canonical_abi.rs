@@ -11,34 +11,32 @@
 //! this repo would be a second implementation of the Canonical ABI, and the
 //! Canonical ABI is the entire product of this stage.
 //!
-//! # The finding this file exists to hold
+//! # The second derivation is gone
 //!
-//! A host operation's ABI is derived **twice**, by two things that never meet:
+//! A host operation's ABI used to be derived twice — by the contract, from the
+//! Pleris `fn` carrying the `host` binding, and by the deployment, in a WIT
+//! package it authored — and nothing compared them. All six of the store's
+//! operations disagreed while every gate stayed green.
 //!
-//! ```text
-//! the contract      from the Pleris `fn` carrying the `host` binding
-//! the deployment    from the WIT package it publishes
-//! ```
+//! Architect ruling, 2026-08-20, resolving it by deletion rather than by
+//! comparison:
 //!
-//! and *nothing compares them*. `wit_parser`'s resolve checks that the
-//! interface exists and that every type a world names is declared. It does not
-//! check that `carts#add` has the type the contract fixed, because the contract
-//! is not an input to it.
+//! > Do not choose "emit vs check" based on `owner`. Choose it based on which
+//! > artifact is the ABI source of truth. […] The deployment implements the
+//! > emitted interface. It does not independently specify what that interface
+//! > means.
 //!
-//! The two disagree today, in this repo, on every operation the store calls —
-//! see `the_contracts_abi_and_the_deployments_wit_are_not_compared`. Until
-//! 2026-08-20 there was nothing to compare: the contract gained `signature`
-//! that day. So this is not a regression. It is a check that became possible
-//! and does not exist.
+//! So `wit::package` emits `pw:host` and `store:data` itself, and a
+//! hand-authored stand-in beside them is not a disagreement to detect — it is a
+//! package defined twice, which the resolver refuses outright.
 //!
-//! And the Canonical ABI does not expose it — it **hides** it. The two flatten
-//! to the same core signature, so no core-level check can find the
-//! disagreement; it lives entirely in the component types. See
-//! `the_two_derivations_coincide_at_the_core_and_differ_above_it`.
+//! What survives here is the fact that made the old defect invisible, because
+//! it still governs what the audit must check: **core Wasm ABI equality is not
+//! component ABI equality.**
 
 use wit_parser::abi::AbiVariant;
 
-use pw_core::contract::{ComponentContract, ImportKind, contracts};
+use pw_core::contract::{ComponentContract, contracts};
 use pw_core::hir::Hir;
 use pw_core::lower::lower_file;
 use pw_core::resolve::Workspace;
@@ -162,45 +160,51 @@ fn a_string_parameter_is_two_core_parameters_and_a_result_is_a_pointer() {
     // making the module speak the second.
 }
 
-/// **The two derivations flatten to the SAME core signature, and that is what
-/// makes the disagreement invisible.**
+/// **One ABI authority: the emitted interface IS the contract's signature.**
 ///
-/// The comparison needs no hand transcription, because the compiler already
-/// renders this exact signature — for an EXPORT. `store:data/carts#current` is
-/// `(SessionId) -> Result<Cart, CartError>` in the contract, and the generated
-/// package declares
+/// This used to assert that two derivations disagreed above the core level
+/// while coinciding at it. The ruling deleted the second derivation, so the
+/// assertion inverts: the operation the deployment sees and the operation the
+/// contract fixed are now the same fact, and there is nothing to keep
+/// synchronized.
 ///
-/// ```wit
-/// cart: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
-/// ```
-///
-/// the same signature through the same type mapping. So flattening
-/// `resources-cart-api#cart` gives the core signature the contract's ABI
-/// implies, and flattening `carts#current` gives the deployment's — both by
-/// `wit_parser`, neither by anything written here.
+/// The old finding survives as the reason the **component-level** audit is
+/// mandatory. `resources-cart-api#cart` and `carts#current` are two different
+/// signatures written two different ways —
+/// `(SessionId) -> Result<Cart, CartError>` exported, and the same shape
+/// imported — and they flatten to an identical core signature:
 ///
 /// ```text
-/// contract    (SessionId) -> Result<Cart, CartError>   [Pointer, Length, Pointer] retptr
-/// deployment  (string) -> string                       [Pointer, Length, Pointer] retptr
+/// [Pointer, Length, Pointer]  retptr, no core result
 /// ```
 ///
-/// Identical. `SessionId` is a `string` alias, and a `result<record, variant>`
-/// and a `string` both exceed the flat limit and so both return through a
-/// pointer. Every one of the six coincides this way.
-///
-/// I expected them to differ and asserted so; they do not, and the correction
-/// is the finding. **No core-level check can catch this** — not the validator,
-/// not the import types, not a signature comparison in the encoder — because at
-/// the core level there is nothing to catch. The disagreement lives entirely in
-/// the COMPONENT types, where the host lifts three `Pointer`s as a `string`
-/// while the guest meant a `result<cart, cart-error>`: the same bytes read as
-/// different shapes, with no trap and no diagnostic.
-///
-/// That is why the check has to compare component types, and why it cannot be
-/// deferred to "the validator will notice".
+/// A `string` and a `result<record, variant>` alike exceed the flat limit and
+/// return through a pointer. So a core-level check can never decide whether an
+/// artifact imports the operation the contract meant: **core Wasm ABI equality
+/// is not component ABI equality**, and the audit has to compare component
+/// types.
 #[test]
-fn the_two_derivations_coincide_at_the_core_and_differ_above_it() {
-    let resolve = resolved("pw-canonical-abi-distance");
+fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
+    let (text, cs) = generated();
+
+    // One authority: what the contract fixes is what the package publishes.
+    let contract_sig = cs
+        .iter()
+        .flat_map(|c| &c.imports)
+        .find(|i| i.key() == "store:data/carts#current")
+        .and_then(|i| i.signature.as_ref())
+        .expect("the contract carries it");
+    assert_eq!(contract_sig.params, vec!["SessionId".to_string()]);
+    assert_eq!(contract_sig.result, "Result<Cart, CartError>");
+    assert!(
+        text.contains(
+            "current: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;"
+        ),
+        "the emitted interface is that signature, not a second opinion about it"
+    );
+
+    // And the core level still cannot tell one component type from another.
+    let resolve = resolved("pw-canonical-abi-authority");
     let flat = flattened(&resolve);
     let by = |k: &str| {
         flat.iter()
@@ -213,57 +217,18 @@ fn the_two_derivations_coincide_at_the_core_and_differ_above_it() {
                 )
             })
     };
-
-    // **The core level: indistinguishable.**
-    //
-    // One pair, because `resources-cart-api#cart` is the only export whose
-    // signature is the same as a host operation's — `(SessionId) ->
-    // Result<Cart, CartError>`, which `Resources.cart` and `Carts.current`
-    // share. `store-page-add-to-cart-api#add-to-cart` is NOT a second pair for
-    // `carts#add`: the page takes `(MenuItemId, PositiveInt)` and reads the
-    // session from context, so it flattens to four core parameters against the
-    // operation's six. Comparing them would compare two different signatures
-    // and prove nothing.
-    let a = by("resources-cart-api#cart");
-    let b = by("carts#current");
+    let exported = by("resources-cart-api#cart");
+    let imported = by("carts#current");
     assert_eq!(
-        (&a.params, &a.results, a.retptr),
-        (&b.params, &b.results, b.retptr),
-        "these flatten differently, which would mean a core-level check could \
-         catch the disagreement after all"
+        (&exported.params, &exported.results, exported.retptr),
+        (&imported.params, &imported.results, imported.retptr),
+        "if these ever differ, a core-level check could decide component \
+         identity after all and the component audit would be redundant"
     );
-
-    // The component level: different types entirely. Compared by NAME of the
-    // result type, which is enough — one is a `result<…>` the package declares
-    // and the other is the builtin `string`.
-    let result_of = |key: &str| -> String {
-        for (_, iface) in resolve.interfaces.iter() {
-            let Some(name) = iface.name.as_deref() else {
-                continue;
-            };
-            for (fname, func) in iface.functions.iter() {
-                if format!("{name}#{fname}") == key {
-                    return match func.result {
-                        None => "()".to_string(),
-                        Some(wit_parser::Type::String) => "string".to_string(),
-                        Some(wit_parser::Type::Id(id)) => resolve.types[id]
-                            .name
-                            .clone()
-                            .unwrap_or_else(|| format!("{:?}", resolve.types[id].kind)),
-                        Some(other) => format!("{other:?}"),
-                    };
-                }
-            }
-        }
-        panic!("no operation {key}")
-    };
-
-    assert_eq!(result_of("carts#current"), "string");
-    assert_ne!(
-        result_of("resources-cart-api#cart"),
-        "string",
-        "the contract's result is a `result<cart, cart-error>`, and the \
-         deployment publishes `string` for the same operation"
+    assert!(
+        exported.retptr && exported.results.is_empty(),
+        "and the coincidence is the flat limit, not an accident of arity: \
+         {exported:?}"
     );
 }
 
@@ -320,10 +285,12 @@ fn the_compiler_can_render_every_host_operations_wit_from_its_declaration() {
         add.contains("result<domain-cart, domain-cart-error>"),
         "the compiler's rendering of `carts#add` returns the declared result: {add}"
     );
+    // And it is what the emitted package publishes, verbatim — one authority,
+    // so the rendering and the artifact cannot drift.
+    let (text, _) = generated();
     assert!(
-        support::APPLICATION_WIT
-            .contains("add: func(session: string, item: string, quantity: s64) -> string;"),
-        "and the deployment publishes a `string` for the same operation"
+        text.contains(add.as_str()),
+        "the emitted WIT contains the rendered signature: {add}"
     );
 }
 
@@ -434,91 +401,6 @@ type StoreId = StoreId { v: Int }
         matches!(got, Err(pw_core::wit::WitError::Unmappable { .. })),
         "`Boxed<StoreId>` is opaque, not privacy-qualified, so it has no ABI \
          until something says what it is: {got:?}"
-    );
-}
-
-/// **PINS A KNOWN DEFECT. The repair turns this red, and that is correct.**
-///
-/// The contract fixes an ABI for every host operation; the deployment publishes
-/// one; they disagree on all six, and no check in this repo compares them.
-///
-/// ```text
-/// operation                    the contract fixes            the deployment publishes
-/// store:data/carts#add         (SessionId, MenuItemId,       (string, string, s64)
-///                               PositiveInt)                  -> string
-///                               -> Result<Cart, CartError>
-/// pw:host/session#read         () -> Session<SessionId>      () -> string
-/// ```
-///
-/// Every gate stays green: `wit_parser` resolves the worlds, the artifact audit
-/// is satisfied because the NAMES match, and `contract::consistent` is
-/// satisfied because the capabilities are untouched. It is the exact shape
-/// `contract::abi` was written to refuse — *same `interface#operation`, wrong
-/// ABI* — one layer further out, where the second signature is somebody else's
-/// artifact rather than a mutation of ours.
-///
-/// It is also the shape `docs/RISK_QUEUE.md` records twice already: **one fact
-/// derived twice, agreeing until an input mattered.** Here the input already
-/// mattered.
-///
-/// Which derivation is authoritative is a model question, not a bug to patch:
-/// for `store:data/*` the application declared the operation and arguably the
-/// compiler should EMIT that WIT; for `pw:host/*` the platform publishes it and
-/// the Pleris declaration is a claim to be CHECKED. That the answer differs by
-/// `Import::owner` is why the ownership distinction had to come first.
-#[test]
-fn the_contracts_abi_and_the_deployments_wit_are_not_compared() {
-    let (_, cs) = generated();
-    let resolve = resolved("pw-canonical-abi-disagreement");
-
-    // What the deployment publishes, by `interface#name` with the interface
-    // unqualified — which is how `flattened` keys it.
-    let mut published: Vec<String> = Vec::new();
-    for (_, iface) in resolve.interfaces.iter() {
-        let Some(name) = iface.name.as_deref() else {
-            continue;
-        };
-        for fname in iface.functions.keys() {
-            published.push(format!("{name}#{fname}"));
-        }
-    }
-
-    let mut disagree = Vec::new();
-    let mut compared = 0;
-    for c in &cs {
-        for i in &c.imports {
-            if i.kind != ImportKind::HostCapability {
-                continue;
-            }
-            let Some(sig) = &i.signature else { continue };
-            let short = format!(
-                "{}#{}",
-                i.interface.rsplit('/').next().unwrap_or(&i.interface),
-                i.name
-            );
-            if !published.contains(&short) {
-                continue;
-            }
-            compared += 1;
-            // The deployment's stand-in returns `string` from every operation.
-            // The contract fixes a `Result` or a nominal type for every one, and
-            // no written Pleris type maps to WIT `string` except `String`.
-            if sig.result != "String" && sig.result != "Str" {
-                disagree.push(format!("{short}: contract result is `{}`", sig.result));
-            }
-        }
-    }
-
-    assert!(compared >= 5, "only {compared} operations examined");
-    disagree.sort();
-    disagree.dedup();
-    assert_eq!(
-        disagree.len(),
-        6,
-        "PINNED: every host operation's contract ABI disagrees with the \
-         deployment's published one, and nothing refuses it. If this count \
-         changed, either the disagreement was repaired — delete this test and \
-         write the check — or a new operation joined it. {disagree:?}"
     );
 }
 

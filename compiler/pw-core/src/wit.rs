@@ -579,8 +579,64 @@ pub fn package(
         });
     }
 
-    let type_text = render_types(&types, ws, &reachable(&types, ws, &apis))?;
-    Ok((render(&type_text, &apis, &worlds), worlds))
+    // **The host packages, generated from the Pleris declarations.**
+    //
+    // Only the operations some contract actually imports: a program does not
+    // publish an interface for a `host`-bound `fn` nothing reaches, any more
+    // than it exports a component nothing instantiates.
+    let wanted: BTreeSet<String> = contracts
+        .iter()
+        .flat_map(|c| &c.imports)
+        .filter(|i| i.kind == ImportKind::HostCapability)
+        .map(|i| i.key())
+        .collect();
+    let mut hosts: BTreeMap<String, HostPackage> = BTreeMap::new();
+    let mut host_uses: BTreeSet<String> = BTreeSet::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (_, d) in hir.all_decls() {
+            let Some(id) = crate::backend::host_binding(d) else {
+                continue;
+            };
+            if !wanted.contains(&id.qualified()) {
+                continue;
+            }
+            // `store:data/carts` → package `store:data`, interface `carts`.
+            let Some((pkg, iface)) = id.interface.split_once('/') else {
+                continue;
+            };
+            let sig = Interface::of(d);
+            let (text, used) = wit_func(&id.name, &sig, &types, ws, unit)?;
+            host_uses.extend(used.iter().cloned());
+            let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
+                name: pkg.to_string(),
+                interfaces: BTreeMap::new(),
+            });
+            let slot = entry
+                .interfaces
+                .entry(iface.to_string())
+                .or_insert_with(|| (BTreeSet::new(), Vec::new()));
+            slot.0.extend(used);
+            slot.1.push(text);
+        }
+    }
+    for h in hosts.values_mut() {
+        for (_, funcs) in h.interfaces.values_mut() {
+            funcs.sort();
+            funcs.dedup();
+        }
+    }
+    let hosts: Vec<HostPackage> = hosts.into_values().collect();
+
+    // The type package must reach what the HOST signatures name too, not only
+    // what the exports do — `capability.SessionId` is reachable from
+    // `pw:host/session#read` and from nothing else.
+    let seeds: Vec<String> = apis
+        .iter()
+        .flat_map(|a| a.uses.iter().cloned())
+        .chain(host_uses)
+        .collect();
+    let type_text = render_types(&types, ws, &reachable(&types, ws, seeds))?;
+    Ok((render(&type_text, &apis, &worlds, &hosts), worlds))
 }
 
 /// **Every host operation's WIT signature, as its Pleris declaration implies
@@ -670,16 +726,24 @@ struct Api {
 }
 
 /// The package text.
-/// **Every type an exported signature can reach, transitively.**
+/// **Every type a published signature can reach, transitively.**
+///
+/// Seeded rather than derived from `apis` since 2026-08-20: the host packages
+/// this file now emits have signatures too, and `capability.SessionId` is
+/// reachable from `pw:host/session#read` and from nothing an export names.
 ///
 /// Only these are emitted. The platform packages declare far more — `Decoder`,
 /// `Style`, `ElementRef` — and none of them appears in a signature the host
 /// calls. Emitting the whole program's types would put shapes on the ABI that
 /// nothing crosses it, and would make any one of them unmappable a refusal for
 /// a package that never needed it.
-fn reachable(types: &Types, ws: &Workspace, apis: &[Api]) -> BTreeSet<String> {
+fn reachable(
+    types: &Types,
+    ws: &Workspace,
+    seeds: impl IntoIterator<Item = String>,
+) -> BTreeSet<String> {
     let mut out: BTreeSet<String> = BTreeSet::new();
-    let mut stack: Vec<String> = apis.iter().flat_map(|a| a.uses.iter().cloned()).collect();
+    let mut stack: Vec<String> = seeds.into_iter().collect();
     while let Some(path) = stack.pop() {
         if !out.insert(path.clone()) {
             continue;
@@ -757,25 +821,49 @@ fn render_types(
     Ok(out)
 }
 
-fn render(type_text: &str, apis: &[Api], worlds: &[World]) -> String {
+/// The package holding every type that crosses a boundary.
+///
+/// Separate from [`PACKAGE`] since 2026-08-20, and the separation is forced:
+/// the host packages this file also emits need these types, and a `pw:app`
+/// world imports `store:data/carts`, so putting the types in `pw:app` would
+/// make the two packages depend on each other.
+///
+/// **Unversioned deliberately.** A nested package declaration and a `use` that
+/// names it must agree, and `pw:types@0.1.0` declared inside a file is not
+/// found by `use pw:types/types` — `wit_parser` reports *package not found*.
+pub const TYPES_PACKAGE: &str = "pw:types";
+
+/// One package of host operations, as the Pleris declarations define them.
+struct HostPackage {
+    /// `store:data`
+    name: String,
+    /// interface name -> its functions, and the types they name.
+    interfaces: BTreeMap<String, (BTreeSet<String>, Vec<String>)>,
+}
+
+fn render(type_text: &str, apis: &[Api], worlds: &[World], hosts: &[HostPackage]) -> String {
     let mut out = String::new();
     out.push_str("// Generated by `pw emit-wit`. Do not edit.\n");
     out.push_str("//\n");
     out.push_str("// One world per ComponentContract. A world's imports are exactly the\n");
-    out.push_str("// contract's imports, projected onto interfaces — see pw-core/src/wit.rs.\n\n");
+    out.push_str("// contract's imports, projected onto interfaces — see pw-core/src/wit.rs.\n");
+    out.push_str("//\n");
+    out.push_str("// The host packages are HERE, generated, because the Pleris declaration is\n");
+    out.push_str("// the ABI authority for every operation this program declares. Architect\n");
+    out.push_str("// ruling, 2026-08-20: a deployment IMPLEMENTS this interface; it does not\n");
+    out.push_str("// independently specify what the interface means. One interface has one\n");
+    out.push_str("// ABI authority, never a Pleris signature plus a hand-authored WIT one\n");
+    out.push_str("// with a comparison keeping them synchronized.\n\n");
     out.push_str(&format!("package {PACKAGE};\n\n"));
-
-    if !type_text.is_empty() {
-        out.push_str("interface types {\n");
-        out.push_str(type_text);
-        out.push_str("}\n\n");
-    }
 
     for a in apis {
         out.push_str(&format!("interface {} {{\n", a.name));
         if !a.uses.is_empty() {
             let names: Vec<String> = a.uses.iter().map(|u| ident(u)).collect();
-            out.push_str(&format!("    use types.{{{}}};\n", names.join(", ")));
+            out.push_str(&format!(
+                "    use {TYPES_PACKAGE}/types.{{{}}};\n",
+                names.join(", ")
+            ));
         }
         for f in &a.funcs {
             out.push_str(&format!("    {f}\n"));
@@ -789,6 +877,37 @@ fn render(type_text: &str, apis: &[Api], worlds: &[World]) -> String {
             out.push_str(&format!("    import {i};\n"));
         }
         out.push_str(&format!("    export {};\n", w.exports));
+        out.push_str("}\n\n");
+    }
+
+    // The dependency packages, nested. `push_dir` wants the directory's own
+    // package unbraced and every other one braced, so this order is not a
+    // stylistic choice.
+    if !type_text.is_empty() {
+        out.push_str(&format!("package {TYPES_PACKAGE} {{\n"));
+        out.push_str("    interface types {\n");
+        for line in type_text.lines() {
+            out.push_str(&format!("    {line}\n"));
+        }
+        out.push_str("    }\n}\n\n");
+    }
+
+    for h in hosts {
+        out.push_str(&format!("package {} {{\n", h.name));
+        for (iface, (uses, funcs)) in &h.interfaces {
+            out.push_str(&format!("    interface {iface} {{\n"));
+            if !uses.is_empty() {
+                let names: Vec<String> = uses.iter().map(|u| ident(u)).collect();
+                out.push_str(&format!(
+                    "        use {TYPES_PACKAGE}/types.{{{}}};\n",
+                    names.join(", ")
+                ));
+            }
+            for f in funcs {
+                out.push_str(&format!("        {f}\n"));
+            }
+            out.push_str("    }\n");
+        }
         out.push_str("}\n\n");
     }
     out

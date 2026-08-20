@@ -252,10 +252,24 @@ fn every_type_an_exported_signature_names_is_declared_in_the_package() {
         })
         .collect();
     let mut missing: Vec<String> = Vec::new();
+    let mut used_lines = 0usize;
     for line in text.lines() {
-        let Some(rest) = line.trim().strip_prefix("use types.{") else {
+        // The prefix is matched by SHAPE, not spelled out. It was
+        // `use types.{` until 2026-08-20, and moving the types into their own
+        // package made every line read `use pw:types/types.{` — so this loop
+        // matched nothing, `missing` stayed empty, and the test passed while
+        // checking one thing instead of two. The vacuity floor below is what a
+        // reader should trust; this is what it guards.
+        let Some(rest) = line
+            .trim()
+            .strip_prefix("use ")
+            .and_then(|r| r.split_once(".{"))
+            .filter(|(head, _)| head.ends_with("types"))
+            .map(|(_, rest)| rest)
+        else {
             continue;
         };
+        used_lines += 1;
         for name in rest.trim_end_matches("};").split(',') {
             let name = name.trim();
             if !name.is_empty() && !declared.contains(name) {
@@ -264,6 +278,11 @@ fn every_type_an_exported_signature_names_is_declared_in_the_package() {
         }
     }
     assert!(missing.is_empty(), "used but not declared: {missing:?}");
+    assert!(
+        used_lines >= 5,
+        "only {used_lines} `use` lines were examined, so the check above \
+         proved nothing"
+    );
     assert!(
         declared.len() >= 10,
         "only {} types declared, which is too few for this to be checking \

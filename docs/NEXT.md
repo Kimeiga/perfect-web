@@ -146,18 +146,55 @@ semantic type → may erase privacy metadata → component type → may flatten 
 ### The sequence
 
 ```text
-1  Pleris declarations canonical for all host-supplied operations   ...
-2  generate deployment-facing WIT from them                          ...
-3  handwritten WIT stops being authoritative; fixtures implement it  ...
-4  explicit ABI representation for privacy-qualified types          DONE
-5  delete `effect .. host ..` completely                            DONE
-6  component-level ABI mutation control, same core flattening        ...
-7  one lowering pipeline: semantic → component → core                ...
-8  generate adapters from that single lowered result                 ...
-9  component-wrap with upstream `wit-component`                      ...
-10 validate and compare COMPONENT import types, not core             ...
-11 invocation-region allocation, then E10-I                          ...
+1  Pleris declarations canonical for all host-supplied operations  DONE
+2  generate deployment-facing WIT from them                        DONE
+3  handwritten WIT stops being authoritative                       DONE
+4  explicit ABI representation for privacy-qualified types         DONE
+5  delete `effect .. host ..` completely                           DONE
+6  component-level ABI mutation control, same core flattening      NEXT
+7  one lowering pipeline: semantic → component → core               ...
+8  generate adapters from that single lowered result                ...
+9  component-wrap with upstream `wit-component`                     ...
+10 validate and compare COMPONENT import types, not core            ...
+11 invocation-region allocation, then E10-I                         ...
 ```
+
+**1–3, as emitted.** `pw emit-wit` now produces one file holding four packages:
+`pw:app` (the worlds and export interfaces), `pw:types`, and the host packages
+`pw:host` and `store:data` generated from the Pleris declarations.
+
+```wit
+package store:data {
+    interface carts {
+        use pw:types/types.{domain-cart, domain-cart-error, domain-session-id, ..};
+        add: func(arg0: domain-session-id, arg1: domain-menu-item-id,
+                  arg2: domain-positive-int) -> result<domain-cart, domain-cart-error>;
+    }
+}
+```
+
+The types moved into their own package because a `pw:app` world imports
+`store:data/carts`, so types living in `pw:app` would make the two packages
+depend on each other. Dependency packages are nested and **unversioned** — a
+`use pw:types/types` does not find a nested `pw:types@0.1.0`.
+
+`tests/support` no longer carries a hand-authored `PLATFORM_WIT` or
+`APPLICATION_WIT`. The resolver states the ruling directly: a stand-in beside
+the generated package is *"package `pw:host` is defined in two different
+locations"*. A deployment still writes an implementation by hand; what it no
+longer writes is the signature.
+
+**And the emitted artifact now shows the two-`SessionId` incoherence**, which is
+the point:
+
+```wit
+pw:host/session      read: func() -> capability-session-id;
+store:data/carts     add:  func(arg0: domain-session-id, ..) -> ..;
+```
+
+`add_to_cart` passes the first into the second. That was invisible before and is
+now in a published interface — an improvement, not a regression, and still with
+the architect.
 
 4 and 5 came first because 1–3 need them: `pw:host/session#read` could not
 render at all until a privacy qualifier had an ABI rule, and the effect clause

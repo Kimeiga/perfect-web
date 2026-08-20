@@ -248,7 +248,7 @@ e8-wit:
     @cargo test --quiet -p pw-core --test wit_worlds 2>&1 | tail -3
     @printf '  %s worlds, %s types on the ABI\n' \
       "$(grep -c '^world ' docs/evidence/E8/store.wit)" \
-      "$(grep -cE '^    (record|variant|type) ' docs/evidence/E8/store.wit)"
+      "$(grep -cE '^ +(record|variant|type) ' docs/evidence/E8/store.wit)"
 
 # E9 gate item 4. How long a check takes, and what an edit costs.
 #
