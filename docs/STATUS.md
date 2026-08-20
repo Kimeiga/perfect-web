@@ -50,7 +50,7 @@ F  `for` becomes real syntax with bindings                         DONE
 C  policy values leave the executable body tree                    DONE
 G  re-run the policy-consumer matrix                               DONE
 H  close E10-P                                                     DONE
-I  Wasm encoding, invocation-region memory, E10-I                  NEXT
+I  Wasm encoding, invocation-region memory, E10-I                  STARTED
 ```
 
 **The final pre-codegen semantic slice, 2026-08-11:**
@@ -75,12 +75,33 @@ predicted it would, and the model was repaired on their ruling of 2026-08-20:
 `Instr::ImportCall` names an `ImportId` — interface plus operation, an identity
 that survives past this compiler. A `CallableImport` carries the ABI and a SET
 of required capabilities. A host implementation is explicit declaration
-metadata — `host "pw:host/carts#add"` — never inferred from a `todo` body or
+metadata — `host "store:data/carts#add"` — never inferred from a `todo` body or
 from an effect row.
 
 **All five store functions encode**, and `wasmparser` validates the module.
-`pw:host/carts#add` takes three arguments and `pw:host/carts#clear` takes one:
-two callables, one authority, both valid.
+`store:data/carts#add` takes three arguments and `store:data/carts#clear` takes
+one: two callables, one authority, both valid. Recorded as
+[ADR-0026](DECISIONS/ADR-0026-a-capability-authorizes-an-operation-it-does-not-identify-one.md).
+
+**Steps 1–3 of the architect's locked order are done** (2026-08-20): ownership
+recorded per import, the operation→capability audit built as three separate
+layers with the ⊆ relation, and the signature/authority mutation controls
+frozen — including *same `interface#operation`, wrong ABI → rejected* at two
+layers, so the audit and the encoder are each proved to depend on the declared
+signature.
+
+**Step 4 — the Canonical ABI adapters — is BLOCKED on a ruling.** A host
+operation's ABI is derived twice, by the contract from the Pleris `fn` and by
+the deployment from the WIT it publishes, and nothing compares them. All six of
+the store's operations disagree while every gate stays green. The Canonical ABI
+does not expose it: both derivations flatten to the *same* core signature, so
+the disagreement lives entirely in the component types. Two more findings came
+with it — a privacy label has no ABI and the stand-in silently erased it, and an
+`effect` declaration was claiming an operation and winning by arriving last.
+
+Reproduce: `cargo test -p pw-core --test canonical_abi -- --nocapture`.
+`docs/NEXT.md` has the decision; `docs/RISK_QUEUE.md` has all three
+classifications.
 
 Every executable expression now belongs to **exactly one named execution
 root**, each with a context. `draw(ctx)`, `acquire`, `release` and the
