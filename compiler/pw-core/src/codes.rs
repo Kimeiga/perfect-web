@@ -155,6 +155,16 @@ codes! {
         "an optimistic transition must be a pure function of the resource's value";
     OPTIMISTIC_TARGET_MISMATCH = "PW0331" / optimistic_target_mismatch / 1, DeclarationRules,
         "an optimistic transition must produce the value type of the resource it targets";
+    // **A known policy in the wrong place**, which is a different failure from
+    // an unknown one. `effect a.b { host ".." }` parsed, was recorded, and was
+    // read by nothing — and while it existed a reader walking declarations could
+    // answer "which operation is this" with an effect's clause instead of a
+    // callable's. Architect ruling, 2026-08-20:
+    //
+    // > Don't merely stop consuming it. You've learned repeatedly that
+    // > semantically dead syntax survives for a long time if it still parses.
+    EFFECT_NAMES_AN_OPERATION = "PW0332" / effect_names_an_operation / 1, DeclarationRules,
+        "an effect is not a callable, so it does not name a host operation";
     CACHE_NO_INVALIDATION = "PW0200" / cache_no_invalidation / 1, DeclarationRules,
         "a shared cache should declare how it is invalidated";
 

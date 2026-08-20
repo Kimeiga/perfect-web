@@ -389,6 +389,67 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     }
 }
 
+/// **PW0332 — an effect is not a callable, so it does not name an operation.**
+///
+/// Its own pass, run for EVERY declaration. It first sat inside
+/// `check_resource`, which is called only for `is_resource_like(kind)` — so an
+/// effect never reached it and the rule was silent. That is the enumeration
+/// pattern `docs/RISK_QUEUE.md` records, caught here by the discriminator half
+/// of its own test rather than by review.
+/// **PW0332 — an effect is not a callable, so it does not name an operation.**
+///
+/// Its own pass, run for EVERY declaration. It first sat inside
+/// [`check_resource`], which is called only when `is_resource_like(kind)` — so
+/// an effect never reached it and the rule was silent while looking present.
+/// That is the enumeration pattern `docs/RISK_QUEUE.md` records, and what
+/// caught it was the discriminator half of its own test rather than review.
+fn check_effect_names_no_operation(decl: &Decl, out: &mut Vec<Finding>) {
+    // `effect session.read { host "pw:host/session#read" }` parsed, was
+    // recorded in the ontology, and was read by NOTHING. It is the fossil of
+    // deriving an operation from a capability, which ADR-0026 killed:
+    //
+    //     effect      what computation does
+    //     capability  the authority
+    //     operation   the callable ABI
+    //
+    // While it existed, a reader walking declarations could answer *which
+    // operation is this* with an effect's clause instead of a callable's — and
+    // one did, rendering the effect's empty signature over the function's real
+    // one. Architect ruling, 2026-08-20:
+    //
+    // > Don't merely stop consuming it. You've learned repeatedly that
+    // > semantically dead syntax survives for a long time if it still parses.
+    //
+    // So it is a diagnostic and not a silent ignore. The two failures are
+    // different and must not be observationally equivalent: an UNKNOWN policy
+    // head is the parser's business; a KNOWN head on a declaration that cannot
+    // mean it is this.
+    if decl.kind != DeclKind::Effect {
+        return;
+    }
+    let Some(h) = policy(&decl.policies, "host") else {
+        return;
+    };
+    let name = decl.name.as_str();
+    out.push(
+        err(
+            crate::codes::EFFECT_NAMES_AN_OPERATION.id,
+            crate::codes::EFFECT_NAMES_AN_OPERATION.invariant,
+            format!("effect `{name}` declares a `host` operation"),
+            h.span.clone(),
+        )
+        .explain(
+            "a capability authorizes an operation and does not identify one (ADR-0026). Two \
+             callables can require one authority and have different ABIs, so an effect cannot \
+             stand for either of them. The operation belongs on the `fn` that performs it",
+        )
+        .repair(
+            "delete the clause, and write `host \"interface#operation\"` on the bodiless `fn` \
+             the deployment supplies",
+        ),
+    );
+}
+
 /// Run every declaration-level rule over one program's HIR.
 ///
 /// Nested declarations included (`all_decls`), which the AST walk did not do:
@@ -401,6 +462,7 @@ pub fn check(hir: &Hir) -> Vec<Finding> {
             check_resource(decl, &mut out);
         }
         check_effects_against_placement(decl, &mut out);
+        check_effect_names_no_operation(decl, &mut out);
     }
     out
 }
@@ -485,6 +547,26 @@ mod tests {
         assert!(codes(bad).contains(&"PW0327"));
         let good = "module c\ncommand add(i: ItemId) -> Cart\n    optimistic Cart() as c => c.add(i)\n{\n    0\n}\n";
         assert!(!codes(good).contains(&"PW0327"));
+    }
+
+    #[test]
+    fn an_effect_naming_a_host_operation_is_rejected_and_a_fn_naming_one_is_not() {
+        // The discriminator the architect asked for: a KNOWN policy on a
+        // declaration that cannot mean it. The same clause on the callable that
+        // performs the effect is correct and must stay silent — otherwise this
+        // would read as "`host` is refused", which is the opposite of ADR-0026.
+        let bad = "module p\n\neffect session.read {\n    capability session.read\n    \
+                   host \"pw:host/session#read\"\n}\n";
+        assert!(codes(bad).contains(&"PW0332"), "{:?}", codes(bad));
+
+        let good = "module p\n\nfn current_session() -> Session<SessionId> !{ session.read }\n    \
+                    host \"pw:host/session#read\"\n";
+        assert!(!codes(good).contains(&"PW0332"), "{:?}", codes(good));
+
+        // And an effect without the clause is unaffected, so the rule is about
+        // the clause and not about effects.
+        let plain = "module p\n\neffect session.read {\n    capability session.read\n}\n";
+        assert!(!codes(plain).contains(&"PW0332"));
     }
 
     #[test]

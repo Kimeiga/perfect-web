@@ -313,6 +313,27 @@ fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, Span)> {
     out
 }
 
+/// **Is this type constructor a privacy QUALIFIER?**
+///
+/// Derived from [`label_of_type`] rather than listed again, because the set of
+/// qualifiers must be authored once. Architect ruling, 2026-08-20:
+///
+/// > The only important thing is that the mapping is authored once and
+/// > inspectable.
+///
+/// It exists because a qualifier is **transparent on the ABI**: privacy
+/// qualification is semantic metadata and needs no independent runtime
+/// representation, so `Session<SessionId>` crosses a component boundary as
+/// whatever `SessionId` crosses as, and the semantic contract keeps the
+/// restriction WIT never sees. See `wit::wit_type`.
+///
+/// This is emphatically **not** "an opaque type is its representation".
+/// Opacity and ABI transparency are different facts, and a generic opaque type
+/// that is not a qualifier still has no WIT form.
+pub fn is_privacy_qualifier(head: &str) -> bool {
+    label_of_type(head, &[]).is_some()
+}
+
 /// The restriction a written type name carries: `Secret<Payments>`.
 fn label_of_type(head: &str, args: &[String]) -> Option<Label> {
     let arg = || args.first().cloned().unwrap_or_else(|| "?".to_string());

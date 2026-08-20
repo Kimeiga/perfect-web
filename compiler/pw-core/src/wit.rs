@@ -385,6 +385,27 @@ fn wit_type(
         ("Option", [a]) => format!("option<{}>", mapped(a)?),
         ("Result", [a, e]) => format!("result<{}, {}>", mapped(a)?, mapped(e)?),
         ("Result", [a]) => format!("result<{}>", mapped(a)?),
+        // **A privacy qualifier is TRANSPARENT.** Architect ruling, 2026-08-20:
+        //
+        // > Privacy qualification is semantic metadata; it need not have an
+        // > independent runtime representation.
+        // >
+        // >     AbiRepresentation(Session<T>) = Transparent(AbiRepresentation(T))
+        //
+        // So `Session<SessionId>` crosses as whatever `SessionId` crosses as,
+        // and the SEMANTIC contract keeps the restriction that WIT never sees —
+        // which is correct, because WIT could not prove `Session<A> → Session<B>`
+        // anyway. That stays Pleris contract semantics, as capabilities stay
+        // outside ordinary core Wasm types.
+        //
+        // The qualifier set comes from `labels::label_of_type`, the one place
+        // that says what a qualifier is, so this is not a second list.
+        //
+        // **This is not "an opaque type is its representation".** Opacity and
+        // ABI transparency are different facts, and the arm below still refuses
+        // a generic opaque type that is not a qualifier — see
+        // `a_generic_opaque_type_that_is_not_a_qualifier_still_has_no_wit_form`.
+        (h, [inner]) if crate::labels::is_privacy_qualifier(h) => mapped(inner)?,
         (h, []) => match types.resolve(ws, unit, h) {
             Some(path) => ident(path),
             None => {

@@ -52,8 +52,7 @@ use pw_syntax::parse_tree;
 /// The platform declarations these tests resolve against.
 const EFFECTS: &str = "module effects\n\n\
      effect log {\n    capability none\n}\n\n\
-     effect database.read<T> {\n    capability database.read<T>\n    \
-     host \"pw:host/database#read\"\n}\n\n\
+     effect database.read<T> {\n    capability database.read<T>\n}\n\n\
      effect database.write<T> {\n    capability database.write<T>\n}\n\n\
      effect cache.read {\n    capability none\n}\n";
 
@@ -120,7 +119,6 @@ fn a_written_effect_resolves_to_its_declaration_and_its_argument() {
         .expect("a declaration");
     assert_eq!(decl.path.text(), "database.read");
     assert_eq!(decl.arity, 1);
-    assert_eq!(decl.host.as_deref(), Some("pw:host/database#read"));
 
     // `Stores` is a MODULE — the domain being read. `capability.rs` records
     // why that counts: a first version accepted only types and reported two
@@ -335,9 +333,14 @@ fn two_families_sharing_a_final_segment_are_never_confused() {
     };
     assert_ne!(a.effect, b.effect);
 
+    // And they are told apart by the fact that DOES distinguish them: the
+    // authority. `database.read<Stores>` requires one; `cache.read` declares
+    // `capability none`. This asserted the `host` clause until 2026-08-20 —
+    // when an effect stopped naming an operation at all (ADR-0026, `PW0332`),
+    // because a capability authorizes an operation and does not identify one.
     let (_hirs, ontology) = program(&[EFFECTS, DOMAIN]);
-    assert!(ontology.declaration(a.effect).unwrap().host.is_some());
-    assert!(ontology.declaration(b.effect).unwrap().host.is_none());
+    assert!(ontology.declaration(a.effect).unwrap().capability.is_some());
+    assert!(ontology.declaration(b.effect).unwrap().capability.is_none());
 }
 
 // --- visibility --------------------------------------------------------------

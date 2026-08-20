@@ -327,39 +327,35 @@ fn the_compiler_can_render_every_host_operations_wit_from_its_declaration() {
     );
 }
 
-/// **PINS A SECOND FINDING: a privacy label has no ABI, and the fixture chose
-/// erasure.**
+/// **A privacy qualifier is transparent on the ABI, and the semantic contract
+/// keeps what WIT never sees.**
 ///
-/// `pw:host/session#read` returns `Session<SessionId>`, and the compiler cannot
-/// put it on the ABI at all:
+/// Architect ruling, 2026-08-20, on the finding that `Session<SessionId>` had
+/// no WIT form:
+///
+/// > Privacy qualification is semantic metadata; it need not have an
+/// > independent runtime representation.
+/// >
+/// > ```text
+/// > AbiRepresentation(Session<T>) = Transparent(AbiRepresentation(T))
+/// > ```
+///
+/// The mistake was never that a label crosses — `current_session()` is exactly
+/// the operation we need — it was that a *fixture* silently decided
+/// `Session<SessionId> ≈ string` without the language saying so.
+///
+/// So the rule is authored once, in the one place that says what a privacy
+/// qualifier is, and the restriction survives where it can actually be checked:
 ///
 /// ```text
-/// Unmappable { ty: "Session<SessionId>", at: "`read`" }
+/// semantic signature    () -> Session<SessionId>     the contract keeps this
+/// component signature   () -> domain-session-id      WIT sees only this
 /// ```
 ///
-/// `Session<S>` is declared `opaque type Session<S> = String`, and its own
-/// comment says what it is for:
-///
-/// > The scoping labels, as declared types. `Session<SessionId>` is a type a
-/// > signature can return, which is what lets the privacy checker read a label
-/// > instead of inferring one from a function's name.
-///
-/// It is a **privacy label**. The deployment's stand-in publishes
-/// `read: func() -> string` for the same operation — which is not a mapping but
-/// an **erasure**, and nothing decided it: a hand-written fixture picked a type
-/// and no check compared it to anything.
-///
-/// This never surfaced before because no export returns a label, so the WIT
-/// generator never met one. It appears the moment host operations are rendered,
-/// which is what makes it the ABI layer's finding rather than the checker's.
-///
-/// Three answers are possible and this test takes none of them: the label has a
-/// representation that crosses; the label is erased at the boundary and the
-/// erasure is *declared*; or an operation returning a label may not cross a
-/// component boundary at all. Refusing is the only one available today, and it
-/// is at least not silent.
+/// WIT could not prove `Session<A> → Session<B>` anyway; that stays Pleris
+/// contract semantics, exactly as capabilities stay outside core Wasm types.
 #[test]
-fn an_operation_returning_a_privacy_label_has_no_wit_form() {
+fn a_privacy_qualifier_is_transparent_to_the_type_it_qualifies() {
     let sources = store_sources();
     let hirs: Vec<Hir> = sources
         .iter()
@@ -369,31 +365,75 @@ fn an_operation_returning_a_privacy_label_has_no_wit_form() {
     let ws = Workspace::build(&refs);
 
     let rendered = wit::host_signatures(&refs, &ws);
-    let read = rendered
-        .get("pw:host/session#read")
-        .expect("the platform declares it");
+    let read = rendered["pw:host/session#read"]
+        .as_ref()
+        .unwrap_or_else(|e| panic!("`Session<SessionId>` must now render: {e}"));
 
-    let Err(pw_core::wit::WitError::Unmappable { ty, .. }) = read else {
-        panic!(
-            "PINNED: `Session<SessionId>` gained a WIT form. If that was a \
-             decision about how a privacy label crosses a boundary, record it \
-             and delete this test. Got {read:?}"
-        );
-    };
-    assert_eq!(ty, "Session<SessionId>");
-
-    // The discriminator: the refusal is about the LABEL, not about host
-    // operations in general. `Carts.current` returns a labelled-free domain
-    // type through the same code path and renders.
+    // Transparent: the qualifier is gone and the qualified type is what crosses.
     assert!(
-        rendered.values().any(|v| v.is_ok()),
-        "if nothing rendered, this test is measuring a broken renderer"
+        read.contains("session-id"),
+        "the ABI is the representation of `SessionId`: {read}"
+    );
+    assert!(
+        !read.contains("session<") && !read.to_lowercase().contains("-session:"),
+        "and the qualifier itself has no WIT form: {read}"
     );
 
-    // And what the deployment publishes instead, which is the erasure.
+    // **The semantic contract still remembers the restriction.** This is the
+    // half that makes the erasure honest rather than lossy: the label is not
+    // discarded, it is kept where it can be checked.
+    let sigs = Signatures::build(&ws, &refs);
+    let cs = contracts(&refs, &sigs, &ws);
+    let semantic = cs
+        .iter()
+        .flat_map(|c| &c.imports)
+        .find(|i| i.key() == "pw:host/session#read")
+        .and_then(|i| i.signature.as_ref())
+        .expect("the contract carries its semantic signature");
+    assert_eq!(
+        semantic.result, "Session<SessionId>",
+        "the restriction survives in the semantic signature, which is what \
+         `Session<A> -> Session<B>` is decided against"
+    );
+}
+
+/// **The crucial restriction: opacity is not ABI transparency.**
+///
+/// > Do **not** establish `opaque type X = String → ABI(X) = string` for every
+/// > opaque type. Opacity and ABI transparency are different facts.
+///
+/// So the rule above is about **privacy qualifiers** and nothing else. A
+/// generic opaque type that is not one still has no WIT form, and refusing it
+/// is the honest answer — the alternative is the plausible guess that
+/// `docs/RISK_QUEUE.md` records as the shape this project keeps deleting.
+///
+/// Without this control, the arm in `wit_type` could be widened to "any generic
+/// nominal is its argument's representation" and every test above would still
+/// pass.
+#[test]
+fn a_generic_opaque_type_that_is_not_a_qualifier_still_has_no_wit_form() {
+    let src = "\
+module shop.opaque
+
+opaque type Boxed<T> = String
+
+fn fetch(id: Boxed<StoreId>) -> Boxed<StoreId>
+    host \"store:data/boxes#get\"
+
+type StoreId = StoreId { v: Int }
+";
+    let hir = lower_file(src, &parse_tree(src).green);
+    let refs: Vec<&Hir> = vec![&hir];
+    let ws = Workspace::build(&refs);
+
+    let rendered = wit::host_signatures(&refs, &ws);
+    let got = rendered
+        .get("store:data/boxes#get")
+        .expect("the operation is declared");
     assert!(
-        support::PLATFORM_WIT.contains("read: func() -> string;"),
-        "the stand-in erases the label to `string`, and nothing compared them"
+        matches!(got, Err(pw_core::wit::WitError::Unmappable { .. })),
+        "`Boxed<StoreId>` is opaque, not privacy-qualified, so it has no ABI \
+         until something says what it is: {got:?}"
     );
 }
 
@@ -479,5 +519,101 @@ fn the_contracts_abi_and_the_deployments_wit_are_not_compared() {
          deployment's published one, and nothing refuses it. If this count \
          changed, either the disagreement was repaired — delete this test and \
          write the check — or a new operation joined it. {disagree:?}"
+    );
+}
+
+/// **PINS A FINDING: two distinct opaque types are not compared at a call.**
+///
+/// Surfaced by rendering host operations, and general rather than specific to
+/// the store. `alpha.Tag` and `beta.Tag` are two `opaque type Tag = String`
+/// declarations, and passing one where the other is expected produces **no
+/// diagnostic**.
+///
+/// It matters here because it is what makes the store's session plumbing
+/// invisible:
+///
+/// ```text
+/// pw:host/session#read     () -> capability-session-id
+/// store:data/carts#add     (domain-session-id, ..) -> ..
+/// add_to_cart              Carts.add(current_session(), item, quantity)
+/// ```
+///
+/// `examples/domain.pw` declares its own `SessionId` and
+/// `packages/pw-platform-web/capability.pw` declares another, and the store
+/// pipes the platform's into the application's. The WIT projection resolves
+/// both correctly and therefore *shows* two unrelated types where the program
+/// has one value — so emitting that interface would publish an incoherence the
+/// Pleris program already contains.
+///
+/// **Note what that does to the information-loss chain.** The architect's model
+/// is one-directional:
+///
+/// ```text
+/// semantic type  → may erase privacy metadata → component type → may flatten → core
+/// ```
+///
+/// But the semantic signature as the contract stores it is the *written* name
+/// `SessionId`, unqualified — so it cannot tell the two apart, while the
+/// component signature can. Here the component type is **more** precise than
+/// the semantic one, which is the opposite of the intended direction and worth
+/// deciding rather than inheriting.
+///
+/// Two things this test does not do: unify the types by name, which is the
+/// merging this project keeps deleting; or invent a conversion. Whether a
+/// session id is a platform type the application imports, or an application
+/// type the platform is generic over, is a modelling decision.
+#[test]
+fn two_opaque_types_of_one_name_are_not_compared_at_a_call() {
+    let a = "module alpha\n\nopaque type Tag = String\n";
+    let b = "module beta\n\nopaque type Tag = String\n";
+    let c = "\
+module gamma
+
+import alpha
+import beta
+
+fn takes(t: beta.Tag) -> Int { 0 }
+
+fn makes() -> alpha.Tag { todo }
+
+fn use_it() -> Int {
+    takes(makes())
+}
+";
+    let sources = [a, b, c];
+    let hirs: Vec<Hir> = sources
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+
+    // They ARE two declarations — the premise, so this is not measuring a
+    // resolver that merged them earlier.
+    let tags: Vec<String> = refs
+        .iter()
+        .enumerate()
+        .flat_map(|(u, h)| {
+            h.all_decls()
+                .filter(|(_, d)| d.name == "Tag")
+                .map(move |(_, d)| format!("{u}:{}", d.name))
+        })
+        .collect();
+    assert_eq!(tags.len(), 2, "{tags:?}");
+
+    // And the call between them is silent — decided by the whole checker, the
+    // same entry point `pw check` uses, not by one pass asked in isolation.
+    let files: Vec<(String, String)> = sources
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (format!("{i}.pw"), s.to_string()))
+        .collect();
+    let codes: Vec<String> = pw_core::check::check_sources(&files)
+        .into_iter()
+        .flat_map(|(_, ds)| ds.into_iter().map(|d| d.code.to_string()))
+        .collect();
+    assert!(
+        codes.is_empty(),
+        "PINNED: if a nominal mismatch is now reported, delete this test and \
+         record the rule. Got {codes:?}"
     );
 }

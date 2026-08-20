@@ -55,84 +55,147 @@ menu — each step's evidence is what makes the next one readable.
 10 then investigate replacing external `Carts.add`             —
 ```
 
-### Step 4 is blocked on a model question the ABI exposed
+### The ruling, 2026-08-20 — Pleris is the ABI authority
 
-**A host operation's ABI is derived twice and nothing compares the two.**
+The block is resolved, and not the way I proposed. I suggested splitting
+emit-vs-check by `owner`. The architect's ruling:
 
-```text
-                        the contract fixes            the deployment publishes
-store:data/carts#add    (SessionId, MenuItemId,       (string, string, s64)
-                         PositiveInt)                  -> string
-                         -> Result<Cart, CartError>
-pw:host/session#read    () -> Session<SessionId>      () -> string
-```
-
-All six of the store's host operations disagree, and every gate stays green —
-the WIT resolve does not take the contract as an input, the artifact audit
-compares names, and `contract::consistent` compares capabilities. Not a
-regression: the contract gained `signature` on 2026-08-20, so until then there
-was nothing to compare.
-
-**The Canonical ABI does not expose this — it hides it.** The two flatten to
-the *same* core signature: `(SessionId) -> Result<Cart, CartError>` and
-`(string) -> string` both give `[Pointer, Length, Pointer]` with a return
-pointer and no core result, because `SessionId` is a `string` alias and both
-results exceed the flat limit. All six coincide. So no core-level check can
-find it — the disagreement lives entirely in the component types, where the
-host lifts three pointers as a `string` while the guest meant a
-`result<cart, cart-error>`: the same bytes read as different shapes, no trap,
-no diagnostic.
-
-The adapters cannot be written until it is settled which derivation is
-authoritative, because they must lift and lower exactly one of them.
-**The answer appears to differ by
-`Import::owner`** — for `store:data/*` the application declared the operation
-in Pleris, so the compiler arguably should emit that WIT; for `pw:host/*` the
-platform publishes it and the Pleris declaration is a claim to be checked
-against it. That the ownership distinction decides this is why step 1 came
-first.
-
-Pinned by `tests/canonical_abi.rs`; `docs/RISK_QUEUE.md` carries the
-classification. **With the architect.**
-
-#### Two more the same work turned up
-
-**A privacy label has no ABI.** `pw:host/session#read` returns
-`Session<SessionId>`, and the WIT generator refuses it outright — a label is
-what lets the privacy checker read a restriction instead of inferring one, and
-it has no shape to put on a wire. The deployment's stand-in publishes
-`func() -> string` for it, which is not a mapping but an **erasure**, chosen by
-a fixture and compared to nothing. Three answers are possible — the label
-crosses with a representation, the erasure is declared, or an operation
-returning a label may not cross at all — and none is taken.
-
-**An `effect` declaration claims an operation.** `effect session.read { host
-"pw:host/session#read" }` and `fn current_session()` both name that operation,
-so a reader walking all declarations answers with whichever it met last — which
-one did, rendering the effect's empty signature over the function's real one.
-`host_binding` now refuses an effect declaration (a capability authorizes an
-operation and does not identify one), and a second claimant is
-`WitError::Claimed` rather than last-wins. **Not done:** the clause is still in
-the effect vocabulary and the ontology still reads it into a field nothing
-consumes. Removing it is the honest end state and is a change to the effect
-vocabulary, so it waits on the same ruling.
-
-**Unblocked and done meanwhile:** `wit::host_signatures` renders every host
-operation's WIT from its Pleris declaration, through exactly the machinery an
-export goes through. Both answers need it — to emit the WIT, or to compare
-against a published one — so building it presumes neither.
+> **Do not choose "emit vs check" based on `owner`. Choose it based on which
+> artifact is the ABI source of truth.** For everything currently in the
+> project, the Pleris declaration should be the source of truth, including
+> `pw:host/session#read`.
 
 ```text
-store:data/carts#add
-    compiler    add: func(arg0: domain-session-id, arg1: domain-menu-item-id,
-                          arg2: domain-positive-int)
-                  -> result<domain-cart, domain-cart-error>;
-    deployment  add: func(session: string, item: string, quantity: s64) -> string;
+Pleris-declared callable
+        ↓
+canonical semantic signature
+        ↓
+ABI lowering
+        ↓
+canonical WIT signature
+       ↙ ↘
+ emitted WIT   core/component adapters
 ```
 
-Everything the Canonical ABI needs regardless of the answer — a linear memory,
-`cabi_realloc`, and the invocation region the temporaries live in — is
-independent of it and is where the work continues meanwhile.
+for application-owned and platform-owned interfaces alike. The deployment
+**implements** the emitted interface; it does not independently specify what
+that interface means.
+
+`owner` stays, and is a different question from ABI source:
+
+```text
+owner            who controls this API's namespace and lifecycle
+ABI source       which representation is authoritative for its signature
+implementation   who actually executes it at deployment time
+```
+
+so `store:data/carts#add` (owner: application, ABI source: Pleris,
+implementation: the deployment host) and `pw:host/session#read` (owner:
+platform, ABI source: Pleris, implementation: the Perfect Web host) are both
+coherent. ADR-0018 is intact: the compiler emits a data artifact and the host
+consumes it, without linking the compiler.
+
+An `abi_source` enum is **not** added yet — every callable is
+`PlerisDeclaration` today. A genuinely foreign API whose owner hands us a WIT
+package would reverse the direction, and that path is not built during E10-A.
+
+The invariant:
+
+> **One interface has one ABI authority.** Never a Pleris signature plus an
+> independently authored WIT signature with a comparison keeping them
+> synchronized.
+
+### The component-level audit is mandatory, as a fourth layer
+
+Core Wasm ABI equality is not component ABI equality — the two derivations
+flatten identically, so the validator can never see the difference. The audit
+becomes:
+
+```text
+1  identity            is this exact ImportId permitted?
+2  component ABI       is this exact component-level parameter/result shape?
+3  authority           operation.required_capabilities
+                          ⊆ component.required_capabilities
+4  admission           component.required_capabilities ⊆ node grants
+```
+
+The current mismatch becomes the permanent negative control, because it is an
+unusually good one: two wrong signatures whose core flattenings coincide.
+
+### Two signatures on a callable, one derived from the other
+
+```text
+CallableImport
+├── id
+├── owner
+├── semantic_signature
+├── component_signature      DERIVED, never authored
+├── required_capabilities
+└── binding
+```
+
+with each layer consuming the right one — type/effect/privacy from the
+semantic, WIT emission and the component audit from the component, adapters
+from its flattening. Information is lost in one direction only, and it is never
+inferred upward:
+
+```text
+semantic type → may erase privacy metadata → component type → may flatten → core type
+```
+
+### The sequence
+
+```text
+1  Pleris declarations canonical for all host-supplied operations   ...
+2  generate deployment-facing WIT from them                          ...
+3  handwritten WIT stops being authoritative; fixtures implement it  ...
+4  explicit ABI representation for privacy-qualified types          DONE
+5  delete `effect .. host ..` completely                            DONE
+6  component-level ABI mutation control, same core flattening        ...
+7  one lowering pipeline: semantic → component → core                ...
+8  generate adapters from that single lowered result                 ...
+9  component-wrap with upstream `wit-component`                      ...
+10 validate and compare COMPONENT import types, not core             ...
+11 invocation-region allocation, then E10-I                          ...
+```
+
+4 and 5 came first because 1–3 need them: `pw:host/session#read` could not
+render at all until a privacy qualifier had an ABI rule, and the effect clause
+was actively producing wrong answers.
+
+**Step 4, as ruled.** `AbiRepresentation(Session<T>) = Transparent(AbiRepresentation(T))`,
+read from `labels::label_of_type` — the one place that says what a privacy
+qualifier is — so the set is authored once. The crucial restriction holds:
+opacity is **not** ABI transparency, and a generic opaque type that is not a
+qualifier still has no WIT form. The semantic contract keeps
+`Session<SessionId>`; WIT sees `capability-session-id`.
+
+**Step 5, as ruled.** The clause is gone from the effect vocabulary, the
+ontology's unused field is deleted, the fixtures no longer carry it, and
+`PW0332` refuses it rather than ignoring it — because semantically dead syntax
+survives for a long time if it still parses.
+
+### Three findings the same work turned up
+
+**Two `SessionId` types, never compared.** `examples/domain.pw` and
+`packages/pw-platform-web/capability.pw` each declare `opaque type SessionId =
+String`, and `add_to_cart` pipes the platform's into the application's. Two
+distinct opaque types passed one for the other produce **no diagnostic** —
+general, not specific to this pair. Emitting the WIT would publish
+`read: func() -> capability-session-id` beside
+`add: func(arg0: domain-session-id, ..)`, which is a faithful projection of an
+incoherence the Pleris program already contains. Pinned by
+`two_opaque_types_of_one_name_are_not_compared_at_a_call`.
+
+**The semantic signature is less precise than the component one.** The contract
+stores the *written* name `SessionId`, unqualified, so it cannot tell the two
+apart — while the WIT projection can. That inverts the intended one-directional
+loss and should be decided rather than inherited.
+
+**A label's type argument was never required to resolve.** `context.pw` wrote
+`Session<SessionId>` without importing `SessionId`, because a privacy label
+compares written spellings and never looked the argument up. Putting the
+operation on the ABI forced the question; the import is now there.
 
 **Step 5 is a constraint, not a convenience.** Architect ruling:
 

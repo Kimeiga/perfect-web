@@ -65,7 +65,6 @@ prelude Effect
 effect database.read<T> {
     placement  origin
     capability database.read<T>
-    host       "pw:host/database#read"
 }
 
 // Generic, on the architect's ruling of 2026-08-07 — and this is the one place
@@ -91,7 +90,6 @@ effect database.read<T> {
 effect database.write<T> {
     placement  origin
     capability database.write<T>
-    host       "pw:host/database#write"
 }
 
 // Opening a connection. Architect ruling, 2026-08-07:
@@ -112,7 +110,6 @@ effect database.write<T> {
 effect database.connect {
     placement  origin
     capability database.connect
-    host       "pw:host/database#connect"
 }
 
 // A transaction is not a read or a write: it is the authority to hold one
@@ -121,7 +118,6 @@ effect database.connect {
 effect database.transaction {
     placement  origin
     capability database.transaction
-    host       "pw:host/database#transaction"
 }
 
 // --- secrets and session ----------------------------------------------------
@@ -132,7 +128,6 @@ effect database.transaction {
 effect secret<C> {
     placement  origin
     capability secret<C>
-    host       "pw:host/secrets#get"
 }
 
 // Reading a secret's VALUE, as distinct from holding the capability. The
@@ -140,7 +135,6 @@ effect secret<C> {
 effect secret.read {
     placement  origin
     capability secret.read
-    host       "pw:host/secrets#read"
 }
 
 // **No intrinsic placement.** Architect ruling, 2026-08-07:
@@ -161,7 +155,6 @@ effect secret.read {
 // placement under a different topology. That is the point.
 effect session.read {
     capability session.read
-    host       "pw:host/session#read"
 }
 
 // --- network ----------------------------------------------------------------
@@ -169,13 +162,11 @@ effect session.read {
 effect network.fetch {
     placement  browser, edge, origin
     capability network.fetch
-    host       "pw:host/network#fetch"
 }
 
 effect network.subscribe {
     placement  browser, edge, origin
     capability network.subscribe
-    host       "pw:host/network#subscribe"
 }
 
 // --- the document, and charter §7.5A's frame phases -------------------------
@@ -255,13 +246,11 @@ effect post_paint {
 effect device.location {
     placement  browser
     capability device.location
-    host       "pw:host/device#location"
 }
 
 effect device.query {
     placement  browser
     capability device.query
-    host       "pw:host/device#query"
 }
 
 // --- resources ---------------------------------------------------------------
@@ -270,12 +259,10 @@ effect device.query {
 // acquire of one kind and a release of another do not cancel.
 effect resource.acquire<R> {
     capability resource.acquire<R>
-    host       "pw:host/resource#acquire"
 }
 
 effect resource.release<R> {
     capability resource.release<R>
-    host       "pw:host/resource#release"
 }
 
 // --- time ---------------------------------------------------------------------
@@ -286,7 +273,6 @@ effect resource.release<R> {
 // measures a duration and does not.
 effect clock.wall {
     capability clock.wall
-    host       "pw:host/clock#wall"
 }
 
 effect clock.read {
@@ -328,5 +314,4 @@ effect unsafe.raw_attribute {
 effect build.input.read<T> {
     placement  build
     capability build.input.read<T>
-    host       "pw:host/build#input-read"
 }

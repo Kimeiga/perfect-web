@@ -50,31 +50,26 @@ prelude Effect
 effect database.read<T> {
     placement  origin
     capability database.read<T>
-    host       \"pw:host/database#read\"
 }
 
 effect database.write<T> {
     placement  origin
     capability database.write<T>
-    host       \"pw:host/database#write\"
 }
 
 effect secret<C> {
     placement  origin
     capability secret<C>
-    host       \"pw:host/secrets#get\"
 }
 
 effect secret.read {
     placement  origin
     capability secret.read
-    host       \"pw:host/secrets#read\"
 }
 
 effect device.location {
     placement  browser
     capability device.location
-    host       \"pw:host/device#location\"
 }
 
 effect dom.mutate {
@@ -95,12 +90,10 @@ effect trace {
 // list in the compiler.
 effect resource.acquire<R> {
     capability resource.acquire<R>
-    host       \"pw:host/resource#acquire\"
 }
 
 effect resource.release<R> {
     capability resource.release<R>
-    host       \"pw:host/resource#release\"
 }
 ";
 

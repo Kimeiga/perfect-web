@@ -14,7 +14,13 @@
 
 module context
 
-import capability.{ Session, User, Organization }
+// The qualifiers AND the types they qualify. The three id types were missing
+// until 2026-08-20: `Session<SessionId>` names `SessionId` and nothing required
+// it to resolve, because a privacy label compares written spellings and never
+// looked the argument up. Putting the operation's signature on the ABI is what
+// forced the question — a label's argument is a real type reference, and the
+// two `SessionId` declarations in this program are two different types.
+import capability.{ Session, User, Organization, SessionId, UserId, OrganizationId }
 
 // **The platform supplies these.**
 //

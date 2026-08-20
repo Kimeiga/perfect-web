@@ -329,13 +329,6 @@ pub struct EffectDecl {
     /// effect that needs no host authority, which is a real and common case
     /// and not a missing declaration.
     pub capability: Option<String>,
-    /// The `host` clause: `pw:host/database#read`.
-    ///
-    /// Where `interface_for` will read from instead of formatting
-    /// `pw:host/{family}` — see `docs/NEXT.md`. `None` means this effect names
-    /// no host interface, which is what `capability none` implies and what a
-    /// purely local effect wants.
-    pub host: Option<String>,
     /// The `placement` clause: where this effect is *meaningful*, as distinct
     /// from where it is *authorised*.
     ///
@@ -419,7 +412,6 @@ impl Ontology {
                         path,
                         arity: decl.type_params.len(),
                         capability: capability_clause(decl),
-                        host: host_clause(decl),
                         placement: placement_clause(decl),
                         impacts: impact_clauses(decl, ws, unit),
                         span: hir.decl_span(id),
@@ -769,17 +761,6 @@ pub fn argument_names_visible_from(ws: &Workspace, unit: usize, hirs: &[&Hir]) -
 fn capability_clause(decl: &Decl) -> Option<String> {
     let value = decl.policy("capability")?.value.trim();
     (value != "none" && !value.is_empty()).then(|| value.to_string())
-}
-
-/// `host "pw:host/database#read"` → `Some("pw:host/database#read")`.
-///
-/// A string literal in the source, because a WIT interface name is not an
-/// expression — see `docs/NEXT.md`. The quotes are the literal's, not part of
-/// the name.
-fn host_clause(decl: &Decl) -> Option<String> {
-    let value = decl.policy("host")?.value.trim();
-    let value = value.trim_matches('"');
-    (!value.is_empty()).then(|| value.to_string())
 }
 
 /// Every `impact` clause on a declaration.
@@ -1166,20 +1147,6 @@ mod tests {
         // Which is NOT the same as never having written the clause — but both
         // mean "no host authority", so they agree here on purpose.
         assert_eq!(capability_clause(&bare()), None);
-    }
-
-    #[test]
-    fn a_host_clause_loses_its_quotes_and_nothing_else() {
-        let d = Decl {
-            policies: vec![crate::hir::Policy {
-                name: "host".into(),
-                value: "\"pw:host/database#read\"".into(),
-                roots: Vec::new(),
-                span: 0..0,
-            }],
-            ..bare()
-        };
-        assert_eq!(host_clause(&d).as_deref(), Some("pw:host/database#read"));
     }
 
     fn bare() -> Decl {

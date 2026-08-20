@@ -350,7 +350,20 @@ fn the_trusted_platform_contract_is_hashed() {
     // missing or `todo` body or from the effect row. The Wasm encoder found
     // why: a capability authorizes an operation and does not identify one, so
     // the binding has to name the callable.
-    const EXPECTED: u64 = 0x01053ad39f22afaf;
+    // Changed again 2026-08-20, later the same day, and by TWO changes:
+    //
+    // - every `effect` declaration lost its `host` clause. Architect ruling —
+    //   an effect is what computation does, a capability is authority, and an
+    //   operation is a callable ABI; an effect naming an operation is the
+    //   fossil of deriving one from the other, which ADR-0026 killed. It is
+    //   `PW0332` now rather than ignored, because dead syntax that still parses
+    //   survives.
+    // - `context.pw` imports `SessionId`, `UserId` and `OrganizationId`.
+    //   `current_session() -> Session<SessionId>` named a type it had not
+    //   imported, and nothing required it to resolve: a privacy label compares
+    //   written spellings and never looked its argument up. Putting the
+    //   operation's signature on the ABI is what asked the question.
+    const EXPECTED: u64 = 0x8aad1af3ca25dc91;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
