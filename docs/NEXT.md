@@ -95,6 +95,41 @@ first.
 Pinned by `tests/canonical_abi.rs`; `docs/RISK_QUEUE.md` carries the
 classification. **With the architect.**
 
+#### Two more the same work turned up
+
+**A privacy label has no ABI.** `pw:host/session#read` returns
+`Session<SessionId>`, and the WIT generator refuses it outright — a label is
+what lets the privacy checker read a restriction instead of inferring one, and
+it has no shape to put on a wire. The deployment's stand-in publishes
+`func() -> string` for it, which is not a mapping but an **erasure**, chosen by
+a fixture and compared to nothing. Three answers are possible — the label
+crosses with a representation, the erasure is declared, or an operation
+returning a label may not cross at all — and none is taken.
+
+**An `effect` declaration claims an operation.** `effect session.read { host
+"pw:host/session#read" }` and `fn current_session()` both name that operation,
+so a reader walking all declarations answers with whichever it met last — which
+one did, rendering the effect's empty signature over the function's real one.
+`host_binding` now refuses an effect declaration (a capability authorizes an
+operation and does not identify one), and a second claimant is
+`WitError::Claimed` rather than last-wins. **Not done:** the clause is still in
+the effect vocabulary and the ontology still reads it into a field nothing
+consumes. Removing it is the honest end state and is a change to the effect
+vocabulary, so it waits on the same ruling.
+
+**Unblocked and done meanwhile:** `wit::host_signatures` renders every host
+operation's WIT from its Pleris declaration, through exactly the machinery an
+export goes through. Both answers need it — to emit the WIT, or to compare
+against a published one — so building it presumes neither.
+
+```text
+store:data/carts#add
+    compiler    add: func(arg0: domain-session-id, arg1: domain-menu-item-id,
+                          arg2: domain-positive-int)
+                  -> result<domain-cart, domain-cart-error>;
+    deployment  add: func(session: string, item: string, quantity: s64) -> string;
+```
+
 Everything the Canonical ABI needs regardless of the answer — a linear memory,
 `cabi_realloc`, and the invocation region the temporaries live in — is
 independent of it and is where the work continues meanwhile.

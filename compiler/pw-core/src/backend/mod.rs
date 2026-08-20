@@ -62,10 +62,30 @@ pub mod wasm;
 /// One reader, used by lowering and by the contract, because "which callables
 /// does this component depend on" must have one answer all the way through:
 /// contract → Backend IR → core Wasm imports → WIT → the E8 artifact audit.
+///
+/// # An `effect` declaration is not a callable
+///
+/// `effect session.read { host "pw:host/session#read" }` uses the same spelling,
+/// and it means something else: it is the residue of deriving an operation from
+/// a CAPABILITY, which the same ruling removed —
+///
+/// > A capability authorizes an operation. It does not identify the operation.
+///
+/// So an effect declaration is refused here. It matters because the effect and
+/// the `fn` that performs it name the *same* operation today —
+/// `pw:host/session#read` is claimed by both `effect session.read` and
+/// `fn current_session()` — and a reader that accepted either would answer with
+/// whichever it met last. It did: `wit::host_signatures` rendered the effect's
+/// empty signature over the function's real one, and the wrong answer looked
+/// like a right one.
+///
+/// The ontology reads that clause separately, and nothing consumes what it
+/// reads. See `docs/RISK_QUEUE.md`.
 pub fn host_binding(decl: &crate::hir::Decl) -> Option<ir::ImportId> {
+    if decl.kind == crate::hir::DeclKind::Effect {
+        return None;
+    }
     let p = decl.policy("host")?;
-    // `host "pw:host/session#read"` — the same spelling an `effect` declaration
-    // uses for the interface serving it, and parsed the same way.
     let raw = p.value.trim().trim_matches('"');
     let (interface, name) = raw.split_once('#')?;
     if interface.is_empty() || name.is_empty() {

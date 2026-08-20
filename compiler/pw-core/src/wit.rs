@@ -65,6 +65,13 @@ pub enum WitError {
         first: String,
         second: String,
     },
+    /// **Two declarations claim one `interface#operation`.**
+    ///
+    /// An operation has one ABI, so two claimants are two ABIs for one name —
+    /// exactly what `contract::abi` refuses when the second one comes from an
+    /// artifact. Reported rather than resolved by order, because "whichever was
+    /// met last" is an answer that looks like every other answer.
+    Claimed { operation: String, count: usize },
 }
 
 impl std::fmt::Display for WitError {
@@ -75,6 +82,9 @@ impl std::fmt::Display for WitError {
             }
             WitError::Collision { wit, first, second } => {
                 write!(f, "`{first}` and `{second}` both mangle to `{wit}`")
+            }
+            WitError::Claimed { operation, count } => {
+                write!(f, "{count} declarations claim `{operation}`")
             }
         }
     }
@@ -399,13 +409,21 @@ fn wit_type(
 /// The second half is not decoration: a WIT interface referring to a type from
 /// another interface must `use` it by name, so a signature that does not report
 /// what it touched produces a package that does not resolve.
+/// One signature as WIT.
+///
+/// `ident` is the operation's WIT identifier and is **already mangled** —
+/// the caller decides, because it is the caller that knows where the name came
+/// from. An export's name is a Pleris name and needs [`ident`]; a host
+/// operation's name came out of `host "store:data/menus#for-store"` and is a
+/// WIT identifier the author wrote, which mangling would turn into `forstore`.
 fn wit_func(
-    name: &str,
+    ident: &str,
     sig: &Interface,
     types: &Types,
     ws: &Workspace,
     unit: usize,
 ) -> Result<(String, BTreeSet<String>), WitError> {
+    let name = ident;
     let at = format!("`{name}`");
     let mut used: BTreeSet<String> = BTreeSet::new();
     let mut params: Vec<String> = Vec::new();
@@ -431,10 +449,7 @@ fn wit_func(
             format!(" -> {}", wit_type(&written, types, ws, unit, &at)?)
         }
     };
-    Ok((
-        format!("{}: func({}){ret};", ident(name), params.join(", ")),
-        used,
-    ))
+    Ok((format!("{ident}: func({}){ret};", params.join(", ")), used))
 }
 
 /// One component's world.
@@ -526,7 +541,7 @@ pub fn package(
         let mut funcs = Vec::new();
         let mut used: BTreeSet<String> = BTreeSet::new();
         for e in &c.exports {
-            let (f, u) = wit_func(&e.name, &sig, &types, ws, unit)?;
+            let (f, u) = wit_func(&ident(&e.name), &sig, &types, ws, unit)?;
             funcs.push(f);
             used.extend(u);
         }
@@ -545,6 +560,83 @@ pub fn package(
 
     let type_text = render_types(&types, ws, &reachable(&types, ws, &apis))?;
     Ok((render(&type_text, &apis, &worlds), worlds))
+}
+
+/// **Every host operation's WIT signature, as its Pleris declaration implies
+/// it**, keyed by `interface#name`.
+///
+/// Rendered through exactly the machinery an export goes through —
+/// `Interface::of` on the declaration, then [`wit_func`] — so the ABI a host
+/// operation is given here and the ABI an exported query is given are one
+/// derivation, not two that agree.
+///
+/// # Why this exists before it is used to emit anything
+///
+/// A host operation's ABI is currently derived **twice**: here, from the Pleris
+/// `fn` carrying the `host` binding, and again by the deployment, in the WIT
+/// package it publishes. Nothing compares them, and in this repo all six of the
+/// store's operations disagree — see `tests/canonical_abi.rs`.
+///
+/// Which derivation is authoritative is a model question with the architect,
+/// and it turns on [`crate::contract::Ownership`]: an operation the application
+/// declared is arguably one the compiler should publish, while a platform
+/// facility is one the compiler must conform to. This function is what **both**
+/// answers need — to emit the WIT, or to compare against a published one — so
+/// building it does not presume either.
+///
+/// The declaration is found by [`crate::backend::host_binding`], the one reader
+/// of the `host` policy, so an operation this names and an operation the
+/// backend imports cannot come apart.
+///
+/// # Per operation, not all-or-nothing
+///
+/// The result is an outcome **per operation**, because one that has no WIT form
+/// must not hide the five that do — the same reason the artifact audit reports
+/// every undeclared import rather than the first. It is not an `Option` either:
+/// absent and refused would then be the same answer, and one of them is a
+/// finding.
+///
+/// `pw:host/session#read` is currently the refused one, and what it refuses is
+/// worth reading: it returns `Session<SessionId>`, a **privacy label**, and a
+/// label has no ABI. See `tests/canonical_abi.rs`.
+pub fn host_signatures(
+    hirs: &[&Hir],
+    ws: &Workspace,
+) -> BTreeMap<String, Result<String, WitError>> {
+    let types = Types::build(hirs);
+    // Collected before rendering, because a second claimant is a defect about
+    // the OPERATION and not about either declaration's signature — and
+    // `out.insert` on a duplicate key answers with whichever came last, which
+    // is how the effect declarations' empty signatures once overwrote the real
+    // ones.
+    let mut claims: BTreeMap<String, Vec<(usize, &Decl)>> = BTreeMap::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (_, d) in hir.all_decls() {
+            if let Some(id) = crate::backend::host_binding(d) {
+                claims.entry(id.qualified()).or_default().push((unit, d));
+            }
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    for (operation, claimants) in claims {
+        let name = operation
+            .rsplit('#')
+            .next()
+            .unwrap_or(&operation)
+            .to_string();
+        let rendered = match claimants.as_slice() {
+            [(unit, d)] => {
+                wit_func(&name, &Interface::of(d), &types, ws, *unit).map(|(text, _)| text)
+            }
+            many => Err(WitError::Claimed {
+                operation: operation.clone(),
+                count: many.len(),
+            }),
+        };
+        out.insert(operation, rendered);
+    }
+    out
 }
 
 /// One component's exported interface.

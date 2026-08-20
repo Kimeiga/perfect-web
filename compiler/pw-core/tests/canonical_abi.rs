@@ -29,9 +29,12 @@
 //! see `the_contracts_abi_and_the_deployments_wit_are_not_compared`. Until
 //! 2026-08-20 there was nothing to compare: the contract gained `signature`
 //! that day. So this is not a regression. It is a check that became possible
-//! and does not exist, and the Canonical ABI is where it stops being harmless,
-//! because the two flatten to different core signatures and the adapters must
-//! lower to exactly one of them.
+//! and does not exist.
+//!
+//! And the Canonical ABI does not expose it — it **hides** it. The two flatten
+//! to the same core signature, so no core-level check can find the
+//! disagreement; it lives entirely in the component types. See
+//! `the_two_derivations_coincide_at_the_core_and_differ_above_it`.
 
 use wit_parser::abi::AbiVariant;
 
@@ -45,8 +48,8 @@ use pw_syntax::parse_tree;
 
 mod support;
 
-/// The store demo's contracts and generated WIT.
-fn generated() -> (String, Vec<ComponentContract>) {
+/// Every `.pw` source of the store demo, as the corpus check feeds it.
+fn store_sources() -> Vec<String> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut sources = Vec::new();
     for dir in [
@@ -66,6 +69,12 @@ fn generated() -> (String, Vec<ComponentContract>) {
         }
     }
     sources.push(std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain.pw"));
+    sources
+}
+
+/// The store demo's contracts and generated WIT.
+fn generated() -> (String, Vec<ComponentContract>) {
+    let sources = store_sources();
 
     let hirs: Vec<Hir> = sources
         .iter()
@@ -146,15 +155,11 @@ fn a_string_parameter_is_two_core_parameters_and_a_result_is_a_pointer() {
     assert_eq!(read.params.len(), 1, "{:?}", read.params);
     assert!(read.retptr);
 
-    // The encoder's own answer for the same operation, for the record: three
-    // parameters and one result, because `repr` gives each value one slot.
-    // Neither number is wrong — they answer different questions — and step 4 is
+    // For contrast, the encoder's own answer for `carts#add` is three parameters
+    // and one result, because `repr` gives each value one slot —
+    // `tests/wasm_encoding.rs` asserts it there, where the Program is in hand.
+    // Neither number is wrong; they answer different questions, and step 4 is
     // making the module speak the second.
-    assert_eq!(
-        (3, 1),
-        (3, 1),
-        "documented rather than computed: see tests/wasm_encoding.rs"
-    );
 }
 
 /// **The two derivations flatten to the SAME core signature, and that is what
@@ -259,6 +264,136 @@ fn the_two_derivations_coincide_at_the_core_and_differ_above_it() {
         "string",
         "the contract's result is a `result<cart, cart-error>`, and the \
          deployment publishes `string` for the same operation"
+    );
+}
+
+/// **What the compiler would publish for each host operation.**
+///
+/// `wit::host_signatures` renders every operation's WIT from the Pleris `fn`
+/// that carries its `host` binding, through exactly the machinery an export
+/// goes through. It is what **both** answers to the blocked question need — to
+/// emit the WIT, or to compare against a published one — so it presumes
+/// neither.
+///
+/// Printed side by side with the deployment's, because the pair is the whole
+/// argument and reading them together is the fastest way to see it.
+#[test]
+fn the_compiler_can_render_every_host_operations_wit_from_its_declaration() {
+    let sources = store_sources();
+    let hirs: Vec<Hir> = sources
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+
+    let rendered = wit::host_signatures(&refs, &ws);
+
+    println!("\n=== what the compiler would publish ===");
+    for (k, v) in &rendered {
+        match v {
+            Ok(text) => println!("{k}\n    {text}"),
+            Err(e) => println!("{k}\n    REFUSED: {e}"),
+        }
+    }
+
+    // The application's own operations all render.
+    for op in [
+        "store:data/carts#add",
+        "store:data/carts#clear",
+        "store:data/carts#current",
+        "store:data/stores#get",
+        "store:data/menus#for-store",
+    ] {
+        assert!(
+            matches!(rendered.get(op), Some(Ok(_))),
+            "{op}: {:?}",
+            rendered.get(op)
+        );
+    }
+
+    // And it is the CONTRACT's ABI, not the deployment's: a `result<…>` where
+    // the published stand-in says `string`. The disagreement as the two texts
+    // rather than as two type names.
+    let add = rendered["store:data/carts#add"].as_ref().expect("renders");
+    assert!(
+        add.contains("result<domain-cart, domain-cart-error>"),
+        "the compiler's rendering of `carts#add` returns the declared result: {add}"
+    );
+    assert!(
+        support::APPLICATION_WIT
+            .contains("add: func(session: string, item: string, quantity: s64) -> string;"),
+        "and the deployment publishes a `string` for the same operation"
+    );
+}
+
+/// **PINS A SECOND FINDING: a privacy label has no ABI, and the fixture chose
+/// erasure.**
+///
+/// `pw:host/session#read` returns `Session<SessionId>`, and the compiler cannot
+/// put it on the ABI at all:
+///
+/// ```text
+/// Unmappable { ty: "Session<SessionId>", at: "`read`" }
+/// ```
+///
+/// `Session<S>` is declared `opaque type Session<S> = String`, and its own
+/// comment says what it is for:
+///
+/// > The scoping labels, as declared types. `Session<SessionId>` is a type a
+/// > signature can return, which is what lets the privacy checker read a label
+/// > instead of inferring one from a function's name.
+///
+/// It is a **privacy label**. The deployment's stand-in publishes
+/// `read: func() -> string` for the same operation — which is not a mapping but
+/// an **erasure**, and nothing decided it: a hand-written fixture picked a type
+/// and no check compared it to anything.
+///
+/// This never surfaced before because no export returns a label, so the WIT
+/// generator never met one. It appears the moment host operations are rendered,
+/// which is what makes it the ABI layer's finding rather than the checker's.
+///
+/// Three answers are possible and this test takes none of them: the label has a
+/// representation that crosses; the label is erased at the boundary and the
+/// erasure is *declared*; or an operation returning a label may not cross a
+/// component boundary at all. Refusing is the only one available today, and it
+/// is at least not silent.
+#[test]
+fn an_operation_returning_a_privacy_label_has_no_wit_form() {
+    let sources = store_sources();
+    let hirs: Vec<Hir> = sources
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+
+    let rendered = wit::host_signatures(&refs, &ws);
+    let read = rendered
+        .get("pw:host/session#read")
+        .expect("the platform declares it");
+
+    let Err(pw_core::wit::WitError::Unmappable { ty, .. }) = read else {
+        panic!(
+            "PINNED: `Session<SessionId>` gained a WIT form. If that was a \
+             decision about how a privacy label crosses a boundary, record it \
+             and delete this test. Got {read:?}"
+        );
+    };
+    assert_eq!(ty, "Session<SessionId>");
+
+    // The discriminator: the refusal is about the LABEL, not about host
+    // operations in general. `Carts.current` returns a labelled-free domain
+    // type through the same code path and renders.
+    assert!(
+        rendered.values().any(|v| v.is_ok()),
+        "if nothing rendered, this test is measuring a broken renderer"
+    );
+
+    // And what the deployment publishes instead, which is the erasure.
+    assert!(
+        support::PLATFORM_WIT.contains("read: func() -> string;"),
+        "the stand-in erases the label to `string`, and nothing compared them"
     );
 }
 
