@@ -18,7 +18,8 @@
 
 module Events
 
-import domain.{ StoreId, MenuItemId, SessionId }
+import domain.{ StoreId, MenuItemId }
+import capability.{ SessionId }
 
 event StoreChanged(store: StoreId)
 

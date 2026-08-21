@@ -16,7 +16,7 @@
 // not the analysis, it is that a page has a body to run it over.
 module generality.materialize_slips_branch
 
-import domain.{ SessionId }
+
 import Resources.{ Cart }
 import Events.{ CartChanged }
 import Carts

@@ -25,8 +25,9 @@
 
 module Resources
 
-import domain.{ StoreId, Store, StoreError, SessionId, Cart, CartError,
-    MenuItem, OrderId, OrderProgress, OrderFailure }
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem,
+    OrderId, OrderProgress, OrderFailure }
+import capability.{ SessionId }
 import Events.{ StoreChanged, MenuChanged }
 
 public query Store(id: StoreId) -> Result<Store, StoreError>

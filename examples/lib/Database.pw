@@ -8,9 +8,11 @@
 
 module Database
 
-import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
-    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
-    RecommendationError, PaymentError, TrackingError, DatabaseTransaction, DatabaseConnection }
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError, DatabaseTransaction,
+    DatabaseConnection }
+import capability.{ SessionId }
 import browser.{ Element, MapHandle, MapError }
 
 // A live connection. It is a resource for the same reason a transaction is —

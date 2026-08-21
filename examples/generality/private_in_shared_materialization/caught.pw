@@ -5,7 +5,7 @@
 //             declaration's own `depends_on` list would miss it
 module generality.materialize_indirect_private
 
-import domain.{ SessionId }
+
 import Resources.{ Cart }
 import Events.{ CartChanged }
 

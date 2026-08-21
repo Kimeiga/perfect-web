@@ -8,7 +8,7 @@
 // restriction lives in a file the author has not opened.
 module generality.materialize_cross_module
 
-import domain.{ SessionId }
+
 import Resources.{ Cart }
 import Events.{ CartChanged }
 

@@ -4,7 +4,7 @@
 //             data in a private entry
 module generality.materialize_private_ok
 
-import domain.{ SessionId }
+
 import Resources.{ Cart }
 import Events.{ CartChanged }
 

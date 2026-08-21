@@ -8,9 +8,10 @@
 
 module Recommender
 
-import domain.{ StoreId, Store, StoreError, Cart, CartError, SessionId,
-    MenuItemId, OrderId, OrderProgress, PositiveInt, Recommendation,
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
     RecommendationError, PaymentError, TrackingError }
+import capability.{ SessionId }
 import browser.{ Element, MapHandle, MapError }
 
 fn for_store(id: StoreId) -> Result<List<Recommendation>, RecommendationError> !{ network.fetch } {

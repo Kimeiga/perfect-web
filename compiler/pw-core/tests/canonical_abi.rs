@@ -198,7 +198,7 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
     assert_eq!(contract_sig.result, "Result<Cart, CartError>");
     assert!(
         text.contains(
-            "current: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;"
+            "current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;"
         ),
         "the emitted interface is that signature, not a second opinion about it"
     );
@@ -404,98 +404,84 @@ type StoreId = StoreId { v: Int }
     );
 }
 
-/// **PINS A FINDING: two distinct opaque types are not compared at a call.**
+/// **PINS A FINDING: call sites are not type-checked at all.**
 ///
-/// Surfaced by rendering host operations, and general rather than specific to
-/// the store. `alpha.Tag` and `beta.Tag` are two `opaque type Tag = String`
-/// declarations, and passing one where the other is expected produces **no
-/// diagnostic**.
+/// Found while executing the architect's step 2 — *make opaque/nominal
+/// compatibility use resolved `DefId`, not representation* — which presupposes
+/// a compatibility check to repair. There is none.
 ///
-/// It matters here because it is what makes the store's session plumbing
-/// invisible:
-///
-/// ```text
-/// pw:host/session#read     () -> capability-session-id
-/// store:data/carts#add     (domain-session-id, ..) -> ..
-/// add_to_cart              Carts.add(current_session(), item, quantity)
-/// ```
-///
-/// `examples/domain.pw` declares its own `SessionId` and
-/// `packages/pw-platform-web/capability.pw` declares another, and the store
-/// pipes the platform's into the application's. The WIT projection resolves
-/// both correctly and therefore *shows* two unrelated types where the program
-/// has one value — so emitting that interface would publish an incoherence the
-/// Pleris program already contains.
-///
-/// **Note what that does to the information-loss chain.** The architect's model
-/// is one-directional:
+/// It is not about opaque types, and not about nominal identity. **No call
+/// site is checked**: not the argument types, not the arity, not the result.
 ///
 /// ```text
-/// semantic type  → may erase privacy metadata → component type → may flatten → core
+/// fn takes_str(s: String) -> Int      takes_str(42)            accepted
+/// fn wrong_return() -> String { 42 }                           accepted
+/// fn wrong_arity(a: Int, b: Int)      wrong_arity(1)           accepted
+/// fn takes_store(s: Store)            takes_store(makes_cart())  accepted
 /// ```
 ///
-/// But the semantic signature as the contract stores it is the *written* name
-/// `SessionId`, unqualified — so it cannot tell the two apart, while the
-/// component signature can. Here the component type is **more** precise than
-/// the semantic one, which is the opposite of the intended direction and worth
-/// deciding rather than inheriting.
+/// The last one is the decisive case: two `type` declarations in one module,
+/// both resolvable, one returned from a call and passed where the other is
+/// expected. Nothing resolves ambiguously and nothing is missing — the check
+/// does not exist.
 ///
-/// Two things this test does not do: unify the types by name, which is the
-/// merging this project keeps deleting; or invent a conversion. Whether a
-/// session id is a platform type the application imports, or an application
-/// type the platform is generic over, is a modelling decision.
+/// # What DOES get checked
+///
+/// The type machinery is real and is applied to specific relations, each with
+/// its own controls: `{#each}` capture element types, handler signatures
+/// (`PW0602`), an optimistic transition's target and value (`PW0331`), match
+/// exhaustiveness, effect rows, and privacy labels. So this is not "types are
+/// unimplemented" — it is that ordinary application of a function is not among
+/// the relations checked.
+///
+/// # Why that matters here
+///
+/// `docs/MILESTONES.md` records **E9 — permanent value type checker** as
+/// COMPLETE, and charter §14 M9A lists `unification-based inference` and
+/// `opaque nominal types` among its contents. A value type checker that accepts
+/// `takes_store(makes_cart())` is not one, so the milestone's headline claim
+/// has no witness — the same claim-versus-witness gap the evidence-reachability
+/// audit found in fixtures, one level up, at a gate.
+///
+/// It also blocks the ABI work in a specific way: the architect's invariant is
+/// that the semantic signature is the most precise representation in the chain.
+/// It cannot be, while the layer that would establish precision never runs.
 #[test]
-fn two_opaque_types_of_one_name_are_not_compared_at_a_call() {
-    let a = "module alpha\n\nopaque type Tag = String\n";
-    let b = "module beta\n\nopaque type Tag = String\n";
-    let c = "\
-module gamma
+fn a_call_site_is_not_type_checked() {
+    // Two declared records, both resolvable, in one module: the case with no
+    // alternative explanation.
+    let src = "\
+module r
 
-import alpha
-import beta
+type Store = Store { id: Int }
+type Cart = Cart { n: Int }
 
-fn takes(t: beta.Tag) -> Int { 0 }
+fn takes_store(s: Store) -> Int { 0 }
 
-fn makes() -> alpha.Tag { todo }
+fn makes_cart() -> Cart { Cart(1) }
 
-fn use_it() -> Int {
-    takes(makes())
+fn breaks() -> Int {
+    takes_store(makes_cart())
 }
 ";
-    let sources = [a, b, c];
-    let hirs: Vec<Hir> = sources
-        .iter()
-        .map(|s| lower_file(s, &parse_tree(s).green))
-        .collect();
-    let refs: Vec<&Hir> = hirs.iter().collect();
-
-    // They ARE two declarations — the premise, so this is not measuring a
-    // resolver that merged them earlier.
-    let tags: Vec<String> = refs
-        .iter()
-        .enumerate()
-        .flat_map(|(u, h)| {
-            h.all_decls()
-                .filter(|(_, d)| d.name == "Tag")
-                .map(move |(_, d)| format!("{u}:{}", d.name))
-        })
-        .collect();
-    assert_eq!(tags.len(), 2, "{tags:?}");
-
-    // And the call between them is silent — decided by the whole checker, the
-    // same entry point `pw check` uses, not by one pass asked in isolation.
-    let files: Vec<(String, String)> = sources
-        .iter()
-        .enumerate()
-        .map(|(i, s)| (format!("{i}.pw"), s.to_string()))
-        .collect();
-    let codes: Vec<String> = pw_core::check::check_sources(&files)
-        .into_iter()
-        .flat_map(|(_, ds)| ds.into_iter().map(|d| d.code.to_string()))
-        .collect();
+    let codes: Vec<String> =
+        pw_core::check::check_sources(&[("r.pw".to_string(), src.to_string())])
+            .into_iter()
+            .flat_map(|(_, ds)| ds.into_iter().map(|d| d.code.to_string()))
+            .collect();
     assert!(
         codes.is_empty(),
-        "PINNED: if a nominal mismatch is now reported, delete this test and \
-         record the rule. Got {codes:?}"
+        "PINNED: a call site is now checked. Delete this test and record the \
+         rule — and check whether E9's gate needs re-evidencing. Got {codes:?}"
     );
+
+    // And the premise: the two types ARE distinct declarations, so this is not
+    // measuring a resolver that merged them.
+    let hir = lower_file(src, &parse_tree(src).green);
+    let names: Vec<String> = hir
+        .all_decls()
+        .filter(|(_, d)| d.kind == pw_core::hir::DeclKind::Type)
+        .map(|(_, d)| d.name.clone())
+        .collect();
+    assert_eq!(names, ["Store", "Cart"], "{names:?}");
 }

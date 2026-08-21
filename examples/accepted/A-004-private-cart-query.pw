@@ -10,7 +10,8 @@
 
 module cart.queries
 
-import domain.{ SessionId, Cart, CartError }
+import domain.{ Cart, CartError }
+import capability.{ SessionId }
 
 import Carts
 

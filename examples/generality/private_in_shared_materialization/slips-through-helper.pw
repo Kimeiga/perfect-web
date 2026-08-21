@@ -21,7 +21,7 @@
 // compiling clean, and then the file is promoted rather than deleted.
 module generality.materialize_slips_helper
 
-import domain.{ SessionId }
+
 import Resources.{ Cart }
 import Events.{ CartChanged }
 import Carts

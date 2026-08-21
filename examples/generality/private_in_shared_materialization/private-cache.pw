@@ -9,7 +9,7 @@
 // answer for another, whatever the label says.
 module generality.materialize_private_cache
 
-import domain.{ SessionId }
+
 import Events.{ CartChanged }
 
 query Draft(session: SessionId) -> Int

@@ -28,7 +28,6 @@ module domain
 
 opaque type StoreId = String
 opaque type MenuItemId = String
-opaque type SessionId = String
 opaque type ConsumerId = String
 opaque type OrderId = String
 opaque type InteractionId = String

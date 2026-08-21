@@ -363,7 +363,15 @@ fn the_trusted_platform_contract_is_hashed() {
     //   imported, and nothing required it to resolve: a privacy label compares
     //   written spellings and never looked its argument up. Putting the
     //   operation's signature on the ABI is what asked the question.
-    const EXPECTED: u64 = 0x8aad1af3ca25dc91;
+    // Changed again 2026-08-20: `examples/domain.pw` no longer declares
+    // `opaque type SessionId = String`. Architect ruling — "current session" is
+    // supplied by the execution environment, so the session principal is a
+    // PLATFORM type and the application does not get to define independently
+    // what identity type the platform's current session has. There were two
+    // declarations wrapping `String`, `add_to_cart` passed the platform's into
+    // the application's, and nothing compared them. Twenty-five files now
+    // import `capability.SessionId`.
+    const EXPECTED: u64 = 0x79839db0aaef03dd;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
