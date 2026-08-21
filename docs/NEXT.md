@@ -114,11 +114,46 @@ It found `Carts.clear(tx, current_session())` against a one-parameter `clear`
 in **three files** — R-011 and two copies in the generality and rules
 witnesses.
 
-**Open with the architect:** does call-site type checking come first as its own
-work, or do 3 and 4 land first and the checker consume them? 3 and 4 are the
-representation a checker needs, so building them without the consumer means
-designing an interface against an imagined caller — the shape that produced
-`interface_for(capability, ontology)` and `HostCall { capability }`.
+**The ordering question is answered by the code, not by judgement.** I asked
+the architect whether the checker comes first or steps 3–4 do. Attempting the
+next piece — argument types — settles it:
+
+```rust
+pub struct Signature {
+    pub returns: Option<String>,        // the return type's HEAD
+    pub returns_args: Vec<String>,
+    pub params: Vec<Option<String>>,    // each parameter's declared type HEAD
+}
+```
+
+A parameter's type is a **written head string**. Comparing an argument against
+it would fail twice over, and both failures are ones this project has already
+recorded:
+
+```text
+domain.SessionId vs capability.SessionId    one written head, two declarations
+List<MenuItem>                              the head is `List`; the argument is gone
+```
+
+The first is exactly the defect that started this sequence. The second is the
+bug `Interface::of`'s own comment records — *"reading only `p.ty` gave `List`
+for `List<OpenTransaction>`"* — and it is the whole reason `DeclaredType`
+exists.
+
+So an argument check written against today's `Signature` would reproduce the
+defect it is meant to catch. **Step 3 is a hard prerequisite for the rest of
+step 2**, not an alternative ordering:
+
+```text
+3  resolved semantic types in Signature / contract.signature
+4  every type argument a signature names must resolve
+2' argument type checking, consuming 3
+```
+
+A narrow interim check — only where both sides are primitives, catching
+`takes_str(42)` — is deliberately **not** taken. It is the shape refused in
+`PW0604`'s own commit: a rule that fires on some mismatches reads as a rule
+that catches them.
 
 **And a milestone claim with no witness.** `docs/MILESTONES.md` records E9 —
 *permanent value type checker* — as COMPLETE, and charter §14 M9A lists
