@@ -99,9 +99,27 @@ the disagreement lives entirely in the component types. Two more findings came
 with it — a privacy label has no ABI and the stand-in silently erased it, and an
 `effect` declaration was claiming an operation and winning by arriving last.
 
-Reproduce: `cargo test -p pw-core --test canonical_abi -- --nocapture`.
-`docs/NEXT.md` has the decision; `docs/RISK_QUEUE.md` has all three
-classifications.
+**The block was resolved by ruling, 2026-08-20**, and not the way I proposed:
+the Pleris declaration is the ABI authority for every operation this program
+declares, so the compiler EMITS the deployment-facing WIT and a deployment
+implements it. Both second derivations are deleted rather than compared. The
+generated package now holds `pw:app`, `pw:types`, `pw:host` and `store:data`.
+
+**Type identity followed**, and stopped at a bigger finding. `SessionId` is now
+a platform principal with one declaration. Attempting the next step — nominal
+compatibility by resolved `DefId` — found that **no call site was type-checked
+at all**: not arguments, not arity, not results. `PW0604` (call arity) is the
+first piece of the repair and found one wrong call copied into three fixtures.
+Argument types are next.
+
+`docs/MILESTONES.md` records **E9 — permanent value type checker** as COMPLETE
+and charter §14 M9A lists `unification-based inference`; E9's evidence
+witnesses what it covers and none of it witnesses call-site typing. Recorded in
+`docs/RISK_QUEUE.md`, not reopened unilaterally.
+
+Reproduce: `cargo test -p pw-core --test canonical_abi --test call_arity`.
+`docs/NEXT.md` carries the sequence and what is open with the architect;
+`docs/RISK_QUEUE.md` carries every classification.
 
 Every executable expression now belongs to **exactly one named execution
 root**, each with a context. `draw(ctx)`, `acquire`, `release` and the

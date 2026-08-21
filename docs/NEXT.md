@@ -55,6 +55,77 @@ menu — each step's evidence is what makes the next one readable.
 10 then investigate replacing external `Carts.add`             —
 ```
 
+### The type-identity ruling, 2026-08-20 — and where it stopped
+
+The architect's sequence after the WIT emission, and its state:
+
+```text
+1  canonicalize SessionId as a platform principal        DONE
+2  nominal compatibility by resolved DefId               PARTIAL — see below
+3  resolved semantic types in contract.signature          ...
+4  every type argument used by a signature must resolve   ...
+5  re-run corpus and evidence; open a corpus version
+   rather than weakening the rule                         ...
+6  regenerate WIT                                         ...
+7  same-core-flattening component mutation control        ...
+8  resume Canonical ABI adapters                          ...
+```
+
+**1 — done.** `examples/domain.pw` no longer declares `SessionId`; 25 files
+import the platform's:
+
+> "current session" is supplied by the execution environment. The application
+> doesn't get to independently define what identity type the platform's current
+> session has.
+
+```wit
+before   read: func() -> capability-session-id;
+         add:  func(arg0: domain-session-id, ..) -> ..;
+
+after    read: func() -> capability-session-id;
+         add:  func(arg0: capability-session-id, ..) -> ..;
+```
+
+The `capability` → `principal`/`context` rename the architect also flagged is
+**not** done: it is naming, and it should not move in the same change as the
+identity fix.
+
+**2 — the premise did not hold.** The step says to make opaque/nominal
+compatibility use resolved `DefId` rather than representation. There was no
+compatibility check to change: **no call site was type-checked at all.**
+
+```text
+fn takes_str(s: String) -> Int      takes_str(42)              accepted
+fn wrong_return() -> String { 42 }                             accepted
+fn wrong_arity(a: Int, b: Int)      wrong_arity(1)             accepted
+fn takes_store(s: Store)            takes_store(makes_cart())  accepted
+```
+
+The narrow finding — two `opaque type SessionId = String` interoperating — was
+a symptom, and an opaque-identity rule would have produced the right verdict on
+it from a mechanism unrelated to the gap.
+
+**`PW0604`, call arity, is the first piece of the repair.** Arity first because
+it needs no inference and could therefore be correct against the whole corpus
+immediately. Argument **types** are the next piece and are deliberately absent:
+a rule that fires on some mismatches reads as a rule that catches them.
+
+It found `Carts.clear(tx, current_session())` against a one-parameter `clear`
+in **three files** — R-011 and two copies in the generality and rules
+witnesses.
+
+**Open with the architect:** does call-site type checking come first as its own
+work, or do 3 and 4 land first and the checker consume them? 3 and 4 are the
+representation a checker needs, so building them without the consumer means
+designing an interface against an imagined caller — the shape that produced
+`interface_for(capability, ontology)` and `HostCall { capability }`.
+
+**And a milestone claim with no witness.** `docs/MILESTONES.md` records E9 —
+*permanent value type checker* — as COMPLETE, and charter §14 M9A lists
+`unification-based inference` and `opaque nominal types`. E9's evidence
+witnesses what it covers and none of it witnesses call-site typing. Recorded,
+not reopened unilaterally.
+
 ### The ruling, 2026-08-20 — Pleris is the ABI authority
 
 The block is resolved, and not the way I proposed. I suggested splitting

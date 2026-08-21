@@ -404,26 +404,32 @@ type StoreId = StoreId { v: Int }
     );
 }
 
-/// **PINS A FINDING: call sites are not type-checked at all.**
+/// **PINS A FINDING: a call site's argument TYPES are not checked.**
 ///
 /// Found while executing the architect's step 2 — *make opaque/nominal
 /// compatibility use resolved `DefId`, not representation* — which presupposes
 /// a compatibility check to repair. There is none.
 ///
-/// It is not about opaque types, and not about nominal identity. **No call
-/// site is checked**: not the argument types, not the arity, not the result.
+/// It is not about opaque types, and not about nominal identity. When this was
+/// written **no call site was checked in any way**:
 ///
 /// ```text
-/// fn takes_str(s: String) -> Int      takes_str(42)            accepted
-/// fn wrong_return() -> String { 42 }                           accepted
-/// fn wrong_arity(a: Int, b: Int)      wrong_arity(1)           accepted
+/// fn takes_str(s: String) -> Int      takes_str(42)              accepted
+/// fn wrong_return() -> String { 42 }                             accepted
+/// fn wrong_arity(a: Int, b: Int)      wrong_arity(1)             accepted
 /// fn takes_store(s: Store)            takes_store(makes_cart())  accepted
 /// ```
 ///
-/// The last one is the decisive case: two `type` declarations in one module,
-/// both resolvable, one returned from a call and passed where the other is
-/// expected. Nothing resolves ambiguously and nothing is missing — the check
-/// does not exist.
+/// **Arity is now checked** — `PW0604`, `tests/call_arity.rs`, the same day —
+/// so the third line no longer holds. The rest do, and the fourth is the
+/// decisive case: two `type` declarations in one module, both resolvable, one
+/// returned from a call and passed where the other is expected, with the arity
+/// correct so nothing else can catch it. Nothing resolves ambiguously and
+/// nothing is missing; the check does not exist.
+///
+/// This test therefore narrows as the repair proceeds rather than being
+/// deleted at the first sign of progress. Arity landing must not read as *call
+/// sites are checked now*.
 ///
 /// # What DOES get checked
 ///
@@ -446,6 +452,7 @@ type StoreId = StoreId { v: Int }
 /// It also blocks the ABI work in a specific way: the architect's invariant is
 /// that the semantic signature is the most precise representation in the chain.
 /// It cannot be, while the layer that would establish precision never runs.
+/// Arity is the first piece of that layer; argument types are the next.
 #[test]
 fn a_call_site_is_not_type_checked() {
     // Two declared records, both resolvable, in one module: the case with no
@@ -471,8 +478,18 @@ fn breaks() -> Int {
             .collect();
     assert!(
         codes.is_empty(),
-        "PINNED: a call site is now checked. Delete this test and record the \
-         rule — and check whether E9's gate needs re-evidencing. Got {codes:?}"
+        "PINNED: a call site's argument types are now checked. Delete this test \
+         and record the rule — and check whether E9's gate needs \
+         re-evidencing. Got {codes:?}"
+    );
+
+    // The arity is deliberately correct here, so this measures the TYPE gap and
+    // not the one `PW0604` closed. Without this the test would go green the day
+    // arity landed and stop reporting anything.
+    assert!(
+        !codes.iter().any(|c| c == "PW0604"),
+        "the fixture must not have an arity error, or it is measuring the \
+         wrong gap: {codes:?}"
     );
 
     // And the premise: the two types ARE distinct declarations, so this is not
