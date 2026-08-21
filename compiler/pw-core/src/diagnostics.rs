@@ -36,11 +36,20 @@ pub enum Detector {
     AbiDecoder,
     /// E6's resource dependency graph, over the whole program.
     ResourceGraph,
+    /// **A call compared against its callee's declared signature.**
+    ///
+    /// Added 2026-08-20 with `PW0604`, the first check of an ordinary call
+    /// site. Named rather than borrowed: it is neither a declaration-header
+    /// rule (it needs the call) nor the pattern matrix (it is not a match), and
+    /// a diagnostic that reports the wrong detector describes a mechanism that
+    /// did not decide it.
+    Signature,
 }
 
 impl Detector {
     pub fn name(self) -> &'static str {
         match self {
+            Detector::Signature => "signature",
             Detector::DeclarationRule => "declaration_rule",
             Detector::ScopeGraph => "scope_graph",
             Detector::PatternMatrix => "pattern_matrix",

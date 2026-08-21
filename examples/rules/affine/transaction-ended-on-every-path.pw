@@ -20,6 +20,10 @@ command clear_cart() -> Result<(), CartError>
         Database.rollback(tx)
         return Ok(())
     }
-    Carts.clear(tx, current_session())
+    // `clear` takes a session, not a transaction. Repaired 2026-08-20
+    // when `PW0604` began checking call arity and found the same wrong
+    // call in three files — a fixture describing a library that does not
+    // exist, copied.
+    Carts.clear(current_session())
     tx.commit()
 }

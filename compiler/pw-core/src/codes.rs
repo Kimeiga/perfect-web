@@ -195,6 +195,14 @@ codes! {
         "a handler must accept the event its attribute delivers";
     CONSTRUCTOR_ARITY = "PW0603" / constructor_arity / 1, Types,
         "a constructor pattern must bind exactly the fields its constructor declares";
+    // **The first check of an ordinary call.** Until 2026-08-20 no call site
+    // was checked at all — not the arity, not the argument types, not the
+    // result — while `docs/MILESTONES.md` recorded E9, *permanent value type
+    // checker*, as complete. Arity first because it needs no inference: the
+    // callee's declaration says how many parameters it has, and the call says
+    // how many arguments it passes. See `docs/RISK_QUEUE.md`.
+    CALL_ARITY = "PW0604" / call_arity / 1, Types,
+        "a call must supply exactly the arguments its callee declares";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

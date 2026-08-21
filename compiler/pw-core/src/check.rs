@@ -967,6 +967,7 @@ fn check_unit_with(
         );
         privacy_flow(&unit.hir, sigs, id, decl, &mut out);
         privacy_sinks(&unit.hir, sigs, id, decl, &mut out);
+        call_arity(&unit.hir, sigs, ws, at, decl, &mut out);
         effect_rows(
             &unit.hir, sigs, inference, ontology, ws, at, id, decl, &mut out,
         );
@@ -1980,6 +1981,132 @@ pub(crate) fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::h
     }
     let body = hir.body(decl.body?);
     name_pair(body, body.root, "cache")
+}
+
+/// **PW0604 — a call passes exactly the arguments its callee declares.**
+///
+/// The first check of an ordinary call site. Until 2026-08-20 there was none:
+/// not the arity, not the argument types, not the result, while
+/// `docs/MILESTONES.md` recorded E9 — *permanent value type checker* — as
+/// complete and charter §14 M9A listed `unification-based inference` among its
+/// contents. `a_call_site_is_not_type_checked` pinned it; this is the first
+/// piece of the repair.
+///
+/// **Arity first, deliberately.** It needs no inference at all — the callee's
+/// declaration says how many parameters it has and the call says how many
+/// arguments it passes — so it can be correct today, on the whole corpus,
+/// without waiting for a type comparison to exist. Argument TYPES are the next
+/// piece and are not here.
+///
+/// # What it refuses to decide
+///
+/// Only a call whose callee resolves **by path** to a declaration with a
+/// signature. A callee that does not resolve is not an arity error and must not
+/// be reported as one — it is either a name this build cannot see or a
+/// different defect with its own code. Silence here is the three-valued
+/// discipline the project uses everywhere else: *wrong*, *right*, and *this
+/// analysis has nothing to say*.
+///
+/// Constructors are excluded for the same reason: `Cart(1)` resolves to a type
+/// declaration, whose "parameters" are a variant's fields, and `PW0603` already
+/// owns that relation.
+fn call_arity(
+    hir: &Hir,
+    sigs: &Signatures,
+    ws: &crate::resolve::Workspace,
+    at: crate::resolve::UnitId,
+    decl: &Decl,
+    out: &mut Vec<Diagnostic>,
+) {
+    let Some(body_id) = decl.body else { return };
+    let body = hir.body(body_id);
+
+    // **`|>` supplies an argument the call does not carry.** `items |>
+    // List.map(f)` is `List.map(items, f)`: the pipeline's left side becomes
+    // the call's first argument, so counting only `args` reports every
+    // pipelined call as one argument short.
+    //
+    // The corpus found this on the rule's first run — five call sites across
+    // A-001 and A-016, all correct code. Built the same way `infer.rs` builds
+    // it, because "which call receives a piped value" must have one answer.
+    let mut piped: std::collections::BTreeSet<crate::hir::ExprId> =
+        std::collections::BTreeSet::new();
+    for id in body.walk() {
+        if let Expr::Binary {
+            op: crate::hir::BinOp::Pipe,
+            rhs,
+            ..
+        } = body.expr(id)
+        {
+            piped.insert(*rhs);
+        }
+    }
+
+    for id in body.walk() {
+        let Expr::Call { callee, args } = body.expr(id) else {
+            continue;
+        };
+        let supplied = args.len() + usize::from(piped.contains(&id));
+        // **By resolved identity, never by spelling.** `two(1)` and
+        // `other.two(1)` are different callees, and a lookup keyed on the
+        // written path would answer for whichever declaration happened to be
+        // spelled that way. The resolution is the same one the backend uses to
+        // decide which declaration a call reaches.
+        let path = path_of(body, *callee);
+        let def = match path.contains('.') {
+            true => ws.resolve_path(at, &path),
+            false => ws.resolve_in(at, crate::resolve::Namespace::Term, &path),
+        };
+        // `Ambiguous` and `Unresolved` are deliberately silent: neither is an
+        // arity error, and reporting one as such would be a right-shaped
+        // verdict from the wrong mechanism.
+        let def = match def {
+            crate::resolve::Resolution::Local(d) => d,
+            crate::resolve::Resolution::Imported { def, .. } => def,
+            _ => continue,
+        };
+        let Some(sig) = sigs.by_def(def) else {
+            continue;
+        };
+        // **A declaration that is not a callable is excluded by having no
+        // signature**, not by a list of kinds this function keeps. `Cart(1)`
+        // reaches a type, whose fields are `PW0603`'s relation and which
+        // `Signatures` does not describe.
+        //
+        // The first version did enumerate kinds, and it needed the callee's
+        // Decl to read `kind` — which it looked up in the CURRENT unit only, so
+        // every cross-module call fell through and the rule silently did not
+        // apply to them. `a_call_across_modules_is_checked_by_resolved_identity`
+        // is what caught it, and the repair is to stop asking the question.
+        // A declaration with no parameter list of its own — a type, an event —
+        // has nothing to say about arity here.
+        if sig.params.is_empty() && supplied == 0 {
+            continue;
+        }
+        if supplied == sig.params.len() {
+            continue;
+        }
+        let (n, m) = (supplied, sig.params.len());
+        let word = |k: usize| if k == 1 { "argument" } else { "arguments" };
+        out.push(
+            Diagnostic::error(
+                crate::codes::CALL_ARITY.id,
+                crate::codes::CALL_ARITY.invariant,
+                Detector::Signature,
+                format!("`{path}` declares {m} {} and this call passes {n}", word(m)),
+                body.expr_span(id),
+            )
+            .reason("call_arity_disagrees_with_declaration")
+            .explain(
+                "the callee's declaration fixes how many arguments a call supplies; a call \
+                 that passes a different number is not the call the declaration describes",
+            )
+            .repair(match n < m {
+                true => "pass the missing arguments",
+                false => "remove the extra arguments",
+            }),
+        );
+    }
 }
 
 /// Charter §7.8: a sink accepts only what its declared privacy level admits.
