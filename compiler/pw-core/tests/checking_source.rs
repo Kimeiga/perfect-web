@@ -295,9 +295,18 @@ fn the_environment_spans_every_file_checked_together() {
         "a.pw".to_string(),
         "module a\ntype T = | X | Y\n".to_string(),
     );
+    // **`b` imports `T`.** It did not until 2026-08-21, and the match was
+    // checkable anyway — because the type environment was keyed by bare NAME
+    // and found `T` ambiently, in a module that never asked for it. That is the
+    // same defect as calling a name you did not import (`PW0021`), one layer
+    // over, and it was holding this test up.
+    //
+    // The assumption A-009 makes testable is that one invocation is one
+    // program, so an IMPORTED type crosses a file. Not that any type does.
     let b = (
         "b.pw".to_string(),
-        "module b\nfn f(t: T) -> Int !{} {\n    match t {\n        X => 1,\n    }\n}\n".to_string(),
+        "module b\nimport a.{ T }\nfn f(t: T) -> Int !{} {\n    match t {\n        X => 1,\n    }\n}\n"
+            .to_string(),
     );
 
     let together = check_sources(&[a.clone(), b.clone()]);
@@ -307,12 +316,23 @@ fn the_environment_spans_every_file_checked_together() {
         "checked together, the match is checkable"
     );
 
-    // Control: alone, `T` is unknown and nothing is claimed.
+    // Control: alone, `T` is unknown and **no exhaustiveness claim is made**.
+    //
+    // Not "no diagnostics at all" — that was the assertion until 2026-08-21 and
+    // it became wrong in the right direction. `b` alone is a module importing
+    // one that is not there, and `PW0020` says so. What must not happen is a
+    // verdict about the match, because the analysis has no constructors to
+    // reason from and guessing is how a wrong answer gets a right shape.
     let alone = check_sources(&[b]);
+    let codes: Vec<&str> = alone[0].1.iter().map(|d| d.code).collect();
     assert!(
-        alone[0].1.is_empty(),
-        "alone, the type is unknown and must not be guessed: {:?}",
-        alone[0].1
+        !codes.contains(&"PW0305"),
+        "alone, the type is unknown and must not be guessed: {codes:?}"
+    );
+    assert_eq!(
+        codes,
+        ["PW0020"],
+        "and the reason it is unknown is reported rather than silent"
     );
 }
 

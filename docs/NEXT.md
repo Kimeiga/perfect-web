@@ -201,14 +201,28 @@ AbiType         boundary representation
 ### The migration order
 
 ```text
-1  re-key type definitions DefId → TypeDef; delete bare-name semantic lookup
-2  move exhaustiveness, ABI and check.rs onto ResolvedType.def_id() → TypeEnv
-3  Signature: params: Vec<ResolvedType>, returns: Option<ResolvedType>
-4  delete semantic access to written type heads and args
-5  derive StableTypeId from ResolvedType
-6  ComponentContract carries the StableTypeId representation
-7  structural ratchet: zero semantic name → TypeDef lookups after resolution
+1  re-key type definitions DefId → TypeDef; delete bare-name semantic lookup  DONE
+2  move exhaustiveness and check.rs onto ResolvedType.def_id() → TypeEnv      DONE
+3  Signature: params: Vec<ResolvedType>, returns: Option<ResolvedType>        NEXT
+4  delete semantic access to written type heads and args                       ...
+5  derive StableTypeId from ResolvedType                                      DONE
+6  ComponentContract carries the StableTypeId representation                   ...
+7  structural ratchet: zero semantic name → TypeDef lookups after resolution   ...
 ```
+
+**1 and 2, landed 2026-08-21.** `Env::adts` and `Env::ctor_names` are keyed by
+`DefId`; there is no by-name entry point; a scrutinee's declared type is
+resolved through `ResolvedType` before the environment is consulted. `locals`
+carries the `DeclaredType` rather than a rendering of it, because re-parsing a
+rendered type is where arguments get dropped.
+
+It found one immediately. `the_environment_spans_every_file_checked_together`
+declared `type T` in `module a` and matched a `T` in `module b` with **no
+import** — checkable only because the lookup was ambient. That is `PW0021`'s
+defect one layer over, and it was holding up the test that makes A-009
+testable. The fixture imports now, and its control improved on the way:
+checking `b` alone reports `PW0020` for the missing module instead of silence,
+so *the type is unknown* is stated rather than inferred from an empty list.
 
 Intermediate work on a branch is fine; **a state where some semantic consumers
 read strings and others read resolved identities must not merge.**

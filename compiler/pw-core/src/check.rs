@@ -40,10 +40,18 @@ pub struct Unit {
 /// `OrderState`, which is declared in `A-002`. Recorded as assumption A-009.
 pub struct Env {
     program: Program,
-    /// ADT name → its `AdtId`.
-    adts: BTreeMap<String, usize>,
-    /// ADT name → constructor names, in declaration order.
-    ctor_names: BTreeMap<String, Vec<String>>,
+    /// **The declaration → its `AdtId`.**
+    ///
+    /// Keyed by `DefId` since 2026-08-21. It was keyed by bare NAME, so two
+    /// modules declaring `Status` had one entry and a match over one saw the
+    /// other's constructors — with no diagnostic, because both spellings agreed.
+    ///
+    /// Architect ruling: *`TypeEnv` never discovers identity; it only supplies
+    /// declaration facts for an identity it is handed.* So this map cannot be
+    /// consulted without a `DefId`, and getting one is resolution's job.
+    adts: BTreeMap<crate::resolve::DefId, usize>,
+    /// The declaration → its constructor names, in declaration order.
+    ctor_names: BTreeMap<crate::resolve::DefId, Vec<String>>,
 }
 
 impl Env {
@@ -55,20 +63,26 @@ impl Env {
         // Two passes: every ADT is declared before any field type is resolved,
         // so mutually recursive types work and declaration order does not
         // change the result.
-        let mut pending: Vec<(String, Vec<hir::VariantDef>)> = Vec::new();
-        for u in units {
-            for (_, d) in u.hir.all_decls() {
+        let mut pending: Vec<(crate::resolve::DefId, String, Vec<hir::VariantDef>)> = Vec::new();
+        for (unit, u) in units.iter().enumerate() {
+            for (id, d) in u.hir.all_decls() {
                 if let Some(vs) = &d.variants {
-                    pending.push((d.name.clone(), vs.clone()));
+                    pending.push((
+                        crate::resolve::DefId { unit, decl: id.0 },
+                        d.name.clone(),
+                        vs.clone(),
+                    ));
                 }
                 if let Some(rep) = &d.opaque_of {
                     program.declare_opaque(&d.name, primitive(rep).unwrap_or(Type::Str));
                 }
             }
         }
-        for (name, _) in &pending {
+        let mut by_name: BTreeMap<String, usize> = BTreeMap::new();
+        for (def, name, _) in &pending {
             let id = program.declare_adt(name, Vec::new());
-            adts.insert(name.clone(), id);
+            adts.insert(*def, id);
+            by_name.insert(name.clone(), id);
         }
         // A field type that is neither primitive nor declared here — usually
         // one reached through an `import` — is nominal-but-unknown, which is
@@ -77,8 +91,8 @@ impl Env {
         // `Cancelled(CancellationReason)` instead of `Cancelled(String)`, and
         // R-007 declares that exact string as its expected error.
         let mut unresolved: BTreeMap<String, usize> = BTreeMap::new();
-        for (name, vs) in &pending {
-            let id = adts[name];
+        for (def, _name, vs) in &pending {
+            let id = adts[def];
             let ctors: Vec<Ctor> = vs
                 .iter()
                 .map(|v| Ctor {
@@ -90,7 +104,12 @@ impl Env {
                             if let Some(t) = primitive(f) {
                                 return t;
                             }
-                            if let Some(i) = adts.get(f) {
+                            // A FIELD's type, by name, within this build's
+                            // table. Not the semantic lookup that was re-keyed:
+                            // a field names a type in its own declaration's
+                            // scope, and resolving those is step 2 of the
+                            // migration. Recorded rather than silently kept.
+                            if let Some(i) = by_name.get(f) {
                                 return Type::Adt(*i);
                             }
                             let oid = *unresolved
@@ -102,7 +121,7 @@ impl Env {
                 })
                 .collect();
             program.adts[id].ctors = ctors;
-            ctor_names.insert(name.clone(), vs.iter().map(|v| v.name.clone()).collect());
+            ctor_names.insert(*def, vs.iter().map(|v| v.name.clone()).collect());
         }
 
         Env {
@@ -116,8 +135,14 @@ impl Env {
         &self.program
     }
 
-    fn adt_of(&self, ty_name: &str) -> Option<usize> {
-        self.adts.get(ty_name).copied()
+    /// The `AdtId` for a declaration whose identity the caller already
+    /// established. There is no by-name entry point, deliberately.
+    fn adt_of(&self, def: crate::resolve::DefId) -> Option<usize> {
+        self.adts.get(&def).copied()
+    }
+
+    fn ctors_of(&self, def: crate::resolve::DefId) -> Option<&[String]> {
+        self.ctor_names.get(&def).map(|v| v.as_slice())
     }
 }
 
@@ -977,16 +1002,19 @@ fn check_unit_with(
         let body = unit.hir.body(body_id);
 
         // Local type facts: a parameter's declared type, and any `let x: T`.
-        let mut locals: BTreeMap<String, String> = BTreeMap::new();
+        // The DECLARED type, not a rendering of it — `List<MenuItem>` written
+        // back into a string is a type a consumer has to re-parse, and
+        // re-parsing is where arguments get dropped.
+        let mut locals: BTreeMap<String, hir::DeclaredType> = BTreeMap::new();
         for p in &decl.params {
             if let Some(t) = &p.ty {
-                locals.insert(p.name.clone(), t.written());
+                locals.insert(p.name.clone(), t.clone());
             }
         }
 
         for id in body.walk() {
             if let Expr::Match { scrutinee, arms } = body.expr(id) {
-                exhaustiveness(env, unit, body, id, *scrutinee, arms, &locals, &mut out);
+                exhaustiveness(env, ws, at, body, id, *scrutinee, arms, &locals, &mut out);
             }
         }
         scopes(decl, body, &mut out);
@@ -1040,21 +1068,25 @@ pub struct MatchAnalysis {
 /// audit would report a proof for a match no rule examined.
 pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
     let env = Env::build(units);
+    // One workspace, because a scrutinee's type must be RESOLVED before the
+    // environment is consulted — `Status` alone does not say whose.
+    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
+    let ws = crate::resolve::Workspace::build(&hirs);
     let mut out = Vec::new();
-    for unit in units {
+    for (at, unit) in units.iter().enumerate() {
         for (_, decl) in unit.hir.all_decls() {
             let Some(body_id) = decl.body else { continue };
             let body = unit.hir.body(body_id);
-            let mut locals: BTreeMap<String, String> = BTreeMap::new();
+            let mut locals: BTreeMap<String, hir::DeclaredType> = BTreeMap::new();
             for p in &decl.params {
                 if let Some(t) = &p.ty {
-                    locals.insert(p.name.clone(), t.written());
+                    locals.insert(p.name.clone(), t.clone());
                 }
             }
             for id in body.walk() {
                 if let Expr::Match { scrutinee, arms } = body.expr(id) {
                     out.push(analyse_match(
-                        &env, &decl.name, body, id, *scrutinee, arms, &locals,
+                        &env, &ws, at, &decl.name, body, id, *scrutinee, arms, &locals,
                     ));
                 }
             }
@@ -1067,12 +1099,14 @@ pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
 #[allow(clippy::too_many_arguments)]
 fn analyse_match(
     env: &Env,
+    ws: &crate::resolve::Workspace,
+    at: usize,
     declaration: &str,
     body: &Body,
     match_id: ExprId,
     scrutinee: ExprId,
     arms: &[hir::MatchArm],
-    locals: &BTreeMap<String, String>,
+    locals: &BTreeMap<String, hir::DeclaredType>,
 ) -> MatchAnalysis {
     let span = body.expr_span(match_id);
     let blocked = |reason: &str, ty: Option<String>| MatchAnalysis {
@@ -1093,16 +1127,32 @@ fn analyse_match(
             None,
         );
     };
-    let Some(ty_name) = locals.get(n) else {
+    let Some(declared) = locals.get(n) else {
         return blocked("the scrutinee's type is not declared in this body", None);
     };
-    let Some(adt_id) = env.adt_of(ty_name) else {
+    // **Resolve, then look up.** `Status` alone does not say whose, and two
+    // modules may declare one. The environment is handed an identity; it never
+    // discovers one.
+    let written = declared.written();
+    let resolution = crate::resolved::resolve(ws, at, None, &[], declared, span.clone());
+    let Some(def) = resolution.resolved().and_then(|t| t.def_id()) else {
         return blocked(
-            "the scrutinee's type is not an algebraic data type this program declares",
-            Some(ty_name.clone()),
+            "the scrutinee's type does not resolve to a declaration",
+            Some(written),
         );
     };
-    let ctors = &env.ctor_names[ty_name];
+    let Some(adt_id) = env.adt_of(def) else {
+        return blocked(
+            "the scrutinee's type is not an algebraic data type this program declares",
+            Some(written),
+        );
+    };
+    let Some(ctors) = env.ctors_of(def) else {
+        return blocked(
+            "the scrutinee's type declares no constructors",
+            Some(written),
+        );
+    };
     let lowered: Vec<Arm> = arms
         .iter()
         .map(|a| Arm {
@@ -1127,7 +1177,7 @@ fn analyse_match(
     };
     MatchAnalysis {
         declaration: declaration.to_string(),
-        scrutinee_type: Some(ty_name.clone()),
+        scrutinee_type: Some(written.clone()),
         span,
         outcome,
     }
@@ -1136,12 +1186,13 @@ fn analyse_match(
 #[allow(clippy::too_many_arguments)]
 fn exhaustiveness(
     env: &Env,
-    unit: &Unit,
+    ws: &crate::resolve::Workspace,
+    at: usize,
     body: &Body,
     match_id: ExprId,
     scrutinee: ExprId,
     arms: &[hir::MatchArm],
-    locals: &BTreeMap<String, String>,
+    locals: &BTreeMap<String, hir::DeclaredType>,
     out: &mut Vec<Diagnostic>,
 ) {
     // **The verdict comes from `analyse_match`, not from a second run.**
@@ -1150,17 +1201,30 @@ fn exhaustiveness(
     // result. Deriving it twice would let the report an audit reads and the
     // error a developer reads disagree, and the disagreement would be silent —
     // which is `docs/RISK_QUEUE.md`'s most common shape.
-    let analysis = analyse_match(env, "", body, match_id, scrutinee, arms, locals);
+    let analysis = analyse_match(env, ws, at, "", body, match_id, scrutinee, arms, locals);
 
     // Only a bare name whose type is declared. No guessing (see module docs).
     let Expr::Name(n) = body.expr(scrutinee) else {
         return;
     };
-    let Some(ty_name) = locals.get(n) else { return };
-    let Some(adt_id) = env.adt_of(ty_name) else {
+    let Some(declared) = locals.get(n) else {
         return;
     };
-    let ctors = &env.ctor_names[ty_name];
+    // The spelling, for the messages below. Provenance — the identity is `def`.
+    let ty_name = declared.written();
+    let Some(def) =
+        crate::resolved::resolve(ws, at, None, &[], declared, body.expr_span(scrutinee))
+            .resolved()
+            .and_then(|t| t.def_id())
+    else {
+        return;
+    };
+    let Some(adt_id) = env.adt_of(def) else {
+        return;
+    };
+    let Some(ctors) = env.ctors_of(def) else {
+        return;
+    };
 
     let lowered: Vec<Arm> = arms
         .iter()
@@ -1274,7 +1338,7 @@ fn exhaustiveness(
             .collect(),
     });
 
-    let _ = (unit, &lowered);
+    let _ = &lowered;
 }
 
 /// HIR pattern → the usefulness algorithm's pattern.

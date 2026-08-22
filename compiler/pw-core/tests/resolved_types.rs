@@ -635,3 +635,68 @@ fn a_parameter_without_its_binder_is_refused() {
         other => panic!("a parameter with no binder must not resolve: {other:?}"),
     }
 }
+
+/// **Two modules may declare one type name, and a match sees only its own.**
+///
+/// The control the architect asked to be frozen while migrating, 2026-08-21:
+///
+/// > A match whose scrutinee resolves to `alpha.Status` must get its
+/// > constructors from `DefId(alpha.Status)` even if `beta.Status` has the same
+/// > bare type name, was declared later, and has overlapping constructor
+/// > spellings. **Reordering the modules must not change the answer.**
+///
+/// > That's the test that proves you've actually killed `by_adt_name`, rather
+/// > than merely wrapping it behind another API.
+///
+/// `Env`'s table was keyed by bare name until this landed, so the two `Status`
+/// declarations shared one entry and the later one won. A match over
+/// `alpha.Status` covering `Ready` and `Failed` was reported non-exhaustive —
+/// against `beta`'s constructors — and one covering `Ready` and `Waiting` was
+/// accepted. No diagnostic said why, because both spellings agreed.
+#[test]
+fn a_match_takes_its_constructors_from_the_declaration_its_scrutinee_resolves_to() {
+    let alpha = "module alpha\n\ntype Status = Ready | Failed\n";
+    let beta = "module beta\n\ntype Status = Ready | Waiting\n";
+    // Covers alpha's constructors exactly, and is missing one of beta's.
+    let user = "\
+module gamma
+
+import alpha.{ Status }
+
+fn describe(s: Status) -> Int {
+    match s {
+        Ready => 0
+        Failed => 1
+    }
+}
+";
+    let check = |sources: Vec<(String, String)>| -> Vec<String> {
+        pw_core::check::check_sources(&sources)
+            .into_iter()
+            .flat_map(|(_, ds)| ds.into_iter().map(|d| d.code.to_string()))
+            .collect()
+    };
+
+    let a = ("a.pw".to_string(), alpha.to_string());
+    let b = ("b.pw".to_string(), beta.to_string());
+    let c = ("c.pw".to_string(), user.to_string());
+
+    // Both orderings, and the answer must be the same one: exhaustive.
+    let one = check(vec![a.clone(), b.clone(), c.clone()]);
+    let two = check(vec![b.clone(), a.clone(), c.clone()]);
+    assert_eq!(one, two, "reordering the modules changed the verdict");
+    assert!(
+        !one.contains(&"PW0305".to_string()),
+        "a match covering `alpha.Status` exactly is exhaustive: {one:?}"
+    );
+
+    // **The discriminator.** The same program missing one of ALPHA's
+    // constructors must be refused — otherwise the assertion above would also
+    // hold for an analysis that never runs.
+    let partial = user.replace("        Failed => 1\n", "");
+    let short = check(vec![a, b, ("c.pw".to_string(), partial)]);
+    assert!(
+        short.contains(&"PW0305".to_string()),
+        "missing `Failed` is not exhaustive: {short:?}"
+    );
+}

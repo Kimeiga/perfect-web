@@ -13,8 +13,6 @@
 #
 # Format: <file>:<field>  <reason>
 
-check.rs:adts                 a type NAME is the key an exhaustiveness question is asked with; E9 replaces it with AdtId
-check.rs:ctor_names          same key as `adts`, and retired with it
 infer.rs:bindings            LOCAL bindings inside one body. A local has no DefId and cannot collide across modules
 labels.rs:bindings           local bindings inside one body, as above
 boundary.rs:resources        a TYPE name, from the whole-program transfer analysis; E9 replaces it with a resolved type id. Moved here from `resume.rs` on 2026-08-07 when the remote-call policy joined the resume-capture one over the same facts — moved rather than copied, because two of these maps is exactly the shape the guard exists to catch
