@@ -112,13 +112,32 @@ at all**: not arguments, not arity, not results. `PW0604` (call arity) is the
 first piece of the repair and found one wrong call copied into three fixtures.
 Argument types are next.
 
-`docs/MILESTONES.md` records **E9 — permanent value type checker** as COMPLETE
-and charter §14 M9A lists `unification-based inference`; E9's evidence
-witnesses what it covers and none of it witnesses call-site typing. Recorded in
-`docs/RISK_QUEUE.md`, not reopened unilaterally.
+**E9 is REOPENED** (2026-08-21), by ruling, with every previously satisfied
+sub-gate listed and unrewritten. A milestone called *permanent value type
+checker* cannot stand while `takes_str(42)`, `fn wrong_return() -> String { 42 }`
+and `takes_store(makes_cart())` all pass — that is a missing central relation,
+not an edge case. Closing gates **E9-V1..V6** are added; `docs/NEXT.md` scores
+them in two columns, because *a representation that CAN express a rule is not a
+checker that enforces it* and six ticks against the first column would be
+exactly as true as E9's original headline.
 
-Reproduce: `cargo test -p pw-core --test canonical_abi --test call_arity`.
-`docs/NEXT.md` carries the sequence and what is open with the architect;
+**The type-identity repair is under way.** `ResolvedType` is the one semantic
+answer to *what type is this?*, with private internals, recursive resolution
+(or `Blocked`), and `same_as` as the only comparison. `StableTypeId` is the
+artifact identity — module path plus declaration, never a `DefId`, so an
+authority artifact does not change because a file was renamed. `TypeEnv` is
+keyed by `DefId` and has no by-name entry point: it never discovers identity,
+it is handed one.
+
+**Next, and it is one commit:** `Signature` carries `ResolvedType` instead of
+written type heads — 35 call sites across `annotations.rs`, `check.rs`,
+`infer.rs`, `backend/lower.rs`, `binding.rs` and `wit.rs`. There is no
+incremental path, because a state where some semantic consumers read strings
+and others read resolved identities must not merge. `docs/NEXT.md` §"The
+migration order" has the seven steps and which are done.
+
+Reproduce: `cargo test -p pw-core --test resolved_types --test call_arity
+--test canonical_abi --test one_comparison --test evidence_is_current`.
 `docs/RISK_QUEUE.md` carries every classification.
 
 Every executable expression now belongs to **exactly one named execution
