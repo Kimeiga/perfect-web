@@ -140,10 +140,11 @@ several security-relevant consumers.
 ### The sequence
 
 ```text
-3a  private ResolvedType + source provenance                    NEXT
-4   recursive resolution: head + every argument, or Blocked       ...
+3a  private ResolvedType + source provenance                    DONE
+4   recursive resolution: head + every argument, or Blocked     DONE
+    StableTypeId — the artifact identity, no DefId              DONE
 3b  migrate Signature and the contract's semantic signature;
-    delete every semantic use of a written type head              ...
+    delete every semantic use of a written type head            NEXT
 2'  call-site typing: instantiate + infer + unify                 ...
 2'' declared-return compatibility                                 ...
     → re-run E9 evidence, close E9 again                          ...
@@ -152,21 +153,65 @@ several security-relevant consumers.
     → Canonical ABI adapters                                      ...
 ```
 
+**3b is measured, not estimated:** 35 call sites across `annotations.rs`,
+`check.rs`, `infer.rs`, `backend/lower.rs`, `binding.rs` and `wit.rs` read
+`Signature`'s written types. It cannot be done incrementally, because the ruling
+forbids carrying both authorities at once — so it is one commit that moves every
+consumer, and it wants a session's full attention rather than the tail of one.
+
+**Open with the architect before starting it.** `types.rs` holds a *third*
+representation — `Type::Adt(AdtId)` / `Type::Opaque(OpaqueId)`, interned and
+keyed by **bare name** — which is what actually collapses `alpha.Tag` and
+`beta.Tag` today, and which `exhaust.rs` and `abi.rs` consume for constructor
+enumeration that `ResolvedType` deliberately does not carry.
+
+```text
+A  ResolvedType replaces Type outright, growing constructors
+B  Type stays as the checker's environment but is re-KEYED by DefId,
+   and ResolvedType is what signatures and contracts carry
+```
+
+The lean is **B** — constructor enumeration is a different question from type
+identity — but B leaves two things that know about types, which is the shape
+this project keeps deleting. Ruling wanted rather than a guess.
+
 **E9 is REOPENED** (`docs/MILESTONES.md`), with closing gates added rather than
 history rewritten:
 
+> If existing machinery already satisfies some, measure and mark them
+> satisfied. Don't rewrite anything merely because it was historically
+> scheduled under E9.
+
+Measured 2026-08-21, and the column that matters is the second one. **A
+representation that CAN express a rule is not a checker that enforces it** —
+conflating those is the claim-versus-witness failure that reopened this
+milestone, so each gate is scored on what a program actually gets refused for.
+
 ```text
-E9-V1  every typed call checks arity and argument compatibility   PW0604 done (arity)
-E9-V2  generic calls instantiate/unify through resolved types
-E9-V3  opaque nominal identity is DefId-based
-E9-V4  declared function result agrees with body result
-E9-V5  every type used by those relations, including all arguments,
-       is resolved before checking
-E9-V6  controls prove ABI-equal nominal types stay semantically distinct
+gate   representation exists          enforced on programs        witness
+────   ─────────────────────          ────────────────────        ───────
+V1     yes, for arity                 ARITY ONLY                  tests/call_arity.rs
+       arguments: no                  arguments: NO               —
+V2     ResolvedType::Parameter        NO                          resolved_types.rs
+       (a_bound_type_parameter…)                                  (representation only)
+V3     yes — DefId-based identity     NO                          two_declarations_of_one
+       and same_as                                                _spelling_are_two_types
+                                                                  (representation only)
+V4     no                             NO                          —
+V5     yes — recursive or Blocked     NO consumer reads it yet    resolution_reaches_every
+                                                                  _argument_or_reports
+V6     yes                            n/a — it is a control       an_opaque_type_is_not
+                                                                  _its_representation
 ```
 
-Where existing machinery already satisfies one, measure and mark it — nothing
-is rewritten merely because it was historically scheduled under E9.
+So exactly **one** gate is partly enforced (V1, arity) and **one** is fully met
+as a control (V6). V2, V3 and V5 have their representation and no consumer: that
+is 3b's whole job, and until it lands, `alpha.Tag ≠ beta.Tag` is a fact the
+compiler can state and does not act on.
+
+Recording it this way rather than as six checkboxes is deliberate. Six ticks
+against *representation exists* would read as a nearly-closed milestone and
+would be exactly as true as E9's original headline.
 
 ### Recorded, and deliberately not acted on yet
 
