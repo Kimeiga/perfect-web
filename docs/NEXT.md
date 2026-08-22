@@ -55,6 +55,132 @@ menu — each step's evidence is what makes the next one readable.
 10 then investigate replacing external `Carts.add`             —
 ```
 
+### The resolved-type ruling, 2026-08-21 — the locked sequence
+
+Three rulings, and the sequence they fix.
+
+**1. `3 → 4 → 2'` is the order, and 3 + 4 are ONE gate.** Not two independently
+valid end states — there must never be a successful
+
+```text
+ResolvedType { head: DefId, args: ["MenuItem"] }   // argument still textual
+```
+
+so resolution is recursive and Blocks if any argument cannot resolve. That
+prevents step 3 from creating another partly-semantic representation that step
+4 then has to clean up.
+
+**2. Replace the written types outright.** Not this:
+
+```rust
+struct Signature {
+    written_params: Vec<String>,
+    resolved_params: Vec<ResolvedType>,   // two authorities — the shape we keep deleting
+}
+```
+
+but a `ResolvedType` with private internals, carrying **provenance** rather
+than a parallel semantic type:
+
+```text
+ResolvedType
+├── semantic identity   DefId / type-parameter identity / resolved arguments
+└── origin              source span, DeclaredType reference
+```
+
+with `def_id()`, `args()`, `type_parameter()`, `canonical_name()`,
+`display_name()`, `written_source()`, `span()`. A diagnostic still says
+*expected `SessionId`* as the programmer wrote it, and an artifact can say
+`pw-platform-web.capability.SessionId`, without any consumer holding a string
+it might treat as meaning:
+
+> **Written syntax can explain a resolved type. It cannot compete with it.**
+
+**A `DefId` is compiler-process identity and must not become the host
+artifact format.** `ComponentContract.signature` serializes a **StableTypeId** —
+package plus declaration identity plus resolved arguments — derived from the
+resolved signature:
+
+```text
+resolved semantic type → stable contract semantic type
+    → component/WIT representation → core ABI representation
+```
+
+Each step may discard information; **none may regain information an earlier
+representation failed to know.**
+
+**3. Call checking is unification, not equality.** Instantiate the callee's type
+parameters freshly, infer each argument, unify, and let the substitution
+determine the result. Representation transparency belongs to ABI lowering, not
+value typing — `opaque type Tag = String` does **not** let unification unwrap
+`Tag` to `String`.
+
+The frozen discriminators:
+
+```text
+takes(String); takes(42)                       reject
+takes(alpha.Tag); pass alpha.Tag               accept
+takes(beta.Tag); pass alpha.Tag                reject   (ABI-equal, semantically distinct)
+takes(List<MenuItem>); pass List<MenuItem>     accept
+takes(List<MenuItem>); pass List<Store>        reject
+identity<T>(T); identity(Store)                infer T = Store
+fn wrong() -> String { 42 }                    reject
+```
+
+The last matters because the finding is broader than arguments: **declared
+returns are not enforcing value types either.**
+
+**4. Privacy consumes the same object.** `Session<"SessionId">` must become
+impossible as successful semantic state — `Session<DefId(SessionId)>` or
+Blocked — and `Session<A> → Session<B>` compares resolved identities, never
+final-segment strings. Resume privacy, remote obligations, partitioning and ABI
+privacy erasure all already depend on these labels, so one repair improves
+several security-relevant consumers.
+
+### The sequence
+
+```text
+3a  private ResolvedType + source provenance                    NEXT
+4   recursive resolution: head + every argument, or Blocked       ...
+3b  migrate Signature and the contract's semantic signature;
+    delete every semantic use of a written type head              ...
+2'  call-site typing: instantiate + infer + unify                 ...
+2'' declared-return compatibility                                 ...
+    → re-run E9 evidence, close E9 again                          ...
+    → regenerate contracts and WIT                                ...
+    → component-level same-core-ABI mutation control              ...
+    → Canonical ABI adapters                                      ...
+```
+
+**E9 is REOPENED** (`docs/MILESTONES.md`), with closing gates added rather than
+history rewritten:
+
+```text
+E9-V1  every typed call checks arity and argument compatibility   PW0604 done (arity)
+E9-V2  generic calls instantiate/unify through resolved types
+E9-V3  opaque nominal identity is DefId-based
+E9-V4  declared function result agrees with body result
+E9-V5  every type used by those relations, including all arguments,
+       is resolved before checking
+E9-V6  controls prove ABI-equal nominal types stay semantically distinct
+```
+
+Where existing machinery already satisfies one, measure and mark it — nothing
+is rewritten merely because it was historically scheduled under E9.
+
+### Recorded, and deliberately not acted on yet
+
+R-011's history — an unresolved call found in 2026-08-10, a wrong arity found
+in 2026-08-20, and its declared invariant unrelated to both — shows that *a
+rejected fixture isolates one defect* is not enforceable by checking only the
+declared expected diagnostic. The stronger framing:
+
+> **Evidence belongs to a claim, and a witness is valid only if all
+> prerequisites for observing that claim are themselves valid.**
+
+Architect ruling: record it, do **not** interrupt the type repair to redesign
+the corpus framework again.
+
 ### The type-identity ruling, 2026-08-20 — and where it stopped
 
 The architect's sequence after the WIT emission, and its state:

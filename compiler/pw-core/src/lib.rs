@@ -52,6 +52,7 @@ pub mod policy;
 pub mod privacy;
 pub mod provenance;
 pub mod resolve;
+pub mod resolved;
 pub mod resume;
 pub mod resume_artifacts;
 pub mod routes;
