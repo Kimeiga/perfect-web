@@ -65,7 +65,7 @@ test a_refused_admission_yields_no_granted_to_link_from ... ok
 test an_instance_runs_within_the_budget_its_deployment_declares ... instantiation spent 16386 fuel
 test the_declared_component_imports_exactly_what_its_world_says ... minimal guest imports: ["perfect-web:store/stores@0.1.0#read", "perfect-web:store/stores@0.1.0#store"]
 test the_std_component_is_refused_for_authority_nobody_asked_for ... std guest imports 34 interfaces
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
 test a_capability_survives_the_crossing_with_its_argument ... ok
 test the_compilers_contracts_deserialize_with_every_field_populated ... ok
 test the_real_contracts_drive_a_real_admission ... ok

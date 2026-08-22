@@ -13,8 +13,8 @@
 package pw:app@0.1.0;
 
 interface resources-cart-api {
-    use pw:types/types.{domain-cart, domain-cart-error, domain-session-id};
-    cart: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{capability-session-id, domain-cart, domain-cart-error};
+    cart: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
 }
 
 interface resources-menu-api {
@@ -33,8 +33,8 @@ interface resources-store-api {
 }
 
 interface store-page-cart-api {
-    use pw:types/types.{domain-cart, domain-cart-error, domain-session-id};
-    cart: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{capability-session-id, domain-cart, domain-cart-error};
+    cart: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
 }
 
 interface store-page-menu-api {
@@ -121,7 +121,6 @@ package pw:types {
         type capability-session-id = string;
         type domain-store-id = string;
         type domain-menu-item-id = string;
-        type domain-session-id = string;
         type domain-order-id = string;
         record domain-menu-item {
             id: domain-menu-item-id,
@@ -176,10 +175,10 @@ package pw:host {
 
 package store:data {
     interface carts {
-        use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item-id, domain-positive-int, domain-session-id};
-        add: func(arg0: domain-session-id, arg1: domain-menu-item-id, arg2: domain-positive-int) -> result<domain-cart, domain-cart-error>;
-        clear: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
-        current: func(arg0: domain-session-id) -> result<domain-cart, domain-cart-error>;
+        use pw:types/types.{capability-session-id, domain-cart, domain-cart-error, domain-menu-item-id, domain-positive-int};
+        add: func(arg0: capability-session-id, arg1: domain-menu-item-id, arg2: domain-positive-int) -> result<domain-cart, domain-cart-error>;
+        clear: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
+        current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
     }
     interface menus {
         use pw:types/types.{domain-menu-item-id, domain-store-error, domain-store-id};
