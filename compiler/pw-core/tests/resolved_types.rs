@@ -44,8 +44,18 @@ fn in_program(sources: &[&str], at: usize, params: &[&str], written: &str) -> Ty
                 .collect(),
         ),
     };
+    // A type parameter needs a binder, so the helper supplies the unit's first
+    // declaration. Which one it is does not matter to these tests; that there
+    // IS one does, because `T` with no binding declaration is not an identity.
+    let binder = refs[at]
+        .all_decls()
+        .next()
+        .map(|(id, _)| pw_core::resolve::DefId {
+            unit: at,
+            decl: id.0,
+        });
     let owned: Vec<String> = params.iter().map(|p| p.to_string()).collect();
-    resolve(&ws, at, &owned, &declared, 0..0)
+    resolve(&ws, at, binder, &owned, &declared, 0..0)
 }
 
 const ALPHA: &str = "module alpha\n\nopaque type Tag = String\n";
@@ -310,7 +320,7 @@ fn the_platforms_session_id_is_one_type_in_the_real_program() {
     let declared = DeclaredType::new("SessionId", Vec::new());
     let mut seen: Vec<pw_core::resolve::DefId> = Vec::new();
     for at in 0..refs.len() {
-        if let TypeResolution::Resolved(t) = resolve(&ws, at, &[], &declared, 0..0)
+        if let TypeResolution::Resolved(t) = resolve(&ws, at, None, &[], &declared, 0..0)
             && let Some(def) = t.def_id()
         {
             seen.push(def);
@@ -363,7 +373,14 @@ fn the_identity_survives_a_different_file_order() {
             .iter()
             .position(|h| h.all_decls().any(|(id, _)| h.module_of(id) == Some(module)))
             .expect("the module is there");
-        let got = resolve(&ws, at, &[], &DeclaredType::new("Tag", Vec::new()), 0..0);
+        let got = resolve(
+            &ws,
+            at,
+            None,
+            &[],
+            &DeclaredType::new("Tag", Vec::new()),
+            0..0,
+        );
         let t = got.resolved().expect("resolves").clone();
         let stable = pw_core::resolved::stable(&refs, &t).expect("has a stable id");
         (t.def_id().expect("nominal"), stable)
@@ -401,7 +418,14 @@ fn the_artifact_identity_separates_what_the_spelling_merged() {
 
     let ids: Vec<String> = (0..2)
         .map(|at| {
-            let got = resolve(&ws, at, &[], &DeclaredType::new("Tag", Vec::new()), 0..0);
+            let got = resolve(
+                &ws,
+                at,
+                None,
+                &[],
+                &DeclaredType::new("Tag", Vec::new()),
+                0..0,
+            );
             let t = got.resolved().expect("resolves").clone();
             pw_core::resolved::stable(&refs, &t)
                 .expect("stable")
@@ -426,6 +450,7 @@ fn the_artifact_identity_carries_arguments_and_round_trips() {
     let got = resolve(
         &ws,
         0,
+        None,
         &[],
         &DeclaredType::new("List", vec!["MenuItem".to_string()]),
         0..0,
@@ -463,6 +488,7 @@ fn the_artifact_identity_carries_arguments_and_round_trips() {
         let got = resolve(
             &ws,
             at,
+            None,
             &[],
             &DeclaredType::new("List", vec!["MenuItem".to_string()]),
             0..0,
@@ -475,4 +501,137 @@ fn the_artifact_identity_carries_arguments_and_round_trips() {
         json, reordered,
         "the artifact bytes must not depend on file order"
     );
+}
+
+/// **Renaming a type parameter is not a contract change.**
+///
+/// Architect ruling, 2026-08-21:
+///
+/// > These should be semantically α-equivalent:
+/// >
+/// > ```text
+/// > fn id<T>(x: T) -> T
+/// > fn id<U>(x: U) -> U
+/// > ```
+/// >
+/// > Renaming a generic parameter should not change the public semantic
+/// > contract.
+///
+/// `StableTypeId::Parameter` carried the SPELLING for one commit, which would
+/// have made `T` → `U` a change a host could observe in an authority artifact.
+/// It carries the binder and the position now, and the name is provenance —
+/// the same principle as everywhere else in this module, missed in the one
+/// place where the identity looks like a name.
+#[test]
+fn renaming_a_type_parameter_does_not_change_the_artifact_identity() {
+    let ident = |param: &str| {
+        let src = format!("module m\n\nfn id<{param}>(x: {param}) -> {param} {{ x }}\n");
+        let hir = lower_file(&src, &parse_tree(&src).green);
+        let refs: Vec<&pw_core::hir::Hir> = vec![&hir];
+        let ws = Workspace::build(&refs);
+        let binder = refs[0]
+            .all_decls()
+            .find(|(_, d)| d.name == "id")
+            .map(|(id, _)| pw_core::resolve::DefId {
+                unit: 0,
+                decl: id.0,
+            })
+            .expect("the fn is there");
+        let got = resolve(
+            &ws,
+            0,
+            Some(binder),
+            &[param.to_string()],
+            &DeclaredType::new(param, Vec::new()),
+            0..0,
+        );
+        let t = got.resolved().expect("a bound parameter resolves").clone();
+        (
+            t.type_parameter().map(str::to_string),
+            pw_core::resolved::stable(&refs, &t).expect("stable"),
+        )
+    };
+
+    let (name_t, id_t) = ident("T");
+    let (name_u, id_u) = ident("U");
+
+    // The premise: the spellings really do differ, so this is not comparing a
+    // program with itself.
+    assert_eq!(name_t.as_deref(), Some("T"));
+    assert_eq!(name_u.as_deref(), Some("U"));
+    assert_ne!(name_t, name_u);
+
+    // And the identity does not.
+    assert_eq!(id_t, id_u);
+    assert_eq!(id_t.to_string(), "m.id#0");
+}
+
+/// **Two parameters of one declaration are two variables.**
+///
+/// The discriminator for the test above: identity by binder ALONE would make
+/// every parameter of a declaration the same type, which would be a far worse
+/// bug than the one being fixed.
+#[test]
+fn two_parameters_of_one_binder_are_distinguished_by_position() {
+    let src = "module m\n\nfn pair<A, B>(x: A, y: B) -> A { x }\n";
+    let hir = lower_file(src, &parse_tree(src).green);
+    let refs: Vec<&pw_core::hir::Hir> = vec![&hir];
+    let ws = Workspace::build(&refs);
+    let binder = refs[0]
+        .all_decls()
+        .find(|(_, d)| d.name == "pair")
+        .map(|(id, _)| pw_core::resolve::DefId {
+            unit: 0,
+            decl: id.0,
+        })
+        .expect("the fn is there");
+    let params = vec!["A".to_string(), "B".to_string()];
+
+    let get = |name: &str| {
+        resolve(
+            &ws,
+            0,
+            Some(binder),
+            &params,
+            &DeclaredType::new(name, Vec::new()),
+            0..0,
+        )
+        .resolved()
+        .expect("resolves")
+        .clone()
+    };
+    let a = get("A");
+    let b = get("B");
+
+    assert!(!a.same_as(&b), "`A` and `B` are two variables");
+    assert_eq!(a.parameter_binding().map(|(_, i)| i), Some(0));
+    assert_eq!(b.parameter_binding().map(|(_, i)| i), Some(1));
+    assert!(a.same_as(&get("A")), "and `A` is the same variable as `A`");
+}
+
+/// **A type parameter with no binding declaration is not an identity.**
+///
+/// `T` means nothing on its own — two declarations each binding a `T` bind two
+/// different variables. A caller that cannot say which declaration binds it
+/// gets a refusal rather than a name to compare, which is the alternative that
+/// would have quietly reintroduced spelling-as-identity.
+#[test]
+fn a_parameter_without_its_binder_is_refused() {
+    let src = "module m\n\nfn id(x: Int) -> Int { x }\n";
+    let hir = lower_file(src, &parse_tree(src).green);
+    let refs: Vec<&pw_core::hir::Hir> = vec![&hir];
+    let ws = Workspace::build(&refs);
+
+    let got = resolve(
+        &ws,
+        0,
+        None,
+        &["T".to_string()],
+        &DeclaredType::new("T", Vec::new()),
+        0..0,
+    );
+    match got {
+        TypeResolution::Blocked { why } => assert!(why.contains("binding"), "{why}"),
+        other => panic!("a parameter with no binder must not resolve: {other:?}"),
+    }
 }

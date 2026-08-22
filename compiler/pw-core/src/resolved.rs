@@ -48,7 +48,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hir::{DeclaredType, Span};
-use crate::resolve::{Namespace, Resolution, Workspace};
+use crate::resolve::{DefId, Namespace, Resolution, Workspace};
 
 pub use resolved_type::ResolvedType;
 
@@ -131,7 +131,9 @@ impl Builtin {
 /// stage did not give me what I need* are three different facts, and a consumer
 /// that cannot tell the second from the third will report a missing import as a
 /// type error.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// No `PartialEq` either, for the reason [`ResolvedType`] has none: a derived
+/// one would compare spans.
+#[derive(Debug, Clone)]
 pub enum TypeResolution {
     Resolved(ResolvedType),
     /// A name in the written type resolves to nothing. Carries the offending
@@ -186,6 +188,7 @@ impl std::fmt::Display for TypeResolution {
 pub fn resolve(
     ws: &Workspace,
     at: usize,
+    binder: Option<DefId>,
     params: &[String],
     written: &DeclaredType,
     span: Span,
@@ -197,7 +200,7 @@ pub fn resolve(
     // describes: the question IS the constructor, because a parameter binds no
     // arguments.
     let head = written.constructor_head_only();
-    if params.iter().any(|p| p == head) {
+    if let Some(index) = params.iter().position(|p| p == head) {
         if !written.args().is_empty() {
             return TypeResolution::Blocked {
                 why: format!(
@@ -206,7 +209,24 @@ pub fn resolve(
                 ),
             };
         }
-        return TypeResolution::Resolved(ResolvedType::parameter(head, span, written.clone()));
+        // **A parameter without its binder is not an identity.** `T` means
+        // nothing on its own — two declarations each binding a `T` bind two
+        // different variables — so a caller that cannot say which declaration
+        // binds it gets a refusal rather than a name to compare.
+        let Some(binder) = binder else {
+            return TypeResolution::Blocked {
+                why: format!(
+                    "`{head}` is a type parameter and no binding declaration was supplied"
+                ),
+            };
+        };
+        return TypeResolution::Resolved(ResolvedType::parameter(
+            head,
+            binder,
+            index as u32,
+            span,
+            written.clone(),
+        ));
     }
 
     let mut args = Vec::new();
@@ -224,7 +244,7 @@ pub fn resolve(
             };
         }
         let inner = DeclaredType::new(a.clone(), Vec::new());
-        match resolve(ws, at, params, &inner, span.clone()) {
+        match resolve(ws, at, binder, params, &inner, span.clone()) {
             TypeResolution::Resolved(t) => args.push(t),
             TypeResolution::Unresolved { name, .. } => {
                 return TypeResolution::Unresolved {
@@ -283,21 +303,34 @@ mod resolved_type {
     use crate::hir::{DeclaredType, Span};
     use crate::resolve::DefId;
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    /// **No `PartialEq`.** `same_as` is the only comparison, and deriving one
+    /// gave a second that disagreed with it: `origin` holds a span, so two uses
+    /// of one type at two places were `same_as` and not `==`. A consumer
+    /// reaching for `==` got *different types* for the same type — two
+    /// authorities for one question, in the module written to delete exactly
+    /// that. Found by reading the derive while making an unrelated change.
+    #[derive(Debug, Clone)]
     pub struct ResolvedType {
         what: What,
         origin: Origin,
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone)]
     enum What {
         /// A declared type, by the identity of its declaration.
         Nominal {
             def: DefId,
             args: Vec<ResolvedType>,
         },
-        /// A type parameter the enclosing declaration binds.
-        Parameter(String),
+        /// A type parameter, by the declaration that binds it and its
+        /// position. The NAME is provenance: `fn id<T>` and `fn id<U>` bind the
+        /// same variable, so a comparison on the spelling would make a rename a
+        /// semantic change.
+        Parameter {
+            name: String,
+            binder: DefId,
+            index: u32,
+        },
         Primitive(Primitive),
         /// `List<T>`, `Option<T>`, `Result<T, E>` — a constructor the language
         /// provides, with its arguments resolved.
@@ -314,7 +347,7 @@ mod resolved_type {
     /// So the spelling is reachable for a diagnostic that wants to echo what
     /// the programmer typed, and is not reachable in a form a consumer could
     /// compare.
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone)]
     struct Origin {
         span: Span,
         written: DeclaredType,
@@ -333,9 +366,19 @@ mod resolved_type {
             }
         }
 
-        pub(super) fn parameter(name: &str, span: Span, written: DeclaredType) -> ResolvedType {
+        pub(super) fn parameter(
+            name: &str,
+            binder: DefId,
+            index: u32,
+            span: Span,
+            written: DeclaredType,
+        ) -> ResolvedType {
             ResolvedType {
-                what: What::Parameter(name.to_string()),
+                what: What::Parameter {
+                    name: name.to_string(),
+                    binder,
+                    index,
+                },
                 origin: Origin { span, written },
             }
         }
@@ -387,9 +430,20 @@ mod resolved_type {
         }
 
         /// The type parameter this is, if it is one.
+        /// The parameter's spelling, for a message. Provenance, not identity.
         pub fn type_parameter(&self) -> Option<&str> {
             match &self.what {
-                What::Parameter(n) => Some(n),
+                What::Parameter { name, .. } => Some(name),
+                _ => None,
+            }
+        }
+
+        /// **What a type parameter IS**: which declaration binds it, and where
+        /// in that declaration's list. This is the identity; the name above is
+        /// not.
+        pub fn parameter_binding(&self) -> Option<(DefId, u32)> {
+            match &self.what {
+                What::Parameter { binder, index, .. } => Some((*binder, *index)),
                 _ => None,
             }
         }
@@ -416,7 +470,20 @@ mod resolved_type {
                 (What::Builtin { ctor: a, args: xs }, What::Builtin { ctor: b, args: ys }) => {
                     a == b && xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| x.same_as(y))
                 }
-                (What::Parameter(a), What::Parameter(b)) => a == b,
+                // By binder and position, never by spelling — `fn id<T>` and
+                // `fn id<U>` bind the same variable.
+                (
+                    What::Parameter {
+                        binder: a,
+                        index: i,
+                        ..
+                    },
+                    What::Parameter {
+                        binder: b,
+                        index: j,
+                        ..
+                    },
+                ) => a == b && i == j,
                 (What::Primitive(a), What::Primitive(b)) => a == b,
                 _ => false,
             }
@@ -481,6 +548,29 @@ mod resolved_type {
 ///
 /// It is emphatically not the spelling. `SessionId` is one spelling and was two
 /// declarations; `capability.SessionId` names one of them.
+/// **The declaration that binds a type parameter**, stably.
+///
+/// `store.page.add_to_cart` — the declaring module and the declaration, the
+/// same construction [`StableTypeId::Declared`] uses and for the same reason.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct StableDeclId(String);
+
+impl StableDeclId {
+    pub fn new(path: impl Into<String>) -> StableDeclId {
+        StableDeclId(path.into())
+    }
+
+    pub fn path(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for StableDeclId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StableTypeId {
@@ -498,10 +588,25 @@ pub enum StableTypeId {
         ctor: String,
         args: Vec<StableTypeId>,
     },
-    /// A type parameter the declaration binds. Carried by NAME because a
-    /// parameter's identity is its binder's, and the binder is the declaration
-    /// the signature belongs to — which the artifact already names.
-    Parameter(String),
+    /// **A type parameter, by its binder and its position.**
+    ///
+    /// Architect ruling, 2026-08-21: these must be α-equivalent —
+    ///
+    /// ```text
+    /// fn id<T>(x: T) -> T
+    /// fn id<U>(x: U) -> U
+    /// ```
+    ///
+    /// > Renaming a generic parameter should not change the public semantic
+    /// > contract.
+    ///
+    /// So the spelling is **not** here. It was, for one commit, and it would
+    /// have made a rename a contract change — the same principle applied
+    /// everywhere else in this module, missed in the one place the identity is
+    /// a name by nature: *spelling explains identity; spelling is not
+    /// identity.* The spelling stays reachable on the `ResolvedType` this was
+    /// derived from.
+    Parameter { binder: StableDeclId, index: u32 },
 }
 
 impl std::fmt::Display for StableTypeId {
@@ -517,7 +622,7 @@ impl std::fmt::Display for StableTypeId {
             StableTypeId::Declared { path, args: a } => write!(f, "{path}<{}>", args(a)),
             StableTypeId::Primitive(p) => f.write_str(p),
             StableTypeId::Builtin { ctor, args: a } => write!(f, "{ctor}<{}>", args(a)),
-            StableTypeId::Parameter(p) => f.write_str(p),
+            StableTypeId::Parameter { binder, index } => write!(f, "{binder}#{index}"),
         }
     }
 }
@@ -543,8 +648,18 @@ pub fn stable(hirs: &[&crate::hir::Hir], t: &ResolvedType) -> Option<StableTypeI
             args: args(t.args())?,
         });
     }
-    if let Some(p) = t.type_parameter() {
-        return Some(StableTypeId::Parameter(p.to_string()));
+    if let Some((binder, index)) = t.parameter_binding() {
+        let hir = hirs.get(binder.unit)?;
+        let (id, decl) = hir.all_decls().find(|(id, _)| id.0 == binder.decl)?;
+        let module = hir.module_of(id).unwrap_or_default();
+        let path = match module.is_empty() {
+            true => decl.name.clone(),
+            false => format!("{module}.{}", decl.name),
+        };
+        return Some(StableTypeId::Parameter {
+            binder: StableDeclId::new(path),
+            index,
+        });
     }
     let def = t.def_id()?;
     let hir = hirs.get(def.unit)?;

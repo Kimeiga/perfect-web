@@ -159,21 +159,94 @@ several security-relevant consumers.
 forbids carrying both authorities at once — so it is one commit that moves every
 consumer, and it wants a session's full attention rather than the tail of one.
 
-**Open with the architect before starting it.** `types.rs` holds a *third*
-representation — `Type::Adt(AdtId)` / `Type::Opaque(OpaqueId)`, interned and
-keyed by **bare name** — which is what actually collapses `alpha.Tag` and
-`beta.Tag` today, and which `exhaust.rs` and `abi.rs` consume for constructor
-enumeration that `ResolvedType` deliberately does not carry.
+### The fork is settled: B, 2026-08-21
+
+> **There is one semantic type identity: `ResolvedType`/`DefId`. `TypeEnv`
+> never discovers identity; it only supplies declaration facts for an identity
+> it is handed.**
+
+That rule is what makes B safe, and it is the difference from
+`HostCall { capability }`. There, a `CapabilityId` and a `DefId` each answered
+*which operation is this* — two answers to one question. Here:
 
 ```text
-A  ResolvedType replaces Type outright, growing constructors
-B  Type stays as the checker's environment but is re-KEYED by DefId,
-   and ResolvedType is what signatures and contracts carry
+ResolvedType::Nominal(DefId(Tree), [Int])   this expression has Tree<Int>
+TypeEnv[DefId(Tree)]                        that declaration has Leaf and Node
 ```
 
-The lean is **B** — constructor enumeration is a different question from type
-identity — but B leaves two things that know about types, which is the shape
-this project keeps deleting. Ruling wanted rather than a guess.
+The environment may never say *I think this is `Tree` because the name is
+`Tree`*. The identity arrived already established. It is
+`Call(DefId(foo))` + `FunctionBodies[DefId(foo)]`, which are not two
+representations of which function was called.
+
+**Constructors stay out of `ResolvedType`.** A use is compact —
+`Nominal { def: Tree, args: [Int] }` — and does not recursively carry its
+declaration. Exhaustiveness goes scrutinee → `TypeEnv[Tree]` → constructors →
+substitute `T := Int`, which is also the substitution machinery E9-V2 needs.
+
+**The vocabulary changes with the migration**, because `Type` beside
+`ResolvedType` invites a reader to assume either might be an expression's type:
+
+```text
+ResolvedType    the occurrence's semantic type
+TypeDef         facts about a declaration
+TypeEnv         DefId → TypeDef
+StableTypeId    serialized semantic identity
+AbiType         boundary representation
+```
+
+`TypeDefId`/`AdtId` become **storage handles**; `DefId` is semantic identity.
+`by_adt_name` and `by_opaque_name` are deleted — that is the bug.
+
+### The migration order
+
+```text
+1  re-key type definitions DefId → TypeDef; delete bare-name semantic lookup
+2  move exhaustiveness, ABI and check.rs onto ResolvedType.def_id() → TypeEnv
+3  Signature: params: Vec<ResolvedType>, returns: Option<ResolvedType>
+4  delete semantic access to written type heads and args
+5  derive StableTypeId from ResolvedType
+6  ComponentContract carries the StableTypeId representation
+7  structural ratchet: zero semantic name → TypeDef lookups after resolution
+```
+
+Intermediate work on a branch is fine; **a state where some semantic consumers
+read strings and others read resolved identities must not merge.**
+
+### The exhaustiveness control to freeze while migrating
+
+```pleris
+module alpha    type Status = Ready | Failed
+module beta     type Status = Ready | Waiting
+```
+
+A match whose scrutinee resolves to `alpha.Status` must take its constructors
+from `DefId(alpha.Status)` — even though `beta.Status` shares the bare name, was
+declared later, and overlaps on `Ready`. **Reordering the modules must not
+change the answer.** That is what proves `by_adt_name` is dead rather than
+wrapped behind a new API.
+
+### Done ahead of the migration, because it had to be
+
+**`StableTypeId::Parameter` is binder + index, not the spelling.**
+
+```pleris
+fn id<T>(x: T) -> T        m.id#0
+fn id<U>(x: U) -> U        m.id#0
+```
+
+> Renaming a generic parameter should not change the public semantic contract.
+
+It carried the name for one commit, which would have made `T` → `U` a change a
+host could observe in an authority artifact. `ResolvedType` carries the binder
+too, and `same_as` compares binder and position — so α-equivalence holds at the
+semantic layer as well, not only at the boundary. A parameter with no binding
+declaration is **Blocked**: `T` alone is not an identity.
+
+**And `ResolvedType` lost its derived `PartialEq`.** It included `origin`, so
+two uses of one type at two spans were `same_as` and not `==` — a second
+comparison disagreeing with the first, in the module written to delete exactly
+that. `same_as` is now the only one, enforced rather than claimed.
 
 **E9 is REOPENED** (`docs/MILESTONES.md`), with closing gates added rather than
 history rewritten:
