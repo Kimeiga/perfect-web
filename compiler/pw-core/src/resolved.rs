@@ -45,6 +45,8 @@
 //! transparency belongs to ABI lowering; two nominal types with one
 //! representation stay two types here.
 
+use serde::{Deserialize, Serialize};
+
 use crate::hir::{DeclaredType, Span};
 use crate::resolve::{Namespace, Resolution, Workspace};
 
@@ -445,4 +447,115 @@ mod resolved_type {
             f.write_str(&self.display_name())
         }
     }
+}
+
+// --- the artifact's identity -------------------------------------------------
+
+/// **A type identity a host artifact can carry.**
+///
+/// Architect ruling, 2026-08-21:
+///
+/// > `DefId` is compiler-process identity and shouldn't become the public host
+/// > artifact format. So `ComponentContract.signature` should be a
+/// > serialization **derived from** the resolved signature, using a stable
+/// > semantic type identity.
+///
+/// ```text
+/// ResolvedType / DefId  →  StableTypeId  →  contract artifact
+/// ```
+///
+/// and never
+///
+/// ```text
+/// source spelling → contract          WIT name → guess what the source was
+/// ```
+///
+/// # What makes it stable
+///
+/// A `DefId` is a unit index and a declaration index — both artefacts of how
+/// this build enumerated files. Compile the same program with its sources in a
+/// different order and every `DefId` moves. A `StableTypeId` names the
+/// declaring MODULE and the declaration, so it is the same across builds,
+/// machines and file orderings. `the_identity_survives_a_different_file_order`
+/// is what says so, and it is the whole point of the type existing.
+///
+/// It is emphatically not the spelling. `SessionId` is one spelling and was two
+/// declarations; `capability.SessionId` names one of them.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StableTypeId {
+    /// `capability.SessionId`, with its arguments resolved.
+    Declared {
+        /// The declaring module and the declaration: `capability.SessionId`.
+        path: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        args: Vec<StableTypeId>,
+    },
+    /// `Int`, `String` — a type with no declaration to name.
+    Primitive(String),
+    /// `List<..>`, `Option<..>`, `Result<..>`.
+    Builtin {
+        ctor: String,
+        args: Vec<StableTypeId>,
+    },
+    /// A type parameter the declaration binds. Carried by NAME because a
+    /// parameter's identity is its binder's, and the binder is the declaration
+    /// the signature belongs to — which the artifact already names.
+    Parameter(String),
+}
+
+impl std::fmt::Display for StableTypeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let args = |a: &[StableTypeId]| {
+            a.iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        match self {
+            StableTypeId::Declared { path, args: a } if a.is_empty() => f.write_str(path),
+            StableTypeId::Declared { path, args: a } => write!(f, "{path}<{}>", args(a)),
+            StableTypeId::Primitive(p) => f.write_str(p),
+            StableTypeId::Builtin { ctor, args: a } => write!(f, "{ctor}<{}>", args(a)),
+            StableTypeId::Parameter(p) => f.write_str(p),
+        }
+    }
+}
+
+/// **Derive the artifact identity from the resolved one.**
+///
+/// One direction only. Information may be discarded going this way — a span, a
+/// spelling — and nothing downstream may recover what an earlier representation
+/// failed to know.
+///
+/// `None` when the declaration a nominal type names cannot be found, which is a
+/// program this build cannot describe rather than a type to guess at.
+pub fn stable(hirs: &[&crate::hir::Hir], t: &ResolvedType) -> Option<StableTypeId> {
+    let args = |xs: &[ResolvedType]| -> Option<Vec<StableTypeId>> {
+        xs.iter().map(|x| stable(hirs, x)).collect()
+    };
+    if let Some(p) = t.as_primitive() {
+        return Some(StableTypeId::Primitive(p.name().to_string()));
+    }
+    if let Some(b) = t.as_builtin() {
+        return Some(StableTypeId::Builtin {
+            ctor: b.name().to_string(),
+            args: args(t.args())?,
+        });
+    }
+    if let Some(p) = t.type_parameter() {
+        return Some(StableTypeId::Parameter(p.to_string()));
+    }
+    let def = t.def_id()?;
+    let hir = hirs.get(def.unit)?;
+    let (id, decl) = hir.all_decls().find(|(id, _)| id.0 == def.decl)?;
+    let module = hir.module_of(id).unwrap_or_default();
+    let path = match module.is_empty() {
+        true => decl.name.clone(),
+        false => format!("{module}.{}", decl.name),
+    };
+    Some(StableTypeId::Declared {
+        path,
+        args: args(t.args())?,
+    })
 }

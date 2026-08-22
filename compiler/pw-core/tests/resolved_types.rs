@@ -328,3 +328,151 @@ fn the_platforms_session_id_is_one_type_in_the_real_program() {
         "and it is the one that declares it"
     );
 }
+
+// --- the artifact identity ---------------------------------------------------
+
+/// **A `StableTypeId` survives a different file order; a `DefId` does not.**
+///
+/// This is the whole reason the type exists. Architect ruling, 2026-08-21:
+///
+/// > `DefId` is compiler-process identity and shouldn't become the public host
+/// > artifact format.
+///
+/// A `DefId` is a unit index and a declaration index — both artefacts of how
+/// this build happened to enumerate files. Compile the same program with the
+/// sources in a different order and every one of them moves. If the contract
+/// carried them, a host would see an authority artifact change because someone
+/// renamed a file.
+#[test]
+fn the_identity_survives_a_different_file_order() {
+    let one = [ALPHA, BETA, DOMAIN];
+    let other = [DOMAIN, BETA, ALPHA];
+
+    let resolve_tag = |sources: &[&str], module: &str| {
+        let hirs: Vec<pw_core::hir::Hir> = sources
+            .iter()
+            .map(|s| lower_file(s, &parse_tree(s).green))
+            .collect();
+        let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+        let ws = Workspace::build(&refs);
+        // Resolve from the unit declaring the named MODULE, whichever index
+        // that is. Finding "the first unit that declares a `Tag`" would find
+        // alpha in one order and beta in the other — two different types, which
+        // is the very confusion this file is about.
+        let at = refs
+            .iter()
+            .position(|h| h.all_decls().any(|(id, _)| h.module_of(id) == Some(module)))
+            .expect("the module is there");
+        let got = resolve(&ws, at, &[], &DeclaredType::new("Tag", Vec::new()), 0..0);
+        let t = got.resolved().expect("resolves").clone();
+        let stable = pw_core::resolved::stable(&refs, &t).expect("has a stable id");
+        (t.def_id().expect("nominal"), stable)
+    };
+
+    let (def_a, stable_a) = resolve_tag(&one, "alpha");
+    let (def_b, stable_b) = resolve_tag(&other, "alpha");
+
+    // The premise: reordering really did move the compiler-process identity, so
+    // the assertion below is not measuring two identical builds.
+    assert_ne!(
+        def_a, def_b,
+        "if the DefId did not move, this proves nothing about stability"
+    );
+
+    // And the artifact identity did not.
+    assert_eq!(stable_a, stable_b);
+    assert_eq!(stable_a.to_string(), "alpha.Tag");
+}
+
+/// **Two declarations of one spelling get two artifact identities.**
+///
+/// The property carried all the way out to what a host reads. If these
+/// collided, everything `ResolvedType` establishes would be discarded at the
+/// boundary — which is exactly what the contract's written type names did.
+#[test]
+fn the_artifact_identity_separates_what_the_spelling_merged() {
+    let sources = [ALPHA, BETA];
+    let hirs: Vec<pw_core::hir::Hir> = sources
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+
+    let ids: Vec<String> = (0..2)
+        .map(|at| {
+            let got = resolve(&ws, at, &[], &DeclaredType::new("Tag", Vec::new()), 0..0);
+            let t = got.resolved().expect("resolves").clone();
+            pw_core::resolved::stable(&refs, &t)
+                .expect("stable")
+                .to_string()
+        })
+        .collect();
+    assert_eq!(ids, ["alpha.Tag", "beta.Tag"]);
+}
+
+/// A generic's arguments are part of the artifact identity too, and it round
+/// trips as data — the contract is a data artifact a host reads without linking
+/// this compiler (ADR-0018).
+#[test]
+fn the_artifact_identity_carries_arguments_and_round_trips() {
+    let hirs: Vec<pw_core::hir::Hir> = [DOMAIN]
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+
+    let got = resolve(
+        &ws,
+        0,
+        &[],
+        &DeclaredType::new("List", vec!["MenuItem".to_string()]),
+        0..0,
+    );
+    let t = got.resolved().expect("resolves");
+    let id = pw_core::resolved::stable(&refs, t).expect("stable");
+    assert_eq!(id.to_string(), "List<domain.MenuItem>");
+
+    let json = serde_json::to_string(&id).expect("serialize");
+    let back: pw_core::resolved::StableTypeId = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, id);
+
+    // And no compiler-process identity leaked into the artifact — asserted as
+    // the PROPERTY rather than by searching the text for "unit". A substring
+    // check was the first version and it failed on the variant name `declared`,
+    // which is the shape of proxy this project keeps deleting: it would also
+    // have passed for a field spelled `u` holding an index.
+    //
+    // The real property is that the bytes do not depend on how this build
+    // enumerated files.
+    let reordered = {
+        let hirs: Vec<pw_core::hir::Hir> = [ALPHA, DOMAIN]
+            .iter()
+            .map(|s| lower_file(s, &parse_tree(s).green))
+            .collect();
+        let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+        let ws = Workspace::build(&refs);
+        let at = refs
+            .iter()
+            .position(|h| {
+                h.all_decls()
+                    .any(|(id, _)| h.module_of(id) == Some("domain"))
+            })
+            .expect("domain");
+        let got = resolve(
+            &ws,
+            at,
+            &[],
+            &DeclaredType::new("List", vec!["MenuItem".to_string()]),
+            0..0,
+        );
+        let t = got.resolved().expect("resolves");
+        serde_json::to_string(&pw_core::resolved::stable(&refs, t).expect("stable"))
+            .expect("serialize")
+    };
+    assert_eq!(
+        json, reordered,
+        "the artifact bytes must not depend on file order"
+    );
+}
