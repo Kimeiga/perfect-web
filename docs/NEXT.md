@@ -204,6 +204,40 @@ AbiType         boundary representation
 1  re-key type definitions DefId → TypeDef; delete bare-name semantic lookup  DONE
 2  move exhaustiveness and check.rs onto ResolvedType.def_id() → TypeEnv      DONE
 3  Signature: params: Vec<ResolvedType>, returns: Option<ResolvedType>        NEXT
+```
+
+### 3b.3 is intentionally boring, and has a criterion
+
+> The 19-site migration should contain **no new type semantics.**
+
+It replaces `Signature`'s written head and argument strings with
+`params: Vec<ResolvedType>` and `returns: Option<ResolvedType>`, and moves each
+consumer to what it actually needs:
+
+```text
+check / infer     semantic ResolvedType
+binding           semantic ResolvedType, or a derived StableTypeId
+WIT               the ABI projection of a ResolvedType
+backend           checked ResolvedType and stable ABI facts
+diagnostics       display_name() / written_source()
+```
+
+**The criterion for every site**, and it settles the arguments before they
+start:
+
+> A consumer asking for the old string because it needs to **print** it is
+> fine. A consumer asking for the old string because it needs to **decide**
+> something is a defect.
+
+`Builtin` stays a third kind. `List`/`Option`/`Result` have no
+user-addressable declaration whose `DefId` is their identity, and synthesising
+one would make the representation cosmetically uniform while lying about where
+its meaning comes from. If Pleris later makes collections package-defined,
+*that* is the evidence for moving them — not tidiness. And `Option<Store>`
+resolving while a bare `Option` does not is correct: recognising a constructor
+is not having an instantiated type.
+
+```text
 4  delete semantic access to written type heads and args                       ...
 5  derive StableTypeId from ResolvedType                                      DONE
 6  ComponentContract carries the StableTypeId representation                   ...
@@ -275,26 +309,29 @@ conflating those is the claim-versus-witness failure that reopened this
 milestone, so each gate is scored on what a program actually gets refused for.
 
 ```text
-gate   representation exists          enforced on programs        witness
-────   ─────────────────────          ────────────────────        ───────
-V1     yes, for arity                 ARITY ONLY                  tests/call_arity.rs
-       arguments: no                  arguments: NO               —
-V2     ResolvedType::Parameter        NO                          resolved_types.rs
-       (a_bound_type_parameter…)                                  (representation only)
-V3     yes — DefId-based identity     NO                          two_declarations_of_one
-       and same_as                                                _spelling_are_two_types
-                                                                  (representation only)
-V4     no                             NO                          —
-V5     yes — recursive or Blocked     NO consumer reads it yet    resolution_reaches_every
-                                                                  _argument_or_reports
-V6     yes                            n/a — it is a control       an_opaque_type_is_not
-                                                                  _its_representation
+gate   representation                  consumers        gate
+────   ─────────────                   ─────────        ────
+V1     yes, for arity                  call sites       PARTIAL — arity only
+V2     ResolvedType::Parameter         none             OPEN
+V3     DefId nominal identity          exhaustiveness   OPEN
+V4     none                            none             OPEN
+V5     recursive resolved-or-blocked   exhaustiveness   OPEN
+V6     yes                             —                MET, as a control
 ```
 
-So exactly **one** gate is partly enforced (V1, arity) and **one** is fully met
-as a control (V6). V2, V3 and V5 have their representation and no consumer: that
-is 3b's whole job, and until it lands, `alpha.Tag ≠ beta.Tag` is a fact the
-compiler can state and does not act on.
+**V3 and V5 gained a consumer on 2026-08-21 and did not move.** Architect
+ruling:
+
+> Don't let "one consumer now uses it" move either gate to complete.
+
+The closing question for V3 is not *can some compiler pass distinguish
+`alpha.Tag` from `beta.Tag`* — that is proven. It is:
+
+> Can an ordinary program pass an `alpha.Tag` where `beta.Tag` is required?
+
+Until the compiler rejects that, V3 is open. V5 closes when the **value-type
+relations themselves** cannot operate on unresolved or partly resolved types,
+not because one other analysis consumes `ResolvedType`.
 
 Recording it this way rather than as six checkboxes is deliberate. Six ticks
 against *representation exists* would read as a nearly-closed milestone and

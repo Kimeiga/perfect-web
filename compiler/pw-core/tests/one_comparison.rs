@@ -27,12 +27,31 @@
 //! needs a person. What it can do is make sure nobody adds one without
 //! recording the judgement, which is the shape every allow-list here has.
 //!
-//! # Why `PartialEq` specifically
+//! # Why `PartialEq` — and `Eq`, `Ord`, `Hash`
 //!
 //! Because `==` is the reflex and `same_as` is the deliberate act. If the wrong
 //! one is the easy one, the wrong one gets used — the same reasoning that put
 //! `DeclaredType`'s fields behind a module boundary and named its escape hatch
 //! `constructor_head_only`.
+//!
+//! Architect ruling, 2026-08-21, widening it past equality:
+//!
+//! > There should be exactly one semantic comparison/keying mechanism for
+//! > `ResolvedType`. […] extend the ratchet so the next person doesn't solve a
+//! > map-key problem by adding `#[derive(Eq, Hash)]` and recreate the same bug
+//! > in a different operator.
+//!
+//! `Ord` and `Hash` are the ones to watch, because they arrive for a reason
+//! that feels unrelated: someone needs a `BTreeMap` or a `HashSet` key and
+//! reaches for the derive. Over a structure still holding `origin`, that keys
+//! by SPAN — two uses of one type land in two buckets, and the map silently
+//! holds duplicates that `same_as` would call one.
+//!
+//! When a semantic key is genuinely needed, it should be a named projection —
+//! `semantic_key()`, or a `TypeIdentity` built from `DefId` + semantic
+//! arguments, binder + index, or constructor + semantic arguments. **Never
+//! provenance.** Not built yet, because nothing needs hashing; this is the
+//! guard that keeps the shortcut from being taken instead.
 
 use std::collections::BTreeSet;
 
@@ -109,13 +128,30 @@ fn offenders(dir: &std::path::Path, out: &mut Vec<String>, seen: &mut BTreeSet<S
             if !semantic.contains(&name) {
                 continue;
             }
-            let derives_eq = lines[..i]
+            // Every derive that makes a SECOND way to compare or key the
+            // structure, not only `PartialEq`. `Ord` and `Hash` are the ones a
+            // map-key problem invites.
+            let derived: Vec<&str> = lines[..i]
                 .iter()
                 .rev()
                 .take(3)
-                .any(|l| l.contains("derive(") && l.contains("PartialEq"));
-            let key = format!("{file}:{name}");
-            if derives_eq && seen.insert(key.clone()) {
+                .filter(|l| l.contains("derive("))
+                .flat_map(|l| {
+                    ["PartialEq", "Eq", "PartialOrd", "Ord", "Hash"]
+                        .into_iter()
+                        .filter(|d| {
+                            // Whole-word, so `Eq` does not match inside
+                            // `PartialEq` and report one derive twice.
+                            l.split(|c: char| !c.is_ascii_alphanumeric())
+                                .any(|w| w == *d)
+                        })
+                })
+                .collect();
+            if derived.is_empty() {
+                continue;
+            }
+            let key = format!("{file}:{name} derives {}", derived.join("+"));
+            if seen.insert(key.clone()) {
                 out.push(key);
             }
         }
@@ -137,9 +173,12 @@ fn no_type_has_both_a_semantic_and_a_derived_comparison() {
 
     assert!(
         found.is_empty(),
-        "these types define a semantic comparison AND derive `PartialEq`, so \
-         `==` and the semantic one can disagree:\n  {}\n\nRemove the derive, \
-         or record the judgement in ALLOWED with a reason.",
+        "these types define a semantic comparison AND derive a structural one, \
+         so the two can disagree:\n  {}\n\nRemove the derive. If a map or set \
+         needs a semantic key, project one — `semantic_key()` built from \
+         identity and never from provenance — rather than deriving over a \
+         structure that still holds a span. Or record the judgement in ALLOWED \
+         with a reason.",
         found.join("\n  ")
     );
 }
@@ -164,7 +203,7 @@ fn the_detector_finds_the_shape_it_is_looking_for() {
     let mut seen = BTreeSet::new();
     offenders(&dir, &mut found, &mut seen);
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(found, ["bad.rs:Thing"]);
+    assert_eq!(found, ["bad.rs:Thing derives PartialEq+Eq"]);
 }
 
 #[test]
@@ -205,4 +244,55 @@ fn the_type_the_rule_exists_for_still_defines_one() {
         !text.contains("PartialEq, Eq)]\n    pub struct ResolvedType"),
         "and it must not have regained a derived comparison"
     );
+}
+
+#[test]
+fn the_map_key_shortcut_is_what_it_is_really_guarding() {
+    // **The case the widening exists for.** Nobody adds `Hash` to defeat
+    // `same_as`; they add it because a `HashSet` needs a key. Over a structure
+    // still holding `origin`, that keys by SPAN — two uses of one type land in
+    // two buckets, and the set holds duplicates `same_as` would call one.
+    //
+    // Reported without a `PartialEq` in sight, which the first version of this
+    // detector would have missed entirely.
+    let dir = std::env::temp_dir().join("pw-one-comparison-hash");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    std::fs::write(
+        dir.join("keyed.rs"),
+        "#[derive(Debug, Clone, Hash)]\n\
+         pub struct Thing {\n    span: usize,\n}\n\n\
+         impl Thing {\n    pub fn same_as(&self, other: &Thing) -> bool {\n        true\n    }\n}\n",
+    )
+    .expect("write");
+
+    let mut found = Vec::new();
+    let mut seen = BTreeSet::new();
+    offenders(&dir, &mut found, &mut seen);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(found, ["keyed.rs:Thing derives Hash"]);
+}
+
+#[test]
+fn eq_inside_partial_eq_is_not_reported_twice() {
+    // `#[derive(PartialEq, Eq)]` is two derives, not three: a substring match
+    // would find `Eq` inside `PartialEq` and report a derive that is not there,
+    // which is the same class of sloppiness as the `"decl"`-inside-`"declared"`
+    // proxy deleted from the evidence test.
+    let dir = std::env::temp_dir().join("pw-one-comparison-substring");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    std::fs::write(
+        dir.join("both.rs"),
+        "#[derive(PartialEq)]\n\
+         pub struct Thing {\n    span: usize,\n}\n\n\
+         impl Thing {\n    pub fn same_as(&self, other: &Thing) -> bool {\n        true\n    }\n}\n",
+    )
+    .expect("write");
+
+    let mut found = Vec::new();
+    let mut seen = BTreeSet::new();
+    offenders(&dir, &mut found, &mut seen);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(found, ["both.rs:Thing derives PartialEq"]);
 }
