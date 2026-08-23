@@ -26,8 +26,45 @@ use crate::hir::{DeclKind, Hir};
 use crate::privacy::{Label, Restriction};
 use crate::resolve::{DefId, Workspace};
 
+/// Resolve a declaration's written type in the unit that declares it.
+///
+/// A free function so the two construction sites below cannot drift: they build
+/// different kinds of signature and must resolve identically.
+fn resolve_in(
+    ws: &Workspace,
+    at: usize,
+    binder: Option<DefId>,
+    params: &[String],
+    ty: &crate::hir::DeclaredType,
+) -> crate::resolved::TypeResolution {
+    crate::resolved::resolve(ws, at, binder, params, ty, 0..0)
+}
+
 /// What a resolved declaration promises.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// # Mid-migration, on a branch
+///
+/// `resolved_params` and `resolved_returns` are the authoritative fields being
+/// migrated to; `params`, `returns` and `returns_args` are the written strings
+/// being migrated away from. Architect ruling, 2026-08-21:
+///
+/// > Do the intermediate work on the branch, but don't merge a state where
+/// > some semantic consumers read strings and some read resolved identities.
+///
+/// So this dual state is legal here and **must not reach `master`**. The
+/// migration criterion for each consumer:
+///
+/// > A consumer asking for the old string because it needs to PRINT it is
+/// > fine. A consumer asking for the old string because it needs to DECIDE
+/// > something is a defect.
+///
+/// # No derived equality
+///
+/// **No derived equality.** It carries resolved types now, and deriving over
+/// them would compare spans — the defect `tests/one_comparison.rs` exists for.
+/// Nothing compared two `Signature`s, so the derive was unused surface that
+/// would have become a second comparison the moment someone reached for it.
+#[derive(Debug, Clone)]
 pub struct Signature {
     /// `Stores.get`, as written at the call site.
     pub path: String,
@@ -44,6 +81,17 @@ pub struct Signature {
     /// Each parameter's declared type head, in order. `None` where the
     /// parameter carries no annotation.
     pub params: Vec<Option<String>>,
+    /// **The parameters, resolved.** One entry per parameter, in order.
+    ///
+    /// A `TypeResolution` rather than a `ResolvedType`, because a parameter
+    /// whose type does not resolve is a fact a consumer must be able to see:
+    /// collapsing it to `None` would make *no annotation* and *an annotation
+    /// naming nothing* the same answer, which is the shape this project keeps
+    /// deleting.
+    pub resolved_params: Vec<Option<crate::resolved::TypeResolution>>,
+    /// **The return type, resolved.** `None` when nothing is returned — absent,
+    /// not undetermined, the distinction `Interface::returns` already draws.
+    pub resolved_returns: Option<crate::resolved::TypeResolution>,
 }
 
 impl Signature {
@@ -104,6 +152,23 @@ impl Signatures {
                                 returns: Some(ty.constructor_head_only().to_string()),
                                 returns_args: ty.args().to_vec(),
                                 params: vec![Some(decl.name.clone())],
+                                // The field's type, and the receiver's — a
+                                // field access reads a `decl.name` and yields
+                                // `ty`.
+                                resolved_params: vec![Some(resolve_in(
+                                    workspace,
+                                    m.unit,
+                                    None,
+                                    &[],
+                                    &crate::hir::DeclaredType::new(decl.name.clone(), Vec::new()),
+                                ))],
+                                resolved_returns: Some(resolve_in(
+                                    workspace,
+                                    m.unit,
+                                    None,
+                                    &[],
+                                    ty,
+                                )),
                             },
                         );
                     }
@@ -136,6 +201,39 @@ impl Signatures {
                         .iter()
                         .map(|p| p.ty.as_ref().map(|t| t.written()))
                         .collect(),
+                    resolved_params: decl
+                        .params
+                        .iter()
+                        .map(|p| {
+                            p.ty.as_ref().map(|t| {
+                                resolve_in(
+                                    workspace,
+                                    m.unit,
+                                    Some(DefId {
+                                        unit: m.unit,
+                                        decl: id.0,
+                                    }),
+                                    &decl.type_params,
+                                    t,
+                                )
+                            })
+                        })
+                        .collect(),
+                    // The declaration binds its own type parameters, so `T` in
+                    // `fn id<T>(x: T) -> T` resolves to a parameter of THIS
+                    // declaration rather than being reported unresolved.
+                    resolved_returns: decl.ret.as_ref().map(|head| {
+                        resolve_in(
+                            workspace,
+                            m.unit,
+                            Some(DefId {
+                                unit: m.unit,
+                                decl: id.0,
+                            }),
+                            &decl.type_params,
+                            &crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone()),
+                        )
+                    }),
                 };
                 // A function whose first parameter is a declared type reads as
                 // that type's member. `offsetWidth(el: ElementRef)` is what
@@ -417,7 +515,14 @@ mod tests {
         let refs: Vec<&Hir> = hirs.iter().collect();
         let ws = Workspace::build(&refs);
         let def = ws.modules[0].lookup_any("get").expect("get");
-        assert_eq!(sigs.by_def(def), sigs.by_path("Stores.get"));
+        // By PATH, not by comparing two `Signature`s: the question is whether
+        // both lookups reach the same declaration, and the path is what says
+        // so. `Signature` lost its derived equality when it began carrying
+        // resolved types — deriving over those would compare spans.
+        assert_eq!(
+            sigs.by_def(def).map(|s| s.path.as_str()),
+            sigs.by_path("Stores.get").map(|s| s.path.as_str()),
+        );
     }
 
     #[test]
