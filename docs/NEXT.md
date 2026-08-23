@@ -206,7 +206,54 @@ AbiType         boundary representation
 3  Signature: params: Vec<ResolvedType>, returns: Option<ResolvedType>        NEXT
 ```
 
-### 3b.3 is intentionally boring, and has a criterion
+### 3b.3 is under way on a branch: `3b3-signature-resolved-types`
+
+**Landed there, green:** `Signature` carries `resolved_params` and
+`resolved_returns` beside the written strings — the dual state the ruling
+permits on a branch and forbids on `master`. `Signature` lost its derived
+`PartialEq` on the way (it would compare spans; nothing used it).
+
+**The remaining dominoes, in dependency order.** Traced by following the
+chain, not guessed:
+
+```text
+1  binding.rs `Interface`      built from DeclaredType directly, not from
+                               Signature — so it can gain resolved types
+                               independently. Feeds BOTH remote_support and
+                               wit.rs, which is why it is first.
+
+2  boundary.rs `TypeFacts`     `profile(ty: Option<&str>)` is name-keyed, and
+                               `name-keyed-allow.txt` already promises "E9
+                               replaces it with a resolved type id". The gate
+                               will demand it the moment binding.rs moves.
+
+3  binding.rs `remote_support` a DECIDE site: it matches `Some("Result") |
+                               Some("Option") | Some("List")` on the written
+                               head to find carriers. Becomes `as_builtin()`,
+                               and the arguments arrive already resolved
+                               instead of via `returns_args`.
+
+4  wit.rs `wit_type`           takes a written string and re-resolves it.
+                               Becomes `def_id()` → `Types::by_def`, which
+                               already exists — this DELETES a resolution
+                               rather than moving one.
+
+5  infer.rs / labels.rs        `label_of_type(head, args)` matches privacy
+                               qualifiers by SPELLING. This is the architect's
+                               step 4: `Session<A> → Session<B>` must compare
+                               resolved identities. Needs the platform's
+                               DefIds.
+
+6  check.rs, annotations.rs, backend/lower.rs   the remainder.
+7  delete the written fields; the dual state ends and the branch can merge.
+```
+
+**Do not merge before step 7.** A state where some semantic consumers read
+strings and others read resolved identities is exactly what the ruling forbids.
+
+### The criterion for every site
+
+### 3b.3 is intentionally boring
 
 > The 19-site migration should contain **no new type semantics.**
 
@@ -318,6 +365,15 @@ V4     none                            none             OPEN
 V5     recursive resolved-or-blocked   exhaustiveness   OPEN
 V6     yes                             —                MET, as a control
 ```
+
+**V2 has no surface syntax to be tested against.** `fn id<T>(x: T) -> T` does
+not parse — `PW0007`. The grammar gives type parameters to `opaque type` and
+`effect` and to nothing else, so no callable is generic and the architect's
+discriminator `identity<T>(T); identity(Store) → infer T = Store` cannot be
+written. Closing V2 needs either callable generics added to the language, or
+the gate restated in terms of the generics that do exist — `Secret<C>`,
+`Session<S>`, `List<T>`. A language-surface decision, not a repair. Pinned by
+`a_callable_cannot_declare_a_type_parameter`.
 
 **V3 and V5 gained a consumer on 2026-08-21 and did not move.** Architect
 ruling:
