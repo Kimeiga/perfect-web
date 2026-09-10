@@ -1,19 +1,11 @@
-//! E4 — the local resource runtime.
+//! E4: the local synchronous resource runtime.
 //!
-//! Charter §14 M4 task 3 lists what a resource runtime owes the language:
-//! one in-flight request per key, request deduplication, reference-counted
-//! subscribers, cancellation when unused, bounded retries with jitter, a
-//! deterministic test clock, trace events, and private/public cache separation.
-//!
-//! These are **behaviour**, like E2A-R (ADR-0016). A passing test here does not
-//! make misuse a compile error; the compiler-side half of E4 is the resource
-//! manifest in `pw-core::hir`.
-//!
-//! # Why a test clock
-//!
-//! Freshness, timeouts and retry backoff are all time. A test that sleeps is
-//! slow and flaky, and a flaky concurrency test gets muted rather than fixed.
-//! [`Clock`] is advanced by the test, so every timing property here is exact.
+//! A resource key owns one admitted request generation and its shared result.
+//! Invalidating or releasing that generation fences publication and wakes its
+//! waiters. It cannot preempt an arbitrary synchronous callback. Host adapter
+//! cancellation, deadlines and durable command admission remain separate work.
+//! See ADR-0018 and ADR-0027. These tests establish local behavior, not compiler
+//! enforcement, tenant isolation or the E10-I generated source-to-host path.
 
 pub mod entry;
 pub use entry::{
@@ -22,17 +14,15 @@ pub use entry::{
 };
 
 use std::collections::HashMap;
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread::{self, ThreadId};
 
 /// Milliseconds since the runtime started.
 pub type Millis = u64;
 
-/// A clock the tests own.
-///
-/// Real time appears only when a host advances this from a real source, which
-/// keeps every timing rule in one place instead of scattered across `Instant`
-/// calls that cannot be controlled.
+/// A clock advanced by a test or host. Overflow must not move it backwards.
 #[derive(Clone, Default)]
 pub struct Clock(Arc<AtomicU64>);
 
@@ -44,24 +34,22 @@ impl Clock {
         self.0.load(Ordering::SeqCst)
     }
     pub fn advance(&self, ms: Millis) {
-        self.0.fetch_add(ms, Ordering::SeqCst);
+        let _ = self.0.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |now| {
+            Some(now.saturating_add(ms))
+        });
     }
 }
 
-/// Which cache a value may be stored in.
-///
-/// The separation is the point: charter §7.8 and the M4 gate both say private
-/// state must never appear in public cache output, and a single cache with a
-/// flag would make that a review question rather than a structural one.
+/// Cache classification, not a principal or tenant identity. Production
+/// partition identity is represented by `EntryIdentity`, not this enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Privacy {
-    /// Shareable between users.
     Public,
-    /// Belongs to one session and must never be served to another.
     Private,
 }
 
-/// What a resource is asked for: its name plus the key that identifies the row.
+/// A resource name plus its local key. This prototype requires its host to
+/// provide consistent manifests and correctly scoped keys.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Key {
     pub resource: String,
@@ -77,71 +65,36 @@ impl Key {
     }
 }
 
-/// Something the runtime did, in order. Charter §14 M4 task 12 wants causal
-/// traces; this is the record they are built from.
+/// Events in admission/completion order. `Cancelled` means the generation's
+/// result is no longer usable, not that arbitrary external work was stopped.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Trace {
-    RequestStarted {
-        key: Key,
-        attempt: u32,
-    },
-    RequestSucceeded {
-        key: Key,
-    },
-    RequestFailed {
-        key: Key,
-        attempt: u32,
-        error: String,
-    },
-    RequestDeduplicated {
-        key: Key,
-    },
-    ServedFromCache {
-        key: Key,
-    },
-    Cancelled {
-        key: Key,
-        reason: &'static str,
-    },
-    Subscribed {
-        key: Key,
-        subscribers: usize,
-    },
-    Unsubscribed {
-        key: Key,
-        subscribers: usize,
-    },
-    RetryScheduled {
-        key: Key,
-        attempt: u32,
-        delay: Millis,
-    },
-    GaveUp {
-        key: Key,
-        attempts: u32,
-    },
-    CommandApplied {
-        idempotency_key: String,
-    },
-    CommandDeduplicated {
-        idempotency_key: String,
-    },
+    RequestStarted { key: Key, attempt: u32 },
+    RequestSucceeded { key: Key },
+    RequestFailed { key: Key, attempt: u32, error: String },
+    RequestDeduplicated { key: Key },
+    ServedFromCache { key: Key },
+    Cancelled { key: Key, reason: &'static str },
+    Subscribed { key: Key, subscribers: usize },
+    Unsubscribed { key: Key, subscribers: usize },
+    RetryScheduled { key: Key, attempt: u32, delay: Millis },
+    GaveUp { key: Key, attempts: u32 },
+    CommandApplied { idempotency_key: String },
+    CommandDeduplicated { idempotency_key: String },
 }
 
-/// How a resource behaves. The runtime half of the manifest the compiler
-/// records in `pw-core::hir::Policy`.
+/// Runtime policy data. Neither this crate nor the compiler owns the other
+/// crate's execution model (ADR-0018).
 #[derive(Debug, Clone)]
 pub struct Manifest {
     pub resource: String,
     pub privacy: Privacy,
-    /// How long a cached value stays usable.
     pub freshness: Millis,
-    /// Attempts in total, not retries after the first. 1 means "do not retry".
+    /// Total attempts. One means no retry.
     pub max_attempts: u32,
-    /// Base backoff; attempt *n* waits `base * 2^(n-1)`, plus deterministic
-    /// jitter derived from the key rather than from a random source — a test
-    /// that cannot predict the delay cannot assert on it.
     pub retry_base: Millis,
+    /// Recorded policy only: synchronous callbacks are not preempted here.
+    /// An adapter must enforce deadlines before this can be a runtime guarantee.
     pub timeout: Millis,
 }
 
@@ -169,21 +122,16 @@ impl Manifest {
         self
     }
 
-    /// Backoff for `attempt`, doubling, with jitter that depends on the key.
-    ///
-    /// Jitter exists so a thundering herd does not retry in lockstep. Deriving
-    /// it from the key rather than from randomness keeps it spread *across
-    /// keys* while staying exactly predictable in a test.
+    /// Deterministic, key-derived jitter for this local test runtime. It spreads
+    /// different keys, not independent clients retrying the same key.
     pub fn backoff(&self, attempt: u32, key: &str) -> Millis {
-        let base = self.retry_base * 2u64.pow(attempt.saturating_sub(1).min(16));
+        let base = self.retry_base.saturating_mul(2u64.pow(attempt.saturating_sub(1).min(16)));
         let spread = base / 4;
         if spread == 0 {
             return base;
         }
-        let h = key
-            .bytes()
-            .fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64));
-        base + h % spread
+        let h = key.bytes().fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64));
+        base.saturating_add(h % spread)
     }
 }
 
@@ -194,32 +142,75 @@ struct Entry {
     privacy: Privacy,
 }
 
+/// One terminal result shared by everyone admitted to an operation. No callback
+/// runs while either this cell or the runtime state is locked.
+struct Completion {
+    owner: ThreadId,
+    result: Mutex<Option<Result<String, String>>>,
+    ready: Condvar,
+}
+
+impl Completion {
+    fn new() -> Self {
+        Self {
+            owner: thread::current().id(),
+            result: Mutex::new(None),
+            ready: Condvar::new(),
+        }
+    }
+
+    fn finish(&self, outcome: Result<String, String>) -> Result<String, String> {
+        let mut result = self.result.lock().expect("completion");
+        let terminal = result.get_or_insert(outcome).clone();
+        self.ready.notify_all();
+        terminal
+    }
+
+    fn outcome(&self) -> Option<Result<String, String>> {
+        self.result.lock().expect("completion").clone()
+    }
+
+    fn wait(&self) -> Result<String, String> {
+        let mut result = self.result.lock().expect("completion");
+        while result.is_none() {
+            if self.owner == thread::current().id() {
+                return Err("an operation cannot synchronously wait for itself".into());
+            }
+            result = self.ready.wait(result).expect("completion");
+        }
+        result.as_ref().expect("terminal result").clone()
+    }
+}
+
+struct QueryFlight {
+    privacy: Privacy,
+    completion: Completion,
+}
+
 #[derive(Default)]
 struct State {
     cache: HashMap<Key, Entry>,
-    /// Keys with a request currently running. The heart of "one in-flight
-    /// request per key".
-    in_flight: HashMap<Key, u32>,
+    in_flight: HashMap<Key, Arc<QueryFlight>>,
     subscribers: HashMap<Key, usize>,
-    /// Idempotency keys of commands already applied.
-    applied: HashMap<String, String>,
+    /// Pending and completed commands, admitted before execution. Kept for this
+    /// Resources instance's lifetime; neither durable nor a bounded replay log.
+    applied: HashMap<String, Arc<Completion>>,
     trace: Vec<Trace>,
 }
 
-/// The runtime. Cheap to clone; every clone shares one state.
 #[derive(Clone)]
 pub struct Resources {
     state: Arc<Mutex<State>>,
     clock: Clock,
 }
 
-/// What a fetch did, so a caller can tell a cache hit from real work.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Fetched {
     FromCache(String),
     Fresh(String),
-    /// Another caller's request was already running; this one joined it.
+    /// The successful terminal result of the request this caller joined.
     Deduplicated(String),
+    /// Loader failure, invalidation, cancellation or rejected local admission.
     Failed(String),
 }
 
@@ -236,204 +227,213 @@ impl Resources {
     }
 
     pub fn in_flight(&self, key: &Key) -> bool {
-        self.state
-            .lock()
-            .expect("state")
-            .in_flight
-            .contains_key(key)
+        self.state.lock().expect("state").in_flight.contains_key(key)
     }
 
     pub fn subscribers(&self, key: &Key) -> usize {
-        self.state
-            .lock()
-            .expect("state")
-            .subscribers
-            .get(key)
-            .copied()
-            .unwrap_or(0)
+        self.state.lock().expect("state").subscribers.get(key).copied().unwrap_or(0)
     }
 
-    /// Everything a public cache would serve. Used to assert that private
-    /// values are not in it.
     pub fn public_cache_contents(&self) -> Vec<(Key, String)> {
-        self.state
-            .lock()
-            .expect("state")
-            .cache
-            .iter()
-            .filter(|(_, e)| e.privacy == Privacy::Public)
-            .map(|(k, e)| (k.clone(), e.value.clone()))
+        self.state.lock().expect("state").cache.iter()
+            .filter(|(_, entry)| entry.privacy == Privacy::Public)
+            .map(|(key, entry)| (key.clone(), entry.value.clone()))
             .collect()
     }
 
-    /// Take a reference to a key. The value is kept while anyone holds one.
     pub fn subscribe(&self, key: &Key) -> Subscription {
-        let mut st = self.state.lock().expect("state");
-        let n = st.subscribers.entry(key.clone()).or_insert(0);
-        *n += 1;
-        let count = *n;
-        st.trace.push(Trace::Subscribed {
-            key: key.clone(),
-            subscribers: count,
-        });
-        Subscription {
-            rt: self.clone(),
-            key: key.clone(),
-            released: false,
-        }
+        let mut state = self.state.lock().expect("state");
+        let count = state.subscribers.entry(key.clone()).or_insert(0);
+        *count += 1;
+        let subscribers = *count;
+        state.trace.push(Trace::Subscribed { key: key.clone(), subscribers });
+        Subscription { rt: self.clone(), key: key.clone(), released: false }
     }
 
-    /// Fetch a key, running `load` only if no usable cached value exists and no
-    /// request for the same key is already running.
-    ///
-    /// `load` returns `Err` to fail an attempt; the manifest decides whether to
-    /// retry.
+    /// Fetch or join one admitted request. A duplicate waits for the shared
+    /// terminal result rather than returning unrelated cached/placeholder data.
+    /// `load` is synchronous and must not depend cyclically on another waiter.
     pub fn fetch(
         &self,
         manifest: &Manifest,
         key: &Key,
         mut load: impl FnMut(u32) -> Result<String, String>,
     ) -> Fetched {
-        {
-            let mut st = self.state.lock().expect("state");
-            let now = self.clock.now();
-
-            if let Some(e) = st
-                .cache
-                .get(key)
-                .filter(|e| now.saturating_sub(e.stored_at) < manifest.freshness)
-            {
-                let v = e.value.clone();
-                st.trace.push(Trace::ServedFromCache { key: key.clone() });
-                return Fetched::FromCache(v);
-            }
-
-            // One in-flight request per key. A recomputation storm hits this
-            // branch, which is the M4 gate item: many callers, one request.
-            if st.in_flight.contains_key(key) {
-                st.trace
-                    .push(Trace::RequestDeduplicated { key: key.clone() });
-                let v = st
-                    .cache
-                    .get(key)
-                    .map(|e| e.value.clone())
-                    .unwrap_or_default();
-                return Fetched::Deduplicated(v);
-            }
-            st.in_flight.insert(key.clone(), 1);
-        }
-
-        let mut last_error = String::new();
-        for attempt in 1..=manifest.max_attempts.max(1) {
-            self.state
-                .lock()
-                .expect("state")
-                .trace
-                .push(Trace::RequestStarted {
-                    key: key.clone(),
-                    attempt,
-                });
-
-            match load(attempt) {
-                Ok(value) => {
-                    let mut st = self.state.lock().expect("state");
-                    st.cache.insert(
-                        key.clone(),
-                        Entry {
-                            value: value.clone(),
-                            stored_at: self.clock.now(),
-                            privacy: manifest.privacy,
-                        },
-                    );
-                    st.in_flight.remove(key);
-                    st.trace.push(Trace::RequestSucceeded { key: key.clone() });
-                    return Fetched::Fresh(value);
+        let flight = {
+            let mut state = self.state.lock().expect("state");
+            if let Some(entry) = state.cache.get(key) {
+                if entry.privacy != manifest.privacy {
+                    return Fetched::Failed("resource privacy classification mismatch".into());
                 }
-                Err(e) => {
-                    let mut st = self.state.lock().expect("state");
-                    st.trace.push(Trace::RequestFailed {
-                        key: key.clone(),
-                        attempt,
-                        error: e.clone(),
+                if self.clock.now().saturating_sub(entry.stored_at) < manifest.freshness {
+                    let value = entry.value.clone();
+                    state.trace.push(Trace::ServedFromCache { key: key.clone() });
+                    return Fetched::FromCache(value);
+                }
+            }
+            if let Some(running) = state.in_flight.get(key).cloned() {
+                if running.privacy != manifest.privacy {
+                    return Fetched::Failed("resource privacy classification mismatch".into());
+                }
+                state.trace.push(Trace::RequestDeduplicated { key: key.clone() });
+                drop(state);
+                return match running.completion.wait() {
+                    Ok(value) => Fetched::Deduplicated(value),
+                    Err(error) => Fetched::Failed(error),
+                };
+            }
+            let flight = Arc::new(QueryFlight {
+                privacy: manifest.privacy,
+                completion: Completion::new(),
+            });
+            state.in_flight.insert(key.clone(), Arc::clone(&flight));
+            flight
+        };
+
+        let attempts = manifest.max_attempts.max(1);
+        let mut last_error = String::new();
+        for attempt in 1..=attempts {
+            {
+                let mut state = self.state.lock().expect("state");
+                if !Self::owns_flight(&state, key, &flight) {
+                    return Self::fetch_outcome(Self::obsolete_outcome(&flight));
+                }
+                state.trace.push(Trace::RequestStarted { key: key.clone(), attempt });
+            }
+            match catch_unwind(AssertUnwindSafe(|| load(attempt))) {
+                Ok(Ok(value)) => {
+                    return Self::fetch_outcome(self.finish_fetch(key, &flight, Ok(value), attempt));
+                }
+                Ok(Err(error)) => {
+                    let mut state = self.state.lock().expect("state");
+                    if !Self::owns_flight(&state, key, &flight) {
+                        return Self::fetch_outcome(Self::obsolete_outcome(&flight));
+                    }
+                    state.trace.push(Trace::RequestFailed {
+                        key: key.clone(), attempt, error: error.clone(),
                     });
-                    last_error = e;
-                    if attempt < manifest.max_attempts {
+                    last_error = error;
+                    if attempt < attempts {
                         let delay = manifest.backoff(attempt, &key.key);
-                        st.trace.push(Trace::RetryScheduled {
-                            key: key.clone(),
-                            attempt,
-                            delay,
-                        });
-                        drop(st);
+                        state.trace.push(Trace::RetryScheduled { key: key.clone(), attempt, delay });
+                        drop(state);
                         self.clock.advance(delay);
                     }
                 }
+                Err(panic) => {
+                    let _ = self.finish_fetch(key, &flight, Err("resource loader panicked".into()), attempt);
+                    resume_unwind(panic);
+                }
             }
         }
-
-        let mut st = self.state.lock().expect("state");
-        st.in_flight.remove(key);
-        st.trace.push(Trace::GaveUp {
-            key: key.clone(),
-            attempts: manifest.max_attempts.max(1),
-        });
-        Fetched::Failed(last_error)
+        Self::fetch_outcome(self.finish_fetch(key, &flight, Err(last_error), attempts))
     }
 
-    /// Apply a command once per idempotency key.
+    fn owns_flight(state: &State, key: &Key, flight: &Arc<QueryFlight>) -> bool {
+        state.in_flight.get(key).is_some_and(|current| Arc::ptr_eq(current, flight))
+    }
+
+    fn obsolete_outcome(flight: &QueryFlight) -> Result<String, String> {
+        flight.completion.outcome().unwrap_or_else(|| Err("request is no longer admitted".into()))
+    }
+
+    fn fetch_outcome(outcome: Result<String, String>) -> Fetched {
+        match outcome {
+            Ok(value) => Fetched::Fresh(value),
+            Err(error) => Fetched::Failed(error),
+        }
+    }
+
+    fn finish_fetch(
+        &self,
+        key: &Key,
+        flight: &Arc<QueryFlight>,
+        outcome: Result<String, String>,
+        attempts: u32,
+    ) -> Result<String, String> {
+        let mut state = self.state.lock().expect("state");
+        if !Self::owns_flight(&state, key, flight) {
+            return Self::obsolete_outcome(flight);
+        }
+        state.in_flight.remove(key);
+        match &outcome {
+            Ok(value) => {
+                state.cache.insert(key.clone(), Entry {
+                    value: value.clone(), stored_at: self.clock.now(), privacy: flight.privacy,
+                });
+                state.trace.push(Trace::RequestSucceeded { key: key.clone() });
+            }
+            Err(_) => state.trace.push(Trace::GaveUp { key: key.clone(), attempts }),
+        }
+        flight.completion.finish(outcome)
+    }
+
+    /// Apply once per key in this Resources instance, including overlapping
+    /// calls. The host owns key scope and payload agreement. This is not a
+    /// crash-safe transaction protocol or a distributed exactly-once guarantee.
     ///
-    /// The M4 gate: duplicate `add_to_cart` calls with the same interaction ID
-    /// produce one logical mutation. A double-click, a retry after a dropped
-    /// response, and a reconnect replay are all the same event.
+    /// A panic is propagated, and its uncertain outcome retained so a later
+    /// duplicate cannot silently execute a possibly committed mutation again.
     pub fn command(&self, idempotency_key: &str, apply: impl FnOnce() -> String) -> String {
-        {
-            let mut st = self.state.lock().expect("state");
-            if let Some(prev) = st.applied.get(idempotency_key) {
-                let prev = prev.clone();
-                st.trace.push(Trace::CommandDeduplicated {
+        let completion = {
+            let mut state = self.state.lock().expect("state");
+            if let Some(running) = state.applied.get(idempotency_key).cloned() {
+                state.trace.push(Trace::CommandDeduplicated {
                     idempotency_key: idempotency_key.to_string(),
                 });
-                return prev;
+                drop(state);
+                return running.wait().unwrap_or_else(|error| panic!("command not replayed: {error}"));
+            }
+            let completion = Arc::new(Completion::new());
+            state.applied.insert(idempotency_key.to_string(), Arc::clone(&completion));
+            completion
+        };
+        match catch_unwind(AssertUnwindSafe(apply)) {
+            Ok(result) => {
+                let mut state = self.state.lock().expect("state");
+                state.trace.push(Trace::CommandApplied { idempotency_key: idempotency_key.to_string() });
+                let _ = completion.finish(Ok(result.clone()));
+                result
+            }
+            Err(panic) => {
+                let _ = completion.finish(Err("command outcome is unknown after a panic".into()));
+                resume_unwind(panic);
             }
         }
-        let result = apply();
-        let mut st = self.state.lock().expect("state");
-        st.applied
-            .insert(idempotency_key.to_string(), result.clone());
-        st.trace.push(Trace::CommandApplied {
-            idempotency_key: idempotency_key.to_string(),
-        });
-        result
     }
 
-    /// Drop cached values for a resource, e.g. after a command invalidates it.
+    /// Remove cached values and terminate current generations. Their callbacks
+    /// may still run, but cannot publish or remove a replacement's state.
     pub fn invalidate(&self, resource: &str) {
-        let mut st = self.state.lock().expect("state");
-        st.cache.retain(|k, _| k.resource != resource);
+        let mut state = self.state.lock().expect("state");
+        state.cache.retain(|key, _| key.resource != resource);
+        let keys: Vec<_> = state.in_flight.keys().filter(|key| key.resource == resource).cloned().collect();
+        for key in keys {
+            if let Some(flight) = state.in_flight.remove(&key) {
+                let _ = flight.completion.finish(Err("resource invalidated".into()));
+                state.trace.push(Trace::Cancelled { key, reason: "resource invalidated" });
+            }
+        }
     }
 
     fn release(&self, key: &Key) {
-        let mut st = self.state.lock().expect("state");
-        let n = st.subscribers.entry(key.clone()).or_insert(0);
-        *n = n.saturating_sub(1);
-        let count = *n;
-        st.trace.push(Trace::Unsubscribed {
-            key: key.clone(),
-            subscribers: count,
-        });
-        // Nobody is watching, so nothing should still be running for it. This
-        // is the "navigation cancels unneeded work" gate item.
-        if count == 0 && st.in_flight.remove(key).is_some() {
-            st.trace.push(Trace::Cancelled {
-                key: key.clone(),
-                reason: "no subscribers remain",
-            });
+        let mut state = self.state.lock().expect("state");
+        let count = state.subscribers.entry(key.clone()).or_insert(0);
+        *count = count.saturating_sub(1);
+        let subscribers = *count;
+        state.trace.push(Trace::Unsubscribed { key: key.clone(), subscribers });
+        if subscribers == 0 {
+            state.subscribers.remove(key);
+            if let Some(flight) = state.in_flight.remove(key) {
+                let _ = flight.completion.finish(Err("no subscribers remain".into()));
+                state.trace.push(Trace::Cancelled { key: key.clone(), reason: "no subscribers remain" });
+            }
         }
     }
 }
 
-/// A reference to a key. Dropping it releases the reference, and the last one
-/// out cancels work nobody is waiting for.
+/// A reference to a key. The last release fences its active generation.
+/// It does not preempt an arbitrary synchronous loader (ADR-0027).
 pub struct Subscription {
     rt: Resources,
     key: Key,
@@ -444,7 +444,6 @@ impl Subscription {
     pub fn key(&self) -> &Key {
         &self.key
     }
-    /// Release early, rather than at end of scope.
     pub fn release(mut self) {
         self.rt.release(&self.key);
         self.released = true;
