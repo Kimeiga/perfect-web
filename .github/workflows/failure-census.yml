@@ -1,0 +1,33 @@
+name: failure-census
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: failure-census-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARGO_TERM_COLOR: always
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v5
+      - name: Show repository-pinned Rust toolchain
+        run: rustup show
+      - name: Resource regression tests
+        run: cargo test --locked -p pw-resource
+      - name: Resource lint
+        run: cargo clippy --locked -p pw-resource --all-targets -- -D warnings
+      - name: Formatting diagnostic
+        if: always()
+        run: cargo fmt --all -- --check
