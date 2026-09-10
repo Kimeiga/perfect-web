@@ -14,7 +14,10 @@ const GUARD: Duration = Duration::from_secs(10);
 fn until(mut predicate: impl FnMut() -> bool) {
     let deadline = Instant::now() + GUARD;
     while !predicate() {
-        assert!(Instant::now() < deadline, "operation did not reach its scheduled state");
+        assert!(
+            Instant::now() < deadline,
+            "operation did not reach its scheduled state"
+        );
         thread::yield_now();
     }
 }
@@ -25,7 +28,10 @@ fn joined_fetch(stale: bool, failure: bool) {
     let manifest = Manifest::new("query").freshness(1);
     let key = Key::new("query", "one");
     if stale {
-        assert_eq!(rt.fetch(&manifest, &key, |_| Ok("old".into())), Fetched::Fresh("old".into()));
+        assert_eq!(
+            rt.fetch(&manifest, &key, |_| Ok("old".into())),
+            Fetched::Fresh("old".into())
+        );
         clock.advance(1);
     }
     thread::scope(|scope| {
@@ -35,15 +41,25 @@ fn joined_fetch(stale: bool, failure: bool) {
             let rt = rt.clone();
             let manifest = manifest.clone();
             let key = key.clone();
-            scope.spawn(move || rt.fetch(&manifest, &key, |_| {
-                started_tx.send(()).unwrap();
-                release_rx.recv_timeout(GUARD).expect("release leader");
-                if failure { Err("upstream failed".into()) } else { Ok("new".into()) }
-            }))
+            scope.spawn(move || {
+                rt.fetch(&manifest, &key, |_| {
+                    started_tx.send(()).unwrap();
+                    release_rx.recv_timeout(GUARD).expect("release leader");
+                    if failure {
+                        Err("upstream failed".into())
+                    } else {
+                        Ok("new".into())
+                    }
+                })
+            })
         };
         started_rx.recv_timeout(GUARD).unwrap();
         let follower = scope.spawn(|| rt.fetch(&manifest, &key, |_| panic!("duplicate load")));
-        until(|| rt.trace().iter().any(|event| matches!(event, Trace::RequestDeduplicated { .. })));
+        until(|| {
+            rt.trace()
+                .iter()
+                .any(|event| matches!(event, Trace::RequestDeduplicated { .. }))
+        });
         release_tx.send(()).unwrap();
         let first = leader.join().unwrap();
         let second = follower.join().unwrap();
@@ -82,19 +98,29 @@ fn overlapping_commands_execute_once_and_share_the_result() {
         let leader = {
             let rt = rt.clone();
             let applied = &applied;
-            scope.spawn(move || rt.command("interaction", || {
-                applied.fetch_add(1, Ordering::SeqCst);
-                started_tx.send(()).unwrap();
-                release_rx.recv_timeout(GUARD).expect("release command");
-                "committed".into()
-            }))
+            scope.spawn(move || {
+                rt.command("interaction", || {
+                    applied.fetch_add(1, Ordering::SeqCst);
+                    started_tx.send(()).unwrap();
+                    release_rx.recv_timeout(GUARD).expect("release command");
+                    "committed".into()
+                })
+            })
         };
         started_rx.recv_timeout(GUARD).unwrap();
-        let follower = scope.spawn(|| rt.command("interaction", || {
-            applied.fetch_add(1, Ordering::SeqCst);
-            "second mutation".into()
-        }));
-        until(|| applied.load(Ordering::SeqCst) > 1 || rt.trace().iter().any(|event| matches!(event, Trace::CommandDeduplicated { .. })));
+        let follower = scope.spawn(|| {
+            rt.command("interaction", || {
+                applied.fetch_add(1, Ordering::SeqCst);
+                "second mutation".into()
+            })
+        });
+        until(|| {
+            applied.load(Ordering::SeqCst) > 1
+                || rt
+                    .trace()
+                    .iter()
+                    .any(|event| matches!(event, Trace::CommandDeduplicated { .. }))
+        });
         release_tx.send(()).unwrap();
         assert_eq!(leader.join().unwrap(), "committed");
         assert_eq!(follower.join().unwrap(), "committed");
@@ -114,11 +140,13 @@ fn an_invalidated_completion_cannot_remove_or_overwrite_its_replacement() {
             let rt = rt.clone();
             let manifest = manifest.clone();
             let key = key.clone();
-            scope.spawn(move || rt.fetch(&manifest, &key, |_| {
-                old_started_tx.send(()).unwrap();
-                old_release_rx.recv_timeout(GUARD).unwrap();
-                Ok("obsolete".into())
-            }))
+            scope.spawn(move || {
+                rt.fetch(&manifest, &key, |_| {
+                    old_started_tx.send(()).unwrap();
+                    old_release_rx.recv_timeout(GUARD).unwrap();
+                    Ok("obsolete".into())
+                })
+            })
         };
         old_started_rx.recv_timeout(GUARD).unwrap();
         rt.invalidate("query");
@@ -128,14 +156,15 @@ fn an_invalidated_completion_cannot_remove_or_overwrite_its_replacement() {
             let rt = rt.clone();
             let manifest = manifest.clone();
             let key = key.clone();
-            scope.spawn(move || rt.fetch(&manifest, &key, |_| {
-                new_started_tx.send(()).unwrap();
-                new_release_rx.recv_timeout(GUARD).unwrap();
-                Ok("replacement".into())
-            }))
+            scope.spawn(move || {
+                rt.fetch(&manifest, &key, |_| {
+                    new_started_tx.send(()).unwrap();
+                    new_release_rx.recv_timeout(GUARD).unwrap();
+                    Ok("replacement".into())
+                })
+            })
         };
-        // On the defective implementation, the replacement returns a fabricated
-        // duplicate without running. A timeout fails the test rather than hangs it.
+        // A deadlock guard is not evidence of correct results or publication.
         let replacement_started = new_started_rx.recv_timeout(GUARD);
         old_release_tx.send(()).unwrap();
         let old_result = old.join().unwrap();
@@ -144,9 +173,15 @@ fn an_invalidated_completion_cannot_remove_or_overwrite_its_replacement() {
         let new_result = new.join().unwrap();
         assert!(replacement_started.is_ok(), "replacement was not admitted");
         assert!(matches!(old_result, Fetched::Failed(_)), "{old_result:?}");
-        assert!(still_running, "old completion removed the replacement's slot");
+        assert!(
+            still_running,
+            "old completion removed the replacement's slot"
+        );
         assert_eq!(new_result, Fetched::Fresh("replacement".into()));
-        assert_eq!(rt.fetch(&manifest, &key, |_| panic!("replacement was not cached")), Fetched::FromCache("replacement".into()));
+        assert_eq!(
+            rt.fetch(&manifest, &key, |_| panic!("replacement was not cached")),
+            Fetched::FromCache("replacement".into())
+        );
     });
 }
 
@@ -164,19 +199,30 @@ fn final_release_wakes_waiters_and_fences_the_still_running_callback() {
             let rt = rt.clone();
             let manifest = manifest.clone();
             let key = key.clone();
-            scope.spawn(move || rt.fetch(&manifest, &key, |_| {
-                started_tx.send(()).unwrap();
-                release_rx.recv_timeout(GUARD).unwrap();
-                Ok("late".into())
-            }))
+            scope.spawn(move || {
+                rt.fetch(&manifest, &key, |_| {
+                    started_tx.send(()).unwrap();
+                    release_rx.recv_timeout(GUARD).unwrap();
+                    Ok("late".into())
+                })
+            })
         };
         started_rx.recv_timeout(GUARD).unwrap();
         let (done_tx, done_rx) = mpsc::channel();
-        let follower = scope.spawn(|| {
-            let outcome = rt.fetch(&manifest, &key, |_| panic!("duplicate load"));
-            done_tx.send(outcome).unwrap();
+        let follower = {
+            let rt = rt.clone();
+            let manifest = manifest.clone();
+            let key = key.clone();
+            scope.spawn(move || {
+                let outcome = rt.fetch(&manifest, &key, |_| panic!("duplicate load"));
+                done_tx.send(outcome).unwrap();
+            })
+        };
+        until(|| {
+            rt.trace()
+                .iter()
+                .any(|event| matches!(event, Trace::RequestDeduplicated { .. }))
         });
-        until(|| rt.trace().iter().any(|event| matches!(event, Trace::RequestDeduplicated { .. })));
         drop(first_subscription);
         assert_eq!(rt.subscribers(&key), 1);
         assert!(rt.in_flight(&key));
@@ -186,11 +232,23 @@ fn final_release_wakes_waiters_and_fences_the_still_running_callback() {
         release_tx.send(()).unwrap();
         let leader_result = leader.join().unwrap();
         follower.join().unwrap();
-        assert!(matches!(follower_result, Ok(Fetched::Failed(_))), "{follower_result:?}");
-        assert!(matches!(leader_result, Fetched::Failed(_)), "{leader_result:?}");
+        assert!(
+            matches!(follower_result, Ok(Fetched::Failed(_))),
+            "{follower_result:?}"
+        );
+        assert!(
+            matches!(leader_result, Fetched::Failed(_)),
+            "{leader_result:?}"
+        );
         assert!(!rt.in_flight(&key));
         assert!(rt.public_cache_contents().is_empty());
-        assert_eq!(rt.trace().iter().filter(|event| matches!(event, Trace::Cancelled { .. })).count(), 1);
+        assert_eq!(
+            rt.trace()
+                .iter()
+                .filter(|event| matches!(event, Trace::Cancelled { .. }))
+                .count(),
+            1
+        );
     });
 }
 
@@ -199,23 +257,37 @@ fn a_panicking_loader_does_not_poison_or_strand_the_key() {
     let rt = Resources::new(Clock::new());
     let manifest = Manifest::new("query");
     let key = Key::new("query", "one");
-    assert!(catch_unwind(AssertUnwindSafe(|| rt.fetch(&manifest, &key, |_| panic!("loader panic")))).is_err());
+    assert!(
+        catch_unwind(AssertUnwindSafe(
+            || rt.fetch(&manifest, &key, |_| panic!("loader panic"))
+        ))
+        .is_err()
+    );
     assert!(!rt.in_flight(&key));
-    assert_eq!(rt.fetch(&manifest, &key, |_| Ok("recovered".into())), Fetched::Fresh("recovered".into()));
+    assert_eq!(
+        rt.fetch(&manifest, &key, |_| Ok("recovered".into())),
+        Fetched::Fresh("recovered".into())
+    );
 }
 
 #[test]
 fn a_panicking_command_is_not_silently_reexecuted() {
     let rt = Resources::new(Clock::new());
     let applied = AtomicUsize::new(0);
-    assert!(catch_unwind(AssertUnwindSafe(|| rt.command("uncertain", || {
-        applied.fetch_add(1, Ordering::SeqCst);
-        panic!("a side effect may already have happened")
-    }))).is_err());
-    assert!(catch_unwind(AssertUnwindSafe(|| rt.command("uncertain", || {
-        applied.fetch_add(1, Ordering::SeqCst);
-        "unsafe replay".into()
-    }))).is_err());
+    assert!(
+        catch_unwind(AssertUnwindSafe(|| rt.command("uncertain", || {
+            applied.fetch_add(1, Ordering::SeqCst);
+            panic!("a side effect may already have happened")
+        })))
+        .is_err()
+    );
+    assert!(
+        catch_unwind(AssertUnwindSafe(|| rt.command("uncertain", || {
+            applied.fetch_add(1, Ordering::SeqCst);
+            "unsafe replay".into()
+        })))
+        .is_err()
+    );
     assert_eq!(applied.load(Ordering::SeqCst), 1);
     assert_eq!(rt.command("independent", || "ok".into()), "ok");
 }
@@ -226,8 +298,14 @@ fn contradictory_privacy_cannot_reuse_a_private_cached_value() {
     let key = Key::new("query", "one");
     let private = Manifest::new("query").private();
     let public = Manifest::new("query");
-    assert_eq!(rt.fetch(&private, &key, |_| Ok("private fixture".into())), Fetched::Fresh("private fixture".into()));
-    assert!(matches!(rt.fetch(&public, &key, |_| panic!("contradictory manifest")), Fetched::Failed(_)));
+    assert_eq!(
+        rt.fetch(&private, &key, |_| Ok("private fixture".into())),
+        Fetched::Fresh("private fixture".into())
+    );
+    assert!(matches!(
+        rt.fetch(&public, &key, |_| panic!("contradictory manifest")),
+        Fetched::Failed(_)
+    ));
     assert!(rt.public_cache_contents().is_empty());
 }
 
@@ -236,21 +314,38 @@ fn a_same_thread_recursive_fetch_fails_instead_of_waiting_for_itself() {
     let rt = Resources::new(Clock::new());
     let manifest = Manifest::new("query");
     let key = Key::new("query", "one");
-    assert_eq!(rt.fetch(&manifest, &key, |_| {
-        assert!(matches!(rt.fetch(&manifest, &key, |_| panic!("recursive load")), Fetched::Failed(_)));
-        Ok("outer".into())
-    }), Fetched::Fresh("outer".into()));
+    assert_eq!(
+        rt.fetch(&manifest, &key, |_| {
+            assert!(matches!(
+                rt.fetch(&manifest, &key, |_| panic!("recursive load")),
+                Fetched::Failed(_)
+            ));
+            Ok("outer".into())
+        }),
+        Fetched::Fresh("outer".into())
+    );
 }
 
 #[test]
 fn independent_callbacks_do_not_run_under_the_global_lock() {
     let rt = Resources::new(Clock::new());
-    assert_eq!(rt.command("outer", || rt.command("inner", || "ok".into())), "ok");
+    assert_eq!(
+        rt.command("outer", || rt.command("inner", || "ok".into())),
+        "ok"
+    );
     let manifest = Manifest::new("query");
-    assert_eq!(rt.fetch(&manifest, &Key::new("query", "outer"), |_| {
-        assert_eq!(rt.fetch(&manifest, &Key::new("query", "inner"), |_| Ok("inner".into())), Fetched::Fresh("inner".into()));
-        Ok("outer".into())
-    }), Fetched::Fresh("outer".into()));
+    assert_eq!(
+        rt.fetch(&manifest, &Key::new("query", "outer"), |_| {
+            assert_eq!(
+                rt.fetch(&manifest, &Key::new("query", "inner"), |_| Ok(
+                    "inner".into()
+                )),
+                Fetched::Fresh("inner".into())
+            );
+            Ok("outer".into())
+        }),
+        Fetched::Fresh("outer".into())
+    );
 }
 
 #[test]
