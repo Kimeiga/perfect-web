@@ -1,0 +1,107 @@
+id,title,url,kind,reviewed_scope
+PCH,PROJECT_CHARTER.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/PROJECT_CHARTER.md,Repository source,"Semantic goals, primitives, browser constraints, gates and deferred work"
+PST,docs/STATUS.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/STATUS.md,Repository source,"Current E9 reopening, accumulated implementation claims; historical entries can conflict"
+PNX,docs/NEXT.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/NEXT.md,Repository source,"Resolved-type migration, unimplemented call/return checking, generic syntax, E10-I"
+PMS,docs/MILESTONES.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/MILESTONES.md,Repository source,Milestone contracts and reopened E9
+PSE,docs/SEMANTICS.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/SEMANTICS.md,Repository source,Early semantic reference; stale relative to current work
+PAR,docs/ARCHITECTURE.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/ARCHITECTURE.md,Repository source,Early architecture; stale Milestone 0 status
+PRR,docs/RISK_REGISTER.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/RISK_REGISTER.md,Repository source,Original risks; distinguish obsolete entries from current evidence
+PRQ,docs/RISK_QUEUE.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/RISK_QUEUE.md,Repository source,"Semantic witness failures, evidence admissibility, unresolved-call history"
+PDE,docs/DECISIONS.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/DECISIONS.md,Repository source,"ADR index: provenance, identities, causality, optimistic transitions and boundaries"
+PWP,web-recompiled/whitepaper.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/web-recompiled/whitepaper.md,Repository source,"Full design draft, especially sections 4–17; explicit uncertainty and adoption"
+PPR,web-recompiled/proof-roadmap.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/web-recompiled/proof-roadmap.md,Repository source,Proof ladder and six separate claims; launch examples are not results
+PMX,docs/research/technology-matrix.md,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/docs/research/technology-matrix.md,Repository source,Existing researched systems; basis for missing-prior-art comparison
+PRS,runtime/pw-resource/src/lib.rs,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/runtime/pw-resource/src/lib.rs,Repository source,"Direct source inspection of Resources.fetch, release, command and cache; not rerun"
+PRT,runtime/pw-resource/tests/gate.rs,https://github.com/Kimeiga/perfect-web/blob/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45/runtime/pw-resource/tests/gate.rs,Repository source,"Direct source inspection of deduplication, command, cancellation and privacy tests; not rerun"
+PCOM,Snapshot commit,https://github.com/Kimeiga/perfect-web/commit/0c2579d2bda9edb91a1ccb817b93f2ba0ab24f45,Repository metadata,Default master snapshot; commit dated 2026-08-23; no unmerged-branch audit
+CF25,"Cloudflare September 12, 2025 dashboard/API postmortem",https://blog.cloudflare.com/deep-dive-into-cloudflares-sept-12-dashboard-and-api-outage/,Incident,"Effect identity trigger distinguished from Tenant Service deployment, authorization dependency and recovery amplification"
+CF19,"Cloudflare July 2, 2019 outage",https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/,Incident,"Regex work explosion, removed protection, insufficient CPU tests and broad rollout"
+CFNOV,"Cloudflare November 18, 2025 outage",https://blog.cloudflare.com/18-november-2025-outage/,Incident,"Permission change, duplicate configuration rows, oversized feature file, recovery amplification"
+GH18,"GitHub October 21, 2018 post-incident analysis",https://github.blog/news-insights/company-news/oct21-post-incident-analysis/,Incident,"Network partition, failover, divergent writes and recovery constraints"
+GL17,GitLab.com database incident,https://about.gitlab.com/blog/gitlab-dot-com-database-incident/,Incident,Production deletion and multiple unreliable backup/restore mechanisms
+FAST,"Fastly June 8, 2021 outage",https://www.fastly.com/blog/summary-of-june-8-outage,Incident,Valid configuration triggered latent software bug with broad impact
+NEXT,Next.js middleware bypass postmortem,https://vercel.com/blog/postmortem-on-next-js-middleware-bypass,Incident,CVE-2025-29927; routing/middleware cannot be sole data authorization boundary
+RSC,Critical security vulnerability in React Server Components,https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components,Advisory,Unauthenticated RSC payload decoding vulnerability; no exploit instructions
+RSC2,Denial of service and source exposure in React Server Components,https://de.react.dev/blog/2025/12/11/denial-of-service-and-source-code-exposure-in-react-server-components,Advisory,Decode work limits and source exposure; updated January 2026
+CACHEPOISON,Practical Web Cache Poisoning,https://portswigger.net/research/practical-web-cache-poisoning,Security research,Unkeyed inputs and differing routing/cache interpretation
+DESYNC,HTTP/2: The Sequel is Always Worse,https://portswigger.net/research/http2,Security research,HTTP/2 to HTTP/1 downgrade and message-boundary disagreement
+NPM,Details about the event-stream incident,https://blog.npmjs.org/post/180565383195/details-about-the-event-stream-incident,Incident,2018 malicious transitive dependency and maintainer handover
+NPMTOK,"npm operations incident July 12, 2018",https://blog.npmjs.org/post/175824896885/incident-report-npm-inc-operations-incident-of.html,Incident,Compromised publisher credentials and malicious package capable of token access; exfiltration not established
+MOZCERT,Technical details on the Firefox add-on outage,https://hacks.mozilla.org/2019/05/technical-details-on-the-recent-firefox-add-on-outage/,Incident,2019 shared signing intermediate certificate expiration
+RUSTINC,Rust 1.52.1 and incremental compilation failures,https://blog.rust-lang.org/2021/05/10/Rust-1.52.1/,Incident,Incremental fingerprint verification exposed prior silent miscompilation risk
+TRANSLATE,React issue 11538: Google Translate DOM mutations,https://github.com/facebook/react/issues/11538,Issue reproduction,2017 reproducible removeChild failure after external DOM changes; not a claim about all current React
+IME,React issue 8683: IME composition and controlled input,https://github.com/react/react/issues/8683,Issue reproduction,2017 browser-dependent composition/change sequences and premature derived actions
+SVELTE,Svelte runtime warnings,https://svelte.dev/docs/svelte/runtime-warnings,Official documentation,Hydration parser-repair mismatch and lifecycle/ownership diagnostics
+QSYNC,Qwik synchronous event processing,https://qwik.dev/tutorial/events/synchronous-sync/,Official documentation,Synchronous event phase versus delayed handler; explicit synchronous subset
+QDRAG,Qwik drag and drop,https://www.qwik.dev/docs/cookbook/drag%26drop/,Official documentation,DataTransfer access and default prevention require timely dispatch handling
+HTMX,htmx hx-history,https://htmx.org/attributes/hx-history/,Official documentation,Prevent sensitive page snapshots from entering framework history storage
+STRIPEI,Stripe idempotent requests,https://docs.stripe.com/api/idempotent_requests,Official documentation,"Key/result semantics, parameter comparison, retention and concurrent conflicts"
+STRIPEW,Stripe webhooks,https://docs.stripe.com/webhooks,Official documentation,"Raw-body verification, duplicates, unordered delivery, historical event versions and replay"
+PGISO,PostgreSQL transaction isolation,https://www.postgresql.org/docs/current/transaction-iso.html,Official documentation,Isolation anomalies and transaction retry requirements
+AWSRETRY,AWS reliability: control and limit retries,https://docs.aws.amazon.com/wellarchitected/2023-04-10/framework/rel_mitigate_interaction_failure_limit_retries.html,Official documentation,"Retry amplification, limits and jitter"
+AWSTIME,AWS reliability: set client timeouts,https://docs.aws.amazon.com/wellarchitected/2022-03-31/framework/rel_mitigate_interaction_failure_client_timeouts.html,Official documentation,Timeout selection and false timeout amplification
+AWSSDK,AWS SDK retry behavior,https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html,Official documentation,Retry budgets and throttling; no fixed version-sensitive defaults used
+CALM,Keeping CALM: When Distributed Consistency is Easy,https://arxiv.org/abs/1901.01930,Research abstract,Monotonicity and coordination under the paper's model; not universal decidability
+ICONF,Coordination Avoidance in Database Systems,https://arxiv.org/abs/1402.2237,Research abstract,Invariant confluence links operations/invariants to coordination requirements
+JEPSEN,Jepsen consistency models,https://jepsen.io/consistency,Research documentation,Consistency as restrictions on observable histories
+FDB,FoundationDB testing,https://apple.github.io/foundationdb/testing.html,Official documentation,Deterministic fault simulation complemented by live and performance testing
+TEMPW,Temporal workflow execution,https://docs.temporal.io/workflow-execution,Official documentation,"Durable event history, replay and command compatibility"
+TEMPA,Temporal activity definition,https://docs.temporal.io/activity-definition,Official documentation,External activity idempotency and retriable effects
+CONVEX,Convex optimistic updates,https://docs.convex.dev/client/react/optimistic-updates,Official documentation,Temporary local query changes; does not establish Pleris concurrent rollback correctness
+FIGMA,How Figma multiplayer technology works,https://www.figma.com/blog/how-figmas-multiplayer-technology-works/,Engineering design,Domain-shaped conflict resolution and multiplayer undo
+CRDT,A Conflict-Free Replicated JSON Datatype,https://arxiv.org/abs/1608.03960,Research abstract,Convergence for nested JSON; not arbitrary business-invariant preservation
+ZANZ,Zanzibar: Google's consistent global authorization system,https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/,Research abstract,Consistency between ACL changes and protected content
+CEDAR,Cedar policy validation,https://docs.cedarpolicy.com/policies/validation.html,Official documentation,Policy validation versus runtime authorization over entities and requests
+MAC,Macaroons: contextual caveats for decentralized authorization,https://research.google/pubs/macaroons-cookies-with-contextual-caveats-for-decentralized-authorization-in-the-cloud/,Research abstract,Attenuated delegated authority with contextual caveats
+JIF,Jif language features,https://www.cs.cornell.edu/jif/doc/jif-3.1.1/language.html,Language documentation,Separate confidentiality/declassification and integrity/endorsement; dynamic principals
+JIFCHECK,Jif label checking,https://www.cs.cornell.edu/jif/doc/jif-3.1.1/label_checking.html,Language documentation,Authority and robustness conditions for downgrading
+LAVA,LavaMoat policies,https://lavamoat.github.io/guides/policy/,Official documentation,"Per-dependency access to globals, builtins, native modules and other packages"
+LAVAWEB,LavaMoat webpack threat model,https://lavamoat.github.io/guides/webpack/,Official documentation,"Trusted build plugins, lockdown ordering and explicit limits of confinement"
+SLSA,SLSA supply-chain threats,https://slsa.dev/spec/v1.1/threats-overview,Standard,Source/build/artifact provenance threats; provenance does not prove benign source
+BAZEL,Bazel hermeticity,https://bazel.build/basics/hermeticity,Official documentation,Declared inputs and isolation for reproducible builds
+SALSA,How Salsa works,https://salsa-rs.github.io/salsa/how_salsa_works.html,Official documentation,Demand-driven memoized pure queries and tracked input changes
+TT,Trusted Types,https://www.w3.org/TR/trusted-types/,Standard,Typed injection sinks and policy boundaries; support must be checked per target
+XSS,OWASP XSS prevention,https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html,Security guidance,"Context-specific sinks, sanitizer mutation and URL hazards"
+SSRF,OWASP SSRF prevention,https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html,Security guidance,"Destination restrictions, resolution and redirect boundaries"
+SESSION,OWASP session management,https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html,Security guidance,"Session creation, renewal, expiration and cookie protections"
+CSRF,OWASP CSRF prevention,https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html,Security guidance,Request origin/intent defenses; SameSite is not a universal substitute
+UPLOAD,OWASP file upload,https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html,Security guidance,"Untrusted names, types, decompression, limits and storage separation"
+SQLI,OWASP SQL injection prevention,https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html,Security guidance,"Parameterized values, allowlisted identifiers and least privilege"
+GRAPHQL,OWASP GraphQL security,https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html,Security guidance,"Query cost, access control, batching and input validation"
+PROTO,OWASP prototype pollution prevention,https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html,Security guidance,Unsafe property paths and shared prototype effects
+OAUTH,OWASP OAuth2 security,https://cheatsheetseries.owasp.org/cheatsheets/OAuth2_Cheat_Sheet.html,Security guidance,"Issuer, redirect, request binding and delegated authority"
+HTML,WHATWG HTML interaction,https://html.spec.whatwg.org/multipage/interaction.html,Standard,"User activation, focus, inertness and activation consumption; targeted sections"
+INPUT,Input Events Level 2,https://www.w3.org/TR/input-events-2/,Standard,Composition and beforeinput; not every editing action is cancelable
+WCAG,Web Content Accessibility Guidelines 2.2,https://www.w3.org/TR/WCAG22/,Standard,"Keyboard, focus, reflow, alternatives, errors and human evaluation; criteria inspected"
+APG,WAI ARIA APG read me first,https://www.w3.org/WAI/ARIA/apg/practices/read-me-first/,Official guidance,Native semantics and ARIA behavioral obligations; real assistive technology validation
+BFCACHE,Back/forward cache,https://web.dev/articles/bfcache,Browser engineering,"Freeze/restore lifecycle, stale sensitive state and avoiding unconditional unload assumptions"
+SW,Service worker lifecycle,https://web.dev/articles/service-worker-lifecycle,Browser engineering,"Installation, waiting, activation and mixed client/worker versions"
+STORAGE,WebKit storage policy,https://webkit.org/blog/14403/updates-to-storage-policy/,Browser engineering,"Origin quotas, persistence and eviction; not a durability SLA"
+CLIP,WebKit async Clipboard API,https://webkit.org/blog/10855/async-clipboard-api/,Browser engineering,Activation/security constraints and clipboard representation
+CVIS,content-visibility,https://web.dev/articles/content-visibility,Browser engineering,"Rendering work skipping, retained DOM and accessibility caveats"
+INP,Optimize Interaction to Next Paint,https://web.dev/articles/optimize-inp,Browser engineering,"Input delay, processing and presentation delay; field interaction latency"
+LCP,Optimize Largest Contentful Paint,https://web.dev/articles/optimize-lcp,Browser engineering,"Resource discovery, transfer and rendering delays"
+LAYOUT,Avoid complex layouts and layout thrashing,https://web.dev/articles/avoid-large-complex-layouts-and-layout-thrashing,Browser engineering,"Forced synchronous layout, read/write batching and DOM-related work"
+BIDI,Unicode Bidirectional Algorithm,https://unicode.org/reports/tr9/,Standard,Bidi ordering and isolation; not font/layout correctness by itself
+FLUENT,Project Fluent,https://projectfluent.org/,Official documentation,Locale-specific grammatical choices without source-language structure dictating every translation
+RO,Resize Observer,https://www.w3.org/TR/resize-observer/,Standard,Resize delivery and loop handling; targeted sections
+PB,Protocol Buffers proto3 language guide,https://protobuf.dev/programming-guides/proto3/,Official documentation,"Field identity, compatibility, reserved identifiers and wire evolution"
+HTTP,RFC 9111 HTTP caching,https://www.rfc-editor.org/info/rfc9111/,Standard,"Vary, cache audience, freshness, validation and incomplete responses"
+STREAM,WHATWG Streams,https://streams.spec.whatwg.org/,Standard,"Backpressure, cancellation, queues and tee behavior; targeted sections"
+RTC,WebRTC,https://www.w3.org/TR/webrtc/,Standard,"Negotiation/state transitions, connectivity and data channel lifecycle; targeted sections"
+MEDIA,Media Capture and Streams,https://www.w3.org/TR/mediacapture-streams/,Standard,"Permission, track and device lifecycle; targeted sections"
+IDB,IndexedDB 3.0,https://www.w3.org/TR/IndexedDB/,Standard,"Transaction lifetime, versionchange and blocked upgrades; targeted sections"
+OTEL,OpenTelemetry sensitive data,https://opentelemetry.io/docs/security/handling-sensitive-data/,Official documentation,Collection minimization and filtering; redaction not a universal privacy proof
+SRM,Diagnosing sample ratio mismatch in A/B testing,https://www.microsoft.com/en-us/research/articles/diagnosing-sample-ratio-mismatch-in-a-b-testing/,Research engineering,Assignment/exposure/logging inconsistencies and measurement validity
+AISEC,Do Users Write More Insecure Code with AI Assistants?,https://arxiv.org/abs/2211.03622,Research abstract,Study of a particular earlier assistant; not a claim about current model rates
+AIPKG,We Have a Package for You!,https://arxiv.org/abs/2406.10279,Research abstract,Package hallucinations in evaluated code generators; no current-model rate extrapolation
+AIOLD,Asleep at the Keyboard?,https://arxiv.org/abs/2108.09293,Research abstract,"Early Copilot security scenario evaluation; mechanism evidence, not current benchmark"
+TIME,Temporal time zones and ambiguity,https://tc39.es/proposal-temporal/docs/timezone.html,Official documentation,"Exact versus wall time, repeated/skipped local times and changing zone rules; no native support assumption"
+PGCON,PostgreSQL constraints,https://www.postgresql.org/docs/current/ddl-constraints.html,Official documentation,"Database-enforced uniqueness, referential integrity and limits of cross-row CHECK predicates"
+VALUE,OCaml polymorphism and its limitations,https://ocaml.org/manual/5.4/polymorphism.html,Language documentation,"Value restriction, mutation and variance; compatibility lesson, not a proposed OCaml syntax import"
+VARIANCE,Rust reference: subtyping and variance,https://doc.rust-lang.org/reference/subtyping.html,Language documentation,Variance of mutable references and function parameters; scoped soundness examples
+EFFCAP,Effects as Capabilities,https://pl.cs.uni-tuebingen.de/publications/brachthaeuser20effects/,Research abstract,Capability requirements simplify polymorphism but do not give the same purity reasoning as observational effect tracking
+KOKA,Koka book: handlers and linear effects,https://koka-lang.github.io/koka/doc/book.html,Language documentation,"Tail-resumptive operations, general control, raw resumption finalization; targeted sections"
+COMPCERT,CompCert research objectives,https://compcert.org/research.html,Research documentation,Semantic preservation and verified validation of untrusted optimizations; not a claim of universal end-to-end trust
+IVY,IVy protocol verification,https://www.microsoft.com/en-us/research/project/ivy/,Research documentation,Predictable transparent protocol verification; project overview only
+SPECC,Spec#,https://www.microsoft.com/en-us/research/project/spec/,Research documentation,"Static types, contracts, runtime checks and separate verification obligations"
