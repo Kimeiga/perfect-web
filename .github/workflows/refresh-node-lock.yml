@@ -1,0 +1,33 @@
+name: refresh-node-lock
+
+on:
+  push:
+    branches: ["fix/licenses-and-wasmtime-audit"]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/licenses-and-wasmtime-audit
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - name: Regenerate lockfile under security override
+        run: |
+          pnpm install --lockfile-only
+          grep -q 'nanoid@3.3.18' pnpm-lock.yaml
+          ! grep -q 'nanoid@3.3.17' pnpm-lock.yaml
+      - name: Commit lockfile and remove helper
+        run: |
+          git rm .github/workflows/refresh-node-lock.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "Regenerate lockfile with patched nanoid"
+          git push
