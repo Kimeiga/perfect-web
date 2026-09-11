@@ -1,0 +1,30 @@
+name: refresh-wasmtime-lock
+
+on:
+  push:
+    branches: ["fix/licenses-and-wasmtime-audit"]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/licenses-and-wasmtime-audit
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Refresh patched Wasmtime lock entries
+        run: cargo update -p wasmtime --precise 47.0.4
+      - name: Commit regenerated lockfile
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "Regenerate lockfile for Wasmtime 47.0.4"
+          git push
