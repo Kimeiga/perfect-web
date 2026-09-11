@@ -1,0 +1,25 @@
+test_C04_one_subscriber_cannot_abort_shared_work (test_models.FailureCounterexamples.test_C04_one_subscriber_cannot_abort_shared_work) ... ok
+test_G06_timeout_does_not_distinguish_commit_from_no_commit (test_models.FailureCounterexamples.test_G06_timeout_does_not_distinguish_commit_from_no_commit) ... ok
+test_G07_blind_restore_erases_later_confirmed_success (test_models.FailureCounterexamples.test_G07_blind_restore_erases_later_confirmed_success) ... ok
+test_G07_commutative_counter_overlay_survives_all_completion_orders (test_models.FailureCounterexamples.test_G07_commutative_counter_overlay_survives_all_completion_orders) ... ok
+test_I08_reading_a_frame_is_not_acknowledging_application (test_models.FailureCounterexamples.test_I08_reading_a_frame_is_not_acknowledging_application) ... ok
+test_J01_equal_url_does_not_establish_equal_audience (test_models.FailureCounterexamples.test_J01_equal_url_does_not_establish_equal_audience) ... ok
+test_U01_missing_metric_is_not_a_measured_zero (test_models.FailureCounterexamples.test_U01_missing_metric_is_not_a_measured_zero) ... ok
+test_duplicate_leaf_is_rejected (test_validate.CensusValidationTests.test_duplicate_leaf_is_rejected) ... ok
+test_duplicate_obligation_is_rejected (test_validate.CensusValidationTests.test_duplicate_obligation_is_rejected) ... ok
+test_empty_corpus_is_not_a_pass (test_validate.CensusValidationTests.test_empty_corpus_is_not_a_pass) ... ok
+test_invalid_enforcement_layer_is_rejected (test_validate.CensusValidationTests.test_invalid_enforcement_layer_is_rejected) ... ok
+test_leaf_outside_group_is_rejected (test_validate.CensusValidationTests.test_leaf_outside_group_is_rejected) ... ok
+test_malformed_id_cannot_disappear_from_inventory (test_validate.CensusValidationTests.test_malformed_id_cannot_disappear_from_inventory) ... ok
+test_missing_audited_revision_is_rejected (test_validate.CensusValidationTests.test_missing_audited_revision_is_rejected) ... ok
+test_missing_cell_is_rejected (test_validate.CensusValidationTests.test_missing_cell_is_rejected) ... ok
+test_missing_evidence_reference_is_rejected (test_validate.CensusValidationTests.test_missing_evidence_reference_is_rejected) ... ok
+test_obligation_unknown_leaf_is_rejected (test_validate.CensusValidationTests.test_obligation_unknown_leaf_is_rejected) ... ok
+test_repository_inventory_is_consistent (test_validate.CensusValidationTests.test_repository_inventory_is_consistent) ... ok
+test_source_and_plan_lanes_are_explicit (test_validate.CensusValidationTests.test_source_and_plan_lanes_are_explicit) ... ok
+test_unknown_status_is_rejected (test_validate.CensusValidationTests.test_unknown_status_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.014s
+
+OK

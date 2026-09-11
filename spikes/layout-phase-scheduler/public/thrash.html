@@ -32,6 +32,8 @@
 <div id="out">not run</div>
 
 <script type="module">
+import { installLayoutObserver } from "./loaf.js";
+
 const COUNT = Number(new URLSearchParams(location.search).get("n") ?? 400);
 
 const grid = document.getElementById("grid");
@@ -75,28 +77,8 @@ window.__run = () => {
   return { mode: "thrash", elements: COUNT, ms: r.ms, checksum: r.acc };
 };
 
-// Long Animation Frame attribution, where supported. This is the browser telling
-// us how much time it spent in forced style and layout — charter §14 M0 task 13
-// asks for exactly this signal.
-window.__loaf = [];
-if ("PerformanceObserver" in window &&
-    PerformanceObserver.supportedEntryTypes?.includes("long-animation-frame")) {
-  new PerformanceObserver((list) => {
-    for (const e of list.getEntries()) {
-      window.__loaf.push({
-        duration: e.duration,
-        blockingDuration: e.blockingDuration,
-        // The number this spike exists to surface:
-        forcedStyleAndLayoutDuration: e.forcedStyleAndLayoutDuration,
-        renderStart: e.renderStart,
-        styleAndLayoutStart: e.styleAndLayoutStart,
-      });
-    }
-  }).observe({ type: "long-animation-frame", buffered: true });
-  window.__loafSupported = true;
-} else {
-  window.__loafSupported = false;
-}
+// One tested serializer reads attribution from each frame's script records.
+installLayoutObserver(window);
 </script>
 </body>
 </html>

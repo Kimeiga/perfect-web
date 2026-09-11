@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: reads per-script attribution, never a similarly named frame property
+ok 1 - reads per-script attribution, never a similarly named frame property
+  ---
+  duration_ms: 0.909672
+  type: 'test'
+  ...
+# Subtest: a measured zero remains different from missing evidence
+ok 2 - a measured zero remains different from missing evidence
+  ---
+  duration_ms: 0.18604
+  type: 'test'
+  ...
+# Subtest: zero long frames do not establish zero layout or unsupported attribution
+ok 3 - zero long frames do not establish zero layout or unsupported attribution
+  ---
+  duration_ms: 0.089165
+  type: 'test'
+  ...
+# Subtest: a frame with no attributed scripts is unobserved
+ok 4 - a frame with no attributed scripts is unobserved
+  ---
+  duration_ms: 0.189376
+  type: 'test'
+  ...
+# Subtest: missing script list is preserved as unavailable, not an observed zero
+ok 5 - missing script list is preserved as unavailable, not an observed zero
+  ---
+  duration_ms: 0.507425
+  type: 'test'
+  ...
+# Subtest: partial attribution retains its subtotal and coverage gap
+ok 6 - partial attribution retains its subtotal and coverage gap
+  ---
+  duration_ms: 0.156456
+  type: 'test'
+  ...
+# Subtest: later frames can supply evidence missing from the first
+ok 7 - later frames can supply evidence missing from the first
+  ---
+  duration_ms: 0.196837
+  type: 'test'
+  ...
+# Subtest: invalid duration undefined is not coerced into a measurement
+ok 8 - invalid duration undefined is not coerced into a measurement
+  ---
+  duration_ms: 0.147492
+  type: 'test'
+  ...
+# Subtest: invalid duration null is not coerced into a measurement
+ok 9 - invalid duration null is not coerced into a measurement
+  ---
+  duration_ms: 0.211829
+  type: 'test'
+  ...
+# Subtest: invalid duration NaN is not coerced into a measurement
+ok 10 - invalid duration NaN is not coerced into a measurement
+  ---
+  duration_ms: 0.296658
+  type: 'test'
+  ...
+# Subtest: invalid duration Infinity is not coerced into a measurement
+ok 11 - invalid duration Infinity is not coerced into a measurement
+  ---
+  duration_ms: 0.110477
+  type: 'test'
+  ...
+# Subtest: invalid duration -1 is not coerced into a measurement
+ok 12 - invalid duration -1 is not coerced into a measurement
+  ---
+  duration_ms: 0.056576
+  type: 'test'
+  ...
+# Subtest: invalid duration 0 is not coerced into a measurement
+ok 13 - invalid duration 0 is not coerced into a measurement
+  ---
+  duration_ms: 0.042304
+  type: 'test'
+  ...
+# Subtest: recording keeps attribution metadata without retaining a browser window
+ok 14 - recording keeps attribution metadata without retaining a browser window
+  ---
+  duration_ms: 0.114934
+  type: 'test'
+  ...
+# Subtest: malformed entry and summary input fail explicitly
+ok 15 - malformed entry and summary input fail explicitly
+  ---
+  duration_ms: 0.328626
+  type: 'test'
+  ...
+# Subtest: unsupported observer is distinct from an empty observing buffer
+ok 16 - unsupported observer is distinct from an empty observing buffer
+  ---
+  duration_ms: 0.121614
+  type: 'test'
+  ...
+# Subtest: observer integration uses the same serializer as the unit tests
+ok 17 - observer integration uses the same serializer as the unit tests
+  ---
+  duration_ms: 0.263477
+  type: 'test'
+  ...
+# Subtest: observer installation failure cannot be reported as unsupported or clean
+ok 18 - observer installation failure cannot be reported as unsupported or clean
+  ---
+  duration_ms: 0.904515
+  type: 'test'
+  ...
+# Subtest: both actual spike pages install the shared, tested instrumentation
+ok 19 - both actual spike pages install the shared, tested instrumentation
+  ---
+  duration_ms: 8.27081
+  type: 'test'
+  ...
+# Subtest: harness closes its server when browser startup fails
+ok 20 - harness closes its server when browser startup fails
+  ---
+  duration_ms: 64.300778
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 126.705686

@@ -32,6 +32,8 @@
 <div id="out">not run</div>
 
 <script type="module">
+import { installLayoutObserver } from "./loaf.js";
+
 const COUNT = Number(new URLSearchParams(location.search).get("n") ?? 400);
 
 const grid = document.getElementById("grid");
@@ -124,24 +126,8 @@ window.__run = () => {
   return { mode: "phased", elements: COUNT, ms: r.ms, checksum: r.acc };
 };
 
-window.__loaf = [];
-if ("PerformanceObserver" in window &&
-    PerformanceObserver.supportedEntryTypes?.includes("long-animation-frame")) {
-  new PerformanceObserver((list) => {
-    for (const e of list.getEntries()) {
-      window.__loaf.push({
-        duration: e.duration,
-        blockingDuration: e.blockingDuration,
-        forcedStyleAndLayoutDuration: e.forcedStyleAndLayoutDuration,
-        renderStart: e.renderStart,
-        styleAndLayoutStart: e.styleAndLayoutStart,
-      });
-    }
-  }).observe({ type: "long-animation-frame", buffered: true });
-  window.__loafSupported = true;
-} else {
-  window.__loafSupported = false;
-}
+// One tested serializer reads attribution from each frame's script records.
+installLayoutObserver(window);
 </script>
 </body>
 </html>

@@ -1,0 +1,100 @@
+{
+  "environment": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "kind": "instrumentation smoke test, not performance comparison",
+  "delivery": "in-memory module and simulated query string",
+  "module_sha256": "06b9c84fcae92ac17f0a4b7f7e0c5ea40424fd7081d2df5a6e714f3f6b39a4f3",
+  "modes": {
+    "thrash": {
+      "runs": [
+        {
+          "mode": "thrash",
+          "elements": 1200,
+          "ms": 2525.899999999907,
+          "checksum": 178800
+        },
+        {
+          "mode": "thrash",
+          "elements": 1200,
+          "ms": 2696,
+          "checksum": 178800
+        },
+        {
+          "mode": "thrash",
+          "elements": 1200,
+          "ms": 2908.399999999907,
+          "checksum": 178800
+        }
+      ],
+      "observation": "observing",
+      "attribution": {
+        "state": "observed",
+        "frameCount": 3,
+        "reportedScripts": 3,
+        "missingScripts": 0,
+        "framesWithoutScripts": 0,
+        "reportedForcedStyleAndLayoutDuration": 8070
+      },
+      "raw": [
+        {
+          "framePropertyType": "undefined",
+          "scriptDurations": [
+            2504
+          ]
+        },
+        {
+          "framePropertyType": "undefined",
+          "scriptDurations": [
+            2678
+          ]
+        },
+        {
+          "framePropertyType": "undefined",
+          "scriptDurations": [
+            2888
+          ]
+        }
+      ]
+    },
+    "phased": {
+      "runs": [
+        {
+          "mode": "phased",
+          "elements": 1200,
+          "ms": 2.3999999999068677,
+          "checksum": 178800
+        },
+        {
+          "mode": "phased",
+          "elements": 1200,
+          "ms": 1.400000000372529,
+          "checksum": 178800
+        },
+        {
+          "mode": "phased",
+          "elements": 1200,
+          "ms": 4.300000000279397,
+          "checksum": 178800
+        }
+      ],
+      "observation": "observing",
+      "attribution": {
+        "state": "unobserved",
+        "frameCount": 0,
+        "reportedScripts": 0,
+        "missingScripts": 0,
+        "framesWithoutScripts": 0,
+        "reportedForcedStyleAndLayoutDuration": null
+      },
+      "raw": []
+    }
+  },
+  "browser": "144.0.7559.96",
+  "positive_control_passed": true,
+  "limits": [
+    "One installed Chromium build on one container",
+    "In-memory delivery does not test HTTP loading when --inline is selected",
+    "Not the historical Chrome 150 build; not Safari, Firefox, or a real phone",
+    "No LoAF records is unobserved attribution, not a zero-layout proof",
+    "Wall-clock values are raw smoke-test context, not speedup claims"
+  ]
+}

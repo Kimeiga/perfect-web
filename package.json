@@ -9,6 +9,8 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "spike:marko": "bash spikes/marko-stream-resume/run.sh"
+    "spike:marko": "bash spikes/marko-stream-resume/run.sh",
+    "test:layout-attribution": "node --test spikes/layout-phase-scheduler/test/loaf.test.mjs",
+    "test:failure-census": "python3 research/failures/tools/validate.py && python3 -m unittest discover -s research/failures/tools -p 'test_*.py' -v"
   }
 }
