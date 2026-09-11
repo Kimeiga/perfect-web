@@ -1,0 +1,27 @@
+name: failure-census
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Check census and countermodels
+        run: |
+          python3 research/failures/tools/validate.py
+          python3 -m unittest discover -s research/failures/tools -p 'test_*.py' -v
+      - name: Check instrumentation
+        run: |
+          node --check spikes/layout-phase-scheduler/measure.mjs
+          node --test spikes/layout-phase-scheduler/test/loaf.test.mjs

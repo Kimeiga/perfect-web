@@ -1,0 +1,17 @@
+{
+  "failures": 224,
+  "families": 24,
+  "coverage": {
+    "partially covered": 42,
+    "specified but unproven": 120,
+    "missing": 57,
+    "intentionally outside scope": 3,
+    "covered": 2
+  },
+  "obligations": {
+    "CF": 72,
+    "RT": 72
+  },
+  "evidence_anchors": 91,
+  "claim": "structural consistency only; not proof of implementation"
+}
