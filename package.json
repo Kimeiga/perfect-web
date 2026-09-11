@@ -8,6 +8,11 @@
   "engines": {
     "node": ">=22.12.0"
   },
+  "pnpm": {
+    "overrides": {
+      "nanoid@<3.3.18": "3.3.18"
+    }
+  },
   "scripts": {
     "spike:marko": "bash spikes/marko-stream-resume/run.sh",
     "test:layout-attribution": "node --test spikes/layout-phase-scheduler/test/loaf.test.mjs",
