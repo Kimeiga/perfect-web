@@ -1,0 +1,42 @@
+name: fix-nanoid-audit
+
+on:
+  push:
+    branches: ["fix/licenses-and-wasmtime-audit"]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/licenses-and-wasmtime-audit
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Raise only nanoid 3.x to the patched release
+        run: |
+          pnpm update nanoid@3.3.18 -r --lockfile-only
+          git diff -- pnpm-lock.yaml
+      - name: Finalize targeted remediation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("docs/research/technology-matrix.md")
+          text = path.read_text().replace(
+              "| **Wasmtime 47.0.4** | typed component interfaces, host-granted capabilities, fuel/epoch limits | stable, released 2026-07-31 |",
+              "| **Wasmtime 47.0.4** | typed component interfaces, host-granted capabilities, fuel/epoch limits | stable |",
+          )
+          path.write_text(text)
+          PY
+          git rm .github/workflows/fix-nanoid-audit.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml docs/research/technology-matrix.md
+          git commit -m "Patch transitive nanoid advisory"
+          git push
