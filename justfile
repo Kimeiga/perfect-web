@@ -3,7 +3,9 @@
 # as milestones make them applicable; unimplemented ones fail loudly with the
 # milestone that will provide them, rather than silently succeeding.
 
-set shell := ["bash", "-uc"]
+# A report filter must not turn a failed producer into a successful gate.
+# errexit also stops grouped evidence commands before later summaries run.
+set shell := ["bash", "-euo", "pipefail", "-c"]
 set positional-arguments
 
 toolchain_bin := justfile_directory() / ".toolchain/prefix/bin"
@@ -62,6 +64,11 @@ audit:
 # Tests
 # ---------------------------------------------------------------------------
 
+# Verify real recipe exit statuses with isolated, deterministic failing producers.
+# This tests the harness, not the compiler or the browser.
+evidence-gates:
+    @python3 -m unittest discover -s scripts/tests -p 'test_evidence_gates.py' -v
+
 test: test-unit test-compile
 
 test-unit:
@@ -95,7 +102,7 @@ test-compile:
 # table plus the accepted neighbours that stop the checker collapsing into
 # "any build difference means reload".
 resume-matrix:
-    @cargo test --quiet -p pw-resume 2>&1 | grep -E 'test result' | head -3
+    @cargo test --quiet -p pw-resume 2>&1 | grep -E 'test result' | sed -n '1,3p'
     @echo "  6 fuzz targets, 22000 generated cases, 0 violations"
     @echo "  Structured generation seeded from the matrix — NOT coverage-guided:"
     @echo "  no instrumentation, no corpus evolution, no branch guidance. It"
@@ -474,6 +481,6 @@ rq-row-polymorphism:
 # ---------------------------------------------------------------------------
 
 # The one command that must pass for the current milestone's gate.
-ci: fmt-check lint case-check test-unit test-compile
+ci: evidence-gates fmt-check lint case-check test-unit test-compile
     @echo ""
     @echo "ci: OK"
