@@ -1,0 +1,35 @@
+# Temporary review helper. Remove before merging the evidence-gate repair.
+name: source-review-snapshot
+on:
+  push:
+    branches: [fix/evidence-gates-2026-09-15]
+    paths: [.github/workflows/source-review-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6
+      - name: Archive tracked source and test runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --prefix=perfect-web/ HEAD > "$RUNNER_TEMP/source.tar.gz"
+          cp "$(command -v just)" "$RUNNER_TEMP/just"
+          just --version > "$RUNNER_TEMP/runner-version.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: source-review-snapshot
+          path: |
+            ${{ runner.temp }}/source.tar.gz
+            ${{ runner.temp }}/just
+            ${{ runner.temp }}/runner-version.txt
+            ${{ runner.temp }}/source-commit.txt
+          retention-days: 1
+          if-no-files-found: error
