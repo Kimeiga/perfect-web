@@ -211,11 +211,11 @@ mod type_ref {
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct DeclaredType {
         head: String,
-        args: Vec<String>,
+        args: Vec<DeclaredType>,
     }
 
     impl DeclaredType {
-        pub fn new(head: impl Into<String>, args: Vec<String>) -> DeclaredType {
+        pub fn new(head: impl Into<String>, args: Vec<DeclaredType>) -> DeclaredType {
             DeclaredType {
                 head: head.into(),
                 args,
@@ -229,16 +229,24 @@ mod type_ref {
             if self.args.is_empty() {
                 self.head.clone()
             } else {
-                format!("{}<{}>", self.head, self.args.join(", "))
+                format!(
+                    "{}<{}>",
+                    self.head,
+                    self.args
+                        .iter()
+                        .map(Self::written)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
         }
 
-        /// The arguments: `["MenuItem"]`.
+        /// The complete argument types, recursively, in source order.
         ///
         /// `{#each xs as x}` needs exactly this — without it a loop binding has
         /// no type, which means a resumable handler inside a loop has no
         /// capture schema (`PW5016`), so the store demo could not use one.
-        pub fn args(&self) -> &[String] {
+        pub fn args(&self) -> &[DeclaredType] {
             &self.args
         }
 
@@ -435,12 +443,9 @@ pub struct Decl {
     pub name_span: Span,
     pub kind: DeclKind,
     pub params: Vec<Param>,
-    /// The declared return type's head, without arguments: `Result`.
-    pub ret: Option<String>,
-    /// Its type arguments, in order: `["Store", "StoreError"]`. Kept separately
-    /// because `Result<T, E>`'s error side is a distinct manifest field, and a
-    /// name with the arguments stripped cannot supply it.
-    pub ret_args: Vec<String>,
+    /// The entire declared return annotation, including nested arguments.
+    /// `None` means no annotation, not an annotation that failed to resolve.
+    pub ret: Option<DeclaredType>,
     /// The variants, when this declaration defines an algebraic data type.
     pub variants: Option<Vec<VariantDef>>,
     /// The fields, when this declaration defines a record.

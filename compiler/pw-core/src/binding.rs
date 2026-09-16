@@ -227,8 +227,15 @@ impl Interface {
                 // reason `DeclaredType` exists.
                 .map(|p| p.ty.as_ref().map(|t| t.written()))
                 .collect(),
-            returns: decl.ret.clone(),
-            returns_args: decl.ret_args.clone(),
+            returns: decl
+                .ret
+                .as_ref()
+                .map(|t| t.constructor_head_only().to_string()),
+            returns_args: decl
+                .ret
+                .as_ref()
+                .map(|t| t.args().iter().map(|a| a.written()).collect())
+                .unwrap_or_default(),
         }
     }
 }

@@ -99,10 +99,10 @@ impl Signatures {
                                 effects: vec![],
                                 label: label_from_return(
                                     Some(ty.constructor_head_only()),
-                                    ty.args(),
+                                    &ty.args().iter().map(|t| t.written()).collect::<Vec<_>>(),
                                 ),
                                 returns: Some(ty.constructor_head_only().to_string()),
-                                returns_args: ty.args().to_vec(),
+                                returns_args: ty.args().iter().map(|t| t.written()).collect(),
                                 params: vec![Some(decl.name.clone())],
                             },
                         );
@@ -128,9 +128,23 @@ impl Signatures {
                         .iter()
                         .map(|e| e.written.clone())
                         .collect(),
-                    label: label_from_return(decl.ret.as_deref(), &decl.ret_args),
-                    returns: decl.ret.clone(),
-                    returns_args: decl.ret_args.clone(),
+                    label: label_from_return(
+                        decl.ret.as_ref().map(|t| t.constructor_head_only()),
+                        &decl
+                            .ret
+                            .as_ref()
+                            .map(|t| t.args().iter().map(|a| a.written()).collect::<Vec<_>>())
+                            .unwrap_or_default(),
+                    ),
+                    returns: decl
+                        .ret
+                        .as_ref()
+                        .map(|t| t.constructor_head_only().to_string()),
+                    returns_args: decl
+                        .ret
+                        .as_ref()
+                        .map(|t| t.args().iter().map(|a| a.written()).collect())
+                        .unwrap_or_default(),
                     params: decl
                         .params
                         .iter()

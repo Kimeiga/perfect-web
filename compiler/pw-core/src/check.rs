@@ -664,10 +664,10 @@ fn resource_value_type(
     ) {
         return None;
     }
-    match decl.ret.as_deref() {
-        Some("Result") => decl.ret_args.first().cloned(),
-        Some(other) => Some(other.to_string()),
-        None => None,
+    let ty = decl.ret.as_ref()?;
+    match ty.constructor_head_only() {
+        "Result" => ty.args().first().map(|t| t.written()),
+        _ => Some(ty.written()),
     }
 }
 

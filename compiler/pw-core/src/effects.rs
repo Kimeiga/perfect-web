@@ -1216,7 +1216,6 @@ mod tests {
             kind: DeclKind::View,
             params: vec![],
             ret: None,
-            ret_args: vec![],
             variants: None,
             fields: None,
             opaque_of: None,

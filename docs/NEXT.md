@@ -2,6 +2,26 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+## 2026-09-15 follow-up: recursive written-type prerequisite repaired
+
+The signature migration exposed a prerequisite: `DeclaredType` stored generic
+arguments as strings and `resolved::resolve` refused nested arguments. The parser
+already knows their structure, so [ADR-0028](DECISIONS/ADR-0028-recursive-written-types-before-signature-cutover.md)
+keeps it through lowering rather than adding another type parser. Parameters,
+record fields and return annotations now share that recursive representation.
+`Decl.ret_args` is removed; manifests preserve complete direct return types.
+
+The resolver now enforces the arity of built-in type constructors, refuses a
+qualified non-type declaration, and recognizes the grammar's unit spelling.
+[Evidence](evidence/E9/recursive-written-types-2026-09-15.md) records the five
+initial failing regressions and the broader tests. This closes only that
+prerequisite, not the signature cutover, E9-V1..V6, or E10-I.
+
+Next remains **the atomic resolved-signature migration** below, followed by
+argument inference/unification and declared-return checking. The existing
+`3b3-signature-resolved-types` branch is not merged: it still has dual fields.
+Callable generics and higher-kinded parameters are not newly implemented here.
+
 ---
 
 ## Now: E10-A — the first backend slice

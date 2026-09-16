@@ -170,7 +170,7 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
                 "pub fun {}( {} ) : total {}\n{}\n",
                 value_name(&decl.name),
                 params.join(", "),
-                type_name(ret),
+                type_name(&ret.written()),
                 indent(&expr, 1),
             )))
         }

@@ -88,7 +88,10 @@ impl<'a> Labels<'a> {
         // A parameter whose written type carries a restriction.
         for p in &decl.params {
             if let Some(ty) = &p.ty
-                && let Some(l) = label_of_type(ty.constructor_head_only(), ty.args())
+                && let Some(l) = label_of_type(
+                    ty.constructor_head_only(),
+                    &ty.args().iter().map(|t| t.written()).collect::<Vec<_>>(),
+                )
             {
                 me.bindings.insert(p.name.clone(), (l, p.span.clone()));
             }
@@ -364,7 +367,6 @@ fn dummy() -> Decl {
         kind: crate::hir::DeclKind::Fn,
         params: vec![],
         ret: None,
-        ret_args: vec![],
         variants: None,
         fields: None,
         policies: vec![],

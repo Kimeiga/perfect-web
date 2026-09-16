@@ -160,9 +160,7 @@ pub fn callable_of(
         params.push(ty(&p.ty.as_ref()?.written())?);
     }
     let result = match &decl.ret {
-        Some(head) => {
-            ty(&crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone()).written())?
-        }
+        Some(written) => ty(&written.written())?,
         None => ir::Type::Unit,
     };
     Some(ir::CallableImport {

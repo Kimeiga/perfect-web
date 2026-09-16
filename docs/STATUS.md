@@ -21,6 +21,17 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## completed gate items
 
+- **2026-09-15 compiler follow-up:** recursive written types and one complete
+  return annotation now survive lowering. Nested arguments resolve recursively;
+  built-in arity and the qualified type namespace are checked; unit spelling is
+  recognized. Direct generic resource results retain their arguments in manifests.
+  The local compiler run passed **178 unit tests and 399 integration tests**
+  across all 51 integration targets, including 11 new regressions. Formatter,
+  compiler Clippy, and the accepted/store corpus checks passed. See
+  [the bounded E9 evidence](evidence/E9/recursive-written-types-2026-09-15.md).
+  This does not complete ordinary argument/return checking or the signature
+  migration. The patch's own CI must establish workspace and audit results.
+
 - The Web Failure Census and layout-attribution repair were merged in
   `c10b825de40528a591e101653218ddff52e9ec6e`. The inventory contains 224 failure
   records and 72 source/build plus 72 runtime obligations. These are research
@@ -70,7 +81,7 @@ just audit
 python3 research/failures/tools/validate.py
 python3 -m unittest discover -s research/failures/tools -p 'test_*.py' -v
 node --test spikes/layout-phase-scheduler/test/loaf.test.mjs
-cargo test -p pw-core --test resolved_types --test call_arity --test canonical_abi --test one_comparison --test evidence_is_current
+cargo test -p pw-core --test recursive_declared_types --test resolved_types --test call_arity --test canonical_abi --test one_comparison --test evidence_is_current
 ```
 
 `just evidence-gates` requires Python 3 and `just`, but not Rust or browsers. It
@@ -84,6 +95,12 @@ The September 15 local review environment was Linux x86_64 with Python 3.13.5,
 Node 22.16.0 and just 1.58.0. Rust was not available locally; actual Rust builds
 and dependency auditing are checked through GitHub Actions, separately from the
 injected-producer tests. No compiler or browser behavior is inferred from mocks.
+
+The compiler follow-up used a verified, isolated copy of the pinned Rust 1.97.1
+and its locked registry dependencies. Its real local compiler tests are distinct
+from the earlier shell failure-injection tests. Long full-suite commands exceeded
+the review runner's execution window, so all compiler integration targets were
+run to completion in explicit batches; the incomplete attempts are not passes.
 
 Changing the parent recipe shell does not repair every nested shell, conditional,
 or independently invoked script. Redirected evidence files may still be partial

@@ -249,13 +249,10 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
     }
 
     let ret = match &decl.ret {
-        Some(head) => {
-            let written = crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone());
-            match f.ty_of(&written, &span) {
-                Lowering::Lowered(t) => t,
-                other => return other.map(|_| unreachable!()),
-            }
-        }
+        Some(written) => match f.ty_of(written, &span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        },
         None => Type::Unit,
     };
 
@@ -678,10 +675,14 @@ impl<'a> Lower<'a> {
         // What the callee returns, from that signature. Not inferred here.
         let ty = match &sig.returns {
             Some(head) => {
-                let written = crate::hir::DeclaredType::new(head.clone(), sig.returns_args.clone());
+                let written = if sig.returns_args.is_empty() {
+                    head.clone()
+                } else {
+                    format!("{}<{}>", head, sig.returns_args.join(", "))
+                };
                 // From the CALLEE's unit. See `ty_written_in`.
                 let at = resolved.map(|d| d.unit).unwrap_or(self.unit);
-                match self.ty_written_in(at, &written.written(), &span) {
+                match self.ty_written_in(at, &written, &span) {
                     Lowering::Lowered(t) => t,
                     other => return other.map(|_| unreachable!()),
                 }

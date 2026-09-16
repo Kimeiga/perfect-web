@@ -163,9 +163,10 @@ fn the_element_type_is_the_argument_and_not_the_carrier() {
         .map(|(_, d)| d.clone())
         .expect("Items is declared");
 
-    assert_eq!(items.ret.as_deref(), Some("Result"));
+    let ret = items.ret.as_ref().expect("declared return type");
+    assert_eq!(ret.constructor_head_only(), "Result");
     assert_eq!(
-        items.ret_args,
+        ret.args().iter().map(|t| t.written()).collect::<Vec<_>>(),
         vec!["List<ItemId>".to_string(), "String".to_string()],
         "the return type's arguments must keep their own arguments"
     );
