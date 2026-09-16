@@ -1,0 +1,24 @@
+name: review-current-branch
+on:
+  push:
+    branches: [fix/resolved-signatures-2026-09-15]
+    paths: [.github/workflows/review-current-branch.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Archive
+        shell: bash
+        run: git archive --format=tar.gz --prefix=perfect-web/ HEAD > "$RUNNER_TEMP/source.tar.gz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: current-branch-source
+          path: ${{ runner.temp }}/source.tar.gz
+          retention-days: 1
+          if-no-files-found: error
