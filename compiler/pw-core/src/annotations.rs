@@ -38,8 +38,8 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let at = hir.decl_span(id);
         let module = module_of(hir, id);
         let types = crate::infer::Types::of_body(sigs, decl, body, module);
-        optional_used_as_present(hir, sigs, body, decl, &at, out);
-        unchecked_cast(hir, &types, body, decl, &at, out);
+        optional_used_as_present(hir, &types, body, decl, &at, out);
+        unchecked_cast(hir, sigs, &types, body, decl, &at, out);
         handler_matches_event(hir, body, sigs, decl, module, &at, out);
     }
 }
@@ -63,7 +63,7 @@ fn module_of(hir: &Hir, decl: crate::hir::DeclId) -> Option<&str> {
 
 fn optional_used_as_present(
     hir: &Hir,
-    sigs: &Signatures,
+    types: &crate::infer::Types<'_>,
     body: &Body,
     decl: &Decl,
     at: &Span,
@@ -90,26 +90,17 @@ fn optional_used_as_present(
         let crate::hir::Pattern::Bind { name, .. } = body.pat(*pat) else {
             continue;
         };
-        let annotated = ty.and_then(|t| body.types.get(t.index())).and_then(|t| {
-            (t.path == "Option")
-                .then(|| t.args.first().and_then(|a| body.types.get(a.index())))
-                .flatten()
-                // Internal invariant: this closure only runs inside
-                // `ty.and_then(..)`, so `ty` is `Some` by construction.
-                .map(|inner| (written(body, ty.expect("annotated")), inner.path.clone()))
-        });
-        let inferred = || {
-            let init = (*init)?;
-            let sig = sigs.by_path(&crate::infer::path_of(body, callee_of(body, init)?))?;
-            if sig.returns.as_deref() != Some("Option") {
-                return None;
-            }
-            let inner = sig.returns_args.first()?.clone();
-            Some((format!("Option<{inner}>"), inner))
-        };
-        let Some((written, inner)) = annotated.or_else(inferred) else {
+        let _ = (ty, init);
+        let Some(ty) = types.bindings().get(name) else {
             continue;
         };
+        if ty.as_builtin() != Some(crate::resolved::Builtin::Option) {
+            continue;
+        }
+        let Some(inner) = ty.args().first() else {
+            continue;
+        };
+        let (written, inner) = (ty.display_name(), inner.display_name());
         optional.push((name.clone(), written, inner, body.expr_span(id)));
     }
     if optional.is_empty() {
@@ -166,8 +157,10 @@ fn optional_used_as_present(
 
 // --- R-009: a cast where a decode belongs -----------------------------------
 
+#[allow(clippy::too_many_arguments)]
 fn unchecked_cast(
     hir: &Hir,
+    sigs: &Signatures,
     types: &crate::infer::Types<'_>,
     body: &Body,
     decl: &Decl,
@@ -182,7 +175,10 @@ fn unchecked_cast(
         // Reading only parameters and annotated `let`s meant `let same = raw`
         // produced a value the rule no longer recognised as external — the
         // same narrowness privacy labels had, in a different analysis.
-        if types.of(body, *value).as_deref() != Some("Unknown") {
+        if !types.of(body, *value).is_some_and(|t| {
+            sigs.language_type("decode", "Unknown")
+                .is_some_and(|unknown| t.same_as(&unknown))
+        }) {
             continue;
         }
         let name = match body.expr(*value) {
@@ -254,8 +250,9 @@ fn handler_matches_event(
             // would make the rule depend on an accident of the program.
             let Some(expected) = sigs
                 .by_path(&format!("{EVENTS_MODULE}.{event}"))
-                .and_then(|s| s.params.first().cloned())
-                .flatten()
+                .and_then(|s| s.params.first())
+                .and_then(Option::as_ref)
+                .and_then(crate::resolved::TypeResolution::resolved)
             else {
                 continue;
             };
@@ -265,14 +262,15 @@ fn handler_matches_event(
             let Expr::Name(handler) = body.expr(e) else {
                 continue;
             };
-            let Some(actual) = module
-                .and_then(|m| sigs.by_path(&format!("{m}.{handler}")))
-                .and_then(|s| s.params.first().cloned())
-                .flatten()
+            let Some(actual) = sigs
+                .in_module(module, handler)
+                .and_then(|s| s.params.first())
+                .and_then(Option::as_ref)
+                .and_then(crate::resolved::TypeResolution::resolved)
             else {
                 continue;
             };
-            if actual == expected {
+            if actual.same_as(expected) {
                 continue;
             }
             out.push(Diagnostic {
@@ -321,14 +319,6 @@ fn written(body: &Body, id: TypeRefId) -> String {
     }
     let args: Vec<String> = t.args.iter().map(|a| written(body, *a)).collect();
     format!("{}<{}>", t.path, args.join(", "))
-}
-
-/// The callee of a call expression, if this is one.
-fn callee_of(body: &Body, id: crate::hir::ExprId) -> Option<crate::hir::ExprId> {
-    match body.expr(id) {
-        Expr::Call { callee, .. } => Some(*callee),
-        _ => None,
-    }
 }
 
 fn lower_head(t: &str) -> String {

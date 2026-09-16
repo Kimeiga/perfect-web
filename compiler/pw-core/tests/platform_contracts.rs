@@ -123,15 +123,19 @@ fn every_platform_signature_is_internally_consistent() {
                 problems.push(format!("{path}: effect `{e}` has an empty argument"));
             }
         }
-        // A return type head with no arguments where one is required.
-        if matches!(sig.returns.as_deref(), Some("Option" | "Result" | "List"))
-            && sig.returns_args.is_empty()
+        // Every written type must resolve completely, not merely have a
+        // nonempty outer argument list. The resolver owns formation/arity.
+        for (position, resolution) in sig.params.iter().enumerate() {
+            if let Some(r) = resolution
+                && !r.is_resolved()
+            {
+                problems.push(format!("{path}: argument {position}: {r}"));
+            }
+        }
+        if let Some(r) = &sig.returns
+            && !r.is_resolved()
         {
-            problems.push(format!(
-                "{path}: returns `{}` with no type argument — a bare `Option` \
-                 does not say what may be absent",
-                sig.returns.as_deref().unwrap_or("?")
-            ));
+            problems.push(format!("{path}: result: {r}"));
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n  "));
@@ -371,7 +375,9 @@ fn the_trusted_platform_contract_is_hashed() {
     // declarations wrapping `String`, `add_to_cart` passed the platform's into
     // the application's, and nothing compared them. Twenty-five files now
     // import `capability.SessionId`.
-    const EXPECTED: u64 = 0x79839db0aaef03dd;
+    // 2026-09-16: List explicitly imports decode.Unknown and decode.Decoder;
+    // all written platform parameter/result types now resolve in their module.
+    const EXPECTED: u64 = 0x3408b3ced959314e;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

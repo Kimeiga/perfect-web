@@ -317,10 +317,10 @@ pub enum Ownership {
 /// means nothing outside it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Signature {
-    /// Parameter types, as written: `["SessionId", "MenuItemId", "PositiveInt"]`.
-    pub params: Vec<String>,
-    /// The result type, as written.
-    pub result: String,
+    /// Stable resolved parameter identities, preserving nominal and generic distinctions.
+    pub params: Vec<crate::resolved::StableTypeId>,
+    /// The resolved result identity, not a source spelling.
+    pub result: crate::resolved::StableTypeId,
 }
 
 impl Signature {
@@ -328,7 +328,15 @@ impl Signature {
     /// disagreement about an ABI reads as two shapes rather than two debug
     /// dumps.
     pub fn render(&self) -> String {
-        format!("({}) -> {}", self.params.join(", "), self.result)
+        format!(
+            "({}) -> {}",
+            self.params
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", "),
+            self.result
+        )
     }
 }
 
@@ -593,6 +601,7 @@ fn component_kind(kind: DeclKind) -> Option<&'static str> {
 #[allow(clippy::too_many_arguments)]
 fn host_calls(
     inference: &Inference<'_>,
+    sigs: &Signatures,
     hirs: &[&Hir],
     unit: usize,
     hir: &Hir,
@@ -625,9 +634,13 @@ fn host_calls(
         // a data artifact (ADR-0018) and a `DefId` means nothing outside this
         // compiler, so the closure returns `Type::Unit` and the written forms
         // are read off the declaration below.
+        let Some(signature) = sigs.by_def(def) else {
+            continue;
+        };
         let Some(callable) = crate::backend::callable_of(
             decl,
             def,
+            signature,
             |_| Some(crate::backend::ir::Type::Unit),
             |effect| match Capability::resolve(effect, declared_types, ontology) {
                 Ok(c) => Some(c),
@@ -639,6 +652,24 @@ fn host_calls(
         ) else {
             continue;
         };
+        // Preserve every slot. An unavailable semantic identity must not
+        // become a shorter signature or silently acquire a Unit result.
+        let Some(params) = signature
+            .params
+            .iter()
+            .map(|p| sigs.stable_type(p.as_ref()?.resolved()?))
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        let result = match &signature.returns {
+            Some(r) => match r.resolved().and_then(|t| sigs.stable_type(t)) {
+                Some(t) => t,
+                None => continue,
+            },
+            None => crate::resolved::StableTypeId::Primitive("Unit".into()),
+        };
+        let semantic_signature = Signature { params, result };
         if !seen.insert((callable.id.interface.clone(), callable.id.name.clone())) {
             continue;
         }
@@ -652,21 +683,7 @@ fn host_calls(
             name: callable.id.name,
             capability: caps.first().map(|c| c.name()).unwrap_or_default(),
             capabilities: caps,
-            signature: Some(Signature {
-                params: decl
-                    .params
-                    .iter()
-                    .map(|p| {
-                        p.ty.as_ref()
-                            .map(|t| t.written())
-                            .unwrap_or_else(|| "?".to_string())
-                    })
-                    .collect(),
-                result: match &decl.ret {
-                    Some(written) => written.written(),
-                    None => "()".to_string(),
-                },
-            }),
+            signature: Some(semantic_signature),
             owner: match callable.binding {
                 crate::backend::ir::ImportBinding::PlatformHost => Ownership::Platform,
                 _ => Ownership::External,
@@ -998,10 +1015,18 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // and have different ABIs, so an import keyed on the capability had
             // no signature it could carry. Each host operation the body calls
             // is its own import, with its own ABI and its own authority set.
-            let mut imports: BTreeSet<Import> =
-                host_calls(&inference, hirs, unit, hir, id, &declared_types, &ontology)
-                    .into_iter()
-                    .collect();
+            let mut imports: BTreeSet<Import> = host_calls(
+                &inference,
+                sigs,
+                hirs,
+                unit,
+                hir,
+                id,
+                &declared_types,
+                &ontology,
+            )
+            .into_iter()
+            .collect();
             for dep in component_calls(&inference, unit, hir, id, &components) {
                 imports.insert(dep);
             }
@@ -1016,13 +1041,21 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // capability is a property of an interface edge, so a component
             // with a remotable query and a handle-passing helper says so about
             // each rather than about itself.
-            // From the DECLARATION, not from `Signatures`. That lookup returned
-            // nothing for a `page`, `view` or `component` — `Signatures` covers
-            // `fn`, `query`, `command`, `subscription`, `resource` and `task` —
-            // so every page export fell through to the permissive default and
-            // came out `Transferable`. The right answer for this corpus,
-            // produced by a mechanism unrelated to its types.
-            let binding = crate::binding::binding_support(decl, &type_facts);
+            // Every executable declaration, including UI, has one resolved
+            // signature. Do not re-resolve the same written annotations here.
+            let binding = match sigs.by_def(crate::resolve::DefId { unit, decl: id.0 }) {
+                Some(signature) => crate::binding::binding_support(signature, &type_facts),
+                None => crate::binding::BindingSupport {
+                    local: crate::binding::LocalSupport::Direct,
+                    remote: crate::binding::RemoteSupport::Undetermined {
+                        positions: vec![crate::binding::Untransferable {
+                            position: "interface".into(),
+                            ty: None,
+                            reason: "the declaring module has no resolved signature".into(),
+                        }],
+                    },
+                },
+            };
             let exports = vec![Export {
                 name: decl.name.clone(),
                 kind: kind.to_string(),

@@ -1,6 +1,7 @@
 # Architecture
 
-Source map reviewed 2026-09-15 at `4a9bcddc095b3b4d0eac0e0c2ddb8a0143de03d9`.
+Source map reviewed 2026-09-16 from `49398dc02be6f2c3ea1a28fdfb77bf66c15266b6`
+with the resolved-signature cutover.
 This describes ownership and open boundaries, not a claim that every charter
 feature is implemented. [STATUS](STATUS.md) owns completion claims and
 [NEXT](NEXT.md) owns the current implementation order.
@@ -22,11 +23,17 @@ program. An operation's identity is distinct from the capabilities authorizing
 it (ADR-0026). Generated projections must not become independently maintained
 semantic authorities.
 
-A central boundary is still unfinished: `signatures.rs` retains written type
-heads, while recursive resolved-type machinery exists separately. NEXT requires
-an atomic migration of semantic consumers, followed by call argument and return
-checking. Adding another name-based compatibility checker would violate that
-order rather than complete it.
+`Signature` now owns recursive semantic parameter/return slots. Missing and
+unresolved annotations are explicit alternatives. `Interface` is a projection
+of that signature, not a second derivation from syntax. Member and boundary
+facts are keyed by resolved receiver identity; WIT and contract identities are
+derived projections. The remaining source-fragment readers use the language's
+existing type grammar, not independent string splitters (ADR-0030).
+
+Comprehensive ordinary-call argument/return checking remains unfinished. The
+backend's remaining internal value-layout approximations and E10-I integration
+are separate obligations; a resolved callable signature does not prove a full
+backend implementation.
 
 ## Runtime ownership
 

@@ -141,7 +141,7 @@ fn the_scan_finds_a_call_that_is_there() {
         "the scan found no call sites at all, which is not what the crate contains"
     );
     assert!(
-        found.iter().any(|s| s.starts_with("signatures.rs:")),
-        "the audited receiver-type discard is in `signatures.rs`: {found:?}"
+        found.contains("resolved.rs:resolve"),
+        "the authoritative resolver inspects each constructor before resolving all arguments: {found:?}"
     );
 }

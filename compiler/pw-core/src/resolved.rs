@@ -124,6 +124,18 @@ impl Builtin {
     }
 }
 
+/// A provenance-free key, derived only from an already resolved type.
+///
+/// Collections use this projection instead of deriving equality or ordering on
+/// `ResolvedType`, whose source spans must never participate in identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TypeKey {
+    Primitive(Primitive),
+    Builtin(Builtin, Vec<TypeKey>),
+    Nominal(DefId, Vec<TypeKey>),
+    Parameter { binder: DefId, index: u32 },
+}
+
 /// **What resolving a written type concluded.**
 ///
 /// Three-valued, like `Lowering`, `Encoding` and `MatchOutcome`, and for the
@@ -289,9 +301,22 @@ pub fn resolve(
     TypeResolution::Resolved(ResolvedType::nominal(def, args, span, written.clone()))
 }
 
+/// Recover a complete annotation from the lowered body type arena.
+/// This is a tree projection, not a parser for a printed type.
+pub fn written_in_body(body: &crate::hir::Body, id: crate::hir::TypeRefId) -> Option<DeclaredType> {
+    let ty = body.types.get(id.index())?;
+    Some(DeclaredType::new(
+        ty.path.clone(),
+        ty.args
+            .iter()
+            .map(|a| written_in_body(body, *a))
+            .collect::<Option<Vec<_>>>()?,
+    ))
+}
+
 /// Private internals, so *you must ask* is enforceable rather than encouraged.
 mod resolved_type {
-    use super::{Builtin, Primitive};
+    use super::{Builtin, Primitive, TypeKey};
     use crate::hir::{DeclaredType, Span};
     use crate::resolve::DefId;
 
@@ -455,29 +480,23 @@ mod resolved_type {
         /// underneath and are two types, which is the whole reason this module
         /// exists.
         pub fn same_as(&self, other: &ResolvedType) -> bool {
-            match (&self.what, &other.what) {
-                (What::Nominal { def: a, args: xs }, What::Nominal { def: b, args: ys }) => {
-                    a == b && xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| x.same_as(y))
+            self.semantic_key() == other.semantic_key()
+        }
+
+        /// The one identity projection. No source spelling or span is included.
+        pub fn semantic_key(&self) -> TypeKey {
+            match &self.what {
+                What::Primitive(p) => TypeKey::Primitive(*p),
+                What::Builtin { ctor, args } => {
+                    TypeKey::Builtin(*ctor, args.iter().map(Self::semantic_key).collect())
                 }
-                (What::Builtin { ctor: a, args: xs }, What::Builtin { ctor: b, args: ys }) => {
-                    a == b && xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| x.same_as(y))
+                What::Nominal { def, args } => {
+                    TypeKey::Nominal(*def, args.iter().map(Self::semantic_key).collect())
                 }
-                // By binder and position, never by spelling — `fn id<T>` and
-                // `fn id<U>` bind the same variable.
-                (
-                    What::Parameter {
-                        binder: a,
-                        index: i,
-                        ..
-                    },
-                    What::Parameter {
-                        binder: b,
-                        index: j,
-                        ..
-                    },
-                ) => a == b && i == j,
-                (What::Primitive(a), What::Primitive(b)) => a == b,
-                _ => false,
+                What::Parameter { binder, index, .. } => TypeKey::Parameter {
+                    binder: *binder,
+                    index: *index,
+                },
             }
         }
 
@@ -628,41 +647,47 @@ impl std::fmt::Display for StableTypeId {
 /// `None` when the declaration a nominal type names cannot be found, which is a
 /// program this build cannot describe rather than a type to guess at.
 pub fn stable(hirs: &[&crate::hir::Hir], t: &ResolvedType) -> Option<StableTypeId> {
-    let args = |xs: &[ResolvedType]| -> Option<Vec<StableTypeId>> {
-        xs.iter().map(|x| stable(hirs, x)).collect()
+    stable_with(t, &|def| {
+        let hir = hirs.get(def.unit)?;
+        let (id, decl) = hir.all_decls().find(|(id, _)| id.0 == def.decl)?;
+        let module = hir.module_of(id).unwrap_or_default();
+        Some(if module.is_empty() {
+            decl.name.clone()
+        } else {
+            format!("{module}.{}", decl.name)
+        })
+    })
+}
+
+/// The single recursive stable-identity projection. The supplied lookup reads
+/// declaration facts for an established DefId; it never resolves a name.
+pub(crate) fn stable_with(
+    t: &ResolvedType,
+    path: &impl Fn(DefId) -> Option<String>,
+) -> Option<StableTypeId> {
+    let args = || {
+        t.args()
+            .iter()
+            .map(|x| stable_with(x, path))
+            .collect::<Option<Vec<_>>>()
     };
     if let Some(p) = t.as_primitive() {
-        return Some(StableTypeId::Primitive(p.name().to_string()));
+        return Some(StableTypeId::Primitive(p.name().into()));
     }
     if let Some(b) = t.as_builtin() {
         return Some(StableTypeId::Builtin {
-            ctor: b.name().to_string(),
-            args: args(t.args())?,
+            ctor: b.name().into(),
+            args: args()?,
         });
     }
     if let Some((binder, index)) = t.parameter_binding() {
-        let hir = hirs.get(binder.unit)?;
-        let (id, decl) = hir.all_decls().find(|(id, _)| id.0 == binder.decl)?;
-        let module = hir.module_of(id).unwrap_or_default();
-        let path = match module.is_empty() {
-            true => decl.name.clone(),
-            false => format!("{module}.{}", decl.name),
-        };
         return Some(StableTypeId::Parameter {
-            binder: StableDeclId::new(path),
+            binder: StableDeclId::new(path(binder)?),
             index,
         });
     }
-    let def = t.def_id()?;
-    let hir = hirs.get(def.unit)?;
-    let (id, decl) = hir.all_decls().find(|(id, _)| id.0 == def.decl)?;
-    let module = hir.module_of(id).unwrap_or_default();
-    let path = match module.is_empty() {
-        true => decl.name.clone(),
-        false => format!("{module}.{}", decl.name),
-    };
     Some(StableTypeId::Declared {
-        path,
-        args: args(t.args())?,
+        path: path(t.def_id()?)?,
+        args: args()?,
     })
 }

@@ -123,3 +123,11 @@ continue quietly.
 Dead code is treated as a signal, not noise: the first `-D warnings` failure
 surfaced genuinely unused model surface, which was resolved by *using* it
 (`--explain`, a warning-level rule) rather than by silencing the lint.
+
+## 2026-09-16: resolved signature authority
+
+[ADR-0030](DECISIONS/ADR-0030-resolved-signature-authority.md): replace written
+signature types atomically with resolved identities, share semantic keys and
+stable projections, and keep missing/blocked/known slots distinct. Boundary
+privacy and WIT decisions consume the same signature. Does not close ordinary
+call/return typing or the component execution gate.

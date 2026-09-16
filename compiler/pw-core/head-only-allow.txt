@@ -16,13 +16,6 @@
 #   paired      the arguments are passed alongside, so nothing is discarded
 #   constructor the CONSTRUCTOR itself is the question, not what it carries
 
-infer.rs:of_body            paired       `element_of_written(head, args)` takes both halves; the split is the callee's parameter list, not a discard
-labels.rs:of_body           paired       `label_of_type(head, args)` takes both halves, and `Secret<Payments>` needs the argument to be a label at all
-signatures.rs:build         paired       `label_from_return(head, args)` takes both; `returns` and `returns_args` are two fields of one type by `Signature`'s own shape
-signatures.rs:build         constructor  a member's receiver is its NOMINAL type: `offsetWidth(el: ElementRef)` is a member of `ElementRef`, and a member of `List<X>` belongs to `List` however it is parameterised
 resolved.rs:resolve         constructor  the head is dispatched on — type parameter, primitive, builtin constructor, or declaration — and each branch then resolves `written.args()` in full. This is the one call site that reads the head in order to NOT discard the arguments: `List<MenuItem>` reaches the `List` branch and the branch resolves `MenuItem`. `resolution_reaches_every_argument_or_reports` is what says so, and `a_generic_differs_by_its_argument` is what would fail if the head became the answer
 
-binding.rs:of               paired       legacy Interface receives a head plus recursively rendered arguments from the single return annotation; no argument is discarded
-boundary.rs:build           constructor  the existing scoped map is constructor-keyed; retain its policy during this structural migration, without reparsing nested argument strings. Its resolved-identity replacement remains the next gate
-check.rs:resource_value_type constructor  distinguish a Result carrier from a direct resource value; return the complete payload type or complete direct type, never its head
 manifest.rs:split_result    constructor  split Result's complete value/error arguments into their distinct manifest roles; all other return types keep their complete written structure

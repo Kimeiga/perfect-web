@@ -97,7 +97,7 @@ fn manifest_of(
         return None;
     }
     let captures = crate::resume::capture_names_and_types(body, types, descriptor);
-    let capture_schema = schema_of(&captures);
+    let capture_schema = schema_of(&captures, types);
     Some(ResumeManifest {
         handler: handler_id(src, body, types, lambda, &capture_schema),
         capture_schema,
@@ -141,7 +141,7 @@ fn artifact_of(
             _ => None,
         })
         .collect();
-    let accepted: Vec<(String, Option<String>)> = declared
+    let accepted: Vec<(String, Option<crate::resolved::ResolvedType>)> = declared
         .iter()
         .filter(|(name, _)| {
             mentioned
@@ -151,9 +151,9 @@ fn artifact_of(
         .cloned()
         .collect();
 
-    let accepted_capture_schema = schema_of(&accepted);
+    let accepted_capture_schema = schema_of(&accepted, types);
     Some(HandlerArtifact {
-        handler: handler_id(src, body, types, lambda, &schema_of(&declared)),
+        handler: handler_id(src, body, types, lambda, &schema_of(&declared, types)),
         accepted_capture_schema,
         expected_document_schema: document_schema.to_string(),
         required_platform_abi: PLATFORM_ABI,
@@ -161,10 +161,21 @@ fn artifact_of(
     })
 }
 
-fn schema_of(captures: &[(String, Option<String>)]) -> String {
+fn schema_of(
+    captures: &[(String, Option<crate::resolved::ResolvedType>)],
+    types: &crate::infer::Types<'_>,
+) -> String {
     let text: Vec<String> = captures
         .iter()
-        .map(|(n, t)| format!("{n}:{}", t.as_deref().unwrap_or("?")))
+        .map(|(n, t)| {
+            format!(
+                "{n}:{}",
+                t.as_ref()
+                    .and_then(|t| types.stable_type(t))
+                    .map(|t| t.to_string())
+                    .unwrap_or_else(|| "?".into())
+            )
+        })
         .collect();
     hash(&text.join(","))
 }

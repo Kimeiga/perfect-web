@@ -13,6 +13,9 @@
 
 module store.ingest
 
+import decode.{ Unknown }
+import domain.{ Store }
+
 fn parse(raw: Unknown) -> Store !{} {
     // ERROR: unchecked cast at an external boundary.
     raw as Store

@@ -333,7 +333,9 @@ fn transitioned_fields(body: &Body, block: ExprId) -> Vec<(String, Span)> {
 
 /// Can the compositor animate this property? Answered by the platform package.
 fn compositable(sigs: &Signatures, property: &str) -> bool {
-    sigs.member_of("Style", &format!("set_{property}"))
+    sigs.language_type("browser", "Style")
+        .as_ref()
+        .and_then(|ty| sigs.member_of(ty, &format!("set_{property}")))
         .is_some_and(|s| s.effects.iter().any(|e| e == "animation.composite"))
 }
 
