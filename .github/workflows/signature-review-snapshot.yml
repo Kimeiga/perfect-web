@@ -1,0 +1,32 @@
+# Temporary read-only review helper. Remove before merging.
+name: signature-review-snapshot
+on:
+  push:
+    branches: [fix/signature-authority-2026-09-16]
+    paths: [.github/workflows/signature-review-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Archive reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --prefix=perfect-web/ HEAD > "$RUNNER_TEMP/source.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/source-revision.txt"
+          sha256sum "$RUNNER_TEMP/source.tar.gz" > "$RUNNER_TEMP/SHA256SUMS"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: signature-review-source
+          path: |
+            ${{ runner.temp }}/source.tar.gz
+            ${{ runner.temp }}/source-revision.txt
+            ${{ runner.temp }}/SHA256SUMS
+          retention-days: 1
+          if-no-files-found: error
