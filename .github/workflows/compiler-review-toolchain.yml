@@ -1,0 +1,37 @@
+# Temporary review helper; remove before merging. No repository write permission.
+name: compiler-review-toolchain
+on:
+  push:
+    branches: [fix/resolved-signatures-2026-09-15]
+    paths: [.github/workflows/compiler-review-toolchain.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Prepare pinned Rust and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLCHAIN=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+          rustup toolchain install "$TOOLCHAIN" --profile minimal --component rustfmt --component clippy --no-self-update
+          cargo +"$TOOLCHAIN" fetch --locked
+          mkdir -p "$RUNNER_TEMP/offline"
+          git archive --format=tar.gz --prefix=perfect-web/ HEAD > "$RUNNER_TEMP/offline/source.tar.gz"
+          TOOLROOT=$(dirname "$(dirname "$(rustup which --toolchain "$TOOLCHAIN" rustc)")")
+          tar -czf "$RUNNER_TEMP/offline/rust.tar.gz" -C "$TOOLROOT" bin lib
+          tar -czf "$RUNNER_TEMP/offline/registry.tar.gz" -C "$HOME/.cargo" registry
+          rustc +"$TOOLCHAIN" --version --verbose > "$RUNNER_TEMP/offline/versions.txt"
+          sha256sum "$RUNNER_TEMP/offline/"*.tar.gz > "$RUNNER_TEMP/offline/SHA256SUMS"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compiler-review-toolchain
+          path: ${{ runner.temp }}/offline/*
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
