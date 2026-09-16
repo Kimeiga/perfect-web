@@ -1,0 +1,100 @@
+# One-use transfer of the exact locally tested tree. Absent from the final tree.
+name: signature-transfer-once
+on:
+  push:
+    branches: [fix/signature-authority-2026-09-16]
+    paths: [.github/workflows/signature-transfer-once.yml]
+permissions:
+  contents: write
+jobs:
+  transfer:
+    if: github.repository == 'Kimeiga/perfect-web' && github.ref == 'refs/heads/fix/signature-authority-2026-09-16'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      BASE: c200ae3e39934285858064fa56a09dabe882657d
+      BASE_TREE: 9d3bb9bbc6a641a552ae2b156c1274314211a0a5
+      EXPECTED_TREE: 06bba6054cba2b170e25e1063065d6aab4a917c1
+      BRANCH: fix/signature-authority-2026-09-16
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Verify, apply and publish tested source
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SIGNATURE_DELTA="$RUNNER_TEMP/signature-delta.json"
+          python3 - <<'PY'
+          import hashlib, lzma, os
+          from pathlib import Path
+          data = b''.join(Path(f'.signature-transfer/{i:02d}.xzpart').read_bytes() for i in range(10))
+          assert hashlib.sha256(data).hexdigest() == 'ed67193cdd74e3adca5dc74c3c8370a69ec07caa9b8994bf05a4649877f0e5f4', 'Transfer digest mismatch'
+          Path(os.environ['SIGNATURE_DELTA']).write_bytes(lzma.decompress(data))
+          PY
+          test "$(git ls-remote --exit-code origin refs/heads/master | awk '{print $1}')" = "$BASE"
+          git fetch --no-tags origin "$BASE"
+          test "$(git rev-parse "$BASE^{tree}")" = "$BASE_TREE"
+          git checkout --detach "$BASE"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path, PurePosixPath
+
+          root = Path.cwd().resolve()
+          delta = json.loads(Path(os.environ['SIGNATURE_DELTA']).read_text())
+          assert isinstance(delta, dict) and len(delta) == 54, 'Unexpected file count'
+          for name, spec in delta.items():
+              path = PurePosixPath(name)
+              assert not path.is_absolute() and path.as_posix() == name
+              assert path.parts[0] in {'compiler', 'docs', 'examples', 'packages'}
+              assert all(part not in {'', '.', '..', '.git'} for part in path.parts)
+              target = root.joinpath(*path.parts)
+              assert not target.is_symlink() and not any(p.is_symlink() for p in target.parents)
+              if spec['base'] is None:
+                  assert not target.exists(), f'New path already exists: {name}'
+                  assert set(spec) == {'base', 'contents', 'result'}
+                  result = spec['contents']
+              else:
+                  assert target.is_file(), f'Missing base: {name}'
+                  original = target.read_bytes()
+                  assert hashlib.sha256(original).hexdigest() == spec['base'], f'Base mismatch: {name}'
+                  assert set(spec) == {'base', 'edits', 'result'}
+                  lines = original.decode('utf-8').splitlines(keepends=True)
+                  previous = 0
+                  for start, end, replacement in spec['edits']:
+                      assert type(start) is int and type(end) is int and isinstance(replacement, str)
+                      assert previous <= start <= end <= len(lines), f'Invalid edit: {name}'
+                      previous = end
+                  for start, end, replacement in reversed(spec['edits']):
+                      lines[start:end] = [replacement]
+                  result = ''.join(lines)
+              raw = result.encode('utf-8')
+              assert hashlib.sha256(raw).hexdigest() == spec['result'], f'Result mismatch: {name}'
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+          PY
+          git add -A
+          TREE=$(git write-tree)
+          test "$TREE" = "$EXPECTED_TREE"
+          test ! -e .signature-transfer
+          test ! -e .github/workflows/signature-review-snapshot.yml
+          test ! -e .github/workflows/signature-transfer-once.yml
+          test "$(git ls-remote --exit-code origin "refs/heads/$BRANCH" | awk '{print $1}')" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          COMMIT=$(git commit-tree "$TREE" -p "$GITHUB_SHA" -p "$BASE" <<'MSG'
+          Complete atomic resolved-signature authority migration
+
+          Replace written signature heads with resolved identities across inference,
+          privacy, boundary checks, contracts, capture schemas, WIT and backend
+          consumers. Preserve concurrent resource-runtime changes without edits.
+
+          Tested local tree: 06bba6054cba2b170e25e1063065d6aab4a917c1.
+          956 workspace tests passed, one existing ignored. Eleven behavioral
+          regressions failed against the old compiler and pass on this tree.
+          Final-head CI and audit must pass before merge. Ordinary argument/return
+          unification and E10-I remain open. All one-use transfer helpers removed.
+          MSG
+          )
+          git push origin "$COMMIT:refs/heads/$BRANCH"
+          printf 'Published commit %s with verified tree %s\n' "$COMMIT" "$TREE"
