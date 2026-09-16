@@ -89,16 +89,19 @@ impl TypeFacts {
                 // `session query Cart(..) -> Result<Cart, CartError>` produces a
                 // `Cart`. The head is the carrier, so the produced type is its
                 // first argument.
-                let produced = match d.ret.as_deref() {
-                    // A scope attaches to a nominal type, so the head is what
-                    // this map is keyed by: `Result<List<X>, E>` scopes `List`,
-                    // the same as before `ret_args` began carrying nesting.
-                    Some("Result") | Some("Option") | Some("List") => d
-                        .ret_args
-                        .first()
-                        .map(|a| a.split('<').next().unwrap_or(a).trim().to_string()),
-                    other => other.map(str::to_string),
-                };
+                // This legacy map is constructor-keyed. The resolved-type
+                // cutover must replace that policy; this migration preserves
+                // it while eliminating reparsing of argument strings.
+                let produced = d
+                    .ret
+                    .as_ref()
+                    .and_then(|ty| match ty.constructor_head_only() {
+                        "Result" | "Option" | "List" => ty
+                            .args()
+                            .first()
+                            .map(|a| a.constructor_head_only().to_string()),
+                        other => Some(other.to_string()),
+                    });
                 if let Some(ty) = produced {
                     f.scoped.insert(ty, restriction);
                 }

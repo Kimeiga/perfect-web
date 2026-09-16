@@ -34,6 +34,8 @@ Status values: `Proposed` · `Accepted` · `Superseded by ADR-NNNN` · `Rejected
 | [0024](DECISIONS/ADR-0024-optimistic-and-rollback-bind-with-a-lambda.md) | *(rejected)* `optimistic` / `rollback` bind their subject with a bare lambda | Rejected, superseded by 0025 | E10 | the lambda said what transformation to perform and not which entry it applied to; and it kept a written inverse, which describes an operation the runtime will not use |
 | [0023](DECISIONS/ADR-0023-milestone-gates-prove-one-layer.md) | A milestone gate proves **one layer's** contract; a cross-layer end-to-end proof belongs at the milestone where both sides exist, as a recorded deferred obligation | Accepted | build | a SECOND gate item deferred for the same reason — one mistake is a patch, two is a structural inversion in the milestone order |
 
+| [0028](DECISIONS/ADR-0028-recursive-written-types-before-signature-cutover.md) | Preserve recursive written types and complete return annotations before the resolved-signature cutover; resolve only valid type identities | Accepted | reopened E9 | no nested type reparsing or partial resolution; ordinary call/return compatibility remains a separate gate |
+
 ## Decisions the charter asked for and where they landed
 
 Charter §14 Milestone 0 task 5 lists eight required ADRs. All eight exist:

@@ -34,16 +34,21 @@ fn in_program(sources: &[&str], at: usize, params: &[&str], written: &str) -> Ty
         .collect();
     let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
     let ws = Workspace::build(&refs);
-    let declared = match written.split_once('<') {
-        None => DeclaredType::new(written, Vec::new()),
-        Some((head, rest)) => DeclaredType::new(
-            head,
-            rest.trim_end_matches('>')
-                .split(',')
-                .map(|a| a.trim().to_string())
-                .collect(),
-        ),
-    };
+    // Ask the real parser and lowering for recursive written structure rather
+    // than maintaining an independent, comma-splitting type parser in tests.
+    let annotation_source = format!("module annotation\nfn probe(x: {written}) {{ x }}\n");
+    let tree = parse_tree(&annotation_source);
+    assert!(tree.errors.is_empty(), "{:?}", tree.errors);
+    let annotation = lower_file(&annotation_source, &tree.green);
+    let declared = annotation
+        .all_decls()
+        .find(|(_, d)| d.name == "probe")
+        .expect("probe")
+        .1
+        .params[0]
+        .ty
+        .clone()
+        .expect("annotation");
     // A type parameter needs a binder, so the helper supplies the unit's first
     // declaration. Which one it is does not matter to these tests; that there
     // IS one does, because `T` with no binding declaration is not an identity.
@@ -252,16 +257,16 @@ fn an_undeclared_name_is_unresolved_rather_than_assumed() {
 ///
 /// *This name is not a type here* and *I could not run* are different facts,
 /// and a consumer that cannot tell them apart reports a missing import as a
-/// type error. A nested generic argument is the case this build does not model,
-/// and it says so rather than resolving the outer type with a spelling inside.
+/// type error. Applying arguments to a type parameter is not modeled, even
+/// though ordinary nested generic arguments now resolve completely.
 #[test]
 fn what_the_resolver_cannot_model_is_blocked_and_says_which() {
-    let got = in_program(&[DOMAIN], 0, &[], "List<Option<Store>>");
+    let got = in_program(&[DOMAIN], 0, &["T"], "T<Int>");
     match got {
         TypeResolution::Blocked { why } => {
-            assert!(why.contains("nests"), "{why}");
+            assert!(why.contains("type parameter"), "{why}");
         }
-        other => panic!("a nested generic is not resolvable yet: {other:?}"),
+        other => panic!("higher-kinded parameter application is not modeled: {other:?}"),
     }
 }
 
@@ -452,7 +457,7 @@ fn the_artifact_identity_carries_arguments_and_round_trips() {
         0,
         None,
         &[],
-        &DeclaredType::new("List", vec!["MenuItem".to_string()]),
+        &DeclaredType::new("List", vec![DeclaredType::new("MenuItem", Vec::new())]),
         0..0,
     );
     let t = got.resolved().expect("resolves");
@@ -490,7 +495,7 @@ fn the_artifact_identity_carries_arguments_and_round_trips() {
             at,
             None,
             &[],
-            &DeclaredType::new("List", vec!["MenuItem".to_string()]),
+            &DeclaredType::new("List", vec![DeclaredType::new("MenuItem", Vec::new())]),
             0..0,
         );
         let t = got.resolved().expect("resolves");

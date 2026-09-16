@@ -518,8 +518,20 @@ impl Workspace {
     /// imports `Stores` is exactly the ambient lookup E2B removed, and
     /// `Stores.missing` is a name the module does not have.
     pub fn resolve_path(&self, unit: UnitId, path: &str) -> Resolution {
+        for ns in Namespace::ALL {
+            match self.resolve_path_in(unit, ns, path) {
+                Resolution::Unresolved => continue,
+                other => return other,
+            }
+        }
+        Resolution::Unresolved
+    }
+
+    /// Resolve a qualified path in the requested namespace. A visible term
+    /// cannot stand in for a type with the same spelling.
+    pub fn resolve_path_in(&self, unit: UnitId, ns: Namespace, path: &str) -> Resolution {
         let Some((head, member)) = path.rsplit_once('.') else {
-            return self.resolve(unit, path);
+            return self.resolve_in(unit, ns, path);
         };
         let Some(m) = self.module_of(unit) else {
             return Resolution::Unresolved;
@@ -532,7 +544,11 @@ impl Workspace {
         let Some(&t) = self.by_name.get(head) else {
             return Resolution::Unresolved;
         };
-        match self.modules[t].lookup_any(member) {
+        match self.modules[t]
+            .defines
+            .get(&(ns, member.to_string()))
+            .copied()
+        {
             Some(def) => Resolution::Imported {
                 def,
                 from: head.to_string(),

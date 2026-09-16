@@ -1156,7 +1156,6 @@ mod tests {
             kind: DeclKind::Effect,
             params: vec![],
             ret: None,
-            ret_args: vec![],
             variants: None,
             fields: None,
             opaque_of: None,

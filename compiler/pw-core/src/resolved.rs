@@ -74,7 +74,7 @@ impl Primitive {
             "Int" => Primitive::Int,
             "Float" => Primitive::Float,
             "String" | "Str" => Primitive::Str,
-            "Unit" => Primitive::Unit,
+            "Unit" | "()" => Primitive::Unit,
             _ => return None,
         })
     }
@@ -231,20 +231,7 @@ pub fn resolve(
 
     let mut args = Vec::new();
     for a in written.args() {
-        // An argument is itself a written type. Parsed shallowly here because
-        // `DeclaredType` carries arguments as spellings; a nested
-        // `List<Option<Store>>` is step 3b's, and saying so is better than
-        // half-resolving it.
-        if a.contains('<') {
-            return TypeResolution::Blocked {
-                why: format!(
-                    "`{text}` nests a generic argument, which needs a written type that carries \
-                     its own arguments"
-                ),
-            };
-        }
-        let inner = DeclaredType::new(a.clone(), Vec::new());
-        match resolve(ws, at, binder, params, &inner, span.clone()) {
+        match resolve(ws, at, binder, params, a, span.clone()) {
             TypeResolution::Resolved(t) => args.push(t),
             TypeResolution::Unresolved { name, .. } => {
                 return TypeResolution::Unresolved {
@@ -266,9 +253,14 @@ pub fn resolve(
     }
 
     if let Some(b) = Builtin::of(head) {
-        // A bare `Option` is not a type — it does not say what may be absent.
-        // The same refusal `platform_contracts.rs` makes of a signature.
-        if args.is_empty() {
+        // A constructor's arity is part of the type, not a lower bound.
+        // Checking only for missing arguments accepted `Result<Int>` and
+        // `Option<Int, String>` as successful semantic types.
+        let arity = match b {
+            Builtin::List | Builtin::Option => 1,
+            Builtin::Result => 2,
+        };
+        if args.len() != arity {
             return TypeResolution::Unresolved {
                 name: head.to_string(),
                 written: text,
@@ -281,7 +273,7 @@ pub fn resolve(
     // visible from this unit. Both go through the workspace, which is what
     // makes `capability.SessionId` and `domain.SessionId` two answers.
     let found = match head.contains('.') {
-        true => ws.resolve_path(at, head),
+        true => ws.resolve_path_in(at, Namespace::Type, head),
         false => ws.resolve_in(at, Namespace::Type, head),
     };
     let def = match found {

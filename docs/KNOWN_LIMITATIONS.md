@@ -17,6 +17,14 @@ checked. Arity checking exists; the argument-type gap is explicitly pinned by
 `Signature` still carries written type heads. The recursive resolved-type work
 must become the single semantic authority before E9's reopened gate can close.
 
+The recursive written-type prerequisite is now implemented (ADR-0028), including
+nested resolution, built-in arity and qualified type namespace checks. Those are
+properties of type formation/resolution, not proof that `pw check` applies full
+value compatibility at every call or return. The legacy signature, privacy and
+boundary consumers retain their previous representations pending the atomic
+cutover. Nominal declaration arity, higher-kinded types and callable generics are
+not added by this repair.
+
 E10-I has not been established: producing core Wasm and testing host admission
 separately does not demonstrate execution of the compiled Pleris command through
 the complete component path with the alternative Rust closure removed.

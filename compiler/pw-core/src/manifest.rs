@@ -281,12 +281,12 @@ fn manifest_of(decl: &Decl) -> (Manifest, Vec<Unparsed>) {
 /// `Result` as the result type and nothing as the error type would describe a
 /// declaration nobody wrote.
 fn split_result(decl: &Decl) -> (Option<String>, Option<String>) {
-    let Some(head) = decl.ret.as_deref() else {
+    let Some(ty) = decl.ret.as_ref() else {
         return (None, None);
     };
-    match (head, decl.ret_args.as_slice()) {
-        ("Result", [ok, err]) => (Some(ok.clone()), Some(err.clone())),
-        _ => (Some(head.to_string()), None),
+    match (ty.constructor_head_only(), ty.args()) {
+        ("Result", [ok, err]) => (Some(ok.written()), Some(err.written())),
+        _ => (Some(ty.written()), None),
     }
 }
 
@@ -389,7 +389,6 @@ mod tests {
                 kind: DeclKind::Query,
                 params: vec![],
                 ret: None,
-                ret_args: vec![],
                 variants: None,
                 fields: None,
                 opaque_of: None,

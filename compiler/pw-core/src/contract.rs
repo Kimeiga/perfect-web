@@ -663,9 +663,7 @@ fn host_calls(
                     })
                     .collect(),
                 result: match &decl.ret {
-                    Some(head) => {
-                        crate::hir::DeclaredType::new(head.clone(), decl.ret_args.clone()).written()
-                    }
+                    Some(written) => written.written(),
                     None => "()".to_string(),
                 },
             }),

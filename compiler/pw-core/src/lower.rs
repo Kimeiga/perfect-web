@@ -241,7 +241,6 @@ impl Lowerer<'_> {
                 kind,
                 params: self.params(node),
                 ret: self.return_type(node),
-                ret_args: self.return_type_args(node),
                 variants: self.variants(node),
                 fields: self.record_fields(node),
                 policies: self.policies(node),
@@ -295,9 +294,7 @@ impl Lowerer<'_> {
                             // The complete type, built once. `DeclaredType`
                             // keeps the head and its arguments together, so a
                             // consumer has to ask for the head alone by name.
-                            ty: t
-                                .as_ref()
-                                .map(|t| crate::hir::DeclaredType::new(type_path(t), type_args(t))),
+                            ty: t.as_ref().map(declared_type),
                             span: span_of(&p),
                         }
                     })
@@ -309,31 +306,10 @@ impl Lowerer<'_> {
     /// The type after `->`. It is the `TypeRef` that is a direct child of the
     /// declaration, so it cannot be confused with a parameter's type (those sit
     /// inside `Param`) or a field's.
-    fn return_type(&self, node: &SyntaxNode) -> Option<String> {
+    fn return_type(&self, node: &SyntaxNode) -> Option<crate::hir::DeclaredType> {
         node.children()
             .find(|c| c.kind() == K::TypeRef)
-            .map(|t| type_path(&t))
-    }
-
-    /// The return type's arguments, as written.
-    /// The return type's arguments **as written**, nesting included.
-    ///
-    /// `Result<List<MenuItemId>, StoreError>` gives `["List<MenuItemId>",
-    /// "StoreError"]`, not `["List", "StoreError"]`. Heads were enough while
-    /// every consumer wanted a carrier's name; they are not enough to answer
-    /// "what is one element of this", and a projection back to a head is one
-    /// `split('<')` away. The reverse is not recoverable.
-    fn return_type_args(&self, node: &SyntaxNode) -> Vec<String> {
-        node.children()
-            .find(|c| c.kind() == K::TypeRef)
-            .and_then(|t| t.children().find(|c| c.kind() == K::TypeArgList))
-            .map(|l| {
-                l.children()
-                    .filter(|c| c.kind() == K::TypeRef)
-                    .map(|t| t.text().to_string().trim().to_string())
-                    .collect()
-            })
-            .unwrap_or_default()
+            .map(|t| declared_type(&t))
     }
 
     fn record_fields(&self, node: &SyntaxNode) -> Option<Vec<Param>> {
@@ -345,9 +321,7 @@ impl Lowerer<'_> {
                     let t = f.children().find(|c| c.kind() == K::TypeRef);
                     Param {
                         name: first_name(&f).unwrap_or_default(),
-                        ty: t
-                            .as_ref()
-                            .map(|t| crate::hir::DeclaredType::new(type_path(t), type_args(t))),
+                        ty: t.as_ref().map(declared_type),
                         span: span_of(&f),
                     }
                 })
@@ -1384,24 +1358,20 @@ fn visibility_of(node: &SyntaxNode) -> Option<String> {
     matches!(first.as_str(), "public" | "session" | "private").then_some(first)
 }
 
-/// A type reference's name, without its type arguments.
-/// The type arguments of a `TypeRef`, **as written**: `Result<List<MenuItem>,
-/// E>` gives `["List<MenuItem>", "E"]`.
-///
-/// Written form rather than heads, because a head loses exactly what the
-/// element rule needs. `Menus.for_store` returns `Result<List<MenuItemId>, _>`
-/// and `{#each menu as item}` iterates what is inside BOTH wrappers — heads
-/// alone stop at `List` and the element is gone.
-fn type_args(t: &SyntaxNode) -> Vec<String> {
-    t.children()
+/// Preserve the parser's complete type structure. No consumer reparses a
+/// nested argument to recover information lost at the syntax/HIR boundary.
+fn declared_type(t: &SyntaxNode) -> crate::hir::DeclaredType {
+    let args = t
+        .children()
         .find(|c| c.kind() == K::TypeArgList)
         .map(|l| {
             l.children()
                 .filter(|c| c.kind() == K::TypeRef)
-                .map(|a| a.text().to_string().trim().to_string())
+                .map(|a| declared_type(&a))
                 .collect()
         })
-        .unwrap_or_default()
+        .unwrap_or_default();
+    crate::hir::DeclaredType::new(type_path(t), args)
 }
 
 fn type_path(t: &SyntaxNode) -> String {
