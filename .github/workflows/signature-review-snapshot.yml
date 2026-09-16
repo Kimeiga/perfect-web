@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
+          ref: c200ae3e39934285858064fa56a09dabe882657d
           persist-credentials: false
       - name: Archive reviewed source
         shell: bash
