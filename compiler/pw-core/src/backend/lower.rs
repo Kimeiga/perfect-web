@@ -44,6 +44,7 @@ use super::ir::{
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Span};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
+use crate::resolved::{Builtin, Primitive, ResolvedType, TypeResolution};
 use crate::signatures::Signatures;
 
 /// **Proof that the program being lowered resolved and checked.**
@@ -150,10 +151,14 @@ fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
             // function on the same declaration, so the artifact a host reads
             // and the IR the encoder consumes cannot disagree about a
             // callable's ABI or its authority.
+            let Some(signature) = cx.sigs.by_def(def) else {
+                continue;
+            };
             let Some(callable) = crate::backend::callable_of(
                 decl,
                 def,
-                |written| match ty_written(cx, unit, written, &decl.name_span) {
+                signature,
+                |ty| match ty_resolved(cx.sigs, ty, &decl.name_span) {
                     Lowering::Lowered(t) => Some(t),
                     _ => None,
                 },
@@ -230,16 +235,22 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
     };
 
     // Parameters first, so a body naming one finds it.
+    let Some(signature) = cx.sigs.by_def(def) else {
+        return Lowering::Blocked {
+            why: "missing resolved signature".into(),
+            span,
+        };
+    };
     let mut params = Vec::new();
-    for p in &decl.params {
-        let Some(declared) = &p.ty else {
+    for (index, p) in decl.params.iter().enumerate() {
+        let Some(declared) = signature.params.get(index).and_then(Option::as_ref) else {
             return Lowering::Unsupported {
                 construct: "an unannotated parameter",
                 span: p.span.clone(),
                 reason: format!("`{}` has no declared type, and the ABI needs one", p.name),
             };
         };
-        let ty = match f.ty_of(declared, &p.span) {
+        let ty = match ty_resolution(cx.sigs, declared, &p.span) {
             Lowering::Lowered(t) => t,
             other => return other.map(|_| unreachable!()),
         };
@@ -248,8 +259,8 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         params.push((v, ty));
     }
 
-    let ret = match &decl.ret {
-        Some(written) => match f.ty_of(written, &span) {
+    let ret = match &signature.returns {
+        Some(resolution) => match ty_resolution(cx.sigs, resolution, &span) {
             Lowering::Lowered(t) => t,
             other => return other.map(|_| unreachable!()),
         },
@@ -372,40 +383,6 @@ fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
     out
 }
 
-/// A written type into its head and arguments, respecting nesting.
-///
-/// `Result<List<MenuItem>, StoreError>` gives `("Result", ["List<MenuItem>",
-/// "StoreError"])`. Splitting on every comma would give three, and the middle
-/// one would resolve against nothing.
-fn split(written: &str) -> (&str, Vec<&str>) {
-    let w = written.trim();
-    let Some(open) = w.find('<') else {
-        return (w, Vec::new());
-    };
-    let head = w[..open].trim();
-    let inner = w[open + 1..].trim_end();
-    let inner = inner.strip_suffix('>').unwrap_or(inner);
-    let mut args = Vec::new();
-    let mut depth = 0usize;
-    let mut start = 0usize;
-    for (i, c) in inner.char_indices() {
-        match c {
-            '<' => depth += 1,
-            '>' => depth = depth.saturating_sub(1),
-            ',' if depth == 0 => {
-                args.push(inner[start..i].trim());
-                start = i + 1;
-            }
-            _ => {}
-        }
-    }
-    let last = inner[start..].trim();
-    if !last.is_empty() {
-        args.push(last);
-    }
-    (head, args)
-}
-
 fn primitive(name: &str) -> Option<Type> {
     Some(match name {
         "Int" => Type::Int,
@@ -451,74 +428,61 @@ impl<'a> Lower<'a> {
         self.next_value += 1;
         v
     }
+}
 
-    /// A declared type, resolved.
-    ///
-    /// **Through the workspace**, so `Cart` in one module and `Cart` in another
-    /// are two types here exactly as they are everywhere else. A backend that
-    /// matched on the spelling would be the fourth place in this project to do
-    /// that, and the first three each cost a milestone.
-    fn ty_of(&self, declared: &crate::hir::DeclaredType, span: &Span) -> Lowering<Type> {
-        self.ty_written_in(self.unit, &declared.written(), span)
-    }
-
-    /// A type as written, resolved.
-    ///
-    /// **One splitter, and it respects nesting.** `Result<List<MenuItem>,
-    /// StoreError>` has two arguments, not three, and a version that split on
-    /// every comma would resolve `List<MenuItem` against nothing.
-    /// A type as written, resolved from a chosen unit.
-    ///
-    /// **A callee's return type is written in the CALLEE's module.**
-    /// `current_session()` returns `Session<SessionId>`, and `Session` is the
-    /// platform's — a caller that imports the function and not the type is
-    /// correct under A-009, so resolving the return type in the caller's scope
-    /// asks the wrong module and finds nothing. That blocked every command in
-    /// the store.
-    fn ty_written_in(&self, unit: usize, written: &str, span: &Span) -> Lowering<Type> {
-        ty_written(self.cx, unit, written, span)
+fn ty_resolution(sigs: &Signatures, resolution: &TypeResolution, span: &Span) -> Lowering<Type> {
+    match resolution.resolved() {
+        Some(ty) => ty_resolved(sigs, ty, span),
+        None => Lowering::Blocked {
+            why: resolution.to_string(),
+            span: span.clone(),
+        },
     }
 }
 
-/// **What a written type is, resolved in one unit.**
-///
-/// A free function because two callers need it and neither may have its own:
-/// `Lower::ty_written_in` while lowering a body, and `signature_of` while
-/// reading a host operation's ABI off its declaration. A second copy is how the
-/// two come to disagree about what `Result<Cart, CartError>` is.
-fn ty_written(cx: &Context<'_>, unit: usize, written: &str, span: &Span) -> Lowering<Type> {
-    let (head, args) = split(written);
-    if let Some(p) = primitive(head) {
-        return Lowering::Lowered(p);
+/// ABI projection: semantic identity arrives resolved. Privacy qualification
+/// is erased only for the selected qualifier definition, not for its spelling.
+fn ty_resolved(sigs: &Signatures, ty: &ResolvedType, span: &Span) -> Lowering<Type> {
+    if let Some(p) = ty.as_primitive() {
+        return Lowering::Lowered(match p {
+            Primitive::Int => Type::Int,
+            Primitive::Float => Type::Float,
+            Primitive::Bool => Type::Bool,
+            Primitive::Str => Type::Str,
+            Primitive::Unit => Type::Unit,
+        });
     }
-    let arg = |i: usize| -> Lowering<Type> {
-        match args.get(i) {
-            Some(a) => ty_written(cx, unit, a, span),
-            None => Lowering::Unsupported {
-                construct: "a carrier with no argument",
-                span: span.clone(),
-                reason: format!("`{head}` needs a type argument and was written bare"),
-            },
-        }
+    let arg = |i: usize| match ty.args().get(i) {
+        Some(t) => ty_resolved(sigs, t, span),
+        None => Lowering::Blocked {
+            why: "resolved constructor is missing an argument".into(),
+            span: span.clone(),
+        },
     };
-    match head {
-        "Result" => match (arg(0), arg(1)) {
-            (Lowering::Lowered(a), Lowering::Lowered(b)) => {
-                Lowering::Lowered(Type::Result(Box::new(a), Box::new(b)))
-            }
-            (Lowering::Lowered(_), other) | (other, _) => other.map(|_: Type| unreachable!()),
-        },
-        "Option" => arg(0).map(|a| Type::Option(Box::new(a))),
-        "List" => arg(0).map(|a| Type::List(Box::new(a))),
-        _ => match cx.ws.resolve_in(unit, Namespace::Type, head) {
-            Resolution::Local(def) | Resolution::Imported { def, .. } => {
-                Lowering::Lowered(Type::Nominal(def))
-            }
-            _ => Lowering::Blocked {
-                why: format!("`{head}` names no type this program declares"),
-                span: span.clone(),
+    if let Some(b) = ty.as_builtin() {
+        return match b {
+            Builtin::Result => match (arg(0), arg(1)) {
+                (Lowering::Lowered(a), Lowering::Lowered(b)) => {
+                    Lowering::Lowered(Type::Result(Box::new(a), Box::new(b)))
+                }
+                (Lowering::Lowered(_), other) | (other, _) => other,
             },
-        },
+            Builtin::Option => arg(0).map(|a| Type::Option(Box::new(a))),
+            Builtin::List => arg(0).map(|a| Type::List(Box::new(a))),
+        };
+    }
+    if sigs.privacy_qualifier(ty).is_some() && ty.args().len() == 1 {
+        return arg(0);
+    }
+    if let Some(def) = ty.def_id()
+        && ty.args().is_empty()
+    {
+        return Lowering::Lowered(Type::Nominal(def));
+    }
+    Lowering::Unsupported {
+        construct: "an unspecialized generic type",
+        span: span.clone(),
+        reason: format!("`{ty}` needs specialization before its layout can be encoded"),
     }
 }
 
@@ -674,19 +638,10 @@ impl<'a> Lower<'a> {
 
         // What the callee returns, from that signature. Not inferred here.
         let ty = match &sig.returns {
-            Some(head) => {
-                let written = if sig.returns_args.is_empty() {
-                    head.clone()
-                } else {
-                    format!("{}<{}>", head, sig.returns_args.join(", "))
-                };
-                // From the CALLEE's unit. See `ty_written_in`.
-                let at = resolved.map(|d| d.unit).unwrap_or(self.unit);
-                match self.ty_written_in(at, &written, &span) {
-                    Lowering::Lowered(t) => t,
-                    other => return other.map(|_| unreachable!()),
-                }
-            }
+            Some(resolution) => match ty_resolution(self.cx.sigs, resolution, &span) {
+                Lowering::Lowered(ty) => ty,
+                other => return other.map(|_| unreachable!()),
+            },
             None => Type::Unit,
         };
 

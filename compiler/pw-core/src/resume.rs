@@ -50,7 +50,7 @@ fn captures_with_spans(
     body: &crate::hir::Body,
     types: &crate::infer::Types<'_>,
     descriptor: ExprId,
-) -> Vec<(String, Span, Option<String>)> {
+) -> Vec<(String, Span, Option<crate::resolved::ResolvedType>)> {
     captures(body, descriptor)
         .into_iter()
         .map(|(name, span, expr)| (name, span, types.of(body, expr)))
@@ -83,7 +83,7 @@ pub(crate) fn capture_names_and_types(
     body: &crate::hir::Body,
     types: &crate::infer::Types<'_>,
     descriptor: ExprId,
-) -> Vec<(String, Option<String>)> {
+) -> Vec<(String, Option<crate::resolved::ResolvedType>)> {
     captures(body, descriptor)
         .into_iter()
         .map(|(name, _, expr)| (name, types.of(body, expr)))
@@ -210,7 +210,7 @@ pub fn check(
             for (name, span, ty) in captures_with_spans(body, &types, *d) {
                 if !matches!(
                     can_cross(
-                        &facts.profile(ty.as_deref()),
+                        &facts.profile(ty.as_ref()),
                         &BoundaryContext {
                             boundary: Boundary::Resume,
                             direction: Direction::Outbound,
@@ -266,7 +266,7 @@ pub fn check(
             for (name, span, expr) in captures(body, *d) {
                 let ty = types.of(body, expr);
                 let verdict = can_cross(
-                    &facts.profile(ty.as_deref()),
+                    &facts.profile(ty.as_ref()),
                     &BoundaryContext {
                         boundary: Boundary::Resume,
                         direction: Direction::Outbound,

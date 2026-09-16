@@ -135,7 +135,7 @@ pub const PLATFORM_PACKAGE: &str = "pw:host";
 /// It was the second pattern for one commit: `contract::host_calls` and
 /// `backend::lower::host_imports` each built the facts from the declaration,
 /// and they would have agreed until one of them learned something.
-/// `ty` resolves a written type; `capability` says what authority an effect
+/// `ty` projects a resolved type onto the backend representation; `capability` says what authority an effect
 /// requires, and returns `None` for one that requires none.
 ///
 /// Both are passed in rather than decided here. Whether `dom.mutate` needs a
@@ -145,7 +145,8 @@ pub const PLATFORM_PACKAGE: &str = "pw:host";
 pub fn callable_of(
     decl: &crate::hir::Decl,
     callee: crate::resolve::DefId,
-    ty: impl Fn(&str) -> Option<ir::Type>,
+    signature: &crate::signatures::Signature,
+    ty: impl Fn(&crate::resolved::ResolvedType) -> Option<ir::Type>,
     capability: impl Fn(&str) -> Option<crate::contract::Capability>,
 ) -> Option<ir::CallableImport> {
     let id = host_binding(decl)?;
@@ -156,11 +157,11 @@ pub fn callable_of(
         false => ir::ImportBinding::External,
     };
     let mut params = Vec::new();
-    for p in &decl.params {
-        params.push(ty(&p.ty.as_ref()?.written())?);
+    for p in &signature.params {
+        params.push(ty(p.as_ref()?.resolved()?)?);
     }
-    let result = match &decl.ret {
-        Some(written) => ty(&written.written())?,
+    let result = match &signature.returns {
+        Some(resolved) => ty(resolved.resolved()?)?,
         None => ir::Type::Unit,
     };
     Some(ir::CallableImport {
@@ -168,12 +169,10 @@ pub fn callable_of(
         callee,
         binding,
         signature: ir::BackendSignature { params, result },
-        required_capabilities: decl
-            .declared_effects
-            .as_deref()
-            .unwrap_or_default()
+        required_capabilities: signature
+            .effects
             .iter()
-            .filter_map(|e| capability(&e.written).map(ir::CapabilityId))
+            .filter_map(|e| capability(e).map(ir::CapabilityId))
             .collect(),
     })
 }

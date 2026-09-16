@@ -3,6 +3,9 @@
 // @dimension: indirect invalid — the Unknown is rebound first
 module generality.cast_rebound
 
+import decode.{ Unknown }
+import domain.{ Store }
+
 fn parse(raw: Unknown) -> Store !{} {
     let same = raw
     same as Store

@@ -526,3 +526,27 @@ warns about. `R-029` was caught by `rules.rs`, which reads declaration HEADERS;
 its new defect is an effect question that only `check.rs` can answer. The
 compensating assertion is in `rules::corpus_tests`: R-029 must still be caught,
 by the whole checker, for its declared code.
+
+
+## C7: resolved-signature fixture repairs, 2026-09-16
+
+No invariant is retired. The current 24 accepted / 46 rejected corpus remains
+clean / rejected for its declared rule. These changes remove accidental reliance
+on undeclared type names and avoid testing two independent defects at once.
+
+| Fixture | Repair | Preserved obligation |
+|---|---|---|
+| R-008 and option-field rule | Import the Store type explicitly | Unchecked Option field access is refused |
+| R-009 and cast generality witness | Import Unknown and Store | Unchecked external cast is refused |
+| R-032, R-037, effect-oracle fixtures | Import ElementRef | Layout reads still violate their effect/phase context |
+| R-029 and optimistic generality witness | Effectful helper returns the actual Cart, not Result<Cart, Error> | Optimistic transition remains impure and is rejected for that rule only |
+| stdlib list | Import Decoder and Unknown from decode | Platform signatures resolve completely |
+
+C0 raw texts are not edited. R-010 and R-030 have unimported parameter types;
+they now fail as unnameable captures instead of borrowing the resource/privacy
+meaning of globally same-spelled types. R-022's unimported PressEvent is blocked
+rather than a known mismatch. Current imported counterparts retain their original
+rules. `corpus_history.rs` tests those boundaries explicitly and keeps the known
+ordinary-type diagnostic gap visible. New `signature_behavior.rs` tests cover
+same-spelled but genuinely different nominal types, including imported handlers.
+The platform signature hash changes only for the explicit list imports.

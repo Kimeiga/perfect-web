@@ -8,16 +8,24 @@
 module generality.optimistic_reads
 
 import Carts
+import domain
+import domain.{ MenuItemId, CartError }
 import Resources.{ Cart }
 import context.{ current_session }
 
+// Keep the result type correct while deliberately performing external work.
+fn impure_read(cart: domain.Cart) -> domain.Cart {
+    Carts.current(current_session())
+    cart
+}
+
 command remove_from_cart(item: MenuItemId)
-    -> Result<Cart, CartError>
+    -> Result<domain.Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
     // A READ, not a write, and in a different command from `R-029`'s: the
     // invariant is about any effect, not about one family.
-    optimistic    Cart(current_session()) as cart => Carts.current(current_session())
+    optimistic    Cart(current_session()) as cart => impure_read(cart)
     invalidates   Cart(current_session())
 {
     Carts.clear(current_session())

@@ -6,6 +6,8 @@
 
 module List
 
+import decode.{ Unknown, Decoder }
+
 // Pure by construction: every row declares `!{}`, so a body that stays inside
 // `List` cannot acquire an effect. E2D reads these rows; nothing hard-codes
 // "List.map is pure" in a checker.

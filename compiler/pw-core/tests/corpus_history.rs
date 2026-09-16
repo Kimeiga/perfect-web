@@ -19,7 +19,8 @@
 
 use pw_core::check::check_sources;
 
-/// Old texts that are expected to compile clean now, each **classified**.
+/// Old texts no longer caught for their declared invariant, each **classified**.
+/// They may still be rejected for an unresolved capture or another real defect.
 ///
 /// Architect ruling, 2026-08-06:
 ///
@@ -50,6 +51,35 @@ enum Why {
 }
 
 const EXPECTED_TO_PASS: &[(&str, Why, &str)] = &[
+    (
+        "R-022",
+        Why::FixtureDidNotExpressIt,
+        "C0's on_press parameter names PressEvent without importing events. The old \
+         mismatch compared its spelling to SubmitEvent even though one side named no \
+         visible type. The current fixture imports the event declaration; that \
+         resolved mismatch remains rejected. The new signature tests require missing \
+         and invalid annotations to remain distinct and exercise a valid same-spelled \
+         nominal mismatch across modules.",
+    ),
+    (
+        "R-030",
+        Why::FixtureDidNotExpressIt,
+        "C0's Cart parameter imports neither domain.Cart nor the scoped resource. The \
+         spelling alone formerly selected a global private type. It is now an \
+         unnameable capture and remains refused, not considered public and \
+         serializable. The current explicit-import fixture still reports \
+         private_in_resume_manifest; the regression suite checks both boundaries.",
+    ),
+    (
+        "R-010",
+        Why::FixtureDidNotExpressIt,
+        "C0 writes DatabaseConnection without importing its defining module. Resolved \
+         signatures can no longer treat that spelling as the globally known resource. \
+         The unknown capture is still refused as resume_capture_schema_unnameable; the \
+         current fixture explicitly imports domain.DatabaseConnection and is refused \
+         as unserializable_capture. The resolved-signature regression suite checks \
+         both sides independently.",
+    ),
     (
         "R-001",
         Why::FixtureDidNotExpressIt,
@@ -244,4 +274,81 @@ fn the_history_is_not_edited_to_match_the_present() {
              file should not exist, or the history has been overwritten."
         );
     }
+}
+
+/// Missing imports must not silently become public serializable captures.
+#[test]
+fn historical_unknown_captures_remain_refused_and_imported_controls_keep_their_rule() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    for (prefix, expected) in [
+        ("R-010", "unserializable_capture"),
+        ("R-030", "private_in_resume_manifest"),
+    ] {
+        let (name, old) = c0()
+            .into_iter()
+            .find(|(name, _)| name.starts_with(prefix))
+            .unwrap();
+        for (src, symbol) in [
+            (old, "resume_capture_schema_unnameable"),
+            (
+                std::fs::read_to_string(root.join("rejected").join(&name)).unwrap(),
+                expected,
+            ),
+        ] {
+            let mut files = library();
+            files.push((name.clone(), src));
+            let ds = check_sources(&files)
+                .into_iter()
+                .find(|(n, _)| n == &name)
+                .unwrap()
+                .1;
+            assert!(
+                ds.iter().any(|d| d.symbol() == symbol),
+                "{prefix} must report {symbol}: {ds:?}"
+            );
+        }
+    }
+}
+
+/// C0's unknown event annotation is not a known incompatible event type.
+#[test]
+fn historical_event_annotation_is_blocked_not_a_nominal_mismatch() {
+    let (name, old) = c0()
+        .into_iter()
+        .find(|(name, _)| name.starts_with("R-022"))
+        .unwrap();
+    let mut files = library();
+    files.push((name.clone(), old));
+    let hirs: Vec<_> = files
+        .iter()
+        .map(|(_, src)| {
+            let parsed = pw_syntax::parse_tree(src);
+            assert!(parsed.ok(), "{:?}", parsed.errors);
+            pw_core::lower::lower_file(src, &parsed.green)
+        })
+        .collect();
+    let refs: Vec<_> = hirs.iter().collect();
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = pw_core::signatures::Signatures::build(&ws, &refs);
+    let sig = sigs.by_path("checkout.address_form.on_press").unwrap();
+    assert!(sig.params[0].as_ref().unwrap().resolved().is_none());
+    // This does not establish comprehensive type-error diagnostics. That E9
+    // obligation remains open; it must consume the blocked state above.
+    let current = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/rejected")
+            .join(&name),
+    )
+    .unwrap();
+    files.last_mut().unwrap().1 = current;
+    let ds = check_sources(&files)
+        .into_iter()
+        .find(|(n, _)| n == &name)
+        .unwrap()
+        .1;
+    assert!(
+        ds.iter()
+            .any(|d| d.symbol() == "handler_signature_mismatch"),
+        "{ds:?}"
+    );
 }

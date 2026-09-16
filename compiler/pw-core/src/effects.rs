@@ -260,7 +260,11 @@ impl<'a> Inference<'a> {
     }
 
     /// What one body performs, given the types its declaration makes known.
-    pub fn infer_in(&self, body: &Body, types: &BTreeMap<String, String>) -> Inferred {
+    pub fn infer_in(
+        &self,
+        body: &Body,
+        types: &BTreeMap<String, crate::resolved::ResolvedType>,
+    ) -> Inferred {
         self.infer_in_at(usize::MAX, body, types)
     }
 
@@ -269,7 +273,7 @@ impl<'a> Inference<'a> {
         &self,
         unit: usize,
         body: &Body,
-        types: &BTreeMap<String, String>,
+        types: &BTreeMap<String, crate::resolved::ResolvedType>,
     ) -> Inferred {
         let mut out = self.infer_at(unit, body);
         self.member_effects(body, types, &mut out);
@@ -283,7 +287,12 @@ impl<'a> Inference<'a> {
     /// lives in the accessors' declared rows (`packages/pw-platform-web/browser.pw`),
     /// not in a list of property names here — which is what E2C's deletion gate
     /// requires and what lets a new accessor be added without touching a checker.
-    fn member_effects(&self, body: &Body, types: &BTreeMap<String, String>, out: &mut Inferred) {
+    fn member_effects(
+        &self,
+        body: &Body,
+        types: &BTreeMap<String, crate::resolved::ResolvedType>,
+        out: &mut Inferred,
+    ) {
         // Which lambdas were handed to which function, so a member call inside
         // a callback names the callback rather than only itself.
         //
@@ -333,7 +342,7 @@ impl<'a> Inference<'a> {
             // `Money.add` once, reporting a pure calculation as writing to the
             // database. A receiver whose type this program does not state is a
             // receiver whose members are unknown.
-            let Some(declared) = types.get(&receiver).map(String::as_str) else {
+            let Some(declared) = types.get(&receiver) else {
                 continue;
             };
             let Some(sig) = self.sigs.member_of(declared, &member) else {
@@ -343,7 +352,7 @@ impl<'a> Inference<'a> {
             // found because the RECEIVER'S TYPE declares it.
             let resolved = out.evidence.record(
                 crate::provenance::FactKind::ResolvedMember {
-                    receiver_type: declared.to_string(),
+                    receiver_type: declared.display_name(),
                     member: member.clone(),
                     via: crate::provenance::Route::ReceiverType,
                 },

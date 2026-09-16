@@ -12,18 +12,20 @@ Those historical statements must not override current source or test results.
 ## Value checking and generated execution
 
 Ordinary call argument types and declared return types are not comprehensively
-checked. Arity checking exists; the argument-type gap is explicitly pinned by
-`compiler/pw-core/tests/canonical_abi.rs::a_call_site_is_not_type_checked`.
-`Signature` still carries written type heads. The recursive resolved-type work
-must become the single semantic authority before E9's reopened gate can close.
+checked. Arity checking exists; `canonical_abi::a_call_site_is_not_type_checked`
+still pins the ordinary-call gap. Signatures now contain resolved identities,
+but the inference engine does not yet implement full unification, generic
+callable instantiation, or all expression types. Unknown annotations remain
+blocked in signatures and at relevant transfer/codegen boundaries; this change
+does not add comprehensive source diagnostics for every unknown annotation.
 
-The recursive written-type prerequisite is now implemented (ADR-0028), including
-nested resolution, built-in arity and qualified type namespace checks. Those are
-properties of type formation/resolution, not proof that `pw check` applies full
-value compatibility at every call or return. The legacy signature, privacy and
-boundary consumers retain their previous representations pending the atomic
-cutover. Nominal declaration arity, higher-kinded types and callable generics are
-not added by this repair.
+A scope/resource policy is now attached to the resolved type rather than its
+spelling, preserving the existing type-level policy. This is not a per-value
+ownership proof. Private RPCs now require conditional principal preservation;
+that records a runtime obligation, not its execution. Stable nominal capture
+identities distinguish modules; complete transitive schema-evolution and host
+semantic-ABI validation remain separate work. Foreign code and backend internal
+record/variant layouts still need their documented integration proofs.
 
 E10-I has not been established: producing core Wasm and testing host admission
 separately does not demonstrate execution of the compiled Pleris command through

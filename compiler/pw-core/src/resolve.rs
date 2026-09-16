@@ -204,7 +204,7 @@ impl ResolveErrorKind {
 }
 
 /// The whole checked set, as one module graph.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Workspace {
     pub modules: Vec<Module>,
     by_name: BTreeMap<String, usize>,

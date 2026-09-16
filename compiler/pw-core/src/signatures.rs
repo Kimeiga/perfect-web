@@ -1,111 +1,144 @@
-//! E2C — resolved library signatures, as the single source of truth.
+//! Resolved library signatures: one semantic authority for every consumer.
 //!
-//! Architect ruling, 2026-08-06:
-//!
-//! > No privacy, placement, or effect checker contains a built-in mapping from
-//! > library function names to labels, effects, capabilities, or worlds.
-//!
-//! Before this, three checkers independently hard-coded the same facts:
-//! `check.rs` knew `secrets.payments()` yields a secret, `placement.rs` knew
-//! `secret.*` is origin-only, and both knew `database.read` is a database
-//! effect. Two of those could disagree and nothing would notice.
-//!
-//! Now one declaration answers all three:
-//!
-//! ```text
-//! secrets.payments : () -> Secret<Payments>  !{ secret.read }
-//!                          ^^^^^^^^^^^^^^^^     ^^^^^^^^^^^
-//!                          privacy label        effect row, from which the
-//!                                               placement solver derives the
-//!                                               capability requirement
-//! ```
+//! Written annotations remain in HIR as source provenance. A signature contains
+//! their resolved identities, or the reason resolution failed, never a second
+//! head/argument spelling. Missing and invalid annotations are distinct states.
 
 use std::collections::BTreeMap;
 
-use crate::hir::{DeclKind, Hir};
+use crate::hir::{Decl, DeclKind, DeclaredType, Hir, Span};
 use crate::privacy::{Label, Restriction};
-use crate::resolve::{DefId, Workspace};
+use crate::resolve::{DefId, Namespace, Resolution, Workspace};
+use crate::resolved::{self, Builtin, Primitive, ResolvedType, StableTypeId, TypeResolution};
 
-/// What a resolved declaration promises.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Closed set of constructors provided by the selected platform module.
+#[derive(Debug, Clone, Copy)]
+pub enum PrivacyQualifier {
+    Secret,
+    Session,
+    User,
+    Organization,
+}
+
+#[derive(Debug, Clone)]
 pub struct Signature {
-    /// `Stores.get`, as written at the call site.
     pub path: String,
-    /// Its declared effect row, as written.
+    pub definition: DefId,
     pub effects: Vec<String>,
-    /// The privacy label of what it returns.
     pub label: Label,
-    /// The return type's head, without arguments.
-    pub returns: Option<String>,
-    /// The return type's arguments: `Option<Store>` gives `["Store"]`. Needed
-    /// wherever the head alone does not say what a value IS — `Option` is not
-    /// a type, `Option<Store>` is.
-    pub returns_args: Vec<String>,
-    /// Each parameter's declared type head, in order. `None` where the
-    /// parameter carries no annotation.
-    pub params: Vec<Option<String>>,
+    /// No annotation is not the same as an annotation which did not resolve.
+    pub returns: Option<TypeResolution>,
+    pub params: Vec<Option<TypeResolution>>,
 }
 
 impl Signature {
-    /// Capability families this needs, derived from the effect row. The
-    /// placement solver takes these; it does not have its own opinion about
-    /// what `secrets.payments` requires.
     pub fn capabilities(&self) -> Vec<String> {
         self.effects
             .iter()
             .map(|e| e.split('.').next().unwrap_or(e).to_string())
             .collect()
     }
+
+    pub fn result(&self) -> Option<&ResolvedType> {
+        self.returns.as_ref().and_then(TypeResolution::resolved)
+    }
 }
 
-/// Every signature reachable in a program, by the path a call site writes.
+/// A member lookup asks for the constructor's declared member set. It does not
+/// equate two instantiated types; full value compatibility uses `same_as`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Receiver {
+    Nominal(DefId),
+    Builtin(Builtin),
+    Primitive(Primitive),
+}
+
+fn receiver(ty: &ResolvedType) -> Option<Receiver> {
+    ty.def_id()
+        .map(Receiver::Nominal)
+        .or_else(|| ty.as_builtin().map(Receiver::Builtin))
+        .or_else(|| ty.as_primitive().map(Receiver::Primitive))
+}
+
 #[derive(Debug, Default)]
 pub struct Signatures {
     by_path: BTreeMap<String, Signature>,
     by_def: BTreeMap<DefId, Signature>,
-    /// `(receiver type, member)` → signature. A function whose first parameter
-    /// is a declared type is that type's member: `offsetWidth(el: ElementRef)`
-    /// is what `anchor.offsetWidth` means.
-    by_member: BTreeMap<(String, String), Signature>,
+    by_member: BTreeMap<(Receiver, String), Signature>,
+    /// Immutable resolver snapshot, mechanically copied from the checked set.
+    workspace: Workspace,
+    /// Stable declaration paths are a projection of DefId, not a name lookup.
+    paths: BTreeMap<DefId, String>,
 }
 
 impl Signatures {
-    /// Build from the resolved workspace.
-    ///
-    /// Keyed by `Module.member` because that is what a call site writes, and by
-    /// `DefId` because that is what a resolved call yields. Both point at the
-    /// same signature, so a checker holding either sees one truth.
     pub fn build(workspace: &Workspace, units: &[&Hir]) -> Signatures {
-        let mut out = Signatures::default();
-
+        let mut out = Signatures {
+            workspace: workspace.clone(),
+            ..Signatures::default()
+        };
         for m in &workspace.modules {
             let Some(hir) = units.get(m.unit) else {
                 continue;
             };
             for (id, decl) in hir.all_decls() {
-                // A record's FIELDS are members, so a type declaration
-                // contributes to the table even though it is not callable.
-                // Without this a field access could never be typed, and a
-                // resume capture reached through one was invisible.
+                let def = DefId {
+                    unit: m.unit,
+                    decl: id.0,
+                };
+                let path = if m.name.is_empty() {
+                    decl.name.clone()
+                } else {
+                    format!("{}.{}", m.name, decl.name)
+                };
+                out.paths.insert(def, path);
+            }
+        }
+        for m in &workspace.modules {
+            let Some(hir) = units.get(m.unit) else {
+                continue;
+            };
+            for (id, decl) in hir.all_decls() {
+                let def = DefId {
+                    unit: m.unit,
+                    decl: id.0,
+                };
                 if decl.kind == DeclKind::Type
                     && let Some(fields) = &decl.fields
                 {
-                    for f in fields {
-                        let Some(ty) = &f.ty else { continue };
-                        out.by_member.insert(
-                            (decl.name.clone(), f.name.clone()),
-                            Signature {
-                                path: format!("{}.{}", decl.name, f.name),
-                                effects: vec![],
-                                label: label_from_return(
-                                    Some(ty.constructor_head_only()),
-                                    &ty.args().iter().map(|t| t.written()).collect::<Vec<_>>(),
-                                ),
-                                returns: Some(ty.constructor_head_only().to_string()),
-                                returns_args: ty.args().iter().map(|t| t.written()).collect(),
-                                params: vec![Some(decl.name.clone())],
-                            },
+                    let nominal = DeclaredType::new(decl.name.clone(), Vec::new());
+                    let recv = resolved::resolve(
+                        workspace,
+                        m.unit,
+                        Some(def),
+                        &decl.type_params,
+                        &nominal,
+                        decl.name_span.clone(),
+                    );
+                    for field in fields {
+                        let Some(written) = &field.ty else { continue };
+                        let result = resolved::resolve(
+                            workspace,
+                            m.unit,
+                            Some(def),
+                            &decl.type_params,
+                            written,
+                            field.span.clone(),
                         );
+                        let label = result.resolved().map(|t| out.label(t)).unwrap_or_default();
+                        if let Some(key) = recv.resolved().and_then(receiver) {
+                            out.by_member.insert(
+                                (key, field.name.clone()),
+                                Signature {
+                                    path: format!("{}.{}", out.paths[&def], field.name),
+                                    definition: def,
+                                    effects: vec![],
+                                    label,
+                                    returns: Some(result),
+                                    params: vec![Some(recv.clone())],
+                                },
+                            );
+                        }
                     }
                 }
                 if !matches!(
@@ -116,136 +149,225 @@ impl Signatures {
                         | DeclKind::Subscription
                         | DeclKind::Resource
                         | DeclKind::Task
+                        | DeclKind::View
+                        | DeclKind::Component
+                        | DeclKind::Page
+                        | DeclKind::Materialize
                 ) {
                     continue;
                 }
-                let sig = Signature {
-                    path: format!("{}.{}", m.name, decl.name),
-                    effects: decl
-                        .declared_effects
-                        .as_deref()
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|e| e.written.clone())
-                        .collect(),
-                    label: label_from_return(
-                        decl.ret.as_ref().map(|t| t.constructor_head_only()),
-                        &decl
-                            .ret
-                            .as_ref()
-                            .map(|t| t.args().iter().map(|a| a.written()).collect::<Vec<_>>())
-                            .unwrap_or_default(),
-                    ),
-                    returns: decl
-                        .ret
-                        .as_ref()
-                        .map(|t| t.constructor_head_only().to_string()),
-                    returns_args: decl
-                        .ret
-                        .as_ref()
-                        .map(|t| t.args().iter().map(|a| a.written()).collect())
-                        .unwrap_or_default(),
-                    params: decl
+                let sig = out.signature_of(def, decl);
+                if Namespace::of(decl.kind) == Some(Namespace::Term) {
+                    if let Some(key) = sig
                         .params
-                        .iter()
-                        .map(|p| p.ty.as_ref().map(|t| t.written()))
-                        .collect(),
-                };
-                // A function whose first parameter is a declared type reads as
-                // that type's member. `offsetWidth(el: ElementRef)` is what
-                // `anchor.offsetWidth` resolves to, and its row — not a list of
-                // property names in a checker — is what says it measures layout.
-                // The receiver's own nominal type. `constructor_head_only`
-                // is right here and audited: `offsetWidth(el: ElementRef)` is a
-                // member of `ElementRef`, and a member of `List<X>` belongs to
-                // `List` however it is parameterised.
-                if let Some(receiver) = decl
-                    .params
-                    .first()
-                    .and_then(|p| p.ty.as_ref())
-                    .map(|t| t.constructor_head_only().to_string())
-                {
-                    out.by_member
-                        .insert((receiver, decl.name.clone()), sig.clone());
+                        .first()
+                        .and_then(Option::as_ref)
+                        .and_then(TypeResolution::resolved)
+                        .and_then(receiver)
+                    {
+                        out.by_member.insert((key, decl.name.clone()), sig.clone());
+                    }
+                    out.by_path.insert(sig.path.clone(), sig.clone());
                 }
-                out.by_path.insert(sig.path.clone(), sig.clone());
-                out.by_def.insert(
-                    DefId {
-                        unit: m.unit,
-                        decl: id.0,
-                    },
-                    sig,
-                );
+                // UI declarations need interfaces too, but are not term-callable.
+                out.by_def.insert(def, sig);
             }
         }
         out
     }
 
+    pub fn workspace(&self) -> &Workspace {
+        &self.workspace
+    }
+
+    pub fn unit_of(&self, module: Option<&str>) -> Option<usize> {
+        let name = module.unwrap_or_default();
+        self.workspace
+            .modules
+            .iter()
+            .find(|m| m.name == name)
+            .map(|m| m.unit)
+    }
+
+    fn signature_of(&self, def: DefId, decl: &Decl) -> Signature {
+        let resolve = |ty: &DeclaredType, span: Span| {
+            resolved::resolve(
+                &self.workspace,
+                def.unit,
+                Some(def),
+                &decl.type_params,
+                ty,
+                span,
+            )
+        };
+        let returns = decl
+            .ret
+            .as_ref()
+            .map(|t| resolve(t, decl.name_span.clone()));
+        Signature {
+            path: self
+                .paths
+                .get(&def)
+                .cloned()
+                .unwrap_or_else(|| decl.name.clone()),
+            definition: def,
+            effects: decl
+                .declared_effects
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .map(|e| e.written.clone())
+                .collect(),
+            label: returns
+                .as_ref()
+                .and_then(TypeResolution::resolved)
+                .map(|t| self.label(t))
+                .unwrap_or_default(),
+            returns,
+            params: decl
+                .params
+                .iter()
+                .map(|p| p.ty.as_ref().map(|t| resolve(t, p.span.clone())))
+                .collect(),
+        }
+    }
+
+    pub fn resolve_type(
+        &self,
+        module: Option<&str>,
+        decl: &Decl,
+        ty: &DeclaredType,
+        span: Span,
+    ) -> TypeResolution {
+        let Some(unit) = self.unit_of(module) else {
+            return TypeResolution::Blocked {
+                why: "the annotation's declaring module is unavailable".into(),
+            };
+        };
+        let binder = Namespace::of(decl.kind).and_then(|ns| {
+            match self.workspace.resolve_in(unit, ns, &decl.name) {
+                Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+                _ => None,
+            }
+        });
+        resolved::resolve(&self.workspace, unit, binder, &decl.type_params, ty, span)
+    }
+
+    /// Language bindings such as the implicit UI receiver and event protocol
+    /// name a defining module explicitly. This is not ambient application lookup.
+    pub fn language_type(&self, module: &str, name: &str) -> Option<ResolvedType> {
+        let unit = self.unit_of(Some(module))?;
+        resolved::resolve(
+            &self.workspace,
+            unit,
+            None,
+            &[],
+            &DeclaredType::new(name, vec![]),
+            0..0,
+        )
+        .resolved()
+        .cloned()
+    }
+
     pub fn by_path(&self, path: &str) -> Option<&Signature> {
         self.by_path.get(path)
     }
-
     pub fn by_def(&self, def: DefId) -> Option<&Signature> {
         self.by_def.get(&def)
     }
 
-    /// A member of `receiver`, resolved by the receiver's TYPE.
-    ///
-    /// There is no by-name fallback and deliberately never will be. The
-    /// previous version resolved an unknown receiver to "the one declaration
-    /// with this member name, if exactly one exists" — conservative in that it
-    /// never resolved AMBIGUOUSLY, and unsafe in a way conservatism does not
-    /// fix: whether a correctness check ran at all depended on a global
-    /// accident. `resolve_corpus` showed it — a sibling declaring a second
-    /// `on_press` made the handler rule go silent rather than wrong.
-    ///
-    /// A correctness analysis never means "use this because it happens to be
-    /// the only one with this spelling".
-    pub fn member_of(&self, receiver: &str, name: &str) -> Option<&Signature> {
-        self.by_member
-            .get(&(receiver.to_string(), name.to_string()))
+    pub fn in_module(&self, module: Option<&str>, path: &str) -> Option<&Signature> {
+        let unit = self.unit_of(module)?;
+        let found = if path.contains('.') {
+            self.workspace.resolve_path_in(unit, Namespace::Term, path)
+        } else {
+            self.workspace.resolve_in(unit, Namespace::Term, path)
+        };
+        match found {
+            Resolution::Local(def) | Resolution::Imported { def, .. } => self.by_def(def),
+            _ => None,
+        }
     }
 
-    /// Every signature by path. A checker that needs to ask "which declarations
-    /// have this property" — rather than "what does this name do" — reads the
-    /// table instead of carrying its own copy of the answer.
+    pub fn member_of(&self, ty: &ResolvedType, name: &str) -> Option<&Signature> {
+        self.by_member.get(&(receiver(ty)?, name.to_string()))
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Signature)> {
         self.by_path.iter()
     }
-
+    pub fn all_signatures(&self) -> impl Iterator<Item = &Signature> {
+        self.by_def.values().chain(self.by_member.values())
+    }
     pub fn len(&self) -> usize {
-        self.by_def.len()
+        self.by_path.len()
     }
-
     pub fn is_empty(&self) -> bool {
-        self.by_def.is_empty()
+        self.by_path.is_empty()
     }
-}
 
-/// The privacy label a return type carries.
-///
-/// `Secret<Payments>` yields `Secret(Payments)`. This is the *only* place that
-/// mapping exists — it reads the declared type, not a table of function names.
-fn label_from_return(head: Option<&str>, args: &[String]) -> Label {
-    let Some(head) = head else {
-        return Label::public();
-    };
-    match head {
-        "Secret" => Label::of(Restriction::Secret(
-            args.first().cloned().unwrap_or_else(|| "?".into()),
-        )),
-        "Session" => Label::of(Restriction::Session(
-            args.first().cloned().unwrap_or_else(|| "SessionId".into()),
-        )),
-        "User" => Label::of(Restriction::User(
-            args.first().cloned().unwrap_or_else(|| "UserId".into()),
-        )),
-        "Organization" => Label::of(Restriction::Organization(
-            args.first()
-                .cloned()
-                .unwrap_or_else(|| "OrganizationId".into()),
-        )),
-        _ => Label::public(),
+    pub fn stable_type(&self, ty: &ResolvedType) -> Option<StableTypeId> {
+        resolved::stable_with(ty, &|def| self.paths.get(&def).cloned())
+    }
+
+    /// Whether this is the selected platform's privacy constructor, by DefId.
+    pub fn privacy_qualifier(&self, ty: &ResolvedType) -> Option<PrivacyQualifier> {
+        self.privacy_kind(ty.def_id()?)
+    }
+
+    pub fn privacy_kind(&self, def: DefId) -> Option<PrivacyQualifier> {
+        let module = self
+            .workspace
+            .modules
+            .iter()
+            .find(|m| m.name == "capability")?;
+        [
+            ("Secret", PrivacyQualifier::Secret),
+            ("Session", PrivacyQualifier::Session),
+            ("User", PrivacyQualifier::User),
+            ("Organization", PrivacyQualifier::Organization),
+        ]
+        .into_iter()
+        .find_map(|(name, kind)| {
+            (module.defines.get(&(Namespace::Type, name.to_string())) == Some(&def)).then_some(kind)
+        })
+    }
+
+    pub fn label(&self, ty: &ResolvedType) -> Label {
+        let mut label = Label::public();
+        if let Some(qualifier) = self.privacy_qualifier(ty)
+            && let Some(arg) = ty.args().first()
+            && let Some(identity) = self.stable_type(arg)
+        {
+            // Preserve the legacy names of the selected platform's intrinsic
+            // principals. Every other identity stays fully qualified.
+            let key = match &identity {
+                StableTypeId::Declared { path, args }
+                    if args.is_empty()
+                        && matches!(
+                            path.as_str(),
+                            "capability.SessionId"
+                                | "capability.UserId"
+                                | "capability.OrganizationId"
+                                | "capability.Payments"
+                                | "capability.Signing"
+                        ) =>
+                {
+                    path.trim_start_matches("capability.").to_string()
+                }
+                _ => format!("type:{}", identity),
+            };
+            label = Label::of(match qualifier {
+                PrivacyQualifier::Secret => Restriction::Secret(key),
+                PrivacyQualifier::Session => Restriction::Session(key),
+                PrivacyQualifier::User => Restriction::User(key),
+                PrivacyQualifier::Organization => Restriction::Organization(key),
+            });
+        }
+        for arg in ty.args() {
+            label = label.join(&self.label(arg));
+        }
+        label
     }
 }
 
@@ -275,15 +397,25 @@ mod tests {
 
         // Each receiver gets its own member, with its own row.
         assert_eq!(
-            sigs.member_of("ElementRef", "offsetWidth")
-                .expect("member")
-                .effects,
+            sigs.member_of(
+                &sigs
+                    .language_type("browser", "ElementRef")
+                    .expect("declared receiver"),
+                "offsetWidth"
+            )
+            .expect("member")
+            .effects,
             ["layout.measure"]
         );
         assert_eq!(
-            sigs.member_of("Widget", "offsetWidth")
-                .expect("member")
-                .effects,
+            sigs.member_of(
+                &sigs
+                    .language_type("other", "Widget")
+                    .expect("declared receiver"),
+                "offsetWidth"
+            )
+            .expect("member")
+            .effects,
             Vec::<String>::new()
         );
 
@@ -292,8 +424,24 @@ mod tests {
         // the old fallback resolved this, so whether a check ran depended on no
         // other type ever declaring an `only_here`. Adding one elsewhere would
         // have silently switched the rule off.
-        assert!(sigs.member_of("ElementRef", "only_here").is_none());
-        assert!(sigs.member_of("Widget", "only_here").is_some());
+        assert!(
+            sigs.member_of(
+                &sigs
+                    .language_type("browser", "ElementRef")
+                    .expect("declared receiver"),
+                "only_here"
+            )
+            .is_none()
+        );
+        assert!(
+            sigs.member_of(
+                &sigs
+                    .language_type("other", "Widget")
+                    .expect("declared receiver"),
+                "only_here"
+            )
+            .is_some()
+        );
     }
 
     /// The fallback stays deleted.
@@ -393,7 +541,8 @@ mod tests {
         // The architect's worked example, as a test. Three questions, one
         // source — not three tables that can disagree.
         let (_, sigs) = build(&[
-            "module secrets\n\nfn payments() -> Secret<Payments> !{ secret.read } { 1 }\n",
+            include_str!("../../../packages/pw-platform-web/capability.pw"),
+            "module secrets\nimport capability.{Secret, Payments}\n\nfn payments() -> Secret<Payments> !{ secret.read } { 1 }\n",
         ]);
         let s = sigs.by_path("secrets.payments").expect("the signature");
 
@@ -431,7 +580,10 @@ mod tests {
         let refs: Vec<&Hir> = hirs.iter().collect();
         let ws = Workspace::build(&refs);
         let def = ws.modules[0].lookup_any("get").expect("get");
-        assert_eq!(sigs.by_def(def), sigs.by_path("Stores.get"));
+        assert_eq!(
+            sigs.by_def(def).map(|s| s.definition),
+            sigs.by_path("Stores.get").map(|s| s.definition)
+        );
     }
 
     #[test]
@@ -439,9 +591,12 @@ mod tests {
         // The stand-in this replaces keyed off `secrets.*`. A function named
         // anything at all must carry a secret if it RETURNS one, and a function
         // called `secrets.something` must not if it does not.
-        let (_, sigs) = build(&["module anything\n\n\
+        let (_, sigs) = build(&[
+            include_str!("../../../packages/pw-platform-web/capability.pw"),
+            "module anything\nimport capability.{Secret, Signing}\n\n\
              fn innocuous_name() -> Secret<Signing> !{} { 1 }\n\
-             fn scary_sounding_secret() -> Int !{} { 1 }\n"]);
+             fn scary_sounding_secret() -> Int !{} { 1 }\n",
+        ]);
         assert_eq!(
             sigs.by_path("anything.innocuous_name")
                 .unwrap()

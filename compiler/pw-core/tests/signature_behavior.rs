@@ -1,0 +1,241 @@
+//! Behavioral regressions through public compiler entry points.
+//! This file also runs unchanged on the pre-migration compiler: its failures
+//! identify behavior, not the existence of a new representation or API.
+use pw_core::hir::{Expr, Hir};
+use pw_core::lower::lower_file;
+use pw_core::resolve::Workspace;
+use pw_core::signatures::Signatures;
+
+const CAPABILITY: &str = include_str!("../../../packages/pw-platform-web/capability.pw");
+
+fn build(sources: &[&str]) -> (Vec<Hir>, Workspace, Signatures) {
+    let hirs: Vec<_> = sources
+        .iter()
+        .map(|s| {
+            let parsed = pw_syntax::parse_tree(s);
+            assert!(parsed.ok(), "fixture must parse: {:?}", parsed.errors);
+            lower_file(s, &parsed.green)
+        })
+        .collect();
+    let refs: Vec<_> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    (hirs, ws, sigs)
+}
+
+fn event_errors(sources: &[&str]) -> Vec<pw_core::diagnostics::Diagnostic> {
+    let (hirs, _, sigs) = build(sources);
+    let mut out = vec![];
+    pw_core::annotations::check(hirs.last().unwrap(), &sigs, &mut out);
+    out
+}
+
+const EVENTS: &str =
+    "module events\ntype Event = Event { x: Int }\nfn press(e: Event) -> () { () }\n";
+
+#[test]
+fn same_spelled_events_from_different_modules_are_not_compatible() {
+    let ds = event_errors(&[
+        EVENTS,
+        "module app\ntype Event = Event { x: Int }\nfn wrong(e: Event) -> () { () }\nview V() { <button on:press={wrong}>x</button> }\n",
+    ]);
+    assert!(
+        ds.iter().any(|d| d.code == "PW0602"),
+        "nominal mismatch was lost: {ds:?}"
+    );
+    let good = event_errors(&[
+        EVENTS,
+        "module app\nimport events.{Event}\nfn right(e: Event) -> () { () }\nview V() { <button on:press={right}>x</button> }\n",
+    ]);
+    assert!(
+        good.is_empty(),
+        "the same imported type must remain valid: {good:?}"
+    );
+}
+
+#[test]
+fn imported_handler_uses_its_declaring_module_not_the_callers_spelling() {
+    let handler =
+        "module handlers\ntype Event = Event { x: Int }\nfn wrong(e: Event) -> () { () }\n";
+    let ds = event_errors(&[
+        EVENTS,
+        handler,
+        "module app\nimport handlers.{wrong}\nview V() { <button on:press={wrong}>x</button> }\n",
+    ]);
+    assert!(
+        ds.iter().any(|d| d.code == "PW0602"),
+        "imported handler went unchecked: {ds:?}"
+    );
+    let handler = "module handlers\nimport events.{Event}\nfn right(e: Event) -> () { () }\n";
+    let ds = event_errors(&[
+        EVENTS,
+        handler,
+        "module app\nimport handlers.{right}\nview V() { <button on:press={right}>x</button> }\n",
+    ]);
+    assert!(ds.is_empty(), "valid imported handler: {ds:?}");
+}
+
+#[test]
+fn a_field_keeps_its_privacy_in_the_actual_parameter_context() {
+    let src = "module app\nimport capability.{Secret, Payments}\ntype Envelope = Envelope { token: Secret<Payments> }\nfn read(e: Envelope) -> Secret<Payments> { e.token }\n";
+    let (hirs, _, sigs) = build(&[CAPABILITY, src]);
+    let hir = &hirs[1];
+    let (id, decl) = hir.all_decls().find(|(_, d)| d.name == "read").unwrap();
+    let body = hir.body(decl.body.unwrap());
+    let labels = pw_core::labels::Labels::of_body(&sigs, decl, body, hir.module_of(id), &[]);
+    let field = body
+        .walk()
+        .into_iter()
+        .find(|id| matches!(body.expr(*id), Expr::Field { name, .. } if name == "token"))
+        .unwrap();
+    assert_eq!(labels.label(body, field).to_string(), "Secret<Payments>");
+}
+
+#[test]
+fn same_spelled_user_type_does_not_impersonate_the_privacy_constructor() {
+    let (hirs, ws, sigs) = build(&[
+        CAPABILITY,
+        "module app\nopaque type Secret<T> = String\nquery f(x: Secret<Int>) -> Secret<Int> { x }\n",
+    ]);
+    assert!(
+        sigs.by_path("app.f").unwrap().label.is_public(),
+        "a spelling is not a platform privacy declaration"
+    );
+    let refs: Vec<_> = hirs.iter().collect();
+    let cs = pw_core::contract::contracts(&refs, &sigs, &ws);
+    assert!(
+        pw_core::wit::package(&refs, &ws, &cs).is_err(),
+        "unsupported user generic must not borrow the platform qualifier's ABI erasure"
+    );
+}
+
+fn capture_codes(sources: &[&str]) -> Vec<&'static str> {
+    let (hirs, _, sigs) = build(sources);
+    let refs: Vec<_> = hirs.iter().collect();
+    let facts = pw_core::boundary::TypeFacts::build(&refs, &sigs);
+    let mut ds = vec![];
+    pw_core::resume::check(hirs.last().unwrap(), &sigs, &facts, &mut ds);
+    ds.iter().map(|d| d.code).collect()
+}
+
+#[test]
+fn acquiring_one_modules_type_does_not_classify_a_homonym_as_a_resource() {
+    let owned = "module alpha\nopaque type Item = String\nfn acquire() -> Item !{ resource.acquire<Item> } { todo }\n";
+    let public = "module beta\nopaque type Item = String\nview V(x: Item) { <button on:press={resumable(captures = { x }) => x}>x</button> }\n";
+    let good = capture_codes(&[owned, public]);
+    assert!(good.is_empty(), "beta.Item is not alpha.Item: {good:?}");
+    let private = "module beta\nimport alpha.{Item}\nview V(x: Item) { <button on:press={resumable(captures = { x }) => x}>x</button> }\n";
+    let bad = capture_codes(&[owned, private]);
+    assert!(
+        bad.contains(&"PW5008"),
+        "the actual resource must remain refused: {bad:?}"
+    );
+}
+
+#[test]
+fn acquired_generic_type_keeps_its_complete_arguments() {
+    let acquired =
+        "module alpha\nfn acquire() -> List<Int> !{ resource.acquire<List<Int>> } { todo }\n";
+    for (ty, resource) in [
+        ("List<Int>", true),
+        ("List<String>", false),
+        ("Option<List<Int>>", true),
+    ] {
+        let source = format!(
+            "module beta\nview V(x: {ty}) {{ <button on:press={{resumable(captures = {{ x }}) => x}}>x</button> }}\n"
+        );
+        let ds = capture_codes(&[acquired, &source]);
+        assert_eq!(ds.contains(&"PW5008"), resource, "{ty}: {ds:?}");
+        assert!(
+            !ds.contains(&"PW5016"),
+            "every test type is fully known: {ds:?}"
+        );
+    }
+}
+
+fn schema(sources: &[&str], at: usize) -> String {
+    let (hirs, _, sigs) = build(sources);
+    let pairs = pw_core::resume_artifacts::generate(sources[at], &hirs[at], &sigs, "test");
+    assert_eq!(pairs.len(), 1, "one real handler, not an empty comparison");
+    assert!(pw_core::resume_artifacts::disagreement(&pairs[0].0, &pairs[0].1).is_none());
+    pairs[0].0.capture_schema.clone()
+}
+
+#[test]
+fn capture_schema_changes_for_a_different_nominal_identity_not_file_order() {
+    let alpha = "module alpha\nopaque type Tag = String\n";
+    let beta = "module beta\nopaque type Tag = String\n";
+    let a = "module app\nimport alpha.{Tag}\nview V(x: Tag) { <button on:press={resumable(captures = { x }) => x}>x</button> }\n";
+    let b = a.replace("alpha.{Tag}", "beta.{Tag}");
+    let first = schema(&[alpha, beta, a], 2);
+    assert_ne!(
+        first,
+        schema(&[alpha, beta, &b], 2),
+        "different nominal types cannot share the capture schema"
+    );
+    assert_eq!(
+        first,
+        schema(&[a, beta, alpha], 0),
+        "process-local DefIds are not artifact identity"
+    );
+}
+
+fn generated_wit(source: &str) -> String {
+    let (hirs, ws, sigs) = build(&[source]);
+    let refs: Vec<_> = hirs.iter().collect();
+    let cs = pw_core::contract::contracts(&refs, &sigs, &ws);
+    let (wit, _) = pw_core::wit::package(&refs, &ws, &cs).expect("supported type must project");
+    wit_parser::Resolve::default()
+        .push_str("generated.wit", &wit)
+        .expect("independent upstream WIT parser");
+    wit
+}
+
+#[test]
+fn nested_result_arguments_are_not_split_at_the_inner_comma() {
+    let wit = generated_wit(
+        "module app\nquery echo(x: List<Result<Int, String>>) -> List<Result<Int, String>> { x }\n",
+    );
+    assert!(wit.contains("list<result<s64, string>>"), "{wit}");
+}
+
+#[test]
+fn every_variant_payload_field_reaches_the_component_type() {
+    let wit = generated_wit(
+        "module app\ntype Choice = | Pair(Int, String) | None\nquery echo(x: Choice) -> Choice { x }\n",
+    );
+    assert!(
+        wit.contains("pair(tuple<s64, string>)"),
+        "second payload field was lost: {wit}"
+    );
+}
+
+#[test]
+fn unit_and_empty_record_have_unit_abis_not_boolean_placeholders() {
+    let wit = generated_wit(
+        "module app\ntype Empty = Empty {}\nquery echo(x: Empty) -> Empty { x }\nquery nested(x: Option<()>) -> Result<(), String> { todo }\n",
+    );
+    assert!(wit.contains("type app-empty = tuple<>;"), "{wit}");
+    assert!(wit.contains("option<tuple<>>"), "{wit}");
+    assert!(wit.contains("result<tuple<>, string>"), "{wit}");
+}
+
+#[test]
+fn explicit_private_signature_requires_a_principal_preserving_remote_binding() {
+    let (hirs, ws, sigs) = build(&[
+        CAPABILITY,
+        "module app\nimport capability.{Session, SessionId}\nquery pass(x: Session<SessionId>) -> Session<SessionId> { x }\n",
+    ]);
+    let refs: Vec<_> = hirs.iter().collect();
+    let cs = pw_core::contract::contracts(&refs, &sigs, &ws);
+    let c = cs.iter().find(|c| c.component_id == "app.pass").unwrap();
+    let remote = &c.exports[0].binding.remote;
+    let pw_core::binding::RemoteSupport::Conditional { obligations } = remote else {
+        panic!("private signature was treated as unconditional: {remote:?}")
+    };
+    assert_eq!(
+        obligations.len(),
+        2,
+        "both inbound and outbound positions owe the obligation"
+    );
+}

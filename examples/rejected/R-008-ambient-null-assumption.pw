@@ -13,6 +13,8 @@
 
 module store.lookup
 
+import domain.{ StoreId, Store }
+
 import Stores
 
 fn store_name(id: StoreId) -> String !{ database.read<Stores> } {

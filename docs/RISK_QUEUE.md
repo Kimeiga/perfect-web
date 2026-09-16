@@ -535,3 +535,18 @@ something passes must name which of the two produced it.
 The five instances so far are why. Two flattered the system, one damned it, and
 one (`.kki` reporting polymorphic rows as total) would have let a *gate* pass
 while hiding the case the architect had flagged as most important.
+
+
+## Resolved-signature cutover, 2026-09-16
+
+ADR-0030 removes written signature heads as semantic authority. Eleven behavioral
+regressions were executed against the original compiler (all failed) and the
+repair (all passed), plus identity and historical-boundary controls. Captures,
+member dispatch, privacy and WIT now consume resolved identities. Complete
+nested effect/variant/opaque arguments survive lowering.
+
+Still open: comprehensive argument/return unification and blocked-annotation
+diagnostics; callable generics and nominal arity; internal backend value layout;
+transitive schema evolution; enforcing conditional RPC principal preservation;
+E10-I. The new RPC result is an explicit obligation, not a runtime authorization
+proof. [Evidence](evidence/E9/signature-authority-2026-09-16.md).
