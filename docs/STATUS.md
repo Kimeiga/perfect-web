@@ -2,8 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-09-15, starting from master
-`4a9bcddc095b3b4d0eac0e0c2ddb8a0143de03d9`.
+**Reviewed:** 2026-09-16, resource-runtime continuation from master
+`49398dc02be6f2c3ea1a28fdfb77bf66c15266b6`.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -20,6 +20,19 @@ The former status file mixed chronological notes with obsolete headlines such as
 observations, not the current completion state. No old raw evidence is rewritten.
 
 ## completed gate items
+
+- **2026-09-16 resource repair:** shared requests now return the real terminal
+  outcome; cancellation/invalidation fence late publication; command admission
+  is atomic within this runtime; unwinding commands retain an explicit unknown
+  outcome; logical deadlines and privacy mismatches are enforced. The full local
+  workspace passed **937 tests, 0 failures, 1 existing ignored test**, including
+  **24 new tests**. All nine initial regressions failed on the old runtime first.
+  Formatter, workspace Clippy, corpus checks, recipe gates, and census/tooling
+  suites passed. See [ADR-0029](DECISIONS/ADR-0029-owned-resource-flights-and-command-outcomes.md)
+  and [scope, reproduction, and census mapping](evidence/E4/resource-repair-2026-09-16.md).
+  This is a synchronous process-local repair, not durable exactly-once, a
+  production cancellation adapter, or completion of E9/E10-I. Its own PR checks
+  must establish the engine-feature build and current dependency audit.
 
 - **2026-09-15 compiler follow-up:** recursive written types and one complete
   return annotation now survive lowering. Nested arguments resolve recursively;
@@ -75,6 +88,8 @@ this tooling repair does not independently re-establish those milestones.
 ## exact commands to reproduce
 
 ```sh
+cargo test --locked -p pw-resource
+cargo test --locked --workspace
 just evidence-gates
 just ci
 just audit
@@ -90,6 +105,11 @@ commands retain their real toolchain requirements. `just doctor` is read-only;
 `just bootstrap` installs the pinned project dependencies.
 
 ## known environmental issues
+
+The September 16 resource repair used the pinned Rust 1.97.1 and locked registry
+snapshot locally on Linux x86_64. Its full workspace run completed with a captured
+zero exit code. These real runtime/compiler results are distinct from the earlier
+mocked recipe tests. The evidence report records scope and environment.
 
 The September 15 local review environment was Linux x86_64 with Python 3.13.5,
 Node 22.16.0 and just 1.58.0. Rust was not available locally; actual Rust builds
