@@ -45,7 +45,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::binding::Interface;
 use crate::contract::{ComponentContract, ImportKind};
 use crate::hir::{Decl, DeclKind, Hir};
-use crate::resolve::{Namespace, Resolution, Workspace};
+use crate::resolve::{DefId, Workspace};
+use crate::resolved::{self, Builtin, Primitive, ResolvedType, TypeResolution};
+use crate::signatures::Signatures;
 
 /// The package version every generated world carries.
 ///
@@ -171,23 +173,22 @@ pub struct Types {
     known: BTreeMap<String, String>,
     /// `DefId` → qualified path, so a resolved reference finds its definition.
     by_def: BTreeMap<crate::resolve::DefId, String>,
+    qualifiers: BTreeSet<DefId>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum TypeDef {
     /// `type Store = Store { id: Int }` → a WIT record.
     Record {
         name: String,
         /// Where it was declared, so its field types resolve from there.
-        unit: usize,
-        fields: Vec<(String, String)>,
+        fields: Vec<(String, TypeResolution)>,
     },
     /// A sum type → a WIT variant. Payload-free cases become `enum`-shaped
     /// variants, which WIT allows and which keeps one construct for both.
     Variant {
         name: String,
-        unit: usize,
-        cases: Vec<(String, Vec<String>)>,
+        cases: Vec<(String, Vec<TypeResolution>)>,
     },
     /// `opaque type StoreId = String`.
     ///
@@ -198,16 +199,12 @@ enum TypeDef {
     /// is about the Pleris type system, where the distinction is enforced;
     /// once a value is on a wire there is nothing left to enforce it with, and
     /// pretending otherwise would be the lie.
-    Alias {
-        name: String,
-        unit: usize,
-        of: String,
-    },
+    Alias { name: String, of: TypeResolution },
 }
 
 impl Types {
     /// Collect every type the program declares, by resolved identity.
-    pub fn build(hirs: &[&Hir]) -> Types {
+    pub fn build(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Types {
         let mut out = Types::default();
         for (unit, hir) in hirs.iter().enumerate() {
             for (id, d) in hir.all_decls() {
@@ -222,34 +219,44 @@ impl Types {
                 };
                 out.by_def
                     .insert(crate::resolve::DefId { unit, decl: id.0 }, path.clone());
+                let def = DefId { unit, decl: id.0 };
+                if sigs.privacy_kind(def).is_some() {
+                    out.qualifiers.insert(def);
+                }
                 match d.kind {
                     DeclKind::Opaque => {
                         let Some(of) = &d.opaque_of else { continue };
                         out.known.insert(path.clone(), ident(&path));
                         out.defs.push(TypeDef::Alias {
                             name: path,
-                            of: of.clone(),
-                            unit,
+                            of: resolve_fragment(ws, unit, d, def, of),
                         });
                     }
-                    _ => out.push_type(&path, unit, d),
+                    _ => out.push_type(&path, unit, d, ws, def),
                 }
             }
         }
         out
     }
 
-    fn push_type(&mut self, path: &str, unit: usize, d: &Decl) {
+    fn push_type(&mut self, path: &str, unit: usize, d: &Decl, ws: &Workspace, def: DefId) {
         if let Some(variants) = &d.variants
             && variants.len() > 1
         {
             self.known.insert(path.to_string(), ident(path));
             self.defs.push(TypeDef::Variant {
                 name: path.to_string(),
-                unit,
                 cases: variants
                     .iter()
-                    .map(|v| (v.name.clone(), v.fields.clone()))
+                    .map(|v| {
+                        (
+                            v.name.clone(),
+                            v.fields
+                                .iter()
+                                .map(|t| resolve_fragment(ws, unit, d, def, t))
+                                .collect(),
+                        )
+                    })
                     .collect(),
             });
             return;
@@ -267,54 +274,65 @@ impl Types {
             .as_ref()
             .map(|fs| {
                 fs.iter()
-                    .filter_map(|f| f.ty.as_ref().map(|t| (f.name.clone(), t.written())))
+                    .filter_map(|f| {
+                        f.ty.as_ref().map(|t| {
+                            (
+                                f.name.clone(),
+                                resolved::resolve(
+                                    ws,
+                                    unit,
+                                    Some(def),
+                                    &d.type_params,
+                                    t,
+                                    f.span.clone(),
+                                ),
+                            )
+                        })
+                    })
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
         self.known.insert(path.to_string(), ident(path));
         self.defs.push(TypeDef::Record {
             name: path.to_string(),
-            unit,
             fields,
         });
     }
 
-    /// **The qualified path a written type name means, from where it is
-    /// written.**
-    ///
-    /// Resolution, not spelling. `SessionId` in `store.page` and `SessionId` in
-    /// `web.capability` are two types, and which one a signature means is the
-    /// workspace's answer — the same one every other analysis asks for. A
-    /// generator matching on the bare name would pick whichever it saw first.
-    fn resolve(&self, ws: &Workspace, unit: usize, name: &str) -> Option<&str> {
-        match ws.resolve_in(unit, Namespace::Type, name) {
-            Resolution::Local(def) | Resolution::Imported { def, .. } => {
-                self.by_def.get(&def).map(String::as_str)
-            }
-            _ => None,
+    /// The declarations the ABI representation actually names. A transparent
+    /// privacy qualifier contributes its argument, not a phantom WIT wrapper.
+    fn declared_within(&self, ty: &ResolvedType, out: &mut BTreeSet<String>) {
+        if let Some(def) = ty.def_id()
+            && !self.qualifiers.contains(&def)
+            && let Some(path) = self.by_def.get(&def)
+        {
+            out.insert(path.clone());
+        }
+        for arg in ty.args() {
+            self.declared_within(arg, out);
         }
     }
+}
 
-    /// Every DECLARED type inside a written type, `Result<Store, E>` included,
-    /// as qualified paths.
-    ///
-    /// Recursive over the carriers, because `use types.{result}` is not a thing
-    /// and `use types.{store}` is — a signature naming `Result<Store, E>`
-    /// touches `Store` and `E`, not `Result`.
-    fn declared_within(
-        &self,
-        ws: &Workspace,
-        unit: usize,
-        written: &str,
-        out: &mut BTreeSet<String>,
-    ) {
-        let (head, args) = split(written);
-        if let Some(path) = self.resolve(ws, unit, head) {
-            out.insert(path.to_string());
-        }
-        for a in args {
-            self.declared_within(ws, unit, a, out);
-        }
+fn resolve_fragment(
+    ws: &Workspace,
+    unit: usize,
+    decl: &Decl,
+    def: DefId,
+    text: &str,
+) -> TypeResolution {
+    match crate::lower::type_fragment(text) {
+        Some(ty) => resolved::resolve(
+            ws,
+            unit,
+            Some(def),
+            &decl.type_params,
+            &ty,
+            decl.name_span.clone(),
+        ),
+        None => TypeResolution::Blocked {
+            why: format!("invalid type syntax `{text}`"),
+        },
     }
 }
 
@@ -327,16 +345,8 @@ impl TypeDef {
         }
     }
 
-    fn unit(&self) -> usize {
-        match self {
-            TypeDef::Record { unit, .. }
-            | TypeDef::Variant { unit, .. }
-            | TypeDef::Alias { unit, .. } => *unit,
-        }
-    }
-
     /// The types this definition mentions, as written.
-    fn referenced(&self) -> Vec<String> {
+    fn referenced(&self) -> Vec<TypeResolution> {
         match self {
             TypeDef::Record { fields, .. } => fields.iter().map(|(_, t)| t.clone()).collect(),
             TypeDef::Variant { cases, .. } => cases.iter().flat_map(|(_, f)| f.clone()).collect(),
@@ -345,83 +355,59 @@ impl TypeDef {
     }
 }
 
-/// A written type into its head and arguments.
-fn split(written: &str) -> (&str, Vec<&str>) {
-    match written.split_once('<') {
-        Some((h, rest)) => (
-            h.trim(),
-            rest.trim_end_matches('>')
-                .split(',')
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .collect(),
-        ),
-        None => (written.trim(), Vec::new()),
-    }
+/// A WIT type is projected from resolved semantic identity, never re-resolved
+/// from a signature's printed spelling in a possibly different module.
+fn wit_type(resolution: &TypeResolution, types: &Types, at: &str) -> Result<String, WitError> {
+    let ty = resolution.resolved().ok_or_else(|| WitError::Unmappable {
+        ty: match resolution {
+            TypeResolution::Unresolved { written, .. } => written.clone(),
+            _ => resolution.to_string(),
+        },
+        at: at.to_string(),
+    })?;
+    wit_resolved(ty, types, at)
 }
 
-/// **A Pleris type name as WIT.**
-///
-/// The table is explicit and short on purpose. Everything not in it and not
-/// declared by the program is [`WitError::Unmappable`] — a generator that fell
-/// back to `string` would produce a world that parses and decodes a value into
-/// something it never was.
-fn wit_type(
-    ty: &str,
-    types: &Types,
-    ws: &Workspace,
-    unit: usize,
-    at: &str,
-) -> Result<String, WitError> {
-    let (head, args) = split(ty);
-    let mapped = |a: &str| wit_type(a, types, ws, unit, at);
-    Ok(match (head, args.as_slice()) {
-        ("Int", []) => "s64".to_string(),
-        ("Float", []) => "f64".to_string(),
-        ("Bool", []) => "bool".to_string(),
-        ("String" | "Str", []) => "string".to_string(),
-        ("Unit", []) => "_".to_string(),
-        ("List", [a]) => format!("list<{}>", mapped(a)?),
-        ("Option", [a]) => format!("option<{}>", mapped(a)?),
-        ("Result", [a, e]) => format!("result<{}, {}>", mapped(a)?, mapped(e)?),
-        ("Result", [a]) => format!("result<{}>", mapped(a)?),
-        // **A privacy qualifier is TRANSPARENT.** Architect ruling, 2026-08-20:
-        //
-        // > Privacy qualification is semantic metadata; it need not have an
-        // > independent runtime representation.
-        // >
-        // >     AbiRepresentation(Session<T>) = Transparent(AbiRepresentation(T))
-        //
-        // So `Session<SessionId>` crosses as whatever `SessionId` crosses as,
-        // and the SEMANTIC contract keeps the restriction that WIT never sees —
-        // which is correct, because WIT could not prove `Session<A> → Session<B>`
-        // anyway. That stays Pleris contract semantics, as capabilities stay
-        // outside ordinary core Wasm types.
-        //
-        // The qualifier set comes from `labels::label_of_type`, the one place
-        // that says what a qualifier is, so this is not a second list.
-        //
-        // **This is not "an opaque type is its representation".** Opacity and
-        // ABI transparency are different facts, and the arm below still refuses
-        // a generic opaque type that is not a qualifier — see
-        // `a_generic_opaque_type_that_is_not_a_qualifier_still_has_no_wit_form`.
-        (h, [inner]) if crate::labels::is_privacy_qualifier(h) => mapped(inner)?,
-        (h, []) => match types.resolve(ws, unit, h) {
-            Some(path) => ident(path),
-            None => {
-                return Err(WitError::Unmappable {
-                    ty: ty.to_string(),
-                    at: at.to_string(),
-                });
-            }
-        },
-        _ => {
-            return Err(WitError::Unmappable {
-                ty: ty.to_string(),
-                at: at.to_string(),
-            });
+fn wit_resolved(ty: &ResolvedType, types: &Types, at: &str) -> Result<String, WitError> {
+    let bad = || WitError::Unmappable {
+        ty: ty.display_name(),
+        at: at.to_string(),
+    };
+    if let Some(p) = ty.as_primitive() {
+        return Ok(match p {
+            Primitive::Int => "s64",
+            Primitive::Float => "f64",
+            Primitive::Bool => "bool",
+            Primitive::Str => "string",
+            Primitive::Unit => "tuple<>",
         }
-    })
+        .to_string());
+    }
+    let mapped = |index: usize| wit_resolved(ty.args().get(index).ok_or_else(bad)?, types, at);
+    if let Some(builtin) = ty.as_builtin() {
+        return Ok(match builtin {
+            Builtin::List => format!("list<{}>", mapped(0)?),
+            Builtin::Option => format!("option<{}>", mapped(0)?),
+            Builtin::Result => format!("result<{}, {}>", mapped(0)?, mapped(1)?),
+        });
+    }
+    let def = ty.def_id().ok_or_else(bad)?;
+    if types.qualifiers.contains(&def) {
+        if ty.args().len() != 1 {
+            return Err(bad());
+        }
+        return mapped(0);
+    }
+    // Generic nominal layouts require specialization. Refuse rather than erase
+    // arguments and accidentally publish the unspecialized representation.
+    if !ty.args().is_empty() {
+        return Err(bad());
+    }
+    types
+        .by_def
+        .get(&def)
+        .map(|path| ident(path))
+        .ok_or_else(bad)
 }
 
 /// One exported declaration's signature, as WIT, plus the declared types it
@@ -441,8 +427,6 @@ fn wit_func(
     ident: &str,
     sig: &Interface,
     types: &Types,
-    ws: &Workspace,
-    unit: usize,
 ) -> Result<(String, BTreeSet<String>), WitError> {
     let name = ident;
     let at = format!("`{name}`");
@@ -455,19 +439,23 @@ fn wit_func(
                 at: at.clone(),
             });
         };
-        params.push(format!("arg{i}: {}", wit_type(ty, types, ws, unit, &at)?));
-        types.declared_within(ws, unit, ty, &mut used);
+        params.push(format!("arg{i}: {}", wit_type(ty, types, &at)?));
+        if let Some(ty) = ty.resolved() {
+            types.declared_within(ty, &mut used);
+        }
     }
-    let ret = match sig.returns.as_deref() {
+    let ret = match sig.returns.as_ref() {
         None => String::new(),
-        Some(head) => {
-            let written = if sig.returns_args.is_empty() {
-                head.to_string()
+        Some(resolution) => {
+            let mapped = wit_type(resolution, types, &at)?;
+            if let Some(ty) = resolution.resolved() {
+                types.declared_within(ty, &mut used);
+            }
+            if resolution.resolved().and_then(ResolvedType::as_primitive) == Some(Primitive::Unit) {
+                String::new()
             } else {
-                format!("{head}<{}>", sig.returns_args.join(", "))
-            };
-            types.declared_within(ws, unit, &written, &mut used);
-            format!(" -> {}", wit_type(&written, types, ws, unit, &at)?)
+                format!(" -> {mapped}")
+            }
         }
     };
     Ok((format!("{ident}: func({}){ret};", params.join(", ")), used))
@@ -508,7 +496,8 @@ pub fn package(
     ws: &Workspace,
     contracts: &[ComponentContract],
 ) -> Result<(String, Vec<World>), WitError> {
-    let types = Types::build(hirs);
+    let sigs = Signatures::build(ws, hirs);
+    let types = Types::build(hirs, ws, &sigs);
     no_collisions(types.known.keys().cloned())?;
     no_collisions(contracts.iter().map(|c| c.component_id.clone()))?;
 
@@ -516,7 +505,7 @@ pub fn package(
     // Contracts are keyed by `module.Name`, which is how `contracts()` builds a
     // component id — read rather than reconstructed, for the same reason the
     // planner reads the exporter map rather than reformatting an id.
-    let mut decls: BTreeMap<String, (usize, &Decl)> = BTreeMap::new();
+    let mut decls: BTreeMap<String, (DefId, &Decl)> = BTreeMap::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, d) in hir.all_decls() {
             let module = hir.module_of(id).unwrap_or_default();
@@ -525,7 +514,7 @@ pub fn package(
             } else {
                 format!("{module}.{}", d.name)
             };
-            decls.insert(path, (unit, d));
+            decls.insert(path, (DefId { unit, decl: id.0 }, d));
         }
     }
 
@@ -555,14 +544,18 @@ pub fn package(
         // One contract per DECLARATION, so the export's signature is the
         // component's own declaration — looked up by the path `contracts()`
         // built the id from, not reconstructed.
-        let (unit, sig) = match decls.get(&c.component_id) {
-            Some((u, d)) => (*u, Interface::of(d)),
-            None => (0, Interface::default()),
-        };
+        let sig = decls
+            .get(&c.component_id)
+            .and_then(|(def, _)| sigs.by_def(*def))
+            .map(Interface::from)
+            .ok_or_else(|| WitError::Unmappable {
+                ty: "missing component signature".into(),
+                at: c.component_id.clone(),
+            })?;
         let mut funcs = Vec::new();
         let mut used: BTreeSet<String> = BTreeSet::new();
         for e in &c.exports {
-            let (f, u) = wit_func(&ident(&e.name), &sig, &types, ws, unit)?;
+            let (f, u) = wit_func(&ident(&e.name), &sig, &types)?;
             funcs.push(f);
             used.extend(u);
         }
@@ -593,7 +586,7 @@ pub fn package(
     let mut hosts: BTreeMap<String, HostPackage> = BTreeMap::new();
     let mut host_uses: BTreeSet<String> = BTreeSet::new();
     for (unit, hir) in hirs.iter().enumerate() {
-        for (_, d) in hir.all_decls() {
+        for (decl_id, d) in hir.all_decls() {
             let Some(id) = crate::backend::host_binding(d) else {
                 continue;
             };
@@ -604,8 +597,17 @@ pub fn package(
             let Some((pkg, iface)) = id.interface.split_once('/') else {
                 continue;
             };
-            let sig = Interface::of(d);
-            let (text, used) = wit_func(&id.name, &sig, &types, ws, unit)?;
+            let sig = sigs
+                .by_def(DefId {
+                    unit,
+                    decl: decl_id.0,
+                })
+                .map(Interface::from)
+                .ok_or_else(|| WitError::Unmappable {
+                    ty: "missing host signature".into(),
+                    at: id.qualified(),
+                })?;
+            let (text, used) = wit_func(&id.name, &sig, &types)?;
             host_uses.extend(used.iter().cloned());
             let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
                 name: pkg.to_string(),
@@ -635,7 +637,7 @@ pub fn package(
         .flat_map(|a| a.uses.iter().cloned())
         .chain(host_uses)
         .collect();
-    let type_text = render_types(&types, ws, &reachable(&types, ws, seeds))?;
+    let type_text = render_types(&types, &reachable(&types, seeds))?;
     Ok((render(&type_text, &apis, &worlds, &hosts), worlds))
 }
 
@@ -680,17 +682,21 @@ pub fn host_signatures(
     hirs: &[&Hir],
     ws: &Workspace,
 ) -> BTreeMap<String, Result<String, WitError>> {
-    let types = Types::build(hirs);
+    let sigs = Signatures::build(ws, hirs);
+    let types = Types::build(hirs, ws, &sigs);
     // Collected before rendering, because a second claimant is a defect about
     // the OPERATION and not about either declaration's signature — and
     // `out.insert` on a duplicate key answers with whichever came last, which
     // is how the effect declarations' empty signatures once overwrote the real
     // ones.
-    let mut claims: BTreeMap<String, Vec<(usize, &Decl)>> = BTreeMap::new();
+    let mut claims: BTreeMap<String, Vec<DefId>> = BTreeMap::new();
     for (unit, hir) in hirs.iter().enumerate() {
-        for (_, d) in hir.all_decls() {
+        for (decl_id, d) in hir.all_decls() {
             if let Some(id) = crate::backend::host_binding(d) {
-                claims.entry(id.qualified()).or_default().push((unit, d));
+                claims.entry(id.qualified()).or_default().push(DefId {
+                    unit,
+                    decl: decl_id.0,
+                });
             }
         }
     }
@@ -703,9 +709,15 @@ pub fn host_signatures(
             .unwrap_or(&operation)
             .to_string();
         let rendered = match claimants.as_slice() {
-            [(unit, d)] => {
-                wit_func(&name, &Interface::of(d), &types, ws, *unit).map(|(text, _)| text)
-            }
+            [def] => sigs
+                .by_def(*def)
+                .ok_or_else(|| WitError::Unmappable {
+                    ty: "missing host signature".into(),
+                    at: operation.clone(),
+                })
+                .and_then(|sig| {
+                    wit_func(&name, &Interface::from(sig), &types).map(|(text, _)| text)
+                }),
             many => Err(WitError::Claimed {
                 operation: operation.clone(),
                 count: many.len(),
@@ -737,11 +749,7 @@ struct Api {
 /// calls. Emitting the whole program's types would put shapes on the ABI that
 /// nothing crosses it, and would make any one of them unmappable a refusal for
 /// a package that never needed it.
-fn reachable(
-    types: &Types,
-    ws: &Workspace,
-    seeds: impl IntoIterator<Item = String>,
-) -> BTreeSet<String> {
+fn reachable(types: &Types, seeds: impl IntoIterator<Item = String>) -> BTreeSet<String> {
     let mut out: BTreeSet<String> = BTreeSet::new();
     let mut stack: Vec<String> = seeds.into_iter().collect();
     while let Some(path) = stack.pop() {
@@ -753,7 +761,9 @@ fn reachable(
         };
         let mut found: BTreeSet<String> = BTreeSet::new();
         for written in def.referenced() {
-            types.declared_within(ws, def.unit(), &written, &mut found);
+            if let Some(ty) = written.resolved() {
+                types.declared_within(ty, &mut found);
+            }
         }
         stack.extend(found);
     }
@@ -765,24 +775,20 @@ fn reachable(
 /// **Refusing, not emitting a placeholder.** A record whose field has no WIT
 /// form is one a host would decode into something it never was, and this is
 /// reached only for types an export actually names.
-fn render_types(
-    types: &Types,
-    ws: &Workspace,
-    wanted: &BTreeSet<String>,
-) -> Result<String, WitError> {
+fn render_types(types: &Types, wanted: &BTreeSet<String>) -> Result<String, WitError> {
     let mut out = String::new();
     for def in &types.defs {
         if !wanted.contains(def.name()) {
             continue;
         }
-        let (name, unit) = (def.name(), def.unit());
+        let name = def.name();
         match def {
             TypeDef::Record { fields, .. } => {
                 if fields.is_empty() {
                     // A WIT record must have at least one field. A Pleris type
                     // with none carries no information, and a nameable type
                     // carrying none is the nearest honest thing.
-                    out.push_str(&format!("    type {} = bool;\n", ident(name)));
+                    out.push_str(&format!("    type {} = tuple<>;\n", ident(name)));
                     continue;
                 }
                 out.push_str(&format!("    record {} {{\n", ident(name)));
@@ -790,7 +796,7 @@ fn render_types(
                     out.push_str(&format!(
                         "        {}: {},\n",
                         ident(f),
-                        wit_type(ty, types, ws, unit, name)?
+                        wit_type(ty, types, name)?
                     ));
                 }
                 out.push_str("    }\n");
@@ -798,14 +804,18 @@ fn render_types(
             TypeDef::Variant { cases, .. } => {
                 out.push_str(&format!("    variant {} {{\n", ident(name)));
                 for (case, fields) in cases {
-                    match fields.first() {
-                        Some(ty) => out.push_str(&format!(
-                            "        {}({}),\n",
-                            ident(case),
-                            wit_type(ty, types, ws, unit, name)?
-                        )),
-                        None => out.push_str(&format!("        {},\n", ident(case))),
-                    }
+                    let payload = match fields.as_slice() {
+                        [] => String::new(),
+                        [ty] => format!("({})", wit_type(ty, types, name)?),
+                        many => format!(
+                            "(tuple<{}>)",
+                            many.iter()
+                                .map(|ty| wit_type(ty, types, name))
+                                .collect::<Result<Vec<_>, _>>()?
+                                .join(", ")
+                        ),
+                    };
+                    out.push_str(&format!("        {}{},\n", ident(case), payload));
                 }
                 out.push_str("    }\n");
             }
@@ -813,7 +823,7 @@ fn render_types(
                 out.push_str(&format!(
                     "    type {} = {};\n",
                     ident(name),
-                    wit_type(of, types, ws, unit, name)?
+                    wit_type(of, types, name)?
                 ));
             }
         }
@@ -948,8 +958,24 @@ mod tests {
             &pw_syntax::parse_tree(src).green,
         )];
         let refs: Vec<&Hir> = hirs.iter().collect();
-        let types = Types::build(&refs);
+        let ws = Workspace::build(&refs);
+        let sigs = Signatures::build(&ws, &refs);
+        let types = Types::build(&refs, &ws, &sigs);
         (hirs, types)
+    }
+
+    // The unit tests enter through the same syntax/resolution boundary as an
+    // annotation. The WIT projection itself never accepts a type spelling.
+    fn project_written(
+        source: &str,
+        types: &Types,
+        ws: &Workspace,
+        unit: usize,
+        at: &str,
+    ) -> Result<String, WitError> {
+        let written = crate::lower::type_fragment(source).expect("valid type syntax");
+        let resolved = crate::resolved::resolve(ws, unit, None, &[], &written, 0..source.len());
+        wit_type(&resolved, types, at)
     }
 
     const SHOP: &str = "\
@@ -967,7 +993,7 @@ type Store = Store { id: Int }
         let refs: Vec<&Hir> = hirs.iter().collect();
         let ws = Workspace::build(&refs);
 
-        let err = wit_type("Whatever", &types, &ws, 0, "f").expect_err("unmappable");
+        let err = project_written("Whatever", &types, &ws, 0, "f").expect_err("unmappable");
         assert_eq!(
             err,
             WitError::Unmappable {
@@ -976,13 +1002,13 @@ type Store = Store { id: Int }
             }
         );
         // The control: the primitives and the carriers do map.
-        assert_eq!(wit_type("Int", &types, &ws, 0, "f").unwrap(), "s64");
+        assert_eq!(project_written("Int", &types, &ws, 0, "f").unwrap(), "s64");
         assert_eq!(
-            wit_type("Result<Int, String>", &types, &ws, 0, "f").unwrap(),
+            project_written("Result<Int, String>", &types, &ws, 0, "f").unwrap(),
             "result<s64, string>"
         );
         assert_eq!(
-            wit_type("List<Option<Bool>>", &types, &ws, 0, "f").unwrap(),
+            project_written("List<Option<Bool>>", &types, &ws, 0, "f").unwrap(),
             "list<option<bool>>"
         );
     }
@@ -1000,11 +1026,11 @@ type Store = Store { id: Int }
         let ws = Workspace::build(&refs);
 
         assert_eq!(
-            wit_type("Store", &types, &ws, 0, "f").unwrap(),
+            project_written("Store", &types, &ws, 0, "f").unwrap(),
             "shop-store"
         );
         assert_eq!(
-            wit_type("Result<Store, String>", &types, &ws, 0, "f").unwrap(),
+            project_written("Result<Store, String>", &types, &ws, 0, "f").unwrap(),
             "result<shop-store, string>"
         );
     }
@@ -1029,16 +1055,18 @@ opaque type SessionId = String
             crate::lower::lower_file(other, &pw_syntax::parse_tree(other).green),
         ];
         let refs: Vec<&Hir> = hirs.iter().collect();
-        let types = Types::build(&refs);
+        let ws = Workspace::build(&refs);
+        let sigs = Signatures::build(&ws, &refs);
+        let types = Types::build(&refs, &ws, &sigs);
         let ws = Workspace::build(&refs);
 
         assert_eq!(types.known.len(), 2, "{:?}", types.known);
         assert_eq!(
-            wit_type("SessionId", &types, &ws, 0, "f").unwrap(),
+            project_written("SessionId", &types, &ws, 0, "f").unwrap(),
             "a-session-id"
         );
         assert_eq!(
-            wit_type("SessionId", &types, &ws, 1, "f").unwrap(),
+            project_written("SessionId", &types, &ws, 1, "f").unwrap(),
             "b-session-id"
         );
     }

@@ -2,8 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-09-15, starting from master
-`4a9bcddc095b3b4d0eac0e0c2ddb8a0143de03d9`.
+**Reviewed:** 2026-09-16, compiler work started at `49398dc` and integrates
+master `c200ae3e39934285858064fa56a09dabe882657d` without changing its runtime repair.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -11,15 +11,48 @@
 Ordinary call argument types and declared return types are not comprehensively
 checked. E10-I, compiling `add_to_cart` through the production component backend
 and executing it through the E8 host without an alternate Rust closure, is open.
-The required order remains the resolved-signature migration, argument/return
-checking, then component adapters and E10-I. See [NEXT](NEXT.md).
+The resolved-signature cutover is complete in this change. The next work is
+argument/return checking, then component adapters and E10-I. See [NEXT](NEXT.md).
 
 The former status file mixed chronological notes with obsolete headlines such as
 "E9 is complete" and "no benchmarks yet". Its complete bytes are preserved in
 [the historical ledger](STATUS-history-2026-09-15.md). That ledger records earlier
 observations, not the current completion state. No old raw evidence is rewritten.
 
+## last passing commit
+
+Baseline master `c200ae3e39934285858064fa56a09dabe882657d` includes the
+recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The new change's final-head CI must pass
+before integration; the baseline pass is not a substitute.
+
 ## completed gate items
+
+- **2026-09-16 resource repair:** shared requests now return the real terminal
+  outcome; cancellation/invalidation fence late publication; command admission
+  is atomic within this runtime; unwinding commands retain an explicit unknown
+  outcome; logical deadlines and privacy mismatches are enforced. The full local
+  workspace passed **937 tests, 0 failures, 1 existing ignored test**, including
+  **24 new tests**. All nine initial regressions failed on the old runtime first.
+  Formatter, workspace Clippy, corpus checks, recipe gates, and census/tooling
+  suites passed. See [ADR-0029](DECISIONS/ADR-0029-owned-resource-flights-and-command-outcomes.md)
+  and [scope, reproduction, and census mapping](evidence/E4/resource-repair-2026-09-16.md).
+  This is a synchronous process-local repair, not durable exactly-once, a
+  production cancellation adapter, or completion of E9/E10-I. Its own PR checks
+  must establish the engine-feature build and current dependency audit.
+
+
+- **2026-09-16: atomic resolved-signature cutover.** Parameter and return slots
+  now contain recursive `TypeResolution`; the old written fields and independent
+  `Interface::of` derivation are removed. Inference, members, privacy, captures,
+  boundary decisions, WIT and backend callable signatures consume resolved
+  identity. Contract identities are stable structured projections.
+  Eleven new behavioral regressions failed on the old compiler and pass here;
+  six authority tests and two historical-boundary controls also pass. Local
+  workspace validation: **956 passed, one existing ignored documentation test**,
+  including 178 core unit tests and 418 core integration tests. The accepted
+  and store programs, formatting, workspace Clippy and census tests pass.
+  [Evidence and exact scope](evidence/E9/signature-authority-2026-09-16.md).
+  **This is not comprehensive ordinary-call typing or E10-I completion.**
 
 - **2026-09-15 compiler follow-up:** recursive written types and one complete
   return annotation now survive lowering. Nested arguments resolve recursively;
@@ -29,8 +62,8 @@ observations, not the current completion state. No old raw evidence is rewritten
   across all 51 integration targets, including 11 new regressions. Formatter,
   compiler Clippy, and the accepted/store corpus checks passed. See
   [the bounded E9 evidence](evidence/E9/recursive-written-types-2026-09-15.md).
-  This does not complete ordinary argument/return checking or the signature
-  migration. The patch's own CI must establish workspace and audit results.
+  That prior change did not complete ordinary argument/return checking or the
+  signature migration. The latter is completed by the September 16 change above.
 
 - The Web Failure Census and layout-attribution repair were merged in
   `c10b825de40528a591e101653218ddff52e9ec6e`. The inventory contains 224 failure
@@ -54,13 +87,13 @@ observations, not the current completion state. No old raw evidence is rewritten
 The baseline CI result is not a result for this patch. Use the patch's own PR
 checks for its Rust builds, audit, and complete gate-regression suite. Earlier
 E7/E8 observations remain in the historical ledger and milestone documents;
-this tooling repair does not independently re-establish those milestones.
+these compiler changes do not independently re-establish those milestones.
 
 ## failing gate items
 
-- **E9 value checking remains open.** `compiler/pw-core/src/signatures.rs` still
-  represents signature types with written heads/arguments. `check.rs::call_arity`
-  checks argument count, not argument-type agreement. The test
+- **E9 value checking remains open.** Signatures now carry resolved identities,
+  but `check.rs::call_arity` still checks argument count, not comprehensive
+  argument-type agreement. The test
   `canonical_abi::a_call_site_is_not_type_checked` deliberately pins the missing
   ordinary-call relation. E9-V1..V6 distinguish representation from enforcement;
   do not close the gate merely because `ResolvedType` exists.
@@ -75,12 +108,14 @@ this tooling repair does not independently re-establish those milestones.
 ## exact commands to reproduce
 
 ```sh
+cargo test --locked -p pw-resource
 just evidence-gates
 just ci
 just audit
 python3 research/failures/tools/validate.py
 python3 -m unittest discover -s research/failures/tools -p 'test_*.py' -v
 node --test spikes/layout-phase-scheduler/test/loaf.test.mjs
+cargo test -p pw-core --test signature_behavior --test signature_authority --test corpus_history
 cargo test -p pw-core --test recursive_declared_types --test resolved_types --test call_arity --test canonical_abi --test one_comparison --test evidence_is_current
 ```
 
@@ -90,6 +125,12 @@ commands retain their real toolchain requirements. `just doctor` is read-only;
 `just bootstrap` installs the pinned project dependencies.
 
 ## known environmental issues
+
+The September 16 resource repair used the pinned Rust 1.97.1 and locked registry
+snapshot locally on Linux x86_64. Its full workspace run completed with a captured
+zero exit code. These real runtime/compiler results are distinct from the earlier
+mocked recipe tests. The evidence report records scope and environment.
+
 
 The September 15 local review environment was Linux x86_64 with Python 3.13.5,
 Node 22.16.0 and just 1.58.0. Rust was not available locally; actual Rust builds
@@ -115,12 +156,11 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. Complete the atomic `Signature` migration to recursive resolved semantic
-   types, removing written-type semantic fallbacks. Follow the migration order
-   in NEXT; do not merge the unfinished dual-representation branch.
-2. Implement and discriminate ordinary call argument and declared return checking,
-   including generics, nested types and nominal identities. Replace pinned-gap
-   witnesses with intended-diagnostic and accepted-neighbor controls.
+1. Implement ordinary-call inference/unification against the resolved signatures,
+   including declared returns and diagnostics for blocked annotations. Replace
+   pinned-gap witnesses with intended-diagnostic and accepted-neighbor controls.
+2. Make the callable-generic discriminator representable, validate nominal arity,
+   and close E9-V1..V6 only against executed checks, not representation alone.
 3. Finish the component adapters and E10-I using those checked signatures;
    execute the compiled command through the host and delete the alternate closure
    path. Preserve the census's remaining design obligations rather than marking

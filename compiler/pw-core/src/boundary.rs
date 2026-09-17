@@ -42,6 +42,8 @@ use std::collections::BTreeMap;
 
 use crate::hir::Hir;
 use crate::privacy::{Label, Restriction};
+use crate::resolve::DefId;
+use crate::resolved::{ResolvedType, TypeKey};
 use crate::signatures::Signatures;
 
 /// **What the whole program says about a type, gathered once.**
@@ -54,60 +56,77 @@ use crate::signatures::Signatures;
 #[derive(Debug, Default)]
 pub struct TypeFacts {
     /// Types some function acquires as a resource, and the path that does.
-    resources: BTreeMap<String, String>,
+    resources: BTreeMap<TypeKey, String>,
+    /// Derived from the one signature privacy analysis, never authored here.
+    declared_labels: BTreeMap<TypeKey, Label>,
     /// Types produced only by a scoped declaration, with the scope.
-    scoped: BTreeMap<String, Restriction>,
+    scoped: BTreeMap<TypeKey, Restriction>,
 }
 
 impl TypeFacts {
     pub fn build(hirs: &[&Hir], sigs: &Signatures) -> TypeFacts {
         let mut f = TypeFacts::default();
-
-        for (path, sig) in sigs.iter() {
-            for e in &sig.effects {
-                let Some(ty) = e
-                    .strip_prefix("resource.acquire<")
-                    .and_then(|r| r.strip_suffix('>'))
-                else {
-                    continue;
-                };
-                f.resources.insert(ty.to_string(), path.clone());
-            }
-        }
-
-        for hir in hirs {
-            for (_, d) in hir.all_decls() {
-                let Some(vis) = d.visibility.as_deref() else {
-                    continue;
-                };
-                let restriction = match vis {
-                    "session" => Restriction::Session("SessionId".into()),
-                    "user" => Restriction::User("UserId".into()),
-                    "organization" => Restriction::Organization("OrganizationId".into()),
-                    _ => continue,
-                };
-                // `session query Cart(..) -> Result<Cart, CartError>` produces a
-                // `Cart`. The head is the carrier, so the produced type is its
-                // first argument.
-                // This legacy map is constructor-keyed. The resolved-type
-                // cutover must replace that policy; this migration preserves
-                // it while eliminating reparsing of argument strings.
-                let produced = d
-                    .ret
-                    .as_ref()
-                    .and_then(|ty| match ty.constructor_head_only() {
-                        "Result" | "Option" | "List" => ty
-                            .args()
-                            .first()
-                            .map(|a| a.constructor_head_only().to_string()),
-                        other => Some(other.to_string()),
+        for sig in sigs.all_signatures() {
+            for resolution in sig
+                .params
+                .iter()
+                .filter_map(Option::as_ref)
+                .chain(sig.returns.iter())
+            {
+                if let Some(ty) = resolution.resolved() {
+                    Self::walk(ty, &mut |t| {
+                        f.declared_labels.insert(t.semantic_key(), sigs.label(t));
                     });
-                if let Some(ty) = produced {
-                    f.scoped.insert(ty, restriction);
                 }
             }
         }
+
+        for (unit, hir) in hirs.iter().enumerate() {
+            for (id, d) in hir.all_decls() {
+                let def = DefId { unit, decl: id.0 };
+                let Some(sig) = sigs.by_def(def) else {
+                    continue;
+                };
+                for effect in d.declared_effects.as_deref().unwrap_or_default() {
+                    if effect.path != "resource.acquire" {
+                        continue;
+                    }
+                    let Some(written) = effect
+                        .args
+                        .first()
+                        .and_then(|a| crate::lower::type_fragment(a))
+                    else {
+                        continue;
+                    };
+                    if let Some(ty) = sigs
+                        .resolve_type(hir.module_of(id), d, &written, effect.span.clone())
+                        .resolved()
+                    {
+                        f.resources.insert(ty.semantic_key(), sig.path.clone());
+                    }
+                }
+                let restriction = match d.visibility.as_deref() {
+                    Some("session") => Restriction::Session("SessionId".into()),
+                    Some("user") => Restriction::User("UserId".into()),
+                    Some("organization") => Restriction::Organization("OrganizationId".into()),
+                    _ => continue,
+                };
+                let Some(result) = sig.result() else { continue };
+                let produced = if result.as_builtin().is_some() {
+                    result.args().first().unwrap_or(result)
+                } else {
+                    result
+                };
+                f.scoped.insert(produced.semantic_key(), restriction);
+            }
+        }
         f
+    }
+
+    /// The declared label for a known signature type. Missing facts must not
+    /// be interpreted as public when constructing a remote interface.
+    pub fn declared_label(&self, ty: &ResolvedType) -> Option<&Label> {
+        self.declared_labels.get(&ty.semantic_key())
     }
 
     /// **What crossing would cost a value of this type.**
@@ -121,7 +140,7 @@ impl TypeFacts {
     /// open here. Reading the head alone looked up `List`, found nothing, and
     /// called it transferable — which is the permissive direction, and exactly
     /// the reading that made `secret<Payments>` placeable in the browser.
-    pub fn profile(&self, ty: Option<&str>) -> TransferProfile {
+    pub fn profile(&self, ty: Option<&ResolvedType>) -> TransferProfile {
         let Some(ty) = ty else {
             return TransferProfile {
                 schema: Schema::Undetermined,
@@ -134,15 +153,16 @@ impl TypeFacts {
         let mut carrier = None;
         // The one place this module takes a type name apart, for the same
         // reason `ontology.rs` is the one place an effect name is.
-        self.walk(ty, &mut |name| {
+        Self::walk(ty, &mut |part| {
+            let key = part.semantic_key();
             if resource.is_none()
-                && let Some(p) = self.resources.get(name)
+                && let Some(p) = self.resources.get(&key)
             {
                 resource = Some(p.clone());
-                carrier = Some(name.to_string());
+                carrier = Some(part.display_name());
             }
             if produced_scope.is_none()
-                && let Some(s) = self.scoped.get(name)
+                && let Some(s) = self.scoped.get(&key)
             {
                 produced_scope = Some(s.clone());
             }
@@ -152,41 +172,26 @@ impl TypeFacts {
             // diagnostic names `OpenTransaction` rather than
             // `List<OpenTransaction>` — the type the reader has to change is
             // the one held open.
-            schema: Schema::Named(
-                carrier.unwrap_or_else(|| ty.split('<').next().unwrap_or(ty).trim().to_string()),
-            ),
+            schema: Schema::Named(carrier.unwrap_or_else(|| ty.display_name())),
             resource,
             produced_scope,
         }
     }
 
-    /// Every nominal name inside a written type, outermost first.
-    fn walk(&self, written: &str, f: &mut impl FnMut(&str)) {
-        let (head, args) = match written.split_once('<') {
-            Some((h, rest)) => (
-                h.trim(),
-                rest.trim_end_matches('>')
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>(),
-            ),
-            None => (written.trim(), Vec::new()),
-        };
-        f(head);
-        for a in args {
-            self.walk(a, f);
+    /// Traverse resolved arguments without truncating nested type structure.
+    fn walk(ty: &ResolvedType, f: &mut impl FnMut(&ResolvedType)) {
+        f(ty);
+        for arg in ty.args() {
+            Self::walk(arg, f);
         }
     }
 
-    /// Is this type one a declaration acquires as a resource?
-    pub fn resource_producer(&self, ty: &str) -> Option<&str> {
-        self.resources.get(ty).map(String::as_str)
+    pub fn resource_producer(&self, ty: &ResolvedType) -> Option<&str> {
+        self.resources.get(&ty.semantic_key()).map(String::as_str)
     }
 
-    /// The restriction this type carries because of what produces it.
-    pub fn produced_scope(&self, ty: &str) -> Option<&Restriction> {
-        self.scoped.get(ty)
+    pub fn produced_scope(&self, ty: &ResolvedType) -> Option<&Restriction> {
+        self.scoped.get(&ty.semantic_key())
     }
 }
 

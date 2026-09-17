@@ -2,6 +2,25 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+## Current: resolved signatures landed; ordinary value checking is next
+
+The September 16 cutover completes step 3b.3 below without merging the old
+`3b3-signature-resolved-types` branch. `Signature` and derived `Interface`
+contain resolved parameter/return slots, not written type heads. Semantic
+consumers use identities, and WIT/contracts are projections of those slots.
+[ADR-0030](DECISIONS/ADR-0030-resolved-signature-authority.md) and its
+[evidence](evidence/E9/signature-authority-2026-09-16.md) record the real
+behavioral differences, fixture repairs, and remaining limits.
+
+Next: ordinary argument inference/unification and declared-return checking,
+including diagnostics for unresolved annotations. Callable generic syntax and
+nominal type arity remain open. Do not restate those checks as complete because
+their input representation now exists. E10-I follows checked value signatures.
+
+**The dated material below is the decision history and original migration
+sequence, not a second current status.** Its old NEXT/BLOCKED labels describe
+the state at those dates and are superseded by this section where applicable.
+
 ## 2026-09-15 follow-up: recursive written-type prerequisite repaired
 
 The signature migration exposed a prerequisite: `DeclaredType` stored generic

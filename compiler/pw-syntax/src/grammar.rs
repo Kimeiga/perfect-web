@@ -2099,6 +2099,26 @@ pub fn parse_tree(src: &str) -> Parse {
     P::new(src).run()
 }
 
+/// Parse a complete type fragment with the same grammar used in declarations.
+/// This is for legacy HIR slots which retain source text, not for reparsing an
+/// already resolved or serialized semantic type. Extra tokens are an error.
+pub fn parse_type(src: &str) -> Parse {
+    let mut p = P::new(src);
+    p.b.start(K::SourceFile);
+    p.type_ref();
+    while !p.at_eof() {
+        p.start(K::ErrorExpr);
+        p.error("PW0103", "a type annotation is one type");
+        p.bump();
+        p.finish();
+    }
+    p.b.finish_node();
+    Parse {
+        green: SyntaxNode::new_root(p.b.finish()),
+        errors: p.errors,
+    }
+}
+
 /// **Parse an optimistic clause, standalone.**
 ///
 /// ```text

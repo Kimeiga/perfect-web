@@ -131,18 +131,25 @@ fn parameters_fields_and_returns_preserve_the_same_recursive_shape() {
     assert_eq!(returned.written(), "Result<List<Option<Int>>, String>");
     assert_eq!(returned.args()[0].args()[0].args()[0].written(), "Int");
 
-    // Boundary and legacy signature projections still read the same annotation.
-    // They are not themselves resolved-type checking yet.
-    let interface = pw_core::binding::Interface::of(probe);
+    // Boundary interfaces project the already-resolved signature. They must
+    // preserve both identity and every nested argument.
     let ws = Workspace::build(&[&hir]);
     let sigs = pw_core::signatures::Signatures::build(&ws, &[&hir]);
     let signature = sigs.by_path("m.probe").expect("signature");
-    assert_eq!(interface.params, vec![Some(parameter.written())]);
-    assert_eq!(interface.returns.as_deref(), Some("Result"));
-    assert_eq!(interface.returns_args, vec!["List<Option<Int>>", "String"]);
-    assert_eq!(signature.params, interface.params);
-    assert_eq!(signature.returns, interface.returns);
-    assert_eq!(signature.returns_args, interface.returns_args);
+    let interface = pw_core::binding::Interface::from(signature);
+    let parameter = signature.params[0].as_ref().unwrap().resolved().unwrap();
+    let result = interface.returns.as_ref().unwrap().resolved().unwrap();
+    assert!(result.same_as(parameter));
+    assert_eq!(result.written_source(), "Result<List<Option<Int>>, String>");
+    assert!(
+        interface.params[0]
+            .as_ref()
+            .unwrap()
+            .resolved()
+            .unwrap()
+            .same_as(parameter)
+    );
+    assert!(signature.result().unwrap().same_as(result));
 }
 
 #[test]

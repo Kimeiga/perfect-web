@@ -396,7 +396,7 @@ impl Lowerer<'_> {
                     fields: v
                         .children()
                         .filter(|c| c.kind() == K::TypeRef)
-                        .map(|t| type_path(&t))
+                        .map(|t| declared_type(&t).written())
                         .collect(),
                     span: span_of(&v),
                 })
@@ -410,7 +410,7 @@ impl Lowerer<'_> {
         }
         node.children()
             .find(|c| c.kind() == K::TypeRef)
-            .map(|t| type_path(&t))
+            .map(|t| declared_type(&t).written())
     }
 
     fn effect_row(&self, row: &SyntaxNode) -> Vec<EffectRef> {
@@ -434,7 +434,7 @@ impl Lowerer<'_> {
                     .map(|list| {
                         list.children()
                             .filter(|c| c.kind() == K::TypeRef)
-                            .map(|a| type_path(&a))
+                            .map(|a| declared_type(&a).written())
                             .collect()
                     })
                     .unwrap_or_default();
@@ -1356,6 +1356,21 @@ fn imported_names(node: &SyntaxNode) -> Vec<String> {
 fn visibility_of(node: &SyntaxNode) -> Option<String> {
     let first = own_tokens(node).first()?.text().to_string();
     matches!(first.as_str(), "public" | "session" | "private").then_some(first)
+}
+
+/// Convert a remaining source-text type slot through the authoritative parser.
+/// Effects and variant payloads still expose written fragments in HIR. All
+/// semantic consumers receive the resulting recursive tree, never a splitter.
+pub(crate) fn type_fragment(src: &str) -> Option<crate::hir::DeclaredType> {
+    let parsed = pw_syntax::parse_type(src);
+    if !parsed.ok() {
+        return None;
+    }
+    parsed
+        .green
+        .children()
+        .find(|n| n.kind() == K::TypeRef)
+        .map(|n| declared_type(&n))
 }
 
 /// Preserve the parser's complete type structure. No consumer reparses a

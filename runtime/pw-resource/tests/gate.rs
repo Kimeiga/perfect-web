@@ -27,15 +27,24 @@ fn a_recomputation_storm_does_not_exceed_one_request_per_key() {
     // request is still running.
     let n = 50;
     std::thread::scope(|s| {
+        let mut readers = Vec::new();
         for _ in 0..n {
             let (rt, m, key, calls) = (rt.clone(), m.clone(), key.clone(), Arc::clone(&calls));
-            s.spawn(move || {
+            readers.push(s.spawn(move || {
                 rt.fetch(&m, &key, |_| {
                     calls.fetch_add(1, Ordering::SeqCst);
                     std::thread::sleep(std::time::Duration::from_millis(20));
                     Ok("Blue Bottle".to_string())
                 })
-            });
+            }));
+        }
+        for reader in readers {
+            match reader.join().expect("reader") {
+                Fetched::Fresh(value)
+                | Fetched::FromCache(value)
+                | Fetched::Deduplicated(value) => assert_eq!(value, "Blue Bottle"),
+                other => panic!("unexpected result: {other:?}"),
+            }
         }
     });
 
@@ -149,33 +158,39 @@ fn navigating_away_cancels_work_nobody_is_waiting_for() {
 
     // Simulate a request in flight for that key, then navigate away.
     let m = Manifest::new("recommendations");
-    let started = std::thread::scope(|s| {
-        let h = s.spawn(|| {
-            rt.fetch(&m, &key, |_| {
-                std::thread::sleep(std::time::Duration::from_millis(30));
+    let (started, ready) = std::sync::mpsc::channel();
+    let (release, resume) = std::sync::mpsc::channel();
+    let result = std::thread::scope(|s| {
+        let (rt, m, key) = (&rt, &m, &key);
+        let h = s.spawn(move || {
+            rt.fetch_cancellable(m, key, |_, cancellation| {
+                started.send(()).expect("started");
+                resume.recv().expect("released");
+                assert_eq!(cancellation.reason(), Some(StopReason::NoSubscribers));
                 Ok("recs".to_string())
             })
         });
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        let was_running = rt.in_flight(&key);
-        h.join().expect("join");
-        was_running
+        ready
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("running");
+        assert!(rt.in_flight(key));
+        drop(a);
+        assert_eq!(rt.subscribers(key), 1, "one viewer remains");
+        assert!(rt.in_flight(key), "first departure must not cancel");
+        drop(b);
+        assert_eq!(rt.subscribers(key), 0);
+        assert!(!rt.in_flight(key));
+        release.send(()).expect("release");
+        h.join().expect("join")
     });
-    assert!(started, "the request must actually have been in flight");
-
-    drop(a);
-    assert_eq!(rt.subscribers(&key), 1, "one viewer left");
-    drop(b);
-    assert_eq!(rt.subscribers(&key), 0);
-
-    // Control: cancellation must fire only when the LAST subscriber leaves.
-    // Cancelling while someone is still watching is a worse bug than leaking.
+    assert_eq!(result, Fetched::Cancelled(StopReason::NoSubscribers));
+    assert!(rt.public_cache_contents().is_empty());
     let cancels = rt
         .trace()
         .iter()
         .filter(|t| matches!(t, Trace::Cancelled { .. }))
         .count();
-    assert!(cancels <= 1, "cancelled more than once: {cancels}");
+    assert_eq!(cancels, 1, "the final subscriber must cancel exactly once");
 }
 
 #[test]

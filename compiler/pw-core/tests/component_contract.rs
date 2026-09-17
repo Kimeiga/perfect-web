@@ -893,7 +893,7 @@ command Add(id: Int) -> Int
     // And the result type alone is enough, with the arity identical.
     let other_result = Signature {
         params: declared.params.clone(),
-        result: format!("Not{}", declared.result),
+        result: pw_core::resolved::StableTypeId::Primitive("String".into()),
     };
     assert!(
         !abi(&c, &[(key.clone(), other_result)]).is_satisfied(),

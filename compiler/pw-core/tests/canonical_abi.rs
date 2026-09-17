@@ -194,8 +194,29 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
         .find(|i| i.key() == "store:data/carts#current")
         .and_then(|i| i.signature.as_ref())
         .expect("the contract carries it");
-    assert_eq!(contract_sig.params, vec!["SessionId".to_string()]);
-    assert_eq!(contract_sig.result, "Result<Cart, CartError>");
+    assert_eq!(
+        contract_sig.params,
+        vec![pw_core::resolved::StableTypeId::Declared {
+            path: "capability.SessionId".into(),
+            args: vec![]
+        }]
+    );
+    assert_eq!(
+        contract_sig.result,
+        pw_core::resolved::StableTypeId::Builtin {
+            ctor: "Result".into(),
+            args: vec![
+                pw_core::resolved::StableTypeId::Declared {
+                    path: "domain.Cart".into(),
+                    args: vec![]
+                },
+                pw_core::resolved::StableTypeId::Declared {
+                    path: "domain.CartError".into(),
+                    args: vec![]
+                }
+            ]
+        }
+    );
     assert!(
         text.contains(
             "current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;"
@@ -358,7 +379,14 @@ fn a_privacy_qualifier_is_transparent_to_the_type_it_qualifies() {
         .and_then(|i| i.signature.as_ref())
         .expect("the contract carries its semantic signature");
     assert_eq!(
-        semantic.result, "Session<SessionId>",
+        semantic.result,
+        pw_core::resolved::StableTypeId::Declared {
+            path: "capability.Session".into(),
+            args: vec![pw_core::resolved::StableTypeId::Declared {
+                path: "capability.SessionId".into(),
+                args: vec![]
+            }]
+        },
         "the restriction survives in the semantic signature, which is what \
          `Session<A> -> Session<B>` is decided against"
     );

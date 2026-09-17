@@ -34,17 +34,25 @@
 module cart.commands
 
 import Carts
+import domain
+import domain.{ MenuItemId, PositiveInt, CartError }
 import Resources.{ Cart }
 import context.{ current_session }
 
+// This helper returns the resource value but still performs the forbidden write.
+fn impure_add(cart: domain.Cart, item: MenuItemId, quantity: PositiveInt) -> domain.Cart {
+    Carts.add(current_session(), item, quantity)
+    cart
+}
+
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
-    -> Result<Cart, CartError>
+    -> Result<domain.Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
     // ERROR: the transition writes the database. It runs on the client, before
     // the round trip, and is discarded by restoring the previous value — which
     // cannot undo a write that already happened.
-    optimistic    Cart(current_session()) as cart => Carts.add(current_session(), item, quantity)
+    optimistic    Cart(current_session()) as cart => impure_add(cart, item, quantity)
     invalidates   Cart(current_session())
 {
     Carts.add(current_session(), item, quantity)

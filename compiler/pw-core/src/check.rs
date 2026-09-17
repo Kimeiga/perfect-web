@@ -577,7 +577,7 @@ fn optimistic_transitions_agree_with_their_target(
                 // it must not be read as a refutation either.
                 continue;
             };
-            if produced == value_ty {
+            if produced.same_as(&value_ty) {
                 continue;
             }
             out.push(Diagnostic {
@@ -629,7 +629,7 @@ fn resource_value_type(
     hirs: &[&Hir],
     unit: usize,
     path: &str,
-) -> Option<String> {
+) -> Option<crate::resolved::ResolvedType> {
     use crate::resolve::{Namespace, Resolution};
     // **A bare name resolves in the TERM namespace**, not in whichever
     // namespace answers first.
@@ -652,7 +652,6 @@ fn resource_value_type(
         Resolution::Local(def) | Resolution::Imported { def, .. } => def,
         _ => return None,
     };
-    let _ = sigs;
     // The WHOLE program. `A-005` writes `optimistic Cart(..)` and imports
     // `Resources.{ Cart }`, so a lookup restricted to this unit would report
     // every cross-module resource as one the file cannot see — which is the
@@ -664,10 +663,10 @@ fn resource_value_type(
     ) {
         return None;
     }
-    let ty = decl.ret.as_ref()?;
-    match ty.constructor_head_only() {
-        "Result" => ty.args().first().map(|t| t.written()),
-        _ => Some(ty.written()),
+    let ty = sigs.by_def(def)?.result()?;
+    match ty.as_builtin() {
+        Some(crate::resolved::Builtin::Result) => ty.args().first().cloned(),
+        _ => Some(ty.clone()),
     }
 }
 
@@ -2816,24 +2815,8 @@ fn effect_rows(
     //
     // Two constructions of one environment is how the narrower one silently
     // wins, which is exactly what happened.
-    let mut types: BTreeMap<String, String> =
-        crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id))
-            .bindings()
-            .clone();
-    for id in body.walk() {
-        let Expr::Let {
-            pat: Some(pat),
-            ty: Some(t),
-            ..
-        } = body.expr(id)
-        else {
-            continue;
-        };
-        if let (HPat::Bind { name, .. }, Some(ty)) = (body.pat(*pat), body.types.get(t.index())) {
-            types.insert(name.clone(), ty.path.clone());
-        }
-    }
-    let mut found = inference.infer_in_at(at, body, &types);
+    let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
+    let mut found = inference.infer_in_at(at, body, types.bindings());
 
     // **Plus the named roots that ARE this declaration's work.**
     //

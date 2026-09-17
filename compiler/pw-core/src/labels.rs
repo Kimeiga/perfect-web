@@ -52,7 +52,7 @@
 use std::collections::BTreeMap;
 
 use crate::hir::{Body, Decl, Expr, ExprId, Pattern as HPat, Span};
-use crate::privacy::{Label, Restriction};
+use crate::privacy::Label;
 use crate::signatures::Signatures;
 
 /// Labels for the values in one body.
@@ -61,7 +61,7 @@ pub struct Labels<'a> {
     /// The module this body is in, and the modules it imports. What an
     /// unqualified name may resolve to, and nothing wider.
     module: Option<&'a str>,
-    imports: &'a [String],
+    types: crate::infer::Types<'a>,
     /// Binding name → its label and where it acquired one.
     bindings: BTreeMap<String, (Label, Span)>,
 }
@@ -76,24 +76,27 @@ impl<'a> Labels<'a> {
         decl: &Decl,
         body: &Body,
         module: Option<&'a str>,
-        imports: &'a [String],
+        _imports: &'a [String],
     ) -> Labels<'a> {
         let mut me = Labels {
             sigs,
             module,
-            imports,
+            types: crate::infer::Types::of_body(sigs, decl, body, module),
             bindings: BTreeMap::new(),
         };
 
-        // A parameter whose written type carries a restriction.
+        // A label comes from the resolved annotation in its real lexical
+        // context. A same-spelled type in another module is not a qualifier.
         for p in &decl.params {
-            if let Some(ty) = &p.ty
-                && let Some(l) = label_of_type(
-                    ty.constructor_head_only(),
-                    &ty.args().iter().map(|t| t.written()).collect::<Vec<_>>(),
-                )
+            if let Some(written) = &p.ty
+                && let Some(ty) = sigs
+                    .resolve_type(module, decl, written, p.span.clone())
+                    .resolved()
             {
-                me.bindings.insert(p.name.clone(), (l, p.span.clone()));
+                let label = sigs.label(ty);
+                if !label.is_public() {
+                    me.bindings.insert(p.name.clone(), (label, p.span.clone()));
+                }
             }
         }
 
@@ -113,14 +116,18 @@ impl<'a> Labels<'a> {
                         let HPat::Bind { name, .. } = body.pat(*pat) else {
                             continue;
                         };
-                        // A written annotation wins: `let k: Secret<Payments>`
-                        // names the capability exactly.
-                        if let Some(l) = ty
-                            .and_then(|t| body.types.get(t.index()))
-                            .and_then(|t| label_of_written(body, t))
+                        if let Some(written) =
+                            ty.and_then(|t| crate::resolved::written_in_body(body, t))
+                            && let Some(resolved) = sigs
+                                .resolve_type(module, decl, &written, body.expr_span(id))
+                                .resolved()
                         {
-                            me.bindings.insert(name.clone(), (l, body.expr_span(id)));
-                            continue;
+                            let label = sigs.label(resolved);
+                            if !label.is_public() {
+                                me.bindings
+                                    .insert(name.clone(), (label, body.expr_span(id)));
+                                continue;
+                            }
                         }
                         (name.clone(), *init, body.expr_span(id))
                     }
@@ -183,17 +190,7 @@ impl<'a> Labels<'a> {
     /// The qualified path is tried first, because a module's own declaration
     /// is what an unqualified name means inside it.
     fn declaration_named(&self, name: &str) -> Option<&crate::signatures::Signature> {
-        if let Some(m) = self.module {
-            if let Some(sig) = self.sigs.by_path(&format!("{m}.{name}")) {
-                return Some(sig);
-            }
-            for import in self.imports {
-                if let Some(sig) = self.sigs.by_path(&format!("{import}.{name}")) {
-                    return Some(sig);
-                }
-            }
-        }
-        None
+        self.sigs.in_module(self.module, name)
     }
 
     /// Where a binding acquired its label, for the diagnostic's origin span.
@@ -218,7 +215,8 @@ impl<'a> Labels<'a> {
             // the floor; a field with its own declared label joins on top.
             Expr::Field { base, name } => {
                 let mut l = self.label(body, *base);
-                if let Some(sig) = crate::infer::Types::of_body(self.sigs, &dummy(), body, None)
+                if let Some(sig) = self
+                    .types
                     .of(body, *base)
                     .and_then(|t| self.sigs.member_of(&t, name))
                 {
@@ -228,8 +226,7 @@ impl<'a> Labels<'a> {
             }
 
             Expr::Call { callee, args } => {
-                let path = crate::infer::path_of(body, *callee);
-                match self.sigs.by_path(&path) {
+                match self.types.callee(body, *callee) {
                     // Declared: its return label is the contract. E2C's whole
                     // model is that one declaration answers this, so a helper
                     // that launders a secret is a library-contract defect and
@@ -314,70 +311,6 @@ fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, Span)> {
         }
     }
     out
-}
-
-/// **Is this type constructor a privacy QUALIFIER?**
-///
-/// Derived from [`label_of_type`] rather than listed again, because the set of
-/// qualifiers must be authored once. Architect ruling, 2026-08-20:
-///
-/// > The only important thing is that the mapping is authored once and
-/// > inspectable.
-///
-/// It exists because a qualifier is **transparent on the ABI**: privacy
-/// qualification is semantic metadata and needs no independent runtime
-/// representation, so `Session<SessionId>` crosses a component boundary as
-/// whatever `SessionId` crosses as, and the semantic contract keeps the
-/// restriction WIT never sees. See `wit::wit_type`.
-///
-/// This is emphatically **not** "an opaque type is its representation".
-/// Opacity and ABI transparency are different facts, and a generic opaque type
-/// that is not a qualifier still has no WIT form.
-pub fn is_privacy_qualifier(head: &str) -> bool {
-    label_of_type(head, &[]).is_some()
-}
-
-/// The restriction a written type name carries: `Secret<Payments>`.
-fn label_of_type(head: &str, args: &[String]) -> Option<Label> {
-    let arg = || args.first().cloned().unwrap_or_else(|| "?".to_string());
-    Some(match head {
-        "Secret" => Label::of(Restriction::Secret(arg())),
-        "Session" => Label::of(Restriction::Session(arg())),
-        "User" => Label::of(Restriction::User(arg())),
-        "Organization" => Label::of(Restriction::Organization(arg())),
-        _ => return None,
-    })
-}
-
-fn label_of_written(body: &Body, t: &crate::hir::TypeRef) -> Option<Label> {
-    let args: Vec<String> = t
-        .args
-        .iter()
-        .filter_map(|a| body.types.get(a.index()).map(|t| t.path.clone()))
-        .collect();
-    label_of_type(&t.path, &args)
-}
-
-/// A declaration with no parameters, for the places that only need `Types` to
-/// resolve a member chain and have no declaration of their own to offer.
-fn dummy() -> Decl {
-    Decl {
-        name: String::new(),
-        name_span: 0..0,
-        kind: crate::hir::DeclKind::Fn,
-        params: vec![],
-        ret: None,
-        variants: None,
-        fields: None,
-        policies: vec![],
-        imports: vec![],
-        visibility: None,
-        opaque_of: None,
-        type_params: vec![],
-        declared_effects: None,
-        body: None,
-        children: vec![],
-    }
 }
 
 /// The modules a unit imports, for scoping unqualified names.

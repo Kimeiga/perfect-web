@@ -134,9 +134,29 @@
         ],
         "signature": {
           "params": [
-            "SessionId"
+            {
+              "declared": {
+                "path": "capability.SessionId"
+              }
+            }
           ],
-          "result": "Result<Cart, CartError>"
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Cart"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.CartError"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "external",
         "kind": "host_capability"
@@ -191,9 +211,36 @@
         ],
         "signature": {
           "params": [
-            "StoreId"
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
           ],
-          "result": "Result<List<MenuItemId>, StoreError>"
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "domain.MenuItemId"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.StoreError"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "external",
         "kind": "host_capability"
@@ -240,9 +287,29 @@
         ],
         "signature": {
           "params": [
-            "StoreId"
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
           ],
-          "result": "Result<Store, StoreError>"
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Store"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.StoreError"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "external",
         "kind": "host_capability"
@@ -317,7 +384,18 @@
         ],
         "signature": {
           "params": [],
-          "result": "Session<SessionId>"
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "platform",
         "kind": "host_capability"
@@ -367,7 +445,18 @@
         ],
         "signature": {
           "params": [],
-          "result": "Session<SessionId>"
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "platform",
         "kind": "host_capability"
@@ -385,11 +474,39 @@
         ],
         "signature": {
           "params": [
-            "SessionId",
-            "MenuItemId",
-            "PositiveInt"
+            {
+              "declared": {
+                "path": "capability.SessionId"
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.PositiveInt"
+              }
+            }
           ],
-          "result": "Result<Cart, CartError>"
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Cart"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.CartError"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "external",
         "kind": "host_capability"
@@ -447,7 +564,18 @@
         ],
         "signature": {
           "params": [],
-          "result": "Session<SessionId>"
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "platform",
         "kind": "host_capability"
@@ -465,9 +593,29 @@
         ],
         "signature": {
           "params": [
-            "SessionId"
+            {
+              "declared": {
+                "path": "capability.SessionId"
+              }
+            }
           ],
-          "result": "Result<Cart, CartError>"
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Cart"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.CartError"
+                  }
+                }
+              ]
+            }
+          }
         },
         "owner": "external",
         "kind": "host_capability"

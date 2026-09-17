@@ -42,12 +42,13 @@
 use std::collections::BTreeMap;
 
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId};
+use crate::resolved::{self, Builtin, ResolvedType};
 use crate::signatures::Signatures;
 
 /// The types known inside one declaration's body.
 pub struct Types<'a> {
     sigs: &'a Signatures,
-    bindings: BTreeMap<String, String>,
+    bindings: BTreeMap<String, ResolvedType>,
     /// The module this body lives in, so a bare name resolves to a sibling
     /// declaration. Without it `shrink(self)` looked up `shrink` and found
     /// nothing, because signatures are stored module-qualified — so a rule
@@ -71,27 +72,24 @@ impl<'a> Types<'a> {
         body: &Body,
         module: Option<&str>,
     ) -> Types<'a> {
-        let mut bindings: BTreeMap<String, String> = BTreeMap::new();
+        let mut bindings: BTreeMap<String, ResolvedType> = BTreeMap::new();
 
         for p in &decl.params {
-            if let Some(t) = &p.ty {
-                bindings.insert(p.name.clone(), t.written());
+            if let Some(t) = &p.ty
+                && let Some(ty) = sigs
+                    .resolve_type(module, decl, t, p.span.clone())
+                    .resolved()
+            {
+                bindings.insert(p.name.clone(), ty.clone());
             }
         }
 
         // `List<MenuItem>` for a parameter, so the `#each` rule below can ask
         // what an element of it is.
-        let mut element_of: BTreeMap<String, String> = BTreeMap::new();
-        for p in &decl.params {
-            if let Some(head) = &p.ty
-                && let Some(elem) = element_of_written(
-                    head.constructor_head_only(),
-                    &head.args().iter().map(|t| t.written()).collect::<Vec<_>>(),
-                )
-            {
-                element_of.insert(p.name.clone(), elem);
-            }
-        }
+        let element_of: BTreeMap<String, ResolvedType> = bindings
+            .iter()
+            .filter_map(|(name, ty)| element_of_type(ty).map(|t| (name.clone(), t.clone())))
+            .collect();
 
         // Charter §7.5A writes `self.style.set_padding(..)` inside a component.
         // `self` is the declaration's own element, and that is a language fact
@@ -99,8 +97,9 @@ impl<'a> Types<'a> {
         if matches!(
             decl.kind,
             DeclKind::View | DeclKind::Component | DeclKind::Page
-        ) {
-            bindings.insert("self".to_string(), "ElementRef".to_string());
+        ) && let Some(ty) = sigs.language_type("browser", "ElementRef")
+        {
+            bindings.insert("self".to_string(), ty);
         }
 
         // Annotated bindings first, then inferred ones — a written annotation
@@ -116,9 +115,10 @@ impl<'a> Types<'a> {
                 continue;
             };
             if let (crate::hir::Pattern::Bind { name, .. }, Some(t)) =
-                (body.pat(*pat), body.types.get(ty.index()))
+                (body.pat(*pat), resolved::written_in_body(body, *ty))
+                && let Some(ty) = sigs.resolve_type(module, decl, &t, 0..0).resolved()
             {
-                bindings.insert(name.clone(), t.path.clone());
+                bindings.insert(name.clone(), ty.clone());
             }
         }
 
@@ -270,7 +270,7 @@ impl<'a> Types<'a> {
     ///
     /// `menu` bound from `query Menu(..)` whose declaration returns
     /// `List<MenuItemId>` gives `MenuItemId`.
-    fn element_type(&self, body: &Body, name: &str) -> Option<String> {
+    fn element_type(&self, body: &Body, name: &str) -> Option<ResolvedType> {
         // A binding whose initialiser is a declaration returning `List<T>`.
         for id in body.walk() {
             let bound = match body.expr(id) {
@@ -296,7 +296,7 @@ impl<'a> Types<'a> {
                 _ => None,
             };
             if let Some(sig) = sig {
-                return element_of_written(sig.returns.as_deref()?, &sig.returns_args);
+                return element_of_type(sig.result()?).cloned();
             }
         }
         None
@@ -304,10 +304,7 @@ impl<'a> Types<'a> {
 
     /// A declaration by path, trying this module first.
     fn by_path(&self, path: &str) -> Option<&'a crate::signatures::Signature> {
-        self.module
-            .as_deref()
-            .and_then(|m| self.sigs.by_path(&format!("{m}.{path}")))
-            .or_else(|| self.sigs.by_path(path))
+        self.sigs.in_module(self.module.as_deref(), path)
     }
 
     /// The type of an expression, or `None` when nothing declared says.
@@ -328,37 +325,31 @@ impl<'a> Types<'a> {
     /// binds `cart` to the target resource's VALUE type, and nothing in the
     /// body says so. Added rather than inferred, because the type comes from
     /// the resource the clause targets — see ADR-0025.
-    pub fn with_binding(mut self, name: &str, ty: &str) -> Types<'a> {
-        self.bindings.insert(name.to_string(), ty.to_string());
+    pub fn with_binding(mut self, name: &str, ty: &ResolvedType) -> Types<'a> {
+        self.bindings.insert(name.to_string(), ty.clone());
         self
     }
 
-    pub fn bindings(&self) -> &BTreeMap<String, String> {
+    pub fn stable_type(&self, ty: &ResolvedType) -> Option<crate::resolved::StableTypeId> {
+        self.sigs.stable_type(ty)
+    }
+
+    pub fn bindings(&self) -> &BTreeMap<String, ResolvedType> {
         &self.bindings
     }
 
-    pub fn of(&self, body: &Body, id: ExprId) -> Option<String> {
+    pub fn of(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {
         match body.expr(id) {
             Expr::Name(n) => self.bindings.get(n).cloned(),
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;
                 self.sigs
                     .member_of(&receiver, name)
-                    .and_then(|s| s.returns.clone())
+                    .and_then(|s| s.result().cloned())
             }
-            Expr::Call { callee, .. } => match body.expr(*callee) {
-                // `el.style()` and `el.style` are the same member; the parser
-                // keeps the distinction and the type does not depend on it.
-                Expr::Field { base, name } => {
-                    let receiver = self.of(body, *base)?;
-                    self.sigs
-                        .member_of(&receiver, name)
-                        .and_then(|s| s.returns.clone())
-                }
-                _ => self
-                    .by_path(&path_of(body, *callee))
-                    .and_then(|s| s.returns.clone()),
-            },
+            Expr::Call { callee, .. } => {
+                self.callee(body, *callee).and_then(|s| s.result().cloned())
+            }
             _ => None,
         }
     }
@@ -366,6 +357,9 @@ impl<'a> Types<'a> {
     /// The signature a call resolves to, **only** when the receiver's type is
     /// known. Never guesses from a name.
     pub fn callee(&self, body: &Body, callee: ExprId) -> Option<&'a crate::signatures::Signature> {
+        if let Some(sig) = self.by_path(&path_of(body, callee)) {
+            return Some(sig);
+        }
         match body.expr(callee) {
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;
@@ -404,47 +398,11 @@ fn first_bound_name(body: &Body, pat: crate::hir::PatternId) -> Option<String> {
     }
 }
 
-fn element_of_written(head: &str, args: &[String]) -> Option<String> {
-    match head {
-        "List" => args.first().map(|a| strip_args(a)),
-        "Result" | "Option" => {
-            let inner = args.first()?;
-            let (h, rest) = split_written(inner);
-            element_of_written(&h, &rest)
-        }
-        _ => None,
+pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {
+    match ty.as_builtin()? {
+        Builtin::List => ty.args().first(),
+        Builtin::Result | Builtin::Option => element_of_type(ty.args().first()?),
     }
-}
-
-/// `List<MenuItem>` -> `("List", ["MenuItem"])`.
-fn split_written(t: &str) -> (String, Vec<String>) {
-    let t = t.trim();
-    match t.split_once('<') {
-        Some((head, rest)) => {
-            let inner = rest.strip_suffix('>').unwrap_or(rest);
-            // One level of nesting: split on commas outside angle brackets.
-            let mut args = Vec::new();
-            let (mut depth, mut start) = (0i32, 0usize);
-            for (i, c) in inner.char_indices() {
-                match c {
-                    '<' => depth += 1,
-                    '>' => depth -= 1,
-                    ',' if depth == 0 => {
-                        args.push(inner[start..i].trim().to_string());
-                        start = i + 1;
-                    }
-                    _ => {}
-                }
-            }
-            args.push(inner[start..].trim().to_string());
-            (head.trim().to_string(), args)
-        }
-        None => (t.to_string(), Vec::new()),
-    }
-}
-
-fn strip_args(t: &str) -> String {
-    t.split('<').next().unwrap_or(t).trim().to_string()
 }
 
 /// `{#each menu as item (item.id)}` gives `("item", "menu")`.

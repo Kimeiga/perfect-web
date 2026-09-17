@@ -123,6 +123,7 @@ fn an_effect_crosses_an_unannotated_generic_helper() {
 module oracle.higher_order
 
 import List
+import browser.{ ElementRef }
 
 view Badge(items: List<ElementRef>) !{} {
     let widths = items |> List.map(fn(el) el.getBoundingClientRect().width)
@@ -193,6 +194,7 @@ view Pure(items: List<Int>) !{} {
     let measuring = codes_with_library(
         "\
 module oracle.two_rows_measuring
+import browser.{ ElementRef }
 
 import List
 

@@ -117,7 +117,6 @@ world store-page-clear-cart {
 
 package pw:types {
     interface types {
-        type capability-session = string;
         type capability-session-id = string;
         type domain-store-id = string;
         type domain-menu-item-id = string;
@@ -168,7 +167,7 @@ package pw:types {
 
 package pw:host {
     interface session {
-        use pw:types/types.{capability-session, capability-session-id};
+        use pw:types/types.{capability-session-id};
         read: func() -> capability-session-id;
     }
 }

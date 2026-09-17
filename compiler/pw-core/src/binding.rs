@@ -43,7 +43,7 @@ use serde::{Deserialize, Serialize};
 use crate::boundary::{
     Blocked, Boundary, BoundaryContext, Crossing, Direction, TypeFacts, Violation, can_cross,
 };
-use crate::privacy::Label;
+use crate::resolved::{Builtin, ResolvedType, TypeResolution};
 use crate::signatures::Signature;
 
 /// **What binding modes an interface edge supports.**
@@ -180,72 +180,19 @@ pub struct Untransferable {
     pub reason: String,
 }
 
-/// **The positions of one interface edge**, as its declaration writes them.
-///
-/// Built from a `Decl` rather than from `Signatures`, and that is deliberate:
-/// `Signatures` covers `fn`, `query`, `command`, `subscription`, `resource` and
-/// `task`, and a `page`, `view` or `component` is not among them. Reading it
-/// meant every page export fell through a lookup to the permissive default and
-/// came out `Transferable` — the right answer for the store demo, arrived at by
-/// a mechanism with nothing to do with its types, which is the shape
-/// `docs/RISK_QUEUE.md` calls coincidental correctness. Found by probing the
-/// emitted contracts rather than by a test, because every test passed.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// A mechanically derived interface projection of the resolved signature.
+/// UI declarations have signatures too; absence never means transferable.
+#[derive(Debug, Clone, Default)]
 pub struct Interface {
-    /// Each parameter's declared type, `None` where it carries no annotation.
-    ///
-    /// `None` is undetermined and not absent: the parameter exists and
-    /// something crosses at that position, and this build cannot say what.
-    pub params: Vec<Option<String>>,
-    /// The declared return type's head, or `None` when nothing is returned.
-    ///
-    /// **Absent, not undetermined.** `page StorePage(id: StoreId)` returns no
-    /// value, so no value crosses outbound and there is nothing to decide.
-    /// Collapsing this into the parameter case would mark every page
-    /// undetermined and every `fn` with no `->` too.
-    pub returns: Option<String>,
-    /// `Result<Store, StoreError>` gives `["Store", "StoreError"]`.
-    pub returns_args: Vec<String>,
-}
-
-impl Interface {
-    /// From a declaration — the form every component kind has.
-    ///
-    /// The parameter type is reassembled from the head and its arguments, which
-    /// the HIR carries separately. Reading only `p.ty` gave `List` for
-    /// `List<MenuItem>` — which emitted `list` with nothing in it, and, worse,
-    /// looked up `List` rather than `MenuItem` when asking whether a position
-    /// carries a resource. `wit-parser` caught the first; the second was
-    /// invisible.
-    pub fn of(decl: &crate::hir::Decl) -> Interface {
-        Interface {
-            params: decl
-                .params
-                .iter()
-                // `written()`, the default path. This read `p.ty` alone and
-                // came out with `List` for `List<OpenTransaction>` — the whole
-                // reason `DeclaredType` exists.
-                .map(|p| p.ty.as_ref().map(|t| t.written()))
-                .collect(),
-            returns: decl
-                .ret
-                .as_ref()
-                .map(|t| t.constructor_head_only().to_string()),
-            returns_args: decl
-                .ret
-                .as_ref()
-                .map(|t| t.args().iter().map(|a| a.written()).collect())
-                .unwrap_or_default(),
-        }
-    }
+    pub params: Vec<Option<TypeResolution>>,
+    pub returns: Option<TypeResolution>,
 }
 
 impl From<&Signature> for Interface {
-    fn from(sig: &Signature) -> Interface {
-        Interface {
+    fn from(sig: &Signature) -> Self {
+        Self {
             params: sig.params.clone(),
             returns: sig.returns.clone(),
-            returns_args: sig.returns_args.clone(),
         }
     }
 }
@@ -281,14 +228,22 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
     let mut undetermined: Vec<Untransferable> = Vec::new();
     let mut owed: Vec<Obligation> = Vec::new();
 
-    let mut consider = |position: String, ty: Option<&str>, direction: Direction| {
+    let mut consider = |position: String, ty: Option<&ResolvedType>, direction: Direction| {
+        let Some(label) = ty.and_then(|t| facts.declared_label(t)) else {
+            undetermined.push(Untransferable {
+                position,
+                ty: ty.map(ResolvedType::display_name),
+                reason: "the signature type or its shared privacy facts are unavailable".into(),
+            });
+            return;
+        };
         let profile = facts.profile(ty);
         let verdict = can_cross(
             &profile,
             &BoundaryContext {
                 boundary: Boundary::RemoteCall,
                 direction,
-                label: Label::public(),
+                label: label.clone(),
                 // Unknowable at build time. See the doc comment above.
                 destination: None,
             },
@@ -308,7 +263,7 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
             Crossing::Violation(Violation::Private { restriction }) => {
                 refused.push(Untransferable {
                     position,
-                    ty: ty.map(str::to_string),
+                    ty: ty.map(ResolvedType::display_name),
                     reason: format!("it carries a {restriction} restriction"),
                 })
             }
@@ -329,7 +284,7 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
                     owed.push(Obligation::PreservePrincipal {
                         principal: r.to_string(),
                         position: position.clone(),
-                        ty: ty.map(str::to_string),
+                        ty: ty.map(ResolvedType::display_name),
                     });
                 }
             }
@@ -337,40 +292,29 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
     };
 
     for (i, p) in sig.params.iter().enumerate() {
-        consider(format!("argument {i}"), p.as_deref(), Direction::Inbound);
+        consider(
+            format!("argument {i}"),
+            p.as_ref().and_then(TypeResolution::resolved),
+            Direction::Inbound,
+        );
     }
 
     // The result and the error are separate positions, because they are
     // separate types and a signature can be remotable in one and not the other:
     // `Result<StoreId, OpenTransaction>` returns a key on success and a handle
     // on failure, and only checking the success side would call it remotable.
-    match sig.returns.as_deref() {
-        // Nothing is returned, so nothing crosses outbound. A `page` is the
-        // ordinary case; a `command` with no result is another. NOT the
-        // undetermined case — there is no position here to be undetermined
-        // about, and treating it as one marked every page in the corpus as an
-        // edge the compiler could not decide.
-        None => {}
-        // `Result<A, E>` and `Option<A>` are carriers. What crosses is what
-        // they carry, so the head is not itself a position — checking it would
-        // ask whether `Result` is transferable, which is not a question.
-        Some("Result") | Some("Option") | Some("List") => {
-            let names = ["result", "error"];
-            for (i, arg) in sig.returns_args.iter().enumerate() {
-                consider(
-                    names.get(i).copied().unwrap_or("result").to_string(),
-                    Some(arg),
-                    Direction::Outbound,
-                );
-            }
-            // A carrier with no arguments recorded says nothing about what it
-            // carries, which IS undetermined: `Result` alone does not name a
-            // type, and something does cross at this position.
-            if sig.returns_args.is_empty() {
-                consider("result".to_string(), None, Direction::Outbound);
+    match sig.returns.as_ref() {
+        None => {} // No declared outbound position, distinct from a blocked one.
+        Some(TypeResolution::Resolved(ty)) if ty.as_builtin() == Some(Builtin::Result) => {
+            for (name, arg) in ["result", "error"].into_iter().zip(ty.args()) {
+                consider(name.to_string(), Some(arg), Direction::Outbound);
             }
         }
-        other => consider("result".to_string(), other, Direction::Outbound),
+        Some(resolution) => consider(
+            "result".to_string(),
+            resolution.resolved(),
+            Direction::Outbound,
+        ),
     }
 
     // Order is the strength of the answer. A refusal is final; an undetermined
@@ -391,10 +335,10 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
 }
 
 /// The binding support of one exported declaration.
-pub fn binding_support(decl: &crate::hir::Decl, facts: &TypeFacts) -> BindingSupport {
+pub fn binding_support(sig: &Signature, facts: &TypeFacts) -> BindingSupport {
     BindingSupport {
         local: LocalSupport::Direct,
-        remote: remote_support(&Interface::of(decl), facts),
+        remote: remote_support(&Interface::from(sig), facts),
     }
 }
 
@@ -452,12 +396,17 @@ page Landing(id: StoreId) {
         let ws = Workspace::build(&hirs);
         let sigs = Signatures::build(&ws, &hirs);
         let facts = TypeFacts::build(&hirs, &sigs);
-        let decl = hir
-            .all_decls()
-            .find(|(_, d)| d.name == name)
-            .map(|(_, d)| d)
-            .unwrap_or_else(|| panic!("no declaration named {name}"));
-        remote_support(&Interface::of(decl), &facts)
+        remote_support(
+            &Interface::from(
+                sigs.by_def(
+                    ws.modules[0]
+                        .lookup_any(name)
+                        .expect("declaration identity"),
+                )
+                .expect("UI and term signatures are indexed"),
+            ),
+            &facts,
+        )
     }
 
     fn support_of(name: &str) -> RemoteSupport {
@@ -593,12 +542,10 @@ page Landing(id: StoreId) {
         let ws = Workspace::build(&hirs);
         let sigs = Signatures::build(&ws, &hirs);
         let facts = TypeFacts::build(&hirs, &sigs);
-        let decl = hir
-            .all_decls()
-            .find(|(_, d)| d.name == "commit")
-            .map(|(_, d)| d)
-            .expect("a declaration");
-        let support = binding_support(decl, &facts);
+        let support = binding_support(
+            sigs.by_path("shop.commit").expect("resolved signature"),
+            &facts,
+        );
         assert_eq!(support.local, LocalSupport::Direct);
         assert!(!support.remote.is_transferable());
     }

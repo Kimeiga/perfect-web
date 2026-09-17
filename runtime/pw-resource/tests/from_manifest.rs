@@ -248,3 +248,32 @@ fn every_accepted_corpus_resource_produces_a_manifest_the_schema_understands() {
         unparsed.join("\n")
     );
 }
+
+#[test]
+fn changing_the_declared_timeout_changes_late_result_acceptance() {
+    // Same work, two source policies. A hand-built default cannot satisfy both.
+    for (timeout, should_succeed) in [("2.seconds", false), ("5.seconds", true)] {
+        let src = STORE_QUERY.replace("timeout     2.seconds", &format!("timeout     {timeout}"));
+        let built = manifests(&src);
+        assert!(built.unparsed.is_empty());
+        let rm = to_runtime(&built.manifests[0]);
+        let clock = Clock::new();
+        let rt = Resources::new(clock.clone());
+        let result = rt.fetch(&rm, &Key::new("Store", "deadline"), |_| {
+            clock.advance(3_000);
+            Ok("finished".into())
+        });
+        assert_eq!(
+            result,
+            if should_succeed {
+                Fetched::Fresh("finished".into())
+            } else {
+                Fetched::TimedOut
+            }
+        );
+        assert_eq!(
+            rt.public_cache_contents().len(),
+            usize::from(should_succeed)
+        );
+    }
+}
