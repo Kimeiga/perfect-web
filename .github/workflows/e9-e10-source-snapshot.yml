@@ -1,0 +1,19 @@
+name: e9-e10-source-snapshot
+on:
+  push:
+    branches:
+      - fix/complete-e9-e10-2026-09-22
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-tree
+          path: |
+            .
+            !.git
+          include-hidden-files: true
