@@ -2,6 +2,7 @@ import * as THREE from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { compileWorldPrompt, DEFAULT_WORLD, type WorldIR } from "./world";
 import { inferDepth, type DepthField } from "./perception";
+import { compileWorldIntent } from "./intent";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#world")!;
 const status = document.querySelector<HTMLElement>("#status")!;
@@ -209,8 +210,21 @@ function audioEnergy() {
   return sum / bins / 255;
 }
 
-document.querySelector<HTMLButtonElement>("#compile")!.onclick = () =>
-  applyWorld(compileWorldPrompt(prompt.value));
+document.querySelector<HTMLButtonElement>("#compile")!.onclick = () => {
+  const button = document.querySelector<HTMLButtonElement>("#compile")!;
+  button.disabled = true;
+  void compileWorldIntent(prompt.value, (message) => (status.textContent = message))
+    .then(({ world: next, source }) => {
+      applyWorld(next);
+      status.textContent =
+        source === "local-ai"
+          ? "World IR compiled by the local model and hot-swapped."
+          : "World IR compiled deterministically.";
+    })
+    .finally(() => {
+      button.disabled = false;
+    });
+};
 
 document.querySelector<HTMLButtonElement>("#mic")!.onclick = () => void enableMicrophone();
 
