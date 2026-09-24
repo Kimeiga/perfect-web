@@ -3,8 +3,14 @@
   "minimumVersion": "3.23.0",
   "entry": [
     "spikes/**/*.mjs",
-    "spikes/**/*.js"
+    "spikes/**/*.js",
+    "spikes/reality-compiler/src/main.ts"
   ],
+  "workspaces": {
+    "patterns": [
+      "spikes/*"
+    ]
+  },
   "ignoreFindings": [
     "spikes/pw-to-marko/src/routes/**"
   ],
