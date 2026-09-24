@@ -1,0 +1,21 @@
+{
+  "name": "@perfect-web/reality-compiler",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.0",
+    "three": "0.186.0",
+    "@huggingface/transformers-structured-output": "4.3.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
+}
