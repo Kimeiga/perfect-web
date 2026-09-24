@@ -33,7 +33,11 @@ jobs:
         with:
           node-version: 24
       - name: Generate full Fallow report
-        run: npx -y fallow@3.23.0 --format json --quiet > fallow-report.json
+        run: |
+          set +e
+          npx -y fallow@3.23.0 --format json --quiet > fallow-report.json
+          status=$?
+          if [ "$status" -gt 1 ]; then exit "$status"; fi
       - name: Summarize health
         run: |
           node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("fallow-report.json","utf8")); const h=j.health?.health_score ?? {}; const s=j.check?.summary ?? {}; const d=j.dupes?.stats ?? {}; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `# Fallow weekly report\n\n- Health: **${h.score ?? "n/a"} ${h.grade ?? ""}**\n- Issues: **${s.total_issues ?? 0}**\n- Dead files: **${s.unused_files ?? 0}**\n- Cycles: **${s.circular_dependencies ?? 0}**\n- Duplication: **${Number(d.duplication_percentage ?? 0).toFixed(1)}%**\n`);'
