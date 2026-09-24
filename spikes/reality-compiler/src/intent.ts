@@ -16,6 +16,8 @@ interface Intent {
   spin: number;
 }
 
+const INTENT_MODEL_REVISION = "2c07371c2e84776cad597f3d813b7d306d292aea";
+
 const schema = {
   type: "object",
   properties: {
@@ -61,6 +63,7 @@ async function generator(progress: Progress) {
       "text-generation",
       "onnx-community/LFM2.5-350M-ONNX",
       {
+        revision: INTENT_MODEL_REVISION,
         dtype: "q4f16",
         device: "webgpu",
         progress_callback: (event: { status?: string; progress?: number }) => {
