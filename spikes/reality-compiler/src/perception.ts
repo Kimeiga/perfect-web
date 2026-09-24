@@ -9,6 +9,9 @@ export interface DepthField {
 type Progress = (message: string) => void;
 type Estimator = { run: any; backend: "webgpu" | "wasm" };
 
+const DEPTH_MODEL = "onnx-community/depth-anything-v2-small";
+const DEPTH_MODEL_REVISION = "4472b7362082ad9968fee890ca0f1e5aca36b93d";
+
 let estimatorPromise: Promise<Estimator> | undefined;
 
 function reportDownload(progress: Progress) {
@@ -21,6 +24,7 @@ function reportDownload(progress: Progress) {
 async function wasmEstimator(pipeline: any, model: string, progress: Progress): Promise<Estimator> {
   progress("Loading local depth model on WASM…");
   const run = await pipeline("depth-estimation", model, {
+    revision: DEPTH_MODEL_REVISION,
     progress_callback: reportDownload(progress),
   });
   return { run, backend: "wasm" };
@@ -31,6 +35,7 @@ async function webgpuEstimator(pipeline: any, model: string, progress: Progress)
   try {
     progress("Loading local depth model on WebGPU…");
     const run = await pipeline("depth-estimation", model, {
+      revision: DEPTH_MODEL_REVISION,
       device: "webgpu",
       progress_callback: reportDownload(progress),
     });
@@ -43,9 +48,8 @@ async function webgpuEstimator(pipeline: any, model: string, progress: Progress)
 
 async function createEstimator(progress: Progress): Promise<Estimator> {
   const { pipeline } = await import("@huggingface/transformers");
-  const model = "onnx-community/depth-anything-v2-small";
-  return (await webgpuEstimator(pipeline, model, progress))
-    ?? wasmEstimator(pipeline, model, progress);
+  return (await webgpuEstimator(pipeline, DEPTH_MODEL, progress))
+    ?? wasmEstimator(pipeline, DEPTH_MODEL, progress);
 }
 
 function normalizedDepth(raw: { data: ArrayLike<number>; width: number; height: number }) {
