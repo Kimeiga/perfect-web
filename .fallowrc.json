@@ -3,8 +3,7 @@
   "minimumVersion": "3.23.0",
   "entry": [
     "spikes/**/*.mjs",
-    "spikes/**/*.js",
-    "spikes/reality-compiler/src/main.ts"
+    "spikes/**/*.js"
   ],
   "workspaces": {
     "patterns": [
@@ -12,16 +11,19 @@
     ]
   },
   "ignoreFindings": [
-    "spikes/pw-to-marko/src/routes/**"
+    "spikes/pw-to-marko/src/routes/**",
+    "spikes/reality-compiler/**"
   ],
   "duplicates": {
     "ignore": [
-      "spikes/pw-to-marko/src/routes/**"
+      "spikes/pw-to-marko/src/routes/**",
+      "spikes/reality-compiler/**"
     ]
   },
   "health": {
     "ignore": [
-      "spikes/pw-to-marko/src/routes/**"
+      "spikes/pw-to-marko/src/routes/**",
+      "spikes/reality-compiler/**"
     ]
   },
   "audit": {
