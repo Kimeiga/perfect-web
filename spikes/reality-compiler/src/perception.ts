@@ -82,9 +82,13 @@ async function sourcePixels(file: File, width: number, height: number) {
   }
 }
 
+function positiveFinite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 function validRawDepth(raw: any): raw is { data: ArrayLike<number>; width: number; height: number } {
-  return !!raw?.data && Number.isFinite(raw.width) && raw.width > 0
-    && Number.isFinite(raw.height) && raw.height > 0;
+  if (!raw?.data) return false;
+  return positiveFinite(raw.width) && positiveFinite(raw.height);
 }
 
 async function runDepth(file: File, estimator: Estimator, progress: Progress) {
