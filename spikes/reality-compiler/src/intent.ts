@@ -41,7 +41,7 @@ const schema = {
     "spin",
   ],
   additionalProperties: false,
-} as const;
+};
 
 const palettes: Record<Atmosphere, Pick<WorldIR, "background" | "fog">> = {
   neutral: { background: "#050608", fog: "#0b1016" },
