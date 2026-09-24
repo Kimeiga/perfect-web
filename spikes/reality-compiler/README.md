@@ -9,7 +9,7 @@ A browser-only experiment for compiling a photograph into an explorable GPU worl
 3. WebGPU inference is attempted first, with the default WASM path as a fallback.
 4. The normalized depth field and source pixels become an interactive 3D point cloud.
 5. Three.js WebGPURenderer draws the world, with its WebGL 2 fallback when WebGPU rendering is unavailable.
-6. A small deterministic World IR hot-swaps visual behavior from natural-language prompt cues.
+6. On WebGPU browsers, LFM2.5 350M runs locally and Transformers.js 4.3 constrains its output to a strict World IR JSON schema. If that model path is unavailable, the deterministic prompt compiler remains the fallback.
 7. Optional microphone energy drives the world without sending audio anywhere.
 
 The source image stays local. Model weights are downloaded from Hugging Face on first use and then handled by the browser cache.
@@ -32,7 +32,7 @@ npm run build
 
 The useful boundary is **AI interprets; deterministic graphics execute**. The depth model runs when a source changes. It is not in the frame loop. Rendering and interaction remain normal GPU work.
 
-The current prompt compiler deliberately uses a deterministic IR compiler instead of pretending a local LLM is already necessary. The next iteration can replace or augment it with schema-constrained Transformers.js generation without changing the renderer contract.
+The renderer only accepts a bounded World IR. Local text generation can choose those values, but it cannot inject code or enter the frame loop. Schema-constrained generation and the deterministic fallback therefore share the same renderer contract.
 
 ## Next experiments
 
