@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.0",
-    "three": "0.186.0"
+    "three": "0.186.0",
+    "@huggingface/transformers-structured-output": "4.3.0"
   },
   "devDependencies": {
     "@types/three": "0.186.0",
