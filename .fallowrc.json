@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "minimumVersion": "3.23.0",
+  "entry": [
+    "spikes/**/*.mjs",
+    "spikes/**/*.js"
+  ],
+  "ignoreFindings": [
+    "spikes/pw-to-marko/src/routes/**"
+  ],
+  "duplicates": {
+    "ignore": [
+      "spikes/pw-to-marko/src/routes/**"
+    ]
+  },
+  "health": {
+    "ignore": [
+      "spikes/pw-to-marko/src/routes/**"
+    ]
+  },
+  "audit": {
+    "gate": "new-only"
+  }
+}
