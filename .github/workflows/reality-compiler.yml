@@ -12,7 +12,7 @@ on:
       - ".github/workflows/reality-compiler.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -24,17 +24,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
       - name: Install and generate lockfile
         run: npm install --ignore-scripts
-      - name: Upload generated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: reality-compiler-package-lock
-          path: spikes/reality-compiler/package-lock.json
-          if-no-files-found: error
+      - name: Commit generated lockfile
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --quiet -- package-lock.json; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore: lock Reality Compiler dependencies"
+          git push origin HEAD:${{ github.head_ref }}
       - name: Enforce Fallow regression gate
         run: npx -y fallow@3.23.0 audit --root . --base origin/master --gate new-only
       - run: npm run build
