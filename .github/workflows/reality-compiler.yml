@@ -26,4 +26,11 @@ jobs:
         with:
           node-version: "24"
       - run: npm install --ignore-scripts
+      - name: Report Fallow findings without treating workspace ownership debt as a build failure
+        run: |
+          set +e
+          npx -y fallow@3.23.0 audit --root . --gate all --format json --quiet > /tmp/reality-fallow.json
+          status=$?
+          cat /tmp/reality-fallow.json
+          if [ "$status" -gt 1 ]; then exit "$status"; fi
       - run: npm run build
