@@ -11,19 +11,16 @@
     ]
   },
   "ignoreFindings": [
-    "spikes/pw-to-marko/src/routes/**",
-    "spikes/reality-compiler/**"
+    "spikes/pw-to-marko/src/routes/**"
   ],
   "duplicates": {
     "ignore": [
-      "spikes/pw-to-marko/src/routes/**",
-      "spikes/reality-compiler/**"
+      "spikes/pw-to-marko/src/routes/**"
     ]
   },
   "health": {
     "ignore": [
-      "spikes/pw-to-marko/src/routes/**",
-      "spikes/reality-compiler/**"
+      "spikes/pw-to-marko/src/routes/**"
     ]
   },
   "audit": {
