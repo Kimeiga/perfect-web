@@ -88,13 +88,16 @@ function worldFromIntent(intent: Intent): WorldIR {
   };
 }
 
+function chatContent(generated: unknown): string | undefined {
+  if (!Array.isArray(generated)) return undefined;
+  const content = generated.at(-1)?.content;
+  return typeof content === "string" ? content : undefined;
+}
+
 function generatedContent(output: any): string {
   const generated = output?.[0]?.generated_text;
-  if (Array.isArray(generated)) {
-    const content = generated.at(-1)?.content;
-    if (typeof content === "string") return content;
-  }
-  if (typeof generated === "string") return generated;
+  const content = typeof generated === "string" ? generated : chatContent(generated);
+  if (content) return content;
   throw new Error("Local intent model returned no structured world.");
 }
 
