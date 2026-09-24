@@ -22,6 +22,8 @@ jobs:
         working-directory: spikes/reality-compiler
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -29,7 +31,7 @@ jobs:
       - name: Report Fallow findings without treating workspace ownership debt as a build failure
         run: |
           set +e
-          npx -y fallow@3.23.0 audit --root . --gate all --format json --quiet > /tmp/reality-fallow.json
+          npx -y fallow@3.23.0 audit --root . --base master --gate all --format json --quiet > /tmp/reality-fallow.json
           status=$?
           cat /tmp/reality-fallow.json
           if [ "$status" -gt 1 ]; then exit "$status"; fi
