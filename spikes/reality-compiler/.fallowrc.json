@@ -2,7 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "minimumVersion": "3.23.0",
   "entry": [
-    "src/main.ts"
+    "src/main.ts",
+    "e2e/**/*.mjs"
   ],
   "audit": {
     "gate": "new-only"

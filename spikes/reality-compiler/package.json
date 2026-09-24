@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:smoke": "playwright test"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.0",
@@ -14,6 +15,7 @@
     "@huggingface/transformers-structured-output": "4.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@types/three": "0.186.0",
     "typescript": "7.0.2",
     "vite": "8.3.0"
