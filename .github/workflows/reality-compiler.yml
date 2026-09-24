@@ -27,12 +27,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - run: npm install --ignore-scripts
-      - name: Report Fallow findings without treating workspace ownership debt as a build failure
-        run: |
-          set +e
-          npx -y fallow@3.23.0 audit --root . --base origin/master --gate all --format json --quiet > /tmp/reality-fallow.json
-          status=$?
-          cat /tmp/reality-fallow.json
-          if [ "$status" -gt 1 ]; then exit "$status"; fi
+      - name: Install and generate lockfile
+        run: npm install --ignore-scripts
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-compiler-package-lock
+          path: spikes/reality-compiler/package-lock.json
+          if-no-files-found: error
+      - name: Enforce Fallow regression gate
+        run: npx -y fallow@3.23.0 audit --root . --base origin/master --gate new-only
       - run: npm run build
