@@ -8,6 +8,7 @@ module generality.cache_branch
 
 import store.queries
 import cart.queries
+import domain.{ StoreId }
 
 page StorePage(id: StoreId, signed_in: Bool) {
     cache shared

@@ -11,9 +11,10 @@ module Receipts
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
     OrderId, OrderProgress, PositiveInt, Recommendation,
     RecommendationError, PaymentError, TrackingError }
-import capability.{ SessionId }
+import capability.{ SessionId, Secret, Payments }
+import html.{ Html }
 import browser.{ Element, MapHandle, MapError }
 
-fn render(key: Int, order: OrderId) -> String !{} {
+fn render(key: Secret<Payments>, order: OrderId) -> Html !{} {
     todo
 }

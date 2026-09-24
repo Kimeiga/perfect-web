@@ -11,13 +11,31 @@ Those historical statements must not override current source or test results.
 
 ## Value checking and generated execution
 
-Ordinary call argument types and declared return types are not comprehensively
-checked. Arity checking exists; `canonical_abi::a_call_site_is_not_type_checked`
-still pins the ordinary-call gap. Signatures now contain resolved identities,
-but the inference engine does not yet implement full unification, generic
-callable instantiation, or all expression types. Unknown annotations remain
-blocked in signatures and at relevant transfer/codegen boundaries; this change
-does not add comprehensive source diagnostics for every unknown annotation.
+**E9-V1..V6 are met** (2026-09-24, ADR-0031). What the value relations do not
+decide is Undecided, counted by `pw audit-values`, and never reported as
+agreement:
+
+- **Member existence.** `box.x` on a `Rect` with no `x`, or `{row.status}` on
+  a type without it, is unknown rather than refused. A-015 reads `box.x` and
+  `box.bottom` from a `Rect` that declares neither; the corpus was written
+  without this relation, and it is the next one to add.
+- **Sum-type variant constructors** (`Circle(3)`) have no type, because the
+  workspace does not resolve variant names as terms. Record and opaque
+  constructions are checked.
+- **Named-argument calls** are Undecided: a signature does not carry parameter
+  names. None occurs in the corpus.
+- **A `()` body discards its last value** (A-018). A branch mismatch in
+  statement position is not refused; as a result, it is.
+- **Generic layouts at the boundary.** Phantom parameters map to one WIT
+  layout; a generic whose layout depends on its arguments is refused, because
+  specialization is not implemented.
+- **Named function values are not instantiated.** A generic function named as
+  a value (`List.map` passed along) has its type parameters as holes.
+- **The unit value `()` lowers to `Expr::Error`.** Its type is therefore
+  unknown. This is harmless to the relations, which never guess, but it is a
+  lowering gap.
+- **`g(a)` followed by `()` on the next line parses as `g(a)()`.** The language
+  has no statement terminator; nothing in the corpus depends on the difference.
 
 A scope/resource policy is now attached to the resolved type rather than its
 spelling, preserving the existing type-level policy. This is not a per-value

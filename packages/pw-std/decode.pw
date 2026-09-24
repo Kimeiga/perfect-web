@@ -29,9 +29,18 @@ type DecodeError =
     | WrongType(String)
     | Invalid(String, String)
 
+// A named description of a decoder, for a program that wants to pass one
+// around as data. The decoders themselves are FUNCTIONS: `string`, `int`, or
+// any `fn(Unknown) -> Result<T, DecodeError>` the program declares.
 type Decoder = Decoder { name: String }
 
-fn field(raw: Unknown, name: String, inner: Decoder) -> Result<Unknown, DecodeError> !{} {
+// **The decoder decides what the field is** (E9-V2, 2026-09-24). This returned
+// `Result<Unknown, DecodeError>` whatever decoder it was given, with the
+// decoder declared as the `Decoder` record — so `field(raw, "id", string)?`
+// was still an undecoded `Unknown`, and passing it where a `String` is
+// required was exactly the unchecked external value this module exists to
+// prevent. A value checker reported it in A-012 the first time it ran.
+fn field<T>(raw: Unknown, name: String, inner: fn(Unknown) -> Result<T, DecodeError>) -> Result<T, DecodeError> !{} {
     Err(DecodeError.Missing(name))
 }
 
@@ -43,6 +52,6 @@ fn int(raw: Unknown) -> Result<Int, DecodeError> !{} {
     Err(DecodeError.WrongType("Int"))
 }
 
-fn list(raw: Unknown, inner: Decoder) -> Result<List<Unknown>, DecodeError> !{} {
+fn list<T>(raw: Unknown, inner: fn(Unknown) -> Result<T, DecodeError>) -> Result<List<T>, DecodeError> !{} {
     Err(DecodeError.WrongType("List"))
 }

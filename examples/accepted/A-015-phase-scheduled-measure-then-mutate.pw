@@ -11,6 +11,8 @@
 
 module store.tooltip
 
+import browser.{ ElementRef, LayoutSnapshot, Rect }
+
 // `layout.measure` and `style.mutate<LayoutAffect>` are distinct phases. The
 // scheduler runs every measure before any mutate, so layout flushes at most once.
 component Tooltip(anchor: ElementRef, content: String) {

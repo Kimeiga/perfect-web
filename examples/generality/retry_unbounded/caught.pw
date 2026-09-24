@@ -7,11 +7,13 @@
 module generality.retry_forever
 
 import Payments
+import domain.{ OrderId, PaymentError }
+import domain.{ Money, PaymentReceipt }
 
-command sync(order: OrderId) -> Result<Int, PaymentError>
+command sync(order: OrderId) -> Result<PaymentReceipt, PaymentError>
     requires      SignedIn
     retry         forever
     idempotent_by InteractionId
 {
-    Payments.charge(order, 1)
+    Payments.charge(order, Money(1))
 }

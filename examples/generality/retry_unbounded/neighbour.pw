@@ -4,11 +4,13 @@
 module generality.retry_bounded_ok
 
 import Payments
+import domain.{ OrderId, PaymentError }
+import domain.{ Money, PaymentReceipt }
 
-command sync(order: OrderId) -> Result<Int, PaymentError>
+command sync(order: OrderId) -> Result<PaymentReceipt, PaymentError>
     requires      SignedIn
     retry         bounded_exponential(max = 5, jitter = true)
     idempotent_by InteractionId
 {
-    Payments.charge(order, 1)
+    Payments.charge(order, Money(1))
 }

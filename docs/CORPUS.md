@@ -550,3 +550,37 @@ rules. `corpus_history.rs` tests those boundaries explicitly and keeps the known
 ordinary-type diagnostic gap visible. New `signature_behavior.rs` tests cover
 same-spelled but genuinely different nominal types, including imported handlers.
 The platform signature hash changes only for the explicit list imports.
+
+## C8: the value relations' first run, 2026-09-24
+
+Opened because the specification changed: written types must now resolve
+(`PW0026`) and every value must have its declared type (`PW0604`–`PW0607`).
+[ADR-0031](DECISIONS/ADR-0031-value-relations.md) is the decision;
+[the evidence](evidence/E9/value-relations-2026-09-24.md) lists the defects the
+first run found. No invariant is retired and no `@expect-error` line changed:
+the current 24 accepted / 46 rejected corpus remains clean / rejected for its
+declared rule only. Pre-change text of every modified fixture is in
+`examples/history/C8/`.
+
+| Fixtures | Repair | Kind |
+|---|---|---|
+| 25 rejected, 55 generality, 7 rule fixtures; A-005, A-006, A-007, A-015..A-019, A-022..A-024 | Import the domain/platform types they name (`StoreId`, `OrderId`, `ElementRef`, ...) | missing context |
+| A-006, A-007/A-019/A-024/R-044, A-010, A-015..A-017, A-023, R-025 | Declare what they name and nothing declared: `stream.Stream`, `domain.LatLng`, `domain.PaymentReceipt`, `browser.LayoutSnapshot`, `domain.InventoryRow`, `domain.DeliveryEstimate`/`EstimateError` | missing declaration |
+| A-001, A-010, R-014, retry witnesses | `type Money<C>`: the corpus wrote `Money<USD>`; the argument was being dropped | declaration corrected |
+| A-004, store, `Carts`, `Resources` | `Session<SessionId>` where `current_session()` is passed (ADR-0031 §7) | signature corrected |
+| store `Menus` | `for_store` returns `List<MenuItem>`, which the page renders | library corrected |
+| A-012, `StoreId`, `decode` | `from_string` fails with `DecodeError`; `field<T>` returns what its decoder produces | library corrected |
+| A-016 | Reads snapshot values through `.value`; `List.sum`/`maximum` are over `Float` | fixture and library corrected |
+| A-017, R-034 | `List<BadgeId>` (declared nowhere) is `List<ElementRef>`: the badges are styled elements | fixture corrected |
+| A-005, optimistic witness | `domain.Cart` qualified: `Cart` is also the imported query | name made unambiguous |
+| R-005, cache-key witnesses | `MenuError` (declared nowhere) is `StoreError`, what `Menus` returns | fixture corrected |
+| R-012, affine witnesses and rule | Map containers are `ElementRef`, as components hold them | fixture corrected |
+| payment witnesses | `Money(100)` rather than `100`; results are `PaymentReceipt` | fixture corrected |
+| sink witnesses | `log.public<T>` records any value; the record witness declares its field `Secret<Payments>` | library and fixture corrected |
+| `undeclared_effect` row witnesses | `Telemetry.record_visible(id)` for a store id, same `network.fetch` effect | fixture corrected |
+| transaction witnesses | `Database.rollback` returns `Result<(), CartError>`, as `commit` does | library corrected |
+
+The history question is unchanged: the rejected fixtures' old texts in `C8` still
+fail for their declared invariant, now also with `PW0026` for the missing
+import that each repair added. That is the evidence the repairs removed an
+obstruction, not the defect.

@@ -10,10 +10,11 @@ module Estimates
 
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
     OrderId, OrderProgress, PositiveInt, Recommendation,
-    RecommendationError, PaymentError, TrackingError, Location }
+    RecommendationError, PaymentError, TrackingError, Location,
+    DeliveryEstimate, EstimateError }
 import capability.{ SessionId }
 import browser.{ Element, MapHandle, MapError }
 
-fn for_location(at: Location) -> Result<String, StoreError> !{ network.fetch } {
+fn for_location(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fetch } {
     todo
 }

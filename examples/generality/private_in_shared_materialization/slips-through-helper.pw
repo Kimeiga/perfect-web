@@ -21,10 +21,10 @@
 // compiling clean, and then the file is promoted rather than deleted.
 module generality.materialize_slips_helper
 
-
 import Resources.{ Cart }
 import Events.{ CartChanged }
 import Carts
+import capability.{ SessionId }
 
 // Public by declaration. Session-derived in fact.
 public query Summary(session: SessionId) -> Int

@@ -11,11 +11,11 @@
 module cart.queries
 
 import domain.{ Cart, CartError }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
 import Carts
 
-session query Cart(session: SessionId) -> Result<Cart, CartError>
+session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
     freshness     0.seconds
     consistency   read_your_writes
     cache         private

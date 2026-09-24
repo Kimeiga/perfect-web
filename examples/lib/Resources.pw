@@ -27,7 +27,7 @@ module Resources
 
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem,
     OrderId, OrderProgress, OrderFailure }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 import Events.{ StoreChanged, MenuChanged }
 
 public query Store(id: StoreId) -> Result<Store, StoreError>
@@ -57,7 +57,7 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
 // Session-scoped, and that is what makes it usable as a control: a shared
 // materialization depending on this is `PW5101`, and the accepted neighbour
 // depending on `Menu` is not.
-session query Cart(session: SessionId) -> Result<Cart, CartError>
+session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
     freshness     0.seconds
     consistency   read_your_writes
     cache         private

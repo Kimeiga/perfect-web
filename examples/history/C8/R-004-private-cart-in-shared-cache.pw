@@ -1,0 +1,37 @@
+// @corpus: rejected
+// @id: R-004
+// @category: private cart in shared cache
+// @rule: PW0100
+// @invariant: private_in_shared_cache
+// @charter: §7.8, §16.3
+// @milestone: 5
+// @expect-error: cannot materialize `StorePage` in a shared public cache
+// @expect-error: `cart` is labeled `Session<SessionId>`; a shared cache may contain only `Public` values
+//
+// The charter's own worked example in §16.3. The diagnostic must name the
+// origin of the Session label and the boundary that rejected it, and offer a
+// legal alternative.
+
+module store.page
+
+// The queries this page materializes. Declared imports, not ambient visibility:
+// the `Session` label that makes this a violation comes from `Cart`'s own
+// declaration in `cart.queries`, and a checker can only see it if the program
+// says where to look (E2B).
+import store.queries
+import cart.queries
+
+page StorePage(id: StoreId) {
+    cache shared
+
+    let store = query Store(id) // Public
+    let cart = query Cart(session) // Session<SessionId>
+
+    view {
+        <main>
+            <h1>{store.name}</h1>
+            // ERROR: session data inside a shared materialization.
+            <p>Items in cart: {cart.line_count}</p>
+        </main>
+    }
+}

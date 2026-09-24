@@ -32,6 +32,18 @@ opaque type Style = String
 
 fn style(el: ElementRef) -> Style !{} { todo }
 
+// **A value read during a frame's measure phase** (charter §7.5A): the
+// geometry of one layout, usable by the phases after it and not by the one
+// that produced it. A-015..A-017 annotate `measure { .. }` results with it; no
+// module declared it until 2026-09-24, so those annotations resolved to nothing.
+opaque type LayoutSnapshot<T> = String
+
+// Reading a snapshot is explicit. A snapshot is not its value — the distinction
+// is what lets the frame model say *when* a measurement was taken — so `T` is
+// reached through this accessor rather than by treating the two as one type.
+// Recorded in docs/ASSUMPTIONS.md; the alternative is a phase rule.
+fn value<T>(snapshot: LayoutSnapshot<T>) -> T !{} { todo }
+
 type Rect = Rect {
     width: Float,
     height: Float,

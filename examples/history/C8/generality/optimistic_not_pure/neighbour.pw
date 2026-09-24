@@ -1,0 +1,23 @@
+// @status: NEIGHBOUR
+// @invariant: optimistic_not_pure
+// @dimension: valid neighbour — the same shape, transformed purely
+//
+// One character of difference in meaning: the transition computes the
+// speculative cart from the one it was given, instead of going to the origin
+// for it. Both are `Cart -> Cart`; only one can be abandoned by restoring the
+// previous value.
+module generality.optimistic_pure
+
+import Carts
+import Resources.{ Cart }
+import context.{ current_session }
+
+command remove_from_cart(item: MenuItemId, quantity: PositiveInt)
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
+    invalidates   Cart(current_session())
+{
+    Carts.clear(current_session())
+}

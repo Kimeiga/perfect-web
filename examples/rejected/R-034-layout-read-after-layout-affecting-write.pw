@@ -15,8 +15,9 @@
 module cart.badge_sizing
 
 import style
+import browser.{ ElementRef }
 
-component BadgeRow(badges: List<BadgeId>) {
+component BadgeRow(badges: List<ElementRef>) {
     placement browser
     frame {
         mutate { self.style.set_padding(8.px) }

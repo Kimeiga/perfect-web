@@ -10,6 +10,6 @@ import clock
 
 page Now() !{ clock.wall } {
     placement origin
-    cache private
+    cache     private
     view { <main><p>Now: {clock.now_wall()}</p></main> }
 }

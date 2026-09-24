@@ -9,8 +9,12 @@
 
 module StoreId
 
-import domain.{ StoreId, StoreError }
+import domain.{ StoreId }
+import decode.{ DecodeError }
 
-fn from_string(raw: String) -> Result<StoreId, StoreError> !{} {
-    Err(StoreError.DecodeFailed(raw))
+// A decoding step, so its failure is a decode failure. It returned
+// `StoreError`, and A-012 propagates it with `?` out of a function whose error
+// is `DecodeError` — a mismatch invisible while `?` had no node in the HIR.
+fn from_string(raw: String) -> Result<StoreId, DecodeError> !{} {
+    Err(DecodeError.Invalid("id", raw))
 }

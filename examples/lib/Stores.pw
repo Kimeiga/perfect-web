@@ -48,7 +48,7 @@ fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> }
 
 // `find` may not find one, and says so in its type. `get` is the form that
 // fails loudly; this is the form whose absence is a value.
-fn find(name: String) -> Option<Store> !{ database.read<Stores> } {
+fn find(id: StoreId) -> Option<Store> !{ database.read<Stores> } {
     todo
 }
 

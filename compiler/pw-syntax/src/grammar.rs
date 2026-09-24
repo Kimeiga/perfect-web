@@ -504,6 +504,45 @@ impl<'a> P<'a> {
             self.finish();
             return true;
         }
+        // **A function type**: `fn(A, B) -> R`. E9, 2026-09-24 (ADR-0031).
+        // A callback had no type to be declared with, so `pw-std` wrote
+        // `List.map(items: List<Unknown>, f: Decoder)` — a record standing in
+        // for a function — and nothing could relate a lambda to what it is
+        // passed as. The result is not optional: `fn(A) -> ()` says it.
+        if self.at_kw("fn") && self.nth_is(1, Kind::LParen) {
+            self.start(K::TypeRef);
+            self.start(K::Name);
+            self.bump(); // `fn`
+            self.finish();
+            self.start(K::FnTypeArgs);
+            self.bump(); // `(`
+            loop {
+                if self.at(Kind::RParen) || self.at_eof() {
+                    break;
+                }
+                if !self.type_ref() {
+                    break;
+                }
+                if !self.eat(Kind::Comma) {
+                    break;
+                }
+            }
+            if !self.eat(Kind::RParen) {
+                self.error("PW0005", "unclosed parameter list, expected `)`");
+            }
+            if self.eat(Kind::Arrow) {
+                self.type_ref();
+            } else {
+                self.error_help(
+                    "PW0001",
+                    "expected `->` and the function type's result",
+                    "a function type always states its result: `fn(A) -> ()` returns nothing",
+                );
+            }
+            self.finish(); // FnTypeArgs
+            self.finish(); // TypeRef
+            return true;
+        }
         if !self.at(Kind::Ident) {
             let found = self.cur().describe();
             self.error("PW0001", format!("expected a type, found {found}"));
@@ -889,7 +928,12 @@ impl<'a> P<'a> {
                 continue;
             }
             if self.at(Kind::Question) {
-                self.bump(); // `?` propagation, no node of its own yet
+                // `?` propagation, a node of its own so the operand is a
+                // child: the operator changes both the value and the control
+                // flow, and a token no node owns tells no analysis either.
+                self.b.start_at(cp, K::TryExpr);
+                self.bump();
+                self.finish();
                 continue;
             }
             break;
@@ -1809,11 +1853,12 @@ impl<'a> P<'a> {
             });
             self.bump();
             self.name("a type name");
-            if self.at(Kind::LAngle) {
-                self.bump();
-                self.skip_balanced(Kind::LAngle, Kind::RAngle);
-                self.eat(Kind::RAngle);
-            }
+            // **The same binder `opaque type` and `effect` use.** This was
+            // `skip_balanced` until 2026-09-24, so `type Box<T> = Box { v: T }`
+            // parsed, lowered with no type parameters, and left `T` a name that
+            // resolved to nothing — a declaration whose generality the parser
+            // accepted and then threw away without a diagnostic.
+            self.type_params();
             if self.eat(Kind::Eq) {
                 if is_record {
                     self.name("a record constructor");
@@ -1892,6 +1937,12 @@ impl<'a> P<'a> {
             self.start(K::FnDecl);
             self.bump();
             self.name("a function name");
+            // **A callable may bind type parameters**: `fn map<T, U>(items:
+            // List<T>, ..) -> List<U>`. E9-V2 (ADR-0031). Until 2026-09-24 this
+            // was `PW0007`, so no callable was generic and `pw-std` declared
+            // `List.map` over `List<decode.Unknown>` — a stand-in that a value
+            // checker must either reject at every use or special-case by name.
+            self.type_params();
             self.param_list();
             if self.eat(Kind::Arrow) {
                 self.type_ref();

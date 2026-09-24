@@ -4,6 +4,8 @@
 module generality.stale_latest
 
 import Stores
+import domain.{ Store, StoreId }
+import domain.{ StoreError }
 
 public query Store(id: StoreId) -> Result<Store, StoreError>
     freshness   10.seconds

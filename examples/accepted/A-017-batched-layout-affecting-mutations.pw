@@ -10,8 +10,9 @@
 module cart.badge_sizing
 
 import style
+import browser.{ ElementRef, LayoutSnapshot }
 
-component BadgeRow(badges: List<BadgeId>) {
+component BadgeRow(badges: List<ElementRef>) {
     placement browser
 
     frame {

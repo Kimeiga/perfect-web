@@ -9,11 +9,12 @@
 
 module store.map_widget
 
-import browser.{ Element, MapHandle, MapError }
+import browser.{ ElementRef, MapHandle, MapError }
+import domain.{ LatLng }
 
 import Maps
 
-resource StoreMap(container: Element, center: LatLng)
+resource StoreMap(container: ElementRef, center: LatLng)
     -> Result<MapHandle, MapError>
 {
     placement browser

@@ -8,6 +8,7 @@ module rules.decode_good
 
 import decode
 import decode.{ Decoder }
+import domain.{ Store }
 
 // 2026-08-10: PW0021 learned to examine bare calls, and this fixture called
 // `store_decoder()` while declaring nothing of that name. Declared here, so

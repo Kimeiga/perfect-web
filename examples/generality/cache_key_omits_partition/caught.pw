@@ -9,8 +9,10 @@ module generality.key_user
 
 import Menus
 import context
+import domain.{ MenuItem, StoreId }
+import domain.{ StoreError }
 
-query Recent(store: StoreId, limit: Int) -> Result<List<MenuItem>, MenuError>
+query Recent(store: StoreId, limit: Int) -> Result<List<MenuItem>, StoreError>
     cache shared
     key   store, limit
 {

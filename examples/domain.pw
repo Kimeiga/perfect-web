@@ -50,7 +50,12 @@ opaque type PositiveInt = Int
 
 type USD = USD { code: String }
 
-type Money = Money { minor_units: Int }
+type Money<C> = Money { minor_units: Int }
+
+// A geographic point. A-007, A-019 and A-024 wrote `center: LatLng` for two
+// years of corpus history while no module declared it — an annotation naming
+// nothing, which checked nothing, and nothing said so until 2026-09-24.
+type LatLng = LatLng { lat: Float, lng: Float }
 
 // --- store ----------------------------------------------------------------
 
@@ -90,7 +95,7 @@ type StoreError =
 type CartLine = CartLine {
     item_id: MenuItemId,
     quantity: PositiveInt,
-    unit_price: Money,
+    unit_price: Money<USD>,
 }
 
 type Cart = Cart {
@@ -166,6 +171,20 @@ type OrderState =
     | Failed(OrderFailure)
 
 // --- recommendations ------------------------------------------------------
+
+// What a captured payment returns (A-010). Named by the corpus, declared by
+// nothing, until the value relations made an unresolved annotation an error.
+type PaymentReceipt = PaymentReceipt { order: OrderId, amount: Money<USD> }
+
+// A delivery estimate and why one could not be made (R-025).
+type DeliveryEstimate = DeliveryEstimate { minutes: Int }
+
+type EstimateError =
+    | NoCoverage
+    | LocationUnavailable
+
+// A row of the inventory table (A-023).
+type InventoryRow = InventoryRow { id: MenuItemId, name: String, status: String }
 
 type Recommendation = Recommendation {
     id: MenuItemId,

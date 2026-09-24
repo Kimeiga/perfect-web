@@ -13,6 +13,8 @@
 
 module cart.lines_view
 
+import domain.{ CartLine }
+
 view CartLines(lines: List<CartLine>) !{} {
     <ul aria-label="Cart">
         // ERROR: no key for a mutable list.

@@ -8,6 +8,8 @@
 module generality.retry_ok
 
 import Payments
+import domain.{ OrderId, PaymentReceipt, USD }
+import domain.{ Money, PaymentError }
 
 command refund(order: OrderId, amount: Money<USD>)
     -> Result<PaymentReceipt, PaymentError>

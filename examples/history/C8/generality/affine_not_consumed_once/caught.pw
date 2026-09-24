@@ -1,0 +1,37 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+//
+// This file was `slips-through.pw` until the branch-aware analysis landed, and
+// it is why that analysis exists.
+//
+// The transaction is released on ONE branch and returned from the other, so
+// there is a path that leaves it open — the same defect R-011 has, written so
+// that the release comes FIRST in the text. The old check asked whether a
+// `return` sat textually between the acquisition and the first release, and
+// here it does not.
+//
+// Structurally different from R-011 in the way that matters: the fixture's
+// early exit is in an `if` with no `else`, and this one is in the `else`.
+
+module generality.affine_branch
+
+import Carts
+import Database
+// 2026-08-10: PW0021 learned to examine bare calls. A witness that calls a
+// name nothing declares is invalid evidence by the corpus's own rule, so the
+// callee is declared here — the witness stays self-contained and its subject
+// is unchanged.
+import context.{ current_session }
+
+command drain_cart() -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    if Carts.is_empty(current_session()) {
+        Database.rollback(tx)
+    } else {
+        // No release on this path, and no `return` before the one above.
+        return Ok(())
+    }
+    tx.commit()
+}

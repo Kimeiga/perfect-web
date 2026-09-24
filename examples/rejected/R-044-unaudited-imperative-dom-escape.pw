@@ -15,6 +15,7 @@
 module store.third_party_map
 
 import VendorSdk
+import domain.{ LatLng }
 
 component VendorMap(center: LatLng) {
     placement browser

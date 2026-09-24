@@ -8,10 +8,10 @@
 
 module Menus
 
-import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, MenuItemId,
     OrderId, OrderProgress, PositiveInt, Recommendation,
     RecommendationError, PaymentError, TrackingError }
-import capability.{ SessionId }
+import capability.{ SessionId, Organization, OrganizationId, User, UserId }
 import browser.{ Element, MapHandle, MapError }
 
 // The public menu: the same for every reader, which is what makes a shared
@@ -46,17 +46,17 @@ import browser.{ Element, MapHandle, MapError }
 // require `database.write<Carts>` and have different ABIs — which is the model
 // error the Wasm encoder found, and the reason a capability may never be a
 // callable identity.
-fn for_store(store: StoreId) -> Result<List<MenuItemId>, StoreError> !{ database.read<Menus> }
+fn for_store(store: StoreId) -> Result<List<MenuItem>, StoreError> !{ database.read<Menus> }
     host "store:data/menus#for-store"
 
 // Partitioned by user rather than by organization. Declared so a challenge
 // witness can vary the PARTITION without varying anything else.
-fn for_user(store: StoreId, limit: Int, user: String) -> Result<List<MenuItemId>, StoreError>
+fn for_user(store: StoreId, limit: Int, user: User<UserId>) -> Result<List<MenuItem>, StoreError>
     !{ database.read<Menus> }
 {
     todo
 }
 
-fn for_store_in_org(store: StoreId, org: String) -> Result<List<MenuItemId>, StoreError> !{ database.read<Menus> } {
+fn for_store_in_org(store: StoreId, org: Organization<OrganizationId>) -> Result<List<MenuItem>, StoreError> !{ database.read<Menus> } {
     todo
 }

@@ -47,7 +47,9 @@ fn commit(tx: DatabaseTransaction) -> Result<(), CartError>
     todo
 }
 
-fn rollback(tx: DatabaseTransaction) -> ()
+// The same result as `commit`: ending a transaction either way can fail, and
+// a body ending in `if .. { rollback(tx) } else { commit(tx) }` has one type.
+fn rollback(tx: DatabaseTransaction) -> Result<(), CartError>
     !{ database.transaction, resource.release<DatabaseTransaction> }
 {
     todo

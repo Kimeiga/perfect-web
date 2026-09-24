@@ -27,6 +27,7 @@ import Database
 // Two silent second defects in one fixture, found by two different checks
 // three days apart, is a fact about the corpus and not about this file.
 import context.{ current_session }
+import domain.{ CartError }
 
 command clear_cart() -> Result<(), CartError>
     requires SignedIn

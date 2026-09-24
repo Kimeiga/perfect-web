@@ -15,6 +15,7 @@ module store.menu_align
 
 import List
 import style
+import browser.{ ElementRef }
 
 component MenuAligner(items: List<ElementRef>) {
     placement browser

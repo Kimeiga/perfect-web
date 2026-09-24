@@ -2,17 +2,22 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-09-16, compiler work started at `49398dc` and integrates
-master `c200ae3e39934285858064fa56a09dabe882657d` without changing its runtime repair.
+**Reviewed:** 2026-09-24, against master `145588e` plus the E9-V change.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
-**Current milestone:** E10 backend work has a reopened E9 prerequisite.
-Ordinary call argument types and declared return types are not comprehensively
-checked. E10-I, compiling `add_to_cart` through the production component backend
-and executing it through the E8 host without an alternate Rust closure, is open.
-The resolved-signature cutover is complete in this change. The next work is
-argument/return checking, then component adapters and E10-I. See [NEXT](NEXT.md).
+**Current milestone:** E9 is **closed again** (2026-09-24). Its reopening gates,
+E9-V1..V6, are met by checks that refuse programs, with discriminators and
+mutation controls: [evidence](evidence/E9/value-relations-2026-09-24.md),
+[ADR-0031](DECISIONS/ADR-0031-value-relations.md). **E10-I is next**: compile
+`add_to_cart` through the production component backend and execute it through
+the E8 host, with the alternate Rust closure path deleted. See [NEXT](NEXT.md).
+
+Three ADR-0031 decisions were made without an architect ruling and are offered
+for reversal:
+- privacy qualifiers are not value-transparent (§7);
+- function types exist (§4);
+- snapshots are read through `.value` (A-020).
 
 The former status file mixed chronological notes with obsolete headlines such as
 "E9 is complete" and "no benchmarks yet". Its complete bytes are preserved in
@@ -26,6 +31,30 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-24: E9-V1..V6, the ordinary value relations.**
+  - `compiler/pw-core/src/values.rs` checks, three-valued, with diagnostics
+    projected from a queryable analysis:
+    - arity and argument types for path, member, piped, query, construction
+      and policy-term calls;
+    - declared results through branches, arms, `return` and `?`;
+    - annotated bindings;
+    - written types that resolve to nothing.
+  - Language additions: callable type parameters instantiated per call,
+    `type` parameters kept, function types typed bidirectionally, `?` as a HIR
+    node, and declared-constructor arity.
+  - Tests: 38 gate tests; 10 of 10 mutation controls killed.
+  - Coverage: every relation in the store program is decided and agrees;
+    the accepted corpus has 144 agreeing value relations and 343 resolving
+    annotations; `pw audit-values` counts the undecided remainder.
+  - Defects found and repaired (corpus C8): in the milestone demo, the
+    accepted corpus and the libraries; see the evidence.
+  - The pre-C8 text of every repaired rejected fixture is still caught for its
+    declared invariant (`corpus_history.rs`).
+  - `just ci` passes.
+  - Not claimed: member existence, sum-type variant constructors,
+    named-argument calls, non-phantom generic layouts at the boundary.
+
 
 - **2026-09-16 resource repair:** shared requests now return the real terminal
   outcome; cancellation/invalidation fence late publication; command admission
@@ -91,12 +120,9 @@ these compiler changes do not independently re-establish those milestones.
 
 ## failing gate items
 
-- **E9 value checking remains open.** Signatures now carry resolved identities,
-  but `check.rs::call_arity` still checks argument count, not comprehensive
-  argument-type agreement. The test
-  `canonical_abi::a_call_site_is_not_type_checked` deliberately pins the missing
-  ordinary-call relation. E9-V1..V6 distinguish representation from enforcement;
-  do not close the gate merely because `ResolvedType` exists.
+- **Member existence is not a value relation yet.** `box.x` on a `Rect`
+  without `x` is unknown rather than refused. This is the first follow-up after
+  E10-I, recorded in KNOWN_LIMITATIONS; it was not one of E9-V1..V6.
 - **E10-I remains open.** A valid core Wasm module and a separately functioning
   host do not prove compiled Pleris execution through the production component
   path. Keep ADR-0023's deferred integration obligation.
@@ -115,6 +141,9 @@ just audit
 python3 research/failures/tools/validate.py
 python3 -m unittest discover -s research/failures/tools -p 'test_*.py' -v
 node --test spikes/layout-phase-scheduler/test/loaf.test.mjs
+just e9-values
+cargo test --locked -p pw-core --test value_relations --test corpus_history
+python3 scripts/e9_value_mutations.py
 cargo test -p pw-core --test signature_behavior --test signature_authority --test corpus_history
 cargo test -p pw-core --test recursive_declared_types --test resolved_types --test call_arity --test canonical_abi --test one_comparison --test evidence_is_current
 ```
@@ -156,12 +185,17 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. Implement ordinary-call inference/unification against the resolved signatures,
-   including declared returns and diagnostics for blocked annotations. Replace
-   pinned-gap witnesses with intended-diagnostic and accepted-neighbor controls.
-2. Make the callable-generic discriminator representable, validate nominal arity,
-   and close E9-V1..V6 only against executed checks, not representation alone.
-3. Finish the component adapters and E10-I using those checked signatures;
-   execute the compiled command through the host and delete the alternate closure
-   path. Preserve the census's remaining design obligations rather than marking
-   them implemented by association.
+1. **E10-I steps 4-6.**
+   - Canonical ABI adapters, with every flattening number taken from
+     `wit-parser` 0.257.1.
+   - One core module per component, with `memory`, `cabi_realloc` and
+     post-return.
+   - Wrap with upstream `wit-component` 0.257.1.
+   - Validate independently, including a component-level same-core-ABI
+     mutation control.
+2. **E10-I steps 7-9.**
+   - `pw-host` links and calls the compiled component with host functions.
+   - `add_to_cart` runs through it in the dev server.
+   - Delete the Rust closure path, and record `just e10-i` evidence.
+3. **The rest of E10.** Then the kiokun proof slice (lookup and search over one
+   shard) as the first application written against checked signatures.

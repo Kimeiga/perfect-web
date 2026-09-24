@@ -1,0 +1,15 @@
+// @status: GENERAL
+// @invariant: declared_placement_cannot_grant
+// @dimension: direct invalid
+module generality.place_direct
+
+import Estimates
+import device
+
+query DeliveryEstimate(session: SessionId) -> Result<String, EstimateError>
+    placement origin
+    cache     private
+{
+    let here = device.current_location()
+    Estimates.for_location(here)
+}

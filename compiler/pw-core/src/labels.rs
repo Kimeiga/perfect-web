@@ -279,6 +279,8 @@ impl<'a> Labels<'a> {
                 .unwrap_or_else(Label::public),
 
             Expr::Cast { value, .. } => self.label(body, *value),
+            // The success value carries what the whole value carried.
+            Expr::Try { value } => self.label(body, *value),
 
             // `query Cart(session)` DECLARES a dependency. The query runs at
             // its own placement, so its effects are not this body's — but its

@@ -6,22 +6,33 @@
 
 module List
 
-import decode.{ Unknown, Decoder }
-
+// **Generic, with function-typed callbacks** (E9-V2, ADR-0031). Until
+// 2026-09-24 no callable could bind a type parameter and there was no function
+// type, so these were declared over `List<decode.Unknown>` with a `Decoder`
+// record standing in for the callback — signatures a value checker would have
+// had to refuse at every use or special-case by name. Each call now
+// instantiates `T` and `U` from its own arguments.
+//
 // Pure by construction: every row declares `!{}`, so a body that stays inside
 // `List` cannot acquire an effect. E2D reads these rows; nothing hard-codes
 // "List.map is pure" in a checker.
 
-fn map(items: List<Unknown>, f: Decoder) -> List<Unknown> !{} { items }
+fn map<T, U>(items: List<T>, f: fn(T) -> U) -> List<U> !{} { [] }
 
-fn fold(items: List<Unknown>, seed: Unknown, f: Decoder) -> Unknown !{} { seed }
+fn fold<T, A>(items: List<T>, seed: A, f: fn(A, T) -> A) -> A !{} { seed }
 
-fn filter(items: List<Unknown>, f: Decoder) -> List<Unknown> !{} { items }
+fn filter<T>(items: List<T>, f: fn(T) -> Bool) -> List<T> !{} { items }
 
-fn length(items: List<Unknown>) -> Int !{} { 0 }
+fn length<T>(items: List<T>) -> Int !{} { 0 }
 
-fn enumerate(items: List<Unknown>) -> List<Unknown> !{} { items }
+// The language has no tuple type, so a position and an element cannot be one
+// value's type yet. The result is therefore not annotated — a hole, not a
+// claim — and `for (i, v) in List.enumerate(xs)` binds by pattern.
+fn enumerate<T>(items: List<T>) !{} { [] }
 
-fn sum(items: List<Int>) -> Int !{} { 0 }
+// Floats, because every caller sums measured lengths. The language has no
+// numeric abstraction, so an `Int` sum is a separate declaration when one is
+// needed rather than a claim this one could make.
+fn sum(items: List<Float>) -> Float !{} { 0.0 }
 
-fn maximum(items: List<Int>) -> Int !{} { 0 }
+fn maximum(items: List<Float>) -> Float !{} { 0.0 }

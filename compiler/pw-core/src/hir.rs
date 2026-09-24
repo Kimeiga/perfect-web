@@ -226,6 +226,21 @@ mod type_ref {
         ///
         /// The default path, and the one every consumer should reach for.
         pub fn written(&self) -> String {
+            // `fn(A, B) -> R`, as the grammar spells a function type: the
+            // last argument is the result.
+            if self.head == "fn"
+                && let Some((result, params)) = self.args.split_last()
+            {
+                return format!(
+                    "fn({}) -> {}",
+                    params
+                        .iter()
+                        .map(Self::written)
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    result.written()
+                );
+            }
             if self.args.is_empty() {
                 self.head.clone()
             } else {
@@ -644,6 +659,7 @@ impl Body {
             }
             Expr::Binary { lhs, rhs, .. } => vec![*lhs, *rhs],
             Expr::Cast { value, .. } => vec![*value],
+            Expr::Try { value } => vec![*value],
             Expr::Interpolated { parts, .. } => parts.clone(),
             Expr::Unary { operand, .. } => vec![*operand],
             Expr::Block { stmts } => stmts.clone(),
@@ -794,6 +810,11 @@ pub enum Expr {
     Cast {
         value: ExprId,
         ty: TypeRefId,
+    },
+    /// `e?`: the success value of `e`, returning its failure — an `Err` or a
+    /// `None` — from the enclosing declaration.
+    Try {
+        value: ExprId,
     },
     /// A string with `{expr}` holes: `"charging {token} now"`.
     ///

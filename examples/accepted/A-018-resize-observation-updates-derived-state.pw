@@ -10,6 +10,8 @@
 
 module store.responsive_menu
 
+import domain.{ MenuItemId }
+
 component ResponsiveMenu(items: List<MenuItemId>) {
     placement browser
 

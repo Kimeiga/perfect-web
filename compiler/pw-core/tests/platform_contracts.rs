@@ -377,7 +377,7 @@ fn the_trusted_platform_contract_is_hashed() {
     // import `capability.SessionId`.
     // 2026-09-16: List explicitly imports decode.Unknown and decode.Decoder;
     // all written platform parameter/result types now resolve in their module.
-    const EXPECTED: u64 = 0x3408b3ced959314e;
+    const EXPECTED: u64 = 0x0f87ace5767164be;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

@@ -149,6 +149,19 @@ pub enum SyntaxKind {
     RecordExpr,
     TupleExpr,
     ListExpr,
+    /// `e?` — propagate the failure of a `Result` or the absence of an
+    /// `Option` to the enclosing declaration's result.
+    ///
+    /// The parser consumed the `?` and emitted nothing until 2026-09-24, so
+    /// the HIR said `let id = field(raw, "id", string)?` bound a `Result` —
+    /// the operator changed the value's type and the function's control
+    /// flow, and no analysis could see either.
+    TryExpr,
+    /// `(A, B) -> R` after `fn` in a type: a function type's parameter types
+    /// and its result, in that order. Its own node rather than a
+    /// `TypeArgList`, so the formatter does not space the parentheses and the
+    /// arrow as if they were angle brackets.
+    FnTypeArgs,
     /// An expression position the parser could not fill.
     ErrorExpr,
     /// HTML-like markup inside a view or component body. Its `{...}`
@@ -370,6 +383,8 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         RecordExpr,
         TupleExpr,
         ListExpr,
+        TryExpr,
+        FnTypeArgs,
         ErrorExpr,
         TemplateRegion,
         Interpolation,

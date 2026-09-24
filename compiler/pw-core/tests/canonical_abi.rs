@@ -194,11 +194,19 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
         .find(|i| i.key() == "store:data/carts#current")
         .and_then(|i| i.signature.as_ref())
         .expect("the contract carries it");
+    // The contract keeps the label: `Session<SessionId>` since 2026-09-24,
+    // when the value relations refused `Carts.current(current_session())`
+    // against a parameter declared as the unlabelled `SessionId`. The WIT
+    // still sees `capability-session-id` — a qualifier is transparent at the
+    // boundary and nowhere else.
     assert_eq!(
         contract_sig.params,
         vec![pw_core::resolved::StableTypeId::Declared {
-            path: "capability.SessionId".into(),
-            args: vec![]
+            path: "capability.Session".into(),
+            args: vec![pw_core::resolved::StableTypeId::Declared {
+                path: "capability.SessionId".into(),
+                args: vec![]
+            }]
         }]
     );
     assert_eq!(
@@ -430,103 +438,4 @@ type StoreId = StoreId { v: Int }
         "`Boxed<StoreId>` is opaque, not privacy-qualified, so it has no ABI \
          until something says what it is: {got:?}"
     );
-}
-
-/// **PINS A FINDING: a call site's argument TYPES are not checked.**
-///
-/// Found while executing the architect's step 2 — *make opaque/nominal
-/// compatibility use resolved `DefId`, not representation* — which presupposes
-/// a compatibility check to repair. There is none.
-///
-/// It is not about opaque types, and not about nominal identity. When this was
-/// written **no call site was checked in any way**:
-///
-/// ```text
-/// fn takes_str(s: String) -> Int      takes_str(42)              accepted
-/// fn wrong_return() -> String { 42 }                             accepted
-/// fn wrong_arity(a: Int, b: Int)      wrong_arity(1)             accepted
-/// fn takes_store(s: Store)            takes_store(makes_cart())  accepted
-/// ```
-///
-/// **Arity is now checked** — `PW0604`, `tests/call_arity.rs`, the same day —
-/// so the third line no longer holds. The rest do, and the fourth is the
-/// decisive case: two `type` declarations in one module, both resolvable, one
-/// returned from a call and passed where the other is expected, with the arity
-/// correct so nothing else can catch it. Nothing resolves ambiguously and
-/// nothing is missing; the check does not exist.
-///
-/// This test therefore narrows as the repair proceeds rather than being
-/// deleted at the first sign of progress. Arity landing must not read as *call
-/// sites are checked now*.
-///
-/// # What DOES get checked
-///
-/// The type machinery is real and is applied to specific relations, each with
-/// its own controls: `{#each}` capture element types, handler signatures
-/// (`PW0602`), an optimistic transition's target and value (`PW0331`), match
-/// exhaustiveness, effect rows, and privacy labels. So this is not "types are
-/// unimplemented" — it is that ordinary application of a function is not among
-/// the relations checked.
-///
-/// # Why that matters here
-///
-/// `docs/MILESTONES.md` records **E9 — permanent value type checker** as
-/// COMPLETE, and charter §14 M9A lists `unification-based inference` and
-/// `opaque nominal types` among its contents. A value type checker that accepts
-/// `takes_store(makes_cart())` is not one, so the milestone's headline claim
-/// has no witness — the same claim-versus-witness gap the evidence-reachability
-/// audit found in fixtures, one level up, at a gate.
-///
-/// It also blocks the ABI work in a specific way: the architect's invariant is
-/// that the semantic signature is the most precise representation in the chain.
-/// It cannot be, while the layer that would establish precision never runs.
-/// Arity is the first piece of that layer; argument types are the next.
-#[test]
-fn a_call_site_is_not_type_checked() {
-    // Two declared records, both resolvable, in one module: the case with no
-    // alternative explanation.
-    let src = "\
-module r
-
-type Store = Store { id: Int }
-type Cart = Cart { n: Int }
-
-fn takes_store(s: Store) -> Int { 0 }
-
-fn makes_cart() -> Cart { Cart(1) }
-
-fn breaks() -> Int {
-    takes_store(makes_cart())
-}
-";
-    let codes: Vec<String> =
-        pw_core::check::check_sources(&[("r.pw".to_string(), src.to_string())])
-            .into_iter()
-            .flat_map(|(_, ds)| ds.into_iter().map(|d| d.code.to_string()))
-            .collect();
-    assert!(
-        codes.is_empty(),
-        "PINNED: a call site's argument types are now checked. Delete this test \
-         and record the rule — and check whether E9's gate needs \
-         re-evidencing. Got {codes:?}"
-    );
-
-    // The arity is deliberately correct here, so this measures the TYPE gap and
-    // not the one `PW0604` closed. Without this the test would go green the day
-    // arity landed and stop reporting anything.
-    assert!(
-        !codes.iter().any(|c| c == "PW0604"),
-        "the fixture must not have an arity error, or it is measuring the \
-         wrong gap: {codes:?}"
-    );
-
-    // And the premise: the two types ARE distinct declarations, so this is not
-    // measuring a resolver that merged them.
-    let hir = lower_file(src, &parse_tree(src).green);
-    let names: Vec<String> = hir
-        .all_decls()
-        .filter(|(_, d)| d.kind == pw_core::hir::DeclKind::Type)
-        .map(|(_, d)| d.name.clone())
-        .collect();
-    assert_eq!(names, ["Store", "Cart"], "{names:?}");
 }

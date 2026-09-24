@@ -312,6 +312,34 @@ e9-oracle:
      } > docs/evidence/E9/effect-oracle.txt
     @grep -E "^test result" docs/evidence/E9/effect-oracle.txt
 
+# E9-V1..V6 — the ordinary value relations. The gate tests, what the checker
+# DECIDED over the store program and the accepted corpus (a checker that
+# decided nothing is silent too), and the mutation controls: each gate's
+# mechanism disabled in turn must fail its tests.
+e9-values:
+    @{ echo "E9-V1..V6 - the ordinary value relations"; echo; \
+       echo "produced by: just e9-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the gate tests (compiler/pw-core/tests/value_relations.rs)"; echo; \
+       cargo test --locked -p pw-core --test value_relations 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what was decided: the store program"; echo; \
+       cargo run --quiet --locked -p pw-cli -- audit-values packages/pw-std/*.pw \
+         packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw; \
+       echo; echo "== what was decided: the accepted corpus as one program"; echo; \
+       cargo run --quiet --locked -p pw-cli -- audit-values packages/pw-std/*.pw \
+         packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw; \
+       echo; echo "== mutation controls (scripts/e9_value_mutations.py)"; echo; \
+       python3 scripts/e9_value_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: member existence. \`box.x\` on a Rect with no \`x\` is"; \
+       echo "unknown, not refused; it is the next relation, not one of V1-V6."; \
+       echo "NOT CLAIMED: branch agreement in statement position, named-argument"; \
+       echo "calls, sum-type variant constructors, or policy-term expressions."; \
+       echo "Each is Undecided and counted above, never reported as agreement."; \
+     } > docs/evidence/E9/value-relations.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E9/value-relations.txt
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

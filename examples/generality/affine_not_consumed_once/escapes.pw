@@ -5,10 +5,11 @@ module generality.affine_escape
 
 import Maps
 import browser.{ Element, MapHandle }
+import browser.{ ElementRef }
 
 let mut cached: Option<MapHandle> = None
 
-fn setup(container: Element) -> ()
+fn setup(container: ElementRef) -> ()
     !{ resource.acquire<MapHandle>, dom.mutate, layout.measure }
 {
     use handle = Maps.create(container, default_center())

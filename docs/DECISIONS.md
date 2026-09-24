@@ -131,3 +131,22 @@ signature types atomically with resolved identities, share semantic keys and
 stable projections, and keep missing/blocked/known slots distinct. Boundary
 privacy and WIT decisions consume the same signature. Does not close ordinary
 call/return typing or the component execution gate.
+
+## 2026-09-24: the value relations
+
+[ADR-0031](DECISIONS/ADR-0031-value-relations.md): one module decides every
+place a value meets a declared type. That covers arity, arguments, fields,
+results (including `?`), annotated bindings and unresolved written types, with
+diagnostics projected from a queryable, three-valued analysis. Adds:
+- callable type parameters instantiated per call;
+- `type` parameters kept;
+- function types;
+- `?` in the HIR;
+- declared-constructor arity.
+
+Decides without a ruling, for reversal:
+- privacy qualifiers are not value-transparent;
+- function types exist;
+- snapshots are read explicitly.
+
+Closes E9-V1..V6. Does not close E10-I.

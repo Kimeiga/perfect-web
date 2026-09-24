@@ -13,6 +13,8 @@
 
 module store.menu_view
 
+import domain.{ MenuItem }
+
 view MenuView(items: List<MenuItem>) !{} {
     // ERROR: layout.measure inside a pure view.
     let available = measure { self.content_width() }

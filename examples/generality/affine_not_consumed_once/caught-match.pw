@@ -10,6 +10,7 @@ module generality.affine_match
 import Carts
 import Database
 import domain.{ OrderState }
+import domain.{ CartError }
 
 command settle(state: OrderState) -> Result<(), CartError>
     requires SignedIn

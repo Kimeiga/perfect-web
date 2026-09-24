@@ -402,6 +402,7 @@ pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {
     match ty.as_builtin()? {
         Builtin::List => ty.args().first(),
         Builtin::Result | Builtin::Option => element_of_type(ty.args().first()?),
+        Builtin::Function => None,
     }
 }
 

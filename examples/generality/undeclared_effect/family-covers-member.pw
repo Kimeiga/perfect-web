@@ -8,6 +8,8 @@
 module generality.effect_family
 
 import Stores
+import domain.{ Store, StoreId }
+import domain.{ StoreError }
 
 fn get(id: StoreId) -> Result<Store, StoreError> !{ database } {
     Stores.get(id)

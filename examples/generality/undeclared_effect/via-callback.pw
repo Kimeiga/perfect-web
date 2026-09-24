@@ -9,6 +9,8 @@ module generality.effect_callback
 
 import Stores
 import List
+import domain.{ Store, StoreId }
+import domain.{ StoreError }
 
 fn labels(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{} {
     List.map(ids, id => Stores.get(id))

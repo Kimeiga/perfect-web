@@ -1,0 +1,15 @@
+// @corpus: platform
+// @id: STD-stream
+// @category: standard library — streams
+// @charter: §7.6
+// @milestone: E9
+//
+// What a subscription produces: a sequence of values, each a success or a
+// typed failure. A-006 declared `-> Stream<OrderProgress, TrackingError>`
+// while no module declared `Stream`, so the annotation resolved to nothing and
+// nothing said so. Declared here, as the standard library's, rather than
+// invented by a checker.
+
+module stream
+
+opaque type Stream<T, E> = String

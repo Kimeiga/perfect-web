@@ -11,9 +11,11 @@ module generality.optimistic_pure
 import Carts
 import Resources.{ Cart }
 import context.{ current_session }
+import domain.{ MenuItemId, PositiveInt }
+import domain.{ CartError }
 
 command remove_from_cart(item: MenuItemId, quantity: PositiveInt)
-    -> Result<Cart, CartError>
+    -> Result<domain.Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
     optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)

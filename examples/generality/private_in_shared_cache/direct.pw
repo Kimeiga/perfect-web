@@ -5,6 +5,7 @@ module generality.cache_direct
 
 import store.queries
 import cart.queries
+import domain.{ StoreId }
 
 page StorePage(id: StoreId) {
     cache shared

@@ -1,0 +1,27 @@
+// @status: GENERAL
+// @invariant: no_feasible_placement
+// @dimension: indirect invalid — two capabilities no single world grants
+//
+// Not "the world you named cannot", which is a different invariant with a
+// different code: NO world can grant both a device read and a database read.
+module generality.no_world
+
+import Stores
+import device
+import domain.{ Location }
+
+fn locate(id: StoreId) -> Result<Store, StoreError>
+    !{ device.location, database.read<Stores> }
+{
+    // BOTH effects are performed, not merely declared.
+    //
+    // The body used to call only `Stores.get`, so `device.location` existed
+    // only in the annotation. That was enough while placement read the
+    // DECLARED row; it stopped being enough when placement started reading
+    // what the body does (architect ruling, 2026-08-07), and the witness went
+    // silent — proving it had been evidence about an annotation rather than
+    // about a program.
+    let here = device.current_location()
+    let north = here.lat
+    Stores.get(id)
+}

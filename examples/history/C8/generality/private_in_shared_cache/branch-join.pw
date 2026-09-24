@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: private_in_shared_cache
+// @dimension: branch join
+//
+// Session-scoped on one path, public on the other. The join must keep the
+// restriction.
+module generality.cache_branch
+
+import store.queries
+import cart.queries
+
+page StorePage(id: StoreId, signed_in: Bool) {
+    cache shared
+
+    let store = query Store(id)
+    let cart = query Cart(session)
+    let shown = if signed_in { cart } else { store }
+
+    view { <main><p>{shown}</p></main> }
+}

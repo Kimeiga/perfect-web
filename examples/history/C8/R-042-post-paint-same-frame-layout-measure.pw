@@ -1,0 +1,35 @@
+// @corpus: rejected
+// @id: R-042
+// @category: post-paint same-frame layout measure
+// @rule: PW3008
+// @invariant: wrong_frame_phase
+// @charter: §7.5A
+// @milestone: 7
+// @expect-error: `post_paint` may not use `layout.measure` in the same frame
+// @expect-error: measure in the next frame transaction, or use an observer
+//
+// Post-paint work exists to happen after presentation. Measuring layout there
+// forces the browser back into style and layout in a frame that had already
+// finished.
+
+module store.analytics
+
+import Telemetry
+import browser.{ ElementRef }
+
+component StorePage(id: StoreId, el: ElementRef) {
+    placement browser
+    post_paint {
+        // ERROR: forcing layout after paint, in the same frame.
+        //
+        // `el.height()` rather than `self.height()`, 2026-08-07: `self` has no
+        // resolved type here, so the member named no declaration and the
+        // `layout.measure` this fixture is about came from the `measure`
+        // keyword rather than from any operation. The keyword no longer
+        // synthesizes effects — a phase says WHEN work runs, not what it does —
+        // and the fixture now performs the read it claims to.
+        let h = measure { el.height() }
+        Telemetry.record_height(id, h)
+    }
+    view { <main><h1>Store</h1></main> }
+}

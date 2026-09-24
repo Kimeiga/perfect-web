@@ -10,14 +10,14 @@ module Payments
 
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
     OrderId, OrderProgress, PositiveInt, Recommendation,
-    RecommendationError, PaymentError, TrackingError }
-import capability.{ SessionId }
+    RecommendationError, PaymentError, TrackingError, Money, USD, PaymentReceipt }
+import capability.{ SessionId, Secret, Payments }
 import browser.{ Element, MapHandle, MapError }
 
-fn capture(key: Int, order: OrderId, amount: Int) -> Result<Int, PaymentError> !{ secret.read, network.fetch } {
+fn capture(key: Secret<Payments>, order: OrderId, amount: Money<USD>) -> Result<PaymentReceipt, PaymentError> !{ secret.read, network.fetch } {
     todo
 }
 
-fn charge(order: OrderId, amount: Int) -> Result<Int, PaymentError> !{ secret.read, network.fetch } {
+fn charge(order: OrderId, amount: Money<USD>) -> Result<PaymentReceipt, PaymentError> !{ secret.read, network.fetch } {
     todo
 }

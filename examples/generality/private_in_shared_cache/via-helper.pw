@@ -10,6 +10,7 @@ module generality.cache_helper
 import store.queries
 import cart.queries
 import capability.{ Session, SessionId }
+import domain.{ Cart, StoreId }
 
 fn summarize(c: Cart) -> Session<SessionId> !{} { todo }
 

@@ -11,6 +11,7 @@ module store.menu_align
 
 import List
 import style
+import browser.{ ElementRef, LayoutSnapshot }
 
 component MenuAligner(items: List<ElementRef>) {
     placement browser
@@ -21,8 +22,8 @@ component MenuAligner(items: List<ElementRef>) {
         let widths: List<LayoutSnapshot<Float>> = measure {
             items |> List.map(fn(it) it.width())
         }
-        let total = derived widths |> List.sum()
-        let max = derived widths |> List.maximum()
+        let total = derived widths |> List.map(fn(w) w.value) |> List.sum()
+        let max = derived widths |> List.map(fn(w) w.value) |> List.maximum()
 
         mutate {
             self.style.set_width(max)

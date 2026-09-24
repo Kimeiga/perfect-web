@@ -57,11 +57,11 @@ fn composite(el: Style, property: String, value: String) -> ()
 // padding invalidate layout, so a geometry read after one of them is a forced
 // synchronous reflow (corpus R-034). A custom property does not.
 
-fn set_width(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
+fn set_width(el: Style, value: Float) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_height(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
+fn set_height(el: Style, value: Float) -> () !{ style.mutate<LayoutAffect> } { () }
 
-fn set_padding(el: Style, value: String) -> () !{ style.mutate<LayoutAffect> } { () }
+fn set_padding(el: Style, value: Float) -> () !{ style.mutate<LayoutAffect> } { () }
 
 fn set_custom(el: Style, property: String, value: String) -> () !{ style.mutate<PaintOnly> } { () }
 

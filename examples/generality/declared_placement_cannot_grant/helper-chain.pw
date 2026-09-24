@@ -9,6 +9,7 @@ module generality.place_helper_chain
 
 import device
 import domain.{ Location }
+import capability.{ SessionId }
 
 fn inner() -> Location !{ device.location } { device.current_location() }
 

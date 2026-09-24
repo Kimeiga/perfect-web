@@ -15,6 +15,7 @@
 module store.browser_widget
 
 import Stores
+import domain.{ StoreId }
 
 component StoreBadge(store_id: StoreId) {
     placement browser

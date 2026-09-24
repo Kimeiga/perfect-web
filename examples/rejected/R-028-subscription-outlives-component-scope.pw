@@ -13,6 +13,8 @@
 
 module order.tracking_view
 
+import domain.{ OrderId }
+
 component OrderCard(order: OrderId) {
     // ERROR: application scope requested from within a component.
     let progress = subscribe OrderTracking(order) { scope application }

@@ -22,6 +22,12 @@
               {
                 "kind": "preserve_principal",
                 "principal": "Session<SessionId>",
+                "position": "argument 0",
+                "ty": "Session<SessionId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
                 "position": "result",
                 "ty": "Cart"
               }
@@ -136,7 +142,14 @@
           "params": [
             {
               "declared": {
-                "path": "capability.SessionId"
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
               }
             }
           ],
@@ -171,6 +184,12 @@
           "remote": {
             "kind": "conditional",
             "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "argument 0",
+                "ty": "Session<SessionId>"
+              },
               {
                 "kind": "preserve_principal",
                 "principal": "Session<SessionId>",
@@ -227,7 +246,7 @@
                     "args": [
                       {
                         "declared": {
-                          "path": "domain.MenuItemId"
+                          "path": "domain.MenuItem"
                         }
                       }
                     ]
@@ -476,7 +495,14 @@
           "params": [
             {
               "declared": {
-                "path": "capability.SessionId"
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
               }
             },
             {
@@ -595,7 +621,14 @@
           "params": [
             {
               "declared": {
-                "path": "capability.SessionId"
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
               }
             }
           ],

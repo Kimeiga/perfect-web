@@ -5,8 +5,10 @@ module generality.place_direct
 
 import Estimates
 import device
+import capability.{ SessionId }
+import domain.{ DeliveryEstimate, EstimateError }
 
-query DeliveryEstimate(session: SessionId) -> Result<String, EstimateError>
+query DeliveryEstimate(session: SessionId) -> Result<DeliveryEstimate, EstimateError>
     placement origin
     cache     private
 {

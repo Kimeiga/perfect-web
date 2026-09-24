@@ -5,9 +5,9 @@
 //             declaration's own `depends_on` list would miss it
 module generality.materialize_indirect_private
 
-
 import Resources.{ Cart }
 import Events.{ CartChanged }
+import capability.{ SessionId }
 
 // Honest about itself: private data, private entry. Nothing wrong here.
 materialize CartSummary(session: SessionId) {

@@ -52,3 +52,6 @@ spikes/browser-resumption/.chrome-profile/
 # fuzzer cleans its own, but a harness killed mid-run leaves them here.
 *.profraw
 *.profdata
+
+# Python bytecode from the scripts/ test suites.
+__pycache__/

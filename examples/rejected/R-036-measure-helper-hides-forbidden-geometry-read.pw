@@ -14,6 +14,8 @@
 
 module store.tooltip
 
+import browser.{ ElementRef }
+
 // Looks pure from the call site. It is not.
 fn tooltip_width(anchor: ElementRef) -> Float !{ layout.measure } {
     anchor.offsetWidth

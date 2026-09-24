@@ -10,6 +10,8 @@
 
 module store.inventory_table
 
+import domain.{ InventoryRow }
+
 component InventoryTable(rows: List<InventoryRow>) {
     placement browser
 

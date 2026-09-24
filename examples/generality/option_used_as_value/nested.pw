@@ -6,6 +6,7 @@
 module generality.option_nested
 
 import Stores
+import domain.{ StoreId }
 
 fn name_of(id: StoreId, verbose: Bool) -> String !{ database.read<Stores> } {
     let store = Stores.find(id)

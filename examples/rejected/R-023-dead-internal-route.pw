@@ -13,6 +13,8 @@
 
 module store.page
 
+import domain.{ StoreId }
+
 // The route table this file is checked against. A link is dead relative to
 // what the program declares, so there has to be something declared.
 page StoreOverview(id: StoreId) !{} {

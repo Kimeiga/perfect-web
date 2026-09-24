@@ -9,6 +9,8 @@ module generality.effect_depth
 
 import Stores
 import List
+import domain.{ Store, StoreId }
+import domain.{ StoreError }
 
 fn inner(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
     Stores.get(id)

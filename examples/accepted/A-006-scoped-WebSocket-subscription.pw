@@ -11,6 +11,7 @@
 module order.tracking
 
 import domain.{ OrderId, OrderProgress, TrackingError }
+import stream.{ Stream }
 
 import Tracking
 

@@ -225,10 +225,25 @@ pub struct Workspace {
     /// have been the ambient union arriving through a side door; this is a
     /// package saying what language environment it provides.
     preludes: BTreeMap<Namespace, Vec<usize>>,
+    /// **How many type parameters each type declaration binds.** A
+    /// declaration fact, keyed by the identity resolution already
+    /// established — never consulted to discover one.
+    ///
+    /// Added 2026-09-24 so a written `Box<Int, Int>` or bare `Box` stops being a
+    /// successful `ResolvedType` (E9-V5). The builtins already had their arity
+    /// checked; a declared constructor did not, and a relation comparing
+    /// `Nominal(Box, [])` against `Nominal(Box, [Int])` would have had to
+    /// guess which one was malformed.
+    type_arity: BTreeMap<DefId, usize>,
     pub errors: Vec<ResolveError>,
 }
 
 impl Workspace {
+    /// The number of type parameters a type declaration binds.
+    pub fn type_arity(&self, def: DefId) -> Option<usize> {
+        self.type_arity.get(&def).copied()
+    }
+
     /// Build the graph from every unit's HIR.
     pub fn build(units: &[&Hir]) -> Workspace {
         let mut ws = Workspace::default();
@@ -265,6 +280,9 @@ impl Workspace {
                     continue;
                 }
                 let def = DefId { unit, decl: id.0 };
+                if ns == Namespace::Type {
+                    ws.type_arity.insert(def, decl.type_params.len());
+                }
                 if defines.insert((ns, decl.name.clone()), def).is_some() {
                     ws.errors.push(ResolveError {
                         kind: ResolveErrorKind::DuplicateDeclaration {
@@ -483,6 +501,12 @@ impl Workspace {
             }
         }
 
+        // One declaration reached through two imports is one declaration.
+        // `import domain` beside `import domain.{ MenuItemId }` made
+        // `MenuItemId` "ambiguous" between itself and itself — found by the
+        // value relations on R-029, 2026-09-24. Ambiguity is two DECLARATIONS.
+        let mut seen = std::collections::BTreeSet::new();
+        hits.retain(|(_, d)| seen.insert(*d));
         match hits.len() {
             0 => Resolution::Unresolved,
             1 => Resolution::Imported {

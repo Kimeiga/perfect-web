@@ -4,9 +4,9 @@
 //             data in a private entry
 module generality.materialize_private_ok
 
-
 import Resources.{ Cart }
 import Events.{ CartChanged }
+import capability.{ SessionId }
 
 materialize CartSummary(session: SessionId) {
     placement      origin

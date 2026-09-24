@@ -1,0 +1,27 @@
+// @corpus: accepted
+// @id: A-018
+// @category: resize observation updates derived state
+// @charter: §7.5A
+// @milestone: 7
+//
+// Size changes are delivered by the browser rather than polled, and land in
+// the NEXT frame transaction, so observing a size cannot force a synchronous
+// layout in the current one.
+
+module store.responsive_menu
+
+component ResponsiveMenu(items: List<MenuItemId>) {
+    placement browser
+
+    // `observe.resize` delivers into a later transaction (charter §7.5A step 7).
+    let width = observe resize(self) -> Float
+    let columns = derived if width > 900.px { 3 } elif width > 600.px { 2 } else { 1 }
+
+    view {
+        <ul aria-label="Menu" style:grid-template-columns={repeat(columns)}>
+            {#each items as item (item)}
+                <li>{item.name}</li>
+            {/each}
+        </ul>
+    }
+}

@@ -2,20 +2,47 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Current: resolved signatures landed; ordinary value checking is next
+## Current: E9 closed; E10-I is next
 
-The September 16 cutover completes step 3b.3 below without merging the old
-`3b3-signature-resolved-types` branch. `Signature` and derived `Interface`
-contain resolved parameter/return slots, not written type heads. Semantic
-consumers use identities, and WIT/contracts are projections of those slots.
-[ADR-0030](DECISIONS/ADR-0030-resolved-signature-authority.md) and its
-[evidence](evidence/E9/signature-authority-2026-09-16.md) record the real
-behavioral differences, fixture repairs, and remaining limits.
+E9-V1..V6 closed on 2026-09-24 ([ADR-0031](DECISIONS/ADR-0031-value-relations.md),
+[evidence](evidence/E9/value-relations-2026-09-24.md)). The value relations are
+the `Checked` gate the backend consumes. Every relation in the store program
+is decided and agrees, including `add_to_cart`'s call to `Carts.add`.
 
-Next: ordinary argument inference/unification and declared-return checking,
-including diagnostics for unresolved annotations. Callable generic syntax and
-nominal type arity remain open. Do not restate those checks as complete because
-their input representation now exists. E10-I follows checked value signatures.
+### E10-I, in the locked order of 2026-08-20
+
+Research of 2026-09-24, with versions checked on crates.io that day:
+- `wit-component` 0.257.1 depends on exactly the `wit-parser`, `wasm-encoder`
+  and `wasmparser` 0.257.1 that `pw-core` already pins, so it is the upstream
+  encoder to use.
+- Wasmtime 47.0.4 parses components with its own 0.252.0 set, a third
+  consumer.
+
+```text
+4  Canonical ABI adapters from checked callable signatures        NEXT
+   every flattening number from wit-parser: wasm_signature, SizeAlign,
+   wasm_import_name / wasm_export_name (Legacy, Sync); one core module
+   per component; exported memory, bump cabi_realloc, cabi_post_*
+5  component wrapping via UPSTREAM wit-component                  —
+   embed_component_metadata + ComponentEncoder::validate(true)
+6  independent validation                                         —
+   wasmparser validator, wit_component::decode compared with the
+   emitted world, and a component-level same-core-ABI mutation
+   (carts#add returning result<store, store-error> must be refused)
+7  instantiate through the E8 linker                              —
+   pw-host: host functions per granted import; export lookup by
+   interface then function; imports_of reports items, not types
+8  run the `.pw` add_to_cart                                      —
+9  delete the Rust closure path; close E10-I                      —
+10 then investigate replacing external `Carts.add`                —
+```
+
+Known risks from the same research:
+- Wasmtime's 0.252.0 parser reading a component made by 0.257.1.
+- Whether the type-only `pw:types` import needs an empty linker instance.
+- Whether the `emits` key's source text binding is inside E10-I.
+
+The first follow-up after E10-I is member existence, the next value relation.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

@@ -9,6 +9,8 @@
 module generality.effect_open
 
 import Stores
+import domain.{ Store, StoreId }
+import domain.{ StoreError }
 
 fn get(id: StoreId) -> Result<Store, StoreError> {
     Stores.get(id)

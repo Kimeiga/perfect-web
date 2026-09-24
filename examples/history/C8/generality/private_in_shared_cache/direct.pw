@@ -1,0 +1,16 @@
+// @status: GENERAL
+// @invariant: private_in_shared_cache
+// @dimension: direct
+module generality.cache_direct
+
+import store.queries
+import cart.queries
+
+page StorePage(id: StoreId) {
+    cache shared
+
+    let store = query Store(id)
+    let cart = query Cart(session)
+
+    view { <main><p>Items: {cart.line_count}</p></main> }
+}

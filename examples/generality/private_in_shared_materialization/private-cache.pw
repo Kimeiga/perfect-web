@@ -9,8 +9,8 @@
 // answer for another, whatever the label says.
 module generality.materialize_private_cache
 
-
 import Events.{ CartChanged }
+import capability.{ SessionId }
 
 query Draft(session: SessionId) -> Int
     freshness     0.seconds

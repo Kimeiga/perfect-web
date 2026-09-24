@@ -47,7 +47,7 @@ impl Signature {
 /// A member lookup asks for the constructor's declared member set. It does not
 /// equate two instantiated types; full value compatibility uses `same_as`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Receiver {
+pub enum Receiver {
     Nominal(DefId),
     Builtin(Builtin),
     Primitive(Primitive),
@@ -60,11 +60,27 @@ fn receiver(ty: &ResolvedType) -> Option<Receiver> {
         .or_else(|| ty.as_primitive().map(Receiver::Primitive))
 }
 
+/// **Facts about one type declaration**, for an identity resolution already
+/// established. Never a way to find one: there is no by-name entry point.
+///
+/// Added 2026-09-24 for the value relations (E9-V1). A construction is a call
+/// whose callee is a type, and checking it needs what the declaration says the
+/// construction takes.
+#[derive(Debug, Clone, Default)]
+pub struct TypeDecl {
+    /// `type Cart = Cart { lines: .., total: .. }`: its fields, in declaration
+    /// order, each resolved from where the declaration is written.
+    pub record: Option<Vec<(String, TypeResolution)>>,
+    /// `opaque type PositiveInt = Int`: what `PositiveInt(1)` is built from.
+    pub representation: Option<TypeResolution>,
+}
+
 #[derive(Debug, Default)]
 pub struct Signatures {
     by_path: BTreeMap<String, Signature>,
     by_def: BTreeMap<DefId, Signature>,
     by_member: BTreeMap<(Receiver, String), Signature>,
+    types: BTreeMap<DefId, TypeDecl>,
     /// Immutable resolver snapshot, mechanically copied from the checked set.
     workspace: Workspace,
     /// Stable declaration paths are a projection of DefId, not a name lookup.
@@ -103,10 +119,62 @@ impl Signatures {
                     unit: m.unit,
                     decl: id.0,
                 };
+                if decl.kind == DeclKind::Opaque
+                    && let Some(rep) = &decl.opaque_of
+                {
+                    // The representation is kept as a spelling by lowering,
+                    // so only a head without arguments can be resolved from
+                    // it faithfully. A generic one is Blocked, not re-parsed.
+                    let representation = match rep.contains('<') {
+                        false => resolved::resolve(
+                            workspace,
+                            m.unit,
+                            Some(def),
+                            &decl.type_params,
+                            &DeclaredType::new(rep.clone(), Vec::new()),
+                            decl.name_span.clone(),
+                        ),
+                        true => TypeResolution::Blocked {
+                            why: format!(
+                                "the representation `{rep}` is kept as a spelling, not a tree"
+                            ),
+                        },
+                    };
+                    out.types.entry(def).or_default().representation = Some(representation);
+                }
                 if decl.kind == DeclKind::Type
                     && let Some(fields) = &decl.fields
                 {
-                    let nominal = DeclaredType::new(decl.name.clone(), Vec::new());
+                    let record: Vec<(String, TypeResolution)> = fields
+                        .iter()
+                        .map(|field| {
+                            let resolution = match &field.ty {
+                                Some(written) => resolved::resolve(
+                                    workspace,
+                                    m.unit,
+                                    Some(def),
+                                    &decl.type_params,
+                                    written,
+                                    field.span.clone(),
+                                ),
+                                None => TypeResolution::Blocked {
+                                    why: format!("the field `{}` has no written type", field.name),
+                                },
+                            };
+                            (field.name.clone(), resolution)
+                        })
+                        .collect();
+                    out.types.entry(def).or_default().record = Some(record);
+                    // The declaration applied to its own parameters: `Box<T>`,
+                    // not `Box`. Resolution checks a declared constructor's
+                    // arity, so the bare name is not a type here.
+                    let nominal = DeclaredType::new(
+                        decl.name.clone(),
+                        decl.type_params
+                            .iter()
+                            .map(|p| DeclaredType::new(p.clone(), Vec::new()))
+                            .collect(),
+                    );
                     let recv = resolved::resolve(
                         workspace,
                         m.unit,
@@ -272,6 +340,17 @@ impl Signatures {
     pub fn by_path(&self, path: &str) -> Option<&Signature> {
         self.by_path.get(path)
     }
+
+    /// What a type declaration says about itself, by its identity.
+    pub fn type_decl(&self, def: DefId) -> Option<&TypeDecl> {
+        self.types.get(&def)
+    }
+
+    /// The qualified path of a declaration, for a diagnostic. A projection of
+    /// the identity, never a way to reach one.
+    pub fn path_of(&self, def: DefId) -> Option<&str> {
+        self.paths.get(&def).map(String::as_str)
+    }
     pub fn by_def(&self, def: DefId) -> Option<&Signature> {
         self.by_def.get(&def)
     }
@@ -291,6 +370,13 @@ impl Signatures {
 
     pub fn member_of(&self, ty: &ResolvedType, name: &str) -> Option<&Signature> {
         self.by_member.get(&(receiver(ty)?, name.to_string()))
+    }
+
+    /// The same lookup, from a receiver's constructor alone. For a value
+    /// relation holding a partly inferred type: `List<?>` still has `List`'s
+    /// members, and which one is meant does not depend on the hole.
+    pub fn member_by(&self, receiver: Receiver, name: &str) -> Option<&Signature> {
+        self.by_member.get(&(receiver, name.to_string()))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Signature)> {

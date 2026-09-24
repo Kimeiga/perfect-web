@@ -6,6 +6,8 @@
 // value the program already knows the type of.
 module generality.cast_known
 
+import domain.{ StoreId }
+
 fn widen(id: StoreId) -> String !{} {
     id as String
 }

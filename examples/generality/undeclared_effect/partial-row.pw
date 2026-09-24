@@ -8,9 +8,11 @@
 module generality.effect_partial
 
 import Stores
-import Analytics
+import Telemetry
+import domain.{ Store, StoreId }
+import domain.{ StoreError }
 
 fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
-    Analytics.record_view(id)
+    Telemetry.record_visible(id)
     Stores.get(id)
 }

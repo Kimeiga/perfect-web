@@ -9,9 +9,10 @@ module generality.sink_record
 
 import log
 import secrets
-import capability.{ Payments, Public }
+import capability.{ Payments, Public, Secret }
+import domain.{ OrderId }
 
-type Attempt = Attempt { order: OrderId, key: String }
+type Attempt = Attempt { order: OrderId, key: Secret<Payments> }
 
 fn audit(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
     let token = secrets.payments()

@@ -7,9 +7,11 @@
 module generality.one_world_ok
 
 import Payments
+import domain.{ OrderId, PaymentError }
+import domain.{ Money, PaymentReceipt }
 
-fn charge(order: OrderId) -> Result<Int, PaymentError>
+fn charge(order: OrderId) -> Result<PaymentReceipt, PaymentError>
     !{ secret.read, network.fetch }
 {
-    Payments.charge(order, 100)
+    Payments.charge(order, Money(100))
 }

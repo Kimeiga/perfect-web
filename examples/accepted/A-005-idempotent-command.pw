@@ -24,7 +24,7 @@ import Resources.{ Cart }
 import context.{ current_session }
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
-    -> Result<Cart, CartError>
+    -> Result<domain.Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
     transaction   serializable

@@ -212,6 +212,11 @@ impl Fmt {
             if prev == '<' {
                 return false;
             }
+            // `fn map<T, U>(items: ..)` — a parameter list hugs the type
+            // parameters before it exactly as it hugs the name.
+            if prev == '>' && parent.kind() == K::ParamList {
+                return false;
+            }
             // A keyword is letters too, so "the previous character is a letter"
             // alone turned `for (i, v)` into `for(i, v)`. Deciding by node kind
             // alone was worse: a variant constructor and a policy value both

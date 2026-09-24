@@ -11,7 +11,7 @@ module Carts
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
     OrderId, OrderProgress, PositiveInt, Recommendation,
     RecommendationError, PaymentError, TrackingError }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 import browser.{ Element, MapHandle, MapError }
 
 // **`store:data`, not `pw:host`.**
@@ -43,14 +43,14 @@ import browser.{ Element, MapHandle, MapError }
 // require `database.write<Carts>` and have different ABIs — which is the model
 // error the Wasm encoder found, and the reason a capability may never be a
 // callable identity.
-fn current(s: SessionId) -> Result<Cart, CartError> !{ database.read<Carts> }
+fn current(s: Session<SessionId>) -> Result<Cart, CartError> !{ database.read<Carts> }
     host "store:data/carts#current"
 
-fn is_empty(s: SessionId) -> Bool !{ database.read<Carts> } {
+fn is_empty(s: Session<SessionId>) -> Bool !{ database.read<Carts> } {
     todo
 }
 
-fn add(s: SessionId, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write<Carts> }
+fn add(s: Session<SessionId>, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write<Carts> }
     host "store:data/carts#add"
 
 // Placing the order. Declared here because `R-030` called it and imported
@@ -72,9 +72,9 @@ fn with_line(cart: Cart, item: MenuItemId, quantity: PositiveInt) -> Cart !{} {
     cart
 }
 
-fn checkout(id: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> } {
+fn checkout(id: Session<SessionId>) -> Result<Cart, CartError> !{ database.write<Carts> } {
     todo
 }
 
-fn clear(s: SessionId) -> Result<Cart, CartError> !{ database.write<Carts> }
+fn clear(s: Session<SessionId>) -> Result<Cart, CartError> !{ database.write<Carts> }
     host "store:data/carts#clear"

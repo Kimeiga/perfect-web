@@ -12,6 +12,7 @@
 module generality.option_unannotated
 
 import Stores
+import domain.{ StoreId }
 
 fn store_name(id: StoreId) -> String !{ database.read<Stores> } {
     let store = Stores.find(id)

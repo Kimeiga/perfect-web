@@ -6,6 +6,7 @@
 module generality.cast_helper
 
 import decode
+import domain.{ Store }
 
 fn incoming() -> Unknown !{ network.fetch } { todo }
 

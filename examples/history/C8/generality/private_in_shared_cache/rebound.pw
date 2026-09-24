@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: private_in_shared_cache
+// @dimension: rebinding
+//
+// The private value is renamed before it is rendered. A rule watching the
+// binding that the query wrote to sees nothing.
+module generality.cache_rebound
+
+import store.queries
+import cart.queries
+
+page StorePage(id: StoreId) {
+    cache shared
+
+    let cart = query Cart(session)
+    let summary = cart
+
+    view { <main><p>Items: {summary.line_count}</p></main> }
+}

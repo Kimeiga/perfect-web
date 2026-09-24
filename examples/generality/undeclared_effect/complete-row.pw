@@ -7,11 +7,13 @@
 module generality.effect_complete
 
 import Stores
-import Analytics
+import Telemetry
 import List
+import domain.{ Store, StoreId }
+import domain.{ StoreError }
 
 fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores>, network.fetch } {
-    Analytics.record_view(id)
+    Telemetry.record_visible(id)
     Stores.get(id)
 }
 

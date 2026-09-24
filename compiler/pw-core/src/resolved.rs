@@ -103,14 +103,19 @@ pub enum Builtin {
     List,
     Option,
     Result,
+    /// `fn(A, B) -> R`: its arguments are the parameter types, then the
+    /// result. Semantic only — no boundary representation exists for a
+    /// function, and every ABI consumer refuses it rather than lowering it.
+    Function,
 }
 
 impl Builtin {
-    fn of(name: &str) -> Option<Builtin> {
+    pub(crate) fn of(name: &str) -> Option<Builtin> {
         Some(match name {
             "List" => Builtin::List,
             "Option" => Builtin::Option,
             "Result" => Builtin::Result,
+            "fn" => Builtin::Function,
             _ => return None,
         })
     }
@@ -120,6 +125,7 @@ impl Builtin {
             Builtin::List => "List",
             Builtin::Option => "Option",
             Builtin::Result => "Result",
+            Builtin::Function => "fn",
         }
     }
 }
@@ -268,11 +274,13 @@ pub fn resolve(
         // A constructor's arity is part of the type, not a lower bound.
         // Checking only for missing arguments accepted `Result<Int>` and
         // `Option<Int, String>` as successful semantic types.
-        let arity = match b {
-            Builtin::List | Builtin::Option => 1,
-            Builtin::Result => 2,
+        let arity_ok = match b {
+            Builtin::List | Builtin::Option => args.len() == 1,
+            Builtin::Result => args.len() == 2,
+            // At least the result; any number of parameters.
+            Builtin::Function => !args.is_empty(),
         };
-        if args.len() != arity {
+        if !arity_ok {
             return TypeResolution::Unresolved {
                 name: head.to_string(),
                 written: text,
@@ -298,6 +306,20 @@ pub fn resolve(
             };
         }
     };
+    // **A declared constructor's arity is part of the type too**, for the
+    // reason the builtins' is. `Session` alone and `Session<A, B>` are not a
+    // `Session<S>`: accepting them made a successful resolution of something
+    // no declaration describes, and every relation downstream would compare
+    // `Nominal(Session, [])` with `Nominal(Session, [S])` and have to guess
+    // which side was the mistake. E9-V5, 2026-09-24.
+    if let Some(arity) = ws.type_arity(def)
+        && arity != args.len()
+    {
+        return TypeResolution::Unresolved {
+            name: head.to_string(),
+            written: text,
+        };
+    }
     TypeResolution::Resolved(ResolvedType::nominal(def, args, span, written.clone()))
 }
 

@@ -1,0 +1,15 @@
+// @status: GENERAL
+// @invariant: stale_key_policy
+// @dimension: indirect invalid — a different concurrency policy
+module generality.stale_latest
+
+import Stores
+
+public query Store(id: StoreId) -> Result<Store, StoreError>
+    freshness   10.seconds
+    consistency snapshot
+    cache       shared
+    concurrency latest_wins
+{
+    Stores.get(id)
+}

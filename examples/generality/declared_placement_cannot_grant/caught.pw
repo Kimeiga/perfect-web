@@ -8,12 +8,14 @@
 module generality.placement_edge_secret
 
 import Payments
+import domain.{ OrderId, PaymentError }
+import domain.{ Money, PaymentReceipt }
 
-fn charge_now(order: OrderId) -> Result<Int, PaymentError> !{ secret.read, network.fetch } {
-    Payments.charge(order, 100)
+fn charge_now(order: OrderId) -> Result<PaymentReceipt, PaymentError> !{ secret.read, network.fetch } {
+    Payments.charge(order, Money(100))
 }
 
-query EdgePrice(order: OrderId) -> Result<Int, PaymentError>
+query EdgePrice(order: OrderId) -> Result<PaymentReceipt, PaymentError>
     placement edge
     cache     private
 {

@@ -174,6 +174,14 @@ pub struct Types {
     /// `DefId` → qualified path, so a resolved reference finds its definition.
     by_def: BTreeMap<crate::resolve::DefId, String>,
     qualifiers: BTreeSet<DefId>,
+    /// Generic declarations whose representation never mentions their type
+    /// parameters — `type Money<C> = Money { minor_units: Int }`. Every
+    /// specialization has the one layout, so `Money<USD>` is `domain-money` on
+    /// the wire. The argument is kept by the semantic contract and dropped by
+    /// the boundary, the same one-directional loss an opaque alias and a
+    /// privacy qualifier already have. A generic whose layout depends on its
+    /// arguments is still refused: that needs specialization, not erasure.
+    phantom: BTreeSet<DefId>,
 }
 
 #[derive(Debug, Clone)]
@@ -233,6 +241,20 @@ impl Types {
                         });
                     }
                     _ => out.push_type(&path, unit, d, ws, def),
+                }
+                // Records and variants only. An opaque type's opacity is not ABI
+                // transparency (ruling, 2026-08-20): a generic opaque type that
+                // is not a privacy qualifier has no WIT form at all.
+                if d.kind == DeclKind::Type
+                    && !d.type_params.is_empty()
+                    && out.defs.last().is_some_and(|t| {
+                        t.referenced().iter().all(|r| {
+                            r.resolved()
+                                .is_some_and(|ty| !mentions_parameter_of(ty, def))
+                        })
+                    })
+                {
+                    out.phantom.insert(def);
                 }
             }
         }
@@ -307,10 +329,26 @@ impl Types {
             && let Some(path) = self.by_def.get(&def)
         {
             out.insert(path.clone());
+            // A phantom argument is not part of the representation.
+            if self.phantom.contains(&def) {
+                return;
+            }
         }
         for arg in ty.args() {
             self.declared_within(arg, out);
         }
+    }
+}
+
+/// Does this type mention one of `binder`'s own type parameters?
+fn mentions_parameter_of(ty: &ResolvedType, binder: DefId) -> bool {
+    ty.parameter_binding().is_some_and(|(b, _)| b == binder)
+        || ty.args().iter().any(|a| mentions_parameter_of(a, binder))
+}
+
+impl Types {
+    fn is_phantom(&self, def: DefId) -> bool {
+        self.phantom.contains(&def)
     }
 }
 
@@ -389,6 +427,8 @@ fn wit_resolved(ty: &ResolvedType, types: &Types, at: &str) -> Result<String, Wi
             Builtin::List => format!("list<{}>", mapped(0)?),
             Builtin::Option => format!("option<{}>", mapped(0)?),
             Builtin::Result => format!("result<{}, {}>", mapped(0)?, mapped(1)?),
+            // A function is not a value that crosses a component boundary.
+            Builtin::Function => return Err(bad()),
         });
     }
     let def = ty.def_id().ok_or_else(bad)?;
@@ -399,8 +439,10 @@ fn wit_resolved(ty: &ResolvedType, types: &Types, at: &str) -> Result<String, Wi
         return mapped(0);
     }
     // Generic nominal layouts require specialization. Refuse rather than erase
-    // arguments and accidentally publish the unspecialized representation.
-    if !ty.args().is_empty() {
+    // arguments and accidentally publish the unspecialized representation —
+    // unless the declaration's layout never mentions its parameters, in which
+    // case the unspecialized representation IS every specialization.
+    if !ty.args().is_empty() && !types.is_phantom(def) {
         return Err(bad());
     }
     types

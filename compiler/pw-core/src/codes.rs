@@ -135,6 +135,11 @@ codes! {
         "a module may declare each name once per namespace";
     IMPORT_CYCLE = "PW0025" / import_cycle / 1, Resolution,
         "modules must not import each other in a cycle";
+    // **A written type that names nothing.** `fn f(x: Stroe)` passed `pw
+    // check` until 2026-09-24: the signature held `Unresolved`, every relation
+    // correctly refused to run on it, and nothing told the author. E9-V5.
+    UNRESOLVED_TYPE = "PW0026" / unresolved_type / 1, Resolution,
+        "a written type must name a type visible here, applied to exactly its parameters";
 
     // --- declaration rules (PW01xx-PW03xx) --------------------------------
     RETRY_NOT_IDEMPOTENT = "PW0312" / retry_not_idempotent / 1, DeclarationRules,
@@ -203,6 +208,14 @@ codes! {
     // how many arguments it passes. See `docs/RISK_QUEUE.md`.
     CALL_ARITY = "PW0604" / call_arity / 1, Types,
         "a call must supply exactly the arguments its callee declares";
+    // **The value relations**, 2026-09-24 (E9-V1, V3, V4). By resolved
+    // identity: two opaque types with one representation are two types.
+    ARGUMENT_TYPE = "PW0605" / argument_type / 1, Types,
+        "a value given for a declared parameter or field must have its declared type";
+    RETURN_TYPE = "PW0606" / return_type / 1, Types,
+        "a body must produce the result type its signature declares";
+    BINDING_TYPE = "PW0607" / binding_type / 1, Types,
+        "an annotated binding must be initialised with a value of its declared type";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

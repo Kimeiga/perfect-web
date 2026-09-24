@@ -8,9 +8,9 @@
 // restriction lives in a file the author has not opened.
 module generality.materialize_cross_module
 
-
 import Resources.{ Cart }
 import Events.{ CartChanged }
+import capability.{ SessionId }
 
 materialize AccountPanel(session: SessionId) {
     placement      edge

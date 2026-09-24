@@ -15,6 +15,11 @@ module log
 
 import capability.{ Private, Public }
 
-fn public(message: String) -> () !{ log<Public> } { () }
+// **A sink records any value** and polices its privacy label, which is read
+// from the effect row's type argument. Declared over `String` until
+// 2026-09-24, so logging a `Secret<Payments>` was a type error as well as the
+// privacy violation the sink exists to refuse — two verdicts about one
+// defect, and the type relation reaching it first.
+fn public<T>(message: T) -> () !{ log<Public> } { () }
 
-fn private(message: String) -> () !{ log<Private> } { () }
+fn private<T>(message: T) -> () !{ log<Private> } { () }

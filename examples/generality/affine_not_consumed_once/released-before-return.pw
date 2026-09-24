@@ -15,6 +15,7 @@ import Database
 // callee is declared here — the witness stays self-contained and its subject
 // is unchanged.
 import context.{ current_session }
+import domain.{ CartError }
 
 command clear_cart() -> Result<(), CartError>
     requires SignedIn

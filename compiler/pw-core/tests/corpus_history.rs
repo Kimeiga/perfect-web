@@ -352,3 +352,101 @@ fn historical_event_annotation_is_blocked_not_a_nominal_mismatch() {
         "{ds:?}"
     );
 }
+
+/// **C8: the value relations' import repairs removed obstructions, not defects.**
+///
+/// Twenty-five rejected fixtures gained an import or a corrected library type
+/// on 2026-09-24 (`docs/CORPUS.md` §C8), because the value relations made a
+/// written type that names nothing an error. Exactly the shape of change this
+/// suite exists to watch: each old text must still be caught for its declared
+/// invariant — now beside a `PW0026` for the import the repair added.
+#[test]
+fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/history/C8");
+    let mut old: Vec<(String, String)> = std::fs::read_dir(&root)
+        .expect("examples/history/C8")
+        .map(|e| e.expect("entry").path())
+        .filter(|p| {
+            p.extension().is_some_and(|x| x == "pw")
+                && p.file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with("R-"))
+        })
+        .map(|p| {
+            (
+                p.file_name().unwrap().to_string_lossy().to_string(),
+                std::fs::read_to_string(&p).expect("read"),
+            )
+        })
+        .collect();
+    old.sort();
+    // A floor, so an emptied directory cannot pass vacuously.
+    assert_eq!(
+        old.len(),
+        25,
+        "docs/CORPUS.md §C8 records 25 repaired rejected fixtures"
+    );
+
+    let mut wrong = Vec::new();
+    for (name, src) in &old {
+        let declared = src
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("// @invariant:"))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| panic!("{name} has no @invariant"));
+        // The old text as the rejected-corpus harness assembles a fixture: the
+        // CURRENT library (its own C8 repairs included — the question is
+        // whether the fixture's defect survived its obstruction being removed)
+        // plus only the accepted modules the fixture imports, since several
+        // rejected fixtures reuse an accepted module's name.
+        let files = c8_program(name, src);
+        let mut symbols: Vec<&'static str> = check_sources(&files)
+            .into_iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, d)| d.iter().map(|d| d.symbol()).collect())
+            .unwrap_or_default();
+        // Declaration-header rules run beside the body checks in `pw check`,
+        // not inside `check_sources`; R-014, R-015 and R-027 are such rules.
+        let hir = pw_core::lower::lower_file(src, &pw_syntax::parse_tree(src).green);
+        symbols.extend(pw_core::rules::check(&hir).iter().map(|d| d.symbol()));
+        if !symbols.contains(&declared.as_str()) {
+            wrong.push(format!(
+                "{name}: its pre-C8 text is no longer caught for `{declared}` \
+                 (it reports {symbols:?}) — the C8 repair removed the defect"
+            ));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// A C8 fixture's program: the library, the accepted modules it imports, and
+/// the fixture. The same assembly `checking_source.rs` uses for the current
+/// rejected corpus, so the old and new texts are asked one question.
+fn c8_program(name: &str, src: &str) -> Vec<(String, String)> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let imported: Vec<String> = src
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("import "))
+        .map(|m| m.split(['.', ' ']).next().unwrap_or("").to_string())
+        .collect();
+    let mut out: Vec<(String, String)> = library()
+        .into_iter()
+        .filter(|(n, s)| {
+            // `library()` here includes the accepted corpus; keep only the
+            // modules this fixture imports from it.
+            let module = s
+                .lines()
+                .find_map(|l| l.trim().strip_prefix("module "))
+                .map(str::trim);
+            let accepted = root.join("examples/accepted").join(n).exists();
+            !accepted
+                || module.is_some_and(|m| {
+                    imported
+                        .iter()
+                        .any(|i| i == m.split('.').next().unwrap_or(m))
+                })
+        })
+        .filter(|(n, _)| n != name)
+        .collect();
+    out.push((name.to_string(), src.to_string()));
+    out
+}

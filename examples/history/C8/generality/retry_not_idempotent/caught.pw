@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: retry_not_idempotent
+// @dimension: indirect invalid — a different retry policy
+module generality.retry_fixed
+
+import Payments
+
+command refund(order: OrderId, amount: Money<USD>)
+    -> Result<PaymentReceipt, PaymentError>
+    requires SignedIn
+    retry    fixed(max = 3)
+{
+    Payments.charge(order, amount)
+}

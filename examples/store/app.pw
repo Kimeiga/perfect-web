@@ -40,7 +40,7 @@ import Menus
 import context.{ current_session }
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem,
     MenuItemId, PositiveInt }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 import Events.{ CartChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
@@ -72,7 +72,7 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
 // Private. Scoped to one session, so `cache private` — and the label the
 // `session` modifier gives it is what makes putting it in the shared cache a
 // compile error rather than a leak nobody notices.
-session query Cart(session: SessionId) -> Result<Cart, CartError>
+session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private

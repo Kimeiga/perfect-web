@@ -1,0 +1,29 @@
+// @status: NEIGHBOUR
+// @invariant: private_in_shared_materialization
+// @dimension: valid neighbour — the same two fragments, both keeping session
+//             data in a private entry
+module generality.materialize_private_ok
+
+
+import Resources.{ Cart }
+import Events.{ CartChanged }
+
+materialize CartSummary(session: SessionId) {
+    placement      origin
+    partition      private
+    depends_on     Cart(session)
+    invalidates_on CartChanged(session)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}
+
+materialize CartBadge(session: SessionId) {
+    placement      origin
+    partition      private
+    depends_on     Cart(session)
+    invalidates_on CartChanged(session)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

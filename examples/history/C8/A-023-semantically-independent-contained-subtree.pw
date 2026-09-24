@@ -1,0 +1,34 @@
+// @corpus: accepted
+// @id: A-023
+// @category: semantically independent contained subtree
+// @charter: §7.5A
+// @milestone: 7
+//
+// Containment is declared because the subtree genuinely cannot affect layout
+// outside it, not because the compiler proved it merely legal. Measured 4.18x
+// faster to build and lay out a 3,000-row subtree.
+
+module store.inventory_table
+
+component InventoryTable(rows: List<InventoryRow>) {
+    placement browser
+
+    // `independent` is a SEMANTIC assertion by the author: nothing inside
+    // influences layout outside. The compiler may then emit `contain` and
+    // `content-visibility`. It may not infer this on its own — measurement
+    // showed containment can be slower where it does not belong.
+    subtree independent {
+        intrinsic_height 24.px
+    }
+
+    view {
+        <table>
+            <caption>Inventory</caption>
+            <tbody>
+                {#each rows as row (row.id)}
+                    <tr><td>{row.name}</td><td>{row.status}</td></tr>
+                {/each}
+            </tbody>
+        </table>
+    }
+}

@@ -8,10 +8,11 @@ module rules.affine_scope
 
 import Maps
 import browser.{ MapHandle }
+import browser.{ ElementRef }
 
 let mut last_center: Option<String> = None
 
-fn setup(container: Element) -> ()
+fn setup(container: ElementRef) -> ()
     !{ resource.acquire<MapHandle>, dom.mutate, layout.measure }
 {
     use handle = Maps.create(container, default_center())

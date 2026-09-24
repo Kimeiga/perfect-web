@@ -16,6 +16,7 @@ module store.analytics
 
 import Telemetry
 import browser.{ ElementRef }
+import domain.{ StoreId }
 
 component StorePage(id: StoreId, el: ElementRef) {
     placement browser

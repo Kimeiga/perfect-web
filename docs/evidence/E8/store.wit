@@ -180,8 +180,8 @@ package store:data {
         current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
     }
     interface menus {
-        use pw:types/types.{domain-menu-item-id, domain-store-error, domain-store-id};
-        for-store: func(arg0: domain-store-id) -> result<list<domain-menu-item-id>, domain-store-error>;
+        use pw:types/types.{domain-menu-item, domain-store-error, domain-store-id};
+        for-store: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
     }
     interface stores {
         use pw:types/types.{domain-store, domain-store-error, domain-store-id};

@@ -8,13 +8,13 @@
 
 module VendorSdk
 
-import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId, LatLng,
     OrderId, OrderProgress, PositiveInt, Recommendation,
     RecommendationError, PaymentError, TrackingError }
 import capability.{ SessionId }
-import browser.{ Element, MapHandle, MapError }
+import browser.{ ElementRef, MapHandle, MapError }
 
-fn mount(container: Element, center: String) -> Result<MapHandle, MapError> !{ dom.mutate, layout.measure } {
+fn mount(container: ElementRef, center: LatLng) -> Result<MapHandle, MapError> !{ dom.mutate, layout.measure } {
     todo
 }
 

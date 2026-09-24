@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: private_in_shared_cache
+// @dimension: helper extraction
+//
+// The private value arrives through a declared function rather than from the
+// query binding directly. `summarize` says in its own type that what it
+// returns is session-scoped.
+module generality.cache_helper
+
+import store.queries
+import cart.queries
+import capability.{ Session, SessionId }
+
+fn summarize(c: Cart) -> Session<SessionId> !{} { todo }
+
+page StorePage(id: StoreId) {
+    cache shared
+
+    let cart = query Cart(session)
+    let line = summarize(cart)
+
+    view { <main><p>Items: {line}</p></main> }
+}

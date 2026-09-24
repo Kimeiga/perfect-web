@@ -15,6 +15,7 @@
 module store.page
 
 import Stores.{ fetch_store }
+import domain.{ StoreId }
 
 view StorePage(store_id: StoreId) !{} {
     // ERROR: network effect inside a pure view.

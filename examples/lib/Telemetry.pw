@@ -14,10 +14,10 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
 import capability.{ SessionId }
 import browser.{ Element, MapHandle, MapError }
 
-fn record_height(name: String, px: Int) -> () !{ network.fetch } {
+fn record_height(store: StoreId, px: Float) -> () !{ network.fetch } {
     todo
 }
 
-fn record_visible(name: String) -> () !{ network.fetch } {
+fn record_visible(store: StoreId) -> () !{ network.fetch } {
     todo
 }

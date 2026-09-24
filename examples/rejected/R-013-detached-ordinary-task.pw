@@ -14,6 +14,7 @@
 module analytics.ping
 
 import Analytics
+import domain.{ MenuItemId }
 
 view ProductCard(item: MenuItemId) !{} {
     <article>

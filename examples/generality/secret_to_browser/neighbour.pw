@@ -9,11 +9,13 @@ module generality.secret_held
 
 import secrets
 import Payments
+import domain.{ OrderId, PaymentError }
+import domain.{ Money, PaymentReceipt }
 
-query Charge(order: OrderId) -> Result<Int, PaymentError>
+query Charge(order: OrderId) -> Result<PaymentReceipt, PaymentError>
     placement origin
     cache     private
 {
     let key = secrets.payments()
-    Payments.capture(key, order, 100)
+    Payments.capture(key, order, Money(100))
 }

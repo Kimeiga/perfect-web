@@ -9,6 +9,7 @@
 module generality.unsafe_other_hatch
 
 import html.{ raw_attribute }
+import html.{ Attr }
 
 fn styled(value: String) -> Attr !{ unsafe.raw_attribute } {
     raw_attribute("style", value)

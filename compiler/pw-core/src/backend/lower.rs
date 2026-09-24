@@ -469,6 +469,11 @@ fn ty_resolved(sigs: &Signatures, ty: &ResolvedType, span: &Span) -> Lowering<Ty
             },
             Builtin::Option => arg(0).map(|a| Type::Option(Box::new(a))),
             Builtin::List => arg(0).map(|a| Type::List(Box::new(a))),
+            Builtin::Function => Lowering::Unsupported {
+                construct: "a function type",
+                span: span.clone(),
+                reason: format!("`{ty}` is a function; a function value has no layout here"),
+            },
         };
     }
     if sigs.privacy_qualifier(ty).is_some() && ty.args().len() == 1 {
@@ -710,6 +715,7 @@ fn construct_name(e: &Expr) -> &'static str {
         Expr::Lambda { .. } => "a lambda",
         Expr::Binary { .. } => "a binary operator",
         Expr::Cast { .. } => "a cast",
+        Expr::Try { .. } => "a `?` propagation",
         Expr::Interpolated { .. } => "an interpolated string",
         _ => "this expression",
     }

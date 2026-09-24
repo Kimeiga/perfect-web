@@ -716,6 +716,14 @@ impl Lowerer<'_> {
                 b.expr(Expr::Call { callee, args }, span)
             }
 
+            K::TryExpr => {
+                let value = match node.children().next() {
+                    Some(c) => self.expr(b, &c),
+                    None => b.expr(Expr::Error, span.clone()),
+                };
+                b.expr(Expr::Try { value }, span)
+            }
+
             K::LambdaExpr => {
                 // `x => e`: the body is the last child; everything before it is
                 // either a parameter or a call-shaped descriptor.
@@ -1311,7 +1319,7 @@ impl Lowerer<'_> {
         let path = first_name(node).unwrap_or_else(|| text(self.src, node).trim().to_string());
         let args = node
             .children()
-            .find(|c| c.kind() == K::TypeArgList)
+            .find(|c| matches!(c.kind(), K::TypeArgList | K::FnTypeArgs))
             .map(|l| {
                 l.children()
                     .filter(|c| c.kind() == K::TypeRef)
@@ -1376,9 +1384,11 @@ pub(crate) fn type_fragment(src: &str) -> Option<crate::hir::DeclaredType> {
 /// Preserve the parser's complete type structure. No consumer reparses a
 /// nested argument to recover information lost at the syntax/HIR boundary.
 fn declared_type(t: &SyntaxNode) -> crate::hir::DeclaredType {
+    // `fn(A, B) -> R` keeps its parameter types then its result, in order, as
+    // the `fn` constructor's arguments.
     let args = t
         .children()
-        .find(|c| c.kind() == K::TypeArgList)
+        .find(|c| matches!(c.kind(), K::TypeArgList | K::FnTypeArgs))
         .map(|l| {
             l.children()
                 .filter(|c| c.kind() == K::TypeRef)
@@ -1433,6 +1443,7 @@ fn is_expr(k: K) -> bool {
             | K::RecordExpr
             | K::TupleExpr
             | K::ListExpr
+            | K::TryExpr
             | K::ErrorExpr
             | K::TemplateRegion
             | K::Field

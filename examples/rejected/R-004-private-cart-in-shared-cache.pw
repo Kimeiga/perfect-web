@@ -20,6 +20,7 @@ module store.page
 // says where to look (E2B).
 import store.queries
 import cart.queries
+import domain.{ StoreId }
 
 page StorePage(id: StoreId) {
     cache shared

@@ -7,6 +7,7 @@
 module generality.cache_public_ok
 
 import store.queries
+import domain.{ StoreId }
 
 page StorePage(id: StoreId) {
     cache shared

@@ -946,6 +946,67 @@ fn edge_label(k: pw_core::graph::EdgeKind) -> &'static str {
 /// tolerating the defect: the exit code is still a failure, the message says
 /// this is a bug in `pw`, and `just ci` runs the robustness suite which fails
 /// hard on any panic at all.
+/// **What the value relations decided**, as counts — E9-V's evidence.
+///
+/// A checker that reports nothing and a checker that decided nothing look the
+/// same from `pw check`. This prints the second question's answer: how many
+/// relations were decided, how many disagreed, and why each undecided one was
+/// not decided.
+fn audit_values_command(paths: &[&String]) -> ExitCode {
+    use pw_core::values::{Outcome, RelationKind};
+    let mut units = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.errors.is_empty() {
+            eprintln!("pw: {path} does not parse; nothing about it is counted");
+            return ExitCode::from(1);
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        units.push(pw_core::check::Unit {
+            path: path.to_string(),
+            src,
+            hir,
+        });
+    }
+    let mut table: std::collections::BTreeMap<(RelationKind, String), usize> =
+        std::collections::BTreeMap::new();
+    let mut disagreements = Vec::new();
+    for (path, relations) in pw_core::values::analysis(&units) {
+        for r in relations {
+            let outcome = match &r.outcome {
+                Outcome::Agree => "agree".to_string(),
+                Outcome::Disagree { expected, actual } => {
+                    disagreements.push(format!(
+                        "{path}: {} {:?} {}: declared {expected}, found {actual}",
+                        r.declaration, r.kind, r.target
+                    ));
+                    "disagree".to_string()
+                }
+                Outcome::Undecided(why) => format!("undecided: {why:?}"),
+            };
+            *table.entry((r.kind, outcome)).or_default() += 1;
+        }
+    }
+    println!("{} file(s)", units.len());
+    for ((kind, outcome), n) in &table {
+        println!("  {:<11} {:<32} {n}", format!("{kind:?}"), outcome);
+    }
+    for d in &disagreements {
+        println!("  {d}");
+    }
+    match disagreements.is_empty() {
+        true => ExitCode::SUCCESS,
+        false => ExitCode::from(1),
+    }
+}
+
 fn main() -> ExitCode {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -1008,11 +1069,12 @@ fn run() -> ExitCode {
             | "emit-contracts"
             | "emit-template"
             | "emit-wit"
+            | "audit-values"
     ) || paths.is_empty()
     {
         eprintln!(
             "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
-             emit-contracts|emit-template|emit-wit> <path.pw>... [--plain]"
+             emit-contracts|emit-template|emit-wit|audit-values> <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -1024,7 +1086,12 @@ fn run() -> ExitCode {
         eprintln!("  emit-graph     print the resource dependency graph (--plain for text)");
         eprintln!("  emit-template  print the checked template IR (--plain for text)");
         eprintln!("  emit-wit       print a WIT world per component contract");
+        eprintln!("  audit-values   count the value relations decided, and why the rest were not");
         return ExitCode::from(2);
+    }
+
+    if cmd == "audit-values" {
+        return audit_values_command(&paths);
     }
 
     if cmd == "emit-manifest" {

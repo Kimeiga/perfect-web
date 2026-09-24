@@ -788,6 +788,7 @@ fn describe(e: &Expr) -> &'static str {
         Expr::Keyword { .. } => "a body-level statement",
         Expr::Template { .. } => "nested markup",
         Expr::Unary { .. } => "a unary operator",
+        Expr::Try { .. } => "a `?` propagation",
         Expr::Error => "an expression that did not parse",
         _ => "this expression",
     }

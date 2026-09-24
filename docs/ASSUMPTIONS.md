@@ -341,3 +341,56 @@ deleted, so the mode cannot return without someone writing it back.
 existed precisely so the occurrences could be counted rather than searched for,
 and retiring it was a list of 31 rather than an investigation. That is the
 argument for naming a compromise instead of leaving it implicit.
+
+
+---
+
+## A-018 — a `()` body discards its last value
+
+**Status:** `open` (2026-09-24, ADR-0031).
+
+The language has no statement terminator, so a function declared `-> ()` whose
+last expression has another type is taken to discard it, not to return it. The
+return relation is not applied to unit declarations.
+
+**Validated by** a language decision on statement terminators or on explicit
+discard. **If false:** unit bodies need a result relation, and the corpus's
+`-> ()` helpers ending in a call become errors unless they end in `()`. `()`
+itself lowers to `Expr::Error` today, so that repair needs the unit value
+lowered first.
+
+## A-019 — a query bound in a UI declaration is its success value
+
+**Status:** `open` (2026-09-24, ADR-0031).
+
+`let store = query Store(id)` in a page binds what `Store` produces when it
+succeeds: the page reads `{store.name}`, and loading and failure are the page's
+to render. The value relation types the binding as the `Ok` side of the
+declared `Result`, the same reading `infer.rs` gives `{#each}` over a query.
+
+**Validated by** the renderer's semantics for query bindings being written
+down (charter §7.6). **If false:** the page must handle the `Result`, and
+passing the binding to a function expecting the value is a type error.
+
+## A-020 — a layout snapshot is read explicitly
+
+**Status:** `open`, ruling needed (2026-09-24, ADR-0031).
+
+`LayoutSnapshot<T>` is a type of its own and is read through `browser.value`
+(`w.value`), not treated as `T`. A-016 reads its widths that way.
+
+**Validated by** an architect ruling. **Alternative:** a phase rule, owned by
+the layout checker, under which a snapshot reads as its value in the phases
+after the measure that produced it.
+
+## A-021 — a receiver-only member is a property
+
+**Status:** `open` (2026-09-24).
+
+A callable member whose only parameter is the receiver is read without a call
+(`self.style`, `snapshot.value`), as `infer.rs` already resolves it. The value
+relations type such a read as the member's result.
+
+**Validated by** the language reference stating property-call syntax.
+**If false:** `self.style` must be written `self.style()`, and the corpus
+changes accordingly.

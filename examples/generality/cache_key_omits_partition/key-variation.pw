@@ -8,8 +8,11 @@ module generality.key_wrong_partition
 
 import Menus
 import context
+import capability.{ SessionId }
+import domain.{ MenuItem, StoreId }
+import domain.{ StoreError }
 
-query Recent(store: StoreId, session: SessionId) -> Result<List<MenuItem>, MenuError>
+query Recent(store: StoreId, session: SessionId) -> Result<List<MenuItem>, StoreError>
     cache shared
     key   store, session
 {

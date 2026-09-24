@@ -9,12 +9,14 @@ module generality.view_fetch_depth
 
 import Estimates
 import domain.{ Location }
+import domain.{ StoreError }
+import domain.{ DeliveryEstimate, EstimateError }
 
-fn nearby(at: Location) -> Result<String, StoreError> !{ network.fetch } {
+fn nearby(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fetch } {
     Estimates.for_location(at)
 }
 
-fn label(at: Location) -> Result<String, StoreError> !{ network.fetch } {
+fn label(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fetch } {
     nearby(at)
 }
 

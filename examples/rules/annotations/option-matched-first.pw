@@ -6,6 +6,7 @@
 module rules.opt_good
 
 import Stores
+import domain.{ Store, StoreId }
 
 fn name_of(id: StoreId) -> String !{ database.read<Stores> } {
     let store: Option<Store> = Stores.find(id)
