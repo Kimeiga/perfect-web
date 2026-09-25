@@ -340,6 +340,73 @@ e9-values:
      } > docs/evidence/E9/value-relations.txt
     @grep -E "^test result|mutants killed" docs/evidence/E9/value-relations.txt
 
+# E10-I steps 4-6 — the store's commands, compiled to Wasm components. Wrapped
+# by upstream `wit-component`, checked by `wit-component`'s decoder against the
+# world each contract fixed. Named by component id, which is how the host and
+# the dev server find them; held to the compiler's current output by `pw-core`'s
+# `evidence_is_current`.
+e10-component:
+    @mkdir -p docs/evidence/E10
+    @for id in store.page.add_to_cart store.page.clear_cart; do \
+      cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
+        --out "docs/evidence/E10/$id.wasm" \
+        packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
+        examples/lib/*.pw examples/store/*.pw; \
+    done
+
+# E10-I — a Pleris-compiled command, executed through the E8 host, with the
+# Rust closure path deleted. The compiled components, the host running them
+# with its own session and data-layer operations and its refusals, and the
+# development server whose commands now run them.
+e10-i:
+    @{ echo "E10-I - the compiled command runs through the host"; echo; \
+       echo "produced by: just e10-i"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== 4-6. compile, wrap with wit-component, audit against the world"; echo; \
+       for id in store.page.add_to_cart store.page.clear_cart; do \
+         cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
+           --out "$(mktemp)" packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+           examples/domain.pw examples/lib/*.pw examples/store/*.pw; \
+       done; \
+       echo; echo "== the committed artifacts are the compiler's current output"; echo; \
+       cargo test --locked -p pw-core --test evidence_is_current --test component --test wasm_encoding 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== 7-8. the E8 host admits and runs them (runtime/pw-host/tests/pleris_component.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test pleris_component -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "(compiled add_to_cart imports|the host saw|the command returned|a failing data layer|refused without|ungranted write refused|starved of fuel).*|^test result.*"; \
+       echo; echo "== 9. the development server's commands are the compiled components"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
+       echo; \
+       echo "NOT CLAIMED: resumable handler BODIES are compiled. The browser's"; \
+       echo "handler for add_to_cart still posts the pressed instance and the"; \
+       echo "literal quantity; the COMMAND it reaches is compiled Pleris."; \
+       echo "NOT CLAIMED: the data layer (store:data/carts) is Pleris. It is the"; \
+       echo "deployment's, as the contract says (owner: external) - NEXT step 10."; \
+     } > docs/evidence/E10/e10-i.txt
+    @grep -E "^test result|the command returned" docs/evidence/E10/e10-i.txt
+
+# E10-I in the browser: the store page whose Add and Clear buttons reach the
+# COMPILED commands, in all three engine families, three full runs — a flake
+# shows up as a run that differs. Needs the Playwright browsers
+# (`pnpm --filter pw-own-renderer-spike exec playwright install chromium firefox
+# webkit`), so it is not part of `just ci`.
+e10-browser engines="chromium firefox webkit":
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @{ echo "E10-I - the store's compiled commands, in browser engines: {{engines}}"; echo; \
+       echo "produced by: just e10-browser {{engines}}"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       for i in 1 2 3; do \
+         echo "== full run $i"; \
+         (cd spikes/own-renderer && pnpm exec playwright test --reporter=line \
+           $(for e in {{engines}}; do printf -- '--project=%s ' "$e"; done) 2>&1) \
+           | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+           | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky|did not run" || true; \
+       done; \
+     } > docs/evidence/E10/browser-suite.txt
+    @cat docs/evidence/E10/browser-suite.txt
+
 # E8. The artifact audit, against real Wasm components.
 #
 # Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is

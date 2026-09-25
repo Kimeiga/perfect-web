@@ -88,6 +88,12 @@ fi
 rm -rf "$OUT.again"
 echo "   byte-identical"
 
+# `just e10-browser` builds through here and runs the suite itself, three
+# times, so one set of build steps serves both.
+if [ "${BUILD_ONLY:-}" = 1 ]; then
+  exit 0
+fi
+
 echo
 echo "== 6. the browser's parsed tree =="
 cd "$SPIKE"

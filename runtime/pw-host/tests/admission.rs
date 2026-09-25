@@ -65,6 +65,7 @@ fn contract(id: &str, placements: &[&str], capabilities: &[&str]) -> ComponentCo
             // asks nothing about transferability — see `plan.rs` for the
             // half that does.
             binding: BindingSupport::default(),
+            component: None,
         }],
     }
 }

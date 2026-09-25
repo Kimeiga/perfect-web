@@ -28,7 +28,7 @@ test("the command's response carries no cart value", async ({ page, request }) =
   // The claim, checked at its narrowest: if the response contained the number,
   // every test below would pass against a runtime that read it from there.
   await ready(page);
-  const response = await request.post("/command/add_to_cart");
+  const response = await request.post("/command/add_to_cart?item=espresso&quantity=1");
   const body = await response.json();
   expect(body).toEqual({ committed: true });
   expect(JSON.stringify(body)).not.toMatch(/line_count/);

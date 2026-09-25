@@ -33,6 +33,10 @@
               }
             ]
           }
+        },
+        "component": {
+          "interface": "pw:app/resources-cart-api@0.1.0",
+          "function": "cart"
         }
       }
     ]
@@ -58,6 +62,10 @@
           "remote": {
             "kind": "transferable"
           }
+        },
+        "component": {
+          "interface": "pw:app/resources-menu-api@0.1.0",
+          "function": "menu"
         }
       }
     ]
@@ -83,6 +91,10 @@
           "remote": {
             "kind": "transferable"
           }
+        },
+        "component": {
+          "interface": "pw:app/resources-order-api@0.1.0",
+          "function": "order"
         }
       }
     ]
@@ -108,6 +120,10 @@
           "remote": {
             "kind": "transferable"
           }
+        },
+        "component": {
+          "interface": "pw:app/resources-store-api@0.1.0",
+          "function": "store"
         }
       }
     ]
@@ -198,6 +214,10 @@
               }
             ]
           }
+        },
+        "component": {
+          "interface": "pw:app/store-page-cart-api@0.1.0",
+          "function": "cart"
         }
       }
     ]
@@ -274,6 +294,10 @@
           "remote": {
             "kind": "transferable"
           }
+        },
+        "component": {
+          "interface": "pw:app/store-page-menu-api@0.1.0",
+          "function": "menu"
         }
       }
     ]
@@ -343,6 +367,10 @@
           "remote": {
             "kind": "transferable"
           }
+        },
+        "component": {
+          "interface": "pw:app/store-page-store-api@0.1.0",
+          "function": "store"
         }
       }
     ]
@@ -429,6 +457,10 @@
           "remote": {
             "kind": "transferable"
           }
+        },
+        "component": {
+          "interface": "pw:app/store-page-store-page-api@0.1.0",
+          "function": "store-page"
         }
       }
     ]
@@ -555,6 +587,10 @@
               }
             ]
           }
+        },
+        "component": {
+          "interface": "pw:app/store-page-add-to-cart-api@0.1.0",
+          "function": "add-to-cart"
         }
       }
     ]
@@ -671,6 +707,10 @@
               }
             ]
           }
+        },
+        "component": {
+          "interface": "pw:app/store-page-clear-cart-api@0.1.0",
+          "function": "clear-cart"
         }
       }
     ]

@@ -123,7 +123,7 @@ Architect ruling, 2026-08-08:
 
 | id | obligation | deferred from | owed at | status |
 |---|---|---|---|---|
-| **E10-I** | Compile `add_to_cart` through the production Pleris→component backend and execute it through the E8 host, **with no alternate Rust closure path**. | E8 gate item 5 | **E10 gate** | **open** |
+| **E10-I** | Compile `add_to_cart` through the production Pleris→component backend and execute it through the E8 host, **with no alternate Rust closure path**. | E8 gate item 5 | **E10 gate** | **closed 2026-09-24** — `store.page.add_to_cart` compiles to a component (Canonical ABI from `wit-parser`, wrapped by `wit-component`, audited against its world by `wit-component`'s decoder). `pw_host::engine::call_within` runs it with the host's session and data layer, and it returns the data layer's result; the dev server's Rust closures are deleted and structurally kept deleted. `docs/evidence/E10/e10-i-2026-09-24.md`, `just e10-i`, ADR-0032 |
 | **E10-P** | Give `ComponentContract`'s placement demand the declaration's real privacy label, not `Label::public()`. | evidence-reachability audit, 2026-08-10 | E10 gate | **closed 2026-08-11** — `contract.rs` calls `check::declaration_label`, the checker's own derivation. The visible result: a `session query` was placeable at build time, and is not. `tests/evidence_reachability.rs::a_session_scoped_query_is_not_placeable_at_build_time` |
 
 **Why it was deferred, in one line:** E8 cannot honestly require an artifact

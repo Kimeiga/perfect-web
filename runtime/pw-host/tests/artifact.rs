@@ -72,6 +72,7 @@ fn contract(imports: Vec<Import>) -> ComponentContract {
             name: "lookup".into(),
             kind: "query".into(),
             binding: BindingSupport::default(),
+            component: None,
         }],
     }
 }
@@ -451,7 +452,19 @@ fn a_granted_guest_calls_the_host_and_receives_its_answer() {
         .find(|i| i.ends_with("#read"))
         .expect("the guest imports `read`")
         .clone();
-    let answers = BTreeMap::from([(read, "Corner Store".to_string())]);
+    // The host's implementation of `read`: it answers from its own data, keyed
+    // by what the guest asked for.
+    let lookup: pw_host::engine::HostFn = std::sync::Arc::new(|args: &[Val]| {
+        let asked = match args.first() {
+            Some(Val::String(s)) => s.clone(),
+            _ => return Err("`read` takes the store id".to_string()),
+        };
+        Ok(vec![Val::Option(Some(Box::new(Val::Record(vec![
+            ("id".to_string(), Val::String(asked)),
+            ("name".to_string(), Val::String("Corner Store".to_string())),
+        ]))))])
+    });
+    let answers = BTreeMap::from([(read, lookup)]);
 
     let out = pw_host::engine::call_within(
         &bytes,
@@ -463,7 +476,7 @@ fn a_granted_guest_calls_the_host_and_receives_its_answer() {
             table_elements: Some(10_000),
         },
         &answers,
-        "lookup",
+        &["lookup"],
         &[Val::String("store_47".into())],
     )
     .unwrap_or_else(|e| panic!("a granted guest must be able to call: {e}"));
@@ -491,7 +504,7 @@ fn a_granted_guest_calls_the_host_and_receives_its_answer() {
         &granted,
         &Limits::unbounded(),
         &answers,
-        "lookup",
+        &["lookup"],
         &[Val::String("store_47".into())],
     )
     .expect_err("an ungranted guest cannot call what it was not linked");

@@ -129,3 +129,39 @@ fn the_check_would_notice_a_change() {
         "the comparison is against real content"
     );
 }
+
+/// **The committed E10 components are what the compiler builds now.**
+///
+/// `runtime/pw-host/tests/pleris_component.rs` and the development server run
+/// `docs/evidence/E10/<component id>.wasm` without linking the compiler, so the
+/// bytes they run must be these: a stale artifact would let them pass against
+/// a command the compiler no longer produces. Byte-for-byte, which also holds
+/// the build to determinism.
+#[test]
+fn the_committed_components_are_what_the_compiler_builds_now() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let units: Vec<pw_core::check::Unit> = store_sources(&root)
+        .into_iter()
+        .enumerate()
+        .map(|(i, src)| pw_core::check::Unit {
+            path: format!("{i}.pw"),
+            hir: lower_file(&src, &parse_tree(&src).green),
+            src,
+        })
+        .collect();
+    for id in ["store.page.add_to_cart", "store.page.clear_cart"] {
+        let fresh = pw_core::backend::component::compile(&units, id)
+            .unwrap_or_else(|e| panic!("{id} compiles: {e}"));
+        let path = format!("docs/evidence/E10/{id}.wasm");
+        let committed = std::fs::read(root.join(&path))
+            .unwrap_or_else(|e| panic!("{path}: {e} — run `just e10-component`"));
+        assert!(
+            fresh.component.bytes == committed,
+            "{path} is stale ({} bytes committed, {} built now). Run `just e10-component` \
+             and commit the result, saying in the commit message what changed in the \
+             compiled command.",
+            committed.len(),
+            fresh.component.bytes.len()
+        );
+    }
+}

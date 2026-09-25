@@ -479,7 +479,10 @@ async function attach() {
           //
           // A response carrying the value would make the UI change because an
           // endpoint said so, which is the thing E6 exists to replace.
-          await module.run();
+          // The pressed instance's address: the one thing the browser holds
+          // about the item a loop's handler captured. The server resolves it
+          // with the derivation that emitted it (E10-I).
+          await module.run({ instance: at });
         } catch (error) {
           // A load that fails is VISIBLE and leaves the button usable. A
           // silent failure here is the worst outcome available: the press did

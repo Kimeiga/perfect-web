@@ -2,47 +2,41 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Current: E9 closed; E10-I is next
+## Current: E10-I closed; the rest of E10, then the kiokun proof slice
 
-E9-V1..V6 closed on 2026-09-24 ([ADR-0031](DECISIONS/ADR-0031-value-relations.md),
-[evidence](evidence/E9/value-relations-2026-09-24.md)). The value relations are
-the `Checked` gate the backend consumes. Every relation in the store program
-is decided and agrees, including `add_to_cart`'s call to `Carts.add`.
-
-### E10-I, in the locked order of 2026-08-20
-
-Research of 2026-09-24, with versions checked on crates.io that day:
-- `wit-component` 0.257.1 depends on exactly the `wit-parser`, `wasm-encoder`
-  and `wasmparser` 0.257.1 that `pw-core` already pins, so it is the upstream
-  encoder to use.
-- Wasmtime 47.0.4 parses components with its own 0.252.0 set, a third
-  consumer.
+E10-I closed on 2026-09-24 ([ADR-0032](DECISIONS/ADR-0032-compiled-components.md),
+[evidence](evidence/E10/e10-i-2026-09-24.md)). The locked order's steps 4-9 are
+done:
 
 ```text
-4  Canonical ABI adapters from checked callable signatures        NEXT
-   every flattening number from wit-parser: wasm_signature, SizeAlign,
-   wasm_import_name / wasm_export_name (Legacy, Sync); one core module
-   per component; exported memory, bump cabi_realloc, cabi_post_*
-5  component wrapping via UPSTREAM wit-component                  —
-   embed_component_metadata + ComponentEncoder::validate(true)
-6  independent validation                                         —
-   wasmparser validator, wit_component::decode compared with the
-   emitted world, and a component-level same-core-ABI mutation
-   (carts#add returning result<store, store-error> must be refused)
-7  instantiate through the E8 linker                              —
-   pw-host: host functions per granted import; export lookup by
-   interface then function; imports_of reports items, not types
-8  run the `.pw` add_to_cart                                      —
-9  delete the Rust closure path; close E10-I                      —
-10 then investigate replacing external `Carts.add`                —
+4  Canonical ABI adapters from checked callable signatures        DONE
+5  component wrapping via UPSTREAM wit-component                  DONE
+6  independent validation (decoder audit, core-identical control) DONE
+7  instantiate through the E8 linker                              DONE
+8  run the `.pw` add_to_cart                                      DONE
+9  delete the Rust closure path; close E10-I                      DONE
+10 then investigate replacing external `Carts.add`                NEXT
 ```
 
-Known risks from the same research:
-- Wasmtime's 0.252.0 parser reading a component made by 0.257.1.
-- Whether the type-only `pw:types` import needs an empty linker instance.
-- Whether the `emits` key's source text binding is inside E10-I.
+### Next, in order
 
-The first follow-up after E10-I is member existence, the next value relation.
+1. **The kiokun proof slice.** A dictionary: entry lookup plus search over one
+   shard. It is written against checked signatures from the start. Everything
+   the component backend refuses on the way is the next backend work, in the
+   order the application needs it.
+2. **Backend breadth, driven by that slice.**
+   - records and variants written into the region;
+   - field projection;
+   - branches;
+   - string constants;
+   - calls between compiled declarations.
+
+   Each lands with a refusal test and a mutation control, in the style of
+   `wasm_encoding.rs`.
+3. **Compiled resumable handler bodies**, then step 10.
+
+The first follow-up in the checker is unchanged: member existence, the next
+value relation after E9-V.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

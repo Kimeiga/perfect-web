@@ -383,6 +383,24 @@ pub struct Export {
     /// assumed when there was no field at all.
     #[serde(default)]
     pub binding: crate::binding::BindingSupport,
+    /// **Where this export is in the compiled component**: the exported
+    /// interface and the function, as the component names them. E10-I,
+    /// 2026-09-24: a host calling a compiled command must find it, and the
+    /// naming is the compiler's projection (`wit::component_export`) — a host
+    /// that re-derived it from `name` would be the second answer ADR-0020
+    /// exists to prevent. Optional and not part of `abi_schema`, like
+    /// `binding`: a contract written before it parses, and its identity is
+    /// unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub component: Option<ComponentExport>,
+}
+
+/// An export's place in a component: `pw:app/store-page-add-to-cart-api@0.1.0`
+/// and `add-to-cart`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ComponentExport {
+    pub interface: String,
+    pub function: String,
 }
 
 /// **What the compiler tells the host about one component.**
@@ -1060,6 +1078,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                 name: decl.name.clone(),
                 kind: kind.to_string(),
                 binding,
+                component: Some(crate::wit::component_export(&component_id, &decl.name)),
             }];
 
             let abi_schema = schema_of(&component_id, &exports, &capabilities, &allowed_placements);

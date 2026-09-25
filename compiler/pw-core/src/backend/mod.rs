@@ -44,6 +44,7 @@
 //! have needed one too, and would have been harder to tell apart from the real
 //! backend afterwards.
 
+pub mod component;
 pub mod ir;
 pub mod lower;
 pub mod wasm;

@@ -278,6 +278,18 @@ pub struct Export {
     /// either way.
     #[serde(default)]
     pub binding: BindingSupport,
+    /// Where the export is in the compiled component, as the compiler named
+    /// it. Mirrored by field name, ADR-0018; absent in a contract written
+    /// before E10-I.
+    #[serde(default)]
+    pub component: Option<ComponentExport>,
+}
+
+/// An export's place in a component: its interface and function.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ComponentExport {
+    pub interface: String,
+    pub function: String,
 }
 
 /// **What binding modes an interface edge supports**, as the compiler derived
@@ -763,6 +775,11 @@ pub mod engine {
 
     use wasmtime::component::types::ComponentItem;
 
+    /// A component-level value, as the engine passes one across the boundary.
+    /// Re-exported so a host implementing operations names the same type the
+    /// engine does, without depending on a second copy of the engine.
+    pub use wasmtime::component::Val;
+
     /// Every instance a component imports, as `interface#name` where the name
     /// is known and `interface` alone otherwise.
     ///
@@ -783,15 +800,28 @@ pub mod engine {
         for (name, item) in ty.imports(&engine) {
             match item.ty {
                 ComponentItem::ComponentInstance(instance) => {
+                    // An instance's OPERATIONS are what it asks for: its
+                    // functions and resources. A type it names is not
+                    // authority — `pw:types/types` holds only the shapes the
+                    // operations mention, and reporting it as an import made
+                    // every compiled component ask for something no contract
+                    // grants (E10-I, 2026-09-24). A `wasi:*` instance is
+                    // always reported, whatever it holds.
                     let mut any = false;
-                    for (func, _) in instance.exports(&engine) {
-                        out.push(format!("{name}#{func}"));
-                        any = true;
+                    for (func, export) in instance.exports(&engine) {
+                        if matches!(
+                            export.ty,
+                            ComponentItem::ComponentFunc(_) | ComponentItem::Resource(_)
+                        ) {
+                            out.push(format!("{name}#{func}"));
+                            any = true;
+                        }
                     }
-                    if !any {
+                    if !any && name.starts_with("wasi:") {
                         out.push(name.to_string());
                     }
                 }
+                ComponentItem::Type(_) => {}
                 _ => out.push(name.to_string()),
             }
         }
@@ -846,6 +876,16 @@ pub mod engine {
         pub fuel_used: Option<u64>,
     }
 
+    /// **One host operation**, as the deployment implements it: the values a
+    /// component passed, in; the values it receives, out. A refusal is an
+    /// error string the call returns to the host, never a value invented for
+    /// the component.
+    pub type HostFn = std::sync::Arc<
+        dyn Fn(&[wasmtime::component::Val]) -> Result<Vec<wasmtime::component::Val>, String>
+            + Send
+            + Sync,
+    >;
+
     /// **Instantiate and CALL, with the host answering from behind a handle.**
     ///
     /// The positive control the architect asked for on 2026-08-08:
@@ -856,31 +896,100 @@ pub mod engine {
     /// Everything else about E8 shows authority being *refused* or *linked*.
     /// This shows it being **used**: the guest calls the host function its
     /// contract permitted, and the value it returns is one only the host could
-    /// have supplied. A capability system that never demonstrates a successful
-    /// call has only ever been observed saying no.
+    /// have supplied.
     ///
-    /// `answers` maps `interface#function` to the value the host returns, and
-    /// is the host's OWN data — the guest receives the answer, never a handle
-    /// to the store behind it.
+    /// `host` maps `interface#function` to the deployment's implementation of
+    /// that operation. It was a map of canned answers until E10-I needed a
+    /// compiled command to call a real data layer; now each granted import is
+    /// linked to exactly one host function, and a granted import with none is
+    /// a refusal rather than a stub.
     ///
-    /// Returns what the exported function produced.
+    /// `export` is the exported function's path: its interface, then the
+    /// function, as the component names them — `["pw:app/..-api@0.1.0",
+    /// "add-to-cart"]` — or a single top-level name.
+    ///
+    /// Returns what the exported function produced. Its post-return runs
+    /// inside the call, so the component's invocation region is reclaimed
+    /// before this returns.
+    #[allow(clippy::too_many_arguments)]
     pub fn call_within(
         bytes: &[u8],
         contract: &crate::ComponentContract,
         granted: &crate::Granted,
         limits: &crate::Limits,
-        answers: &std::collections::BTreeMap<String, String>,
-        export: &str,
+        host: &std::collections::BTreeMap<String, HostFn>,
+        export: &[&str],
         args: &[wasmtime::component::Val],
     ) -> Result<Vec<wasmtime::component::Val>, String> {
-        use wasmtime::component::{Component, Linker, Val};
-        use wasmtime::{Config, Engine, Store};
+        Prepared::compile(bytes)?.call_within(contract, granted, limits, host, export, args)
+    }
 
-        let mut config = Config::new();
-        config.wasm_component_model(true);
-        config.consume_fuel(limits.fuel.is_some());
-        let engine = Engine::new(&config).map_err(|e| e.to_string())?;
-        let component = Component::new(&engine, bytes).map_err(|e| e.to_string())?;
+    /// **A component compiled once, run many times.**
+    ///
+    /// Compiling is the expensive half of a call: Cranelift translates the
+    /// whole component. A server that compiled per request paid it on every
+    /// press of Add — and under the browser suite's parallel load that CPU was
+    /// visible as Firefox's timing-sensitive tests failing, which is how it
+    /// was found (E10-I, 2026-09-24). Authority is NOT cached: every call
+    /// builds its linker from that call's `Granted`, so a grant revoked
+    /// between two calls is revoked for the second.
+    pub struct Prepared {
+        engine: wasmtime::Engine,
+        component: wasmtime::component::Component,
+    }
+
+    impl Prepared {
+        /// Compile a component. The engine meters fuel, so a call can be
+        /// given a budget; a call with none gets the whole range.
+        pub fn compile(bytes: &[u8]) -> Result<Prepared, String> {
+            let mut config = wasmtime::Config::new();
+            config.wasm_component_model(true);
+            config.consume_fuel(true);
+            let engine = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
+            let component =
+                wasmtime::component::Component::new(&engine, bytes).map_err(|e| e.to_string())?;
+            Ok(Prepared { engine, component })
+        }
+
+        /// [`call_within`], on the compiled component.
+        #[allow(clippy::too_many_arguments)]
+        pub fn call_within(
+            &self,
+            contract: &crate::ComponentContract,
+            granted: &crate::Granted,
+            limits: &crate::Limits,
+            host: &std::collections::BTreeMap<String, HostFn>,
+            export: &[&str],
+            args: &[wasmtime::component::Val],
+        ) -> Result<Vec<wasmtime::component::Val>, String> {
+            run(
+                &self.engine,
+                &self.component,
+                contract,
+                granted,
+                limits,
+                host,
+                export,
+                args,
+            )
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn run(
+        engine: &wasmtime::Engine,
+        component: &wasmtime::component::Component,
+        contract: &crate::ComponentContract,
+        granted: &crate::Granted,
+        limits: &crate::Limits,
+        host: &std::collections::BTreeMap<String, HostFn>,
+        export: &[&str],
+        args: &[wasmtime::component::Val],
+    ) -> Result<Vec<wasmtime::component::Val>, String> {
+        use wasmtime::Store;
+        use wasmtime::component::{Linker, Val};
+        let engine = engine.clone();
+        let component = component.clone();
 
         let mut linker: Linker<crate::Meter> = Linker::new(&engine);
         let supplied = crate::linkable(contract, granted);
@@ -900,24 +1009,26 @@ pub mod engine {
                 .map_err(|e| format!("{interface}: {e}"))?;
             for func in here {
                 let key = format!("{interface}#{func}");
-                let answer = answers.get(&key).cloned();
+                // Granted, and the deployment supplies nothing for it: a
+                // refusal. Linking a stub would make "authorized" and
+                // "implemented" the same word.
+                let Some(implementation) = host.get(&key).cloned() else {
+                    return Err(format!(
+                        "`{key}` is granted and the host implements nothing for it"
+                    ));
+                };
                 instance
                     .func_new(func, move |_, _ty, args, results| {
-                        // The host's own value, keyed by what the GUEST asked
-                        // for. It never receives the map, only the answer —
-                        // `Handle`'s whole point, at the call itself.
-                        let asked = match args.first() {
-                            Some(Val::String(s)) => s.clone(),
-                            _ => String::new(),
-                        };
-                        if let Some(slot) = results.first_mut() {
-                            *slot = match &answer {
-                                Some(v) => Val::Option(Some(Box::new(Val::Record(vec![
-                                    ("id".to_string(), Val::String(asked)),
-                                    ("name".to_string(), Val::String(v.clone())),
-                                ])))),
-                                None => Val::Option(None),
-                            };
+                        let out = implementation(args).map_err(wasmtime::Error::msg)?;
+                        if out.len() != results.len() {
+                            return Err(wasmtime::Error::msg(format!(
+                                "the host returned {} values where the operation has {}",
+                                out.len(),
+                                results.len()
+                            )));
+                        }
+                        for (slot, v) in results.iter_mut().zip(out) {
+                            *slot = v;
                         }
                         Ok(())
                     })
@@ -927,23 +1038,32 @@ pub mod engine {
 
         let mut store = Store::new(&engine, crate::Meter::from(limits));
         store.limiter(|m| &mut m.limits);
-        if let Some(fuel) = limits.fuel {
-            store.set_fuel(fuel).map_err(|e| e.to_string())?;
-        }
+        // The engine always meters; an unbounded call is given all of it.
+        store
+            .set_fuel(limits.fuel.unwrap_or(u64::MAX))
+            .map_err(|e| e.to_string())?;
         let instance = linker
             .instantiate(&mut store, &component)
             .map_err(|e| e.to_string())?;
 
+        // The export by its path, one segment at a time: an interface export
+        // is an instance whose function is found inside it.
+        let mut index = None;
+        for segment in export {
+            index = Some(
+                instance
+                    .get_export_index(&mut store, index.as_ref(), segment)
+                    .ok_or_else(|| format!("no export `{}`", export.join("#")))?,
+            );
+        }
+        let index = index.ok_or_else(|| "an empty export path".to_string())?;
         let func = instance
-            .get_func(&mut store, export)
-            .ok_or_else(|| format!("no export `{export}`"))?;
-        // One result slot. The spike's `lookup` returns a string, and a
-        // component's result arity is part of its type — a caller guessing it
-        // would be reimplementing the type check the engine already does, and
-        // an arity mismatch is reported by `call` in the engine's own words.
-        let mut results = vec![Val::Bool(false)];
+            .get_func(&mut store, index)
+            .ok_or_else(|| format!("`{}` is not a function", export.join("#")))?;
+        // The result arity is the function's type's, read from the artifact.
+        let mut results = vec![Val::Bool(false); func.ty(&store).results().len()];
         func.call(&mut store, args, &mut results)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("{e:#}"))?;
         Ok(results)
     }
 

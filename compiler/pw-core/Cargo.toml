@@ -29,20 +29,18 @@ serde_json.workspace = true
 # a mixed set is a set nobody upstream tests.
 wasm-encoder = "0.257.1"
 
-# E8 gate item: "the world's imports are exactly `contract.imports`, and
-# `wit-bindgen` accepts it". `wit-parser` is the crate `wasm-tools` and
-# `wit-bindgen` are both built on, so the second half is checked by the real
-# parser rather than by a reader written here — a second WIT parser in this
-# repo would be the shape the project keeps deleting, and a particularly bad
-# one: the whole point of emitting WIT is that somebody else's toolchain reads
-# it.
-#
-# A DEV dependency. Generating WIT needs no parser; only proving the output is
-# WIT does.
-[dev-dependencies]
+# E10-I — the component. Architect ruling, 2026-08-20: *do not hand-implement
+# the Component Model binary format. Pleris owns the lowering facts; upstream
+# owns the component-format encoding.* `wit-component` is that upstream, and
+# 0.257.1 depends on exactly `wit-parser`, `wasm-encoder` and `wasmparser`
+# 0.257.1 — the set this crate already pins (crates.io, checked 2026-09-24:
+# released 2026-08-19, not yanked, license Apache-2.0 WITH LLVM-exception OR
+# Apache-2.0 OR MIT). Every Canonical ABI number — flattening, sizes,
+# alignments, mangled names — is read from `wit-parser`, which is now a
+# normal dependency for that reason: the ABI's facts are no longer only
+# checked here, they are consumed.
+wit-component = "0.257.1"
 wit-parser = "0.257.1"
-
-# The validator, for proving the encoder's output is a well-formed module. A
-# module this repo declares valid is worth nothing; one the parser `wasmtime`
-# is built on accepts is evidence.
+# The core module's own import list, read back from the bytes the encoder
+# produced rather than from what the encoder meant to produce.
 wasmparser = "0.257.1"

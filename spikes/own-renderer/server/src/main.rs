@@ -30,11 +30,23 @@
 //! `EntryKey`, not SQLite, not outbox rows, not compiler graph nodes. The
 //! boundary is asserted, not assumed — see `e2e/protocol-boundary.spec.mjs`.
 //!
+//! # Its commands are compiled Pleris (E10-I)
+//!
+//! `add_to_cart` and `clear_cart` run as the components the compiler built
+//! from `examples/store/app.pw` (`docs/evidence/E10/<component id>.wasm`),
+//! admitted against each artifact's real imports and executed through the E8
+//! host's engine. This server supplies only the DEPLOYMENT: the platform's
+//! session operation, and `store:data/carts`, the data layer whose staged write
+//! commits with its event only when the compiled command returns `Ok`. The Rust
+//! closures that computed the commands are deleted, and
+//! `the_commands_run_as_compiled_components` keeps them deleted.
+//!
 //! # Deliberately not
 //!
 //! A deployment abstraction, an authentication system, a plugin host, a Wasm
-//! executor, an HTTP/3 experiment, or a distributed materializer. Each of those
-//! belongs to a milestone that has not started.
+//! executor of its own (the one it uses is `pw-host`'s), an HTTP/3 experiment,
+//! or a distributed materializer. Each of those belongs to a milestone that has
+//! not started.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -42,7 +54,8 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 
 use pw_document::{IdentityDomain, LocalPartId, PartAddress, Partition, TemplateSchemaId};
-use pw_host::{Admission, ComponentContract, Granted, Node, Topology, admit};
+use pw_host::engine::{HostFn, Val};
+use pw_host::{Admission, ComponentContract, Granted, Limits, Node, Topology, admit};
 use pw_materialize::{Clock, EntryKey, FragmentPolicy, Materializer};
 use pw_protocol::{CURRENT, CausalBasis, Patch, PatchOp, ResourceEntryId, StreamFrame, Version};
 use pw_render::{Env, PartId, Template, Value};
@@ -131,8 +144,16 @@ struct Server {
     clock: Clock,
     /// The one materializer. Versions come from here and from nowhere else.
     materializer: Materializer,
-    /// Per-session cart state, behind the materializer's command boundary.
-    carts: Mutex<BTreeMap<String, i64>>,
+    /// Per-session cart lines — `(item, quantity)` — behind the
+    /// materializer's command boundary. This is the deployment's DATA LAYER:
+    /// `store:data/carts#add` is its operation, and the compiled command calls
+    /// it through the host.
+    carts: Mutex<BTreeMap<String, Lines>>,
+    /// The compiled components, by component id, read from
+    /// `docs/evidence/E10/` as the compiler wrote them. Data, like the
+    /// contracts: this server links no compiler. Compiled once, with the
+    /// artifact's imports read once — both are properties of the bytes.
+    components: BTreeMap<String, Loaded>,
     /// The document's static assets.
     dist: std::path::PathBuf,
     /// Frames waiting for each session's subscriber.
@@ -145,11 +166,9 @@ struct Server {
     /// producing a `Granted` or a refusal — instead of being ambient because
     /// the function happens to be callable.
     ///
-    /// What is still a Rust closure is the BODY. Running it as compiled
-    /// Wasm needs a Pleris→component backend, which does not exist: `pw
-    /// emit-koka` covers the pure subset and there is no code generator behind
-    /// it. Saying so here rather than describing this as the finished item is
-    /// the point of `docs/EVIDENCE_LEDGER.md`.
+    /// The BODY is no longer a Rust closure (E10-I, 2026-09-24): each command
+    /// runs as the component the compiler built from its `.pw` declaration,
+    /// admitted against the imports the artifact actually has.
     contracts: Vec<ComponentContract>,
     topology: Topology,
 }
@@ -189,6 +208,41 @@ fn cart_entry(session: &str) -> ResourceEntryId {
 /// Panics rather than defaulting to an empty list. An empty list means every
 /// command has no contract and is refused, which looks like a security posture
 /// and is actually a missing file.
+/// **The compiled components**, as the compiler wrote them.
+///
+/// `just e10-component` writes `docs/evidence/E10/<component id>.wasm`, named
+/// by the contract's own id so nothing here derives a name. Panics on a
+/// missing artifact rather than running without it: a command with no
+/// compiled body has no body at all now.
+/// A cart's lines, `(item, quantity)`, as the data layer holds them.
+type Lines = Vec<(String, i64)>;
+
+/// One compiled component: ready to run, and what its artifact imports.
+struct Loaded {
+    prepared: pw_host::engine::Prepared,
+    imports: Vec<String>,
+}
+
+fn components() -> BTreeMap<String, Loaded> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../docs/evidence/E10");
+    let mut out = BTreeMap::new();
+    for id in ["store.page.add_to_cart", "store.page.clear_cart"] {
+        let path = dir.join(format!("{id}.wasm"));
+        let bytes = std::fs::read(&path).unwrap_or_else(|e| {
+            panic!(
+                "{}: {e}\nrun `just e10-component` to compile the store's commands",
+                path.display()
+            )
+        });
+        let imports = pw_host::engine::imports_of(&bytes)
+            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let prepared = pw_host::engine::Prepared::compile(&bytes)
+            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        out.insert(id.to_string(), Loaded { prepared, imports });
+    }
+    out
+}
+
 fn contracts() -> Vec<ComponentContract> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../docs/evidence/E8/component-contracts.json");
@@ -255,6 +309,7 @@ impl Server {
             clock,
             materializer,
             carts: Mutex::new(BTreeMap::new()),
+            components: components(),
             menu: Mutex::new(default_menu()),
             dist,
             pending: Mutex::new(BTreeMap::new()),
@@ -281,13 +336,16 @@ impl Server {
             return Err(format!("no contract for `{component_id}`"));
         };
         let node = &self.topology.nodes[0].name;
-        // No artifact to audit — the body is still a Rust closure — so the
-        // audit is given nothing rather than being told everything is fine.
-        // `admit` treats an empty import list as a component that imports
-        // nothing, which is true of a closure.
-        match admit(c, &self.topology, node, &[]) {
+        // **The artifact's own imports**, read from the component the host is
+        // about to run — not a list anyone wrote down. Until E10-I the body
+        // was a Rust closure and the audit was given nothing.
+        let actual = match self.components.get(component_id) {
+            Some(loaded) => loaded.imports.clone(),
+            None => return Err(format!("no compiled component for `{component_id}`")),
+        };
+        match admit(c, &self.topology, node, &actual) {
             Admission::Admit { .. } => {
-                let a = admit(c, &self.topology, node, &[]);
+                let a = admit(c, &self.topology, node, &actual);
                 Granted::from(&a, &BTreeMap::new())
                     .ok_or_else(|| format!("`{component_id}` was admitted but granted nothing"))
             }
@@ -302,8 +360,56 @@ impl Server {
         EntryKey::from_identity(&cart_identity(session))
     }
 
+    /// How many items the session's cart holds: what the page shows.
     fn cart_value(&self, session: &str) -> i64 {
-        *self.carts.lock().expect("carts").get(session).unwrap_or(&0)
+        self.carts
+            .lock()
+            .expect("carts")
+            .get(session)
+            .map(|lines| lines.iter().map(|(_, q)| q).sum())
+            .unwrap_or(0)
+    }
+
+    /// **Run one compiled command through the host.**
+    ///
+    /// Authority first — `admit` against the artifact's real imports — then
+    /// the component, with the deployment's implementation of each granted
+    /// operation. The command's result is whatever the COMPONENT returns.
+    fn run(
+        &self,
+        component_id: &str,
+        host: &BTreeMap<String, HostFn>,
+        args: &[Val],
+    ) -> Result<Vec<Val>, String> {
+        let granted = self.authorise(component_id)?;
+        let contract = self
+            .contracts
+            .iter()
+            .find(|c| c.component_id == component_id)
+            .ok_or_else(|| format!("no contract for `{component_id}`"))?;
+        let export = contract.exports[0]
+            .component
+            .clone()
+            .ok_or_else(|| format!("`{component_id}`'s contract does not locate its export"))?;
+        self.components[component_id].prepared.call_within(
+            contract,
+            &granted,
+            &Limits {
+                fuel: Some(50_000_000),
+                memory_bytes: Some(16 * 1024 * 1024),
+                table_elements: Some(1_000),
+            },
+            host,
+            &[&export.interface, &export.function],
+            args,
+        )
+    }
+
+    /// The platform's session operation: the request's session, and nothing
+    /// else the component could ask it for.
+    fn session_operation(session: &str) -> HostFn {
+        let session = session.to_string();
+        Arc::new(move |_args: &[Val]| Ok(vec![Val::String(session.clone())]))
     }
 
     /// The materializer's version for this entry.
@@ -320,45 +426,99 @@ impl Server {
         )
     }
 
-    /// `add_to_cart`, through the real path.
+    /// **`add_to_cart`, as the compiler built it.**
     ///
-    /// The command commits state and its event together. If `fail` is set it
-    /// rolls back, and then neither the state nor the event survives — so the
-    /// browser receives nothing, which is the property ADR-0019 exists for.
-    fn add_to_cart(&self, session: &str, fail: bool) -> Result<(), String> {
-        // **Authority first, and it can say no.** The contract says this
-        // command needs `database.write<Carts>`; the topology says whether this
-        // node has it. Before this, the command ran because it was callable.
-        let granted = self.authorise("store.page.add_to_cart")?;
-        debug_assert!(
-            granted.handle("database.write<Carts>").is_some(),
-            "the write capability is what this command is for"
-        );
-
-        // Read, commit and write under ONE lock.
-        //
-        // The read used to sit outside it, so two presses landing in the same
-        // instant both read 0, both computed 1, and one of them was lost — a
-        // classic read-modify-write race, invisible to every test that clicks
-        // once and waits. `lazy-handler.spec.mjs` clicks twice concurrently to
-        // prove the module is fetched once, and that is what found it.
+    /// No Rust computes this command's result. The component runs the
+    /// compiled body of
+    ///
+    /// ```text
+    /// command add_to_cart(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
+    /// {
+    ///     Carts.add(current_session(), item, quantity)
+    /// }
+    /// ```
+    ///
+    /// and what this server supplies is the DEPLOYMENT: the platform's session
+    /// operation, and `store:data/carts#add`, its data layer. The data layer
+    /// STAGES the new lines; only if the component returns `Ok` are the state
+    /// and its event committed together (ADR-0019), so a command that fails —
+    /// or traps — commits nothing and the browser receives nothing.
+    ///
+    /// `fail` makes the data layer answer `cart-expired`, the rollback path the
+    /// browser tests exercise.
+    fn add_to_cart(
+        &self,
+        session: &str,
+        item: &str,
+        quantity: i64,
+        fail: bool,
+    ) -> Result<(), String> {
+        // One lock across the call and the commit: two presses in the same
+        // instant both read the lines, and one of them would be lost —
+        // `lazy-handler.spec.mjs` clicks twice concurrently to find exactly that.
         {
             let mut carts = self.carts.lock().expect("carts");
-            let next = carts.get(session).copied().unwrap_or(0) + 1;
-            let result: Result<Vec<i64>, String> = self.materializer.command(|tx| {
-                Materializer::set_state(tx, &format!("cart:{session}"), &next.to_string());
-                if fail {
-                    return Err("the command failed after writing".to_string());
+            let current = carts.get(session).cloned().unwrap_or_default();
+            let staged: Arc<Mutex<Option<Lines>>> = Arc::default();
+
+            let for_add = staged.clone();
+            let this_session = session.to_string();
+            let add: HostFn = Arc::new(move |args: &[Val]| {
+                let [Val::String(s), Val::String(item), Val::S64(quantity)] = args else {
+                    return Err(format!("carts#add received {args:?}"));
+                };
+                // The session the component passes is the one the host gave
+                // it; anything else is a component acting for someone else.
+                if *s != this_session {
+                    return Err("carts#add was passed another session".to_string());
                 }
-                Ok(vec![pw_materialize::Event::new(
+                if fail {
+                    return Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                        "cart-expired".into(),
+                        None,
+                    )))))]);
+                }
+                let mut lines = current.clone();
+                match lines.iter_mut().find(|(i, _)| i == item) {
+                    Some((_, q)) => *q += quantity,
+                    None => lines.push((item.clone(), *quantity)),
+                }
+                let cart = cart_value(&lines);
+                *for_add.lock().expect("staged") = Some(lines);
+                Ok(vec![Val::Result(Ok(Some(Box::new(cart))))])
+            });
+            let host = BTreeMap::from([
+                (
+                    "pw:host/session#read".to_string(),
+                    Self::session_operation(session),
+                ),
+                ("store:data/carts#add".to_string(), add),
+            ]);
+
+            let out = self.run(
+                "store.page.add_to_cart",
+                &host,
+                &[Val::String(item.to_string()), Val::S64(quantity)],
+            )?;
+            match out.as_slice() {
+                [Val::Result(Ok(_))] => {}
+                [Val::Result(Err(e))] => return Err(format!("add_to_cart failed: {e:?}")),
+                other => return Err(format!("add_to_cart returned {other:?}")),
+            }
+            let lines = staged
+                .lock()
+                .expect("staged")
+                .take()
+                .ok_or("add_to_cart succeeded without its data layer writing")?;
+            let total: i64 = lines.iter().map(|(_, q)| q).sum();
+            self.materializer.command(|tx| {
+                Materializer::set_state(tx, &format!("cart:{session}"), &total.to_string());
+                Ok::<_, String>(vec![pw_materialize::Event::new(
                     "Events.CartChanged",
                     &[session],
                 )])
-            });
-            // Rolled back: neither the state nor the event survives, so the
-            // cart is not updated and nothing is queued for the browser.
-            result?;
-            carts.insert(session.to_string(), next);
+            })?;
+            carts.insert(session.to_string(), lines);
         }
 
         // The materializer drains the committed event and regenerates the
@@ -367,29 +527,73 @@ impl Server {
         Ok(())
     }
 
-    /// `clear_cart`, through the same path as `add_to_cart`.
+    /// **`clear_cart`, as the compiler built it**, through the same path.
     fn clear_cart(&self, session: &str) -> Result<(), String> {
-        // Its own contract, its own decision. `clear_cart` requires
-        // `database.write<Carts>` exactly as `add_to_cart` does, and asking
-        // once for both would make one command's authority the other's.
-        let _granted = self.authorise("store.page.clear_cart")?;
-
-        let key = session.to_string();
-        // The same discipline as `add_to_cart`: the state change and the
-        // command commit under one lock, so a clear racing an add cannot land
-        // between the add's read and its write.
         {
             let mut carts = self.carts.lock().expect("carts");
+            let cleared: Arc<Mutex<bool>> = Arc::default();
+            let for_clear = cleared.clone();
+            let this_session = session.to_string();
+            let clear: HostFn = Arc::new(move |args: &[Val]| {
+                let [Val::String(s)] = args else {
+                    return Err(format!("carts#clear received {args:?}"));
+                };
+                if *s != this_session {
+                    return Err("carts#clear was passed another session".to_string());
+                }
+                *for_clear.lock().expect("cleared") = true;
+                Ok(vec![Val::Result(Ok(Some(Box::new(cart_value(&[])))))])
+            });
+            let host = BTreeMap::from([
+                (
+                    "pw:host/session#read".to_string(),
+                    Self::session_operation(session),
+                ),
+                ("store:data/carts#clear".to_string(), clear),
+            ]);
+            let out = self.run("store.page.clear_cart", &host, &[])?;
+            match out.as_slice() {
+                [Val::Result(Ok(_))] => {}
+                other => return Err(format!("clear_cart returned {other:?}")),
+            }
+            if !*cleared.lock().expect("cleared") {
+                return Err("clear_cart succeeded without its data layer clearing".into());
+            }
             self.materializer.command::<String>(|_tx| {
                 Ok(vec![pw_materialize::Event::new(
                     "Events.CartChanged",
-                    &[&key],
+                    &[session],
                 )])
             })?;
-            carts.insert(key.clone(), 0);
+            carts.insert(session.to_string(), Vec::new());
         }
         self.drain(session);
         Ok(())
+    }
+
+    /// The menu item a pressed Add button's loop instance holds.
+    ///
+    /// The browser sends the instance's ADDRESS — it holds nothing else about
+    /// the item — and the item is resolved with the same token derivation the
+    /// renderer used to emit that instance, over the menu as the server holds
+    /// it now. An address naming no current item resolves to nothing.
+    fn menu_item_at(&self, address: &str) -> Option<String> {
+        let (template, each) = self.menu_part();
+        let token = address
+            .split('|')
+            .next()?
+            .rsplit('/')
+            .next()?
+            .split_once('@')?
+            .1;
+        let items = self.menu.lock().expect("menu").clone();
+        let env = self.menu_env(&items);
+        let _ = template;
+        items.iter().find_map(|(id, _)| {
+            (pw_render::instance_token_of(PartId(each.0), &item(id, ""), "id", &env).to_string()
+                == token)
+                .then(|| id.clone())
+        })
     }
 
     /// Consume committed events and regenerate what they invalidate.
@@ -908,6 +1112,29 @@ impl MenuOp {
     }
 }
 
+/// A cart as the WIT's `domain-cart` record: its lines, each with an item,
+/// a quantity and a unit price.
+fn cart_value(lines: &[(String, i64)]) -> Val {
+    Val::Record(vec![(
+        "lines".into(),
+        Val::List(
+            lines
+                .iter()
+                .map(|(item, quantity)| {
+                    Val::Record(vec![
+                        ("item-id".into(), Val::String(item.clone())),
+                        ("quantity".into(), Val::S64(*quantity)),
+                        (
+                            "unit-price".into(),
+                            Val::Record(vec![("minor-units".into(), Val::S64(450))]),
+                        ),
+                    ])
+                })
+                .collect(),
+        ),
+    )])
+}
+
 fn default_menu() -> Vec<(String, String)> {
     [
         ("espresso", "Espresso"),
@@ -999,7 +1226,29 @@ fn handle(server: &Server, mut stream: TcpStream) {
 
     match (method, route) {
         ("POST", "/command/add_to_cart") => {
-            let ok = server.add_to_cart(&session, false).is_ok();
+            // The command's arguments: the item — named directly, or by the
+            // loop instance the pressed button belongs to — and the quantity.
+            // Missing either is a malformed request, not a command to guess.
+            let arg = |name: &str| {
+                query.split('&').find_map(|kv| {
+                    let (k, v) = kv.split_once('=')?;
+                    (k == name).then(|| percent_decode(v))
+                })
+            };
+            let item =
+                arg("item").or_else(|| arg("instance").and_then(|a| server.menu_item_at(&a)));
+            let quantity = arg("quantity").and_then(|q| q.parse::<i64>().ok());
+            let (Some(item), Some(quantity)) = (item, quantity) else {
+                respond_json(&mut stream, 400, &session, fresh, "{\"committed\":false}");
+                return;
+            };
+            let result = server.add_to_cart(&session, &item, quantity, false);
+            if let Err(e) = &result
+                && std::env::var("PW_TRACE").is_ok()
+            {
+                eprintln!("add_to_cart: {e}");
+            }
+            let ok = result.is_ok();
             respond_json(
                 &mut stream,
                 202,
@@ -1023,7 +1272,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             );
         }
         ("POST", "/command/add_and_fail") => {
-            let _ = server.add_to_cart(&session, true);
+            let _ = server.add_to_cart(&session, "espresso", 1, true);
             respond_json(&mut stream, 500, &session, fresh, "{\"committed\":false}");
         }
         ("POST", "/command/menu_changed") => {
@@ -1161,11 +1410,22 @@ fn handle(server: &Server, mut stream: TcpStream) {
             // Deliberately tiny, and deliberately not a bundle. Every handler
             // is its own module, because "the exact handler was fetched" is
             // only observable if handlers are separable.
+            // `add_to_cart(item.id, PositiveInt(1))` passes the captured item
+            // — which the browser knows only as the loop instance it pressed —
+            // and the literal quantity. The handler body is not compiled from
+            // Pleris yet (KNOWN_LIMITATIONS: resumable handler bodies); the
+            // COMMAND it calls is.
+            let args = match name.as_str() {
+                "add_to_cart" => {
+                    "?instance=\" + encodeURIComponent(context?.instance ?? \"\") + \"&quantity=1"
+                }
+                _ => "",
+            };
             let body = format!(
                 "// handler {name}, identity {id}\n\
                  export const name = {name:?};\n\
-                 export async function run() {{\n\
-                 \x20 await fetch(\"/command/{name}\", {{ method: \"POST\" }});\n\
+                 export async function run(context) {{\n\
+                 \x20 await fetch(\"/command/{name}{args}\", {{ method: \"POST\" }});\n\
                  }}\n"
             );
             respond(
@@ -1430,6 +1690,36 @@ fn document(body: &str, templates: &[Template], cursor: u64) -> String {
     )
 }
 
+/// A query-string value, `%XX`-decoded. A malformed escape decodes to
+/// nothing rather than to a guess.
+fn percent_decode(v: &str) -> String {
+    let bytes = v.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' if i + 2 < bytes.len() => {
+                let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("");
+                match u8::from_str_radix(hex, 16) {
+                    Ok(b) => out.push(b),
+                    Err(_) => return String::new(),
+                }
+                i += 3;
+            }
+            b'%' => return String::new(),
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(out).unwrap_or_default()
+}
+
 fn session_of(headers: &str) -> String {
     headers
         .split("pw-session=")
@@ -1496,6 +1786,14 @@ mod tests {
         Server::on(std::path::PathBuf::from("."), Vec::new(), topology)
     }
 
+    /// With the compiler's template IR, for a test whose second command
+    /// regenerates the fragment the first one materialized.
+    fn rendering_server() -> Server {
+        let templates: Vec<Template> =
+            serde_json::from_str(include_str!("../../store-ir.json")).expect("the template IR");
+        Server::on(std::path::PathBuf::from("."), templates, dev_topology())
+    }
+
     /// **The command path asks, and a refusal is a refusal.**
     ///
     /// E8's last gate item asks for the dev server's command path to go through
@@ -1503,13 +1801,12 @@ mod tests {
     /// `database.write<Carts>` by its CONTRACT, and a node without it cannot
     /// run the command — the state does not move and no event is queued.
     ///
-    /// The body is still a Rust closure. Running it as compiled Wasm needs a
-    /// Pleris→component backend, which does not exist.
+    /// The body is the compiled component (E10-I); the refusal comes first.
     #[test]
     fn a_command_is_refused_on_a_node_that_does_not_grant_its_capability() {
         let s = server(barren());
         let err = s
-            .add_to_cart("session-1", false)
+            .add_to_cart("session-1", "espresso", 1, false)
             .expect_err("a barren node cannot host a write");
         assert!(
             err.contains("add_to_cart") && err.contains("barren"),
@@ -1523,9 +1820,80 @@ mod tests {
     #[test]
     fn the_same_command_runs_where_the_capability_exists() {
         let s = server(dev_topology());
-        s.add_to_cart("session-1", false)
+        s.add_to_cart("session-1", "espresso", 1, false)
             .expect("the dev origin grants the write");
         assert_eq!(s.cart_value("session-1"), 1);
+    }
+
+    /// **The command's arguments reach the data layer through the compiled
+    /// body**, and its result is the component's. `cortado` and `2` go in as
+    /// the command's arguments; the session is the host's; the lines the
+    /// data layer holds afterwards are what `Carts.add` was called with.
+    #[test]
+    fn the_compiled_command_carries_its_arguments_to_the_data_layer() {
+        let s = rendering_server();
+        s.add_to_cart("session-9", "cortado", 2, false)
+            .expect("runs");
+        s.add_to_cart("session-9", "espresso", 1, false)
+            .expect("runs");
+        s.add_to_cart("session-9", "cortado", 1, false)
+            .expect("runs");
+        let lines = s.carts.lock().unwrap().get("session-9").cloned().unwrap();
+        assert_eq!(
+            lines,
+            [("cortado".to_string(), 3), ("espresso".to_string(), 1)]
+        );
+        assert_eq!(s.cart_value("session-9"), 4);
+        assert_eq!(
+            s.cart_value("another-session"),
+            0,
+            "one session's cart only"
+        );
+    }
+
+    /// **A failed command commits nothing.** The data layer answers
+    /// `cart-expired`, the COMPONENT returns it, and neither the staged write
+    /// nor its event survives — ADR-0019, now decided by what the compiled
+    /// command returned rather than by a closure's control flow.
+    #[test]
+    fn a_failing_command_commits_neither_state_nor_event() {
+        let s = rendering_server();
+        s.add_to_cart("session-3", "espresso", 1, false)
+            .expect("runs");
+        let err = s
+            .add_to_cart("session-3", "cortado", 5, true)
+            .expect_err("the data layer refuses");
+        assert!(
+            err.contains("cart-expired"),
+            "the component's own result: {err}"
+        );
+        assert_eq!(s.cart_value("session-3"), 1, "the failed add left nothing");
+    }
+
+    /// **No Rust closure computes a command.** Structural, because the
+    /// failure it guards against — a body quietly reimplemented beside the
+    /// component — would pass every behavioural test above.
+    #[test]
+    fn the_commands_run_as_compiled_components() {
+        let src = include_str!("main.rs");
+        for (command, id) in [
+            (
+                "fn add_to_cart(",
+                "self.run(\n                \"store.page.add_to_cart\"",
+            ),
+            ("fn clear_cart(", "self.run(\"store.page.clear_cart\""),
+        ] {
+            let start = src.find(command).expect("the command");
+            let body = &src[start..start + src[start..].find("\n    }\n").expect("its end")];
+            assert!(
+                body.contains(id),
+                "`{command}` must run its compiled component"
+            );
+            assert!(
+                !body.contains("+ 1"),
+                "`{command}` computes something itself"
+            );
+        }
     }
 
     /// Each command is authorised on its own contract.

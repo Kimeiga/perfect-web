@@ -1,38 +1,36 @@
-//! **E10-A — the real `add_to_cart` becomes a core Wasm module.**
+//! **The store's commands and queries become Canonical-ABI core modules.**
 //!
 //! Architect ruling, 2026-08-19:
 //!
-//! > Encode the smallest real `add_to_cart` path first. Parameters →
-//! > target/session host call → `database.write<Carts>` host call →
-//! > `Result<Cart, CartError>` → return. Don't broaden language support until
-//! > that path demands it.
+//! > Encode the smallest real `add_to_cart` path first. […] **No semantic
+//! > rediscovery in the encoder.** […] **Unsupported IR is a hard backend
+//! > result.** Never emit `nop`, zero, empty block, dummy result, etc. for an
+//! > instruction you haven't implemented.
 //!
-//! and, on what the encoder may not do:
-//!
-//! > **No semantic rediscovery in the encoder.** […] **Unsupported IR is a hard
-//! > backend result.** Never emit `nop`, zero, empty block, dummy result, etc.
-//! > for an instruction you haven't implemented.
+//! The E10-A encoder held every non-scalar as an `i32` handle, so its modules
+//! validated and could not be components: `carts#add` had three core
+//! parameters where the Canonical ABI gives six. E10-I replaced it — one
+//! encoder, with every flattening and name read from `wit-parser` — and these
+//! are its controls, each of which the handle encoder's version also asserted
+//! in its own terms.
 //!
 //! # A module this repo declares valid is worth nothing
 //!
-//! Every test below that says "valid" means `wasmparser::Validator` accepted
-//! it — the parser `wasmtime` is built on. The E8 gate made the same choice for
-//! WIT and for the same reason: the whole point of emitting a standard format
-//! is that somebody else's toolchain reads it.
+//! Every "valid" below is `wasmparser::Validator`'s verdict.
 
+use pw_core::backend::component;
 use pw_core::backend::ir::Program;
 use pw_core::backend::lower::{Checked, Context, program};
-use pw_core::backend::wasm;
+use pw_core::backend::wasm::{self, Encoding};
 use pw_core::check::Unit;
-use pw_core::contract::contracts;
+use pw_core::contract::{ComponentContract, contracts};
 use pw_core::hir::Hir;
 use pw_core::lower::lower_file;
 use pw_core::resolve::Workspace;
 use pw_core::signatures::Signatures;
 use pw_syntax::parse_tree;
 
-/// The store demo, lowered through the whole front end.
-fn store_program() -> Program {
+fn store_files() -> Vec<(String, String)> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut files = Vec::new();
     for d in [
@@ -58,15 +56,24 @@ fn store_program() -> Program {
         "domain.pw".to_string(),
         std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain"),
     ));
+    files
+}
 
-    let units: Vec<Unit> = files
+fn units(files: &[(String, String)]) -> Vec<Unit> {
+    files
         .iter()
         .map(|(path, src)| Unit {
             path: path.clone(),
             src: src.clone(),
             hir: lower_file(src, &parse_tree(src).green),
         })
-        .collect();
+        .collect()
+}
+
+/// The store, lowered, with its contracts.
+fn store() -> (Program, Vec<ComponentContract>) {
+    let files = store_files();
+    let units = units(&files);
     let hirs: Vec<Hir> = files
         .iter()
         .map(|(_, s)| lower_file(s, &parse_tree(s).green))
@@ -87,58 +94,46 @@ fn store_program() -> Program {
             ds.iter().map(|d| d.code).collect::<Vec<_>>()
         )
     });
-    program(&checked).0
+    (program(&checked).0, cs.clone())
 }
 
 /// `wasmparser`'s verdict, not this repo's.
 fn validate(bytes: &[u8]) -> Result<(), String> {
-    wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::default())
+    wasmparser::Validator::new()
         .validate_all(bytes)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
 
+/// The components the store's commands and queries compile to.
+const COMPONENTS: [&str; 5] = [
+    "store.page.Cart",
+    "store.page.Menu",
+    "store.page.Store",
+    "store.page.add_to_cart",
+    "store.page.clear_cart",
+];
+
 // --- the gate ----------------------------------------------------------------
 
-/// **The real `add_to_cart` encodes, and the module validates.**
-///
-/// It did not, for one commit, and the reason was a model error the encoder
-/// found on its first run: `Instr::HostCall` was keyed on a CAPABILITY, and
-/// `add_to_cart` and `clear_cart` both call `database.write<Carts>` with three
-/// arguments and one. `wasmparser` said *"expected i32 but nothing on stack"*.
-///
-/// Architect ruling, 2026-08-20:
-///
-/// > **A capability authorizes an operation. It does not identify the
-/// > operation.** So `database.write<Carts>` must never be used as the callable
-/// > import identity.
-///
-/// An import is now a `CallableImport` with an `ImportId`, a signature taken
-/// from the callee's own declaration, and a SET of required capabilities.
+/// **Every command and query in the store compiles to a component whose core
+/// module validates.** Five, not one: `add_to_cart` staying inside the
+/// supported set would prove little if its neighbours were refused.
 #[test]
-fn the_store_encodes_to_a_valid_core_module() {
-    let p = store_program();
-    let (bytes, refusals) = wasm::module(&p);
-
-    validate(&bytes).unwrap_or_else(|e| {
-        panic!(
-            "the generated module is not valid Wasm: {e}\nrefusals: {:?}",
-            refusals.iter().map(|r| r.to_string()).collect::<Vec<_>>()
+fn every_store_command_and_query_encodes_to_a_valid_core_module() {
+    let units = units(&store_files());
+    for id in COMPONENTS {
+        let compiled =
+            component::compile(&units, id).unwrap_or_else(|e| panic!("`{id}` must compile: {e}"));
+        validate(&compiled.component.core)
+            .unwrap_or_else(|e| panic!("`{id}`'s core module is not valid Wasm: {e}"));
+        component::audit(
+            &compiled.component.bytes,
+            &compiled.wit,
+            &compiled.component.world,
         )
-    });
-
-    let exports = exported_names(&bytes);
-    for want in ["Menu", "Store", "Cart", "add_to_cart", "clear_cart"] {
-        assert!(
-            exports.contains(&want.to_string()),
-            "`{want}` encodes: {exports:?}"
-        );
+        .unwrap_or_else(|w| panic!("`{id}` disagrees with its world: {w:?}"));
     }
-    assert!(
-        refusals.is_empty(),
-        "nothing in the store refuses to encode: {:?}",
-        refusals.iter().map(|r| r.to_string()).collect::<Vec<_>>()
-    );
 }
 
 /// **The control the ruling asked to be frozen: same capability, two
@@ -147,11 +142,12 @@ fn the_store_encodes_to_a_valid_core_module() {
 /// > `Carts.add` / `Carts.clear` — same capability, different signatures →
 /// > **two callable imports**, both valid.
 ///
-/// This is the whole finding, as a positive proof rather than a refusal.
+/// Their core arities are now the Canonical ABI's — `add` six (session, item
+/// and quantity flattened, plus the result pointer), `clear` three — read back
+/// from the bytes `wit-parser` shaped.
 #[test]
 fn one_capability_authorizes_two_callables_with_different_abis() {
-    let p = store_program();
-
+    let (p, _) = store();
     let add = p
         .imports
         .iter()
@@ -162,127 +158,104 @@ fn one_capability_authorizes_two_callables_with_different_abis() {
         .iter()
         .find(|i| i.id.qualified() == "store:data/carts#clear")
         .expect("Carts.clear is an import");
-
-    // Different ABIs.
-    assert_eq!(add.signature.params.len(), 3);
-    assert_eq!(clear.signature.params.len(), 1);
-    assert_ne!(add.signature, clear.signature);
-
-    // One authority.
+    assert_ne!(add.signature, clear.signature, "different ABIs");
     let caps = |i: &pw_core::backend::ir::CallableImport| -> Vec<String> {
         i.required_capabilities.iter().map(|c| c.name()).collect()
     };
-    assert_eq!(caps(add), ["database.write<Carts>"]);
+    assert_eq!(caps(add), ["database.write<Carts>"], "one authority");
     assert_eq!(caps(clear), ["database.write<Carts>"]);
 
-    // And both are real imports of the built module, with their own types.
-    let (bytes, _) = wasm::module(&p);
-    let names = imported_names(&bytes);
-    assert!(names.contains(&("store:data/carts".to_string(), "add".to_string())));
-    assert!(names.contains(&("store:data/carts".to_string(), "clear".to_string())));
-
-    // The signature the encoder used is the CALLABLE's, not one derived from a
-    // call site: `clear_cart` calls `clear` with one argument and `add_to_cart`
-    // calls `add` with three, and a shared import would have had to be one or
-    // the other.
-    let arities = imported_arities(&bytes);
-    assert_eq!(arities.get("store:data/carts#add"), Some(&3));
-    assert_eq!(arities.get("store:data/carts#clear"), Some(&1));
+    let units = units(&store_files());
+    let add_core = component::compile(&units, "store.page.add_to_cart")
+        .expect("add_to_cart")
+        .component
+        .core;
+    let clear_core = component::compile(&units, "store.page.clear_cart")
+        .expect("clear_cart")
+        .component
+        .core;
+    assert_eq!(
+        imported_arities(&add_core).get("store:data/carts#add"),
+        Some(&6)
+    );
+    assert_eq!(
+        imported_arities(&clear_core).get("store:data/carts#clear"),
+        Some(&3)
+    );
 }
 
-/// **Mutate only the ABI and the module stops validating.**
+/// **Mutate only the declared ABI and the encoder refuses.**
 ///
-/// The same control as `component_contract`'s, one layer down. That one proves
-/// the AUDIT would catch a substituted artifact; this proves the ENCODER
-/// genuinely reads `CallableImport::signature` rather than recomputing an arity
-/// that happens to agree with it.
-///
-/// The distinction is not academic. The encoder derived arities from call sites
-/// until 2026-08-20, and every test above would still have passed — because for
-/// a program where each operation is called one way, a derived arity and a
-/// declared one are the same number. Removing a parameter from the declaration
-/// while leaving the call site alone is what separates them: a signature-driven
-/// encoder emits a 2-parameter import and a call pushing 3, and `wasmparser`
-/// refuses it.
+/// The world is the ABI authority: remove a parameter from `carts#add` in the
+/// WIT the contract fixed, leave the call site alone, and the encoder must
+/// refuse — never emit a call that pushes three values to a two-value import.
 #[test]
-fn an_import_whose_declared_abi_disagrees_with_its_call_site_does_not_validate() {
-    let p = store_program();
-    let (bytes, _) = wasm::module(&p);
-    validate(&bytes).expect("it validates before the mutation");
-
-    let mut mutated = p.clone();
-    let add = mutated
-        .imports
-        .iter_mut()
-        .find(|i| i.id.qualified() == "store:data/carts#add")
-        .expect("Carts.add is an import");
-    assert_eq!(add.signature.params.len(), 3, "the shape being mutated");
-    add.signature.params.pop();
-
-    // The IDENTITY is untouched, which is the point of the mutation.
+fn an_import_whose_declared_abi_disagrees_with_its_call_site_is_refused() {
+    let units = units(&store_files());
+    let compiled = component::compile(&units, "store.page.add_to_cart").expect("builds");
+    let original = "add: func(arg0: capability-session-id, arg1: domain-menu-item-id, arg2: \
+                    domain-positive-int) -> result<domain-cart, domain-cart-error>;";
     assert!(
-        mutated
+        compiled.wit.contains(original),
+        "the mutation's anchor moved"
+    );
+    let mutated = compiled.wit.replace(
+        original,
+        "add: func(arg0: capability-session-id, arg1: domain-menu-item-id) -> \
+         result<domain-cart, domain-cart-error>;",
+    );
+
+    let (p, cs) = store();
+    let f = p
+        .functions
+        .iter()
+        .find(|f| f.export == "add_to_cart")
+        .expect("lowered");
+    let (resolve, world) =
+        component::world_of(&mutated, &compiled.component.world).expect("mutated WIT parses");
+    let _ = cs;
+    match wasm::core_module(&resolve, world, f, "add-to-cart", &p.imports) {
+        Encoding::Blocked { why } => {
+            assert!(
+                why.contains("passes 3 arguments"),
+                "refused for the ABI: {why}"
+            )
+        }
+        other => panic!("a call the world's ABI does not describe must be refused: {other}"),
+    }
+}
+
+/// **A component imports only what its contract allows**, never a superset.
+///
+/// E8's rule, at the artifact: each compiled component's core imports are
+/// among its OWN contract's imports.
+#[test]
+fn every_component_imports_only_what_its_contract_allows() {
+    let units = units(&store_files());
+    for id in COMPONENTS {
+        let compiled = component::compile(&units, id).expect("compiles");
+        let allowed: Vec<String> = compiled.contract.imports.iter().map(|i| i.key()).collect();
+        let extra: Vec<&String> = compiled
+            .component
             .imports
             .iter()
-            .any(|i| i.id.qualified() == "store:data/carts#add")
-    );
-
-    let (bytes, _) = wasm::module(&mutated);
-    let err = validate(&bytes)
-        .expect_err("a call pushing three arguments to a two-parameter import is not valid Wasm");
-    assert!(
-        err.contains("type mismatch"),
-        "and it is refused for the ABI, not incidentally: {err}"
-    );
-}
-
-/// **The module's imports are exactly the contract's**, name for name.
-///
-/// The E8 rule, one layer earlier: actual imports ⊆ the allowed set, never a
-/// superset. Here it is an equality because the program declares exactly what
-/// its functions call — and the encoder read the interface off
-/// `Program::imports` rather than deriving it, so this compares the artifact
-/// with the CONTRACT rather than with itself.
-#[test]
-fn the_modules_imports_are_the_contracts_imports() {
-    let p = store_program();
-    let (bytes, _) = wasm::module(&p);
-
-    let mut actual: Vec<(String, String)> = imported_names(&bytes);
-    actual.sort();
-    actual.dedup();
-
-    let mut allowed: Vec<(String, String)> = p
-        .imports
-        .iter()
-        .map(|i| (i.id.interface.clone(), i.id.name.clone()))
-        .collect();
-    allowed.sort();
-    allowed.dedup();
-
-    // **Subset, never superset** — E8's rule, one layer earlier. A module that
-    // imports fewer than it is allowed is fine; one that imports even one more
-    // has authority the compiler never approved.
-    let extra: Vec<&(String, String)> = actual.iter().filter(|a| !allowed.contains(a)).collect();
-    assert!(
-        extra.is_empty(),
-        "the module imports something the contract does not allow: {extra:?}"
-    );
-    assert!(
-        !actual.is_empty(),
-        "and it imports something, so the subset is not vacuous"
-    );
+            .filter(|i| !allowed.contains(i))
+            .collect();
+        assert!(
+            extra.is_empty(),
+            "`{id}` imports what its contract does not allow: {extra:?}"
+        );
+        assert!(
+            !compiled.component.imports.is_empty(),
+            "`{id}` imports something, so the subset is not vacuous"
+        );
+    }
 }
 
 /// **Every capability a function calls has an import**, or the encoder refuses.
-///
-/// Without this the encoder could emit `call 0` for a capability nothing
-/// declared — a call to whatever import happened to be first, which validates
-/// and is wrong. `body` returns `Blocked` instead, and this is what says the
-/// precondition holds for the real program rather than only being handled.
 #[test]
 fn every_capability_a_function_calls_has_an_import() {
-    let p = store_program();
+    let (p, _) = store();
     let declared: Vec<String> = p
         .imports
         .iter()
@@ -304,94 +277,74 @@ fn every_capability_a_function_calls_has_an_import() {
 
 /// **An unimplemented instruction is refused by name, never encoded.**
 ///
-/// The rule the three-valued outcome exists for. A `Construct` encoded to a
-/// zero would produce a module that validates, links, instantiates and does the
-/// wrong thing — and every check downstream of here reads bytes, so nothing
-/// would notice.
+/// A `Construct` encoded to a zero would produce a module that validates,
+/// links, instantiates and does the wrong thing.
 #[test]
 fn an_unimplemented_instruction_is_refused_rather_than_faked() {
     use pw_core::backend::ir::{Block, BlockId, Function, Instr, Terminator, Type, ValueId};
     use pw_core::resolve::DefId;
 
+    let wit = "package t:t;\ninterface api {\n    record r { a: s64 }\n    builds: func() -> r;\n}\nworld w {\n    export api;\n}\n";
+    let (resolve, world) = component::world_of(wit, "w").expect("the control's WIT");
     let def = DefId { unit: 0, decl: 0 };
-    let p = Program {
-        functions: vec![Function {
-            def,
-            export: "builds".to_string(),
-            params: vec![],
-            ret: Type::Nominal(def),
-            blocks: vec![Block {
-                id: BlockId(0),
-                instrs: vec![Instr::Construct {
-                    result: ValueId(0),
-                    ctor: def,
-                    args: vec![],
-                    ty: Type::Nominal(def),
-                }],
-                terminator: Terminator::Return(ValueId(0)),
+    let f = Function {
+        def,
+        export: "builds".to_string(),
+        params: vec![],
+        ret: Type::Nominal(def),
+        blocks: vec![Block {
+            id: BlockId(0),
+            instrs: vec![Instr::Construct {
+                result: ValueId(0),
+                ctor: def,
+                args: vec![],
+                ty: Type::Nominal(def),
             }],
-            capabilities: vec![],
+            terminator: Terminator::Return(ValueId(0)),
         }],
-        types: vec![],
-        imports: vec![],
+        capabilities: vec![],
     };
-
-    let (bytes, refusals) = wasm::module(&p);
-    assert_eq!(refusals.len(), 1, "one function, one refusal");
-    let text = refusals[0].to_string();
-    assert!(
-        text.contains("record or variant"),
-        "the refusal names the construct: {text}"
-    );
-    assert!(!refusals[0].is_encoded());
-
-    // And the module is still valid — it simply has no such function. A refusal
-    // must not corrupt what did encode.
-    validate(&bytes).expect("a module missing a refused function is still a module");
-    assert!(
-        exported_names(&bytes).is_empty(),
-        "and it exports nothing, rather than exporting an empty body"
-    );
+    match wasm::core_module(&resolve, world, &f, "builds", &[]) {
+        Encoding::Unsupported { construct, .. } => {
+            assert!(construct.contains("record or variant"), "{construct}")
+        }
+        other => panic!("a construction must be refused by name: {other}"),
+    }
 }
 
 /// **The encoder never decides anything from a name.**
-///
-/// The structural guard `lower.rs` carries, one layer down and with more at
-/// stake: this file's answers become machine code, where nothing downstream can
-/// notice a wrong one. `docs/RISK_QUEUE.md` is mostly instances of
-/// spelling-based resolution.
 #[test]
 fn the_encoder_never_decides_from_a_name() {
-    let src = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/backend/wasm.rs"),
-    )
-    .expect("wasm.rs");
-
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/backend");
     let mut offenders = Vec::new();
-    for (n, line) in src.lines().enumerate() {
-        let l = line.trim();
-        if l.starts_with("//") || l.starts_with("///") {
-            continue;
-        }
-        // A capability, effect or interface spelling compared as a literal.
-        // `capability.name()` is used as a MAP KEY, which is the identity the
-        // contract established — comparing it against a constant would be the
-        // encoder deciding.
-        if l.contains("== \"database")
-            || l.contains("== \"session")
-            || l.contains("== \"pw:host")
-            || l.contains("starts_with(\"pw:host")
-            || l.contains("contains(\"database")
-        {
-            offenders.push(format!("wasm.rs:{}: {l}", n + 1));
+    let mut scanned = 0;
+    for file in ["wasm.rs", "component.rs"] {
+        let src = std::fs::read_to_string(dir.join(file)).expect(file);
+        scanned += src.lines().count();
+        for (n, line) in src.lines().enumerate() {
+            let l = line.trim();
+            if l.starts_with("//") || l.starts_with("///") {
+                continue;
+            }
+            // A capability, effect, interface or type spelling compared as a
+            // literal. Which interface an import is comes from the world; which
+            // types agree from `same_type`.
+            if l.contains("== \"database")
+                || l.contains("== \"session")
+                || l.contains("== \"pw:host")
+                || l.contains("== \"store:")
+                || l.contains("starts_with(\"pw:host")
+                || l.contains("contains(\"database")
+                || l.contains("\"domain-")
+            {
+                offenders.push(format!("{file}:{}: {l}", n + 1));
+            }
         }
     }
+    assert!(scanned > 500, "the scan read too little to mean anything");
     assert!(
         offenders.is_empty(),
-        "the encoder decides something from a spelling:\n  {}\n\n\
-         Which interface serves a capability is the CONTRACT's answer, carried \
-         on `Program::imports`. Matching a name here would make the E8 audit a \
-         comparison of the encoder with itself.",
+        "the encoder decides something from a spelling:\n  {}",
         offenders.join("\n  ")
     );
 }
@@ -426,34 +379,6 @@ fn imported_arities(bytes: &[u8]) -> std::collections::BTreeMap<String, usize> {
                 }
             }
             _ => {}
-        }
-    }
-    out
-}
-
-fn exported_names(bytes: &[u8]) -> Vec<String> {
-    let mut out = Vec::new();
-    for payload in wasmparser::Parser::new(0).parse_all(bytes) {
-        if let Ok(wasmparser::Payload::ExportSection(s)) = payload {
-            for e in s.into_iter().flatten() {
-                out.push(e.name.to_string());
-            }
-        }
-    }
-    out
-}
-
-fn imported_names(bytes: &[u8]) -> Vec<(String, String)> {
-    let mut out = Vec::new();
-    for payload in wasmparser::Parser::new(0).parse_all(bytes) {
-        if let Ok(wasmparser::Payload::ImportSection(s)) = payload {
-            // `into_imports` flattens the compact encodings — an import
-            // section may group several names under one module, and iterating
-            // the section directly yields the GROUPS.
-            for i in s.into_imports() {
-                let i = i.expect("import entry");
-                out.push((i.module.to_string(), i.name.to_string()));
-            }
         }
     }
     out

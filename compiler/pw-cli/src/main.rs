@@ -1007,6 +1007,72 @@ fn audit_values_command(paths: &[&String]) -> ExitCode {
     }
 }
 
+/// **Compile one component to a Wasm component.** E10-I.
+///
+/// Writes the component to `out`, and prints what it imports and whether its
+/// component-level types agree with its world — read back through
+/// `wit-component`'s decoder, not through anything that wrote it.
+fn emit_component_command(paths: &[&String], component_id: &str, out: &str) -> ExitCode {
+    let mut units = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        units.push(pw_core::check::Unit {
+            path: path.to_string(),
+            src,
+            hir,
+        });
+    }
+    let compiled = match pw_core::backend::component::compile(&units, component_id) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("pw: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let audit = pw_core::backend::component::audit(
+        &compiled.component.bytes,
+        &compiled.wit,
+        &compiled.component.world,
+    );
+    if let Err(e) = std::fs::write(out, &compiled.component.bytes) {
+        eprintln!("pw: cannot write {out}: {e}");
+        return ExitCode::from(2);
+    }
+    println!(
+        "{component_id}: world {} — {} bytes ({} bytes of core module)",
+        compiled.component.world,
+        compiled.component.bytes.len(),
+        compiled.component.core.len()
+    );
+    for i in &compiled.component.imports {
+        println!("  imports {i}");
+    }
+    match audit {
+        Ok(n) => {
+            println!("  component-level audit: {n} functions agree with the world");
+            ExitCode::SUCCESS
+        }
+        Err(wrong) => {
+            for w in wrong {
+                eprintln!("  audit: {w}");
+            }
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -1046,7 +1112,7 @@ fn run() -> ExitCode {
             skip_next = false;
             continue;
         }
-        if a == "--out" {
+        if a == "--out" || a == "--component" {
             skip_next = true;
             continue;
         }
@@ -1070,11 +1136,12 @@ fn run() -> ExitCode {
             | "emit-template"
             | "emit-wit"
             | "audit-values"
+            | "emit-component"
     ) || paths.is_empty()
     {
         eprintln!(
             "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
-             emit-contracts|emit-template|emit-wit|audit-values> <path.pw>... [--plain]"
+             emit-contracts|emit-template|emit-wit|audit-values|emit-component> <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -1087,7 +1154,25 @@ fn run() -> ExitCode {
         eprintln!("  emit-template  print the checked template IR (--plain for text)");
         eprintln!("  emit-wit       print a WIT world per component contract");
         eprintln!("  audit-values   count the value relations decided, and why the rest were not");
+        eprintln!(
+            "  emit-component --component ID --out FILE  compile one component to a Wasm component"
+        );
         return ExitCode::from(2);
+    }
+
+    if cmd == "emit-component" {
+        let flag = |name: &str| {
+            args.iter()
+                .position(|a| a == name)
+                .and_then(|i| args.get(i + 1))
+                .cloned()
+        };
+        let (Some(id), Some(out)) = (flag("--component"), flag("--out")) else {
+            eprintln!("usage: pw emit-component --component ID --out FILE <path.pw>...");
+            return ExitCode::from(2);
+        };
+        let sources: Vec<&String> = paths.iter().copied().filter(|p| **p != id).collect();
+        return emit_component_command(&sources, &id, &out);
     }
 
     if cmd == "audit-values" {

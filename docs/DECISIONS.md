@@ -150,3 +150,12 @@ Decides without a ruling, for reversal:
 - snapshots are read explicitly.
 
 Closes E9-V1..V6. Does not close E10-I.
+
+## 2026-09-24: compiled components (E10-I)
+
+[ADR-0032](DECISIONS/ADR-0032-compiled-components.md): Canonical ABI adapters
+from the world, with every number from `wit-parser`, one encoder, and upstream
+`wit-component` wrapping. Component identity is checked twice: during encoding
+and by decoding the artifact. The host runs a component with the deployment's
+operations, compiled once. The contract locates each export (ruling needed). The
+dev server's command closures are deleted. Closes E10-I.

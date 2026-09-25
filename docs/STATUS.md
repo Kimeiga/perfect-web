@@ -6,12 +6,17 @@
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
-**Current milestone:** E9 is **closed again** (2026-09-24). Its reopening gates,
-E9-V1..V6, are met by checks that refuse programs, with discriminators and
-mutation controls: [evidence](evidence/E9/value-relations-2026-09-24.md),
-[ADR-0031](DECISIONS/ADR-0031-value-relations.md). **E10-I is next**: compile
-`add_to_cart` through the production component backend and execute it through
-the E8 host, with the alternate Rust closure path deleted. See [NEXT](NEXT.md).
+**Current milestone:** E10, in progress. **E10-I closed 2026-09-24**
+([evidence](evidence/E10/e10-i-2026-09-24.md), [ADR-0032](DECISIONS/ADR-0032-compiled-components.md)):
+`add_to_cart` compiles to a Wasm component, runs through the E8 host with the
+host's own operations, and the dev server's Rust closure path is deleted. E9
+closed the same day (E9-V1..V6, [evidence](evidence/E9/value-relations-2026-09-24.md),
+[ADR-0031](DECISIONS/ADR-0031-value-relations.md)). Next: the rest of E10, and
+the kiokun proof slice. See [NEXT](NEXT.md).
+
+Two ADR-0032 decisions also await a ruling:
+- the contract locates each export in its component;
+- a handler sends the pressed loop instance.
 
 Three ADR-0031 decisions were made without an architect ruling and are offered
 for reversal:
@@ -31,6 +36,28 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-24: E10-I, a Pleris-compiled command through the E8 host.**
+  - `backend/wasm.rs` now emits Canonical-ABI core modules, with every
+    signature, flattening, layout and mangled name from `wit-parser` 0.257.1.
+  - `backend/component.rs` wraps them with `wit-component` 0.257.1 and audits
+    each artifact against its world through `wit-component`'s decoder.
+  - The store's `add_to_cart` is a 4,221-byte component importing exactly
+    `pw:host/session#read` and `store:data/carts#add`. All five store commands
+    and queries compile and audit.
+  - `pw_host::engine::call_within` ran it: the component read the host's
+    session, called `carts#add("session-7", "cortado", 2)`, and returned the
+    data layer's result.
+  - Controls: admission and engine refusals, an unimplemented grant, fuel, and
+    a core-identical but component-different import.
+  - The dev server's commands run the compiled components, and its closures
+    are deleted.
+  - Browser suite: Chromium 86/86 ×3, recorded. Three engines 258/258 ×3,
+    observed only; the host's disk filled, and macOS purged the browsers.
+  - Found on the way: `imports_of` reported type exports as imports, which
+    corrected E8's audit counts. Per-call compilation also amplified a
+    pre-existing Firefox flake; components are now compiled once.
+
 
 - **2026-09-24: E9-V1..V6, the ordinary value relations.**
   - `compiler/pw-core/src/values.rs` checks, three-valued, with diagnostics
@@ -123,9 +150,15 @@ these compiler changes do not independently re-establish those milestones.
 - **Member existence is not a value relation yet.** `box.x` on a `Rect`
   without `x` is unknown rather than refused. This is the first follow-up after
   E10-I, recorded in KNOWN_LIMITATIONS; it was not one of E9-V1..V6.
-- **E10-I remains open.** A valid core Wasm module and a separately functioning
-  host do not prove compiled Pleris execution through the production component
-  path. Keep ADR-0023's deferred integration obligation.
+- **The rest of E10 is open.** The component backend is narrow. It lacks:
+  - compiled resumable handler bodies;
+  - records and variants written into the region;
+  - branches;
+  - calls between compiled declarations;
+  - a compiled data layer;
+  - an automatic memory strategy.
+
+  Each missing construct is refused by name.
 - **Broader proposals remain proposals.** Temporal authorization, compatibility
   across live versions, commitment/unknown outcomes, composed budgets, and
   browser-owned editing behavior are recorded in the census. Their presence in
@@ -141,6 +174,9 @@ just audit
 python3 research/failures/tools/validate.py
 python3 -m unittest discover -s research/failures/tools -p 'test_*.py' -v
 node --test spikes/layout-phase-scheduler/test/loaf.test.mjs
+just e10-component
+just e10-i
+just e10-browser chromium
 just e9-values
 cargo test --locked -p pw-core --test value_relations --test corpus_history
 python3 scripts/e9_value_mutations.py
@@ -154,6 +190,14 @@ commands retain their real toolchain requirements. `just doctor` is read-only;
 `just bootstrap` installs the pinned project dependencies.
 
 ## known environmental issues
+
+**2026-09-24: the host's disk filled during E10-I.** 460 GB, with between 0
+and 3 GB free, almost all of it used outside this repository. Shell commands
+failed until the repository's incremental build cache (3.6 GB, regenerable) was
+removed. Builds since use `CARGO_INCREMENTAL=0`. macOS purged
+`~/Library/Caches`, which included every Playwright browser build, so the
+three-engine browser run could not be re-recorded. Chromium was reinstalled
+(about 350 MB) and recorded.
 
 The September 16 resource repair used the pinned Rust 1.97.1 and locked registry
 snapshot locally on Linux x86_64. Its full workspace run completed with a captured
@@ -185,17 +229,17 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **E10-I steps 4-6.**
-   - Canonical ABI adapters, with every flattening number taken from
-     `wit-parser` 0.257.1.
-   - One core module per component, with `memory`, `cabi_realloc` and
-     post-return.
-   - Wrap with upstream `wit-component` 0.257.1.
-   - Validate independently, including a component-level same-core-ABI
-     mutation control.
-2. **E10-I steps 7-9.**
-   - `pw-host` links and calls the compiled component with host functions.
-   - `add_to_cart` runs through it in the dev server.
-   - Delete the Rust closure path, and record `just e10-i` evidence.
-3. **The rest of E10.** Then the kiokun proof slice (lookup and search over one
-   shard) as the first application written against checked signatures.
+1. **The kiokun proof slice**, as the next forcing application: dictionary
+   entry lookup and search over one shard. It will exercise records, lists,
+   branches and field reads, which the component backend refuses today.
+2. **Widen the component backend by what that slice needs:**
+   - constructing records and variants in the region;
+   - field projection;
+   - branches;
+   - string constants via a data segment;
+   - calls between compiled declarations.
+
+   Each lands with a mutation-controlled test, in the style of E10-I.
+3. **Compile resumable handler bodies**, so the page's
+   `add_to_cart(item.id, PositiveInt(1))` is Pleris end to end. Then replace
+   `store:data/carts` with compiled Pleris over narrower primitives (step 10).

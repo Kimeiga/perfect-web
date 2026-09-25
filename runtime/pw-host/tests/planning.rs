@@ -224,6 +224,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
             name: "Widget".into(),
             kind: "component".into(),
             binding: pw_host::BindingSupport::default(),
+            component: None,
         }],
     };
     let origin_only = ComponentContract {
@@ -237,6 +238,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
             name: "Store".into(),
             kind: "query".into(),
             binding: pw_host::BindingSupport::default(),
+            component: None,
         }],
     };
 
@@ -298,6 +300,7 @@ fn placement_and_transferability_are_independent_and_only_one_pair_fails() {
             name: "Widget".into(),
             kind: "component".into(),
             binding: pw_host::BindingSupport::default(),
+            component: None,
         }],
     };
     let store = |placements: &[&str], remote: pw_host::RemoteSupport| ComponentContract {
@@ -314,6 +317,7 @@ fn placement_and_transferability_are_independent_and_only_one_pair_fails() {
                 local: pw_host::LocalSupport::Direct,
                 remote,
             },
+            component: None,
         }],
     };
     let handle = || pw_host::RemoteSupport::Refused {
@@ -403,6 +407,7 @@ fn an_undetermined_signature_does_not_refuse_a_deployment() {
                     }],
                 },
             },
+            component: None,
         }],
     };
     let widget = ComponentContract {
@@ -421,6 +426,7 @@ fn an_undetermined_signature_does_not_refuse_a_deployment() {
             name: "Widget".into(),
             kind: "component".into(),
             binding: pw_host::BindingSupport::default(),
+            component: None,
         }],
     };
     let p = plan(&[widget, store], &full());
@@ -525,6 +531,7 @@ fn a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan() {
             name: "Widget".into(),
             kind: "component".into(),
             binding: pw_host::BindingSupport::default(),
+            component: None,
         }],
     };
     let basket = ComponentContract {
@@ -549,6 +556,7 @@ fn a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan() {
                     }],
                 },
             },
+            component: None,
         }],
     };
 
@@ -595,6 +603,7 @@ fn widget_for() -> ComponentContract {
             name: "Widget".into(),
             kind: "component".into(),
             binding: pw_host::BindingSupport::default(),
+            component: None,
         }],
     }
 }
@@ -620,6 +629,7 @@ fn basket_colocatable() -> ComponentContract {
                     }],
                 },
             },
+            component: None,
         }],
     }
 }

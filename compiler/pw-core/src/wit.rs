@@ -519,6 +519,14 @@ pub struct World {
     pub imports: Vec<String>,
     /// The name of the interface this world exports.
     pub exports: String,
+    /// The declaration the component is, by identity. A backend finds a
+    /// world through this rather than by re-mangling a name: E10-I's encoder
+    /// holds a `DefId`, and a second route from a declaration to its world
+    /// would be a second answer to one question.
+    pub declaration: DefId,
+    /// The exported interface's functions, as the WIT names them, in contract
+    /// export order.
+    pub functions: Vec<String>,
 }
 
 /// The interface name for a component's exports.
@@ -527,6 +535,21 @@ pub struct World {
 /// package, and every component needs both.
 fn api(component_id: &str) -> String {
     format!("{}-api", ident(component_id))
+}
+
+/// **Where a contract's export lives in its component.** The one place that
+/// names it: the world generated below exports this interface with this
+/// function, and the contract carries the same pair for the host.
+pub fn component_export(component_id: &str, export: &str) -> crate::contract::ComponentExport {
+    let (package, version) = PACKAGE.split_once('@').unwrap_or((PACKAGE, ""));
+    let at = match version.is_empty() {
+        true => String::new(),
+        false => format!("@{version}"),
+    };
+    crate::contract::ComponentExport {
+        interface: format!("{package}/{}{at}", api(component_id)),
+        function: ident(export),
+    }
 }
 
 /// **Generate the WIT package for a checked program.**
@@ -586,9 +609,15 @@ pub fn package(
         // One contract per DECLARATION, so the export's signature is the
         // component's own declaration — looked up by the path `contracts()`
         // built the id from, not reconstructed.
-        let sig = decls
+        let declaration = decls
             .get(&c.component_id)
-            .and_then(|(def, _)| sigs.by_def(*def))
+            .map(|(def, _)| *def)
+            .ok_or_else(|| WitError::Unmappable {
+                ty: "missing component declaration".into(),
+                at: c.component_id.clone(),
+            })?;
+        let sig = sigs
+            .by_def(declaration)
             .map(Interface::from)
             .ok_or_else(|| WitError::Unmappable {
                 ty: "missing component signature".into(),
@@ -611,6 +640,12 @@ pub fn package(
             name: ident(&c.component_id),
             imports,
             exports: api(&c.component_id),
+            declaration,
+            functions: c
+                .exports
+                .iter()
+                .map(|e| component_export(&c.component_id, &e.name).function)
+                .collect(),
         });
     }
 

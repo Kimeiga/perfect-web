@@ -5,7 +5,7 @@
     "params": [
       "id"
     ],
-    "schema": "921b503ff9b0596c",
+    "schema": "8495cfb5e17666ae",
     "chunks": [
       {
         "chunk": "static",
@@ -57,7 +57,7 @@
                 "id": 3,
                 "owner": 0,
                 "event": "press",
-                "handler": "215128a6db429d05",
+                "handler": "e1ab9fca1f6fc15b",
                 "name": "add_to_cart"
               }
             },

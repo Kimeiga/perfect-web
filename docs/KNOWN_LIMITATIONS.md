@@ -45,9 +45,25 @@ identities distinguish modules; complete transitive schema-evolution and host
 semantic-ABI validation remain separate work. Foreign code and backend internal
 record/variant layouts still need their documented integration proofs.
 
-E10-I has not been established: producing core Wasm and testing host admission
-separately does not demonstrate execution of the compiled Pleris command through
-the complete component path with the alternative Rust closure removed.
+**E10-I is established** (2026-09-24, ADR-0032): the store's commands compile
+to components and run through the E8 host, and the Rust closure path is deleted.
+The component backend is narrow, and everything outside it is refused by name
+rather than approximated:
+
+- **Straight-line bodies only.** Import calls and scalar constants are
+  supported; values move flat or in their canonical layout. Constructing a
+  record or variant, reading a field, a branch, a call to another compiled
+  declaration, and a string constant are refused.
+- **The invocation region is provisional.** It is a bump region reclaimed by
+  each export's post-return, and nothing can outlive an invocation.
+- **Resumable handler bodies are not compiled.** `add_to_cart(item.id,
+  PositiveInt(1))` in the page is a dev-server handler posting the pressed
+  instance and the literal quantity; the command it reaches is compiled.
+- **The data layer is not Pleris.** `store:data/carts` is the deployment's
+  (`owner: external`), as the contract records.
+- **The three-engine browser result is observed, not recorded.** The host's
+  disk filled during E10-I and macOS purged the Playwright browsers.
+  `browser-suite.txt` records Chromium only.
 
 ## Research requirements are not implemented guarantees
 
