@@ -425,6 +425,28 @@ e10-build:
      } > docs/evidence/E10/build.txt
     @cat docs/evidence/E10/build.txt
 
+# What the store and the accepted corpus make affine, and why: only types an
+# effect row acquires. No store value is affine or annotated, and the language
+# has no borrow, lifetime or move syntax. With it, charter M10 task 10's
+# remaining half: carried captures serialize deterministically. Resume
+# versioning is E7V's (docs/evidence/E7V/deployment-matrix.txt).
+#
+# E10 gate item 5 — no ownership syntax for ordinary application values.
+e10-ownership:
+    @{ echo "E10 gate item 5 - no ownership syntax for ordinary values; task 10 - deterministic resumable state"; echo; \
+       echo "produced by: just e10-ownership"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== what is affine, and what is not (compiler/pw-core/tests/ownership.rs)"; echo; \
+       cargo test --locked -p pw-core --test ownership -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "^(store|accepted corpus|not Pleris): .*|^test [a-z_]+ .*|^test result.*"; \
+       echo; echo "== carried captures serialize deterministically (runtime/pw-render/tests/properties.rs)"; echo; \
+       cargo test --locked -p pw-render --test properties carried 2>&1 | grep -E "^(test |test result)"; \
+       echo; echo "== resume versioning: E7V, recorded in docs/evidence/E7V/deployment-matrix.txt"; \
+       grep -cE "^" docs/evidence/E7V/deployment-matrix.txt | sed 's/^/   lines: /'; \
+     } > docs/evidence/E10/ownership.txt
+    @cat docs/evidence/E10/ownership.txt
+
 # The development server under sustained commands and session churn: frames
 # held, subscribers, outbox rows and materialized entries, each bounded. The
 # compiled command called 20,000 times through the E8 host, with resident memory

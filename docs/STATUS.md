@@ -53,6 +53,16 @@ before integration; the baseline pass is not a substitute.
 
 ## completed gate items
 
+- **2026-09-25: E10 gate item 5 and task 10.**
+  - Only effect-row producers make a value affine: `DatabaseConnection`,
+    `DatabaseTransaction` and `MapHandle`, in the store and in the accepted
+    corpus.
+  - The store's 10 declarations have 20 typed value positions, with 0 affine
+    and 0 annotated.
+  - Borrow, lifetime, move and box syntax are not Pleris.
+  - Carried captures serialize deterministically. Resume versioning is E7V's.
+  - Evidence: [ownership-2026-09-25.md](evidence/E10/ownership-2026-09-25.md).
+
 - **2026-09-25: E10 gate item 3, sustained load (ADR-0035).**
   - Measured first, with no bound in place: 3,000 commands left 3,000 consumed
     events in the outbox. 1,000 departed visitors and 300 menu changes left
@@ -244,6 +254,7 @@ just e10-i
 just e10-handlers
 just e10-build
 just e10-load
+just e10-ownership
 just e10-browser chromium
 just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
 just e9-values

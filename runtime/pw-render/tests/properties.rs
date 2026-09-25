@@ -770,3 +770,49 @@ fn a_public_domain_and_a_session_domain_render_different_tokens() {
         "two sessions do not correlate"
     );
 }
+
+/// **Carried captures serialize deterministically** (charter §14 M10 task 10).
+///
+/// Two renders of one document are byte-identical, and so are two templates
+/// listing the same capture paths in different orders. The object's keys are
+/// sorted by `serde_json`'s map; if a dependency ever enabled its
+/// `preserve_order` feature, the permuted case would fail here rather than as
+/// a document whose bytes depended on how its template was built.
+#[test]
+fn carried_captures_serialize_deterministically() {
+    let env = Env::new().set(
+        "item",
+        record(&[
+            ("id", Value::Text("cortado".into())),
+            ("name", Value::Text("Cortado".into())),
+            ("price", Value::Int(450)),
+        ]),
+    );
+    let one = render(
+        &button_capturing(&["item.price", "item.id", "item.name"]),
+        &env,
+        &[],
+    )
+    .unwrap();
+    let two = render(
+        &button_capturing(&["item.name", "item.price", "item.id"]),
+        &env,
+        &[],
+    )
+    .unwrap();
+    let again = render(
+        &button_capturing(&["item.price", "item.id", "item.name"]),
+        &env,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(one, again, "the same document, twice");
+    assert_eq!(
+        one, two,
+        "the order a template lists paths in does not reach the bytes"
+    );
+    assert!(
+        one.contains("{&quot;item&quot;:{&quot;id&quot;:&quot;cortado&quot;,&quot;name&quot;:&quot;Cortado&quot;,&quot;price&quot;:450}}"),
+        "keys sorted: {one}"
+    );
+}

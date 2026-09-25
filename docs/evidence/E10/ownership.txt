@@ -1,0 +1,27 @@
+E10 gate item 5 - no ownership syntax for ordinary values; task 10 - deterministic resumable state
+
+produced by: just e10-ownership
+commit: 901547b73b4670842c1a8f75636da7e490d6b212 + uncommitted changes
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== what is affine, and what is not (compiler/pw-core/tests/ownership.rs)
+
+test no_store_value_is_affine_or_annotated ... store: 10 declarations, 20 typed value positions, 0 affine, 0 ownership annotations
+test only_scarce_resources_are_affine ... store: affine by an acquiring producer: {"DatabaseConnection", "DatabaseTransaction", "MapHandle"}
+accepted corpus: affine by an acquiring producer: {"DatabaseConnection", "DatabaseTransaction", "MapHandle"}
+test the_language_has_no_borrow_lifetime_or_move_syntax ... not Pleris: fn f(x: &Int) -> Int { x }
+not Pleris: fn f(x: &mut Int) -> Int { x }
+not Pleris: fn f<'a>(x: Int) -> Int { x }
+not Pleris: fn f(x: 'a Int) -> Int { x }
+not Pleris: fn f(move x: Int) -> Int { x }
+not Pleris: fn f(x: Box<Int>) -> Int { *x }
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+== carried captures serialize deterministically (runtime/pw-render/tests/properties.rs)
+
+test a_capture_that_cannot_be_carried_blocks_the_render ... ok
+test carried_captures_serialize_deterministically ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.00s
+
+== resume versioning: E7V, recorded in docs/evidence/E7V/deployment-matrix.txt
+   lines: 22
