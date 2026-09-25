@@ -68,7 +68,11 @@ before integration; the baseline pass is not a substitute.
     address resolution and the per-command glue are deleted.
   - Found: `clear_cart` never committed its state; the Wasm IR's string
     constants were source tokens. Both are fixed.
-  - `just ci` passes. Browser suite: see the evidence file.
+  - `just ci` passes. Browser suite: three engines, 273/273 in three
+    consecutive recorded runs (`f8adc03`). The first recording failed one
+    WebKit test. The cause was harness interference: `public-fragment` renamed
+    the shared menu on the shared host. It was reproduced on demand and fixed
+    by isolating that suite; the failed record is kept.
 
 - **2026-09-24: E10-I, a Pleris-compiled command through the E8 host.**
   - `backend/wasm.rs` now emits Canonical-ABI core modules, with every

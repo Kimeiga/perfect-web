@@ -1,0 +1,15 @@
+E10 - the store page, compiled commands and handlers, in browser engines: chromium firefox webkit
+
+produced by: just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
+commit: 687aaf4aac697c13f9eef98d3ff2c2b139397f4e
+playwright: Version 1.58.0
+
+== full run 1
+  273 passed (48.7s)
+== full run 2
+  1) [webkit] › e2e/store.spec.mjs:130:3 › the update touches only what changed › only cart-related part ids update 
+    Error: exactly the cart's part
+  1 failed
+  272 passed (36.7s)
+== full run 3
+  273 passed (35.0s)
