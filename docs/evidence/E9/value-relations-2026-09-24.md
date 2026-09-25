@@ -42,7 +42,16 @@ Every relation written in `examples/store/app.pw` agrees, including
 holds that with a floor.
 
 The undecided returns are library stubs whose body is `todo`, whose value no
-declaration states. The undecided arguments are values whose type nothing
+declaration states.
+
+**Re-recorded 2026-09-25 at `afd54a9`** (`value-relations.txt`). The counts
+moved because ADR-0040 made `List`'s operations `intrinsic` declarations with
+no bodies and added `packages/pw-std/string.pw`: the store program is 39 files,
+`Return agree` is 22 and `undecided` 40, because the placeholder bodies `seed`,
+`items`, `0` and `[]` were four Return relations. The new signatures add
+annotations (346 in the store program). The accepted corpus moves the same way
+(Return 22 and 53, annotations 386). The gate tests are still 38, and the
+mutation controls still 10 of 10. The undecided arguments are values whose type nothing
 states: a lambda with no expected function type, `4.px`, or a binding from
 `measure { .. }`. They are counted, not reported, and never read as
 agreement.
