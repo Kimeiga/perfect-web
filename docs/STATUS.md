@@ -53,6 +53,19 @@ before integration; the baseline pass is not a substitute.
 
 ## completed gate items
 
+- **2026-09-25: E10 gate item 1, the store builds from source (ADR-0034).**
+  - `pw build` writes every artifact of a checked program:
+    - the template IR;
+    - both handler modules;
+    - all five commands and queries as audited components;
+    - the contracts and the WIT.
+  - It ran with neither Koka nor Node on the PATH, and its outputs are
+    byte-identical to the artifacts recorded separately
+    ([build.txt](evidence/E10/build.txt)).
+  - Found: lowering refusals did not say which declaration they belonged to,
+    and `pw emit-template` re-read its sources with `unwrap_or_default()`.
+  - Not claimed: the dev server runs the queries as components.
+
 - **2026-09-25: compiled resumable handlers (E10, ADR-0033).**
   - `backend/js.rs` compiles each handler's body to an ES module;
     `pw emit-handlers` writes `<identity>.mjs`. The store's `add_to_cart`
@@ -197,10 +210,9 @@ these compiler changes do not independently re-establish those milestones.
   Each missing construct is refused by name. The handler backend is narrow
   too: one command call per handler, with no local computation, branches or
   event parameter. Captures are not a patched part.
-- **CI's cost is not yet measured on a warm cache.** Since E10-I every
-  workspace build compiles Wasmtime. The two runs since took 5m06s (stopped at
-  `test-unit`) and 5m29s, both on a cold cache; earlier runs took 2m28s to
-  2m47s.
+- **CI cost of the engine, measured:** since E10-I every workspace build
+  compiles Wasmtime. On a warm cache, CI on `ebd4696` took 2m54s, against 2m28s
+  to 2m47s before. The two cold-cache runs took 5m06s and 5m29s.
 - **Broader proposals remain proposals.** Temporal authorization, compatibility
   across live versions, commitment/unknown outcomes, composed budgets, and
   browser-owned editing behavior are recorded in the census. Their presence in
@@ -219,6 +231,7 @@ node --test spikes/layout-phase-scheduler/test/loaf.test.mjs
 just e10-component
 just e10-i
 just e10-handlers
+just e10-build
 just e10-browser chromium
 just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
 just e9-values

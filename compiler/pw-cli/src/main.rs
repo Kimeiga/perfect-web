@@ -645,6 +645,7 @@ fn emit_manifest_command(paths: &[&String]) -> ExitCode {
 /// the only runtime there can ever be (ADR-0018).
 fn emit_template_command(paths: &[&String], plain: bool) -> ExitCode {
     let mut hirs = Vec::new();
+    let mut sources = Vec::new();
     for path in paths {
         let src = match std::fs::read_to_string(path) {
             Ok(s) => s,
@@ -659,24 +660,16 @@ fn emit_template_command(paths: &[&String], plain: bool) -> ExitCode {
             return ExitCode::FAILURE;
         }
         hirs.push(pw_core::lower::lower_file(&src, &parsed.green));
+        sources.push(src);
     }
     let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
 
     // Handler identities, derived once by the resume artifacts and read by the
-    // template IR. Per file, because `located` walks one HIR against the whole
-    // program's signatures.
+    // template IR: `pw_core::build::templates`, which `pw build` writes too.
     let ws = pw_core::resolve::Workspace::build(&refs);
     let sigs = pw_core::signatures::Signatures::build(&ws, &refs);
-    let mut handlers = pw_core::template_ir::Handlers::new();
-    for (path, hir) in paths.iter().zip(&hirs) {
-        let src = std::fs::read_to_string(path).unwrap_or_default();
-        for (decl, lambda, m, _) in
-            pw_core::resume_artifacts::located(&src, hir, &sigs, pw_core::resume_artifacts::BUILD)
-        {
-            handlers.insert((decl, lambda), m.handler);
-        }
-    }
-    let templates = pw_core::template_ir::build_with(&refs, &handlers);
+    let texts: Vec<&str> = sources.iter().map(String::as_str).collect();
+    let templates = pw_core::build::templates(&refs, &texts, &sigs);
 
     let mut blocked = 0usize;
     for t in &templates {
@@ -1012,6 +1005,133 @@ fn audit_values_command(paths: &[&String]) -> ExitCode {
 /// Writes the component to `out`, and prints what it imports and whether its
 /// component-level types agree with its world — read back through
 /// `wit-component`'s decoder, not through anything that wrote it.
+/// `pw build --out DIR`: every artifact of one checked program.
+///
+/// ```text
+/// DIR/templates.json            the template IR, with handler identities
+/// DIR/handlers/<identity>.mjs   each resumable handler's compiled body
+/// DIR/components/<id>.wasm      each command and query, audited
+/// DIR/contracts.json            what the host admits each component by
+/// DIR/app.wit                   the worlds the components implement
+/// ```
+///
+/// All or nothing, like `emit-handlers`: one refusal writes nothing and fails
+/// the build, naming what was refused and why. No Koka and no Marko: neither
+/// backend is called (E10 gate item 1).
+fn build_command(paths: &[&String], out: &str) -> ExitCode {
+    let mut units = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing built");
+            return ExitCode::FAILURE;
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        units.push(pw_core::check::Unit {
+            path: path.to_string(),
+            src,
+            hir,
+        });
+    }
+    let build = match pw_core::build::build(&units) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("pw: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let refused = build.refusals();
+    if !refused.is_empty() {
+        for r in &refused {
+            eprintln!("pw: refused: {r}");
+        }
+        eprintln!("pw: {} refusal(s); nothing written", refused.len());
+        return ExitCode::FAILURE;
+    }
+
+    let dir = std::path::Path::new(out);
+    let write = |rel: &str, bytes: &[u8]| -> Result<(), String> {
+        let path = dir.join(rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))
+    };
+    let mut lines = Vec::new();
+    let result = (|| -> Result<(), String> {
+        let templates =
+            serde_json::to_string_pretty(&build.templates).map_err(|e| e.to_string())?;
+        write("templates.json", format!("{templates}\n").as_bytes())?;
+        let contracts =
+            serde_json::to_string_pretty(&build.contracts).map_err(|e| e.to_string())?;
+        write("contracts.json", format!("{contracts}\n").as_bytes())?;
+        write("app.wit", build.wit.as_bytes())?;
+        for h in &build.handlers {
+            if let pw_core::backend::wasm::Encoding::Encoded(m) = &h.module {
+                write(&format!("handlers/{}.mjs", m.identity), m.source.as_bytes())?;
+                lines.push(format!(
+                    "  handler    {}  `{}` calls `{}`  {} bytes",
+                    m.identity,
+                    m.name,
+                    m.command,
+                    m.source.len()
+                ));
+            }
+        }
+        for (id, built) in &build.components {
+            match built {
+                pw_core::backend::component::Built::Component { compiled, audited } => {
+                    let c = &compiled.component;
+                    write(&format!("components/{id}.wasm"), &c.bytes)?;
+                    lines.push(format!(
+                        "  component  {id}  {} bytes ({} core), {audited} function(s) audited, \
+                         imports [{}]",
+                        c.bytes.len(),
+                        c.core.len(),
+                        c.imports.join(", ")
+                    ));
+                }
+                pw_core::backend::component::Built::NoBody { kind } => {
+                    lines.push(format!("  no body    {id}  a {kind:?}"));
+                }
+                pw_core::backend::component::Built::Placeholder => {
+                    lines.push(format!(
+                        "  todo       {id}  a placeholder body; nothing built depends on it"
+                    ));
+                }
+                pw_core::backend::component::Built::Refused(_) => {}
+            }
+        }
+        Ok(())
+    })();
+    if let Err(e) = result {
+        eprintln!("pw: cannot write the build: {e}");
+        return ExitCode::from(2);
+    }
+    let handlers = build.handlers.len();
+    let components = build
+        .components
+        .iter()
+        .filter(|(_, b)| matches!(b, pw_core::backend::component::Built::Component { .. }))
+        .count();
+    println!(
+        "pw build: {} template(s), {handlers} handler(s), {components} component(s), {} contract(s) -> {out}",
+        build.templates.len(),
+        build.contracts.len()
+    );
+    for l in lines {
+        println!("{l}");
+    }
+    ExitCode::SUCCESS
+}
+
 /// `pw emit-handlers --out DIR`: every resumable handler, as `DIR/<identity>.mjs`.
 ///
 /// All or nothing. A page whose handlers were partly written would render
@@ -1213,12 +1333,13 @@ fn run() -> ExitCode {
             | "audit-values"
             | "emit-component"
             | "emit-handlers"
+            | "build"
     ) || paths.is_empty()
     {
         eprintln!(
             "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
-             emit-contracts|emit-template|emit-wit|audit-values|emit-component|emit-handlers> \
-             <path.pw>... [--plain]"
+             emit-contracts|emit-template|emit-wit|audit-values|emit-component|emit-handlers|\
+             build> <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -1237,7 +1358,24 @@ fn run() -> ExitCode {
         eprintln!(
             "  emit-handlers --out DIR  compile every resumable handler to DIR/<identity>.mjs"
         );
+        eprintln!(
+            "  build --out DIR          every artifact: templates, handlers, components, contracts, WIT"
+        );
         return ExitCode::from(2);
+    }
+
+    if cmd == "build" {
+        let out = args
+            .iter()
+            .position(|a| a == "--out")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
+        let Some(out) = out else {
+            eprintln!("usage: pw build --out DIR <path.pw>...");
+            return ExitCode::from(2);
+        };
+        let sources: Vec<&String> = paths.iter().copied().filter(|p| **p != out).collect();
+        return build_command(&sources, &out);
     }
 
     if cmd == "emit-handlers" {

@@ -315,27 +315,62 @@ pub struct Compiled {
     pub contract: crate::contract::ComponentContract,
 }
 
-/// **Compile one component of a program, end to end.**
-///
+/// A checked, lowered program with the WIT its contracts fix: what every
+/// component of it is built from. Built once per program by [`with_program`].
+struct Program<'p> {
+    hirs: &'p [&'p crate::hir::Hir],
+    wit: &'p str,
+    /// One world per contract, in contract order: a world is found through the
+    /// contract it was generated from, never by re-deriving its name.
+    worlds: Vec<(
+        &'p crate::contract::ComponentContract,
+        &'p crate::wit::World,
+    )>,
+    lowered: &'p super::ir::Program,
+    /// What the lowering refused, per declaration.
+    refusals: &'p [(
+        crate::resolve::DefId,
+        super::ir::Lowering<super::ir::Function>,
+    )],
+}
+
+impl Program<'_> {
+    /// Why this declaration did not lower, in the lowering's own words.
+    fn refused(&self, def: crate::resolve::DefId) -> String {
+        self.refusals
+            .iter()
+            .filter(|(d, _)| *d == def)
+            .map(|(_, r)| r.to_string())
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+
+    /// Is this declaration's body a placeholder the author has not written?
+    fn placeholder(&self, def: crate::resolve::DefId) -> bool {
+        self.refusals.iter().any(|(d, r)| {
+            *d == def
+                && matches!(
+                    r,
+                    super::ir::Lowering::Unsupported { construct, .. }
+                        if *construct == super::lower::PLACEHOLDER
+                )
+        })
+    }
+}
+
 /// Check (the backend only ever sees a program that checked), lower, generate
-/// the WIT the contracts fix, and build the component for `component_id`. The
-/// one path the CLI, the tests and the development server share, so no two of
-/// them can compile the same command differently.
-pub fn compile(units: &[crate::check::Unit], component_id: &str) -> Result<Compiled, String> {
+/// the WIT, and hand the result to `f`. The one setup [`compile`] and
+/// [`compile_all`] share, so the two cannot build a component differently.
+fn with_program<R>(
+    units: &[crate::check::Unit],
+    f: impl FnOnce(&Program<'_>) -> Result<R, String>,
+) -> Result<R, String> {
     let hirs: Vec<&crate::hir::Hir> = units.iter().map(|u| &u.hir).collect();
     let ws = crate::resolve::Workspace::build(&hirs);
     let sigs = crate::signatures::Signatures::build(&ws, &hirs);
     let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
     let (wit, worlds) =
         crate::wit::package(&hirs, &ws, &contracts).map_err(|e| format!("WIT: {e}"))?;
-    // One world per contract, in contract order: the world is found through
-    // the contract it was generated from, never by re-deriving its name.
-    let (contract, world) = contracts
-        .iter()
-        .zip(&worlds)
-        .find(|(c, _)| c.component_id == component_id)
-        .ok_or_else(|| format!("no component `{component_id}` in this program"))?;
-
     let cx = super::lower::Context {
         hirs: &hirs,
         ws: &ws,
@@ -351,27 +386,122 @@ pub fn compile(units: &[crate::check::Unit], component_id: &str) -> Result<Compi
                 .join("; ")
         )
     })?;
-    let (program, refusals) = super::lower::program(&checked);
-    let Some(function) = program
-        .functions
-        .iter()
-        .find(|f| f.def == world.declaration)
-    else {
-        return Err(format!(
-            "`{component_id}` did not lower: {}",
-            refusals
+    let (lowered, refusals) = super::lower::program_by_declaration(&checked);
+    f(&Program {
+        hirs: &hirs,
+        wit: &wit,
+        worlds: contracts.iter().zip(&worlds).collect(),
+        lowered: &lowered,
+        refusals: &refusals,
+    })
+}
+
+/// **Compile one component of a program, end to end.**
+///
+/// The one path the CLI, the tests and the development server share, so no
+/// two of them can compile the same command differently.
+pub fn compile(units: &[crate::check::Unit], component_id: &str) -> Result<Compiled, String> {
+    with_program(units, |p| {
+        let (contract, world) = p
+            .worlds
+            .iter()
+            .find(|(c, _)| c.component_id == component_id)
+            .ok_or_else(|| format!("no component `{component_id}` in this program"))?;
+        let Some(function) = p
+            .lowered
+            .functions
+            .iter()
+            .find(|f| f.def == world.declaration)
+        else {
+            return Err(format!(
+                "`{component_id}` did not lower: {}",
+                p.refused(world.declaration)
+            ));
+        };
+        match build(p.wit, world, function, &p.lowered.imports) {
+            Encoding::Encoded(component) => Ok(Compiled {
+                component,
+                wit: p.wit.to_string(),
+                contract: (*contract).clone(),
+            }),
+            other => Err(format!("`{component_id}`: {other}")),
+        }
+    })
+}
+
+/// What one contract of a program built to.
+#[derive(Debug, Clone)]
+pub enum Built {
+    /// A command or query: compiled, and audited against its world. `audited`
+    /// is how many functions the audit compared.
+    Component {
+        compiled: Box<Compiled>,
+        audited: usize,
+    },
+    /// A declaration with no component body: a page or a view renders through
+    /// the template IR, and a resource declares a lifecycle.
+    NoBody { kind: crate::hir::DeclKind },
+    /// A command or query whose body is `todo`: its author has not written it,
+    /// which is not the backend declining it. A build fails only if something
+    /// it builds depends on one (`build::Build::refusals`).
+    Placeholder,
+    /// A command or query the backend refused, with the reasons.
+    Refused(String),
+}
+
+/// **Every component of a program, compiled and audited**, in contract order.
+///
+/// Checked and lowered once. A command or query that does not compile is
+/// reported as refused rather than left out: a build that listed only what
+/// compiled would make the backend look finished.
+pub fn compile_all(units: &[crate::check::Unit]) -> Result<Vec<(String, Built)>, String> {
+    with_program(units, |p| {
+        let mut out = Vec::new();
+        for (contract, world) in &p.worlds {
+            let kind = crate::resolve::declaration(p.hirs, world.declaration).map(|d| d.kind);
+            let function = p
+                .lowered
+                .functions
                 .iter()
-                .map(|r| r.to_string())
-                .collect::<Vec<_>>()
-                .join("; ")
-        ));
-    };
-    match build(&wit, world, function, &program.imports) {
-        Encoding::Encoded(component) => Ok(Compiled {
-            component,
-            wit,
-            contract: contract.clone(),
-        }),
-        other => Err(format!("`{component_id}`: {other}")),
-    }
+                .find(|f| f.def == world.declaration);
+            let built = match (function, kind) {
+                (Some(function), _) => match build(p.wit, world, function, &p.lowered.imports) {
+                    Encoding::Encoded(component) => {
+                        match audit(&component.bytes, p.wit, &component.world) {
+                            Ok(audited) => Built::Component {
+                                compiled: Box::new(Compiled {
+                                    component,
+                                    wit: p.wit.to_string(),
+                                    contract: (*contract).clone(),
+                                }),
+                                audited,
+                            },
+                            Err(wrong) => Built::Refused(format!(
+                                "the artifact disagrees with its world: {}",
+                                wrong.join("; ")
+                            )),
+                        }
+                    }
+                    other => Built::Refused(other.to_string()),
+                },
+                (None, Some(crate::hir::DeclKind::Command | crate::hir::DeclKind::Query))
+                    if p.placeholder(world.declaration) =>
+                {
+                    Built::Placeholder
+                }
+                (None, Some(crate::hir::DeclKind::Command | crate::hir::DeclKind::Query)) => {
+                    Built::Refused(format!("did not lower: {}", p.refused(world.declaration)))
+                }
+                (None, Some(kind)) => Built::NoBody { kind },
+                (None, None) => {
+                    return Err(format!(
+                        "`{}`'s world names a declaration no unit holds",
+                        contract.component_id
+                    ));
+                }
+            };
+            out.push((contract.component_id.clone(), built));
+        }
+        Ok(out)
+    })
 }

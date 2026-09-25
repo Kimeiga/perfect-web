@@ -298,6 +298,21 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
 /// Takes `Checked`, not `Context`. See the type's docstring: the precondition
 /// is the parameter, so it cannot be skipped.
 pub fn program(checked: &Checked<'_>) -> (Program, Vec<Lowering<Function>>) {
+    let (program, refusals) = program_by_declaration(checked);
+    (program, refusals.into_iter().map(|(_, r)| r).collect())
+}
+
+/// The construct a `todo` body is refused as: a declaration its author has
+/// not written yet, which is not the backend declining something it could
+/// be asked to compile.
+pub const PLACEHOLDER: &str = "a `todo` body";
+
+/// [`program`], with each refusal paired with the declaration it refuses, so
+/// a caller can say why one component did not build without quoting every
+/// other refusal in the program.
+pub fn program_by_declaration(
+    checked: &Checked<'_>,
+) -> (Program, Vec<(DefId, Lowering<Function>)>) {
     let cx = checked.context();
     let mut out = Program::default();
     let mut refusals = Vec::new();
@@ -308,7 +323,7 @@ pub fn program(checked: &Checked<'_>) -> (Program, Vec<Lowering<Function>>) {
             }
             match function(cx, unit, decl, hir.decl_span(id)) {
                 Lowering::Lowered(f) => out.functions.push(f),
-                other => refusals.push(other),
+                other => refusals.push((DefId { unit, decl: id.0 }, other)),
             }
         }
     }
@@ -545,7 +560,7 @@ impl<'a> Lower<'a> {
             // A placeholder body. `Unsupported`, not `Blocked`: the program is
             // perfectly well-formed and there is simply nothing to compile.
             Expr::Name(n) if n == "todo" => Lowering::Unsupported {
-                construct: "a `todo` body",
+                construct: PLACEHOLDER,
                 span,
                 reason: "the declaration is a placeholder".to_string(),
             },

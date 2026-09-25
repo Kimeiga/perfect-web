@@ -27,6 +27,7 @@ pub mod annotations;
 pub mod backend;
 pub mod binding;
 pub mod boundary;
+pub mod build;
 pub mod capability;
 pub mod check;
 pub mod codes;

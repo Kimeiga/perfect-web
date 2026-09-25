@@ -385,6 +385,46 @@ e10-i:
      } > docs/evidence/E10/e10-i.txt
     @grep -E "^test result|the command returned" docs/evidence/E10/e10-i.txt
 
+# `pw build` runs with PATH=/usr/bin:/bin, which holds neither Koka nor Node, so
+# the build cannot reach them even by shelling out. The control line shows
+# where they are on the ordinary PATH. The build's outputs are then compared
+# byte for byte with the artifacts recorded separately.
+#
+# E10 gate item 1 — the store builds from source to every artifact, without
+# Koka or Marko.
+e10-build:
+    @cargo build --quiet --locked -p pw-cli
+    @{ echo "E10 gate item 1 - the store builds from source, without Koka or Marko"; echo; \
+       echo "produced by: just e10-build"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the control: the ordinary PATH"; \
+       for t in koka node npm pnpm; do printf '  %-5s %s\n' "$t" "$(command -v "$t" || echo absent)"; done; \
+       echo; echo "== the build's PATH: /usr/bin:/bin"; \
+       for t in koka node npm pnpm; do printf '  %-5s %s\n' "$t" "$(env -i PATH=/usr/bin:/bin sh -c "command -v $t" || echo absent)"; done; \
+       out="$(mktemp -d)"; echo; \
+       env -i PATH=/usr/bin:/bin HOME="$HOME" ./target/debug/pw build --out "$out" \
+         packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw | sed "s#$out#OUT#"; \
+       echo; echo "== what was written"; \
+       (cd "$out" && find . -type f | sort | while read -r f; do printf '  %7d  %s\n' "$(wc -c < "$f")" "${f#./}"; done); \
+       echo; echo "== byte-identical to the separately recorded artifacts"; \
+       for id in store.page.add_to_cart store.page.clear_cart; do \
+         cmp "$out/components/$id.wasm" "docs/evidence/E10/$id.wasm" && echo "  components/$id.wasm = docs/evidence/E10/$id.wasm"; done; \
+       for f in docs/evidence/E10/handlers/*.mjs; do \
+         cmp "$out/handlers/$(basename "$f")" "$f" && echo "  handlers/$(basename "$f") = $f"; done; \
+       cmp "$out/templates.json" spikes/own-renderer/store-ir.json && echo "  templates.json = spikes/own-renderer/store-ir.json (pw emit-template)"; \
+       rm -rf "$out"; \
+       echo; echo "== compiler/pw-core/tests/build.rs"; echo; \
+       cargo test --locked -p pw-core --test build 2>&1 | grep -E '^(test |test result)'; \
+       echo; \
+       echo "NOT CLAIMED: the queries run as components in the development server."; \
+       echo "They compile and are audited; the server still computes the page's"; \
+       echo "values itself (NEXT). The four Resources.* queries are 'todo' in the"; \
+       echo "library, and nothing the store builds depends on them."; \
+     } > docs/evidence/E10/build.txt
+    @cat docs/evidence/E10/build.txt
+
 # Writes the store's modules as `pw emit-handlers` emits them to
 # `docs/evidence/E10/handlers/`, held there by `evidence_is_current`, and
 # records the refusal matrix, the renderer carrying exactly the paths a handler

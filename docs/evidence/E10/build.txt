@@ -1,0 +1,62 @@
+E10 gate item 1 - the store builds from source, without Koka or Marko
+
+produced by: just e10-build
+commit: ebd4696aa7ea93a60a0d9cf495658bc501811078 + uncommitted changes
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the control: the ordinary PATH
+  koka  /Users/haki/code/perfect-web/.toolchain/prefix/bin/koka
+  node  /Users/haki/.asdf/shims/node
+  npm   /Users/haki/.asdf/shims/npm
+  pnpm  /Users/haki/Library/pnpm/pnpm
+
+== the build's PATH: /usr/bin:/bin
+  koka  absent
+  node  absent
+  npm   absent
+  pnpm  absent
+
+pw build: 1 template(s), 2 handler(s), 5 component(s), 10 contract(s) -> OUT
+  handler    e1ab9fca1f6fc15b  `add_to_cart` calls `store.page.add_to_cart`  281 bytes
+  handler    5e53c6a9aaee307a  `clear_cart` calls `store.page.clear_cart`  246 bytes
+  todo       Resources.Cart  a placeholder body; nothing built depends on it
+  todo       Resources.Menu  a placeholder body; nothing built depends on it
+  todo       Resources.Order  a placeholder body; nothing built depends on it
+  todo       Resources.Store  a placeholder body; nothing built depends on it
+  component  store.page.Cart  3520 bytes (343 core), 2 function(s) audited, imports [store:data/carts#current]
+  component  store.page.Menu  3037 bytes (345 core), 2 function(s) audited, imports [store:data/menus#for-store]
+  component  store.page.Store  3037 bytes (344 core), 2 function(s) audited, imports [store:data/stores#get]
+  no body    store.page.StorePage  a Page
+  component  store.page.add_to_cart  4221 bytes (423 core), 3 function(s) audited, imports [pw:host/session#read, store:data/carts#add]
+  component  store.page.clear_cart  3797 bytes (409 core), 3 function(s) audited, imports [pw:host/session#read, store:data/carts#clear]
+
+== what was written
+     6085  app.wit
+     3520  components/store.page.Cart.wasm
+     3037  components/store.page.Menu.wasm
+     3037  components/store.page.Store.wasm
+     4221  components/store.page.add_to_cart.wasm
+     3797  components/store.page.clear_cart.wasm
+    16509  contracts.json
+      246  handlers/5e53c6a9aaee307a.mjs
+      281  handlers/e1ab9fca1f6fc15b.mjs
+     2928  templates.json
+
+== byte-identical to the separately recorded artifacts
+  components/store.page.add_to_cart.wasm = docs/evidence/E10/store.page.add_to_cart.wasm
+  components/store.page.clear_cart.wasm = docs/evidence/E10/store.page.clear_cart.wasm
+  handlers/5e53c6a9aaee307a.mjs = docs/evidence/E10/handlers/5e53c6a9aaee307a.mjs
+  handlers/e1ab9fca1f6fc15b.mjs = docs/evidence/E10/handlers/e1ab9fca1f6fc15b.mjs
+  templates.json = spikes/own-renderer/store-ir.json (pw emit-template)
+
+== compiler/pw-core/tests/build.rs
+
+test a_placeholder_that_something_depends_on_is_a_refusal ... ok
+test a_program_that_does_not_check_builds_nothing ... ok
+test the_store_builds_every_artifact_from_source ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+NOT CLAIMED: the queries run as components in the development server.
+They compile and are audited; the server still computes the page's
+values itself (NEXT). The four Resources.* queries are 'todo' in the
+library, and nothing the store builds depends on them.

@@ -171,3 +171,14 @@ The browser's arguments are typed by the command component's own parameters.
 The dev server has one command path, which fixes `clear_cart`'s uncommitted
 state. A string literal has a value only where no escape rule is involved
 (ruling needed). Supersedes ADR-0032 §8.
+
+## 2026-09-25: `pw build` (E10 gate item 1)
+
+[ADR-0034](DECISIONS/ADR-0034-pw-build.md): one command builds every artifact
+of a checked program: the template IR, the handler modules, every component
+(audited), and the contracts and WIT. It composes the stages that own each
+artifact, and is all or nothing. Each contract gets one outcome: component, no
+body, placeholder, or refused. A `todo` placeholder fails the build only when
+something depends on it (ruling needed). The gate's evidence runs the build
+with neither Koka nor Node on the PATH.
+
