@@ -694,4 +694,99 @@ mod tests {
         );
         assert_eq!(escaped.len(), 33);
     }
+
+    /// **What each compiled query costs, per call** (E10 task 4, ADR-0046).
+    ///
+    /// The evaluation of memory strategies needs the work and the memory of
+    /// real calls: instructions executed (wasmtime's fuel), the largest linear
+    /// memory the instance had, and the fresh instance's cost beside the
+    /// call's. The sample shard by default; `KIOKUN_DATA` measures the whole
+    /// shard. Run in release: `just e10-memory`.
+    #[test]
+    #[ignore = "a measurement, run in release by `just e10-memory`"]
+    fn memory_and_work_per_call() {
+        let a = if std::env::var_os("KIOKUN_DATA").is_some() {
+            load().expect("the whole shard loads")
+        } else {
+            app()
+        };
+        let mut words: Vec<String> = a.index.shard.entries.keys().cloned().collect();
+        words.extend(generated_words(2_000));
+        let batches: Vec<Val> = words
+            .chunks(1_000)
+            .map(|c| Val::List(c.iter().map(|w| Val::String(w.clone())).collect()))
+            .collect();
+        let workloads: Vec<(&str, Vec<Vec<Val>>)> = vec![
+            (
+                "Place",
+                words.iter().map(|w| vec![Val::String(w.clone())]).collect(),
+            ),
+            ("Places", batches.into_iter().map(|b| vec![b]).collect()),
+            (
+                "Lookup",
+                a.index
+                    .shard
+                    .entries
+                    .keys()
+                    .map(|w| vec![Val::String(w.clone())])
+                    .collect(),
+            ),
+            (
+                "Search",
+                queries(&a.index)
+                    .into_iter()
+                    .map(|q| vec![Val::String(q)])
+                    .collect(),
+            ),
+        ];
+        println!(
+            "memory: shard {} ({} entries)",
+            a.index.shard.name,
+            a.index.shard.entries.len()
+        );
+        for (query, cases) in workloads {
+            let mut fuel = Vec::new();
+            let mut peak = std::collections::BTreeMap::<usize, usize>::new();
+            let (mut inst, mut call) = (Vec::new(), Vec::new());
+            let mut worst: Option<(u64, usize, &Vec<Val>)> = None;
+            for args in &cases {
+                let u = a.usage(query, args).expect("the call runs");
+                if worst.is_none_or(|(f, _, _)| u.fuel > f) {
+                    worst = Some((u.fuel, u.peak_memory, args));
+                }
+                fuel.push(u.fuel);
+                *peak.entry(u.peak_memory).or_default() += 1;
+                inst.push(u.instantiate);
+                call.push(u.call);
+            }
+            fuel.sort();
+            inst.sort();
+            call.sort();
+            let q = |f: f64| ((cases.len() - 1) as f64 * f) as usize;
+            let kib: Vec<String> = peak
+                .iter()
+                .map(|(bytes, n)| format!("{} KiB x{n}", bytes / 1024))
+                .collect();
+            println!(
+                "memory: {query}: {} calls; instructions p50 {} p99 {} max {}; \
+                 peak memory {}; instantiate p50 {:.1} µs; call p50 {:.1} µs p99 {:.1} µs",
+                cases.len(),
+                fuel[q(0.5)],
+                fuel[q(0.99)],
+                fuel[q(1.0)],
+                kib.join(", "),
+                inst[q(0.5)].as_secs_f64() * 1e6,
+                call[q(0.5)].as_secs_f64() * 1e6,
+                call[q(0.99)].as_secs_f64() * 1e6,
+            );
+            if let Some((f, bytes, args)) = worst
+                && let [Val::String(s)] = args.as_slice()
+            {
+                println!(
+                    "memory: {query}: the most work, {f} instructions and {} KiB, was {s:?}",
+                    bytes / 1024
+                );
+            }
+        }
+    }
 }

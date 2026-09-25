@@ -58,7 +58,16 @@ impl Query {
     }
 
     fn call(&self, ops: &BTreeMap<String, HostFn>, args: &[Val]) -> Result<Val, String> {
-        let out = self.prepared.call_within(
+        self.measured(ops, args).map(|(v, _)| v)
+    }
+
+    /// The call, and what it cost (ADR-0046).
+    fn measured(
+        &self,
+        ops: &BTreeMap<String, HostFn>,
+        args: &[Val],
+    ) -> Result<(Val, pw_host::engine::Usage), String> {
+        let (out, usage) = self.prepared.call_measured(
             &self.contract,
             &self.granted,
             &Limits {
@@ -70,9 +79,11 @@ impl Query {
             &[&self.export[0], &self.export[1]],
             args,
         )?;
-        out.into_iter()
+        let v = out
+            .into_iter()
             .next()
-            .ok_or_else(|| format!("`{}` returned nothing", self.contract.component_id))
+            .ok_or_else(|| format!("`{}` returned nothing", self.contract.component_id))?;
+        Ok((v, usage))
     }
 }
 
@@ -161,6 +172,19 @@ impl App {
             read: Arc::new(Mutex::new(BTreeMap::new())),
             templates,
         })
+    }
+
+    /// What one call of each compiled query costs, by name (ADR-0046).
+    #[cfg(test)]
+    pub fn usage(&self, query: &str, args: &[Val]) -> Result<pw_host::engine::Usage, String> {
+        let q = match query {
+            "Place" => self.place.as_ref(),
+            "Places" => &self.places,
+            "Lookup" => &self.lookup,
+            "Search" => &self.search,
+            other => return Err(format!("no query `{other}`")),
+        };
+        q.measured(&self.data_layer(), args).map(|(_, u)| u)
     }
 
     /// Where a word's file is, by the compiled rule.

@@ -54,8 +54,12 @@ rather than approximated:
   supported, and values moved flat or in their canonical layout. Matches over
   `Option` and `Result`, field reads and their cases came after (ADR-0036),
   and then computation (ADR-0039, below).
-- **The invocation region is provisional.** It is a bump region reclaimed by
-  each export's post-return, and nothing can outlive an invocation.
+- **The invocation region is the memory strategy** (ADR-0046, measured). It
+  is a bump region reclaimed by each export's post-return, and nothing can
+  outlive an invocation. A call's peak is its whole allocation: kiokun's
+  Search reaches 3.2 MB for the one-letter query `T`.
+- **Each call instantiates afresh** (ADR-0032). At 7–14 µs it costs more than
+  most kiokun calls themselves (ADR-0046).
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
 

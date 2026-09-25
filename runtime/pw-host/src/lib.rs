@@ -211,6 +211,10 @@ pub struct Meter {
 pub struct MemoryLimits {
     pub memory_bytes: Option<usize>,
     pub table_elements: Option<usize>,
+    /// The largest linear memory any instance in the store was granted, in
+    /// bytes: its initial size, or a growth the limiter allowed. What E10
+    /// task 4's evaluation measures (ADR-0046).
+    pub peak_memory: usize,
 }
 
 impl From<&Limits> for Meter {
@@ -219,6 +223,7 @@ impl From<&Limits> for Meter {
             limits: MemoryLimits {
                 memory_bytes: l.memory_bytes,
                 table_elements: l.table_elements,
+                peak_memory: 0,
             },
         }
     }
@@ -236,7 +241,11 @@ impl wasmtime::ResourceLimiter for MemoryLimits {
         // failure it can handle, which is a different and better thing than
         // the host aborting. Charter §7.10's direction — a boundary reports
         // rather than crashes.
-        Ok(self.memory_bytes.is_none_or(|max| desired <= max))
+        let allowed = self.memory_bytes.is_none_or(|max| desired <= max);
+        if allowed {
+            self.peak_memory = self.peak_memory.max(desired);
+        }
+        Ok(allowed)
     }
 
     fn table_growing(
@@ -1110,7 +1119,66 @@ pub mod engine {
         export: &[&str],
         args: &[wasmtime::component::Val],
     ) -> Result<Vec<wasmtime::component::Val>, String> {
+        run_measured(
+            engine, component, contract, granted, limits, host, export, args,
+        )
+        .map(|(results, _)| results)
+    }
+
+    /// **What one call cost** (ADR-0046): what E10 task 4's evaluation of
+    /// memory strategies measures, per call, through the same path every call
+    /// takes.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct Usage {
+        /// Instructions executed by the call, as wasmtime's fuel counts them.
+        pub fuel: u64,
+        /// The largest linear memory the instance had, in bytes: pages, so a
+        /// multiple of 64 KiB.
+        pub peak_memory: usize,
+        /// Linking and instantiating: the fresh instance each call gets.
+        pub instantiate: std::time::Duration,
+        /// The call itself, post-return included.
+        pub call: std::time::Duration,
+    }
+
+    impl Prepared {
+        /// [`Prepared::call_within`], and what the call cost.
+        #[allow(clippy::too_many_arguments)]
+        pub fn call_measured(
+            &self,
+            contract: &crate::ComponentContract,
+            granted: &crate::Granted,
+            limits: &crate::Limits,
+            host: &std::collections::BTreeMap<String, HostFn>,
+            export: &[&str],
+            args: &[wasmtime::component::Val],
+        ) -> Result<(Vec<wasmtime::component::Val>, Usage), String> {
+            run_measured(
+                &self.engine,
+                &self.component,
+                contract,
+                granted,
+                limits,
+                host,
+                export,
+                args,
+            )
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn run_measured(
+        engine: &wasmtime::Engine,
+        component: &wasmtime::component::Component,
+        contract: &crate::ComponentContract,
+        granted: &crate::Granted,
+        limits: &crate::Limits,
+        host: &std::collections::BTreeMap<String, HostFn>,
+        export: &[&str],
+        args: &[wasmtime::component::Val],
+    ) -> Result<(Vec<wasmtime::component::Val>, Usage), String> {
         use wasmtime::Store;
+        let started = std::time::Instant::now();
         use wasmtime::component::{Linker, Val};
         let engine = engine.clone();
         let component = component.clone();
@@ -1169,6 +1237,8 @@ pub mod engine {
         let instance = linker
             .instantiate(&mut store, &component)
             .map_err(|e| e.to_string())?;
+        let instantiated = std::time::Instant::now();
+        let fuel_before = store.get_fuel().map_err(|e| e.to_string())?;
 
         // The export by its path, one segment at a time: an interface export
         // is an instance whose function is found inside it.
@@ -1188,7 +1258,13 @@ pub mod engine {
         let mut results = vec![Val::Bool(false); func.ty(&store).results().len()];
         func.call(&mut store, args, &mut results)
             .map_err(|e| format!("{e:#}"))?;
-        Ok(results)
+        let usage = Usage {
+            fuel: fuel_before.saturating_sub(store.get_fuel().map_err(|e| e.to_string())?),
+            peak_memory: store.data().limits.peak_memory,
+            instantiate: instantiated - started,
+            call: instantiated.elapsed(),
+        };
+        Ok((results, usage))
     }
 
     /// Each imported interface's FUNCTION exports, read from the component.

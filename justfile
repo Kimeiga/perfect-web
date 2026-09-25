@@ -562,6 +562,24 @@ e10-kiokun:
      } > docs/evidence/E10/kiokun.txt
     @cat docs/evidence/E10/kiokun.txt
 
+# ADR-0046: E10 task 4 — what each compiled kiokun query costs per call, in
+# release: instructions, peak linear memory, and instantiation beside the call.
+# With KIOKUN_DATA naming a kiokun-data checkout, over the whole shard.
+e10-memory:
+    @{ echo "ADR-0046 - memory strategies: what each call costs"; echo; \
+       echo "produced by: just e10-memory"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "machine: $(uname -m), $(sysctl -n machdep.cpu.brand_string 2>/dev/null || uname -s)"; echo; \
+       cargo test --locked --release -p kiokun-server memory_and_work -- --ignored --nocapture 2>&1 \
+         | grep -oE "memory: .*|^test result.*"; \
+       echo; \
+       echo "NOT CLAIMED: reference counting, Wasm GC and reuse analysis were not built and"; \
+       echo "measured against the region. ADR-0046 argues from these numbers and the"; \
+       echo "invocation model."; \
+     } > docs/evidence/E10/memory.txt
+    @cat docs/evidence/E10/memory.txt
+
 # ADR-0045: an affine value consumed exactly once on every path; the witnesses
 # and the mutation controls.
 #

@@ -275,3 +275,9 @@ kiokun's shard rule among them.
 the end of a scope and a failing `?` are exits, a second release is
 counted, and a release in a loop is refused. A declaration whose row
 promises to release a parameter must. No syntax is added.
+
+[ADR-0046](DECISIONS/ADR-0046-memory-strategy-measured.md): E10 task 4.
+Every compiled kiokun query was measured per call on the whole shard:
+instructions, peak linear memory, and instantiation beside the call.
+Invocation regions stay the strategy; the other six the charter names are
+judged against the numbers. Per-call instantiation, not memory, dominates.

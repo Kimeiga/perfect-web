@@ -44,9 +44,10 @@ done:
    which was a silent miscompile, `{#match}` over `Option` and `Result`, and
    interpolated attributes. kiokun's pages use all three. Pure computation
    compiles to JavaScript modules too (ADR-0044), and PW2005's "exactly
-   once" is checked on every path (ADR-0045, task 7). Next: a handler that
-   computes its arguments with that encoder, then E10's remaining charter
-   task, 4 (memory strategies, measured).
+   once" is checked on every path (ADR-0045, task 7), and memory strategies
+   are evaluated on kiokun's calls (ADR-0046, task 4). Next: a handler that
+   computes its arguments with that encoder; then, if ruled, instance reuse,
+   which the measurements favour.
 3. ~~**Compiled resumable handler bodies**~~ DONE 2026-09-25 (ADR-0033). Then
    step 10. Two things the handler work left open, in order of need:
    - captures as a patched part, so that a captured field a patch changes is

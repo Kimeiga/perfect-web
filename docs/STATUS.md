@@ -9,10 +9,9 @@ change below.
 
 **Current milestone:** E10. **All five gate items have recorded evidence as
 of 2026-09-25** (see below). Closing E10 is left to the architect's review, with
-these charter tasks not done:
-- task 2's Wasm for compute-heavy modules in the browser (its JavaScript
-  modules for pure computation are ADR-0044's);
-- task 4's evaluation of memory strategies.
+this charter task not done: task 2's Wasm for compute-heavy modules in the
+browser (its JavaScript modules for pure computation are ADR-0044's). Task
+4's evaluation of memory strategies is ADR-0046's.
 
 Task 7's affine annotations are the effect rows `resource.acquire<T>` and
 `resource.release<T>`, and since ADR-0045 the invariant they express is
@@ -113,6 +112,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0046: whether the next performance work is instance reuse, which the
+  measurements favour, rather than a memory strategy.
 - ADR-0045: a release in a loop is refused even when the loop runs once; the
   body's value moves a resource to the caller; a declaration whose row
   releases `T` owes its `T` parameter one release on every path.
@@ -164,6 +165,14 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: E10 task 4, memory strategies evaluated (ADR-0046).** The host
+  reports each call's instructions, peak linear memory and instantiation
+  time. Every compiled kiokun query was measured on the whole shard. 98.9%
+  of Search calls stay in their first 64 KiB page; the heaviest, `T`, grows
+  its region to 3.2 MB. A fresh instance (7–14 µs) costs more than a `Place`
+  or `Lookup` call. Invocation regions stay; the revisit conditions are
+  written down. Evidence: `docs/evidence/E10/memory.txt` (`just e10-memory`).
 
 - **2026-09-25: E10 task 2, pure computation as JavaScript modules
   (ADR-0044).** A query that reaches no host compiles to an ES module from
