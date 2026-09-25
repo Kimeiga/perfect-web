@@ -876,9 +876,17 @@ impl Lowerer<'_> {
                             Some(p) => self.pattern(b, p),
                             None => b.pat(Pattern::Error, span_of(&arm)),
                         };
-                        let body = match kids.get(1) {
-                            Some(e) => self.expr(b, e),
-                            None => b.expr(Expr::Error, span_of(&arm)),
+                        let body = match kids.get(1..).unwrap_or_default() {
+                            [] => b.expr(Expr::Error, span_of(&arm)),
+                            [e] => self.expr(b, e),
+                            // `=> return e`: the two statements a block reads
+                            // it as, and so a block (the parser's `arm_body`).
+                            stmts => {
+                                let at =
+                                    span_of(&stmts[0]).start..span_of(&stmts[stmts.len() - 1]).end;
+                                let stmts = stmts.iter().map(|s| self.expr(b, s)).collect();
+                                b.expr(Expr::Block { stmts }, at)
+                            }
                         };
                         MatchArm { pat, body }
                     })

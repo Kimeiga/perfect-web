@@ -181,12 +181,12 @@ fn a_match_that_misses_a_case_is_refused() {
         "module m\n\ntype Doc = Doc {\n    s: String,\n}\n\nfn get(w: String) -> Option<String> !{ database.read<Doc> }\n    host \"m:d/e#get\"\n\npublic query Q(w: String) -> Option<String> {\n    match get(w) {\n        Some(x) => Some(x),\n    }\n}\n",
         "m.Q",
     );
-    // The BACKEND refuses it. `pw check` accepts a match over `Option` with a
-    // case missing: exhaustiveness is not checked for the language's own
-    // variants (KNOWN_LIMITATIONS). So this refusal is the only thing between
-    // such a match and a component with no code for `None`.
+    // The CHECKER refuses it, and names the missing case. Until 2026-09-25 it
+    // did not: exhaustiveness read only a bare name annotated with a declared
+    // sum type, and this refusal was the backend's. The backend's refusal
+    // stays behind the checker's as a second layer.
     assert!(
-        err.contains("a match that does not cover every case"),
+        err.contains("[PW0305] match on `Option<String>` is not exhaustive"),
         "{err}"
     );
 }

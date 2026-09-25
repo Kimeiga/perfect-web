@@ -89,7 +89,14 @@ and each sense by `<id>:<index>`.
    instead of linking to a literal `{…}`. Interpolated attributes need a new
    part kind, in the IR, the renderer and the runtime's patching, and are not
    built.
-3. **The first search design grouped by entry and language.** That gave two
+3. **The checker passed a match with a missing case.** A match over a call,
+   or over `Option` or `Result`, was never analysed for exhaustiveness,
+   although ADR-0011 requires `pw` to reject an incomplete match. The
+   backend's refusal of one while compiling `Lookup` found it. The checker
+   now refuses it with PW0305, and fixing it found four more ways a match was
+   proven exhaustive when it was not
+   ([ADR-0038](ADR-0038-every-match-typed.md)).
+4. **The first search design grouped by entry and language.** That gave two
    hits for `人`, ordered by whichever Japanese row came first. Now there is
    one hit per entry, the best row by score and then commonness, with its
    languages combined, as kiokun groups them.

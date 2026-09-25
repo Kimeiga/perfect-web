@@ -718,6 +718,17 @@ impl<'a> P<'a> {
         // begins with the spaces in front of it, and a formatter reading node
         // boundaries would reflow them.
         self.eat_trivia();
+        // **`return` is not an operand.** It is a statement of its own, and a
+        // block reads the statement after it as the value it returns
+        // (`values::result_sites`). Parsed as an ordinary name, `return (x)`
+        // was a call of `return`, refused as unresolved, and `return -1` was
+        // a subtraction whose left operand was `return`, accepted silently.
+        if self.at_kw("return") {
+            self.start(K::NameExpr);
+            self.bump();
+            self.finish();
+            return;
+        }
         let cp = self.b.checkpoint();
         self.expr_lhs(cp);
         loop {
@@ -1483,8 +1494,11 @@ impl<'a> P<'a> {
                 let before = self.pos;
                 self.start(K::MatchArm);
                 self.pattern();
-                if self.eat(Kind::FatArrow) {
-                    self.expr(0);
+                // Until 2026-09-25 an arm with no `=>` was accepted without a
+                // word, which is how `=> return Ok(())` became an arm whose
+                // pattern was `Ok(())` (below).
+                if self.expect(Kind::FatArrow, "after a match arm's pattern") {
+                    self.arm_body();
                 }
                 self.finish();
                 self.eat(Kind::Comma);
@@ -1497,6 +1511,29 @@ impl<'a> P<'a> {
             }
         }
         self.finish();
+    }
+
+    /// A match arm's body: one expression, or `return` and the value on its
+    /// line.
+    ///
+    /// A block reads `return e` as two statements, `return` and then `e`. An
+    /// arm holds one expression, so until 2026-09-25
+    /// `Delivered(r) => return Ok(())` ended at `return`, and `Ok(())` was
+    /// read as the next arm's pattern, with no body and no error. The
+    /// exhaustiveness analysis read that phantom arm as a wildcard, which
+    /// proved every match holding one exhaustive. Now the arm holds both
+    /// statements, and the HIR reads them as a block.
+    fn arm_body(&mut self) {
+        let returns = self.at_kw("return");
+        self.expr(0);
+        if returns
+            && !self.newline_ahead()
+            && !self.at(Kind::Comma)
+            && !self.at(Kind::RBrace)
+            && !self.at_eof()
+        {
+            self.expr(0);
+        }
     }
 
     fn pattern(&mut self) {
@@ -2709,6 +2746,58 @@ mod tests {
         );
         assert!(ks.contains(&K::CtorPat), "{ks:?}");
         assert!(ks.contains(&K::WildcardPat), "{ks:?}");
+    }
+
+    #[test]
+    fn a_return_in_an_arm_keeps_the_value_on_its_line() {
+        // Until 2026-09-25 this was FOUR arms: the third was `Ok(())`, a
+        // pattern with no `=>` and no body, and nothing reported it.
+        let src = "fn f(s: S) -> Int {\n    match s {\n        A => 1\n        B(r) => return Ok(())\n        C(x) => return (x)\n        D => return\n        E => 2\n    }\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let arms: Vec<_> = p
+            .green
+            .descendants()
+            .filter(|n| n.kind() == K::MatchArm)
+            .collect();
+        assert_eq!(arms.len(), 5, "{arms:#?}");
+        // `B(r)`'s arm holds `return` and `Ok(())`; `C(x)`'s holds `return`
+        // and `(x)`, not a call of `return`; a bare `return` holds itself.
+        let bodies: Vec<usize> = arms.iter().map(|a| a.children().count() - 1).collect();
+        assert_eq!(bodies, [1, 2, 2, 1, 1]);
+    }
+
+    #[test]
+    fn return_is_a_statement_not_an_operand() {
+        // Two statements each: `return`, then the value. Parsed as a name,
+        // `return (x)` was a call and `return -1` a subtraction.
+        let src =
+            "fn f(x: Int) -> Int {\n    return (x)\n}\nfn g(x: Int) -> Int {\n    return -1\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let ks = kinds(&p.green);
+        assert!(!ks.contains(&K::CallExpr), "{ks:?}");
+        assert!(!ks.contains(&K::BinaryExpr), "{ks:?}");
+        let returns = p
+            .green
+            .descendants()
+            .filter(|n| n.kind() == K::NameExpr && n.text().to_string().trim() == "return")
+            .count();
+        assert_eq!(returns, 2);
+    }
+
+    #[test]
+    fn an_arm_without_an_arrow_is_reported() {
+        let p = parse_tree(
+            "fn f(s: S) -> Int {\n    match s {\n        A => 1\n        B 2\n    }\n}\n",
+        );
+        assert!(
+            p.errors
+                .iter()
+                .any(|e| e.message.contains("after a match arm's pattern")),
+            "{:?}",
+            p.errors
+        );
     }
 
     #[test]

@@ -384,7 +384,14 @@ pub fn check_match_multi(program: &Program, scrutinees: &[Type], arms: &[Arm]) -
     // and cascading a second diagnostic from a defect an earlier phase already
     // reported would be noise — but the RESULT is `Blocked`, so nothing
     // downstream can read the empty `missing` list as a proof.
-    let blocked = blockers(program, scrutinees.first(), arms);
+    // One scrutinee is matched as itself; several as the synthetic tuple
+    // whose constructor each arm's pattern is.
+    let whole = match scrutinees {
+        [one] => Some(one.clone()),
+        [] => None,
+        many => Some(Type::Tuple(many.to_vec())),
+    };
+    let blocked = blockers(program, whole.as_ref(), arms);
 
     let mut matrix: Vec<Row> = Vec::new();
     let mut unreachable = Vec::new();
@@ -430,21 +437,27 @@ pub fn check_match_multi(program: &Program, scrutinees: &[Type], arms: &[Arm]) -
 ///
 /// Detected before the matrix is built, so the answer is `Blocked` whatever
 /// the padded matrix happens to produce.
+///
+/// **Each pattern against its own type.** A nested pattern indexes its
+/// field's constructors, not the scrutinee's. Until 2026-09-25 every nested
+/// pattern was checked against the scrutinee's list, which was harmless only
+/// because the checker read every nested constructor against that list too,
+/// and read one it did not find there as a wildcard. `Circle(Draft)` now
+/// reaches here as `Circle` over `Draft`, `Status`'s first constructor, and
+/// checking `Draft` against `Circle`'s arity would block a correct match.
 fn blockers(program: &Program, scrutinee: Option<&Type>, arms: &[Arm]) -> Vec<Blocked> {
     let Some(ty) = scrutinee else {
         return Vec::new();
     };
-    let Some(ctors) = program.ctors_of(ty) else {
-        return Vec::new();
-    };
     let mut out = Vec::new();
-    let mut stack: Vec<&Pattern> = arms.iter().map(|a| &a.pattern).collect();
-    while let Some(p) = stack.pop() {
+    let mut stack: Vec<(&Pattern, Type)> = arms.iter().map(|a| (&a.pattern, ty.clone())).collect();
+    while let Some((p, ty)) = stack.pop() {
         match p {
             Pattern::Ctor { ctor, args } => {
-                if let Some(c) = ctors.get(*ctor)
-                    && c.fields.len() != args.len()
-                {
+                let Some(c) = program.ctors_of(&ty).and_then(|cs| cs.get(*ctor).cloned()) else {
+                    continue;
+                };
+                if c.fields.len() != args.len() {
                     let b = Blocked::PatternArity {
                         ctor: c.name.clone(),
                     };
@@ -452,10 +465,10 @@ fn blockers(program: &Program, scrutinee: Option<&Type>, arms: &[Arm]) -> Vec<Bl
                         out.push(b);
                     }
                 }
-                stack.extend(args.iter());
+                stack.extend(args.iter().zip(c.fields));
             }
-            Pattern::Or(alts) => stack.extend(alts.iter()),
-            _ => {}
+            Pattern::Or(alts) => stack.extend(alts.iter().map(|a| (a, ty.clone()))),
+            Pattern::Wildcard => {}
         }
     }
     out
@@ -619,6 +632,63 @@ mod tests {
             }]
         );
         assert!(!report.outcome().is_violation(), "nor as a violation");
+    }
+
+    #[test]
+    fn a_nested_pattern_is_validated_against_its_fields_type() {
+        // `Circle(Draft)`: `Draft` is `Status`'s constructor 0, with no
+        // fields. Checked against the scrutinee's list, it read as `Circle`,
+        // which has one, and a correct match was blocked for an arity it does
+        // not have.
+        let mut p = Program::new();
+        let status = p.declare_adt(
+            "Status",
+            vec![
+                Ctor {
+                    name: "Draft".into(),
+                    fields: vec![],
+                },
+                Ctor {
+                    name: "Sent".into(),
+                    fields: vec![],
+                },
+            ],
+        );
+        let shape = p.declare_adt(
+            "Shape",
+            vec![
+                Ctor {
+                    name: "Circle".into(),
+                    fields: vec![Type::Adt(status)],
+                },
+                Ctor {
+                    name: "Square".into(),
+                    fields: vec![],
+                },
+            ],
+        );
+        let circle = |inner| Pattern::ctor(0, vec![Pattern::unit(inner)]);
+        let report = check_match(
+            &p,
+            &Type::Adt(shape),
+            &[arm(circle(0)), arm(circle(1)), arm(Pattern::unit(1))],
+        );
+        assert!(report.blocked.is_empty(), "{:?}", report.blocked);
+        assert!(report.missing.is_empty(), "{:?}", report.missing);
+
+        // And a missing nested case is named as one.
+        let report = check_match(
+            &p,
+            &Type::Adt(shape),
+            &[arm(circle(0)), arm(Pattern::unit(1))],
+        );
+        assert!(report.blocked.is_empty(), "{:?}", report.blocked);
+        let missing: Vec<String> = report
+            .missing
+            .iter()
+            .map(|w| render_witness(&p, &Type::Adt(shape), w))
+            .collect();
+        assert_eq!(missing, ["Circle(Sent)"]);
     }
 
     #[test]

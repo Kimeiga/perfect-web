@@ -453,6 +453,30 @@ e10-oracle:
      } > docs/evidence/E10/oracle.txt
     @cat docs/evidence/E10/oracle.txt
 
+# ADR-0038's tests, and its mutation controls: each fix undone in turn must
+# fail them (scripts/match_mutations.py restores the sources after each).
+#
+# E10 — every match is analysed, and each pattern against its own type.
+e10-match:
+    @{ echo "ADR-0038 - every match is analysed, and each pattern against its own type"; echo; \
+       echo "produced by: just e10-match"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/match_exhaustiveness.rs)"; echo; \
+       cargo test --locked -p pw-core --test match_exhaustiveness 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the analysis (compiler/pw-core/src/exhaust.rs)"; echo; \
+       cargo test --locked -p pw-core --lib exhaust:: 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the grammar (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib 2>&1 | grep -E '^test (grammar::tests::(a_return|return_is|an_arm)|result)'; \
+       echo; echo "== mutation controls (scripts/match_mutations.py)"; echo; \
+       python3 scripts/match_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a pattern nested under Some, Ok or Err, a literal pattern,"; \
+       echo "and a scrutinee the value relations cannot type are not analysed. Each"; \
+       echo "is Blocked, with its reason, and never reported as exhaustive."; \
+     } > docs/evidence/E10/match.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/match.txt
+
 # `pw build` for examples/kiokun into docs/evidence/E10/kiokun/ (held there by
 # evidence_is_current), the host's tests over the committed sample shard, the
 # browser spec in three engines, and, with KIOKUN_DATA naming a kiokun-data

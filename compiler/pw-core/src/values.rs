@@ -418,6 +418,28 @@ struct Solved {
     relations: Vec<ValueRelation>,
 }
 
+/// **The type the value relations give one expression, and its name.**
+///
+/// For an analysis that needs a type where no annotation says one: the
+/// exhaustiveness check's scrutinee, when it is a call rather than a declared
+/// name (`match get(w) { .. }`). `Ty::Unknown` where the typer does not know,
+/// never a guess.
+pub(crate) fn type_of(
+    sigs: &Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    module: Option<&str>,
+    decl: &Decl,
+    body: &Body,
+    e: ExprId,
+) -> (Ty, String) {
+    let typer = Typer::new(sigs, ws, at, module, decl, body);
+    let around = typer.arms_around(e);
+    let t = typer.with_bindings(&around, || typer.of(e));
+    let name = typer.display(&t);
+    (t, name)
+}
+
 /// What a call's written path names.
 pub(crate) enum Named<'s> {
     /// The callee is not a path, or its path names nothing. `x.f(a)` may still
@@ -641,11 +663,16 @@ impl<'a> Typer<'a> {
             Expr::If {
                 then, els: Some(e), ..
             } => join(self.of(*then), self.of(*e)),
-            Expr::Match { arms, .. } => arms
-                .iter()
-                .map(|a| self.of(a.body))
-                .reduce(join)
-                .unwrap_or(Ty::Unknown),
+            // Each arm's body, with its pattern's names bound to the payload
+            // types the scrutinee's type gives them: `entry` in
+            // `Some(entry) => ..` is the option's `T`.
+            Expr::Match { scrutinee, arms } => {
+                let st = self.of(*scrutinee);
+                arms.iter()
+                    .map(|a| self.with_bindings(&self.arm_bindings(&st, a.pat), || self.of(a.body)))
+                    .reduce(join)
+                    .unwrap_or(Ty::Unknown)
+            }
             Expr::Record { name: Some(_), .. } => self.construct(id).result,
             Expr::List { items } => Ty::Builtin(
                 Builtin::List,
@@ -683,6 +710,67 @@ impl<'a> Typer<'a> {
             "None" if own => Ty::Builtin(Builtin::Option, vec![Ty::Unknown]),
             _ => Ty::Unknown,
         }
+    }
+
+    /// The names an arm's pattern binds, typed from the scrutinee's type:
+    /// `Some(x)` binds the option's `T`; `Ok(x)` and `Err(e)` the result's two
+    /// sides. Only a name bound directly under one of the language's own
+    /// cases, where the program declares nothing of that name; a declared
+    /// variant's payload, and any nested pattern, bind nothing here and stay
+    /// unknown, which every relation reads as undecided.
+    fn arm_bindings(&self, scrutinee: &Ty, pat: crate::hir::PatternId) -> Vec<(String, Ty)> {
+        let Pattern::Ctor { path, args } = self.body.pat(pat) else {
+            return Vec::new();
+        };
+        let [inner] = args.as_slice() else {
+            return Vec::new();
+        };
+        let Pattern::Bind { name, .. } = self.body.pat(*inner) else {
+            return Vec::new();
+        };
+        let own = matches!(
+            self.ws.resolve_in(self.at, Namespace::Term, path),
+            Resolution::Unresolved
+        );
+        let payload = match (path.as_str(), scrutinee) {
+            ("Some", Ty::Builtin(Builtin::Option, a)) if own => a.first(),
+            ("Ok", Ty::Builtin(Builtin::Result, a)) if own => a.first(),
+            ("Err", Ty::Builtin(Builtin::Result, a)) if own => a.get(1),
+            _ => None,
+        };
+        match payload {
+            Some(t) if !self.shadowed.contains(name) => vec![(name.clone(), t.clone())],
+            _ => Vec::new(),
+        }
+    }
+
+    /// Every name bound by a match arm that encloses `target`, outermost
+    /// first, each typed in the scope its own match sees.
+    fn arms_around(&self, target: ExprId) -> Vec<(String, Ty)> {
+        let mut parent: BTreeMap<ExprId, ExprId> = BTreeMap::new();
+        for e in self.body.walk() {
+            for c in self.body.children(e) {
+                parent.insert(c, e);
+            }
+        }
+        let mut path = vec![target];
+        while let Some(p) = parent.get(path.last().expect("non-empty")) {
+            path.push(*p);
+        }
+        path.reverse();
+        let mut bound: Vec<(String, Ty)> = Vec::new();
+        for pair in path.windows(2) {
+            let (outer, inner) = (pair[0], pair[1]);
+            let Expr::Match { scrutinee, arms } = self.body.expr(outer) else {
+                continue;
+            };
+            let Some(arm) = arms.iter().find(|a| a.body == inner) else {
+                continue;
+            };
+            let st = self.with_bindings(&bound, || self.of(*scrutinee));
+            bound.extend(self.arm_bindings(&st, arm.pat));
+        }
+        bound
     }
 
     /// Run `f` with these names bound, restoring what they meant before.

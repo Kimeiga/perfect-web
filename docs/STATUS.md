@@ -2,7 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-09-24, against master `145588e` plus the E9-V change.
+**Reviewed:** 2026-09-25, against master `1e2d0de` plus the exhaustiveness
+change below.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -31,7 +32,35 @@ feature turned on E8's guest tests in every workspace build, and a clean
 checkout has no guests. Fixed in `83af93c`, and CI is green on it. Recorded in
 [the E10-I evidence](evidence/E10/e10-i-2026-09-24.md).
 
+**Correction, 2026-09-25: ADR-0011's exhaustiveness rule was not enforced for
+most matches, and the analysis proved some incomplete ones exhaustive**
+([ADR-0038](DECISIONS/ADR-0038-every-match-typed.md)). ADR-0011 requires `pw` to
+reject an incomplete match whatever the effect row.
+- The checker analysed only a scrutinee that was a parameter annotated with a
+  sum type the program declares. A match over a call, a field, a local, or any
+  `Option` or `Result` was never analysed, so `match get(w) { Some(x) => .. }`
+  passed `pw check`. The kiokun slice found it: the backend refused such a
+  match while compiling `Lookup`.
+- Fixing it found four ways the analysis reported an incomplete match as
+  exhaustive, all present at `1e2d0de`:
+  - nested patterns were read against the scrutinee's type, so
+    `Circle(Draft)` covered `Circle(Sent)`;
+  - a constructor its type lacks read as a wildcard;
+  - a shadowed parameter was read as the parameter;
+  - `=> return Ok(())` parsed as an arm ending at `return` plus a phantom arm
+    whose pattern was `Ok(())`, with no error, and the phantom arm read as a
+    wildcard.
+- All five are fixed, with tests in
+  `compiler/pw-core/tests/match_exhaustiveness.rs`. A constructor its type
+  lacks is the new PW0608. What the analysis still cannot read (a literal, a
+  pattern nested under `Some`) blocks it, with the reason, and is never proven
+  (KNOWN_LIMITATIONS).
+
 Decisions awaiting a ruling:
+- ADR-0038: a bare pattern name is a constructor whenever some type has one of
+  that name, so a binding cannot share a constructor's name.
+- ADR-0038: `return` stays a statement, whose value is the next statement,
+  rather than becoming an expression.
 - ADR-0032: the contract locates each export in its component.
 - ADR-0033 / A-022: captured values carried on the element are resume
   metadata, not identity markup.
@@ -78,7 +107,8 @@ before integration; the baseline pass is not a substitute.
   - Found:
     - the platform package depended on the store example;
     - interpolated attribute strings rendered literally;
-    - the checker does not check exhaustiveness over `Option` and `Result`.
+    - the checker did not check exhaustiveness over `Option` and `Result`
+      (corrected the same day, with four related false proofs; see above).
 
 - **2026-09-25: E10 gate item 4, size and performance against baselines.**
   - The store's components are 3,037 to 4,221 bytes, against 5,276 for a

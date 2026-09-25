@@ -74,10 +74,15 @@ alike are still not interchangeable.
 
 ## Findings
 
-- **The checker does not check exhaustiveness over `Option` and `Result`.**
-  `match get(w) { Some(x) => Some(x) }` passes `pw check`. The backend refuses
-  it ("does not cover every case"), so no component is built with a missing
-  arm. The checker should say so first (KNOWN_LIMITATIONS).
+- **The checker did not check exhaustiveness over `Option` and `Result`.**
+  `match get(w) { Some(x) => Some(x) }` passed `pw check`. The backend refused
+  it ("does not cover every case"), so no component was built with a missing
+  arm. **Fixed the same day:** the checker types a scrutinee that is not a
+  declared name with the value relations, analyses `Option` and `Result` as
+  sum types, and refuses the match with PW0305, naming `None`. The backend's
+  refusal stays as a second layer, which no test reaches now. Four related
+  false proofs were found while fixing it
+  ([ADR-0038](ADR-0038-every-match-typed.md)).
 - **Refactoring the encoder changed no store component.** The committed
   `add_to_cart` and `clear_cart` are byte-identical (`evidence_is_current`).
 
@@ -90,7 +95,8 @@ alike are still not interchangeable.
     - an entry returned through a newly built `Some`;
     - a missing word, and a stub whose target is missing;
     - empty, 15 KB and emoji strings intact;
-    - three refusals, each asserted by its exact reason.
+    - three refusals, each asserted by its exact reason. Since the fix
+      above, the missing case is the checker's refusal, not the backend's.
   - `tests/oracle.rs`: every compiled declaration agrees with an independent
     reference ([oracle evidence](../evidence/E10/oracle-2026-09-25.md)).
 - The whole kiokun shard: 16,921 entries looked up and rendered, 103 redirects

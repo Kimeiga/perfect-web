@@ -209,3 +209,13 @@ on share-alike data). The data layer is the deployment's, as kiokun's search is
 its database's. Building it found the platform package depending on the store
 example, and interpolated attribute strings rendering literally; both fixed.
 
+## 2026-09-25: every match is analysed (E10)
+
+[ADR-0038](DECISIONS/ADR-0038-every-match-typed.md): the exhaustiveness
+analysis reads every match. Scrutinees are typed by the value relations,
+`Option` and `Result` are sum types to it, and each pattern is read against its
+own type. A constructor its type lacks is the new PW0608. `return` is a
+statement in an arm too, and an arm with no `=>` is an error. Five gaps, each
+of which reported a match as exhaustive when it was not; the kiokun slice
+found the first. Two decisions need a ruling: a bare name is a constructor
+whenever some type has one of that name, and no `return` expression is built.

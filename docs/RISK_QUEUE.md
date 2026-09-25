@@ -84,6 +84,18 @@ accepted-corpus program is rejected, or any rejected-corpus program compiles"* â
 cannot be evaluated until **E2** puts a front end in front of it. RQ-3 is
 therefore `partial`, not `done`.
 
+**Correction, 2026-09-25 (ADR-0038).** Once it ran on `.pw` source, the
+analysis read only a parameter annotated with a declared sum type, so most
+matches were never analysed. And four kinds of incomplete match were reported
+exhaustive:
+- a nested pattern read against the scrutinee's type;
+- a constructor its type lacks read as a wildcard;
+- a shadowed parameter read as the parameter;
+- a phantom arm the parser made from `=> return e`.
+
+All five gaps are closed, each with a test. What remains blocks the analysis
+rather than proving it.
+
 ## RQ-4 â€” structured concurrency
 
 Split, because a runtime task tree cannot make a compile-fail fixture fail at

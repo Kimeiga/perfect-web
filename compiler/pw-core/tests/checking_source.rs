@@ -379,12 +379,18 @@ fn building_the_environment_reads_variants_and_opaques() {
     );
     let env = Env::build(std::slice::from_ref(&u));
     let p = env.program();
-    assert_eq!(p.adts.len(), 1);
-    assert_eq!(p.adts[0].name, "S");
+    // The program's own sum type, then the language's own two (2026-09-25),
+    // which a match over a call or over `Option`/`Result` is checked against.
+    let names: Vec<&str> = p.adts.iter().map(|a| a.name.as_str()).collect();
+    assert_eq!(names, ["S", "Option", "Result"]);
     assert_eq!(p.adts[0].ctors.len(), 2);
     assert_eq!(p.adts[0].ctors[1].fields.len(), 1, "B carries one field");
-    assert_eq!(p.opaques.len(), 1);
-    assert_eq!(p.opaques[0].name, "StoreId");
+    let option: Vec<&str> = p.adts[1].ctors.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(option, ["Some", "None"]);
+    // `StoreId`, and the opaque payload of `Some`/`Ok`/`Err`: what a witness
+    // prints as `Some(_)`.
+    let opaques: Vec<&str> = p.opaques.iter().map(|o| o.name.as_str()).collect();
+    assert_eq!(opaques, ["StoreId", "_"]);
 }
 
 /// Everything a developer would be shown for one diagnostic, as one string.

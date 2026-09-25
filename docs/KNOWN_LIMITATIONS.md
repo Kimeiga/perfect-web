@@ -68,10 +68,22 @@ their cases (2026-09-25, ADR-0036). Still refused by name:
 - calls between compiled declarations;
 - arithmetic, `if`, and string operations.
 
-- **The checker does not check exhaustiveness over `Option` and `Result`.**
-  `match x { Some(y) => .. }` passes `pw check`. The backend refuses to
-  compile it ("does not cover every case"), so no component misses an arm,
-  but the checker should report it first.
+- **Some matches are not analysed for exhaustiveness.** Each is counted
+  Blocked by the match audit, with its reason: neither proven nor refused.
+  - A constructor pattern nested under `Some`, `Ok` or `Err`
+    (`Some(Some(x))`). The backend refuses nested patterns.
+  - A literal pattern (`Some("a")`).
+  - A scrutinee the value relations cannot type, including a name bound at
+    two sites.
+
+  Until 2026-09-25 matches over `Option`, `Result` and calls were not checked
+  at all, and four other shapes were proven exhaustive when they were not
+  (ADR-0038).
+- **A binding cannot share a constructor's name** (ADR-0038, ruling needed).
+  A bare pattern name that some type has as a constructor is read as that
+  constructor, and against another type it is PW0608.
+- **`return` is a statement, not an expression.** Its value is the statement
+  after it, in a block or on its line in a match arm (ADR-0038).
 - **Interpolated attribute strings do not render.** `href="/stores/{id}"` is
   read by the route checker, but the template IR has no part for it and blocks
   the render, naming `href={value}` as the form that renders.

@@ -216,6 +216,10 @@ codes! {
         "a body must produce the result type its signature declares";
     BINDING_TYPE = "PW0607" / binding_type / 1, Types,
         "an annotated binding must be initialised with a value of its declared type";
+    // Until 2026-09-25 such a pattern read as a wildcard, so `Ok(x)` and
+    // `Err(e)` arms proved a match over an `Option` exhaustive.
+    PATTERN_CONSTRUCTOR = "PW0608" / pattern_constructor / 1, Types,
+        "a constructor pattern must name a constructor of the type it matches";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

@@ -52,6 +52,12 @@ pub struct Env {
     adts: BTreeMap<crate::resolve::DefId, usize>,
     /// The declaration → its constructor names, in declaration order.
     ctor_names: BTreeMap<crate::resolve::DefId, Vec<String>>,
+    /// `Option` and `Result`: an ADT each, and its constructors. Keyed by the
+    /// built-in, since they have no declaration.
+    builtins: BTreeMap<crate::resolved::Builtin, (usize, Vec<String>)>,
+    /// The opaque type of their payloads, which a pattern nested under `Some`,
+    /// `Ok` or `Err` is read against.
+    payload: crate::types::OpaqueId,
 }
 
 impl Env {
@@ -124,10 +130,42 @@ impl Env {
             ctor_names.insert(*def, vs.iter().map(|v| v.name.clone()).collect());
         }
 
+        // `Option` and `Result`, the language's own variants, as the analysis
+        // sees any other. Their payloads are opaque: a pattern nested under
+        // `Some`, `Ok` or `Err` is left to `subject` to refuse, rather than
+        // checked against a type the analysis does not have. The opaque type's
+        // name is what a witness prints for it: `Some(_)`.
+        let any = program.declare_opaque("_", Type::Str);
+        let mut builtins = BTreeMap::new();
+        for (b, name, cases) in [
+            (
+                crate::resolved::Builtin::Option,
+                "Option",
+                vec![("Some", 1), ("None", 0)],
+            ),
+            (
+                crate::resolved::Builtin::Result,
+                "Result",
+                vec![("Ok", 1), ("Err", 1)],
+            ),
+        ] {
+            let ctors: Vec<Ctor> = cases
+                .iter()
+                .map(|(c, n)| Ctor {
+                    name: c.to_string(),
+                    fields: vec![Type::Opaque(any); *n],
+                })
+                .collect();
+            let id = program.declare_adt(name, ctors);
+            builtins.insert(b, (id, cases.iter().map(|(c, _)| c.to_string()).collect()));
+        }
+
         Env {
             program,
             adts,
             ctor_names,
+            builtins,
+            payload: any,
         }
     }
 
@@ -143,6 +181,19 @@ impl Env {
 
     fn ctors_of(&self, def: crate::resolve::DefId) -> Option<&[String]> {
         self.ctor_names.get(&def).map(|v| v.as_slice())
+    }
+
+    /// `Option` or `Result`, as an ADT and its constructors.
+    fn builtin(&self, b: crate::resolved::Builtin) -> Option<(usize, &[String])> {
+        self.builtins.get(&b).map(|(id, cs)| (*id, cs.as_slice()))
+    }
+
+    /// Whether any type this program knows has a constructor of this name.
+    fn names_a_constructor(&self, name: &str) -> bool {
+        self.program
+            .adts
+            .iter()
+            .any(|a| a.ctors.iter().any(|c| c.name == name))
     }
 }
 
@@ -1019,9 +1070,19 @@ fn check_unit_with(
             }
         }
 
-        for id in body.walk() {
-            if let Expr::Match { scrutinee, arms } = body.expr(id) {
-                exhaustiveness(env, ws, at, body, id, *scrutinee, arms, &locals, &mut out);
+        let site = MatchSite {
+            env,
+            ws,
+            sigs,
+            at,
+            module: unit.hir.module_of(id),
+            decl,
+            body,
+            locals: &locals,
+        };
+        for match_id in body.walk() {
+            if let Expr::Match { scrutinee, arms } = body.expr(match_id) {
+                exhaustiveness(&site, match_id, *scrutinee, arms, &mut out);
             }
         }
         scopes(decl, body, &mut out);
@@ -1079,9 +1140,11 @@ pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
     // environment is consulted — `Status` alone does not say whose.
     let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
     let ws = crate::resolve::Workspace::build(&hirs);
+    // The value relations type a scrutinee no annotation types.
+    let sigs = crate::signatures::Signatures::build(&ws, &hirs);
     let mut out = Vec::new();
     for (at, unit) in units.iter().enumerate() {
-        for (_, decl) in unit.hir.all_decls() {
+        for (decl_id, decl) in unit.hir.all_decls() {
             let Some(body_id) = decl.body else { continue };
             let body = unit.hir.body(body_id);
             let mut locals: BTreeMap<String, hir::DeclaredType> = BTreeMap::new();
@@ -1090,11 +1153,19 @@ pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
                     locals.insert(p.name.clone(), t.clone());
                 }
             }
+            let site = MatchSite {
+                env: &env,
+                ws: &ws,
+                sigs: &sigs,
+                at,
+                module: unit.hir.module_of(decl_id),
+                decl,
+                body,
+                locals: &locals,
+            };
             for id in body.walk() {
                 if let Expr::Match { scrutinee, arms } = body.expr(id) {
-                    out.push(analyse_match(
-                        &env, &ws, at, &decl.name, body, id, *scrutinee, arms, &locals,
-                    ));
+                    out.push(analyse_match(&site, &decl.name, id, *scrutinee, arms).0);
                 }
             }
         }
@@ -1102,19 +1173,168 @@ pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
     out
 }
 
-/// The analysis, with no diagnostics in it.
-#[allow(clippy::too_many_arguments)]
-fn analyse_match(
-    env: &Env,
-    ws: &crate::resolve::Workspace,
+/// **What a match is over**: its ADT, constructors and name, found once and
+/// read by both the analysis and its diagnostic.
+struct Subject {
+    adt: usize,
+    ctors: Vec<String>,
+    /// The type as written or inferred, for messages.
+    name: String,
+}
+
+/// Where a match is, and what it can read: the context both callers share.
+struct MatchSite<'a> {
+    env: &'a Env,
+    ws: &'a crate::resolve::Workspace,
+    sigs: &'a crate::signatures::Signatures,
     at: usize,
+    module: Option<&'a str>,
+    decl: &'a Decl,
+    body: &'a Body,
+    locals: &'a BTreeMap<String, hir::DeclaredType>,
+}
+
+/// **The type a match is over**, or why the analysis cannot say.
+///
+/// A bare name with a declared type reads the declaration. Anything else (a
+/// call: `match Entries.get(word) { .. }`) is typed by the value relations,
+/// which type calls already. Until 2026-09-25 a scrutinee that was not a bare
+/// declared name, and every match over `Option` or `Result`, was Blocked, and
+/// a match with its `None` arm missing passed `pw check`. The kiokun slice's
+/// backend refused one, which is how it was found.
+///
+/// A parameter's declared type is read only where the name means the
+/// parameter. A body that binds the name again (`Some(x) => match x { .. }`
+/// in a function with a parameter `x`) is left to the value relations, which
+/// read a name bound at two sites as unknown rather than guess which one is
+/// meant. Until 2026-09-25 the parameter's type was read, and a match over the
+/// arm's value was proven against the parameter's constructors.
+fn subject(site: &MatchSite<'_>, scrutinee: ExprId) -> Result<Subject, (String, Option<String>)> {
+    let MatchSite {
+        env,
+        ws,
+        sigs,
+        at,
+        module,
+        decl,
+        body,
+        locals,
+    } = site;
+    let span = body.expr_span(scrutinee);
+    if let Expr::Name(n) = body.expr(scrutinee)
+        && let Some(declared) = locals.get(n)
+        && !rebinds(body, n)
+    {
+        // **Resolve, then look up.** `Status` alone does not say whose, and
+        // two modules may declare one. The environment is handed an identity;
+        // it never discovers one.
+        let written = declared.written();
+        let resolution = crate::resolved::resolve(ws, *at, None, &[], declared, span);
+        let Some(t) = resolution.resolved() else {
+            return Err((
+                "the scrutinee's type does not resolve to a declaration".into(),
+                Some(written),
+            ));
+        };
+        if let Some((adt, ctors)) = t.as_builtin().and_then(|b| env.builtin(b)) {
+            return Ok(Subject {
+                adt,
+                ctors: ctors.to_vec(),
+                name: written,
+            });
+        }
+        let Some(def) = t.def_id() else {
+            return Err((
+                "the scrutinee's type does not resolve to a declaration".into(),
+                Some(written),
+            ));
+        };
+        return declared_adt(env, def, written);
+    }
+    match crate::values::type_of(sigs, ws, *at, *module, decl, body, scrutinee) {
+        (crate::values::Ty::Builtin(b, _), name) => match env.builtin(b) {
+            Some((adt, ctors)) => Ok(Subject {
+                adt,
+                ctors: ctors.to_vec(),
+                name,
+            }),
+            None => Err((
+                "the scrutinee's type is not an algebraic data type".into(),
+                Some(name),
+            )),
+        },
+        (crate::values::Ty::Nominal(def, _), name) => declared_adt(env, def, name),
+        (_, _) => Err(("the scrutinee's type is unknown here".into(), None)),
+    }
+}
+
+/// Whether a pattern in this body binds `name`, as a `let` or an arm does.
+fn rebinds(body: &Body, name: &str) -> bool {
+    body.pats
+        .iter()
+        .any(|(_, p, _)| matches!(p, HPat::Bind { name: n, .. } if n == name))
+}
+
+fn declared_adt(
+    env: &Env,
+    def: crate::resolve::DefId,
+    name: String,
+) -> Result<Subject, (String, Option<String>)> {
+    let Some(adt) = env.adt_of(def) else {
+        return Err((
+            "the scrutinee's type is not an algebraic data type this program declares".into(),
+            Some(name),
+        ));
+    };
+    let Some(ctors) = env.ctors_of(def) else {
+        return Err((
+            "the scrutinee's type declares no constructors".into(),
+            Some(name),
+        ));
+    };
+    Ok(Subject {
+        adt,
+        ctors: ctors.to_vec(),
+        name,
+    })
+}
+
+/// A constructor pattern naming a constructor its type does not have.
+struct Foreign {
+    constructor: String,
+    /// The type the pattern is read against, and that type's constructors.
+    ty: String,
+    ctors: Vec<String>,
+    span: hir::Span,
+}
+
+/// A constructor pattern binding a different number of fields than its
+/// constructor declares.
+struct Arity {
+    ctor: String,
+    written: usize,
+    declared: usize,
+    span: hir::Span,
+}
+
+/// What a match's diagnostics are read from, beside its verdict.
+enum Found {
+    /// No subject. The audit says why, and there is nothing to report.
+    Nothing,
+    /// The subject, and each arm as the analysis read it, or why it could
+    /// not. Kept per arm, so one arm's fault never hides another's.
+    Arms(Subject, Vec<Result<Arm, PatternFault>>),
+}
+
+/// The analysis, with no diagnostics in it, and what they are read from.
+fn analyse_match(
+    site: &MatchSite<'_>,
     declaration: &str,
-    body: &Body,
     match_id: ExprId,
     scrutinee: ExprId,
     arms: &[hir::MatchArm],
-    locals: &BTreeMap<String, hir::DeclaredType>,
-) -> MatchAnalysis {
+) -> (MatchAnalysis, Found) {
+    let (env, body) = (site.env, site.body);
     let span = body.expr_span(match_id);
     let blocked = |reason: &str, ty: Option<String>| MatchAnalysis {
         declaration: declaration.to_string(),
@@ -1124,51 +1344,49 @@ fn analyse_match(
             reason: reason.to_string(),
         },
     };
-
-    // Only a bare name whose type is declared. No guessing (see module docs) —
-    // and each of these was a bare `return` until 2026-08-10, which is exactly
-    // the silence the audit could not tell from a proof.
-    let Expr::Name(n) = body.expr(scrutinee) else {
-        return blocked(
-            "the scrutinee is not a bare name, so its type is unknown here",
-            None,
-        );
+    let subject = match subject(site, scrutinee) {
+        Ok(s) => s,
+        Err((reason, ty)) => return (blocked(&reason, ty), Found::Nothing),
     };
-    let Some(declared) = locals.get(n) else {
-        return blocked("the scrutinee's type is not declared in this body", None);
-    };
-    // **Resolve, then look up.** `Status` alone does not say whose, and two
-    // modules may declare one. The environment is handed an identity; it never
-    // discovers one.
-    let written = declared.written();
-    let resolution = crate::resolved::resolve(ws, at, None, &[], declared, span.clone());
-    let Some(def) = resolution.resolved().and_then(|t| t.def_id()) else {
-        return blocked(
-            "the scrutinee's type does not resolve to a declaration",
-            Some(written),
-        );
-    };
-    let Some(adt_id) = env.adt_of(def) else {
-        return blocked(
-            "the scrutinee's type is not an algebraic data type this program declares",
-            Some(written),
-        );
-    };
-    let Some(ctors) = env.ctors_of(def) else {
-        return blocked(
-            "the scrutinee's type declares no constructors",
-            Some(written),
-        );
-    };
-    let lowered: Vec<Arm> = arms
+    let read: Vec<Result<Arm, PatternFault>> = arms
         .iter()
-        .map(|a| Arm {
-            pattern: to_exhaust_pattern(body, a.pat, ctors),
-            span: body.pat_span(a.pat),
+        .map(|a| {
+            to_exhaust_pattern(env, body, a.pat, &Type::Adt(subject.adt), &subject.name).map(
+                |pattern| Arm {
+                    pattern,
+                    span: body.pat_span(a.pat),
+                },
+            )
         })
         .collect();
+    // The audit's reason is the first fault, in the order an author would
+    // repair them: a constructor of another type, then a field count, then
+    // what the analysis does not read.
+    let fault = read
+        .iter()
+        .filter_map(|r| r.as_ref().err())
+        .min_by_key(|f| match f {
+            PatternFault::Foreign(_) => 0,
+            PatternFault::Arity(_) => 1,
+            PatternFault::Unread(_) => 2,
+        });
+    if let Some(f) = fault {
+        let why = match f {
+            PatternFault::Foreign(f) => {
+                format!("`{}` is not a constructor of `{}`", f.constructor, f.ty)
+            }
+            PatternFault::Arity(a) => format!(
+                "`{}` binds {} field(s) but declares {}",
+                a.ctor, a.written, a.declared
+            ),
+            PatternFault::Unread(why) => why.clone(),
+        };
+        let name = subject.name.clone();
+        return (blocked(&why, Some(name)), Found::Arms(subject, read));
+    }
+    let lowered: Vec<Arm> = read.into_iter().filter_map(Result::ok).collect();
 
-    let report = exhaust::check_match(env.program(), &Type::Adt(adt_id), &lowered);
+    let report = exhaust::check_match(env.program(), &Type::Adt(subject.adt), &lowered);
     let outcome = match report.outcome() {
         crate::outcome::Outcome::Proven(_) => MatchOutcome::Proven,
         crate::outcome::Outcome::Blocked(bs) => MatchOutcome::Blocked {
@@ -1178,126 +1396,59 @@ fn analyse_match(
             missing: report
                 .missing
                 .iter()
-                .map(|w| exhaust::render_witness(env.program(), &Type::Adt(adt_id), w))
+                .map(|w| exhaust::render_witness(env.program(), &Type::Adt(subject.adt), w))
                 .collect(),
         },
     };
-    MatchAnalysis {
-        declaration: declaration.to_string(),
-        scrutinee_type: Some(written.clone()),
-        span,
-        outcome,
-    }
+    (
+        MatchAnalysis {
+            declaration: declaration.to_string(),
+            scrutinee_type: Some(subject.name.clone()),
+            span,
+            outcome,
+        },
+        Found::Arms(subject, lowered.into_iter().map(Ok).collect()),
+    )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn exhaustiveness(
-    env: &Env,
-    ws: &crate::resolve::Workspace,
-    at: usize,
-    body: &Body,
+    site: &MatchSite<'_>,
     match_id: ExprId,
     scrutinee: ExprId,
     arms: &[hir::MatchArm],
-    locals: &BTreeMap<String, hir::DeclaredType>,
     out: &mut Vec<Diagnostic>,
 ) {
-    // **The verdict comes from `analyse_match`, not from a second run.**
+    // **The verdict and its subject come from `analyse_match`.**
     //
     // Architect ruling, 2026-08-10: a diagnostic is a projection of an analysis
     // result. Deriving it twice would let the report an audit reads and the
     // error a developer reads disagree, and the disagreement would be silent —
-    // which is `docs/RISK_QUEUE.md`'s most common shape.
-    let analysis = analyse_match(env, ws, at, "", body, match_id, scrutinee, arms, locals);
+    // which is `docs/RISK_QUEUE.md`'s most common shape. Until 2026-09-25 this
+    // function re-derived the scrutinee's type for its messages; it now reads
+    // the one `analyse_match` found.
+    let body = site.body;
+    let (analysis, found) = analyse_match(site, "", match_id, scrutinee, arms);
+    let Found::Arms(subject, read) = found else {
+        return;
+    };
+    let ty_name = &subject.name;
 
-    // Only a bare name whose type is declared. No guessing (see module docs).
-    let Expr::Name(n) = body.expr(scrutinee) else {
-        return;
-    };
-    let Some(declared) = locals.get(n) else {
-        return;
-    };
-    // The spelling, for the messages below. Provenance — the identity is `def`.
-    let ty_name = declared.written();
-    let Some(def) =
-        crate::resolved::resolve(ws, at, None, &[], declared, body.expr_span(scrutinee))
-            .resolved()
-            .and_then(|t| t.def_id())
-    else {
-        return;
-    };
-    let Some(adt_id) = env.adt_of(def) else {
-        return;
-    };
-    let Some(ctors) = env.ctors_of(def) else {
-        return;
-    };
-
-    let lowered: Vec<Arm> = arms
-        .iter()
-        .map(|a| Arm {
-            pattern: to_exhaust_pattern(body, a.pat, ctors),
-            span: body.pat_span(a.pat),
-        })
-        .collect();
-
-    // Validate BEFORE analysing. A pattern whose arity disagrees with its
-    // constructor is a defect in its own right, and it is also what
-    // desynchronizes the pattern row from the type list inside the
-    // exhaustiveness algorithm. Reporting it here means the author is told
-    // what is actually wrong, rather than being told about a missing variant
-    // that follows from it.
+    // Each arm's own defect, where it is. A pattern whose arity disagrees with
+    // its constructor, or that names a constructor its type lacks, is a
+    // defect in its own right, and reporting it means the author is told what
+    // is actually wrong, rather than being told about a missing variant that
+    // follows from it. Both are found at any depth, and are never a reason to
+    // stop reading the other arms.
     //
-    // `exhaust.rs` defends against the mismatch anyway. Two layers, because
-    // "upstream validated it" is the assumption that produced the panic.
-    let program = env.program();
-    for (arm, lowered) in arms.iter().zip(&lowered) {
-        let exhaust::Pattern::Ctor { ctor, args } = &lowered.pattern else {
-            continue;
-        };
-        let Some(declared) = program
-            .ctors_of(&Type::Adt(adt_id))
-            .and_then(|cs| cs.get(*ctor).cloned())
-        else {
-            continue;
-        };
-        if args.len() == declared.fields.len() {
-            continue;
+    // `exhaust.rs` defends against an arity mismatch anyway. Two layers,
+    // because "upstream validated it" is the assumption that produced the
+    // panic.
+    for fault in read.into_iter().filter_map(Result::err) {
+        match fault {
+            PatternFault::Foreign(f) => out.push(foreign_constructor(body, match_id, &subject, f)),
+            PatternFault::Arity(a) => out.push(constructor_arity(body, match_id, &subject, a)),
+            PatternFault::Unread(_) => {}
         }
-        out.push(Diagnostic {
-            code: crate::codes::CONSTRUCTOR_ARITY.id,
-            invariant: crate::codes::CONSTRUCTOR_ARITY.invariant,
-            reason: "constructor_pattern_arity_mismatch",
-            detector: Detector::PatternMatrix,
-            severity: Severity::Error,
-            message: format!(
-                "`{}` binds {} field(s) but declares {}",
-                declared.name,
-                args.len(),
-                declared.fields.len()
-            ),
-            primary_span: body.pat_span(arm.pat),
-            related: vec![Related {
-                span: body.expr_span(match_id),
-                label: format!("matching on `{ty_name}`"),
-            }],
-            explanation: Some(format!(
-                "A constructor pattern binds its constructor's fields, so the count                  is not a style choice — `{}` carries {} of them. Writing a different                  number leaves the compiler with a pattern that does not describe any                  value of this type.",
-                declared.name,
-                declared.fields.len()
-            )),
-            repairs: vec![Repair {
-                description: if args.len() < declared.fields.len() {
-                    format!(
-                        "bind the remaining field(s), or write `{}(_)`-style wildcards",
-                        declared.name
-                    )
-                } else {
-                    format!("`{}` takes {}", declared.name, declared.fields.len())
-                },
-                replacement: None,
-            }],
-        });
     }
 
     // A `Blocked` analysis produced NO ANSWER. The reason is already reported
@@ -1326,7 +1477,7 @@ fn exhaustiveness(
             "`{ty_name}` has {} constructor(s); {} of them {} unmatched. \
              Adding a variant to a type must break every match on it at compile \
              time, which is why a wildcard arm is not the default repair.",
-            ctors.len(),
+            subject.ctors.len(),
             missing.len(),
             if missing.len() == 1 { "is" } else { "are" },
         )),
@@ -1344,8 +1495,91 @@ fn exhaustiveness(
             }))
             .collect(),
     });
+}
 
-    let _ = &lowered;
+/// **PW0603**: a constructor pattern binding a different number of fields
+/// than its constructor declares.
+fn constructor_arity(body: &Body, match_id: ExprId, subject: &Subject, a: Arity) -> Diagnostic {
+    Diagnostic {
+        code: crate::codes::CONSTRUCTOR_ARITY.id,
+        invariant: crate::codes::CONSTRUCTOR_ARITY.invariant,
+        reason: "constructor_pattern_arity_mismatch",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`{}` binds {} field(s) but declares {}",
+            a.ctor, a.written, a.declared
+        ),
+        primary_span: a.span,
+        related: vec![Related {
+            span: body.expr_span(match_id),
+            label: format!("matching on `{}`", subject.name),
+        }],
+        explanation: Some(format!(
+            "A constructor pattern binds its constructor's fields, so the count \
+             is not a style choice — `{}` carries {} of them. Writing a different \
+             number leaves the compiler with a pattern that does not describe any \
+             value of this type.",
+            a.ctor, a.declared
+        )),
+        repairs: vec![Repair {
+            description: if a.written < a.declared {
+                format!(
+                    "bind the remaining field(s), or write `{}(_)`-style wildcards",
+                    a.ctor
+                )
+            } else {
+                format!("`{}` takes {}", a.ctor, a.declared)
+            },
+            replacement: None,
+        }],
+    }
+}
+
+/// **PW0608**: a constructor pattern whose constructor its type does not have.
+fn foreign_constructor(body: &Body, match_id: ExprId, subject: &Subject, f: Foreign) -> Diagnostic {
+    Diagnostic {
+        code: crate::codes::PATTERN_CONSTRUCTOR.id,
+        invariant: crate::codes::PATTERN_CONSTRUCTOR.invariant,
+        reason: "pattern_names_a_constructor_its_type_lacks",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!("`{}` is not a constructor of `{}`", f.constructor, f.ty),
+        primary_span: f.span,
+        related: vec![Related {
+            span: body.expr_span(match_id),
+            label: format!("matching on `{}`", subject.name),
+        }],
+        explanation: Some(format!(
+            "A constructor pattern matches the values its constructor builds, and \
+             no value of `{}` is built by `{}`. The arm can never match. Read as \
+             a binding, it would match everything and hide the cases it misses.",
+            f.ty, f.constructor
+        )),
+        repairs: vec![Repair {
+            description: format!(
+                "`{}`'s constructors are {}",
+                f.ty,
+                f.ctors
+                    .iter()
+                    .map(|c| format!("`{c}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            replacement: None,
+        }],
+    }
+}
+
+/// Why a pattern has no reading in the analysis.
+enum PatternFault {
+    /// A type error, reported as PW0608.
+    Foreign(Foreign),
+    /// A field count its constructor does not declare, reported as PW0603.
+    Arity(Arity),
+    /// Not an error, and not analysed. The analysis is Blocked, with this
+    /// reason.
+    Unread(String),
 }
 
 /// HIR pattern → the usefulness algorithm's pattern.
@@ -1355,31 +1589,109 @@ fn exhaustiveness(
 /// as a binding it matches everything, which makes the first arm cover the
 /// scrutinee and reports a non-exhaustive match as exhaustive — the failure is
 /// silent and favourable, which is the shape `docs/RISK_QUEUE.md` tracks.
-fn to_exhaust_pattern(body: &Body, id: hir::PatternId, ctors: &[String]) -> EPat {
+///
+/// **Each pattern is read against its own type.** Until 2026-09-25 every
+/// pattern, at any depth, was read against the constructors of the
+/// scrutinee's type, and a constructor that type does not have read as a
+/// wildcard. So `Ok(x)` and `Err(e)` arms proved a match over an `Option`
+/// exhaustive, `Circle(Draft)` read as `Circle(_)`, and a literal covered
+/// every value: each a proof of something false, of the same favourable shape
+/// as above. Now a nested pattern is read against its field's type, a
+/// constructor its type does not have is PW0608, and what the analysis cannot
+/// read blocks it, with the reason: a literal, or a constructor pattern
+/// against a type whose constructors it does not know, such as `Some`'s
+/// payload.
+fn to_exhaust_pattern(
+    env: &Env,
+    body: &Body,
+    id: hir::PatternId,
+    ty: &Type,
+    ty_name: &str,
+) -> Result<EPat, PatternFault> {
+    let program = env.program();
+    let ctors = program.ctors_of(ty);
+    let unread = || {
+        PatternFault::Unread(if *ty == Type::Opaque(env.payload) {
+            "a constructor pattern nested under a built-in variant is not analysed: \
+             the analysis does not see into the payload of `Some`, `Ok` or `Err`"
+                .to_string()
+        } else {
+            format!(
+                "a constructor pattern against `{ty_name}` is not analysed: the \
+                 analysis does not know that type's constructors"
+            )
+        })
+    };
+    let foreign = |name: &str, cs: &[Ctor]| {
+        PatternFault::Foreign(Foreign {
+            constructor: name.to_string(),
+            ty: ty_name.to_string(),
+            ctors: cs.iter().map(|c| c.name.clone()).collect(),
+            span: body.pat_span(id),
+        })
+    };
     match body.pat(id) {
-        HPat::Wild | HPat::Literal(_) | HPat::Error => EPat::Wildcard,
-        HPat::Bind { name, .. } => match ctors.iter().position(|c| c == name) {
-            Some(i) => EPat::unit(i),
-            None => EPat::Wildcard,
-        },
+        HPat::Wild | HPat::Error => Ok(EPat::Wildcard),
+        HPat::Literal(_) => Err(PatternFault::Unread(
+            "a literal pattern is not analysed: it covers one value, and the \
+             analysis does not enumerate a literal's type"
+                .to_string(),
+        )),
+        HPat::Bind { name, .. } => {
+            if let Some(cs) = &ctors
+                && let Some(i) = cs.iter().position(|c| &c.name == name)
+            {
+                // `Some` alone, for a constructor that carries a field.
+                return match cs[i].fields.len() {
+                    0 => Ok(EPat::unit(i)),
+                    declared => Err(PatternFault::Arity(Arity {
+                        ctor: name.clone(),
+                        written: 0,
+                        declared,
+                        span: body.pat_span(id),
+                    })),
+                };
+            }
+            // Another type's constructor is not a fresh binding: `None`
+            // against a `Status` names `Option`'s case.
+            if env.names_a_constructor(name) {
+                return Err(match &ctors {
+                    Some(cs) => foreign(name, cs),
+                    None => unread(),
+                });
+            }
+            Ok(EPat::Wildcard)
+        }
         HPat::Ctor { path, args } => {
             // `DecodeError.Invalid` and `Invalid` name the same constructor.
             let short = path.rsplit('.').next().unwrap_or(path);
-            match ctors.iter().position(|c| c == short) {
-                Some(i) => EPat::ctor(
-                    i,
-                    args.iter()
-                        .map(|a| to_exhaust_pattern(body, *a, ctors))
-                        .collect(),
-                ),
-                None => EPat::Wildcard,
+            let Some(cs) = ctors else {
+                return Err(unread());
+            };
+            let Some(i) = cs.iter().position(|c| c.name == short) else {
+                return Err(foreign(short, &cs));
+            };
+            let fields = &cs[i].fields;
+            if args.len() != fields.len() {
+                return Err(PatternFault::Arity(Arity {
+                    ctor: short.to_string(),
+                    written: args.len(),
+                    declared: fields.len(),
+                    span: body.pat_span(id),
+                }));
             }
+            let args = args
+                .iter()
+                .zip(fields)
+                .map(|(a, t)| to_exhaust_pattern(env, body, *a, t, &program.type_name(t)))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(EPat::ctor(i, args))
         }
-        HPat::Or(ps) => EPat::Or(
-            ps.iter()
-                .map(|p| to_exhaust_pattern(body, *p, ctors))
-                .collect(),
-        ),
+        HPat::Or(ps) => ps
+            .iter()
+            .map(|p| to_exhaust_pattern(env, body, *p, ty, ty_name))
+            .collect::<Result<Vec<_>, _>>()
+            .map(EPat::Or),
     }
 }
 
