@@ -774,6 +774,21 @@ fn lower_element(
             AttrValue::None => {
                 out.push(Chunk::Static(format!(" {}", a.name)));
             }
+            // `href="/stores/{id}"`: a string with a hole. The route checker
+            // reads the hole, as a link to a declared route; the template IR
+            // has no part that renders one. Until 2026-09-25 it wrote the
+            // braces out, and a document linked to `/stores/{id}` as if that
+            // were the address. The kiokun slice's first render showed it.
+            AttrValue::Static(v) if unquote(v).contains('{') => {
+                out.push(Chunk::Dynamic(Part::Blocked {
+                    reason: format!(
+                        "`{name}` interpolates inside an attribute string, which the \
+                         template IR does not represent yet; write `{name}={{value}}`",
+                        name = a.name
+                    ),
+                    at: format!("{}={}", a.name, v),
+                }));
+            }
             AttrValue::Static(v) => {
                 // The HIR keeps the value AS WRITTEN, quotes included, because
                 // it is a faithful record of the source. The IR is a
