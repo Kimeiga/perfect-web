@@ -111,7 +111,7 @@ inlined. Still refused by name:
 - **A function is not a value.** A lambda or a declaration's name is compiled
   where a list operation runs it; stored, returned, or passed to any other
   declaration, it is refused.
-- **A statement keyword cannot name a value** (PW0009, ADR-0041, ruling
+- **A statement keyword cannot name a value** (PW0013, ADR-0041, ruling
   needed). `let query = ..` is refused rather than read as a `query ..`
   statement at every use.
 

@@ -116,6 +116,10 @@ codes! {
     UNCLOSED_ARGS = "PW0010" / unclosed_args / 1, Syntax, "an argument list must be closed";
     UNCLOSED_LIST = "PW0011" / unclosed_list / 1, Syntax, "a list literal must be closed";
     UNCLOSED_MATCH = "PW0012" / unclosed_match / 1, Syntax, "a match must be closed";
+    // Its own code, not PW0009's "an expression was expected": ADR-0041 first
+    // emitted PW0009 for it, which named the wrong invariant.
+    KEYWORD_AS_NAME = "PW0013" / keyword_as_name / 1, Syntax,
+        "a statement keyword cannot name a binding or a parameter";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------

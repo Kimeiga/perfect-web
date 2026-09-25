@@ -97,7 +97,7 @@ compared with them.
    statement, which the checker reads as a value of no known type. The
    program checked and meant something else, and the backend was the first
    to refuse it. The parser now refuses a binding or parameter named with a
-   statement keyword (PW0009). **(ruling needed)** The alternative is
+   statement keyword (PW0013). **(ruling needed)** The alternative is
    contextual keywords, which would keep such names usable.
 3. **`List.group_by` was missing.** Grouping rows by entry needed runs of
    equal keys, as views that copy nothing. The key is a `String`, and a run is

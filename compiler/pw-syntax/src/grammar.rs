@@ -1454,7 +1454,7 @@ impl<'a> P<'a> {
         if self.at(Kind::Ident) && STMT_KEYWORDS.contains(&self.cur_text()) {
             let word = self.cur_text().to_string();
             self.error(
-                "PW0009",
+                "PW0013",
                 format!(
                     "`{word}` is a statement keyword and cannot name {what}: a use of it \
                      would read as a `{word} ..` statement"
@@ -2860,7 +2860,8 @@ mod tests {
             assert!(
                 p.errors
                     .iter()
-                    .any(|e| e.message.contains("`query` is a statement keyword")),
+                    .any(|e| e.code == "PW0013"
+                        && e.message.contains("`query` is a statement keyword")),
                 "{src:?}: {:?}",
                 p.errors
             );

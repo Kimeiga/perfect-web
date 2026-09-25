@@ -76,11 +76,11 @@ E9 claims generic callables are instantiated per call.
 **Correction, 2026-09-25: a statement keyword could name a value.**
 `let query = ..` parsed. Then every later `query` in an expression read as a
 `query ..` statement, and the program checked while meaning something else.
-The parser now refuses such a name (PW0009, ADR-0041, ruling needed).
+The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
 - ADR-0041: a binding or parameter cannot be named with a statement keyword
-  (PW0009); contextual keywords are the alternative.
+  (PW0013); contextual keywords are the alternative.
 - ADR-0040: `String.to_lower_ascii` maps `A`–`Z` only; Unicode case mapping is
   not decided.
 - ADR-0039 §1: `Int` traps where its exact result does not fit; `/` and `%`
