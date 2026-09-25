@@ -119,8 +119,9 @@ compared with them.
 6. **A component call per word made loading three times slower.** Each call
    is a fresh instance, about 20 µs. Placing 1.49 million files through
    `Place` took the whole shard's load from 9.5 s (kiokun's Rust rule) to
-   32.6 s. `Places` answers a thousand words a call, and the load took 8.6 s
-   and 10.4 s in two runs (`docs/evidence/E10/kiokun.txt` records the 8.6 s).
+   32.6 s. `Places` answers a thousand words a call. The load then took
+   between 8.6 s and 10.8 s across four runs; `docs/evidence/E10/kiokun.txt`
+   records the latest.
    Per-call instantiation is ADR-0032's, and remains a known cost.
 
 ## Acceptance
