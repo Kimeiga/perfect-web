@@ -36,7 +36,11 @@ fn data_dir() -> PathBuf {
 }
 
 fn load() -> Result<app::App, String> {
-    let shard = shard::Shard::load(&data_dir(), SHARD)?;
+    load_from(&data_dir())
+}
+
+fn load_from(dir: &std::path::Path) -> Result<app::App, String> {
+    let shard = shard::Shard::load(dir, SHARD)?;
     app::App::load(
         &root().join("docs/evidence/E10/kiokun"),
         data::Index::build(shard),
@@ -165,8 +169,10 @@ mod tests {
     use super::*;
     use pw_host::engine::Val;
 
+    /// The committed sample, whatever `KIOKUN_DATA` says: these tests are
+    /// about the sample's 28 entries, and the whole shard has its own test.
     fn app() -> app::App {
-        load().expect("the slice loads")
+        load_from(&root().join("examples/kiokun/data").join(SHARD)).expect("the slice loads")
     }
 
     fn field<'a>(v: &'a Val, name: &str) -> &'a Val {
@@ -298,7 +304,7 @@ mod tests {
             "set KIOKUN_DATA to kiokun-data's output_dictionary"
         );
         let started = std::time::Instant::now();
-        let a = app();
+        let a = load().expect("the whole shard loads");
         let loaded = started.elapsed();
         let words: Vec<String> = a.index.shard.entries.keys().cloned().collect();
         let (mut rendered, mut followed, mut failures) = (0, 0, Vec::new());

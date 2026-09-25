@@ -441,7 +441,7 @@ e10-oracle:
        echo "rust: $(rustc --version)"; echo; \
        echo "== the differential oracle (compiler/pw-conformance/tests/oracle.rs)"; echo; \
        cargo test --locked -p pw-conformance --test oracle -- --nocapture --test-threads=1 2>&1 \
-         | grep -oE "^oracle: .*|^test result.*"; \
+         | grep -oE "oracle: .*|^test result.*"; \
        echo; echo "== matches, fields and variants, run (compiler/pw-conformance/tests/variants.rs)"; echo; \
        cargo test --locked -p pw-conformance --test variants -- --nocapture --test-threads=1 2>&1 \
          | grep -oE "^(人|地図) -> .*|^m\.Q: .*|^test [a-z_]+ .*|^test result.*"; \
@@ -476,7 +476,7 @@ e10-kiokun:
        head -1 examples/kiokun/data/han-1char-3/MANIFEST.txt; \
        echo; echo "== the host (spikes/kiokun/server)"; echo; \
        cargo test --locked -p kiokun-server -- --nocapture --test-threads=1 2>&1 \
-         | grep -oE "^(sample|person|ren|人|谚|ひと|zzzz-no-such-word): .*|^test [a-z_:]+ .*|^test result.*"; \
+         | grep -oE "(sample|person|ren|人|谚|ひと|zzzz-no-such-word): .*|^test [a-z_:]+ .*|^test result.*"; \
        echo; echo "== the whole shard"; echo; \
        if [ -n "${KIOKUN_DATA:-}" ]; then \
          cargo test --locked --release -p kiokun-server whole -- --include-ignored --nocapture 2>&1 \
