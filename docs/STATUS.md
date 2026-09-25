@@ -65,6 +65,12 @@ reject an incomplete match whatever the effect row.
   E9's counts and its 10 of 10 mutants are unchanged, and the oracle's missing
   case is now the checker's refusal.
 
+**Correction, 2026-09-25: "kiokun's ranking" is the slice's port**
+(ADR-0041, corrected). Every agreement ADR-0041 reports is with
+`data::Index::search`, ADR-0037's Rust port. kiokun.com's current
+`/api/search` takes hangul and CJK punctuation as CJK and astral Han as Latin,
+and searches script variants (地図 ⇄ 地圖); the port does neither.
+
 **Correction, 2026-09-25: PW2005 enforced less than its invariant**
 ([ADR-0045](DECISIONS/ADR-0045-affine-exactly-once.md)). "An affine value
 must be consumed exactly once" was checked as "released before each

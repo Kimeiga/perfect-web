@@ -157,3 +157,24 @@ compared with them.
 
   Each must fail a test.
 - The browser spec, in three engines.
+
+## Correction, 2026-09-25: which ranking "kiokun's" is
+
+"Kiokun's ranking" in this ADR is the slice's Rust port,
+`data::Index::search`, written for ADR-0037. Every agreement above is with
+that port. kiokun.com's own `/api/search` (`sveltekit-app/src/routes/api/
+search/+server.ts`, last changed 2026-09-04) differs from it in at least two
+ways, found while scoping Korean search:
+- **Which queries are CJK.** kiokun.com tests
+  `/[\u3000-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/`. That takes a hangul or
+  CJK-punctuation query as CJK, and an astral Han query (U+20000 and above)
+  as Latin. The port takes any Han character, astral included, or kana, and
+  nothing else.
+- **Script variants.** kiokun.com searches each CJK query's variants
+  (`getCjkSearchTerms`: 地図 ⇄ 地圖, 学 ⇄ 學). The port follows only the one
+  stub a query names.
+
+Holding the slice to kiokun.com's current search means re-deriving the
+reference from that TypeScript. Korean search depends on it, because
+kiokun.com's hangul queries take the CJK path.
+

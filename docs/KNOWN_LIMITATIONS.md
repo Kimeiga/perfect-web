@@ -144,6 +144,9 @@ its logic in Pleris and its data layer in the host:
   deployment's.
 - **The index is Rust.** Candidate retrieval, case folding and a stub's target
   are the host's, as the database's are kiokun.com's. The ranking is Pleris.
+- **The ranking is held to the slice's port, not to kiokun.com's live search**
+  (ADR-0041, corrected). kiokun.com's `/api/search` decides which queries are
+  CJK differently (hangul yes, astral Han no) and searches script variants.
 - **Korean is looked up, not searched.** An entry shows its Korean words,
   Japanese names and character (ADR-0037, amended). The index has Chinese and
   Japanese rows; kiokun.com's Korean rows need its romanization and ranking
