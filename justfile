@@ -574,9 +574,9 @@ e10-affine:
        echo "rust: $(rustc --version)"; echo; \
        echo "== each witness (examples/generality/affine_not_consumed_once)"; echo; \
        for f in examples/generality/affine_not_consumed_once/*.pw; do \
-         printf '%-40s %-10s ' "$(basename $f)" "$(grep -m1 '@status:' $f | sed 's#// @status: ##')"; \
-         ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw $f 2>&1 \
-           | grep -oE '\[PW2005\][^[]*' | head -1 | sed 's/\x1b\[[0-9;]*m//g' || true; echo; \
+         printf '%-40s %-10s %s\n' "$(basename $f)" "$(grep -m1 '@status:' $f | sed 's#// @status: ##')" \
+           "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw $f 2>&1 \
+              | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[PW2005\][^[]*' | head -1)"; \
        done; \
        echo; echo "== the generality suite"; echo; \
        cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
