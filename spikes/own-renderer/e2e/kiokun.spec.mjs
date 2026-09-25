@@ -28,10 +28,13 @@ test("a simplified form is followed to its entry by the compiled lookup", async 
   await expect(page.locator("#headword")).toHaveText("諺");
 });
 
-test("a word this shard does not have is a 404", async ({ page }) => {
-  const response = await page.goto("/無");
+test("a word kiokun does not have is a 404", async ({ page }) => {
+  // A word no shard has. Since ADR-0041 a lookup reads other shards' files,
+  // so a word merely outside `han-1char-3` (`無`) is found when the server
+  // runs on a whole kiokun-data checkout.
+  const response = await page.goto("/zzzz-no-such-word");
   expect(response.status()).toBe(404);
-  await expect(page.locator("#headword")).toHaveText("無");
+  await expect(page.locator("#headword")).toHaveText("zzzz-no-such-word");
   await expect(page.locator("main p")).toHaveText("There is no entry for it here.");
 });
 
