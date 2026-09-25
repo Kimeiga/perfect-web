@@ -1,7 +1,7 @@
 E10 gate item 1 - the store builds from source, without Koka or Marko
 
 produced by: just e10-build
-commit: ebd4696aa7ea93a60a0d9cf495658bc501811078 + uncommitted changes
+commit: a610f9962106305e26be7cd6949e8da9381a2f7f
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the control: the ordinary PATH
@@ -54,7 +54,7 @@ pw build: 1 template(s), 2 handler(s), 5 component(s), 10 contract(s) -> OUT
 test a_placeholder_that_something_depends_on_is_a_refusal ... ok
 test a_program_that_does_not_check_builds_nothing ... ok
 test the_store_builds_every_artifact_from_source ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
 
 NOT CLAIMED: the queries run as components in the development server.
 They compile and are audited; the server still computes the page's
