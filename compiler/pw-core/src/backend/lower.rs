@@ -914,8 +914,8 @@ impl<'a> Lower<'a> {
         };
         let rt = self.types.get(&r).cloned();
         if rt.as_ref() != Some(&lt) {
-            // The checker types a comparison as a `Bool` without comparing
-            // its operands' types (KNOWN_LIMITATIONS), so this is reachable.
+            // `pw check` refuses operands of two known types (PW0609,
+            // ADR-0043). This is reached by operands it could not type.
             return Lowering::Blocked {
                 why: format!(
                     "`{op:?}` on a {lt:?} and a {}: the operands differ in type",
@@ -1504,6 +1504,7 @@ impl<'a> Lower<'a> {
             ) => Type::Bool,
             (I::StrJoin, [Some(Type::List(t)), Some(Type::Str)]) if **t == Type::Str => Type::Str,
             (I::StrTrim | I::StrToLowerAscii, [Some(Type::Str)]) => Type::Str,
+            (I::FloatFromInt, [Some(Type::Int)]) => Type::Float,
             (op, types) => {
                 return Lowering::Blocked {
                     why: format!("`{op:?}` receives {types:?}"),
@@ -2200,6 +2201,7 @@ fn intrinsic_argument(op: Intrinsic, k: usize, prior: &[Type]) -> Option<Type> {
         (I::ListConcat, 1) => prior.first().cloned(),
         (I::StrFromCodepoints, 0) => Some(Type::List(Box::new(Type::Int))),
         (I::StrJoin, 0) => Some(Type::List(Box::new(Type::Str))),
+        (I::FloatFromInt, 0) => Some(Type::Int),
         (
             I::StrLength
             | I::StrCodepoints

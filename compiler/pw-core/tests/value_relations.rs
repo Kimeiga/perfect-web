@@ -850,3 +850,88 @@ fn every_expression_kind_is_lowered_as_an_expression() {
         "expression kinds lowering does not treat as expressions: {missing:?}"
     );
 }
+
+// --- operands (ADR-0043) -----------------------------------------------------------
+
+/// **An operator's operands, and an `if`'s condition, are typed** (PW0609).
+/// Until 2026-09-25 a comparison was typed `Bool` whatever it compared:
+/// `1 == "a"` checked, and the component backend was the first to refuse it.
+#[test]
+fn an_operator_takes_operands_of_the_types_it_takes() {
+    let program = |body: &str| {
+        format!(
+            "module o\n\ntype Word = Word {{ text: String }}\n\n\
+             fn f(n: Int, x: Float, s: String, b: Bool, w: Word) -> Bool {{\n    {body}\n}}\n"
+        )
+    };
+    for bad in [
+        "n == s",
+        "s != n",
+        "n < x",
+        "s >= n",
+        "(n + x) > 0.0",
+        "(s + s) == s",
+        "(w * 2) == w",
+        "(b & n) == b",
+        "(n & b) == b",
+        "n == 1 | s",
+        "s | b",
+        "!n",
+        "-s == s",
+        "if n { true } else { false }",
+    ] {
+        let src = program(bad);
+        assert!(
+            codes(&src).contains(&"PW0609".to_string()),
+            "{bad}: {:?}",
+            messages(&src)
+        );
+    }
+    // The control: the same operators, each on the types it takes.
+    for good in [
+        "n == 1",
+        "s != \"a\"",
+        "x < 1.5",
+        "s >= \"a\"",
+        "(n + n * 2 - n / 3 % 4) > 0",
+        "(x + x * 2.0 - x / 3.0) > 0.0",
+        "b & n == 1 | !b",
+        "-n < 0",
+        "w == w",
+        "if b { n > 0 } else { false }",
+    ] {
+        let src = program(good);
+        assert!(codes(&src).is_empty(), "{good}: {:?}", messages(&src));
+    }
+}
+
+/// An operand the program does not type is undecided, never reported: the
+/// relation is about types the program states.
+#[test]
+fn an_untyped_operand_is_undecided_not_refused() {
+    let src = "module o\n\nfn f(n: Int, u) -> Bool { u == n & u + 1 > n }\n";
+    assert!(codes(src).is_empty(), "{:?}", messages(src));
+    let units: Vec<Unit> = vec![Unit {
+        path: "t.pw".to_string(),
+        hir: lower_file(src, &parse_tree(src).green),
+        src: src.to_string(),
+    }];
+    let operands: Vec<_> = pw_core::values::analysis(&units)
+        .into_iter()
+        .flat_map(|(_, r)| r)
+        .filter(|r| r.kind == RelationKind::Operand)
+        .collect();
+    assert!(!operands.is_empty());
+    assert!(
+        operands
+            .iter()
+            .all(|r| !matches!(r.outcome, Outcome::Disagree { .. })),
+        "{operands:?}"
+    );
+    assert!(
+        operands
+            .iter()
+            .any(|r| matches!(r.outcome, Outcome::Undecided(_))),
+        "{operands:?}"
+    );
+}

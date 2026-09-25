@@ -438,11 +438,14 @@ fn what_stays_outside_is_refused_by_name() {
         "{generic}"
     );
 
+    // `pw check` refuses it now, before the backend sees it (PW0609,
+    // ADR-0043). The backend's own refusal stays for operands the checker
+    // cannot type.
     let mixed = refused(
         "module r\n\npublic query Q(a: Int, b: String) -> Bool { a == b }\n",
         "r.Q",
     );
-    assert!(mixed.contains("differ in type"), "{mixed}");
+    assert!(mixed.contains("PW0609"), "{mixed}");
 
     let float_rem = refused(
         "module r\n\npublic query Q(a: Float, b: Float) -> Float { a % b }\n",

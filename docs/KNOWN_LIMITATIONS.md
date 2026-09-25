@@ -76,9 +76,11 @@ inlined. Still refused by name:
 - **Traps are not distinguished by cause.** An `Int` overflow and a zero
   divisor both stop the invocation, and the host reports a failed call; which
   one it was is not carried.
-- **The checker does not compare a comparison's operands.** `1 == "a"` types
-  as a `Bool` and passes `pw check`; the backend refuses it. A value relation
-  for it is the fix, and is not built.
+- **An operand the checker cannot type is undecided** (ADR-0043). PW0609
+  refuses operands of two known types that an operator does not take, and
+  counts the rest as undecided; the backend refuses what remains.
+- **There is no implicit conversion between `Int` and `Float`.**
+  `Float.from_int` converts where a count meets a measurement (ADR-0043).
 - **The logical operators are `&` and `|`.** `&&` does not parse. They
   short-circuit.
 
@@ -116,7 +118,7 @@ inlined. Still refused by name:
   `take`, `concat`, `map`, `filter`, `fold`, `any`, `all`, `find`, `sort_by`
   and `group_by` (by a `String` key, adjacent runs); `String` has `length`, `codepoints`, `from_codepoints`,
   `starts_with`, `ends_with`, `contains`, `join`, `trim` and
-  `to_lower_ascii`. There is no slicing, no Unicode case mapping, and no map
+  `to_lower_ascii`; `Float` has `from_int` (ADR-0043). There is no slicing, no Unicode case mapping, and no map
   or set type. `sum`, `maximum` and `enumerate` still have placeholder
   bodies.
 - **A function is not a value.** A lambda or a declaration's name is compiled

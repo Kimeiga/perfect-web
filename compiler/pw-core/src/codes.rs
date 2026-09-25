@@ -222,6 +222,10 @@ codes! {
         "an annotated binding must be initialised with a value of its declared type";
     // Until 2026-09-25 such a pattern read as a wildcard, so `Ok(x)` and
     // `Err(e)` arms proved a match over an `Option` exhaustive.
+    // Until 2026-09-25 a comparison was typed `Bool` whatever it compared,
+    // and `1 == "a"` checked; the backend was the first to refuse it.
+    OPERAND_TYPE = "PW0609" / operand_type / 1, Types,
+        "an operator's operands, and a condition, must have the types they take";
     PATTERN_CONSTRUCTOR = "PW0608" / pattern_constructor / 1, Types,
         "a constructor pattern must name a constructor of the type it matches";
 

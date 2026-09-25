@@ -320,6 +320,8 @@ pub enum Intrinsic {
     StrTrim,
     /// `A`-`Z` only.
     StrToLowerAscii,
+    /// The nearest `Float`, ties to even: exact up to 2^53 (ADR-0043).
+    FloatFromInt,
 }
 
 /// **An `intrinsic` declaration's operation**, by the name its policy gives.
@@ -358,6 +360,7 @@ impl Operation {
             "string.join" => Operation::Intrinsic(I::StrJoin),
             "string.trim" => Operation::Intrinsic(I::StrTrim),
             "string.to_lower_ascii" => Operation::Intrinsic(I::StrToLowerAscii),
+            "float.from_int" => Operation::Intrinsic(I::FloatFromInt),
             _ => return None,
         })
     }

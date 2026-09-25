@@ -59,6 +59,7 @@ const PROGRAM: &str = "module s
 
 import List
 import String
+import Float
 
 type Word = Word {
     text: String,
@@ -132,6 +133,8 @@ public query Runs(words: List<Word>) -> List<List<Int>> {
 public query Totals(rows: List<List<Int>>) -> List<Int> {
     List.map(rows, row => List.fold(row, 0, (total, x) => total + x))
 }
+
+public query AsFloat(n: Int) -> Float { Float.from_int(n) }
 ";
 
 fn compiled(id: &str) -> Runnable {
@@ -476,5 +479,29 @@ fn group_by_finds_runs_of_equal_keys() {
             Ok(Val::List(want.iter().map(|r| ints(r)).collect())),
             "{words:?}"
         );
+    }
+}
+
+/// **`Float.from_int` is IEEE 754's conversion** (ADR-0043): exact up to
+/// 2^53 in magnitude, then the nearest `Float`, ties to even, as Rust's
+/// `as f64` is.
+#[test]
+fn an_int_becomes_the_nearest_float() {
+    let r = compiled("s.AsFloat");
+    let mut rng = Rng(0xf1);
+    let mut cases = vec![
+        0,
+        1,
+        -1,
+        i64::MAX,
+        i64::MIN,
+        1 << 53,
+        (1 << 53) + 1,
+        (1 << 53) + 3,
+        -(1 << 53) - 1,
+    ];
+    cases.extend((0..CASES).map(|_| rng.int()));
+    for n in cases {
+        assert_eq!(call(&r, &[Val::S64(n)]), Ok(Val::Float64(n as f64)), "{n}");
     }
 }

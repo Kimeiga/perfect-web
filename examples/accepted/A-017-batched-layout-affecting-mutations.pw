@@ -11,12 +11,16 @@ module cart.badge_sizing
 
 import style
 import browser.{ ElementRef, LayoutSnapshot }
+import Float
 
 component BadgeRow(badges: List<ElementRef>) {
     placement browser
 
     frame {
-        let unit: LayoutSnapshot<Float> = measure { self.content_width() / badges.length() }
+        // A count is converted before it divides a width: arithmetic takes two
+        // values of one type (ADR-0039 §2), which PW0609 checks since
+        // 2026-09-25 (ADR-0043). This read `/ badges.length()`.
+        let unit: LayoutSnapshot<Float> = measure { self.content_width() / Float.from_int(badges.length()) }
         mutate {
             for badge in badges {
                 badge.style.set_width(unit)

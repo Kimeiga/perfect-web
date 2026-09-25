@@ -9,6 +9,8 @@
 
 module store.rating_spark
 
+import Float
+
 paint RatingSpark(values: List<Float>, width: Float, height: Float) !{ paint.custom } {
     // Declared inputs only. No document access, no geometry reads: the painter
     // receives its size rather than measuring it.
@@ -16,9 +18,13 @@ paint RatingSpark(values: List<Float>, width: Float, height: Float) !{ paint.cus
     isolated true
 
     draw(ctx) {
-        let step = width / values.length()
+        // Counts are converted where they meet widths: arithmetic takes two
+        // values of one type (ADR-0039 §2), which PW0609 checks since
+        // 2026-09-25 (ADR-0043). This read `width / values.length()` and
+        // `i * step`.
+        let step = width / Float.from_int(values.length())
         for (i, v) in values.enumerate() {
-            ctx.rect(i * step, height * (1.0 - v), step - 1.0, height * v)
+            ctx.rect(Float.from_int(i) * step, height * (1.0 - v), step - 1.0, height * v)
         }
     }
 }

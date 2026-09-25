@@ -387,7 +387,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // declares the `String` module (ADR-0040). The compiler supplies both.
     // Later the same day `List.group_by` joined them, for kiokun's ranking
     // (ADR-0041).
-    const EXPECTED: u64 = 0xa430c06974b3116c;
+    // 2026-09-25: `float.pw` declares the `Float` module and `from_int`
+    // (ADR-0043). Arithmetic takes two values of one type, which the checker
+    // now enforces, so a count used in a `Float` computation is converted.
+    const EXPECTED: u64 = 0x488035e419364f6b;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

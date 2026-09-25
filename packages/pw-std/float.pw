@@ -1,0 +1,14 @@
+// @corpus: platform
+// @id: STD-float
+// @category: standard library — numbers
+// @charter: §7.1
+// @milestone: E10
+
+module Float
+
+// **An `Int` as a `Float`** (ADR-0043). Arithmetic and comparison take two
+// values of one type (ADR-0039 §2), so a count used in a `Float` computation
+// is converted where it is used. The nearest `Float`, ties to even, as IEEE
+// 754 converts: exact for every `Int` up to 2^53 in magnitude.
+fn from_int(n: Int) -> Float !{}
+    intrinsic "float.from_int"

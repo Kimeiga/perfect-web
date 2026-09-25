@@ -2719,6 +2719,19 @@ impl Enc<'_> {
             outs
         };
         let held = match op {
+            // `f64.convert_i64_s`: IEEE 754's nearest value, ties to even.
+            N::FloatFromInt => {
+                let f = self.locals.fresh(ValType::F64);
+                self.ops.extend([
+                    I::LocalGet(flats[0].1[0]),
+                    I::F64ConvertI64S,
+                    I::LocalSet(f),
+                ]);
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![f],
+                }
+            }
             N::ListLength => {
                 let n = self.locals.fresh(ValType::I64);
                 self.ops

@@ -562,6 +562,29 @@ e10-kiokun:
      } > docs/evidence/E10/kiokun.txt
     @cat docs/evidence/E10/kiokun.txt
 
+# ADR-0043: an operator's operands and an `if`'s condition typed (PW0609), and
+# `Float.from_int`, with the mutation controls.
+#
+# E10 — the checker gap KNOWN_LIMITATIONS named: `1 == "a"` checked.
+e10-operands:
+    @{ echo "ADR-0043 - operands are typed, and Float.from_int"; echo; \
+       echo "produced by: just e10-operands"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the value relations (compiler/pw-core/tests/value_relations.rs)"; echo; \
+       cargo test --locked -p pw-core --test value_relations -- --test-threads=1 2>&1 \
+         | grep -E '^test (an_operator|an_untyped|the_accepted)|^test result'; \
+       echo; echo "== Float.from_int (compiler/pw-conformance/tests/stdlib.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test stdlib an_int_becomes -- --test-threads=1 2>&1 \
+         | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/operand_mutations.py)"; echo; \
+       python3 scripts/operand_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: an operand the checker cannot type. It is undecided, and"; \
+       echo "the component backend refuses what remains."; \
+     } > docs/evidence/E10/operands.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/operands.txt
+
 # ADR-0042's template branches and attributes: the checker's refusals and the
 # IR (pw-core), what renders (pw-render), and the mutation controls.
 #

@@ -256,3 +256,9 @@ template block's markers are kept and checked (PW5019), `{:else}` and
 and an attribute interpolates, each value escaped for its context (a URI
 component in a URL). It fixes a silent miscompile: `{:else}` was dropped, and
 both branches rendered together.
+
+[ADR-0043](DECISIONS/ADR-0043-operands-are-typed.md): an operator's operands,
+and an `if`'s condition, are related to the types they take (PW0609), so
+`1 == "a"` no longer checks. `Float.from_int` converts a count. Building it
+found two accepted fixtures dividing a `Float` by an `Int`, which ADR-0039 §2
+refuses.

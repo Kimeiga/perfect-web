@@ -330,6 +330,9 @@ pub enum RelationKind {
     Return,
     Binding,
     Annotation,
+    /// An operator's operand, or an `if`'s condition, against the type it
+    /// takes (PW0609).
+    Operand,
 }
 
 /// Why a relation was not decided.
@@ -1402,6 +1405,26 @@ impl<'a> Typer<'a> {
                     out.extend(self.call(id).relations)
                 }
                 Expr::Record { name: Some(_), .. } => out.extend(self.construct(id).relations),
+                // An operator's operands, and a condition. Until 2026-09-25 a
+                // comparison was typed `Bool` whatever it compared, so
+                // `1 == "a"` checked, and the backend was the first to refuse.
+                Expr::Binary { op, lhs, rhs } => out.extend(self.operands(id, op, *lhs, *rhs)),
+                Expr::Unary { op, operand } => {
+                    let (what, expected) = match op {
+                        UnOp::Not => ("the operand of `!`", Some(Ty::Primitive(Primitive::Bool))),
+                        UnOp::Neg => ("the operand of `-`", None),
+                    };
+                    out.push(match expected {
+                        Some(t) => self.operand(id, *operand, what, &t),
+                        None => self.number(id, *operand, what),
+                    });
+                }
+                Expr::If { cond, .. } => out.push(self.operand(
+                    id,
+                    *cond,
+                    "the condition of `if`",
+                    &Ty::Primitive(Primitive::Bool),
+                )),
                 Expr::Let {
                     pat: Some(pat),
                     ty: Some(ty),
@@ -1433,6 +1456,92 @@ impl<'a> Typer<'a> {
                 }
                 _ => {}
             }
+        }
+    }
+
+    /// **An operator's operands** (PW0609). A logical operator takes `Bool`s;
+    /// a comparison, two values of one type; arithmetic, two `Int`s or two
+    /// `Float`s. Which operators a type supports beyond that is the backend's
+    /// to refuse, not a type disagreement.
+    fn operands(&self, id: ExprId, op: &BinOp, lhs: ExprId, rhs: ExprId) -> Vec<ValueRelation> {
+        let sym = match op {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Rem => "%",
+            BinOp::Cmp(c) => c.as_str(),
+            BinOp::And => "&",
+            BinOp::Or => "|",
+            BinOp::Pipe | BinOp::Transition | BinOp::Assign => return Vec::new(),
+        };
+        let left = format!("the left side of `{sym}`");
+        let right = format!("the right side of `{sym}`, like its left,");
+        match op {
+            BinOp::And | BinOp::Or => {
+                let b = Ty::Primitive(Primitive::Bool);
+                vec![
+                    self.operand(id, lhs, &left, &b),
+                    self.operand(id, rhs, &format!("the right side of `{sym}`"), &b),
+                ]
+            }
+            BinOp::Cmp(_) => vec![self.operand(id, rhs, &right, &self.of(lhs))],
+            _ => vec![
+                self.number(id, lhs, &left),
+                self.operand(id, rhs, &right, &self.of(lhs)),
+            ],
+        }
+    }
+
+    /// One operand against the type it takes.
+    fn operand(&self, id: ExprId, value: ExprId, what: &str, expected: &Ty) -> ValueRelation {
+        let actual = self.of(value);
+        let mut s = Subst::default();
+        let outcome = match unify(&mut s, expected, &actual) {
+            Verdict::Agree => Outcome::Agree,
+            Verdict::Undecided => Outcome::Undecided(Undecided::Unknown),
+            Verdict::Disagree => Outcome::Disagree {
+                expected: self.display(expected),
+                actual: self.display(&actual),
+            },
+        };
+        self.operand_relation(id, value, what, outcome)
+    }
+
+    /// An operand arithmetic takes: an `Int` or a `Float`.
+    fn number(&self, id: ExprId, value: ExprId, what: &str) -> ValueRelation {
+        let actual = self.of(value);
+        let outcome = match &actual {
+            Ty::Primitive(Primitive::Int | Primitive::Float) => Outcome::Agree,
+            Ty::Unknown | Ty::Parameter { .. } | Ty::Var(_) => {
+                Outcome::Undecided(Undecided::Unknown)
+            }
+            // A list, a record or a string is never a number, whatever its
+            // arguments are.
+            other => Outcome::Disagree {
+                expected: "Int or Float".to_string(),
+                actual: self.display(other),
+            },
+        };
+        self.operand_relation(id, value, what, outcome)
+    }
+
+    fn operand_relation(
+        &self,
+        id: ExprId,
+        value: ExprId,
+        what: &str,
+        outcome: Outcome,
+    ) -> ValueRelation {
+        ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Operand,
+            span: self.body.expr_span(value),
+            target: what.to_string(),
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary: (self.body.expr_span(id), "the operator".to_string()),
         }
     }
 
@@ -1915,6 +2024,20 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
             .repair(format!(
                 "initialise it with a `{expected}`, or change the annotation"
             )),
+            RelationKind::Operand => Diagnostic::error(
+                crate::codes::OPERAND_TYPE.id,
+                crate::codes::OPERAND_TYPE.invariant,
+                Detector::Signature,
+                format!("{} must be `{expected}`, and this is `{actual}`", r.target),
+                r.span.clone(),
+            )
+            .reason("operand_type_disagrees_with_operator")
+            .explain(
+                "a comparison's sides share a type, arithmetic takes two `Int`s or two \
+                 `Float`s, and `&`, `|`, `!` and an `if` take `Bool`s; two types with one \
+                 representation are still two types",
+            )
+            .repair(format!("make it a `{expected}`")),
             RelationKind::Annotation => Diagnostic::error(
                 crate::codes::UNRESOLVED_TYPE.id,
                 crate::codes::UNRESOLVED_TYPE.invariant,

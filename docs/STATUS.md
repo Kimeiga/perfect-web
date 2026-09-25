@@ -62,6 +62,13 @@ reject an incomplete match whatever the effect row.
   E9's counts and its 10 of 10 mutants are unchanged, and the oracle's missing
   case is now the checker's refusal.
 
+**Correction, 2026-09-25: `pw check` did not type an operator's operands**
+([ADR-0043](DECISIONS/ADR-0043-operands-are-typed.md)). `1 == "a"` checked,
+and so did two accepted fixtures that divide a `Float` by an `Int`: A-017 and
+A-021. ADR-0039 §2 refuses both. PW0609 relates each operand to the type its
+operator takes. The fixtures now convert with the new `Float.from_int`, and
+their claims are unchanged.
+
 **Correction, 2026-09-25: `{:else}` in a template was a silent miscompile**
 ([ADR-0042](DECISIONS/ADR-0042-template-branches-and-attributes.md)).
 `{#if a}A{:else}B{/if}` passed `pw check` and `pw build`. It rendered A and B
@@ -95,6 +102,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0043: `Float.from_int` names the `Int` to `Float` conversion; there is
+  no implicit one.
 - ADR-0042: `{#match e}{:Some(x)} .. {:None} .. {/match}` is the template
   syntax for taking an `Option` or a `Result` apart.
 - ADR-0042: a value interpolated into a URL attribute is one URI component,
@@ -139,6 +148,11 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: operands are typed (ADR-0043).** Not a gate item; the checker
+  gap KNOWN_LIMITATIONS named. PW0609 relates operands and conditions to the
+  types they take, and `Float.from_int` converts. Evidence:
+  `docs/evidence/E10/operands.txt` (`just e10-operands`).
 
 - **2026-09-25: the template gaps (ADR-0042).** Not a gate item; `docs/NEXT.md`
   named them after ADR-0041.
