@@ -462,8 +462,8 @@ e10-bench:
        echo; echo "== the host, release: runtime/pw-host/tests/bench.rs"; echo; \
        cargo test --quiet --locked --release -p pw-host --features engine --test bench -- --include-ignored --nocapture --test-threads=1 2>&1 \
          | grep -E "^bench:|^test result"; \
-       echo; echo "== the browser: activation, the runtime before compiled handlers and now (chromium, 1 worker)"; echo; \
-       bash spikes/own-renderer/activation-compare.sh 83af93c 11; \
+       echo; echo "== the browser: activation, the runtime before compiled handlers and now (chromium, 1 worker, interleaved)"; echo; \
+       bash spikes/own-renderer/activation-compare.sh 83af93c 7 3; \
        echo; echo "== the browser: E7's instrument, re-run (full record: performance-e7-instrument.txt)"; echo; \
        echo "  E7's record (2026-08-07, an older Chromium; activation is one sample):"; grep -E "interactive-script-bytes|interactive-wasm-bytes|activation-ms|interaction-long-frames|runtime-layout-reads" docs/evidence/E7/performance.txt | sed 's/^ */    /'; \
        echo "  now (activation is one sample; the comparison above is the measurement):"; grep -E "interactive-script-bytes|interactive-wasm-bytes|activation-ms|interaction-long-frames|runtime-layout-reads" docs/evidence/E10/performance-e7-instrument.txt | sed 's/^ */    /'; \

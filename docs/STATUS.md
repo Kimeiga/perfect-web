@@ -60,9 +60,12 @@ before integration; the baseline pass is not a substitute.
     guest 22.1 µs. The native operation costs 0.30 µs, so per-call
     instantiation dominates; that is named, not reduced.
   - Browser activation shows no measurable change against the pre-E10 runtime
-    (15.50 against 15.70 ms median, 11 samples each).
-  - Correction made while recording: a one-sample comparison with E7's record
-    had shown a fivefold gain that is not real.
+    (15.70 against 15.80 ms median, 21 interleaved samples each, twice).
+  - Two corrections made while recording:
+    - a one-sample comparison with E7's record showed a fivefold gain that is
+      not real;
+    - a blocked comparison showed a regression of half again (10.3 against
+      15.7 ms), which was machine drift between the blocks.
   - Evidence: [bench-2026-09-25.md](evidence/E10/bench-2026-09-25.md).
 
 - **2026-09-25: E10 gate item 5 and task 10.**

@@ -14,14 +14,14 @@ Every number below has a negative control in the same session:
   interactive-wasm-bytes=74222
   script 30211 http://127.0.0.1:3148/pw-runtime.mjs
   wasm 74222 http://127.0.0.1:3148/pw-resume.wasm
-  activation-ms=18.70
+  activation-ms=20.10
   interaction-long-frames=0 worst-ms=0.0 forced-attr-exposed=false
-  control-long-frames=1 worst-ms=150.5
+  control-long-frames=1 worst-ms=150.6
   runtime-layout-reads=0
   large-menu-items=1000
   large-menu-content-visibility=auto
-  large-menu-first-layout-ms-visible=10.8 samples=[10.8,10.8,18.9,9.6,12.3]
-  large-menu-first-layout-ms-contained=1.8 samples=[1.8,1.7,1.7,1.8,1.9]
+  large-menu-first-layout-ms-visible=10.8 samples=[10.8,10.6,19.9,10.1,12.1]
+  large-menu-first-layout-ms-contained=1.7 samples=[1.6,1.9,1.7,1.7,1.9]
 
   ✓  6 [chromium] › e2e/performance.spec.mjs:317:1 › gate 10: a thousand-item menu keeps a bounded rendering cost (1.3s)
 

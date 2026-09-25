@@ -49,14 +49,15 @@ Count **downloaded** and **inline** JS separately: they cost differently
 
 Recorded to §18.5: commit in the raw file; Apple M2 Pro, macOS, arm64;
 Chromium 145.0.7632.6 through Playwright 1.58.0; localhost, no shaping; warm
-(a warm-up round, and 11 page loads per runtime); medians with ranges;
+(a warm-up round; 21 page loads per runtime, interleaved with the other
+runtime's); medians with ranges or interquartile ranges;
 `just e10-bench`; raw file `docs/evidence/E10/bench.txt`, written up in
 [bench-2026-09-25.md](evidence/E10/bench-2026-09-25.md).
 
 ```text
 component add_to_cart            4,221 B (1,386 gz)   Rust no_std guest 5,276 B (2,451 gz)
 host call, median (release)     21.1 µs               Rust no_std guest 22.1 µs; native op 0.30 µs
-browser activation, median      15.50 ms (11 samples)  runtime before E10 handlers 15.70 ms
+browser activation, median      15.70 ms (21, interleaved)  runtime before E10 handlers 15.80 ms
 ```
 
 ## Milestone 0 spike measurements — NOT benchmarks

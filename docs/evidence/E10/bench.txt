@@ -1,7 +1,7 @@
 E10 gate item 4 - code size and performance against baselines
 
 produced by: just e10-bench
-commit: 858df975955edc46c6e42a69baf57faddac2bd61 + uncommitted changes
+commit: e7d5f19e32fb658a6ef06120b000fbba8c6d8910
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 host: arm64 Apple M2 Pro
 
@@ -23,16 +23,16 @@ host: arm64 Apple M2 Pro
 
 == the host, release: runtime/pw-host/tests/bench.rs
 
-bench: compile the Rust no_std guest (5276 bytes): 2.0 ms
-bench: the Rust no_std guest's lookup through the host: median 21.169 µs per call (min 20.953, max 21.278; 7 rounds x 2000 calls)
-bench: store.page.add_to_cart through the host: median 20.236 µs per call (min 19.795, max 20.448; 7 rounds x 2000 calls)
+bench: compile the Rust no_std guest (5276 bytes): 2.7 ms
+bench: the Rust no_std guest's lookup through the host: median 21.723 µs per call (min 21.046, max 23.659; 7 rounds x 2000 calls)
+bench: store.page.add_to_cart through the host: median 20.267 µs per call (min 19.765, max 20.801; 7 rounds x 2000 calls)
 bench: the data layer's add, called natively: median 0.303 µs per call (min 0.302, max 0.305; 7 rounds x 200000 calls)
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s
 
 == the browser: activation, the runtime before compiled handlers and now (chromium, 1 worker)
 
-  before (83af93c)       median  15.70 ms   samples: 8.00 14.60 15.50 15.60 15.70 15.70 15.80 16.00 16.00 17.00 17.10 
-  now (858df97)          median  15.50 ms   samples: 4.10 11.40 14.50 14.80 15.20 15.50 15.60 16.90 17.20 17.70 18.80 
+  before (83af93c)       median  10.30 ms   samples: 9.20 9.30 9.50 9.70 10.00 10.30 11.80 14.50 15.20 16.30 16.50 
+  now (e7d5f19)          median  15.70 ms   samples: 4.10 14.40 14.90 15.40 15.50 15.70 15.80 16.10 16.10 17.80 17.90 
 
 == the browser: E7's instrument, re-run (full record: performance-e7-instrument.txt)
 
@@ -45,6 +45,6 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
   now (activation is one sample; the comparison above is the measurement):
     interactive-script-bytes=30211
     interactive-wasm-bytes=74222
-    activation-ms=18.70
+    activation-ms=20.10
     interaction-long-frames=0 worst-ms=0.0 forced-attr-exposed=false
     runtime-layout-reads=0
