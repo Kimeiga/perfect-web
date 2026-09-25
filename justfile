@@ -503,6 +503,28 @@ e10-pure:
      } > docs/evidence/E10/pure.txt
     @grep -E "^test result|mutants killed|^oracle:" docs/evidence/E10/pure.txt
 
+# ADR-0040's standard library, compiled: each list and string operation
+# against Rust's own over generated inputs, and the mutation controls.
+#
+# E10 task 2 — the standard library the kiokun slice's logic needs.
+e10-stdlib:
+    @{ echo "ADR-0040 - the standard library's lists and strings, compiled"; echo; \
+       echo "produced by: just e10-stdlib"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== against Vec and str (compiler/pw-conformance/tests/stdlib.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test stdlib -- --nocapture --test-threads=1 2>&1 \
+         | grep -E '^(test |test result)|^r\.Q: '; \
+       echo; echo "== mutation controls (scripts/stdlib_mutations.py)"; echo; \
+       python3 scripts/stdlib_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: Unicode case mapping. to_lower_ascii maps A-Z only."; \
+       echo "NOT CLAIMED: a function as a value. A lambda or a declaration's name is"; \
+       echo "compiled where a list operation runs it; stored, returned or passed to"; \
+       echo "any other declaration, it is refused."; \
+     } > docs/evidence/E10/stdlib.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/stdlib.txt
+
 # `pw build` for examples/kiokun into docs/evidence/E10/kiokun/ (held there by
 # evidence_is_current), the host's tests over the committed sample shard, the
 # browser spec in three engines, and, with KIOKUN_DATA naming a kiokun-data

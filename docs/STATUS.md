@@ -63,6 +63,8 @@ reject an incomplete match whatever the effect row.
   case is now the checker's refusal.
 
 Decisions awaiting a ruling:
+- ADR-0040: `String.to_lower_ascii` maps `A`–`Z` only; Unicode case mapping is
+  not decided.
 - ADR-0039 §1: `Int` traps where its exact result does not fit; `/` and `%`
   are Euclidean, as Koka's are; a zero divisor traps, where Koka answers 0.
 - ADR-0038: a bare pattern name is a constructor whenever some type has one of
@@ -99,6 +101,15 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: E10 task 2, the standard library compiled (ADR-0040).**
+  - `List`'s operations and a new `String` module are `intrinsic`
+    declarations the component backend compiles; the placeholder bodies are
+    gone.
+  - Each operation agrees with Rust's `Vec`, `str` and `char` over generated
+    inputs, trapping where they have no value.
+  - Found and fixed: `(a, b) => e` had never parsed.
+  - Evidence: `docs/evidence/E10/stdlib.txt` (`just e10-stdlib`).
 
 - **2026-09-25: E10 task 2, pure computation compiled to Wasm (ADR-0039).**
   Not a gate item; the backend breadth `docs/NEXT.md` puts first.

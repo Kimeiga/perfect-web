@@ -247,6 +247,116 @@ pub enum Instr {
         value: ValueId,
         ty: Type,
     },
+    /// **A loop over a list** (ADR-0040): `body` runs once per element, with
+    /// `params` bound. For a fold the parameters are the accumulator, which
+    /// `seed` starts, then the element; for a sort, the two elements being
+    /// compared; otherwise the element. The function argument the program
+    /// wrote, a lambda or a named declaration, is the body.
+    Each {
+        result: ValueId,
+        kind: EachKind,
+        list: ValueId,
+        seed: Option<ValueId>,
+        params: Vec<ValueId>,
+        body: Region,
+        ty: Type,
+    },
+    /// **An operation the standard library declares and the compiler
+    /// supplies** (ADR-0040), on values.
+    Intrinsic {
+        result: ValueId,
+        op: Intrinsic,
+        args: Vec<ValueId>,
+        ty: Type,
+    },
+    /// `[a, b, c]`.
+    MakeList {
+        result: ValueId,
+        items: Vec<ValueId>,
+        ty: Type,
+    },
+}
+
+/// What a loop over a list computes (ADR-0040).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EachKind {
+    /// Each element's value: a list as long as the input.
+    Map,
+    /// The elements whose value is `true`, in order.
+    Filter,
+    /// The accumulator after the last element.
+    Fold,
+    /// Whether any element's value is `true`; stops at the first.
+    Any,
+    /// Whether every element's value is `true`; stops at the first `false`.
+    All,
+    /// `Some` of the first element whose value is `true`.
+    Find,
+    /// The elements ordered by the body, a comparison: a positive value puts
+    /// the second first. Stable.
+    SortBy,
+}
+
+/// A first-order operation of the standard library (ADR-0040).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Intrinsic {
+    ListLength,
+    ListGet,
+    ListTake,
+    ListConcat,
+    /// In code points.
+    StrLength,
+    StrCodepoints,
+    /// Traps on a value that is not a Unicode scalar value.
+    StrFromCodepoints,
+    StrStartsWith,
+    StrEndsWith,
+    StrContains,
+    StrJoin,
+    /// Unicode `White_Space` from both ends.
+    StrTrim,
+    /// `A`-`Z` only.
+    StrToLowerAscii,
+}
+
+/// **An `intrinsic` declaration's operation**, by the name its policy gives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Operation {
+    Each(EachKind),
+    Intrinsic(Intrinsic),
+}
+
+impl Operation {
+    /// The operation an `intrinsic "..."` clause names, if the backend knows
+    /// it. The table is the standard library's, one entry per declaration in
+    /// `packages/pw-std`.
+    pub fn named(name: &str) -> Option<Operation> {
+        use EachKind as E;
+        use Intrinsic as I;
+        Some(match name {
+            "list.map" => Operation::Each(E::Map),
+            "list.filter" => Operation::Each(E::Filter),
+            "list.fold" => Operation::Each(E::Fold),
+            "list.any" => Operation::Each(E::Any),
+            "list.all" => Operation::Each(E::All),
+            "list.find" => Operation::Each(E::Find),
+            "list.sort_by" => Operation::Each(E::SortBy),
+            "list.length" => Operation::Intrinsic(I::ListLength),
+            "list.get" => Operation::Intrinsic(I::ListGet),
+            "list.take" => Operation::Intrinsic(I::ListTake),
+            "list.concat" => Operation::Intrinsic(I::ListConcat),
+            "string.length" => Operation::Intrinsic(I::StrLength),
+            "string.codepoints" => Operation::Intrinsic(I::StrCodepoints),
+            "string.from_codepoints" => Operation::Intrinsic(I::StrFromCodepoints),
+            "string.starts_with" => Operation::Intrinsic(I::StrStartsWith),
+            "string.ends_with" => Operation::Intrinsic(I::StrEndsWith),
+            "string.contains" => Operation::Intrinsic(I::StrContains),
+            "string.join" => Operation::Intrinsic(I::StrJoin),
+            "string.trim" => Operation::Intrinsic(I::StrTrim),
+            "string.to_lower_ascii" => Operation::Intrinsic(I::StrToLowerAscii),
+            _ => return None,
+        })
+    }
 }
 
 /// An operator on two values of one primitive type.
@@ -329,7 +439,10 @@ impl Instr {
             | Instr::Unary { result, .. }
             | Instr::If { result, .. }
             | Instr::Concat { result, .. }
-            | Instr::Format { result, .. } => *result,
+            | Instr::Format { result, .. }
+            | Instr::Each { result, .. }
+            | Instr::Intrinsic { result, .. }
+            | Instr::MakeList { result, .. } => *result,
         }
     }
 
@@ -346,7 +459,10 @@ impl Instr {
             | Instr::Unary { ty, .. }
             | Instr::If { ty, .. }
             | Instr::Concat { ty, .. }
-            | Instr::Format { ty, .. } => ty,
+            | Instr::Format { ty, .. }
+            | Instr::Each { ty, .. }
+            | Instr::Intrinsic { ty, .. }
+            | Instr::MakeList { ty, .. } => ty,
         }
     }
 
@@ -357,6 +473,7 @@ impl Instr {
         match self {
             Instr::Match { arms, .. } => arms.iter().map(|a| &a.body).collect(),
             Instr::If { then, els, .. } => vec![then, els],
+            Instr::Each { body, .. } => vec![body],
             _ => Vec::new(),
         }
     }

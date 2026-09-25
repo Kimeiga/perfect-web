@@ -38,8 +38,8 @@ done:
    comparisons, and calls between compiled declarations, inlined. Each has a
    test run through the host and a mutation control (`just e10-pure`). Still
    refused: declared variants built or matched, recursion, generic callees.
-   Next, the standard library: list and string operations the shard rule and
-   the ranking need, then the template gaps.
+   The standard library came next (ADR-0040): `List` and `String`, compiled.
+   Next: the kiokun shard rule and ranking in Pleris, then the template gaps.
 3. ~~**Compiled resumable handler bodies**~~ DONE 2026-09-25 (ADR-0033). Then
    step 10. Two things the handler work left open, in order of need:
    - captures as a patched part, so that a captured field a patch changes is

@@ -1302,6 +1302,22 @@ impl Enc<'_> {
             } => return self.branch(*result, *cond, then, els, ty),
             Instr::Concat { result, parts, .. } => return self.concat(*result, parts),
             Instr::Format { result, value, .. } => return self.format(*result, *value),
+            Instr::MakeList { result, items, ty } => return self.make_list(*result, items, ty),
+            Instr::Intrinsic {
+                result,
+                op,
+                args,
+                ty,
+            } => return self.intrinsic(*result, *op, args, ty),
+            Instr::Each {
+                result,
+                kind,
+                list,
+                seed,
+                params,
+                body,
+                ty,
+            } => return self.each(*result, *kind, *list, *seed, params, body, ty),
         }
         Encoding::Encoded(())
     }
@@ -1885,6 +1901,857 @@ impl Enc<'_> {
         Encoding::Encoded(())
     }
 
+    /// The element type of a list's component type.
+    fn element_of(&self, list: WitType) -> Option<WitType> {
+        match dealias(self.resolve, list) {
+            WitType::Id(id) => match &self.resolve.types[id].kind {
+                TypeDefKind::List(e) => Some(*e),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// A type's size and alignment in memory, from `SizeAlign`.
+    fn layout(&self, t: &WitType) -> (u32, u32) {
+        (
+            self.sizes.size(t).size_wasm32() as u32,
+            self.sizes.align(t).align_wasm32() as u32,
+        )
+    }
+
+    /// Allocate `count * size` bytes, `count` an `i32` local: the product in
+    /// 64 bits, and a trap past what one region could hold.
+    fn alloc_array(&mut self, count: u32, size: u32, align: u32) -> u32 {
+        use wasm_encoder::Instruction as I;
+        let bytes = self.locals.fresh(ValType::I64);
+        self.ops.extend([
+            I::LocalGet(count),
+            I::I64ExtendI32U,
+            I::I64Const(size as i64),
+            I::I64Mul,
+            I::LocalTee(bytes),
+            I::I64Const(i32::MAX as i64),
+            I::I64GtU,
+            I::If(wasm_encoder::BlockType::Empty),
+            I::Unreachable,
+            I::End,
+        ]);
+        let out = self.locals.fresh(ValType::I32);
+        self.ops.extend([
+            I::I32Const(0),
+            I::I32Const(0),
+            I::I32Const(align as i32),
+            I::LocalGet(bytes),
+            I::I32WrapI64,
+            I::Call(self.realloc_index),
+            I::LocalSet(out),
+        ]);
+        out
+    }
+
+    /// A fresh local holding `base + index * size`.
+    fn element_address(&mut self, base: u32, index: u32, size: u32) -> u32 {
+        use wasm_encoder::Instruction as I;
+        let at = self.locals.fresh(ValType::I32);
+        self.ops.extend([
+            I::LocalGet(base),
+            I::LocalGet(index),
+            I::I32Const(size as i32),
+            I::I32Mul,
+            I::I32Add,
+            I::LocalSet(at),
+        ]);
+        at
+    }
+
+    /// Store a value's layout at `addr + offset`: copied when it is in memory,
+    /// written from its flat values otherwise.
+    fn store_at(&mut self, value: ValueId, ty: WitType, addr: u32, offset: u64) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let Some(h) = self.held.get(&value).cloned() else {
+            blocked!("`{}` stores {value:?} and nothing defines it", self.export);
+        };
+        let Some(ht) = h.ty() else {
+            blocked!("`{}` stores a call with no result", self.export);
+        };
+        if !same_type(resolve, ht, &ty) {
+            blocked!(
+                "`{}` stores a value of another component type in a list",
+                self.export
+            );
+        }
+        match h {
+            Held::Memory { ptr, .. } => {
+                self.ops.push(I::LocalGet(addr));
+                if offset != 0 {
+                    self.ops.push(I::I32Const(offset as i32));
+                    self.ops.push(I::I32Add);
+                }
+                self.ops.push(I::LocalGet(ptr));
+                self.ops
+                    .push(I::I32Const(sizes.size(&ty).size_wasm32() as i32));
+                self.ops.push(I::MemoryCopy {
+                    src_mem: 0,
+                    dst_mem: 0,
+                });
+                Encoding::Encoded(())
+            }
+            Held::Flat { locals, .. } => {
+                match store(resolve, sizes, &ty, addr, offset, &locals, &mut self.ops) {
+                    Encoding::Encoded(_) => Encoding::Encoded(()),
+                    other => other.map(|_| ()),
+                }
+            }
+            Held::Nothing => blocked!("`{}` stores a call with no result", self.export),
+        }
+    }
+
+    /// `memory.copy(dst, src, size)`, from locals and a constant size.
+    fn copy(&mut self, dst: u32, src: u32, size: u32) {
+        use wasm_encoder::Instruction as I;
+        self.ops.extend([
+            I::LocalGet(dst),
+            I::LocalGet(src),
+            I::I32Const(size as i32),
+            I::MemoryCopy {
+                src_mem: 0,
+                dst_mem: 0,
+            },
+        ]);
+    }
+
+    /// **`[a, b, c]`**: the elements, one after another, in the region.
+    fn make_list(&mut self, result: ValueId, items: &[ValueId], ty: &Type) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let Some(lt) = self.type_of(result, ty) else {
+            refuse!(
+                "a list whose component type nothing fixes",
+                "`{}` builds a {ty:?}",
+                self.export
+            );
+        };
+        let Some(et) = self.element_of(lt) else {
+            blocked!("`{}` builds a list of a type that is not one", self.export);
+        };
+        let (size, align) = self.layout(&et);
+        let base = self.locals.fresh(ValType::I32);
+        self.ops.extend([
+            I::I32Const(0),
+            I::I32Const(0),
+            I::I32Const(align as i32),
+            I::I32Const((size as usize * items.len()) as i32),
+            I::Call(self.realloc_index),
+            I::LocalSet(base),
+        ]);
+        for (i, item) in items.iter().enumerate() {
+            match self.store_at(*item, et, base, (i as u64) * size as u64) {
+                Encoding::Encoded(()) => {}
+                other => return other,
+            }
+        }
+        let len = self.locals.fresh(ValType::I32);
+        self.ops
+            .extend([I::I32Const(items.len() as i32), I::LocalSet(len)]);
+        self.held.insert(
+            result,
+            Held::Flat {
+                ty: lt,
+                locals: vec![base, len],
+            },
+        );
+        Encoding::Encoded(())
+    }
+
+    /// Bind a loop's parameters and emit its body: the region's value is left
+    /// in `held`.
+    fn loop_body(&mut self, binds: &[(ValueId, Held)], body: &super::ir::Region) -> Encoding<()> {
+        for (v, h) in binds {
+            self.held.insert(*v, h.clone());
+        }
+        self.region(&body.instrs)
+    }
+
+    /// **A loop over a list** (ADR-0040): the body is emitted once, inside
+    /// the loop, with its parameters' locals set for each element.
+    #[allow(clippy::too_many_arguments)]
+    fn each(
+        &mut self,
+        result: ValueId,
+        kind: super::ir::EachKind,
+        list: ValueId,
+        seed: Option<ValueId>,
+        params: &[ValueId],
+        body: &super::ir::Region,
+        ty: &Type,
+    ) -> Encoding<()> {
+        use super::ir::EachKind as K;
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let (lt, ls) = match self.flat_locals(list) {
+            Encoding::Encoded(x) => x,
+            other => return other.map(|_| unreachable!()),
+        };
+        let Some(et) = self.element_of(lt) else {
+            blocked!("`{}` loops over a value that is not a list", self.export);
+        };
+        let (esize, ealign) = self.layout(&et);
+        let (ptr, len) = (ls[0], ls[1]);
+        let Some(rt) = self.type_of(result, ty) else {
+            refuse!(
+                "a list operation whose component type nothing fixes",
+                "`{}`'s `{kind:?}` produces a {ty:?}",
+                self.export
+            );
+        };
+        let item_of = |this: &mut Self, i: u32| {
+            let at = this.element_address(ptr, i, esize);
+            Held::Memory { ty: et, ptr: at }
+        };
+        if kind == K::SortBy {
+            return self.sort_by(result, rt, ptr, len, et, params, body);
+        }
+        let i = self.locals.fresh(ValType::I32);
+        self.ops.extend([I::I32Const(0), I::LocalSet(i)]);
+        match kind {
+            K::Map => {
+                let Some(ut) = self.element_of(rt) else {
+                    blocked!("`{}` maps into a type that is not a list", self.export);
+                };
+                let (usz, ualign) = self.layout(&ut);
+                let out = self.alloc_array(len, usz, ualign);
+                self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+                self.ops
+                    .extend([I::LocalGet(i), I::LocalGet(len), I::I32GeU, I::BrIf(1)]);
+                let item = item_of(self, i);
+                if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+                    self.loop_body(&[(params[0], item)], body)
+                {
+                    return other;
+                }
+                let dst = self.element_address(out, i, usz);
+                match self.store_at(body.value, ut, dst, 0) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.ops.extend([
+                    I::LocalGet(i),
+                    I::I32Const(1),
+                    I::I32Add,
+                    I::LocalSet(i),
+                    I::Br(0),
+                    I::End,
+                    I::End,
+                ]);
+                self.held.insert(
+                    result,
+                    Held::Flat {
+                        ty: rt,
+                        locals: vec![out, len],
+                    },
+                );
+            }
+            K::Filter => {
+                let out = self.alloc_array(len, esize, ealign);
+                let count = self.locals.fresh(ValType::I32);
+                self.ops.extend([I::I32Const(0), I::LocalSet(count)]);
+                self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+                self.ops
+                    .extend([I::LocalGet(i), I::LocalGet(len), I::I32GeU, I::BrIf(1)]);
+                let item = item_of(self, i);
+                let Held::Memory { ptr: at, .. } = item else {
+                    unreachable!("an element is in memory")
+                };
+                if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+                    self.loop_body(&[(params[0], item)], body)
+                {
+                    return other;
+                }
+                let keep = match self.flat_locals(body.value) {
+                    Encoding::Encoded((_, c)) => c[0],
+                    other => return other.map(|_| unreachable!()),
+                };
+                self.ops.extend([I::LocalGet(keep), I::If(Empty)]);
+                let dst = self.element_address(out, count, esize);
+                self.copy(dst, at, esize);
+                self.ops.extend([
+                    I::LocalGet(count),
+                    I::I32Const(1),
+                    I::I32Add,
+                    I::LocalSet(count),
+                    I::End,
+                ]);
+                self.ops.extend([
+                    I::LocalGet(i),
+                    I::I32Const(1),
+                    I::I32Add,
+                    I::LocalSet(i),
+                    I::Br(0),
+                    I::End,
+                    I::End,
+                ]);
+                self.held.insert(
+                    result,
+                    Held::Flat {
+                        ty: rt,
+                        locals: vec![out, count],
+                    },
+                );
+            }
+            K::Fold => {
+                let Some(seed) = seed else {
+                    blocked!("`{}`'s fold has no seed", self.export);
+                };
+                let holder = self.holder(rt);
+                match self.move_into(seed, &holder) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+                self.ops
+                    .extend([I::LocalGet(i), I::LocalGet(len), I::I32GeU, I::BrIf(1)]);
+                let item = item_of(self, i);
+                if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+                    self.loop_body(&[(params[0], holder.clone()), (params[1], item)], body)
+                {
+                    return other;
+                }
+                match self.move_into(body.value, &holder) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.ops.extend([
+                    I::LocalGet(i),
+                    I::I32Const(1),
+                    I::I32Add,
+                    I::LocalSet(i),
+                    I::Br(0),
+                    I::End,
+                    I::End,
+                ]);
+                self.held.insert(result, holder);
+            }
+            K::Any | K::All | K::Find => {
+                // `any` stops at the first `true`, `all` at the first
+                // `false`, `find` at the first `true`, keeping its address.
+                let out = self.locals.fresh(ValType::I32);
+                let initial = i32::from(kind == K::All);
+                self.ops.extend([I::I32Const(initial), I::LocalSet(out)]);
+                self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+                self.ops
+                    .extend([I::LocalGet(i), I::LocalGet(len), I::I32GeU, I::BrIf(1)]);
+                let item = item_of(self, i);
+                let Held::Memory { ptr: at, .. } = item else {
+                    unreachable!("an element is in memory")
+                };
+                if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+                    self.loop_body(&[(params[0], item)], body)
+                {
+                    return other;
+                }
+                let c = match self.flat_locals(body.value) {
+                    Encoding::Encoded((_, c)) => c[0],
+                    other => return other.map(|_| unreachable!()),
+                };
+                self.ops.push(I::LocalGet(c));
+                if kind == K::All {
+                    self.ops.push(I::I32Eqz);
+                }
+                self.ops.push(I::If(Empty));
+                match kind {
+                    K::Find => self.ops.extend([I::LocalGet(at), I::LocalSet(out)]),
+                    K::Any => self.ops.extend([I::I32Const(1), I::LocalSet(out)]),
+                    _ => self.ops.extend([I::I32Const(0), I::LocalSet(out)]),
+                }
+                // Out of the `if`, the loop and the block.
+                self.ops.extend([I::Br(2), I::End]);
+                self.ops.extend([
+                    I::LocalGet(i),
+                    I::I32Const(1),
+                    I::I32Add,
+                    I::LocalSet(i),
+                    I::Br(0),
+                    I::End,
+                    I::End,
+                ]);
+                if kind == K::Find {
+                    // `out` is the found element's address, or 0, which no
+                    // allocation has.
+                    let Some((_, _, offset)) =
+                        case_layout(self.resolve, self.sizes, rt, BuiltinCase::Some)
+                    else {
+                        blocked!("`{}` finds into a type that is not an option", self.export);
+                    };
+                    let area = self.locals.fresh(ValType::I32);
+                    allocate(self.sizes, &rt, self.realloc_index, area, &mut self.ops);
+                    self.ops.extend([
+                        I::LocalGet(area),
+                        I::LocalGet(out),
+                        I::I32Const(0),
+                        I::I32Ne,
+                        I::I32Store8(MemArg {
+                            offset: 0,
+                            align: 0,
+                            memory_index: 0,
+                        }),
+                        I::LocalGet(out),
+                        I::If(Empty),
+                        I::LocalGet(area),
+                        I::I32Const(offset as i32),
+                        I::I32Add,
+                        I::LocalGet(out),
+                        I::I32Const(esize as i32),
+                        I::MemoryCopy {
+                            src_mem: 0,
+                            dst_mem: 0,
+                        },
+                        I::End,
+                    ]);
+                    self.held.insert(result, Held::Memory { ty: rt, ptr: area });
+                } else {
+                    self.held.insert(
+                        result,
+                        Held::Flat {
+                            ty: rt,
+                            locals: vec![out],
+                        },
+                    );
+                }
+            }
+            K::SortBy => unreachable!("sorted above"),
+        }
+        Encoding::Encoded(())
+    }
+
+    /// **A stable merge sort**, bottom-up, between two buffers (ADR-0040
+    /// §5). The comparison is emitted once, in the merge step.
+    #[allow(clippy::too_many_arguments)]
+    fn sort_by(
+        &mut self,
+        result: ValueId,
+        rt: WitType,
+        ptr: u32,
+        len: u32,
+        et: WitType,
+        params: &[ValueId],
+        body: &super::ir::Region,
+    ) -> Encoding<()> {
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let (esize, ealign) = self.layout(&et);
+        let (src, dst) = (
+            self.alloc_array(len, esize, ealign),
+            self.alloc_array(len, esize, ealign),
+        );
+        let bytes = self.locals.fresh(ValType::I32);
+        self.ops.extend([
+            I::LocalGet(len),
+            I::I32Const(esize as i32),
+            I::I32Mul,
+            I::LocalSet(bytes),
+            I::LocalGet(src),
+            I::LocalGet(ptr),
+            I::LocalGet(bytes),
+            I::MemoryCopy {
+                src_mem: 0,
+                dst_mem: 0,
+            },
+        ]);
+        let fresh = |this: &mut Self| this.locals.fresh(ValType::I32);
+        let (width, lo, mid, hi, i, j, k, take, swap) = (
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+        );
+        let min = |a: u32, b: u32| {
+            [
+                I::LocalGet(a),
+                I::LocalGet(b),
+                I::LocalGet(a),
+                I::LocalGet(b),
+                I::I32LtU,
+                I::Select,
+            ]
+        };
+        self.ops.extend([I::I32Const(1), I::LocalSet(width)]);
+        // while width < len
+        self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+        self.ops
+            .extend([I::LocalGet(width), I::LocalGet(len), I::I32GeU, I::BrIf(1)]);
+        self.ops.extend([I::I32Const(0), I::LocalSet(lo)]);
+        //   while lo < len
+        self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+        self.ops
+            .extend([I::LocalGet(lo), I::LocalGet(len), I::I32GeU, I::BrIf(1)]);
+        let sum = self.locals.fresh(ValType::I32);
+        self.ops.extend([
+            I::LocalGet(lo),
+            I::LocalGet(width),
+            I::I32Add,
+            I::LocalSet(sum),
+        ]);
+        self.ops.extend(min(sum, len));
+        self.ops.push(I::LocalSet(mid));
+        self.ops.extend([
+            I::LocalGet(lo),
+            I::LocalGet(width),
+            I::I32Const(1),
+            I::I32Shl,
+            I::I32Add,
+            I::LocalSet(sum),
+        ]);
+        self.ops.extend(min(sum, len));
+        self.ops.push(I::LocalSet(hi));
+        self.ops.extend([
+            I::LocalGet(lo),
+            I::LocalSet(i),
+            I::LocalGet(mid),
+            I::LocalSet(j),
+            I::LocalGet(lo),
+            I::LocalSet(k),
+        ]);
+        //     while k < hi
+        self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+        self.ops
+            .extend([I::LocalGet(k), I::LocalGet(hi), I::I32GeU, I::BrIf(1)]);
+        // take = j >= hi ? 1 : (i >= mid ? 0 : compare(src[i], src[j]) <= 0)
+        self.ops.extend([
+            I::LocalGet(j),
+            I::LocalGet(hi),
+            I::I32GeU,
+            I::If(Empty),
+            I::I32Const(1),
+            I::LocalSet(take),
+            I::Else,
+            I::LocalGet(i),
+            I::LocalGet(mid),
+            I::I32GeU,
+            I::If(Empty),
+            I::I32Const(0),
+            I::LocalSet(take),
+            I::Else,
+        ]);
+        let a = self.element_address(src, i, esize);
+        let b = self.element_address(src, j, esize);
+        if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) = self.loop_body(
+            &[
+                (params[0], Held::Memory { ty: et, ptr: a }),
+                (params[1], Held::Memory { ty: et, ptr: b }),
+            ],
+            body,
+        ) {
+            return other;
+        }
+        let order = match self.flat_locals(body.value) {
+            Encoding::Encoded((_, c)) => c[0],
+            other => return other.map(|_| unreachable!()),
+        };
+        self.ops.extend([
+            I::LocalGet(order),
+            I::I64Const(0),
+            I::I64LeS,
+            I::LocalSet(take),
+            I::End,
+            I::End,
+        ]);
+        let to = self.element_address(dst, k, esize);
+        self.ops.extend([I::LocalGet(take), I::If(Empty)]);
+        let from_i = self.element_address(src, i, esize);
+        self.copy(to, from_i, esize);
+        self.ops.extend([
+            I::LocalGet(i),
+            I::I32Const(1),
+            I::I32Add,
+            I::LocalSet(i),
+            I::Else,
+        ]);
+        let from_j = self.element_address(src, j, esize);
+        self.copy(to, from_j, esize);
+        self.ops.extend([
+            I::LocalGet(j),
+            I::I32Const(1),
+            I::I32Add,
+            I::LocalSet(j),
+            I::End,
+        ]);
+        self.ops.extend([
+            I::LocalGet(k),
+            I::I32Const(1),
+            I::I32Add,
+            I::LocalSet(k),
+            I::Br(0),
+            I::End,
+            I::End,
+        ]);
+        //   lo += 2 * width
+        self.ops.extend([
+            I::LocalGet(lo),
+            I::LocalGet(width),
+            I::I32Const(1),
+            I::I32Shl,
+            I::I32Add,
+            I::LocalSet(lo),
+            I::Br(0),
+            I::End,
+            I::End,
+        ]);
+        // swap the buffers; width *= 2
+        self.ops.extend([
+            I::LocalGet(src),
+            I::LocalSet(swap),
+            I::LocalGet(dst),
+            I::LocalSet(src),
+            I::LocalGet(swap),
+            I::LocalSet(dst),
+            I::LocalGet(width),
+            I::I32Const(1),
+            I::I32Shl,
+            I::LocalSet(width),
+            I::Br(0),
+            I::End,
+            I::End,
+        ]);
+        self.held.insert(
+            result,
+            Held::Flat {
+                ty: rt,
+                locals: vec![src, len],
+            },
+        );
+        Encoding::Encoded(())
+    }
+
+    /// **A standard-library operation on values** (ADR-0040).
+    fn intrinsic(
+        &mut self,
+        result: ValueId,
+        op: super::ir::Intrinsic,
+        args: &[ValueId],
+        ty: &Type,
+    ) -> Encoding<()> {
+        use super::ir::Intrinsic as N;
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let mut flats = Vec::new();
+        for a in args {
+            match self.flat_locals(*a) {
+                Encoding::Encoded(x) => flats.push(x),
+                other => return other.map(|_| unreachable!()),
+            }
+        }
+        let Some(rt) = self.type_of(result, ty) else {
+            refuse!(
+                "an intrinsic whose component type nothing fixes",
+                "`{}`'s `{op:?}` produces a {ty:?}",
+                self.export
+            );
+        };
+        // A helper's results, into fresh locals of their core types.
+        let call = |this: &mut Self, h: Helper, inputs: &[u32]| -> Vec<u32> {
+            let index = this.helpers.index(h);
+            for l in inputs {
+                this.ops.push(I::LocalGet(*l));
+            }
+            this.ops.push(I::Call(index));
+            let (_, results) = h.signature();
+            let outs: Vec<u32> = results.iter().map(|t| this.locals.fresh(*t)).collect();
+            for l in outs.iter().rev() {
+                this.ops.push(I::LocalSet(*l));
+            }
+            outs
+        };
+        let held = match op {
+            N::ListLength => {
+                let n = self.locals.fresh(ValType::I64);
+                self.ops
+                    .extend([I::LocalGet(flats[0].1[1]), I::I64ExtendI32U, I::LocalSet(n)]);
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![n],
+                }
+            }
+            N::ListTake => {
+                // min(max(n, 0), len), in 64 bits.
+                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let n = flats[1].1[0];
+                let wide = self.locals.fresh(ValType::I64);
+                let out = self.locals.fresh(ValType::I32);
+                self.ops.extend([
+                    I::LocalGet(len),
+                    I::I64ExtendI32U,
+                    I::LocalSet(wide),
+                    I::LocalGet(n),
+                    I::I64Const(0),
+                    I::I64LtS,
+                    I::If(Empty),
+                    I::I64Const(0),
+                    I::LocalSet(wide),
+                    I::Else,
+                    I::LocalGet(n),
+                    I::LocalGet(wide),
+                    I::I64LtS,
+                    I::If(Empty),
+                    I::LocalGet(n),
+                    I::LocalSet(wide),
+                    I::End,
+                    I::End,
+                    I::LocalGet(wide),
+                    I::I32WrapI64,
+                    I::LocalSet(out),
+                ]);
+                // A view: lists do not change.
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![ptr, out],
+                }
+            }
+            N::ListGet => {
+                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let index = flats[1].1[0];
+                let Some(et) = self.element_of(flats[0].0) else {
+                    blocked!("`{}` indexes a value that is not a list", self.export);
+                };
+                let (esize, _) = self.layout(&et);
+                let Some((_, _, offset)) =
+                    case_layout(self.resolve, self.sizes, rt, BuiltinCase::Some)
+                else {
+                    blocked!(
+                        "`{}` indexes into a type that is not an option",
+                        self.export
+                    );
+                };
+                let area = self.locals.fresh(ValType::I32);
+                allocate(self.sizes, &rt, self.realloc_index, area, &mut self.ops);
+                let inside = self.locals.fresh(ValType::I32);
+                self.ops.extend([
+                    I::LocalGet(index),
+                    I::I64Const(0),
+                    I::I64GeS,
+                    I::LocalGet(index),
+                    I::LocalGet(len),
+                    I::I64ExtendI32U,
+                    I::I64LtS,
+                    I::I32And,
+                    I::LocalSet(inside),
+                    I::LocalGet(area),
+                    I::LocalGet(inside),
+                    I::I32Store8(MemArg {
+                        offset: 0,
+                        align: 0,
+                        memory_index: 0,
+                    }),
+                    I::LocalGet(inside),
+                    I::If(Empty),
+                    I::LocalGet(area),
+                    I::I32Const(offset as i32),
+                    I::I32Add,
+                    I::LocalGet(ptr),
+                    I::LocalGet(index),
+                    I::I32WrapI64,
+                    I::I32Const(esize as i32),
+                    I::I32Mul,
+                    I::I32Add,
+                    I::I32Const(esize as i32),
+                    I::MemoryCopy {
+                        src_mem: 0,
+                        dst_mem: 0,
+                    },
+                    I::End,
+                ]);
+                Held::Memory { ty: rt, ptr: area }
+            }
+            N::ListConcat => {
+                let (pa, la) = (flats[0].1[0], flats[0].1[1]);
+                let (pb, lb) = (flats[1].1[0], flats[1].1[1]);
+                let Some(et) = self.element_of(flats[0].0) else {
+                    blocked!("`{}` joins a value that is not a list", self.export);
+                };
+                let (esize, ealign) = self.layout(&et);
+                let total = self.locals.fresh(ValType::I32);
+                self.ops.extend([
+                    I::LocalGet(la),
+                    I::LocalGet(lb),
+                    I::I32Add,
+                    I::LocalSet(total),
+                ]);
+                let out = self.alloc_array(total, esize, ealign);
+                let second = self.element_address(out, la, esize);
+                self.ops.extend([
+                    I::LocalGet(out),
+                    I::LocalGet(pa),
+                    I::LocalGet(la),
+                    I::I32Const(esize as i32),
+                    I::I32Mul,
+                    I::MemoryCopy {
+                        src_mem: 0,
+                        dst_mem: 0,
+                    },
+                    I::LocalGet(second),
+                    I::LocalGet(pb),
+                    I::LocalGet(lb),
+                    I::I32Const(esize as i32),
+                    I::I32Mul,
+                    I::MemoryCopy {
+                        src_mem: 0,
+                        dst_mem: 0,
+                    },
+                ]);
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![out, total],
+                }
+            }
+            N::StrLength => Held::Flat {
+                ty: rt,
+                locals: call(self, Helper::Utf8Count, &flats[0].1),
+            },
+            N::StrCodepoints => Held::Flat {
+                ty: rt,
+                locals: call(self, Helper::Codepoints, &flats[0].1),
+            },
+            N::StrFromCodepoints => Held::Flat {
+                ty: rt,
+                locals: call(self, Helper::FromCodepoints, &flats[0].1),
+            },
+            N::StrStartsWith | N::StrEndsWith | N::StrContains => {
+                let h = match op {
+                    N::StrStartsWith => Helper::StartsWith,
+                    N::StrEndsWith => Helper::EndsWith,
+                    _ => Helper::Contains,
+                };
+                let inputs = [flats[0].1[0], flats[0].1[1], flats[1].1[0], flats[1].1[1]];
+                Held::Flat {
+                    ty: rt,
+                    locals: call(self, h, &inputs),
+                }
+            }
+            N::StrJoin => {
+                let inputs = [flats[0].1[0], flats[0].1[1], flats[1].1[0], flats[1].1[1]];
+                Held::Flat {
+                    ty: rt,
+                    locals: call(self, Helper::Join, &inputs),
+                }
+            }
+            N::StrTrim => Held::Flat {
+                ty: rt,
+                locals: call(self, Helper::Trim, &flats[0].1),
+            },
+            N::StrToLowerAscii => Held::Flat {
+                ty: rt,
+                locals: call(self, Helper::LowerAscii, &flats[0].1),
+            },
+        };
+        self.held.insert(result, held);
+        Encoding::Encoded(())
+    }
+
     /// **A field of a record**: an address inside its layout, or a slice of
     /// its flat values.
     fn project(&mut self, result: ValueId, of: ValueId, field: u32) -> Encoding<()> {
@@ -2132,6 +2999,722 @@ impl Enc<'_> {
             self.held.insert(b, Held::Memory { ty: pt, ptr: at });
         }
         self.settle(&arm.body, holder)
+    }
+}
+
+/// `i32.load8_u` at `offset` past the address on the stack.
+fn byte_at(offset: u64) -> wasm_encoder::Instruction<'static> {
+    wasm_encoder::Instruction::I32Load8U(MemArg {
+        offset,
+        align: 0,
+        memory_index: 0,
+    })
+}
+
+/// `i32.store8` at `offset` past the address below the value on the stack.
+fn byte_to(offset: u64) -> wasm_encoder::Instruction<'static> {
+    wasm_encoder::Instruction::I32Store8(MemArg {
+        offset,
+        align: 0,
+        memory_index: 0,
+    })
+}
+
+/// Decode the UTF-8 code point at the address in `at` into `cp`, its byte
+/// length into `n`. The text is valid UTF-8: every string a component holds
+/// came through the Canonical ABI, which lifts only valid UTF-8, or was made
+/// here from valid pieces.
+fn decode_utf8(at: u32, b0: u32, cp: u32, n: u32) -> Vec<wasm_encoder::Instruction<'static>> {
+    use wasm_encoder::BlockType::Empty;
+    use wasm_encoder::Instruction as I;
+    let continuation = |offset: u64, shift: i32| {
+        let mut v = vec![
+            I::LocalGet(at),
+            byte_at(offset),
+            I::I32Const(0x3F),
+            I::I32And,
+        ];
+        if shift > 0 {
+            v.extend([I::I32Const(shift), I::I32Shl]);
+        }
+        v
+    };
+    let mut v = vec![
+        I::LocalGet(at),
+        byte_at(0),
+        I::LocalTee(b0),
+        I::I32Const(0x80),
+        I::I32LtU,
+        I::If(Empty),
+        I::LocalGet(b0),
+        I::LocalSet(cp),
+        I::I32Const(1),
+        I::LocalSet(n),
+        I::Else,
+        I::LocalGet(b0),
+        I::I32Const(0xE0),
+        I::I32LtU,
+        I::If(Empty),
+        I::LocalGet(b0),
+        I::I32Const(0x1F),
+        I::I32And,
+        I::I32Const(6),
+        I::I32Shl,
+    ];
+    v.extend(continuation(1, 0));
+    v.extend([
+        I::I32Or,
+        I::LocalSet(cp),
+        I::I32Const(2),
+        I::LocalSet(n),
+        I::Else,
+        I::LocalGet(b0),
+        I::I32Const(0xF0),
+        I::I32LtU,
+        I::If(Empty),
+        I::LocalGet(b0),
+        I::I32Const(0x0F),
+        I::I32And,
+        I::I32Const(12),
+        I::I32Shl,
+    ]);
+    v.extend(continuation(1, 6));
+    v.push(I::I32Or);
+    v.extend(continuation(2, 0));
+    v.extend([
+        I::I32Or,
+        I::LocalSet(cp),
+        I::I32Const(3),
+        I::LocalSet(n),
+        I::Else,
+        I::LocalGet(b0),
+        I::I32Const(0x07),
+        I::I32And,
+        I::I32Const(18),
+        I::I32Shl,
+    ]);
+    v.extend(continuation(1, 12));
+    v.push(I::I32Or);
+    v.extend(continuation(2, 6));
+    v.push(I::I32Or);
+    v.extend(continuation(3, 0));
+    v.extend([
+        I::I32Or,
+        I::LocalSet(cp),
+        I::I32Const(4),
+        I::LocalSet(n),
+        I::End,
+        I::End,
+        I::End,
+    ]);
+    v
+}
+
+/// Push whether the code point in `cp` has Unicode's `White_Space` property:
+/// the set Rust's `char::is_whitespace` tests.
+fn white_space(cp: u32) -> Vec<wasm_encoder::Instruction<'static>> {
+    use wasm_encoder::Instruction as I;
+    // U+0009..=U+000D
+    let mut v = vec![
+        I::LocalGet(cp),
+        I::I32Const(0x09),
+        I::I32Sub,
+        I::I32Const(5),
+        I::I32LtU,
+    ];
+    for single in [
+        0x20, 0x85, 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000,
+    ] {
+        v.extend([I::LocalGet(cp), I::I32Const(single), I::I32Eq, I::I32Or]);
+    }
+    // U+2000..=U+200A
+    v.extend([
+        I::LocalGet(cp),
+        I::I32Const(0x2000),
+        I::I32Sub,
+        I::I32Const(11),
+        I::I32LtU,
+        I::I32Or,
+    ]);
+    v
+}
+
+/// The bytes at `a + i` and `b + i` differ: push that as an `i32`.
+fn bytes_differ(a: u32, b: u32, i: u32) -> Vec<wasm_encoder::Instruction<'static>> {
+    use wasm_encoder::Instruction as I;
+    vec![
+        I::LocalGet(a),
+        I::LocalGet(i),
+        I::I32Add,
+        byte_at(0),
+        I::LocalGet(b),
+        I::LocalGet(i),
+        I::I32Add,
+        byte_at(0),
+        I::I32Ne,
+    ]
+}
+
+/// `i += 1`.
+fn increment(i: u32) -> [wasm_encoder::Instruction<'static>; 4] {
+    use wasm_encoder::Instruction as I;
+    [I::LocalGet(i), I::I32Const(1), I::I32Add, I::LocalSet(i)]
+}
+
+/// The body of each string helper after the first three. Returns the extra
+/// locals and the instructions; the caller wraps them in a `Function`.
+fn string_helper(
+    h: Helper,
+    realloc_index: u32,
+) -> (Vec<(u32, ValType)>, Vec<wasm_encoder::Instruction<'static>>) {
+    use wasm_encoder::BlockType::Empty;
+    use wasm_encoder::Instruction as I;
+    let alloc = |align: i32, size: Vec<I<'static>>, into: u32| {
+        let mut v = vec![I::I32Const(0), I::I32Const(0), I::I32Const(align)];
+        v.extend(size);
+        v.extend([I::Call(realloc_index), I::LocalSet(into)]);
+        v
+    };
+    // `while i < n { body; i += 1 }`, `i` starting at 0.
+    let each = |i: u32, n: u32, body: Vec<I<'static>>| {
+        let mut v = vec![
+            I::I32Const(0),
+            I::LocalSet(i),
+            I::Block(Empty),
+            I::Loop(Empty),
+            I::LocalGet(i),
+            I::LocalGet(n),
+            I::I32GeU,
+            I::BrIf(1),
+        ];
+        v.extend(body);
+        v.extend(increment(i));
+        v.extend([I::Br(0), I::End, I::End]);
+        v
+    };
+    match h {
+        // params 0 p, 1 l; locals 2 i, 3 n (i64)
+        Helper::Utf8Count => {
+            let mut ops = each(
+                2,
+                1,
+                vec![
+                    I::LocalGet(0),
+                    I::LocalGet(2),
+                    I::I32Add,
+                    byte_at(0),
+                    I::I32Const(0xC0),
+                    I::I32And,
+                    I::I32Const(0x80),
+                    I::I32Ne,
+                    I::If(Empty),
+                    I::LocalGet(3),
+                    I::I64Const(1),
+                    I::I64Add,
+                    I::LocalSet(3),
+                    I::End,
+                ],
+            );
+            ops.extend([I::LocalGet(3), I::End]);
+            (vec![(1, ValType::I32), (1, ValType::I64)], ops)
+        }
+        // params 0 p, 1 l; locals 2 i, 3 k, 4 out, 5 count, 6 b0, 7 cp, 8 n, 9 at
+        Helper::Codepoints => {
+            let mut ops = each(
+                2,
+                1,
+                vec![
+                    I::LocalGet(0),
+                    I::LocalGet(2),
+                    I::I32Add,
+                    byte_at(0),
+                    I::I32Const(0xC0),
+                    I::I32And,
+                    I::I32Const(0x80),
+                    I::I32Ne,
+                    I::LocalGet(5),
+                    I::I32Add,
+                    I::LocalSet(5),
+                ],
+            );
+            ops.extend(alloc(8, vec![I::LocalGet(5), I::I32Const(8), I::I32Mul], 4));
+            ops.extend([
+                I::I32Const(0),
+                I::LocalSet(2),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(2),
+                I::LocalGet(1),
+                I::I32GeU,
+                I::BrIf(1),
+                I::LocalGet(0),
+                I::LocalGet(2),
+                I::I32Add,
+                I::LocalSet(9),
+            ]);
+            ops.extend(decode_utf8(9, 6, 7, 8));
+            ops.extend([
+                I::LocalGet(4),
+                I::LocalGet(3),
+                I::I32Const(8),
+                I::I32Mul,
+                I::I32Add,
+                I::LocalGet(7),
+                I::I64ExtendI32U,
+                I::I64Store(MemArg {
+                    offset: 0,
+                    align: 3,
+                    memory_index: 0,
+                }),
+                I::LocalGet(2),
+                I::LocalGet(8),
+                I::I32Add,
+                I::LocalSet(2),
+            ]);
+            ops.extend(increment(3));
+            ops.extend([
+                I::Br(0),
+                I::End,
+                I::End,
+                I::LocalGet(4),
+                I::LocalGet(5),
+                I::End,
+            ]);
+            (vec![(8, ValType::I32)], ops)
+        }
+        // params 0 lp, 1 ll; locals 2 i, 3 bytes, 4 c, 5 out, 6 cur; 7 cp (i64)
+        Helper::FromCodepoints => {
+            let point = |ops: &mut Vec<I<'static>>| {
+                ops.extend([
+                    I::LocalGet(0),
+                    I::LocalGet(2),
+                    I::I32Const(8),
+                    I::I32Mul,
+                    I::I32Add,
+                    I::I64Load(MemArg {
+                        offset: 0,
+                        align: 3,
+                        memory_index: 0,
+                    }),
+                    I::LocalSet(7),
+                ]);
+            };
+            // Pass 1: every value a scalar value, and the byte count.
+            let mut first = Vec::new();
+            point(&mut first);
+            first.extend([
+                I::LocalGet(7),
+                I::I64Const(0),
+                I::I64LtS,
+                I::LocalGet(7),
+                I::I64Const(0x10FFFF),
+                I::I64GtS,
+                I::I32Or,
+                I::LocalGet(7),
+                I::I64Const(0xD800),
+                I::I64GeS,
+                I::LocalGet(7),
+                I::I64Const(0xDFFF),
+                I::I64LeS,
+                I::I32And,
+                I::I32Or,
+                I::If(Empty),
+                I::Unreachable,
+                I::End,
+                I::LocalGet(7),
+                I::I32WrapI64,
+                I::LocalSet(4),
+                // bytes += 1 + (c >= 0x80) + (c >= 0x800) + (c >= 0x10000)
+                I::LocalGet(3),
+                I::I32Const(1),
+                I::I32Add,
+                I::LocalGet(4),
+                I::I32Const(0x80),
+                I::I32GeU,
+                I::I32Add,
+                I::LocalGet(4),
+                I::I32Const(0x800),
+                I::I32GeU,
+                I::I32Add,
+                I::LocalGet(4),
+                I::I32Const(0x10000),
+                I::I32GeU,
+                I::I32Add,
+                I::LocalSet(3),
+            ]);
+            let mut ops = each(2, 1, first);
+            ops.extend(alloc(1, vec![I::LocalGet(3)], 5));
+            ops.extend([I::LocalGet(5), I::LocalSet(6)]);
+            // Pass 2: encode.
+            let mut second = Vec::new();
+            point(&mut second);
+            let unit = |shift: i32, mask: i32, tag: i32, offset: u64| {
+                let mut v = vec![I::LocalGet(6), I::LocalGet(4)];
+                if shift > 0 {
+                    v.extend([I::I32Const(shift), I::I32ShrU]);
+                }
+                v.extend([
+                    I::I32Const(mask),
+                    I::I32And,
+                    I::I32Const(tag),
+                    I::I32Or,
+                    byte_to(offset),
+                ]);
+                v
+            };
+            second.extend([I::LocalGet(7), I::I32WrapI64, I::LocalSet(4)]);
+            second.extend([
+                I::LocalGet(4),
+                I::I32Const(0x80),
+                I::I32LtU,
+                I::If(Empty),
+                I::LocalGet(6),
+                I::LocalGet(4),
+                byte_to(0),
+                I::LocalGet(6),
+                I::I32Const(1),
+                I::I32Add,
+                I::LocalSet(6),
+                I::Else,
+                I::LocalGet(4),
+                I::I32Const(0x800),
+                I::I32LtU,
+                I::If(Empty),
+            ]);
+            second.extend(unit(6, 0x1F, 0xC0, 0));
+            second.extend(unit(0, 0x3F, 0x80, 1));
+            second.extend([
+                I::LocalGet(6),
+                I::I32Const(2),
+                I::I32Add,
+                I::LocalSet(6),
+                I::Else,
+                I::LocalGet(4),
+                I::I32Const(0x10000),
+                I::I32LtU,
+                I::If(Empty),
+            ]);
+            second.extend(unit(12, 0x0F, 0xE0, 0));
+            second.extend(unit(6, 0x3F, 0x80, 1));
+            second.extend(unit(0, 0x3F, 0x80, 2));
+            second.extend([
+                I::LocalGet(6),
+                I::I32Const(3),
+                I::I32Add,
+                I::LocalSet(6),
+                I::Else,
+            ]);
+            second.extend(unit(18, 0x07, 0xF0, 0));
+            second.extend(unit(12, 0x3F, 0x80, 1));
+            second.extend(unit(6, 0x3F, 0x80, 2));
+            second.extend(unit(0, 0x3F, 0x80, 3));
+            second.extend([
+                I::LocalGet(6),
+                I::I32Const(4),
+                I::I32Add,
+                I::LocalSet(6),
+                I::End,
+                I::End,
+                I::End,
+            ]);
+            ops.extend(each(2, 1, second));
+            ops.extend([I::LocalGet(5), I::LocalGet(3), I::End]);
+            (vec![(5, ValType::I32), (1, ValType::I64)], ops)
+        }
+        // params 0 p1, 1 l1, 2 p2, 3 l2; local 4 i
+        Helper::StartsWith => {
+            let mut ops = vec![
+                I::LocalGet(3),
+                I::LocalGet(1),
+                I::I32GtU,
+                I::If(Empty),
+                I::I32Const(0),
+                I::Return,
+                I::End,
+            ];
+            let mut body = bytes_differ(0, 2, 4);
+            body.extend([I::If(Empty), I::I32Const(0), I::Return, I::End]);
+            ops.extend(each(4, 3, body));
+            ops.extend([I::I32Const(1), I::End]);
+            (vec![(1, ValType::I32)], ops)
+        }
+        // params 0 p1, 1 l1, 2 p2, 3 l2; locals 4 i, 5 base
+        Helper::EndsWith => {
+            let mut ops = vec![
+                I::LocalGet(3),
+                I::LocalGet(1),
+                I::I32GtU,
+                I::If(Empty),
+                I::I32Const(0),
+                I::Return,
+                I::End,
+                I::LocalGet(0),
+                I::LocalGet(1),
+                I::I32Add,
+                I::LocalGet(3),
+                I::I32Sub,
+                I::LocalSet(5),
+            ];
+            let mut body = bytes_differ(5, 2, 4);
+            body.extend([I::If(Empty), I::I32Const(0), I::Return, I::End]);
+            ops.extend(each(4, 3, body));
+            ops.extend([I::I32Const(1), I::End]);
+            (vec![(2, ValType::I32)], ops)
+        }
+        // params 0 p1, 1 l1, 2 p2, 3 l2; locals 4 start, 5 i, 6 last, 7 here
+        Helper::Contains => {
+            let mut ops = vec![
+                I::LocalGet(3),
+                I::LocalGet(1),
+                I::I32GtU,
+                I::If(Empty),
+                I::I32Const(0),
+                I::Return,
+                I::End,
+                I::LocalGet(1),
+                I::LocalGet(3),
+                I::I32Sub,
+                I::LocalSet(6),
+                I::I32Const(0),
+                I::LocalSet(4),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(4),
+                I::LocalGet(6),
+                I::I32GtU,
+                I::BrIf(1),
+                I::LocalGet(0),
+                I::LocalGet(4),
+                I::I32Add,
+                I::LocalSet(7),
+                I::I32Const(0),
+                I::LocalSet(5),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(5),
+                I::LocalGet(3),
+                I::I32GeU,
+                I::If(Empty),
+                I::I32Const(1),
+                I::Return,
+                I::End,
+            ];
+            ops.extend(bytes_differ(7, 2, 5));
+            ops.push(I::BrIf(1));
+            ops.extend(increment(5));
+            ops.extend([I::Br(0), I::End, I::End]);
+            ops.extend(increment(4));
+            ops.extend([I::Br(0), I::End, I::End, I::I32Const(0), I::End]);
+            (vec![(4, ValType::I32)], ops)
+        }
+        // params 0 lp, 1 ll, 2 sp, 3 sl; locals 4 i, 5 out, 6 cur, 7 ep, 8 el, 9 total; 10 wide (i64)
+        Helper::Join => {
+            let element = |field: u64, into: u32| {
+                vec![
+                    I::LocalGet(0),
+                    I::LocalGet(4),
+                    I::I32Const(8),
+                    I::I32Mul,
+                    I::I32Add,
+                    I::I32Load(MemArg {
+                        offset: field,
+                        align: 2,
+                        memory_index: 0,
+                    }),
+                    I::LocalSet(into),
+                ]
+            };
+            // The total length, in 64 bits: the parts, and a separator between
+            // each two.
+            let mut sum = element(4, 8);
+            sum.extend([
+                I::LocalGet(10),
+                I::LocalGet(8),
+                I::I64ExtendI32U,
+                I::I64Add,
+                I::LocalSet(10),
+            ]);
+            let mut ops = each(4, 1, sum);
+            ops.extend([
+                I::LocalGet(1),
+                I::If(Empty),
+                I::LocalGet(10),
+                I::LocalGet(3),
+                I::I64ExtendI32U,
+                I::LocalGet(1),
+                I::I32Const(1),
+                I::I32Sub,
+                I::I64ExtendI32U,
+                I::I64Mul,
+                I::I64Add,
+                I::LocalSet(10),
+                I::End,
+                I::LocalGet(10),
+                I::I64Const(i32::MAX as i64),
+                I::I64GtU,
+                I::If(Empty),
+                I::Unreachable,
+                I::End,
+                I::LocalGet(10),
+                I::I32WrapI64,
+                I::LocalSet(9),
+            ]);
+            ops.extend(alloc(1, vec![I::LocalGet(9)], 5));
+            ops.extend([I::LocalGet(5), I::LocalSet(6)]);
+            let mut copy = vec![
+                I::LocalGet(4),
+                I::If(Empty),
+                I::LocalGet(6),
+                I::LocalGet(2),
+                I::LocalGet(3),
+                I::MemoryCopy {
+                    src_mem: 0,
+                    dst_mem: 0,
+                },
+                I::LocalGet(6),
+                I::LocalGet(3),
+                I::I32Add,
+                I::LocalSet(6),
+                I::End,
+            ];
+            copy.extend(element(0, 7));
+            copy.extend(element(4, 8));
+            copy.extend([
+                I::LocalGet(6),
+                I::LocalGet(7),
+                I::LocalGet(8),
+                I::MemoryCopy {
+                    src_mem: 0,
+                    dst_mem: 0,
+                },
+                I::LocalGet(6),
+                I::LocalGet(8),
+                I::I32Add,
+                I::LocalSet(6),
+            ]);
+            ops.extend(each(4, 1, copy));
+            ops.extend([I::LocalGet(5), I::LocalGet(9), I::End]);
+            (vec![(6, ValType::I32), (1, ValType::I64)], ops)
+        }
+        // params 0 p, 1 l; locals 2 start, 3 end, 4 cp, 5 n, 6 b0, 7 at, 8 k
+        Helper::Trim => {
+            let mut ops = vec![
+                I::I32Const(0),
+                I::LocalSet(2),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(2),
+                I::LocalGet(1),
+                I::I32GeU,
+                I::BrIf(1),
+                I::LocalGet(0),
+                I::LocalGet(2),
+                I::I32Add,
+                I::LocalSet(7),
+            ];
+            ops.extend(decode_utf8(7, 6, 4, 5));
+            ops.extend(white_space(4));
+            ops.extend([
+                I::I32Eqz,
+                I::BrIf(1),
+                I::LocalGet(2),
+                I::LocalGet(5),
+                I::I32Add,
+                I::LocalSet(2),
+                I::Br(0),
+                I::End,
+                I::End,
+                I::LocalGet(1),
+                I::LocalSet(3),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(3),
+                I::LocalGet(2),
+                I::I32LeU,
+                I::BrIf(1),
+                // The last code point starts at the last byte that is not a
+                // continuation byte.
+                I::LocalGet(3),
+                I::I32Const(1),
+                I::I32Sub,
+                I::LocalSet(8),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(0),
+                I::LocalGet(8),
+                I::I32Add,
+                byte_at(0),
+                I::I32Const(0xC0),
+                I::I32And,
+                I::I32Const(0x80),
+                I::I32Ne,
+                I::BrIf(1),
+                I::LocalGet(8),
+                I::I32Const(1),
+                I::I32Sub,
+                I::LocalSet(8),
+                I::Br(0),
+                I::End,
+                I::End,
+                I::LocalGet(0),
+                I::LocalGet(8),
+                I::I32Add,
+                I::LocalSet(7),
+            ]);
+            ops.extend(decode_utf8(7, 6, 4, 5));
+            ops.extend(white_space(4));
+            ops.extend([
+                I::I32Eqz,
+                I::BrIf(1),
+                I::LocalGet(8),
+                I::LocalSet(3),
+                I::Br(0),
+                I::End,
+                I::End,
+                // A view of the same bytes.
+                I::LocalGet(0),
+                I::LocalGet(2),
+                I::I32Add,
+                I::LocalGet(3),
+                I::LocalGet(2),
+                I::I32Sub,
+                I::End,
+            ]);
+            (vec![(7, ValType::I32)], ops)
+        }
+        // params 0 p, 1 l; locals 2 i, 3 out, 4 b
+        Helper::LowerAscii => {
+            let mut ops = alloc(1, vec![I::LocalGet(1)], 3);
+            ops.extend(each(
+                2,
+                1,
+                vec![
+                    I::LocalGet(3),
+                    I::LocalGet(2),
+                    I::I32Add,
+                    I::LocalGet(0),
+                    I::LocalGet(2),
+                    I::I32Add,
+                    byte_at(0),
+                    I::LocalTee(4),
+                    // b + 32 for `A`..=`Z`: (b - 65) < 26 is 1 or 0, times 32.
+                    I::LocalGet(4),
+                    I::I32Const(65),
+                    I::I32Sub,
+                    I::I32Const(26),
+                    I::I32LtU,
+                    I::I32Const(5),
+                    I::I32Shl,
+                    I::I32Add,
+                    byte_to(0),
+                ],
+            ));
+            ops.extend([I::LocalGet(3), I::LocalGet(1), I::End]);
+            (vec![(3, ValType::I32)], ops)
+        }
+        Helper::StrEq | Helper::StrCmp | Helper::IntToString => {
+            unreachable!("written in Helper::body")
+        }
     }
 }
 
@@ -2615,6 +4198,23 @@ enum Helper {
     StrCmp,
     /// `(i64) -> (ptr, len)`: decimal text, allocated in the region.
     IntToString,
+    /// `(p, l) -> i64`: code points in a string (ADR-0040).
+    Utf8Count,
+    /// `(p, l) -> (ptr, len)`: a string's code points, as a `list<s64>`.
+    Codepoints,
+    /// `(ptr, len) -> (p, l)`: UTF-8 from a `list<s64>`; traps on a value
+    /// that is not a Unicode scalar value.
+    FromCodepoints,
+    /// `(p1, l1, p2, l2) -> 1 | 0`.
+    StartsWith,
+    EndsWith,
+    Contains,
+    /// `(list_ptr, list_len, sep_p, sep_l) -> (p, l)`.
+    Join,
+    /// `(p, l) -> (p, l)`: a view without `White_Space` at either end.
+    Trim,
+    /// `(p, l) -> (p, l)`: `A`-`Z` to `a`-`z`.
+    LowerAscii,
 }
 
 struct Helpers {
@@ -2639,8 +4239,17 @@ impl Helpers {
 impl Helper {
     fn signature(self) -> (Vec<ValType>, Vec<ValType>) {
         match self {
-            Helper::StrEq | Helper::StrCmp => (vec![ValType::I32; 4], vec![ValType::I32]),
+            Helper::StrEq
+            | Helper::StrCmp
+            | Helper::StartsWith
+            | Helper::EndsWith
+            | Helper::Contains => (vec![ValType::I32; 4], vec![ValType::I32]),
             Helper::IntToString => (vec![ValType::I64], vec![ValType::I32, ValType::I32]),
+            Helper::Utf8Count => (vec![ValType::I32; 2], vec![ValType::I64]),
+            Helper::Codepoints | Helper::FromCodepoints | Helper::Trim | Helper::LowerAscii => {
+                (vec![ValType::I32; 2], vec![ValType::I32; 2])
+            }
+            Helper::Join => (vec![ValType::I32; 4], vec![ValType::I32; 2]),
         }
     }
 
@@ -2655,6 +4264,15 @@ impl Helper {
             })
         };
         let (locals, ops): (Vec<(u32, ValType)>, Vec<I<'static>>) = match self {
+            Helper::Utf8Count
+            | Helper::Codepoints
+            | Helper::FromCodepoints
+            | Helper::StartsWith
+            | Helper::EndsWith
+            | Helper::Contains
+            | Helper::Join
+            | Helper::Trim
+            | Helper::LowerAscii => string_helper(self, realloc_index),
             // params: 0 p1, 1 l1, 2 p2, 3 l2; local 4 i
             Helper::StrEq => (
                 vec![(1, ValType::I32)],

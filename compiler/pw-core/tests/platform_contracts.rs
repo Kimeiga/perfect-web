@@ -382,7 +382,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // store example, so every program using the platform had to include the
     // store's domain; the kiokun slice, the second application, was the first
     // to notice. The platform package now checks on its own.
-    const EXPECTED: u64 = 0x10cee9db783809b4;
+    // 2026-09-25: `List`'s operations are `intrinsic` declarations with no
+    // bodies, where `map` had returned `[]` and `length` 0, and `string.pw`
+    // declares the `String` module (ADR-0040). The compiler supplies both.
+    const EXPECTED: u64 = 0x84ba70b0afba8208;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

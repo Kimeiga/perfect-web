@@ -231,3 +231,13 @@ private copy of its `Resolve`. Building it found a query body the parser
 dropped, a backend that compiled programs that did not parse, a Koka backend
 that emitted invalid negation, and an import missing when called only in an
 arm; all fixed.
+
+## 2026-09-25: the standard library's lists and strings, compiled (E10)
+
+[ADR-0040](DECISIONS/ADR-0040-standard-library.md): `List` and a new `String`
+module are declarations the compiler supplies, each marked `intrinsic`, read
+as `host` is. `map`, `filter`, `fold`, `any`, `all`, `find` and a stable
+`sort_by` compile their function argument where they run it; `length`, `get`,
+`take`, `concat`, and the string operations are routines in the component.
+`to_lower_ascii` maps `A`–`Z` only (ruling needed). Building it found that
+`(a, b) => e` had never parsed.

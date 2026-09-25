@@ -17,13 +17,49 @@ module List
 // `List` cannot acquire an effect. E2D reads these rows; nothing hard-codes
 // "List.map is pure" in a checker.
 
-fn map<T, U>(items: List<T>, f: fn(T) -> U) -> List<U> !{} { [] }
+//
+// **Supplied by the compiler** (ADR-0040). Each operation is declared here with
+// its type, and `intrinsic` names what the backend compiles it to. Until
+// 2026-09-25 these had placeholder bodies: `map` returned `[]` and `length`
+// returned 0, and programs type-checked against them and computed nothing.
 
-fn fold<T, A>(items: List<T>, seed: A, f: fn(A, T) -> A) -> A !{} { seed }
+fn map<T, U>(items: List<T>, f: fn(T) -> U) -> List<U> !{}
+    intrinsic "list.map"
 
-fn filter<T>(items: List<T>, f: fn(T) -> Bool) -> List<T> !{} { items }
+fn fold<T, A>(items: List<T>, seed: A, f: fn(A, T) -> A) -> A !{}
+    intrinsic "list.fold"
 
-fn length<T>(items: List<T>) -> Int !{} { 0 }
+fn filter<T>(items: List<T>, f: fn(T) -> Bool) -> List<T> !{}
+    intrinsic "list.filter"
+
+fn length<T>(items: List<T>) -> Int !{}
+    intrinsic "list.length"
+
+// `Some` of the element at `index`, counting from 0, and `None` outside.
+fn get<T>(items: List<T>, index: Int) -> Option<T> !{}
+    intrinsic "list.get"
+
+// The first `count` elements: all of them when there are fewer, none when
+// `count` is negative.
+fn take<T>(items: List<T>, count: Int) -> List<T> !{}
+    intrinsic "list.take"
+
+fn concat<T>(first: List<T>, second: List<T>) -> List<T> !{}
+    intrinsic "list.concat"
+
+fn any<T>(items: List<T>, f: fn(T) -> Bool) -> Bool !{}
+    intrinsic "list.any"
+
+fn all<T>(items: List<T>, f: fn(T) -> Bool) -> Bool !{}
+    intrinsic "list.all"
+
+// The first element `f` accepts.
+fn find<T>(items: List<T>, f: fn(T) -> Bool) -> Option<T> !{}
+    intrinsic "list.find"
+
+// Stable. `compare(a, b)` above zero puts `b` before `a`.
+fn sort_by<T>(items: List<T>, compare: fn(T, T) -> Int) -> List<T> !{}
+    intrinsic "list.sort_by"
 
 // The language has no tuple type, so a position and an element cannot be one
 // value's type yet. The result is therefore not annotated — a hole, not a

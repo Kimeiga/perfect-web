@@ -1,0 +1,42 @@
+// @corpus: platform
+// @id: STD-string
+// @category: standard library — text
+// @charter: §7.1
+// @milestone: E10
+
+module String
+
+// **Text, by Unicode code point** (ADR-0040). A `String` is UTF-8. `length`
+// counts code points, not bytes, and `codepoints` reads the scalar values. The
+// compiler supplies every operation; `intrinsic` names which.
+
+fn length(text: String) -> Int !{}
+    intrinsic "string.length"
+
+fn codepoints(text: String) -> List<Int> !{}
+    intrinsic "string.codepoints"
+
+// A value that is not a Unicode scalar value, a surrogate or one past
+// U+10FFFF, stops the invocation.
+fn from_codepoints(points: List<Int>) -> String !{}
+    intrinsic "string.from_codepoints"
+
+fn starts_with(text: String, prefix: String) -> Bool !{}
+    intrinsic "string.starts_with"
+
+fn ends_with(text: String, suffix: String) -> Bool !{}
+    intrinsic "string.ends_with"
+
+fn contains(text: String, part: String) -> Bool !{}
+    intrinsic "string.contains"
+
+fn join(parts: List<String>, separator: String) -> String !{}
+    intrinsic "string.join"
+
+// Unicode `White_Space` removed from both ends, as Rust's `str::trim`.
+fn trim(text: String) -> String !{}
+    intrinsic "string.trim"
+
+// `A`-`Z` to `a`-`z`, and nothing else (ADR-0040, ruling needed).
+fn to_lower_ascii(text: String) -> String !{}
+    intrinsic "string.to_lower_ascii"

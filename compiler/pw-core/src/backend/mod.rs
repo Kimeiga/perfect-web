@@ -99,6 +99,19 @@ pub fn host_binding(decl: &crate::hir::Decl) -> Option<ir::ImportId> {
     })
 }
 
+/// **Is this declaration an operation the compiler supplies, and which?**
+///
+/// The `intrinsic` policy and nothing else (ADR-0040), for the reason
+/// [`host_binding`] reads `host`: the backend decides by what a declaration
+/// says it is, never by its name. `Some(Err(name))` is an `intrinsic` clause
+/// naming an operation this backend does not know, which the lowering refuses
+/// by that name rather than compiling a call to nothing.
+pub fn intrinsic_binding(decl: &crate::hir::Decl) -> Option<Result<ir::Operation, String>> {
+    let p = decl.policy("intrinsic")?;
+    let name = p.value.trim().trim_matches('"');
+    Some(ir::Operation::named(name).ok_or_else(|| name.to_string()))
+}
+
 /// **The WIT package the Pleris platform itself owns.**
 ///
 /// Architect ruling, 2026-08-20:

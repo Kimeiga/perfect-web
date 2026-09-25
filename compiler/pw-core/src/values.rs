@@ -1550,7 +1550,10 @@ fn function_type(sig: &Signature) -> Ty {
 /// A lambda's parameter names, in order, when every parameter is a plain
 /// binding. `fn(a, b) e` lowers its list as one call-shaped pattern around the
 /// bindings; `x => e` as the binding itself.
-fn lambda_names(body: &Body, params: &[crate::hir::PatternId]) -> Option<Vec<String>> {
+/// A lambda's parameter names: `x => ..`, `fn(a, b) ..` and `(a, b) => ..`,
+/// the last two lowered as one unnamed constructor pattern. The backend reads
+/// parameters through this too (ADR-0040), so the two cannot disagree.
+pub(crate) fn lambda_names(body: &Body, params: &[crate::hir::PatternId]) -> Option<Vec<String>> {
     let bind = |p: crate::hir::PatternId| match body.pat(p) {
         Pattern::Bind { name, .. } => Some(name.clone()),
         _ => None,

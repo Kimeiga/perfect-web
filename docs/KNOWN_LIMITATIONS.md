@@ -71,7 +71,7 @@ inlined. Still refused by name:
 - `%` on a `Float`, and a `Float` interpolated: their semantics are not
   decided;
 - list and string operations beyond the ones the standard library declares
-  (see below).
+  (ADR-0040, below).
 
 - **Traps are not distinguished by cause.** An `Int` overflow and a zero
   divisor both stop the invocation, and the host reports a failed call; which
@@ -101,10 +101,16 @@ inlined. Still refused by name:
 - **Interpolated attribute strings do not render.** `href="/stores/{id}"` is
   read by the route checker, but the template IR has no part for it and blocks
   the render, naming `href={value}` as the form that renders.
-- **The standard library's list functions are signatures.** `List.map`,
-  `fold`, `filter` and `length` have stub bodies, and there are no string
-  functions. Pleris programs type-check against them and cannot compute with
-  them.
+- **The standard library is small** (ADR-0040). `List` has `length`, `get`,
+  `take`, `concat`, `map`, `filter`, `fold`, `any`, `all`, `find` and
+  `sort_by`; `String` has `length`, `codepoints`, `from_codepoints`,
+  `starts_with`, `ends_with`, `contains`, `join`, `trim` and
+  `to_lower_ascii`. There is no slicing, no Unicode case mapping, and no map
+  or set type. `sum`, `maximum` and `enumerate` still have placeholder
+  bodies.
+- **A function is not a value.** A lambda or a declaration's name is compiled
+  where a list operation runs it; stored, returned, or passed to any other
+  declaration, it is refused.
 
 **Resumable handler bodies are compiled** (2026-09-25, ADR-0033), to one ES
 module each, and the page's elements carry what the handlers read. The set is

@@ -217,6 +217,8 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "privacy" => Domain::LabelCtor,
         "capability" => Domain::EffectRef,
         "host" => Domain::Str,
+        // ADR-0040: the operation the compiler supplies, by its name.
+        "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
         "impact" => Domain::Word(&[
             "layout_read",
@@ -404,6 +406,7 @@ mod tests {
             "privacy",
             "capability",
             "host",
+            "intrinsic",
             "impact",
             "optimistic",
             "rollback",

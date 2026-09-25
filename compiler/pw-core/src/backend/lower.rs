@@ -38,9 +38,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
-    BinaryOp, Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Const, Function, ImportId,
-    Instr, Lowering, MatchArm, Program, Region, Shape, Terminator, Type, TypeDef, UnaryOp, ValueId,
-    all_instrs,
+    BinaryOp, Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Const, EachKind, Function,
+    ImportId, Instr, Intrinsic, Lowering, MatchArm, Operation, Program, Region, Shape, Terminator,
+    Type, TypeDef, UnaryOp, ValueId, all_instrs,
 };
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Pattern, Span};
@@ -726,7 +726,7 @@ impl<'a> Lower<'a> {
                     };
                     self.variant(case, Some(payload), expected, span)
                 }
-                _ => self.call(body, *callee, args, span),
+                _ => self.call(body, *callee, args, None, expected, span),
             },
             Expr::Match { scrutinee, arms } => self.matched(body, *scrutinee, arms, expected, span),
             Expr::Field { base, name } => self.field(body, *base, name, span),
@@ -747,6 +747,7 @@ impl<'a> Lower<'a> {
                 name: Some(name),
                 fields,
             } => self.record(body, name, fields, span),
+            Expr::List { items } => self.list(body, items, expected, span),
             other => Lowering::Unsupported {
                 construct: construct_name(other),
                 span,
@@ -865,11 +866,24 @@ impl<'a> Lower<'a> {
                     };
                 }
             },
+            // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`.
             B::Pipe => {
-                return Lowering::Unsupported {
-                    construct: "a pipeline",
-                    span,
-                    reason: "`a |> f(..)` is not lowered yet; write the call".to_string(),
+                let piped = match self.expr(body, lhs, None) {
+                    Lowering::Lowered(v) => v,
+                    other => return other,
+                };
+                return match body.expr(rhs) {
+                    Expr::Call { callee, args } => {
+                        self.call(body, *callee, args, Some(piped), expected, span)
+                    }
+                    Expr::Name(_) | Expr::Field { .. } => {
+                        self.call(body, rhs, &[], Some(piped), expected, span)
+                    }
+                    _ => Lowering::Unsupported {
+                        construct: "a pipeline into something that is not a call",
+                        span,
+                        reason: "`a |> f(..)` feeds `a` to a call".to_string(),
+                    },
                 };
             }
             B::And | B::Or => unreachable!("handled above"),
@@ -1244,6 +1258,377 @@ impl<'a> Lower<'a> {
             args,
             ty,
         }))
+    }
+
+    /// **`[a, b, c]`**: every element of one type, which the context fixes
+    /// for an empty list.
+    fn list(
+        &mut self,
+        body: &Body,
+        items: &[ExprId],
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let mut element = match expected {
+            Some(Type::List(t)) => Some((**t).clone()),
+            _ => None,
+        };
+        let mut values = Vec::new();
+        for item in items {
+            let v = match self.expr(body, *item, element.as_ref()) {
+                Lowering::Lowered(v) => v,
+                other => return other,
+            };
+            let t = self.types.get(&v).cloned();
+            match (&element, t) {
+                (None, Some(t)) => element = Some(t),
+                (Some(e), Some(t)) if *e == t => {}
+                (e, t) => {
+                    return Lowering::Blocked {
+                        why: format!("a list of {e:?} holds a {t:?}"),
+                        span,
+                    };
+                }
+            }
+            values.push(v);
+        }
+        let Some(element) = element else {
+            return Lowering::Unsupported {
+                construct: "an empty list whose element type nothing fixes",
+                span,
+                reason: "`[]` needs the type its context expects".to_string(),
+            };
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::MakeList {
+            result,
+            items: values,
+            ty: Type::List(Box::new(element)),
+        }))
+    }
+
+    /// **A standard-library operation** (ADR-0040): a loop whose body is the
+    /// function argument, or an operation on values.
+    fn intrinsic(
+        &mut self,
+        body: &Body,
+        op: Operation,
+        args: &[crate::hir::Arg],
+        piped: Option<ValueId>,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        if args.iter().any(|a| a.name.is_some()) {
+            return Lowering::Unsupported {
+                construct: "a named argument",
+                span,
+                reason: "a signature does not carry parameter names".to_string(),
+            };
+        }
+        // The arguments as written, the piped value first.
+        let given: Vec<Given> = piped
+            .into_iter()
+            .map(Given::Value)
+            .chain(args.iter().map(|a| Given::Expr(a.value)))
+            .collect();
+        match op {
+            Operation::Intrinsic(i) => {
+                let mut values: Vec<ValueId> = Vec::new();
+                for (k, g) in given.iter().enumerate() {
+                    let prior: Vec<Type> = values
+                        .iter()
+                        .filter_map(|v| self.types.get(v).cloned())
+                        .collect();
+                    let want = intrinsic_argument(i, k, &prior);
+                    match self.given(body, g, want.as_ref()) {
+                        Lowering::Lowered(v) => values.push(v),
+                        other => return other,
+                    }
+                }
+                self.apply(i, values, span)
+            }
+            Operation::Each(kind) => self.each(body, kind, &given, expected, span),
+        }
+    }
+
+    /// A value given to an intrinsic: already lowered when it was piped.
+    fn given(&mut self, body: &Body, g: &Given, want: Option<&Type>) -> Lowering<ValueId> {
+        match g {
+            Given::Value(v) => Lowering::Lowered(*v),
+            Given::Expr(e) => self.expr(body, *e, want),
+        }
+    }
+
+    /// **A loop over a list**, its body the function argument.
+    fn each(
+        &mut self,
+        body: &Body,
+        kind: EachKind,
+        given: &[Given],
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let Some((first, rest)) = given.split_first() else {
+            return Lowering::Blocked {
+                why: "a list operation with no list".to_string(),
+                span,
+            };
+        };
+        let list = match self.given(body, first, None) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let Some(Type::List(element)) = self.types.get(&list).cloned() else {
+            return Lowering::Blocked {
+                why: format!(
+                    "`{kind:?}` over {:?}, which is not a list",
+                    self.types.get(&list)
+                ),
+                span,
+            };
+        };
+        let element = *element;
+        let (seed, function) = match (kind, rest) {
+            (EachKind::Fold, [seed, f]) => (Some(seed), f),
+            (EachKind::Fold, _) => {
+                return Lowering::Blocked {
+                    why: "a fold takes a list, a seed and a function".to_string(),
+                    span,
+                };
+            }
+            (_, [f]) => (None, f),
+            _ => {
+                return Lowering::Blocked {
+                    why: format!("`{kind:?}` takes a list and a function"),
+                    span,
+                };
+            }
+        };
+        let seed = match seed {
+            Some(g) => match self.given(body, g, expected) {
+                Lowering::Lowered(v) => Some(v),
+                other => return other,
+            },
+            None => None,
+        };
+        let seed_ty = seed.and_then(|v| self.types.get(&v).cloned());
+        let params = match (kind, &seed_ty) {
+            (EachKind::Fold, Some(a)) => vec![a.clone(), element.clone()],
+            (EachKind::Fold, None) => {
+                return Lowering::Blocked {
+                    why: "the fold's seed has no type".to_string(),
+                    span,
+                };
+            }
+            (EachKind::SortBy, _) => vec![element.clone(), element.clone()],
+            _ => vec![element.clone()],
+        };
+        let body_expected = match kind {
+            EachKind::Map => match expected {
+                Some(Type::List(u)) => Some((**u).clone()),
+                _ => None,
+            },
+            EachKind::Fold => seed_ty.clone(),
+            EachKind::SortBy => Some(Type::Int),
+            _ => Some(Type::Bool),
+        };
+        let Given::Expr(f) = function else {
+            return Lowering::Blocked {
+                why: "a piped value is not the function".to_string(),
+                span,
+            };
+        };
+        let (bound, region) =
+            match self.function_region(body, *f, &params, body_expected.as_ref(), span.clone()) {
+                Lowering::Lowered(x) => x,
+                other => return other.map(|_| unreachable!()),
+            };
+        let produced = self.types.get(&region.value).cloned();
+        let need = |t: Type| -> Result<(), String> {
+            match &produced {
+                Some(p) if *p == t => Ok(()),
+                other => Err(format!(
+                    "the function produces {other:?} where {t:?} is needed"
+                )),
+            }
+        };
+        let ty = match kind {
+            EachKind::Map => match produced.clone() {
+                Some(u) => Ok(Type::List(Box::new(u))),
+                None => Err("the function's value has no type".to_string()),
+            },
+            EachKind::Filter => need(Type::Bool).map(|_| Type::List(Box::new(element))),
+            EachKind::Any | EachKind::All => need(Type::Bool).map(|_| Type::Bool),
+            EachKind::Find => need(Type::Bool).map(|_| Type::Option(Box::new(element))),
+            EachKind::SortBy => need(Type::Int).map(|_| Type::List(Box::new(element))),
+            EachKind::Fold => match seed_ty.clone() {
+                Some(a) => need(a.clone()).map(|_| a),
+                None => Err("the fold's seed has no type".to_string()),
+            },
+        };
+        let ty = match ty {
+            Ok(t) => t,
+            Err(why) => return Lowering::Blocked { why, span },
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Each {
+            result,
+            kind,
+            list,
+            seed,
+            params: bound,
+            body: region,
+            ty,
+        }))
+    }
+
+    /// An operation on values, typed by its arguments.
+    fn apply(&mut self, op: Intrinsic, args: Vec<ValueId>, span: Span) -> Lowering<ValueId> {
+        use Intrinsic as I;
+        let types: Vec<Option<Type>> = args.iter().map(|v| self.types.get(v).cloned()).collect();
+        let ty = match (op, types.as_slice()) {
+            (I::ListLength, [Some(Type::List(_))]) => Type::Int,
+            (I::ListGet, [Some(Type::List(t)), Some(Type::Int)]) => Type::Option(t.clone()),
+            (I::ListTake, [Some(t @ Type::List(_)), Some(Type::Int)]) => t.clone(),
+            (I::ListConcat, [Some(a @ Type::List(_)), Some(b)]) if a == b => a.clone(),
+            (I::StrLength, [Some(Type::Str)]) => Type::Int,
+            (I::StrCodepoints, [Some(Type::Str)]) => Type::List(Box::new(Type::Int)),
+            (I::StrFromCodepoints, [Some(Type::List(t))]) if **t == Type::Int => Type::Str,
+            (
+                I::StrStartsWith | I::StrEndsWith | I::StrContains,
+                [Some(Type::Str), Some(Type::Str)],
+            ) => Type::Bool,
+            (I::StrJoin, [Some(Type::List(t)), Some(Type::Str)]) if **t == Type::Str => Type::Str,
+            (I::StrTrim | I::StrToLowerAscii, [Some(Type::Str)]) => Type::Str,
+            (op, types) => {
+                return Lowering::Blocked {
+                    why: format!("`{op:?}` receives {types:?}"),
+                    span,
+                };
+            }
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Intrinsic {
+            result,
+            op,
+            args,
+            ty,
+        }))
+    }
+
+    /// **A function argument, as a region** (ADR-0040 §3): a lambda's body, or
+    /// a named declaration's, with its parameters bound to fresh values of
+    /// `params`' types. Known where it is written, so nothing is a closure.
+    fn function_region(
+        &mut self,
+        body: &Body,
+        f: ExprId,
+        params: &[Type],
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<(Vec<ValueId>, Region)> {
+        match body.expr(f).clone() {
+            Expr::Lambda {
+                descriptor: None,
+                params: patterns,
+                body: inner,
+            } => {
+                // The typer's reading of the parameters, so the two agree.
+                let Some(names) = crate::values::lambda_names(body, &patterns) else {
+                    return Lowering::Unsupported {
+                        construct: "a lambda parameter that is not a name",
+                        span,
+                        reason: "a function's parameters are names here".to_string(),
+                    };
+                };
+                if names.len() != params.len() {
+                    return Lowering::Blocked {
+                        why: format!(
+                            "the function takes {} parameters and receives {}",
+                            names.len(),
+                            params.len()
+                        ),
+                        span,
+                    };
+                }
+                let bound = self.fresh_typed(params);
+                let scope = self.locals.clone();
+                for (name, v) in names.iter().zip(&bound) {
+                    self.locals.insert(name.clone(), *v);
+                }
+                let region = self.region(body, inner, expected);
+                self.locals = scope;
+                region.map(|r| (bound, r))
+            }
+            Expr::Lambda { .. } => Lowering::Unsupported {
+                construct: "a resumable lambda as a function argument",
+                span,
+                reason: "its descriptor belongs to a handler".to_string(),
+            },
+            Expr::Name(n) if self.locals.contains_key(&n) => Lowering::Unsupported {
+                construct: "a function held in a value",
+                span,
+                reason: format!("`{n}` is a value here; pass a lambda or a declaration's name"),
+            },
+            Expr::Name(_) | Expr::Field { .. } => {
+                let path = crate::infer::path_of(body, f);
+                let resolution = match path.contains('.') {
+                    true => self.cx.ws.resolve_path(self.unit, &path),
+                    false => self.cx.ws.resolve_in(self.unit, Namespace::Term, &path),
+                };
+                let def = match resolution {
+                    Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
+                    _ => {
+                        return Lowering::Blocked {
+                            why: format!("`{path}` names no declaration here"),
+                            span,
+                        };
+                    }
+                };
+                let bound = self.fresh_typed(params);
+                let outer = std::mem::take(&mut self.instrs);
+                let value = match crate::resolve::declaration(self.cx.hirs, def)
+                    .and_then(crate::backend::intrinsic_binding)
+                {
+                    Some(Ok(Operation::Intrinsic(i))) => self.apply(i, bound.clone(), span),
+                    Some(_) => Lowering::Unsupported {
+                        construct: "a list operation passed as a function",
+                        span,
+                        reason: format!("`{path}` takes a function itself"),
+                    },
+                    None => {
+                        let returns = self.cx.sigs.by_def(def).and_then(|s| s.returns.clone());
+                        let ret = match returns {
+                            Some(r) => ty_resolution(self.cx.sigs, &r, &span),
+                            None => Lowering::Lowered(Type::Unit),
+                        };
+                        match ret {
+                            Lowering::Lowered(ret) => self.inline(def, bound.clone(), &ret, span),
+                            other => other.map(|_| unreachable!()),
+                        }
+                    }
+                };
+                let instrs = std::mem::replace(&mut self.instrs, outer);
+                value.map(|v| (bound, Region { instrs, value: v }))
+            }
+            _ => Lowering::Unsupported {
+                construct: "a function argument that is not a lambda or a declaration's name",
+                span,
+                reason: "a function is known where it is passed (ADR-0040 §3)".to_string(),
+            },
+        }
+    }
+
+    /// Fresh values of these types.
+    fn fresh_typed(&mut self, types: &[Type]) -> Vec<ValueId> {
+        types
+            .iter()
+            .map(|t| {
+                let v = self.fresh();
+                self.types.insert(v, t.clone());
+                v
+            })
+            .collect()
     }
 
     /// **A call to another Pleris declaration, inlined** (ADR-0039 §4): its
@@ -1635,6 +2020,8 @@ impl<'a> Lower<'a> {
         body: &Body,
         callee: ExprId,
         args: &[crate::hir::Arg],
+        piped: Option<ValueId>,
+        expected: Option<&Type>,
         span: Span,
     ) -> Lowering<ValueId> {
         let path = crate::infer::path_of(body, callee);
@@ -1668,6 +2055,21 @@ impl<'a> Lower<'a> {
             Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
             _ => None,
         };
+        // **An operation the compiler supplies** (ADR-0040): read from the
+        // declaration's `intrinsic` clause, before its arguments are lowered,
+        // because a function argument is compiled where it is called.
+        if let Some(decl) = resolved.and_then(|d| crate::resolve::declaration(self.cx.hirs, d))
+            && let Some(op) = crate::backend::intrinsic_binding(decl)
+        {
+            return match op {
+                Ok(op) => self.intrinsic(body, op, args, piped, expected, span),
+                Err(name) => Lowering::Unsupported {
+                    construct: "an intrinsic this backend does not know",
+                    span,
+                    reason: format!("`{path}` is declared `intrinsic \"{name}\"`"),
+                },
+            };
+        }
         let Some(sig) = resolved
             .and_then(|d| self.cx.sigs.by_def(d))
             .or_else(|| self.cx.sigs.by_path(&path))
@@ -1679,9 +2081,12 @@ impl<'a> Lower<'a> {
             };
         };
 
-        // The arguments, each expecting its parameter's declared type.
-        let mut lowered = Vec::new();
+        // The arguments, each expecting its parameter's declared type. A piped
+        // value is the first.
+        let mut lowered: Vec<ValueId> = piped.into_iter().collect();
+        let offset = lowered.len();
         for (i, a) in args.iter().enumerate() {
+            let i = i + offset;
             let expected = match sig.params.get(i).and_then(Option::as_ref) {
                 Some(p) => match ty_resolution(self.cx.sigs, p, &span) {
                     Lowering::Lowered(t) => Some(t),
@@ -1689,6 +2094,19 @@ impl<'a> Lower<'a> {
                 },
                 None => None,
             };
+            // A function is compiled where the standard library runs it
+            // (ADR-0040 §3); a declaration taking one would need it as a
+            // value.
+            if matches!(body.expr(a.value), Expr::Lambda { .. }) {
+                return Lowering::Unsupported {
+                    construct: "a function passed to a declaration that is not an intrinsic",
+                    span,
+                    reason: format!(
+                        "`{path}` takes a function; only the standard library's list \
+                         operations compile one, where they run it (ADR-0040 §3)"
+                    ),
+                };
+            }
             match self.expr(body, a.value, expected.as_ref()) {
                 Lowering::Lowered(v) => lowered.push(v),
                 other => return other,
@@ -1759,6 +2177,37 @@ impl<'a> Lower<'a> {
             },
         }
         Lowering::Lowered(result)
+    }
+}
+
+/// An argument to an intrinsic, as it arrives: a piped value already lowered,
+/// or an expression written in the call.
+enum Given {
+    Value(ValueId),
+    Expr(ExprId),
+}
+
+/// The type an intrinsic's `k`th argument must have, where the operation
+/// fixes it: what `[]` or `None` written there needs to know.
+fn intrinsic_argument(op: Intrinsic, k: usize, prior: &[Type]) -> Option<Type> {
+    use Intrinsic as I;
+    match (op, k) {
+        (I::ListGet | I::ListTake, 1) => Some(Type::Int),
+        (I::ListConcat, 1) => prior.first().cloned(),
+        (I::StrFromCodepoints, 0) => Some(Type::List(Box::new(Type::Int))),
+        (I::StrJoin, 0) => Some(Type::List(Box::new(Type::Str))),
+        (
+            I::StrLength
+            | I::StrCodepoints
+            | I::StrStartsWith
+            | I::StrEndsWith
+            | I::StrContains
+            | I::StrTrim
+            | I::StrToLowerAscii,
+            _,
+        )
+        | (I::StrJoin, 1) => Some(Type::Str),
+        _ => None,
     }
 }
 

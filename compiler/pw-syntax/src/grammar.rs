@@ -182,6 +182,10 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // `materialize` block's policies live inside its braces (E6).
     "capability",
     "host",
+    // ADR-0040: a standard-library operation the compiler supplies, as
+    // `host` names one the host supplies. Declaration metadata, never
+    // inferred from a name.
+    "intrinsic",
     // What an effect does to the frame: `impact layout_write when LayoutAffect`.
     // A policy clause for the same reason `capability` is — the value is a
     // declarative name, not an expression.
@@ -801,14 +805,38 @@ impl<'a> P<'a> {
                 self.finish();
             }
             Kind::LParen => {
-                self.start(K::ParenExpr);
+                // `(a, b) => a + b` writes a lambda's parameters as a
+                // parenthesised list, which is a `TupleExpr` until `=>` makes
+                // it parameters. Until 2026-09-25 only one expression was
+                // read here, so the comma was an unclosed parenthesis, and the
+                // form the lambda grammar below describes never parsed.
+                let cp = self.b.checkpoint();
                 self.bump();
+                let mut tuple = false;
                 if !self.at(Kind::RParen) {
                     self.expr(0);
+                    while self.eat(Kind::Comma) {
+                        tuple = true;
+                        if self.at(Kind::RParen) {
+                            break;
+                        }
+                        self.expr(0);
+                    }
                 }
                 if !self.eat(Kind::RParen) {
                     self.error("PW0008", "unclosed parenthesis, expected `)`");
                 }
+                // The language has no tuple type: a list in parentheses is a
+                // lambda's parameters or nothing.
+                if tuple && !self.at(Kind::FatArrow) {
+                    self.error(
+                        "PW0009",
+                        "a parenthesised list is a lambda's parameters, `(a, b) => ..`; \
+                         the language has no tuple value",
+                    );
+                }
+                self.b
+                    .start_at(cp, if tuple { K::TupleExpr } else { K::ParenExpr });
                 self.finish();
             }
             Kind::LBracket => {
@@ -2799,6 +2827,38 @@ mod tests {
             .filter(|n| n.kind() == K::NameExpr && n.text().to_string().trim() == "return")
             .count();
         assert_eq!(returns, 2);
+    }
+
+    #[test]
+    fn a_lambdas_parameters_may_be_a_parenthesised_list() {
+        // `(a, b) => a + b`: a list in parentheses, then `=>`. Until
+        // 2026-09-25 the parser read one expression inside parentheses, so
+        // the comma was an unclosed parenthesis and this never parsed, though
+        // the lambda grammar below described it.
+        let src =
+            "fn f(xs: List<Int>) -> Int {\n    List.fold(xs, 0, (total, x) => total + x)\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let lambda = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::LambdaExpr)
+            .expect("a lambda");
+        assert!(
+            lambda.children().any(|c| c.kind() == K::TupleExpr),
+            "{lambda:#?}"
+        );
+        // And nowhere else: the language has no tuple value.
+        let p = parse_tree("fn f() -> Int {\n    let pair = (1, 2)\n    3\n}\n");
+        assert!(
+            p.errors
+                .iter()
+                .any(|e| e.message.contains("a lambda's parameters")),
+            "{:?}",
+            p.errors
+        );
+        // A single parenthesised expression is still just that.
+        parse_ok("fn f(a: Int) -> Int {\n    (a + 1) * 2\n}\n");
     }
 
     #[test]
