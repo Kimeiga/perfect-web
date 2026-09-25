@@ -477,6 +477,32 @@ e10-match:
      } > docs/evidence/E10/match.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/match.txt
 
+# ADR-0039's compiled computation against exact references, against Koka
+# 3.2.3 (which is why this is not in `just ci`), and its mutation controls.
+#
+# E10 task 2 — pure computation compiled to Wasm.
+e10-pure:
+    @{ echo "ADR-0039 - pure computation in the component backend"; echo; \
+       echo "produced by: just e10-pure"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "koka: $(koka --version | head -1)"; echo; \
+       echo "== against exact references (compiler/pw-conformance/tests/computation.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test computation -- --nocapture --test-threads=1 2>&1 \
+         | grep -E '^(test |test result)|cases, |^r\.Q: '; \
+       echo; echo "== against Koka (compiler/pw-conformance/tests/koka_oracle.rs)"; echo; \
+       KOKA="$(command -v koka)" cargo test --locked -p pw-conformance --test koka_oracle -- --ignored --nocapture 2>&1 \
+         | grep -E '^oracle:|^test result'; \
+       echo; echo "== mutation controls (scripts/pure_mutations.py)"; echo; \
+       python3 scripts/pure_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: internal functions. A call is inlined, so recursion and"; \
+       echo "generic declarations are refused; code size grows with each call site."; \
+       echo "NOT CLAIMED: declared variants built or matched, Float remainder and"; \
+       echo "formatting, and early return. Each is refused by name."; \
+     } > docs/evidence/E10/pure.txt
+    @grep -E "^test result|mutants killed|^oracle:" docs/evidence/E10/pure.txt
+
 # `pw build` for examples/kiokun into docs/evidence/E10/kiokun/ (held there by
 # evidence_is_current), the host's tests over the committed sample shard, the
 # browser spec in three engines, and, with KIOKUN_DATA naming a kiokun-data

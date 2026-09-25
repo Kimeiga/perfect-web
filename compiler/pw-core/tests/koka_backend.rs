@@ -197,3 +197,16 @@ fn the_corpus_reports_honestly_how_little_of_it_lowers() {
         "the subset is meant to be small: {emitted} emitted, {skipped} skipped"
     );
 }
+
+#[test]
+fn a_negated_name_is_kokas_negation() {
+    // `-a` is not Koka's negation after `(`: it reads as the start of an
+    // operator section, and Koka refused `(-a + b)` the first time a negated
+    // name reached it (2026-09-25, the ADR-0039 oracle). `~` is.
+    let out = generate("module m\n\nfn f(a: Int, b: Int) -> Int !{} { -a + b }\n");
+    assert!(out.source.contains("(~a + b)"), "{}", out.source);
+    // The language has no negative literal: `-1` is `1` negated, and `~1` is
+    // -1 to Koka 3.2.3, checked by running it.
+    let out = generate("module m\n\nfn g(a: Int) -> Int !{} { if a < 0 { -1 } else { 1 } }\n");
+    assert!(out.source.contains("~1"), "{}", out.source);
+}

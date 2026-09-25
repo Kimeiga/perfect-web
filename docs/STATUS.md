@@ -63,6 +63,8 @@ reject an incomplete match whatever the effect row.
   case is now the checker's refusal.
 
 Decisions awaiting a ruling:
+- ADR-0039 §1: `Int` traps where its exact result does not fit; `/` and `%`
+  are Euclidean, as Koka's are; a zero divisor traps, where Koka answers 0.
 - ADR-0038: a bare pattern name is a constructor whenever some type has one of
   that name, so a binding cannot share a constructor's name.
 - ADR-0038: `return` stays a statement, whose value is the next statement,
@@ -97,6 +99,20 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: E10 task 2, pure computation compiled to Wasm (ADR-0039).**
+  Not a gate item; the backend breadth `docs/NEXT.md` puts first.
+  - The component backend compiles `Int` and `Float` arithmetic, comparisons,
+    `&`, `|`, `!`, `if`, string literals, interpolation, records, and calls to
+    other declarations, inlined.
+  - Every operator agrees with an exact `i128` reference over generated
+    inputs, trapping exactly where the reference has no 64-bit value, and with
+    Koka 3.2.3 wherever Pleris produces a value.
+  - Found and fixed on the way: a query body the parser dropped with an error
+    only the CLI saw; a backend that compiled programs that did not parse; a
+    Koka backend that emitted invalid negation; an import missing when it was
+    called only inside a `match` arm.
+  - Evidence: `docs/evidence/E10/pure.txt` (`just e10-pure`).
 
 - **2026-09-25: E10 gate item 2, and the kiokun slice.**
   - The backend compiles `match` over `Option` and `Result`, field reads, and

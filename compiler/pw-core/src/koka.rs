@@ -251,8 +251,11 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
         }
 
         Expr::Unary { op, operand } => {
+            // `~` is Koka's negation. `-a` is not: after `(` Koka reads `-` as
+            // the start of an operator section, and refused `(-a + b)` the
+            // first time a negated name reached it (2026-09-25).
             let o = match op {
-                UnOp::Neg => "-",
+                UnOp::Neg => "~",
                 UnOp::Not => "!",
             };
             format!("{o}{}", lower_expr(b, *operand)?)

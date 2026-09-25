@@ -206,6 +206,81 @@ pub enum Instr {
         arms: Vec<MatchArm>,
         ty: Type,
     },
+    /// Arithmetic or a comparison on two values of one primitive type
+    /// (ADR-0039). `Int` arithmetic traps rather than wrapping, and `/` and
+    /// `%` are Euclidean.
+    Binary {
+        result: ValueId,
+        op: BinaryOp,
+        lhs: ValueId,
+        rhs: ValueId,
+        ty: Type,
+    },
+    /// `-x` on an `Int` or a `Float`, and `!b`.
+    Unary {
+        result: ValueId,
+        op: UnaryOp,
+        operand: ValueId,
+        ty: Type,
+    },
+    /// **`if c { .. } else { .. }`**, structured as a match is: two regions,
+    /// whose values are the result. `&` and `|`, the language's logical
+    /// operators, lower to it, so their right side is evaluated only when it
+    /// decides the result.
+    If {
+        result: ValueId,
+        cond: ValueId,
+        then: Region,
+        els: Region,
+        ty: Type,
+    },
+    /// A string made of other strings, in order: an interpolation's pieces.
+    Concat {
+        result: ValueId,
+        parts: Vec<ValueId>,
+        ty: Type,
+    },
+    /// A value written as text: an `Int` in decimal, a `Bool` as `true` or
+    /// `false`. What an interpolation's hole holds.
+    Format {
+        result: ValueId,
+        value: ValueId,
+        ty: Type,
+    },
+}
+
+/// An operator on two values of one primitive type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BinaryOp {
+    Add,
+    Sub,
+    Mul,
+    /// Euclidean: `-7 / 2` is `-4`.
+    Div,
+    /// Euclidean: in `[0, |b|)`.
+    Rem,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+}
+
+impl BinaryOp {
+    /// Does this operator produce a `Bool` rather than its operands' type?
+    pub fn compares(self) -> bool {
+        matches!(
+            self,
+            BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum UnaryOp {
+    Neg,
+    Not,
 }
 
 /// A case of the language's own variants.
@@ -249,7 +324,12 @@ impl Instr {
             | Instr::Construct { result, .. }
             | Instr::Project { result, .. }
             | Instr::Variant { result, .. }
-            | Instr::Match { result, .. } => *result,
+            | Instr::Match { result, .. }
+            | Instr::Binary { result, .. }
+            | Instr::Unary { result, .. }
+            | Instr::If { result, .. }
+            | Instr::Concat { result, .. }
+            | Instr::Format { result, .. } => *result,
         }
     }
 
@@ -261,9 +341,44 @@ impl Instr {
             | Instr::Construct { ty, .. }
             | Instr::Project { ty, .. }
             | Instr::Variant { ty, .. }
-            | Instr::Match { ty, .. } => ty,
+            | Instr::Match { ty, .. }
+            | Instr::Binary { ty, .. }
+            | Instr::Unary { ty, .. }
+            | Instr::If { ty, .. }
+            | Instr::Concat { ty, .. }
+            | Instr::Format { ty, .. } => ty,
         }
     }
+
+    /// The regions this instruction holds: a match's arms, an `if`'s two
+    /// sides. A walk that stops at a region's edge is how an import called
+    /// only inside an arm went missing from the module's imports.
+    pub fn regions(&self) -> Vec<&Region> {
+        match self {
+            Instr::Match { arms, .. } => arms.iter().map(|a| &a.body).collect(),
+            Instr::If { then, els, .. } => vec![then, els],
+            _ => Vec::new(),
+        }
+    }
+
+    /// This instruction and every instruction inside its regions, in order.
+    pub fn walk<'a>(&'a self, out: &mut Vec<&'a Instr>) {
+        out.push(self);
+        for r in self.regions() {
+            for i in &r.instrs {
+                i.walk(out);
+            }
+        }
+    }
+}
+
+/// Every instruction in `instrs`, regions included.
+pub fn all_instrs(instrs: &[Instr]) -> Vec<&Instr> {
+    let mut out = Vec::new();
+    for i in instrs {
+        i.walk(&mut out);
+    }
+    out
 }
 
 /// How a block ends. Every block has one — there is no falling off the end.

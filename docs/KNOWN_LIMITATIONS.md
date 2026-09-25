@@ -52,21 +52,35 @@ rather than approximated:
 
 - **Straight-line bodies, at E10-I.** Import calls and scalar constants were
   supported, and values moved flat or in their canonical layout. Matches over
-  `Option` and `Result`, field reads and their cases came after (ADR-0036,
-  below). Constructing a declared record or variant, a call to another
-  compiled declaration, and a string constant are still refused.
+  `Option` and `Result`, field reads and their cases came after (ADR-0036),
+  and then computation (ADR-0039, below).
 - **The invocation region is provisional.** It is a bump region reclaimed by
   each export's post-return, and nothing can outlive an invocation.
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
 
 **The backend matches over `Option` and `Result`**, reads fields, and builds
-their cases (2026-09-25, ADR-0036). Still refused by name:
+their cases (2026-09-25, ADR-0036). **It computes** (2026-09-25, ADR-0039):
+`Int` and `Float` arithmetic, comparisons, `&`, `|`, `!`, `if`, string
+literals, interpolation, records built, and calls to other declarations,
+inlined. Still refused by name:
 
-- nested patterns;
-- declared records and variants built;
-- calls between compiled declarations;
-- arithmetic, `if`, and string operations.
+- nested patterns, and a declared variant built or matched;
+- recursion, and a call to a generic declaration: calls are inlined;
+- an early `return`, an assignment, a pipeline, and a loop;
+- `%` on a `Float`, and a `Float` interpolated: their semantics are not
+  decided;
+- list and string operations beyond the ones the standard library declares
+  (see below).
+
+- **Traps are not distinguished by cause.** An `Int` overflow and a zero
+  divisor both stop the invocation, and the host reports a failed call; which
+  one it was is not carried.
+- **The checker does not compare a comparison's operands.** `1 == "a"` types
+  as a `Bool` and passes `pw check`; the backend refuses it. A value relation
+  for it is the fix, and is not built.
+- **The logical operators are `&` and `|`.** `&&` does not parse. They
+  short-circuit.
 
 - **Some matches are not analysed for exhaustiveness.** Each is counted
   Blocked by the match audit, with its reason: neither proven nor refused.

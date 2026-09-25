@@ -38,8 +38,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
-    Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Const, Function, ImportId, Instr,
-    Lowering, MatchArm, Program, Region, Shape, Terminator, Type, TypeDef, ValueId,
+    BinaryOp, Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Const, Function, ImportId,
+    Instr, Lowering, MatchArm, Program, Region, Shape, Terminator, Type, TypeDef, UnaryOp, ValueId,
+    all_instrs,
 };
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Pattern, Span};
@@ -87,11 +88,19 @@ impl<'a> Checked<'a> {
             "the checked units and the lowering context describe different \
              programs, so the proof would be about neither"
         );
-        let errors: Vec<crate::diagnostics::Diagnostic> = crate::check::check_units(units)
-            .into_iter()
-            .flat_map(|(_, ds)| ds)
-            .filter(|d| d.severity == crate::diagnostics::Severity::Error)
-            .collect();
+        // **A program that did not parse did not check**, whatever the checker
+        // says of the tree that survived. `Unit` carries its source and not
+        // its parse errors, so they are read again here. Until 2026-09-25 they
+        // were not: `{ a + b }` in a query was an unknown policy to the parser
+        // and an empty body to the backend, which compiled it.
+        let mut errors: Vec<crate::diagnostics::Diagnostic> =
+            units.iter().flat_map(syntax_errors).collect();
+        errors.extend(
+            crate::check::check_units(units)
+                .into_iter()
+                .flat_map(|(_, ds)| ds)
+                .filter(|d| d.severity == crate::diagnostics::Severity::Error),
+        );
         if errors.is_empty() {
             Ok(Checked { cx })
         } else {
@@ -102,6 +111,30 @@ impl<'a> Checked<'a> {
     pub fn context(&self) -> &Context<'a> {
         &self.cx
     }
+}
+
+/// A unit's syntax errors, as diagnostics.
+fn syntax_errors(unit: &crate::check::Unit) -> Vec<crate::diagnostics::Diagnostic> {
+    pw_syntax::parse_tree(&unit.src)
+        .errors
+        .into_iter()
+        .map(|e| crate::diagnostics::Diagnostic {
+            code: e.code,
+            invariant: crate::codes::ALL
+                .iter()
+                .find(|c| c.id == e.code)
+                .map(|c| c.invariant)
+                .unwrap_or("a program must parse"),
+            reason: "syntax_error",
+            detector: crate::diagnostics::Detector::Parser,
+            severity: crate::diagnostics::Severity::Error,
+            message: format!("{}: {}", unit.path, e.message),
+            primary_span: e.span,
+            related: Vec::new(),
+            explanation: e.help,
+            repairs: Vec::new(),
+        })
+        .collect()
 }
 
 /// What the lowering needs from upstream, gathered once.
@@ -131,11 +164,12 @@ pub struct Context<'a> {
 /// several authorities, one authority can serve many operations, and an
 /// operation can be placement-constrained while needing none.
 fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
-    // Every import the lowered code actually calls.
+    // Every import the lowered code actually calls, inside a match arm or an
+    // `if` as much as at the top of a body.
     let mut wanted: BTreeSet<ImportId> = BTreeSet::new();
     for f in &p.functions {
         for b in &f.blocks {
-            for i in &b.instrs {
+            for i in all_instrs(&b.instrs) {
                 if let Instr::ImportCall { import, .. } = i {
                     wanted.insert(import.clone());
                 }
@@ -233,6 +267,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         instrs: Vec::new(),
         locals: BTreeMap::new(),
         types: BTreeMap::new(),
+        inlining: vec![def],
     };
 
     // Parameters first, so a body naming one finds it.
@@ -335,6 +370,13 @@ pub fn program_by_declaration(
 }
 
 /// Every nominal type the lowered functions reach, resolved to its shape.
+///
+/// A field's type comes from the signatures, resolved where the declaration is
+/// written. Until 2026-09-25 it was the head of the written type read as a
+/// primitive, with `String` for anything else: `redirect: Option<String>` was
+/// a `String`. Nothing read this table then. The encoder reads it now, for a
+/// record that never crosses the boundary (ADR-0039), so a type that does not
+/// resolve leaves its declaration out rather than guessing.
 fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
     let mut wanted: Vec<DefId> = Vec::new();
     for f in &p.functions {
@@ -343,71 +385,72 @@ fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
         }
         wanted.extend(f.ret.nominals());
         for b in &f.blocks {
-            for i in &b.instrs {
+            for i in all_instrs(&b.instrs) {
                 wanted.extend(i.ty().nominals());
             }
         }
     }
-    wanted.sort();
-    wanted.dedup();
-
-    let mut out = Vec::new();
-    for def in wanted {
-        let Some(hir) = cx.hirs.get(def.unit) else {
+    let mut out: Vec<TypeDef> = Vec::new();
+    let mut seen: BTreeSet<DefId> = BTreeSet::new();
+    // Transitively: a record's field may be another record.
+    while let Some(def) = wanted.pop() {
+        if !seen.insert(def) {
+            continue;
+        }
+        let Some(decl) = crate::resolve::declaration(cx.hirs, def) else {
             continue;
         };
-        let Some(decl) = hir
-            .all_decls()
-            .find(|(id, _)| id.0 == def.decl)
-            .map(|(_, d)| d)
-        else {
-            continue;
+        let at = decl.name_span.clone();
+        let resolved = |r: &TypeResolution| match ty_resolution(cx.sigs, r, &at) {
+            Lowering::Lowered(t) => Some(t),
+            _ => None,
         };
-        let shape = if let Some(of) = &decl.opaque_of {
-            Shape::Alias(Box::new(primitive(of).unwrap_or(Type::Str)))
+        let declared = cx.sigs.type_decl(def);
+        let shape = if let Some(rep) = declared.and_then(|t| t.representation.as_ref()) {
+            match resolved(rep) {
+                Some(t) => Shape::Alias(Box::new(t)),
+                None => continue,
+            }
         } else if let Some(variants) = &decl.variants
             && variants.len() > 1
         {
+            // A declared variant's payloads are not resolved here: the
+            // backend builds and matches none (ADR-0039 §6).
             Shape::Variant {
                 cases: variants.iter().map(|v| (v.name.clone(), None)).collect(),
             }
-        } else {
-            Shape::Record {
-                fields: decl
-                    .fields
-                    .as_ref()
-                    .map(|fs| {
-                        fs.iter()
-                            .filter_map(|f| {
-                                f.ty.as_ref().map(|t| {
-                                    (
-                                        f.name.clone(),
-                                        primitive(t.constructor_head_only()).unwrap_or(Type::Str),
-                                    )
-                                })
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default(),
+        } else if let Some(fields) = declared.and_then(|t| t.record.as_ref()) {
+            let mut out_fields = Vec::new();
+            let mut whole = true;
+            for (name, r) in fields {
+                match resolved(r) {
+                    Some(t) => out_fields.push((name.clone(), t)),
+                    None => whole = false,
+                }
             }
+            if !whole {
+                continue;
+            }
+            Shape::Record { fields: out_fields }
+        } else {
+            continue;
         };
+        if let Shape::Record { fields } = &shape {
+            for (_, t) in fields {
+                wanted.extend(t.nominals());
+            }
+        }
+        if let Shape::Alias(t) = &shape {
+            wanted.extend(t.nominals());
+        }
         out.push(TypeDef {
             def,
             name: decl.name.clone(),
             shape,
         });
     }
+    out.sort_by_key(|t| t.def);
     out
-}
-
-fn primitive(name: &str) -> Option<Type> {
-    Some(match name {
-        "Int" => Type::Int,
-        "Float" => Type::Float,
-        "Bool" => Type::Bool,
-        "String" | "Str" => Type::Str,
-        _ => return None,
-    })
 }
 
 fn component_id(cx: &Context<'_>, unit: usize, decl: &Decl) -> String {
@@ -434,6 +477,10 @@ struct Lower<'a> {
     /// Every value's type, recorded where the value is made. A `match` asks
     /// what its scrutinee is, and a field access what record it reads.
     types: BTreeMap<ValueId, Type>,
+    /// The declarations whose bodies are being lowered, outermost first: the
+    /// export, then each callee inlined into it (ADR-0039 §4). A call to one
+    /// of them is a recursion.
+    inlining: Vec<DefId>,
 }
 
 impl<'a> Lower<'a> {
@@ -603,6 +650,23 @@ impl<'a> Lower<'a> {
             Expr::Name(n) if self.builtin(n) == Some(BuiltinCase::None) => {
                 self.variant(BuiltinCase::None, None, expected, span)
             }
+            // The language's own truth values, where nothing else has the
+            // name: the typer's rule.
+            Expr::Name(n) if (n == "true" || n == "false") && self.own_term(n) => {
+                let result = self.fresh();
+                Lowering::Lowered(self.push(Instr::Const {
+                    result,
+                    value: Const::Bool(n == "true"),
+                    ty: Type::Bool,
+                }))
+            }
+            Expr::Name(n) if n == "return" => Lowering::Unsupported {
+                construct: "an early `return`",
+                span,
+                reason: "a body's value is its last expression here; a `return` part-way \
+                         through would need a jump out of every enclosing region"
+                    .to_string(),
+            },
             Expr::Name(n) => match self.locals.get(n) {
                 Some(v) => Lowering::Lowered(*v),
                 None => Lowering::Blocked {
@@ -666,12 +730,625 @@ impl<'a> Lower<'a> {
             },
             Expr::Match { scrutinee, arms } => self.matched(body, *scrutinee, arms, expected, span),
             Expr::Field { base, name } => self.field(body, *base, name, span),
+            Expr::Binary { op, lhs, rhs } => self.binary(body, op, *lhs, *rhs, expected, span),
+            Expr::Unary { op, operand } => self.unary(body, op, *operand, expected, span),
+            Expr::If {
+                cond,
+                then,
+                els: Some(els),
+            } => self.branch(body, *cond, *then, *els, expected, span),
+            Expr::If { els: None, .. } => Lowering::Unsupported {
+                construct: "an `if` without `else`",
+                span,
+                reason: "it has no value when its condition is false".to_string(),
+            },
+            Expr::Interpolated { text, parts } => self.interpolated(body, text, parts, span),
+            Expr::Record {
+                name: Some(name),
+                fields,
+            } => self.record(body, name, fields, span),
             other => Lowering::Unsupported {
                 construct: construct_name(other),
                 span,
                 reason: "the backend lowers calls, names, literals, blocks, bindings, \
-                         field reads, and matches over `Option` and `Result`"
+                         field reads, matches over `Option` and `Result`, arithmetic, \
+                         comparisons, `if`, interpolated strings and records"
                     .to_string(),
+            },
+        }
+    }
+
+    /// Is `name` a term the program leaves to the language, here?
+    fn own_term(&self, name: &str) -> bool {
+        !self.locals.contains_key(name)
+            && matches!(
+                self.cx.ws.resolve_in(self.unit, Namespace::Term, name),
+                Resolution::Unresolved
+            )
+    }
+
+    /// Lower `e` into a region of its own: its instructions, and its value.
+    /// Names it binds stay inside.
+    fn region(&mut self, body: &Body, e: ExprId, expected: Option<&Type>) -> Lowering<Region> {
+        let outer = std::mem::take(&mut self.instrs);
+        let scope = self.locals.clone();
+        let value = self.expr(body, e, expected);
+        self.locals = scope;
+        let instrs = std::mem::replace(&mut self.instrs, outer);
+        value.map(|value| Region { instrs, value })
+    }
+
+    /// A region holding one constant.
+    fn constant(&mut self, value: Const, ty: Type) -> Region {
+        let result = self.fresh();
+        self.types.insert(result, ty.clone());
+        Region {
+            instrs: vec![Instr::Const { result, value, ty }],
+            value: result,
+        }
+    }
+
+    /// Lower `e` and require the type `want`.
+    fn typed(&mut self, body: &Body, e: ExprId, want: &Type) -> Lowering<ValueId> {
+        let span = body.expr_span(e);
+        let v = match self.expr(body, e, Some(want)) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        match self.types.get(&v) {
+            Some(t) if t == want => Lowering::Lowered(v),
+            other => Lowering::Blocked {
+                why: format!("a {want:?} is needed here and this is {other:?}"),
+                span,
+            },
+        }
+    }
+
+    /// **Arithmetic, a comparison, `&` or `|`** (ADR-0039 §1, §2).
+    fn binary(
+        &mut self,
+        body: &Body,
+        op: &crate::hir::BinOp,
+        lhs: ExprId,
+        rhs: ExprId,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        use crate::hir::BinOp as B;
+        // `a & b` is `if a { b } else { false }`, and `a | b` is
+        // `if a { true } else { b }`: the right side runs only when it decides.
+        if matches!(op, B::And | B::Or) {
+            let cond = match self.typed(body, lhs, &Type::Bool) {
+                Lowering::Lowered(v) => v,
+                other => return other,
+            };
+            let right = match self.region(body, rhs, Some(&Type::Bool)) {
+                Lowering::Lowered(r) => r,
+                other => return other.map(|_| unreachable!()),
+            };
+            if self.types.get(&right.value) != Some(&Type::Bool) {
+                return Lowering::Blocked {
+                    why: "the right side of a logical operator is not a Bool".to_string(),
+                    span,
+                };
+            }
+            let (then, els) = match op {
+                B::And => (right, self.constant(Const::Bool(false), Type::Bool)),
+                _ => (self.constant(Const::Bool(true), Type::Bool), right),
+            };
+            let result = self.fresh();
+            return Lowering::Lowered(self.push(Instr::If {
+                result,
+                cond,
+                then,
+                els,
+                ty: Type::Bool,
+            }));
+        }
+        let op = match op {
+            B::Add => BinaryOp::Add,
+            B::Sub => BinaryOp::Sub,
+            B::Mul => BinaryOp::Mul,
+            B::Div => BinaryOp::Div,
+            B::Rem => BinaryOp::Rem,
+            B::Cmp(c) => match c.as_str() {
+                "==" => BinaryOp::Eq,
+                "!=" => BinaryOp::Ne,
+                "<" => BinaryOp::Lt,
+                "<=" => BinaryOp::Le,
+                ">" => BinaryOp::Gt,
+                ">=" => BinaryOp::Ge,
+                other => {
+                    return Lowering::Blocked {
+                        why: format!("`{other}` is not a comparison"),
+                        span,
+                    };
+                }
+            },
+            B::Pipe => {
+                return Lowering::Unsupported {
+                    construct: "a pipeline",
+                    span,
+                    reason: "`a |> f(..)` is not lowered yet; write the call".to_string(),
+                };
+            }
+            B::And | B::Or => unreachable!("handled above"),
+            B::Transition | B::Assign => {
+                return Lowering::Unsupported {
+                    construct: "an assignment",
+                    span,
+                    reason: "a compiled body binds each name once".to_string(),
+                };
+            }
+        };
+        // An arithmetic operator's operands have its result's type; a
+        // comparison's have whatever type they share.
+        let operand = if op.compares() { None } else { expected };
+        let l = match self.expr(body, lhs, operand) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let Some(lt) = self.types.get(&l).cloned() else {
+            return Lowering::Blocked {
+                why: "an operand has no type".to_string(),
+                span,
+            };
+        };
+        let r = match self.expr(body, rhs, Some(&lt)) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let rt = self.types.get(&r).cloned();
+        if rt.as_ref() != Some(&lt) {
+            // The checker types a comparison as a `Bool` without comparing
+            // its operands' types (KNOWN_LIMITATIONS), so this is reachable.
+            return Lowering::Blocked {
+                why: format!(
+                    "`{op:?}` on a {lt:?} and a {}: the operands differ in type",
+                    rt.map_or("value of no type".to_string(), |t| format!("{t:?}"))
+                ),
+                span,
+            };
+        }
+        let ty = match (op, &lt) {
+            (BinaryOp::Rem, Type::Float) => {
+                return Lowering::Unsupported {
+                    construct: "`%` on a Float",
+                    span,
+                    reason: "its semantics are not decided, and Wasm has no instruction for it"
+                        .to_string(),
+                };
+            }
+            (
+                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Rem,
+                Type::Int | Type::Float,
+            ) => lt.clone(),
+            (BinaryOp::Eq | BinaryOp::Ne, Type::Int | Type::Float | Type::Bool | Type::Str) => {
+                Type::Bool
+            }
+            (
+                BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge,
+                Type::Int | Type::Float | Type::Str,
+            ) => Type::Bool,
+            (op, t) => {
+                return Lowering::Unsupported {
+                    construct: "an operator on a value of this type",
+                    span,
+                    reason: format!("`{op:?}` on a {t:?}"),
+                };
+            }
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Binary {
+            result,
+            op,
+            lhs: l,
+            rhs: r,
+            ty,
+        }))
+    }
+
+    /// `-x` and `!b`.
+    fn unary(
+        &mut self,
+        body: &Body,
+        op: &crate::hir::UnOp,
+        operand: ExprId,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let (op, v) = match op {
+            crate::hir::UnOp::Not => match self.typed(body, operand, &Type::Bool) {
+                Lowering::Lowered(v) => (UnaryOp::Not, v),
+                other => return other,
+            },
+            crate::hir::UnOp::Neg => match self.expr(body, operand, expected) {
+                Lowering::Lowered(v) => (UnaryOp::Neg, v),
+                other => return other,
+            },
+        };
+        let ty = match (op, self.types.get(&v)) {
+            (UnaryOp::Not, _) => Type::Bool,
+            (UnaryOp::Neg, Some(t @ (Type::Int | Type::Float))) => t.clone(),
+            (UnaryOp::Neg, other) => {
+                return Lowering::Unsupported {
+                    construct: "`-` on a value that is not a number",
+                    span,
+                    reason: format!("the operand is {other:?}"),
+                };
+            }
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Unary {
+            result,
+            op,
+            operand: v,
+            ty,
+        }))
+    }
+
+    /// **`if c { a } else { b }`**: two regions, one type.
+    fn branch(
+        &mut self,
+        body: &Body,
+        cond: ExprId,
+        then: ExprId,
+        els: ExprId,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let cond = match self.typed(body, cond, &Type::Bool) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let then = match self.region(body, then, expected) {
+            Lowering::Lowered(r) => r,
+            other => return other.map(|_| unreachable!()),
+        };
+        let then_ty = self.types.get(&then.value).cloned();
+        let fixed = expected.cloned().or(then_ty.clone());
+        let els = match self.region(body, els, fixed.as_ref()) {
+            Lowering::Lowered(r) => r,
+            other => return other.map(|_| unreachable!()),
+        };
+        let els_ty = self.types.get(&els.value).cloned();
+        let ty = match (then_ty, els_ty) {
+            (Some(a), Some(b)) if a == b => a,
+            (a, b) => {
+                return Lowering::Blocked {
+                    why: format!("the branches produce {a:?} and {b:?}"),
+                    span,
+                };
+            }
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::If {
+            result,
+            cond,
+            then,
+            els,
+            ty,
+        }))
+    }
+
+    /// **`"han-{n}"`**: the literal pieces and each hole's value as text,
+    /// concatenated (ADR-0039 §3). The holes are the ones `lower.rs` found in
+    /// the token, in order: each non-empty `{..}` is the next part.
+    fn interpolated(
+        &mut self,
+        body: &Body,
+        text: &str,
+        parts: &[ExprId],
+        span: Span,
+    ) -> Lowering<ValueId> {
+        if text.starts_with("\"\"\"") || text.contains('\\') {
+            return Lowering::Unsupported {
+                construct: "an interpolated string whose escapes the language does not define",
+                span,
+                reason: "A-023: a string literal has a value only where no escape rule is \
+                         involved"
+                    .to_string(),
+            };
+        }
+        let Some(inner) = text.strip_prefix('"').and_then(|t| t.strip_suffix('"')) else {
+            return Lowering::Blocked {
+                why: "an interpolated string that is not a quoted token".to_string(),
+                span,
+            };
+        };
+        enum Piece<'t> {
+            Text(&'t str),
+            Hole(usize),
+        }
+        let mut pieces = Vec::new();
+        let mut rest = inner;
+        let mut next = 0;
+        while let Some(open) = rest.find('{') {
+            let after = &rest[open + 1..];
+            let Some(close) = after.find('}') else {
+                break;
+            };
+            pieces.push(Piece::Text(&rest[..open]));
+            if after[..close].trim().is_empty() {
+                return Lowering::Unsupported {
+                    construct: "an empty interpolation hole",
+                    span,
+                    reason: "`{}` holds no expression".to_string(),
+                };
+            }
+            pieces.push(Piece::Hole(next));
+            next += 1;
+            rest = &after[close + 1..];
+        }
+        pieces.push(Piece::Text(rest));
+        if next != parts.len() {
+            return Lowering::Blocked {
+                why: format!(
+                    "the string has {next} holes and {} of them parsed",
+                    parts.len()
+                ),
+                span,
+            };
+        }
+        let mut values = Vec::new();
+        for piece in pieces {
+            match piece {
+                Piece::Text("") => {}
+                Piece::Text(t) => {
+                    let result = self.fresh();
+                    values.push(self.push(Instr::Const {
+                        result,
+                        value: Const::Str(t.to_string()),
+                        ty: Type::Str,
+                    }));
+                }
+                Piece::Hole(i) => {
+                    let v = match self.expr(body, parts[i], None) {
+                        Lowering::Lowered(v) => v,
+                        other => return other,
+                    };
+                    let v = match self.types.get(&v) {
+                        Some(Type::Str) => v,
+                        Some(Type::Int | Type::Bool) => {
+                            let result = self.fresh();
+                            self.push(Instr::Format {
+                                result,
+                                value: v,
+                                ty: Type::Str,
+                            })
+                        }
+                        other => {
+                            return Lowering::Unsupported {
+                                construct: "an interpolated value of this type",
+                                span: body.expr_span(parts[i]),
+                                reason: format!(
+                                    "{other:?} has no text form here; a `Float`'s \
+                                     formatting is not decided"
+                                ),
+                            };
+                        }
+                    };
+                    values.push(v);
+                }
+            }
+        }
+        match values.as_slice() {
+            [] => {
+                let result = self.fresh();
+                Lowering::Lowered(self.push(Instr::Const {
+                    result,
+                    value: Const::Str(String::new()),
+                    ty: Type::Str,
+                }))
+            }
+            [one] => Lowering::Lowered(*one),
+            _ => {
+                let result = self.fresh();
+                Lowering::Lowered(self.push(Instr::Concat {
+                    result,
+                    parts: values,
+                    ty: Type::Str,
+                }))
+            }
+        }
+    }
+
+    /// **`Store { id: 1 }`**: a declared record, every field given once, in
+    /// declaration order (ADR-0039 §6).
+    fn record(
+        &mut self,
+        body: &Body,
+        name: &str,
+        fields: &[crate::hir::FieldInit],
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let found = match name.contains('.') {
+            true => self.cx.ws.resolve_path_in(self.unit, Namespace::Type, name),
+            false => self.cx.ws.resolve_in(self.unit, Namespace::Type, name),
+        };
+        let def = match found {
+            Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
+            _ => {
+                return Lowering::Blocked {
+                    why: format!("`{name}` names no type here"),
+                    span,
+                };
+            }
+        };
+        let Some(declared) = self.cx.sigs.type_decl(def).and_then(|t| t.record.clone()) else {
+            return Lowering::Unsupported {
+                construct: "building a value of a type with no record fields",
+                span,
+                reason: format!("`{name}` is not a record"),
+            };
+        };
+        if let Some(extra) = fields
+            .iter()
+            .find(|f| !declared.iter().any(|(n, _)| *n == f.name))
+        {
+            return Lowering::Blocked {
+                why: format!("`{name}` has no field `{}`", extra.name),
+                span,
+            };
+        }
+        // A generic record's layout depends on its arguments: `ty_resolved`'s
+        // refusal, for the same reason.
+        if crate::resolve::declaration(self.cx.hirs, def).is_some_and(|d| !d.type_params.is_empty())
+        {
+            return Lowering::Unsupported {
+                construct: "building a value of a generic record",
+                span,
+                reason: format!("`{name}` needs specialization before its layout is known"),
+            };
+        }
+        let ty = Type::Nominal(def);
+        let mut args = Vec::new();
+        for (field, resolution) in &declared {
+            let given: Vec<&crate::hir::FieldInit> =
+                fields.iter().filter(|f| f.name == *field).collect();
+            let [init] = given.as_slice() else {
+                return Lowering::Blocked {
+                    why: format!(
+                        "`{name}` is built with its field `{field}` {} times",
+                        given.len()
+                    ),
+                    span,
+                };
+            };
+            let want = match ty_resolution(self.cx.sigs, resolution, &span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            };
+            let v = match init.value {
+                Some(e) => match self.typed(body, e, &want) {
+                    Lowering::Lowered(v) => v,
+                    other => return other,
+                },
+                // `Point { x, y }`: the shorthand names a binding.
+                None => match self.locals.get(field) {
+                    Some(v) if self.types.get(v) == Some(&want) => *v,
+                    _ => {
+                        return Lowering::Blocked {
+                            why: format!("`{field}` is not a bound {want:?} here"),
+                            span,
+                        };
+                    }
+                },
+            };
+            args.push(v);
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Construct {
+            result,
+            ctor: def,
+            args,
+            ty,
+        }))
+    }
+
+    /// **A call to another Pleris declaration, inlined** (ADR-0039 §4): its
+    /// body, lowered with its parameters bound to the arguments.
+    fn inline(
+        &mut self,
+        callee: DefId,
+        args: Vec<ValueId>,
+        ret: &Type,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let Some(decl) = crate::resolve::declaration(self.cx.hirs, callee) else {
+            return Lowering::Blocked {
+                why: "a callee no unit holds".to_string(),
+                span,
+            };
+        };
+        if self.inlining.contains(&callee) {
+            return Lowering::Unsupported {
+                construct: "a recursive call",
+                span,
+                reason: format!(
+                    "`{}` calls itself, directly or through another declaration; calls are \
+                     inlined (ADR-0039 §4) and an inlined recursion has no end the compiler \
+                     can see",
+                    decl.name
+                ),
+            };
+        }
+        if !decl.type_params.is_empty() {
+            return Lowering::Unsupported {
+                construct: "a call to a generic declaration",
+                span,
+                reason: format!("`{}` needs specialization before it is inlined", decl.name),
+            };
+        }
+        let Some(body_id) = decl.body else {
+            return Lowering::Unsupported {
+                construct: "a call to a declaration with no body",
+                span,
+                reason: format!(
+                    "`{}` has neither a body nor a `host` binding to call",
+                    decl.name
+                ),
+            };
+        };
+        let Some(sig) = self.cx.sigs.by_def(callee) else {
+            return Lowering::Blocked {
+                why: format!("`{}` has no resolved signature", decl.name),
+                span,
+            };
+        };
+        if args.len() != decl.params.len() {
+            return Lowering::Blocked {
+                why: format!(
+                    "`{}` takes {} arguments and receives {}",
+                    decl.name,
+                    decl.params.len(),
+                    args.len()
+                ),
+                span,
+            };
+        }
+        let mut bound = BTreeMap::new();
+        for (i, (p, a)) in decl.params.iter().zip(&args).enumerate() {
+            let Some(declared) = sig.params.get(i).and_then(Option::as_ref) else {
+                return Lowering::Unsupported {
+                    construct: "an unannotated parameter",
+                    span,
+                    reason: format!("`{}`'s `{}` has no declared type", decl.name, p.name),
+                };
+            };
+            let want = match ty_resolution(self.cx.sigs, declared, &span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            };
+            if self.types.get(a) != Some(&want) {
+                return Lowering::Blocked {
+                    why: format!(
+                        "`{}` receives a {:?} as `{}`, declared {want:?}",
+                        decl.name,
+                        self.types.get(a),
+                        p.name
+                    ),
+                    span,
+                };
+            }
+            bound.insert(p.name.clone(), *a);
+        }
+        let body = self.cx.hirs[callee.unit].body(body_id);
+        let caller = (std::mem::replace(&mut self.locals, bound), self.unit);
+        self.unit = callee.unit;
+        self.inlining.push(callee);
+        let out = self.expr(body, body.root, Some(ret));
+        self.inlining.pop();
+        (self.locals, self.unit) = caller;
+        let v = match out {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        match self.types.get(&v) {
+            Some(t) if t == ret => Lowering::Lowered(v),
+            other => Lowering::Blocked {
+                why: format!("`{}` produces a {other:?} and declares {ret:?}", decl.name),
+                span,
             },
         }
     }
@@ -1065,14 +1742,9 @@ impl<'a> Lower<'a> {
                 });
             }
             None => match def {
-                Some(callee) => {
-                    self.push(Instr::Call {
-                        result,
-                        callee,
-                        args: lowered,
-                        ty,
-                    });
-                }
+                // Compiled Pleris: inlined, so the component still exports
+                // one function and imports only the host (ADR-0039 §4).
+                Some(callee) => return self.inline(callee, lowered, &ty, span),
                 // A call that needs no authority and whose callee has no
                 // resolved identity here — a platform declaration reached
                 // through the prelude. Refused rather than emitted as a call to

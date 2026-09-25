@@ -552,6 +552,23 @@ pub fn component_export(component_id: &str, export: &str) -> crate::contract::Co
     }
 }
 
+/// **Each declared type's WIT identifier in `pw:types/types`, by declaration.**
+///
+/// The names [`package`] gives them, from the same table, so the backend finds
+/// a declaration's type in a world by the identity the generator used, never
+/// by mangling a name a second time (ADR-0039 §5). A declaration only some
+/// worlds name is in this map whether or not a given world includes it; the
+/// encoder looks it up in the world and defines it itself when it is absent.
+pub fn type_idents(hirs: &[&Hir], ws: &Workspace) -> BTreeMap<DefId, String> {
+    let sigs = Signatures::build(ws, hirs);
+    let types = Types::build(hirs, ws, &sigs);
+    types
+        .by_def
+        .iter()
+        .filter_map(|(def, path)| types.known.get(path).map(|ident| (*def, ident.clone())))
+        .collect()
+}
+
 /// **Generate the WIT package for a checked program.**
 ///
 /// One `world` per contract, plus one `interface types` holding every type the

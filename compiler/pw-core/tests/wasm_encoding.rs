@@ -277,14 +277,51 @@ fn every_capability_a_function_calls_has_an_import() {
 
 /// **An unimplemented instruction is refused by name, never encoded.**
 ///
-/// A `Construct` encoded to a zero would produce a module that validates,
-/// links, instantiates and does the wrong thing.
+/// A call to another declaration encoded to a zero would produce a module that
+/// validates, links, instantiates and does the wrong thing. The lowering
+/// inlines such calls (ADR-0039 §4), so the IR's `Call` reaches the encoder
+/// only from a program built by hand, and it is refused.
 #[test]
 fn an_unimplemented_instruction_is_refused_rather_than_faked() {
     use pw_core::backend::ir::{Block, BlockId, Function, Instr, Terminator, Type, ValueId};
     use pw_core::resolve::DefId;
 
-    let wit = "package t:t;\ninterface api {\n    record r { a: s64 }\n    builds: func() -> r;\n}\nworld w {\n    export api;\n}\n";
+    let wit = "package t:t;\ninterface api {\n    builds: func() -> s64;\n}\nworld w {\n    export api;\n}\n";
+    let (resolve, world) = component::world_of(wit, "w").expect("the control's WIT");
+    let def = DefId { unit: 0, decl: 0 };
+    let f = Function {
+        def,
+        export: "builds".to_string(),
+        params: vec![],
+        ret: Type::Int,
+        blocks: vec![Block {
+            id: BlockId(0),
+            instrs: vec![Instr::Call {
+                result: ValueId(0),
+                callee: DefId { unit: 0, decl: 1 },
+                args: vec![],
+                ty: Type::Int,
+            }],
+            terminator: Terminator::Return(ValueId(0)),
+        }],
+        capabilities: vec![],
+    };
+    match wasm::core_module(&resolve, world, &f, "builds", &[]) {
+        Encoding::Unsupported { construct, .. } => {
+            assert!(construct.contains("call to another"), "{construct}")
+        }
+        other => panic!("a call must be refused by name: {other}"),
+    }
+}
+
+/// **A declared variant is not built** (ADR-0039 §6): a record is, and a
+/// variant's construction is refused rather than laid out as a record.
+#[test]
+fn building_a_declared_variant_is_refused() {
+    use pw_core::backend::ir::{Block, BlockId, Function, Instr, Terminator, Type, ValueId};
+    use pw_core::resolve::DefId;
+
+    let wit = "package t:t;\ninterface api {\n    variant v { a, b(s64) }\n    builds: func() -> v;\n}\nworld w {\n    export api;\n}\n";
     let (resolve, world) = component::world_of(wit, "w").expect("the control's WIT");
     let def = DefId { unit: 0, decl: 0 };
     let f = Function {
@@ -306,9 +343,9 @@ fn an_unimplemented_instruction_is_refused_rather_than_faked() {
     };
     match wasm::core_module(&resolve, world, &f, "builds", &[]) {
         Encoding::Unsupported { construct, .. } => {
-            assert!(construct.contains("record or variant"), "{construct}")
+            assert!(construct.contains("declared variant"), "{construct}")
         }
-        other => panic!("a construction must be refused by name: {other}"),
+        other => panic!("a variant's construction must be refused by name: {other}"),
     }
 }
 

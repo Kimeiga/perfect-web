@@ -219,3 +219,15 @@ statement in an arm too, and an arm with no `=>` is an error. Five gaps, each
 of which reported a match as exhaustive when it was not; the kiokun slice
 found the first. Two decisions need a ruling: a bare name is a constructor
 whenever some type has one of that name, and no `return` expression is built.
+
+## 2026-09-25: pure computation in the component backend (E10)
+
+[ADR-0039](DECISIONS/ADR-0039-pure-computation.md): arithmetic, comparisons,
+`&`, `|`, `!`, `if`, string literals, interpolation, records, and calls to
+other declarations (inlined). `Int` traps where its exact result does not fit,
+and `/` and `%` are Euclidean, as Koka's are; a zero divisor traps where Koka
+answers 0 (ruling needed). Types the world never names are defined in a
+private copy of its `Resolve`. Building it found a query body the parser
+dropped, a backend that compiled programs that did not parse, a Koka backend
+that emitted invalid negation, and an import missing when called only in an
+arm; all fixed.

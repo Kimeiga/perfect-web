@@ -27,8 +27,8 @@ use wit_parser::{
     Function as WitFunction, PackageId, Resolve, Type as WitType, TypeDefKind, WorldId, WorldItem,
 };
 
-use super::ir::{CallableImport, Function};
-use super::wasm::{Encoding, core_module};
+use super::ir::Function;
+use super::wasm::{Encoding, core_module_with};
 
 /// A compiled component and the facts it was built from.
 #[derive(Debug, Clone)]
@@ -54,11 +54,16 @@ pub fn parse(wit: &str) -> Result<(Resolve, PackageId), String> {
 }
 
 /// **Compile one exported function of one world into a component.**
+///
+/// `program` is the lowered program the function belongs to: its imports, and
+/// the declared types a body may build without the world naming them, found
+/// in the world by `idents` when it does (ADR-0039 §5).
 pub fn build(
     wit: &str,
     world: &crate::wit::World,
     function: &Function,
-    imports: &[CallableImport],
+    program: &super::ir::Program,
+    idents: &std::collections::BTreeMap<crate::resolve::DefId, String>,
 ) -> Encoding<Component> {
     let (resolve, pkg) = match parse(wit) {
         Ok(r) => r,
@@ -87,7 +92,15 @@ pub fn build(
         };
     };
 
-    let core = match core_module(&resolve, world_id, function, export, imports) {
+    let core = match core_module_with(
+        &resolve,
+        world_id,
+        function,
+        export,
+        &program.imports,
+        &program.types,
+        idents,
+    ) {
         Encoding::Encoded(c) => c,
         Encoding::Unsupported { construct, reason } => {
             return Encoding::Unsupported { construct, reason };
@@ -327,6 +340,8 @@ struct Program<'p> {
         &'p crate::wit::World,
     )>,
     lowered: &'p super::ir::Program,
+    /// Each declared type's identifier in the WIT package.
+    idents: &'p std::collections::BTreeMap<crate::resolve::DefId, String>,
     /// What the lowering refused, per declaration.
     refusals: &'p [(
         crate::resolve::DefId,
@@ -387,11 +402,13 @@ fn with_program<R>(
         )
     })?;
     let (lowered, refusals) = super::lower::program_by_declaration(&checked);
+    let idents = crate::wit::type_idents(&hirs, &ws);
     f(&Program {
         hirs: &hirs,
         wit: &wit,
         worlds: contracts.iter().zip(&worlds).collect(),
         lowered: &lowered,
+        idents: &idents,
         refusals: &refusals,
     })
 }
@@ -418,7 +435,7 @@ pub fn compile(units: &[crate::check::Unit], component_id: &str) -> Result<Compi
                 p.refused(world.declaration)
             ));
         };
-        match build(p.wit, world, function, &p.lowered.imports) {
+        match build(p.wit, world, function, p.lowered, p.idents) {
             Encoding::Encoded(component) => Ok(Compiled {
                 component,
                 wit: p.wit.to_string(),
@@ -465,7 +482,7 @@ pub fn compile_all(units: &[crate::check::Unit]) -> Result<Vec<(String, Built)>,
                 .iter()
                 .find(|f| f.def == world.declaration);
             let built = match (function, kind) {
-                (Some(function), _) => match build(p.wit, world, function, &p.lowered.imports) {
+                (Some(function), _) => match build(p.wit, world, function, p.lowered, p.idents) {
                     Encoding::Encoded(component) => {
                         match audit(&component.bytes, p.wit, &component.world) {
                             Ok(audited) => Built::Component {

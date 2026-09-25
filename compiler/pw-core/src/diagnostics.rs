@@ -44,12 +44,18 @@ pub enum Detector {
     /// a diagnostic that reports the wrong detector describes a mechanism that
     /// did not decide it.
     Signature,
+    /// **The parser.** A syntax error, reported where a program is checked
+    /// by a caller that holds only its units: `backend::lower::Checked::of`.
+    /// Added 2026-09-25, when a query body the parser had reported as an
+    /// unknown policy was compiled anyway, from the tree that survived.
+    Parser,
 }
 
 impl Detector {
     pub fn name(self) -> &'static str {
         match self {
             Detector::Signature => "signature",
+            Detector::Parser => "parser",
             Detector::DeclarationRule => "declaration_rule",
             Detector::ScopeGraph => "scope_graph",
             Detector::PatternMatrix => "pattern_matrix",

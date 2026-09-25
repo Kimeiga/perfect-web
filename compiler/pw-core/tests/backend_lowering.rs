@@ -235,7 +235,7 @@ opaque type Id = String
 type Cart = Cart { n: Int }
 type CartError = CartError { why: String }
 
-fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> } { todo }
+fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> } { Ok(Cart { n: 1 }) }
 
 command Add(id: Id) -> Result<Cart, CartError>
     requires SignedIn
@@ -277,12 +277,14 @@ command Add(id: Id) -> Result<Cart, CartError>
         imports.is_empty(),
         "an effect row is not a host binding: {imports:?}"
     );
+    // Compiled here means its body is: calls are inlined (ADR-0039 §4), so
+    // `write`'s `Ok(Cart { n: 1 })` is `Add`'s own code.
     assert!(
         f.blocks[0]
             .instrs
             .iter()
-            .any(|i| matches!(i, Instr::Call { .. })),
-        "it is an ordinary call: {:?}",
+            .any(|i| matches!(i, Instr::Construct { .. })),
+        "the callee's body is compiled into the caller: {:?}",
         f.blocks[0].instrs
     );
     assert!(
@@ -306,7 +308,7 @@ command Add(id: Id) -> Result<Cart, CartError>
     // The discriminating half: the same declaration WITH a host binding is an
     // import. One line of difference, and it is the declaration's own metadata.
     let bound = src.replace(
-        "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> } { todo }",
+        "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> } { Ok(Cart { n: 1 }) }",
         "fn write(id: Id) -> Result<Cart, CartError> !{ database.write<Cart> }\n    host \"store:data/carts#write\"",
     );
     let built = Built::synthetic(&bound);
@@ -355,7 +357,7 @@ opaque type Id = String
 type Cart = Cart { n: Int }
 type CartError = CartError { why: String }
 
-fn double(n: Int) -> Int { n }
+fn double(n: Int) -> Int { n * 2 }
 
 command Pure(id: Id) -> Int
     requires SignedIn
@@ -371,12 +373,13 @@ command Pure(id: Id) -> Int
         .find(|f| f.export == "Pure")
         .unwrap_or_else(|| panic!("{refusals:?}"));
 
+    // Inlined (ADR-0039 §4): `double`'s multiplication is `Pure`'s own.
     assert!(
         f.blocks[0]
             .instrs
             .iter()
-            .any(|i| matches!(i, Instr::Call { .. })),
-        "a call to a function with no effect row is an ordinary call: {:?}",
+            .any(|i| matches!(i, Instr::Binary { .. })),
+        "a call to a function with no effect row is compiled here: {:?}",
         f.blocks[0].instrs
     );
     assert!(

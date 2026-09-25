@@ -33,15 +33,13 @@ done:
    arithmetic and `if` in the backend), so the shard rule and the ranking can
    move from the host into Pleris; then the template gaps (an interpolated
    attribute, `else`, `Option`).
-2. **Backend breadth, driven by that slice.**
-   - records and variants written into the region;
-   - field projection;
-   - branches;
-   - string constants;
-   - calls between compiled declarations.
-
-   Each lands with a refusal test and a mutation control, in the style of
-   `wasm_encoding.rs`.
+2. ~~**Backend breadth, driven by that slice.**~~ DONE 2026-09-25 (ADR-0039):
+   records built, field projection, branches, string constants, arithmetic and
+   comparisons, and calls between compiled declarations, inlined. Each has a
+   test run through the host and a mutation control (`just e10-pure`). Still
+   refused: declared variants built or matched, recursion, generic callees.
+   Next, the standard library: list and string operations the shard rule and
+   the ranking need, then the template gaps.
 3. ~~**Compiled resumable handler bodies**~~ DONE 2026-09-25 (ADR-0033). Then
    step 10. Two things the handler work left open, in order of need:
    - captures as a patched part, so that a captured field a patch changes is

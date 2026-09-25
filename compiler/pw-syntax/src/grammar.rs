@@ -1642,7 +1642,10 @@ impl<'a> P<'a> {
         {
             return false;
         }
-        // A value must follow, on this line.
+        // A value must follow, on this line. An operator is not one: `a + b`
+        // in a query's body is an expression. Until 2026-09-25 only `<` was
+        // excluded, so `{ a + b }` was an unknown policy `a` with the value
+        // `+ b`, and the body lost its only statement.
         !matches!(
             self.nth(1).kind,
             Kind::Dot
@@ -1655,6 +1658,18 @@ impl<'a> P<'a> {
                 | Kind::Arrow
                 | Kind::Colon
                 | Kind::Eof
+                | Kind::Plus
+                | Kind::Minus
+                | Kind::Star
+                | Kind::Slash
+                | Kind::Percent
+                | Kind::Cmp
+                | Kind::RAngle
+                | Kind::Amp
+                | Kind::Pipe
+                | Kind::PipeGt
+                | Kind::Question
+                | Kind::LBracket
         ) && !self.nth_starts_line(1)
     }
 
@@ -2784,6 +2799,38 @@ mod tests {
             .filter(|n| n.kind() == K::NameExpr && n.text().to_string().trim() == "return")
             .count();
         assert_eq!(returns, 2);
+    }
+
+    #[test]
+    fn a_query_body_may_begin_with_an_operand() {
+        // A query's body is where its policies live, so a bare name at the
+        // start of a line could be a policy's head. One followed by an
+        // operator is an operand: until 2026-09-25 `{ a + b }` was an unknown
+        // policy `a`, and the body had no statement.
+        for body in [
+            "a + b",
+            "a * b - a / b",
+            "a % b",
+            "a == b",
+            "b != 0 & a > 1",
+            "b == 0 | a > b",
+            "a > b",
+            "a |> f",
+            "items[0]",
+        ] {
+            let src = format!("public query Q(a: Int, b: Int) -> Int {{ {body} }}\n");
+            let p = parse_ok(&src);
+            assert_lossless(&src, &p);
+        }
+        // A real unknown policy is still one.
+        let p = parse_tree("public query Q(a: Int) -> Int {\n    cahce shared\n    a\n}\n");
+        assert!(
+            p.errors
+                .iter()
+                .any(|e| e.message.contains("unknown policy `cahce`")),
+            "{:?}",
+            p.errors
+        );
     }
 
     #[test]

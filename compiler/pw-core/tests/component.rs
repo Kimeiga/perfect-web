@@ -111,7 +111,7 @@ fn build(c: &Compiled, export: &str) -> Encoding<Component> {
         .iter()
         .find(|w| w.declaration == f.def)
         .unwrap_or_else(|| panic!("`{export}` has a world"));
-    component::build(&c.wit, world, f, &c.program.imports)
+    component::build(&c.wit, world, f, &c.program, &Default::default())
 }
 
 fn add_to_cart() -> (Compiled, Component) {
@@ -232,7 +232,7 @@ fn an_import_whose_component_type_differs_is_refused_though_its_core_type_does_n
         .iter()
         .find(|w| w.declaration == f.def)
         .expect("world");
-    match component::build(&mutated, world_decl, f, &c.program.imports) {
+    match component::build(&mutated, world_decl, f, &c.program, &Default::default()) {
         Encoding::Blocked { why } => assert!(why.contains("another component type"), "{why}"),
         other => panic!("a cart result built from a store import must be refused: {other}"),
     }
