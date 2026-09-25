@@ -240,6 +240,47 @@ page WordPage(word: String, entry: Option<Entry>) {
                             </ul>
                         </section>
                     {/if}
+                    {#match e.character}
+                        {:Some(ch)}
+                            <section aria-label="Character">
+                                <h2>Character</h2>
+                                <dl id="character">
+                                    {#match ch.strokes}
+                                        {:Some(st)}
+                                            <dt>Strokes</dt>
+                                            <dd class="strokes">{st}</dd>
+                                        {:None}
+                                    {/match}
+                                    {#match ch.grade}
+                                        {:Some(gr)}
+                                            <dt>School grade</dt>
+                                            <dd class="grade">{gr}</dd>
+                                        {:None}
+                                    {/match}
+                                    {#match ch.jlpt}
+                                        {:Some(jl)}
+                                            <dt>Former JLPT level</dt>
+                                            <dd class="jlpt">{jl}</dd>
+                                        {:None}
+                                    {/match}
+                                    {#match ch.frequency}
+                                        {:Some(fq)}
+                                            <dt>Frequency rank</dt>
+                                            <dd class="frequency">{fq}</dd>
+                                        {:None}
+                                    {/match}
+                                    {#if ch.hangul}
+                                        <dt>Korean reading</dt>
+                                        <dd class="hangul">{ch.hangul}</dd>
+                                    {/if}
+                                    {#if ch.meanings}
+                                        <dt>Meaning in Korean</dt>
+                                        <dd class="meanings">{ch.meanings}</dd>
+                                    {/if}
+                                </dl>
+                            </section>
+                        {:None}
+                    {/match}
                     {#if e.japanese}
                         <section aria-label="Japanese">
                             <h2>Japanese</h2>
@@ -253,6 +294,36 @@ page WordPage(word: String, entry: Option<Entry>) {
                                                 <li>{sense.glosses}</li>
                                             {/each}
                                         </ol>
+                                    </li>
+                                {/each}
+                            </ul>
+                        </section>
+                    {/if}
+                    {#if e.korean}
+                        <section aria-label="Korean">
+                            <h2>Korean</h2>
+                            <ul id="korean">
+                                {#each e.korean as kw (kw.id)}
+                                    <li>
+                                        <span class="hangul">{kw.hangul}</span>
+                                        <span class="hanja">{kw.hanja}</span>
+                                        <span class="pronunciation">{kw.pronunciation}</span>
+                                        <span class="definitions">{kw.definitions}</span>
+                                    </li>
+                                {/each}
+                            </ul>
+                        </section>
+                    {/if}
+                    {#if e.names}
+                        <section aria-label="Names">
+                            <h2>Names</h2>
+                            <ul id="names">
+                                {#each e.names as nm (nm.id)}
+                                    <li>
+                                        <span class="written">{nm.written}</span>
+                                        <span class="readings">{nm.readings}</span>
+                                        <span class="kinds">{nm.kinds}</span>
+                                        <span class="translations">{nm.translations}</span>
                                     </li>
                                 {/each}
                             </ul>

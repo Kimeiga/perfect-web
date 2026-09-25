@@ -20,6 +20,14 @@ test("an entry renders from the compiled lookup, with no script", async ({ page 
   expect(await page.locator("script").count(), "a static page").toBe(0);
 });
 
+test("an entry shows its Korean words, names and character", async ({ page }) => {
+  // `WordPage`'s `{#match e.character}` and its nested matches (ADR-0042).
+  await page.goto("/人");
+  await expect(page.locator("#korean .hangul").first()).toHaveText("인");
+  expect(await page.locator("#names li").count()).toBeGreaterThan(0);
+  await expect(page.locator("#character .strokes")).toHaveText("2");
+});
+
 test("a simplified form is followed to its entry by the compiled lookup", async ({ page }) => {
   // `谚`'s file holds only a redirect to `諺`. Following it is `Lookup`'s
   // compiled match, not the host's.

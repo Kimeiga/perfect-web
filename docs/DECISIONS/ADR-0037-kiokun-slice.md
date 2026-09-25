@@ -124,3 +124,33 @@ and each sense by `<id>:<index>`.
 The answer to "could it rewrite kiokun.com" is more specific now; see the
 evidence file's list of what the slice did not need and what the full site
 would.
+
+## Amendment, 2026-09-25: Korean words, names and the character
+
+Later the same day the slice's `Entry` gained three things kiokun's entries
+carry and its page did not show:
+- `korean`, from `korean_words`: hangul, hanja, pronunciation and
+  definitions;
+- `names`, from `japanese_names` (JMnedict): written forms, readings, kinds
+  and romanizations;
+- `character: Option<Character>`, from `chinese_char`, `japanese_char` and
+  `korean_char`. It holds strokes, school grade, the former JLPT level and
+  frequency, each an `Option<Int>`, and the hanja table's hangul readings and
+  meanings.
+
+`WordPage` renders them with `{#if}`, `{#each}` and nested `{#match}`
+(ADR-0042). The compiled `Lookup` carries the larger record unchanged. All
+17,597 entries of the whole shard render.
+
+Found while doing it: kiokun's build lists some records twice in one entry.
+JMnedict's name 5345360 is in 釋 under both 釈 and 釋. The renderer refused
+the page, because two items shared a loop key. The host now reads each record
+once: an exact repeat is dropped, and a different record with a repeated id
+is keyed `<id>:<n>`.
+
+**Not done: Korean search.** kiokun.com's search index has Korean rows
+(164,941 of 834,036). They are keyed by hangul, with a romanized reading
+from its own `hangul_to_romanization`. The slice's index and ranking cover
+Chinese and Japanese. Adding Korean faithfully needs that romanization and
+kiokun.com's ranking for hangul queries ported and held to references, as
+ADR-0041 did for the rest. Pitch accent is not in kiokun's entries.

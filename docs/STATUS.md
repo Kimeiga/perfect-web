@@ -162,7 +162,9 @@ before integration; the baseline pass is not a substitute.
   - An attribute interpolates, and each value is escaped for its context. In
     a URL, each value is one URI component.
   - kiokun's two word pages are one, `WordPage`, and its search links are
-    `href="/{hit.target}"`.
+    `href="/{hit.target}"`. An entry now shows its Korean words, Japanese
+    names and character, with nested `{#match}` over `Option<Int>` fields
+    (ADR-0037, amended). All 17,597 entries of the whole shard render.
   - Found and fixed: `{:else}` was a silent miscompile, and a secret in an
     attribute string checked clean (corrections above).
   - Evidence: `docs/evidence/E10/templates.txt` (`just e10-templates`).

@@ -88,11 +88,36 @@ package pw:types {
             senses: list<dictionary-japanese-sense>,
             common: bool,
         }
+        record dictionary-korean-word {
+            id: string,
+            hangul: string,
+            hanja: string,
+            pronunciation: string,
+            definitions: string,
+        }
+        record dictionary-japanese-name {
+            id: string,
+            written: string,
+            readings: string,
+            kinds: string,
+            translations: string,
+        }
+        record dictionary-character {
+            strokes: option<s64>,
+            grade: option<s64>,
+            jlpt: option<s64>,
+            frequency: option<s64>,
+            hangul: string,
+            meanings: string,
+        }
         record dictionary-entry {
             key: string,
             redirect: option<string>,
             chinese: list<dictionary-chinese-word>,
             japanese: list<dictionary-japanese-word>,
+            korean: list<dictionary-korean-word>,
+            names: list<dictionary-japanese-name>,
+            character: option<dictionary-character>,
         }
         record dictionary-search-hit {
             id: string,

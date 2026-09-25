@@ -5,10 +5,11 @@
 // @charter: §14 M10
 // @milestone: E10
 //
-// kiokun.com is a Chinese–Japanese dictionary. Its build merges CC-CEDICT and
-// JMdict into one entry per word, keyed by the traditional form, and a
-// simplified or Japanese form is a stub that redirects to it. These are that
-// entry and one row of search results, narrowed to what the slice renders.
+// kiokun.com is a Chinese, Japanese and Korean dictionary. Its build merges
+// CC-CEDICT, JMdict, JMnedict, KANJIDIC and a Korean dictionary into one entry
+// per word, keyed by the traditional form, and a simplified or Japanese form
+// is a stub that redirects to it. These are that entry and one row of search
+// results, narrowed to what the slice renders.
 
 module dictionary
 
@@ -39,12 +40,47 @@ type JapaneseWord = JapaneseWord {
     common: Bool,
 }
 
+// One Korean word, from the Korean Learners' Dictionary: its hangul, its
+// hanja where it has one, its pronunciation, and its definitions joined.
+type KoreanWord = KoreanWord {
+    id: String,
+    hangul: String,
+    hanja: String,
+    pronunciation: String,
+    definitions: String,
+}
+
+// One Japanese name, from JMnedict: its written forms and readings, what
+// kind of name it is (given, surname, place..), and its romanizations.
+type JapaneseName = JapaneseName {
+    id: String,
+    written: String,
+    readings: String,
+    kinds: String,
+    translations: String,
+}
+
+// The character an entry is, when it is one. Strokes, grade, the former
+// JLPT level and frequency are KANJIDIC's where it has them; the hangul
+// readings and meanings are the hanja table's.
+type Character = Character {
+    strokes: Option<Int>,
+    grade: Option<Int>,
+    jlpt: Option<Int>,
+    frequency: Option<Int>,
+    hangul: String,
+    meanings: String,
+}
+
 // An entry. A stub carries only `key` and `redirect`, the entry it names.
 type Entry = Entry {
     key: String,
     redirect: Option<String>,
     chinese: List<ChineseWord>,
     japanese: List<JapaneseWord>,
+    korean: List<KoreanWord>,
+    names: List<JapaneseName>,
+    character: Option<Character>,
 }
 
 // One search result. `id` is unique within a result list: a word can match

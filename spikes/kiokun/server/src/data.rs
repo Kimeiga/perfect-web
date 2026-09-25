@@ -79,8 +79,87 @@ fn record(fields: Vec<(&str, Val)>) -> Val {
     )
 }
 
-/// kiokun's entry, as the world's `entry` record: `key`, `redirect`,
-/// `chinese`, `japanese`, in the declaration's order.
+/// Each item's `field`'s strings, joined: `definitions[].text`.
+fn joined(items: &serde_json::Value, key: &str, field: &str, by: &str) -> String {
+    list(items, key)
+        .map(|d| text(d, field))
+        .filter(|t| !t.is_empty())
+        .collect::<Vec<_>>()
+        .join(by)
+}
+
+/// Records keyed by their `id`, once each. kiokun's build can list one
+/// record twice: JMnedict's name 5345360 is in 釋 under both 釈 and 釋, and
+/// a keyed list refuses two items with one key. An exact repeat is dropped; a
+/// different record with a repeated id is keyed `<id>:<n>`.
+fn distinct<'a>(
+    records: impl Iterator<Item = &'a serde_json::Value>,
+) -> impl Iterator<Item = (String, &'a serde_json::Value)> {
+    let mut seen: Vec<(String, &serde_json::Value)> = Vec::new();
+    records.filter_map(move |r| {
+        let id = text(r, "id");
+        if seen.iter().any(|(i, s)| *i == id && *s == r) {
+            return None;
+        }
+        let n = seen.iter().filter(|(i, _)| *i == id).count();
+        seen.push((id.clone(), r));
+        Some((if n == 0 { id } else { format!("{id}:{n}") }, r))
+    })
+}
+
+/// A number the data may not have, as the world's `option<s64>`.
+fn maybe_int(v: Option<&serde_json::Value>) -> Val {
+    Val::Option(v.and_then(|n| n.as_i64()).map(|n| Box::new(Val::S64(n))))
+}
+
+/// The character an entry is, from kiokun's `chinese_char`, `japanese_char`
+/// and `korean_char`, or `None` for a word that is not one character.
+fn character(json: &serde_json::Value) -> Val {
+    let (zh, jp, kr) = (
+        json.get("chinese_char"),
+        json.get("japanese_char"),
+        json.get("korean_char"),
+    );
+    if zh.is_none() && jp.is_none() && kr.is_none() {
+        return Val::Option(None);
+    }
+    let misc = jp.and_then(|j| j.get("misc"));
+    let strokes = zh
+        .and_then(|z| z.get("strokeCount"))
+        .or_else(|| {
+            misc.and_then(|m| m.get("strokeCounts"))
+                .and_then(|s| s.get(0))
+        })
+        .or_else(|| kr.and_then(|k| k.get("strokes")));
+    let meanings = kr
+        .map(|k| {
+            list(k, "meaningsEn")
+                .filter_map(|m| m.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
+        })
+        .unwrap_or_default();
+    Val::Option(Some(Box::new(record(vec![
+        ("strokes", maybe_int(strokes)),
+        ("grade", maybe_int(misc.and_then(|m| m.get("grade")))),
+        ("jlpt", maybe_int(misc.and_then(|m| m.get("jlptLevel")))),
+        (
+            "frequency",
+            maybe_int(misc.and_then(|m| m.get("frequency"))),
+        ),
+        (
+            "hangul",
+            Val::String(
+                kr.map(|k| joined(k, "readings", "hangul", "、"))
+                    .unwrap_or_default(),
+            ),
+        ),
+        ("meanings", Val::String(meanings)),
+    ]))))
+}
+
+/// kiokun's entry, as the world's `entry` record, in the declaration's order:
+/// `key`, `redirect`, `chinese`, `japanese`, `korean`, `names`, `character`.
 pub fn entry(json: &serde_json::Value) -> Val {
     let chinese = list(json, "chinese_words")
         .map(|w| {
@@ -128,6 +207,50 @@ pub fn entry(json: &serde_json::Value) -> Val {
         ),
         ("chinese", Val::List(chinese)),
         ("japanese", Val::List(japanese)),
+        (
+            "korean",
+            Val::List(
+                list(json, "korean_words")
+                    .map(|w| {
+                        record(vec![
+                            ("id", Val::String(text(w, "id"))),
+                            ("hangul", Val::String(text(w, "hangul"))),
+                            ("hanja", Val::String(text(w, "hanja"))),
+                            ("pronunciation", Val::String(text(w, "pronunciation"))),
+                            (
+                                "definitions",
+                                Val::String(joined(w, "definitions", "text", "; ")),
+                            ),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        (
+            "names",
+            Val::List(
+                distinct(list(json, "japanese_names"))
+                    .map(|(id, n)| {
+                        let kinds: Vec<String> = list(n, "translation")
+                            .flat_map(|t| list(t, "type"))
+                            .filter_map(|k| k.as_str().map(str::to_string))
+                            .collect();
+                        let translations: Vec<String> = list(n, "translation")
+                            .map(|t| joined(t, "translation", "text", "; "))
+                            .filter(|t| !t.is_empty())
+                            .collect();
+                        record(vec![
+                            ("id", Val::String(id)),
+                            ("written", Val::String(forms(n, "kanji").join("、"))),
+                            ("readings", Val::String(forms(n, "kana").join("、"))),
+                            ("kinds", Val::String(kinds.join(", "))),
+                            ("translations", Val::String(translations.join("; "))),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        ("character", character(json)),
     ])
 }
 
@@ -423,5 +546,31 @@ impl Index {
                 ])
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// An exact repeat is dropped, as 釋 lists JMnedict's name 5345360
+    /// twice; a different record with a repeated id is kept and keyed apart.
+    #[test]
+    fn a_record_listed_twice_is_read_once() {
+        let json: serde_json::Value = serde_json::json!({ "names": [
+            { "id": "1", "text": "a" },
+            { "id": "1", "text": "a" },
+            { "id": "1", "text": "b" },
+            { "id": "2", "text": "c" },
+        ]});
+        let keys: Vec<(String, String)> = super::distinct(super::list(&json, "names"))
+            .map(|(k, r)| (k, super::text(r, "text")))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                ("1".to_string(), "a".to_string()),
+                ("1:1".to_string(), "b".to_string()),
+                ("2".to_string(), "c".to_string()),
+            ]
+        );
     }
 }

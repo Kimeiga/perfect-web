@@ -135,8 +135,10 @@ its logic in Pleris and its data layer in the host:
   deployment's.
 - **The index is Rust.** Candidate retrieval, case folding and a stub's target
   are the host's, as the database's are kiokun.com's. The ranking is Pleris.
-- **Korean entries render their heading only.** The slice's `Entry` has
-  Chinese and Japanese words; kiokun's `korean_words` are not read.
+- **Korean is looked up, not searched.** An entry shows its Korean words,
+  Japanese names and character (ADR-0037, amended). The index has Chinese and
+  Japanese rows; kiokun.com's Korean rows need its romanization and ranking
+  ported first. Pitch accent is not in kiokun's entries.
 - **A call is a fresh instance** (ADR-0032). Bulk work needs a query over a
   list, as `shards.Places` is: a call a word made the whole shard's load three
   times slower.

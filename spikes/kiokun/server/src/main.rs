@@ -426,6 +426,18 @@ mod tests {
         assert!(html.contains("人"), "{html}");
         assert!(html.contains("rén"), "pinyin: {html}");
         assert!(!html.contains("<script"), "a static page");
+        // Korean, names and the character, each from kiokun's own entry.
+        let text = bare(&html);
+        assert!(
+            text.contains("<span class=\"hangul\">인</span>"),
+            "Korean: {html}"
+        );
+        assert!(text.contains("Hitozaki"), "a name: {html}");
+        assert!(
+            text.contains("<dd class=\"strokes\">2</dd>"),
+            "strokes: {html}"
+        );
+        assert!(text.contains("<dd class=\"grade\">1</dd>"), "grade: {html}");
 
         let (status, html) = route(&a, "GET", "/%E8%B0%9A");
         assert_eq!(status, 200, "the redirect, followed");
