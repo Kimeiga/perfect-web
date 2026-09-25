@@ -107,6 +107,8 @@ public query Points(text: String) -> List<Int> { String.codepoints(text) }
 
 public query Rebuilt(points: List<Int>) -> String { String.from_codepoints(points) }
 
+public query RebuiltLength(points: List<Int>) -> Int { String.length(String.from_codepoints(points)) }
+
 public query Prefix(text: String, part: String) -> Bool { String.starts_with(text, part) }
 
 public query Suffix(text: String, part: String) -> Bool { String.ends_with(text, part) }
@@ -330,7 +332,13 @@ fn string_operations_agree_with_str() {
 
 #[test]
 fn text_is_rebuilt_from_code_points_and_bad_ones_trap() {
+    // Returned, a bad string is refused by the host too: the Canonical ABI
+    // lifts only valid UTF-8. Measured inside the component, it is not, so
+    // `RebuiltLength` is what shows the component's own check. The mutation
+    // controls found that the first version of this test could not tell
+    // (2026-09-25).
     let rebuilt = compiled("s.Rebuilt");
+    let length = compiled("s.RebuiltLength");
     let mut rng = Rng(0xc0);
     for _ in 0..CASES {
         let mut points: Vec<i64> = rng.string().chars().map(|c| c as i64).collect();
@@ -342,6 +350,12 @@ fn text_is_rebuilt_from_code_points_and_bad_ones_trap() {
             .iter()
             .map(|p| u32::try_from(*p).ok().and_then(char::from_u32))
             .collect();
+        agree(
+            "s.RebuiltLength",
+            call(&length, &[ints(&points)]),
+            want.as_ref().map(|s| Val::S64(s.chars().count() as i64)),
+            &format!("{points:?}"),
+        );
         agree(
             "s.Rebuilt",
             call(&rebuilt, &[ints(&points)]),
