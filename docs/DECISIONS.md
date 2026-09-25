@@ -191,3 +191,21 @@ cached cart fragment, and its next poll is told to reload. A served document's
 cursor is never zero, and the runtime reloads on `Reload`. Measured before:
 3,000 retained events, 600,000 frames, 1,001 entries.
 
+## 2026-09-25: matches, fields and variants in the backend (E10)
+
+[ADR-0036](DECISIONS/ADR-0036-matches-fields-variants.md): `match` over
+`Option` and `Result` is a structured IR instruction whose arms are regions.
+Lowering is bidirectional, so `None` takes the type its use fixes. The encoder
+types a constructed variant from its uses and checks every move with
+`same_type`, and every layout number comes from `wit-parser`. The store's
+components are byte-identical afterwards.
+
+## 2026-09-25: the kiokun slice (E10)
+
+[ADR-0037](DECISIONS/ADR-0037-kiokun-slice.md): a second application, entry
+lookup and search over one real shard of kiokun.com, compiled by `pw build`.
+Its data is kiokun's own files, copied with attribution (owner decision needed
+on share-alike data). The data layer is the deployment's, as kiokun's search is
+its database's. Building it found the platform package depending on the store
+example, and interpolated attribute strings rendering literally; both fixed.
+

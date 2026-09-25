@@ -1,0 +1,30 @@
+kiokun.com shard han-1char-3: 28 files copied byte for byte by scripts/kiokun_sample.py
+
+ba/人.json.deflate   19104  1f832f4e5f3a58d602c0447aecb2911cd56525d809d6de967baa7efd055fcfbc  entry
+02/市.json.deflate   18325  c8e98a3c530d75ad6d2f07f13e01422149511a944dc84f504cdd960ba2d49485  entry
+5a/魚.json.deflate   19214  4b8fac4d583802368a3492e8aa9c1d68766eff45712899af52821eeb8bea5b68  entry
+52/酒.json.deflate   16622  4938ce5573d983deaff0dcdacb88d17f7a2222fb3f42a411334411c259c4ab79  entry
+42/時.json.deflate   19698  831f1de403655f47acc61393b763688e15b2c8cbc3abf7e61506d932385fc40e  entry
+22/夢.json.deflate   12179  6c1cc37a8665ea0b493efac4dee6ddcc0b4d47cffe20c86ba94d88bf8ab59a39  entry
+7a/空.json.deflate   17303  f6f225a9c96782c79dd1612bf3b166e58ee0f41f4d139940935e18bd34042cf5  entry
+52/青.json.deflate   17415  76c100524e875e6cf6655899b9058ed83ba9182b100f9e457ff63d623e7f254b  entry
+0a/上.json.deflate   19076  c79880cc2b8cacc3c86846bd06fd381f7890f5a2341e8e0c0ddbea389ff111a7  entry
+1a/多.json.deflate   17253  96aea6ec479c969da243312a8b781c4124879d979ff93e5e5992d1222002b11d  entry
+62/面.json.deflate   18344  5962ff4930b07eb22db19a9bbdc8bf5260b3202b9533312479ec32c349d40df0  entry
+72/色.json.deflate   17297  ab6f4f26d5cec147aadbe49ffb059d8fb9fdeb642017589bd72d22519cd8d731  entry
+72/聲.json.deflate   13598  820d28609bca4c98d5e9b5ec849e3691acd7820a2dceb4d21d8216ef37e94397  entry
+02/樂.json.deflate   21218  0e24da07be38540afc05ab85afe4b6ce56470b7033ebeb2a940575bb290a35d7  entry
+22/錢.json.deflate   15221  a60af908ecda1b89d659c57f07db0f37fef9f99b5ed7c370aea0034b7f2e2c4e  entry
+12/園.json.deflate   15940  7e9c225332d91ac783be6766550ddcc9fe738f12379c14a84387cdbbbdf78fc7  entry
+42/終.json.deflate   14733  6b24464d8cedaf23f715362d20e9494092d96073fa2906ef9f14a0aca9bded49  entry
+4a/半.json.deflate   15162  efe376bcbce81bb324e0f513cb698c8fb50abd0134abb6697ab611dc67e095bf  entry
+62/形.json.deflate   16293  c630882aefa7cfcbf720347629f680910e16eec9947cf6e5f0b028973bde60a0  entry
+5a/博.json.deflate   14839  c15f972d24bb86b963e52dc33eed3df585707cdcd3b551031cf2a82bef2f55c3  entry
+1a/谚.json.deflate    2177  58209bf2a3540895b2db58ba2e544cd127913435e39c955e53a0a2d5af02fa9e  redirect -> 諺
+fa/諺.json.deflate    4507  b51e072ad770ee5ad1c3355c7c5f123c2af98959212a8485a514ba45bc12e9be  entry
+2a/贪.json.deflate    2715  1e08b38459611b47cfc2920bdb678c6fb5ad33cef4a3e191125b59ad648fc96a  redirect -> 貪
+aa/貪.json.deflate    6701  0429fe0a20656e3e905baaba985cbc611614a58a4c33476112cf6737df686d6d  entry
+12/攒.json.deflate    3260  f6221cf020680322231240c6753d380805716f33b97e3d8888809d03f6805118  redirect -> 攢
+22/攢.json.deflate    4179  3640827024f0dd92828ddf05068348c7917c3912287e2798ceb55ae85b2242e3  entry
+22/缢.json.deflate    2151  c1efdb7ceaa05bf414038c30e884792d4ba700c5189ad944c3cf20de868cfc50  redirect -> 縊
+0a/縊.json.deflate    3715  380f823648047d89751a2fb98c3a576c26f749b1ee42f7a2d610107bb3c52120  entry

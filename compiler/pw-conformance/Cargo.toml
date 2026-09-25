@@ -1,0 +1,26 @@
+[package]
+name = "pw-conformance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# Compiled Pleris, executed, and compared with what it should do: E10's
+# semantics oracle (charter §14 M10 gate item 2, task 9).
+#
+# The one place the compiler and the engine meet. `pw-core` links no engine,
+# because a compiler that could run what it builds would be tempted to decide
+# by running. `pw-host` and the development server link no compiler (ADR-0020:
+# the host reads the compiler's output as data). A test of what a compiled
+# declaration DOES needs both, so it lives here, and nothing ships from here.
+[dependencies]
+pw-core = { path = "../pw-core" }
+pw-syntax = { path = "../pw-syntax" }
+pw-host = { path = "../../runtime/pw-host", features = ["engine"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+# Already in the graph through pw-host (47.0.4 in Cargo.lock): the oracle reads
+# each artifact's own types to generate its inputs.
+wasmtime = "47.0.3"

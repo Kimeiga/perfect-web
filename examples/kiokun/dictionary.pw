@@ -1,0 +1,60 @@
+// @corpus: fixture
+// @id: KIOKUN-dictionary
+// @category: the kiokun slice — an entry and a search hit, as kiokun.com's
+//            app reads them
+// @charter: §14 M10
+// @milestone: E10
+//
+// kiokun.com is a Chinese–Japanese dictionary. Its build merges CC-CEDICT and
+// JMdict into one entry per word, keyed by the traditional form, and a
+// simplified or Japanese form is a stub that redirects to it. These are that
+// entry and one row of search results, narrowed to what the slice renders.
+
+module dictionary
+
+// One Chinese reading of a word: its forms, pinyin, and definitions. `id` is
+// CC-CEDICT's line, which keys the list: one entry can have several readings
+// with the same pinyin.
+type ChineseWord = ChineseWord {
+    id: String,
+    traditional: String,
+    simplified: String,
+    pinyin: String,
+    definitions: String,
+}
+
+// One sense of a Japanese word, its glosses joined.
+type JapaneseSense = JapaneseSense {
+    id: String,
+    glosses: String,
+}
+
+// One Japanese word: its written forms and readings, and its senses. `id` is
+// JMdict's sequence number.
+type JapaneseWord = JapaneseWord {
+    id: String,
+    written: String,
+    readings: String,
+    senses: List<JapaneseSense>,
+    common: Bool,
+}
+
+// An entry. A stub carries only `key` and `redirect`, the entry it names.
+type Entry = Entry {
+    key: String,
+    redirect: Option<String>,
+    chinese: List<ChineseWord>,
+    japanese: List<JapaneseWord>,
+}
+
+// One search result. `id` is unique within a result list: a word can match
+// in Chinese and in Japanese, and the list is keyed.
+type SearchHit = SearchHit {
+    id: String,
+    word: String,
+    target: String,
+    language: String,
+    pronunciation: String,
+    definition: String,
+    common: Bool,
+}

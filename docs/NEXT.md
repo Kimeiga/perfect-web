@@ -26,10 +26,13 @@ done:
 
 ### Next, in order
 
-1. **The kiokun proof slice.** A dictionary: entry lookup plus search over one
-   shard. It is written against checked signatures from the start. Everything
-   the component backend refuses on the way is the next backend work, in the
-   order the application needs it.
+1. ~~**The kiokun proof slice.**~~ DONE 2026-09-25 (ADR-0037): entry lookup and
+   search over shard `han-1char-3`, with the backend breadth it needed (matches,
+   fields, variants: ADR-0036). What the full site needs next, in order:
+   pure computation (a real standard library for lists and strings, and
+   arithmetic and `if` in the backend), so the shard rule and the ranking can
+   move from the host into Pleris; then the template gaps (an interpolated
+   attribute, `else`, `Option`).
 2. **Backend breadth, driven by that slice.**
    - records and variants written into the region;
    - field projection;

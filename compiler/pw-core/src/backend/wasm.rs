@@ -72,7 +72,7 @@ use wit_parser::{
     TypeDefKind, WasmExport, WasmExportKind, WasmImport, WorldId, WorldItem, WorldKey,
 };
 
-use super::ir::{CallableImport, Const, Instr, Terminator, Type, ValueId};
+use super::ir::{BuiltinCase, CallableImport, Const, Instr, Terminator, Type, ValueId};
 
 /// **What an encoding produced, and never silently nothing.**
 ///
@@ -552,12 +552,20 @@ fn export_body(
 ) -> Encoding<Function> {
     use wasm_encoder::Instruction as I;
 
-    let mut ops: Vec<I<'static>> = Vec::new();
-    let mut locals = Locals {
-        first: export_sig.params.len() as u32,
-        types: Vec::new(),
+    let mut enc = Enc {
+        resolve,
+        sizes,
+        imports,
+        realloc_index,
+        export: &function.export,
+        ops: Vec::new(),
+        locals: Locals {
+            first: export_sig.params.len() as u32,
+            types: Vec::new(),
+        },
+        held: BTreeMap::new(),
+        expected: expected_types(resolve, function, export_fn, imports),
     };
-    let mut held: BTreeMap<ValueId, Held> = BTreeMap::new();
 
     // Parameters arrive flat, in the order the world lists them.
     let mut next_param = 0u32;
@@ -571,7 +579,7 @@ fn export_body(
         };
         let ls: Vec<u32> = (next_param..next_param + flats.len() as u32).collect();
         next_param += flats.len() as u32;
-        held.insert(
+        enc.held.insert(
             *value,
             Held::Flat {
                 ty: param.ty,
@@ -583,126 +591,10 @@ fn export_body(
     let Some(entry) = function.entry() else {
         blocked!("`{}` has no entry block", function.export);
     };
-    for instr in &entry.instrs {
-        match instr {
-            Instr::ImportCall {
-                result,
-                import,
-                args,
-                ..
-            } => {
-                let Some((index, sig, func)) = imports.get(&import.qualified()) else {
-                    blocked!("`{}` has no core import", import.qualified());
-                };
-                if args.len() != func.params.len() {
-                    blocked!(
-                        "`{}` passes {} arguments to `{}`, whose world function takes {}",
-                        function.export,
-                        args.len(),
-                        import.qualified(),
-                        func.params.len()
-                    );
-                }
-                for (a, param) in args.iter().zip(&func.params) {
-                    let Some(h) = held.get(a) else {
-                        blocked!(
-                            "`{}` passes {a:?} to `{}` and nothing defines it",
-                            function.export,
-                            import.qualified()
-                        );
-                    };
-                    let Some(t) = h.ty() else {
-                        blocked!("`{}` passes a call with no result", function.export);
-                    };
-                    // **The component-level check.** Two positions that
-                    // flatten alike are not therefore one type.
-                    if !same_type(resolve, t, &param.ty) {
-                        blocked!(
-                            "`{}` passes a value of another component type as `{}` of `{}`",
-                            function.export,
-                            param.name,
-                            import.qualified()
-                        );
-                    }
-                    match push_flat_values(resolve, sizes, h, &mut ops) {
-                        Encoding::Encoded(()) => {}
-                        other => return other.map(|_| unreachable!()),
-                    }
-                }
-                let out = match (&func.result, sig.retptr) {
-                    (Some(rt), true) => {
-                        let area = locals.fresh(ValType::I32);
-                        allocate(sizes, rt, realloc_index, area, &mut ops);
-                        ops.push(I::LocalGet(area));
-                        ops.push(I::Call(*index));
-                        Held::Memory { ty: *rt, ptr: area }
-                    }
-                    (Some(rt), false) => {
-                        ops.push(I::Call(*index));
-                        let ls: Vec<u32> = sig
-                            .results
-                            .iter()
-                            .map(|t| locals.fresh(core_type(*t)))
-                            .collect();
-                        for l in ls.iter().rev() {
-                            ops.push(I::LocalSet(*l));
-                        }
-                        Held::Flat {
-                            ty: *rt,
-                            locals: ls,
-                        }
-                    }
-                    (None, _) => {
-                        ops.push(I::Call(*index));
-                        Held::Nothing
-                    }
-                };
-                held.insert(*result, out);
-            }
-            Instr::Const { result, value, ty } => {
-                let (wit, op, vt) = match (value, ty) {
-                    (Const::Int(n), Type::Int) => (WitType::S64, I::I64Const(*n), ValType::I64),
-                    (Const::Bool(b), Type::Bool) => {
-                        (WitType::Bool, I::I32Const(i32::from(*b)), ValType::I32)
-                    }
-                    (Const::Float(x), Type::Float) => {
-                        (WitType::F64, I::F64Const((*x).into()), ValType::F64)
-                    }
-                    (other, _) => refuse!(
-                        "a constant that needs the invocation region",
-                        "`{}` holds {other:?}; writing it into memory needs a data \
-                         segment this encoder does not emit",
-                        function.export
-                    ),
-                };
-                let l = locals.fresh(vt);
-                ops.push(op);
-                ops.push(I::LocalSet(l));
-                held.insert(
-                    *result,
-                    Held::Flat {
-                        ty: wit,
-                        locals: vec![l],
-                    },
-                );
-            }
-            Instr::Call { callee, .. } => refuse!(
-                "a call to another Pleris declaration",
-                "`{}` calls {callee:?}; a component calls another declaration through \
-                 an import, and linking two compiled components is not encoded yet",
-                function.export
-            ),
-            Instr::Construct { .. } => refuse!(
-                "building a record or variant",
-                "`{}` constructs a value, which needs a layout written into the region",
-                function.export
-            ),
-            Instr::Project { .. } => refuse!(
-                "reading a field",
-                "`{}` projects a field of a value it does not hold flat",
-                function.export
-            ),
-        }
+    if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+        enc.region(&entry.instrs)
+    {
+        return other.map(|_| unreachable!());
     }
 
     // The result: returned flat, or by pointer when it exceeds the flat limit.
@@ -714,10 +606,10 @@ fn export_body(
             entry.terminator
         );
     };
-    let Some(h) = held.get(v) else {
+    let Some(h) = enc.held.get(v).cloned() else {
         blocked!("`{}` returns {v:?} and nothing defines it", function.export);
     };
-    match (&export_fn.result, h) {
+    match (&export_fn.result, &h) {
         (None, _) => {}
         (Some(rt), h) => {
             let Some(t) = h.ty() else {
@@ -732,36 +624,720 @@ fn export_body(
             match (export_sig.retptr, h) {
                 // The value already has its canonical layout at an address:
                 // that address IS the result.
-                (true, Held::Memory { ptr, .. }) => ops.push(I::LocalGet(*ptr)),
+                (true, Held::Memory { ptr, .. }) => enc.ops.push(I::LocalGet(*ptr)),
                 (true, Held::Nothing) => {
                     blocked!("`{}` returns a call with no result", function.export)
                 }
-                (true, Held::Flat { .. }) => refuse!(
-                    "a flat value returned by pointer",
-                    "`{}` would have to store its result into the region first",
-                    function.export
-                ),
-                (false, h) => match push_flat_values(resolve, sizes, h, &mut ops) {
+                // A flat value returned by pointer is stored into the region
+                // first, the way a constructed variant is.
+                (true, Held::Flat { ty, locals: flats }) => {
+                    let area = enc.locals.fresh(ValType::I32);
+                    allocate(sizes, ty, realloc_index, area, &mut enc.ops);
+                    match store(resolve, sizes, ty, area, 0, flats, &mut enc.ops) {
+                        Encoding::Encoded(_) => {}
+                        other => return other.map(|_| unreachable!()),
+                    }
+                    enc.ops.push(I::LocalGet(area));
+                }
+                (false, h) => match push_flat_values(resolve, sizes, h, &mut enc.ops) {
                     Encoding::Encoded(()) => {}
                     other => return other.map(|_| unreachable!()),
                 },
             }
         }
     }
-    ops.push(I::End);
+    enc.ops.push(I::End);
 
     let mut groups: Vec<(u32, ValType)> = Vec::new();
-    for t in &locals.types {
+    for t in &enc.locals.types {
         match groups.last_mut() {
             Some((n, seen)) if seen == t => *n += 1,
             _ => groups.push((1, *t)),
         }
     }
     let mut f = Function::new(groups);
-    for op in &ops {
+    for op in &enc.ops {
         f.instruction(op);
     }
     Encoding::Encoded(f)
+}
+
+/// **The component type each value must have where it is used.**
+///
+/// A constructed variant cannot say what it is: `None` is `None` of whatever
+/// its use needs. The world fixes the types of the export's result and of
+/// every import's parameters, and a match's arms produce its result, so the
+/// type flows backwards from those uses. Only a value with no instruction of
+/// its own to type it (a variant, and through it its payload) reads this; every
+/// other value is typed where it is made and checked with `same_type` where it
+/// is used.
+fn expected_types(
+    resolve: &Resolve,
+    function: &super::ir::Function,
+    export_fn: &WitFunction,
+    imports: &BTreeMap<String, (u32, WasmSignature, WitFunction)>,
+) -> BTreeMap<ValueId, WitType> {
+    let mut out = BTreeMap::new();
+    let Some(entry) = function.entry() else {
+        return out;
+    };
+    if let (Some(rt), Terminator::Return(v)) = (&export_fn.result, &entry.terminator) {
+        out.insert(*v, *rt);
+    }
+    expect_region(resolve, &entry.instrs, imports, &mut out);
+    out
+}
+
+fn expect_region(
+    resolve: &Resolve,
+    instrs: &[Instr],
+    imports: &BTreeMap<String, (u32, WasmSignature, WitFunction)>,
+    out: &mut BTreeMap<ValueId, WitType>,
+) {
+    // Backwards: a use comes after the value it uses.
+    for instr in instrs.iter().rev() {
+        match instr {
+            Instr::ImportCall { import, args, .. } => {
+                if let Some((_, _, func)) = imports.get(&import.qualified()) {
+                    for (a, p) in args.iter().zip(&func.params) {
+                        out.entry(*a).or_insert(p.ty);
+                    }
+                }
+            }
+            Instr::Match { result, arms, .. } => {
+                if let Some(t) = out.get(result).copied() {
+                    for arm in arms {
+                        out.entry(arm.body.value).or_insert(t);
+                    }
+                }
+                for arm in arms {
+                    expect_region(resolve, &arm.body.instrs, imports, out);
+                }
+            }
+            Instr::Variant {
+                result,
+                case,
+                payload: Some(p),
+                ..
+            } => {
+                if let Some(pt) = out
+                    .get(result)
+                    .and_then(|t| payload_type(resolve, *t, *case))
+                {
+                    out.entry(*p).or_insert(pt);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The payload type of `case` in the variant type `t`, if it has one.
+fn payload_type(resolve: &Resolve, t: WitType, case: BuiltinCase) -> Option<WitType> {
+    let WitType::Id(id) = dealias(resolve, t) else {
+        return None;
+    };
+    match (&resolve.types[id].kind, case) {
+        (TypeDefKind::Option(p), BuiltinCase::Some) => Some(*p),
+        (TypeDefKind::Result(r), BuiltinCase::Ok) => r.ok,
+        (TypeDefKind::Result(r), BuiltinCase::Err) => r.err,
+        _ => None,
+    }
+}
+
+/// A variant type's discriminant for `case`, its payload type, and where the
+/// payload sits: every number from `SizeAlign`. `None` when `t` is not a
+/// variant that has this case.
+fn case_layout(
+    resolve: &Resolve,
+    sizes: &SizeAlign,
+    t: WitType,
+    case: BuiltinCase,
+) -> Option<(u32, Option<WitType>, u64)> {
+    let WitType::Id(id) = dealias(resolve, t) else {
+        return None;
+    };
+    let (disc, payload, cases): (u32, Option<WitType>, Vec<Option<WitType>>) =
+        match (&resolve.types[id].kind, case) {
+            (TypeDefKind::Option(p), BuiltinCase::None) => (0, None, vec![None, Some(*p)]),
+            (TypeDefKind::Option(p), BuiltinCase::Some) => (1, Some(*p), vec![None, Some(*p)]),
+            (TypeDefKind::Result(r), BuiltinCase::Ok) => (0, r.ok, vec![r.ok, r.err]),
+            (TypeDefKind::Result(r), BuiltinCase::Err) => (1, r.err, vec![r.ok, r.err]),
+            _ => return None,
+        };
+    // Two cases: an 8-bit discriminant, as the Canonical ABI gives any
+    // variant of up to 256 cases.
+    let offset = sizes
+        .payload_offset(wit_parser::Int::U8, cases.iter().map(Option::as_ref))
+        .size_wasm32() as u64;
+    Some((disc, payload, offset))
+}
+
+/// The encoder's state while one export's body is emitted.
+struct Enc<'a> {
+    resolve: &'a Resolve,
+    sizes: &'a SizeAlign,
+    imports: &'a BTreeMap<String, (u32, WasmSignature, WitFunction)>,
+    realloc_index: u32,
+    export: &'a str,
+    ops: Vec<wasm_encoder::Instruction<'static>>,
+    locals: Locals,
+    held: BTreeMap<ValueId, Held>,
+    expected: BTreeMap<ValueId, WitType>,
+}
+
+impl Enc<'_> {
+    /// Emit a region's instructions in order.
+    fn region(&mut self, instrs: &[Instr]) -> Encoding<()> {
+        for instr in instrs {
+            match self.instr(instr) {
+                Encoding::Encoded(()) => {}
+                other => return other,
+            }
+        }
+        Encoding::Encoded(())
+    }
+
+    /// A fresh local holding `base + offset`.
+    fn address(&mut self, base: u32, offset: u64) -> u32 {
+        use wasm_encoder::Instruction as I;
+        let l = self.locals.fresh(ValType::I32);
+        self.ops.push(I::LocalGet(base));
+        if offset != 0 {
+            self.ops.push(I::I32Const(offset as i32));
+            self.ops.push(I::I32Add);
+        }
+        self.ops.push(I::LocalSet(l));
+        l
+    }
+
+    fn instr(&mut self, instr: &Instr) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        match instr {
+            Instr::ImportCall {
+                result,
+                import,
+                args,
+                ..
+            } => {
+                let Some((index, sig, func)) = self.imports.get(&import.qualified()) else {
+                    blocked!("`{}` has no core import", import.qualified());
+                };
+                if args.len() != func.params.len() {
+                    blocked!(
+                        "`{}` passes {} arguments to `{}`, whose world function takes {}",
+                        self.export,
+                        args.len(),
+                        import.qualified(),
+                        func.params.len()
+                    );
+                }
+                for (a, param) in args.iter().zip(&func.params) {
+                    let Some(h) = self.held.get(a).cloned() else {
+                        blocked!(
+                            "`{}` passes {a:?} to `{}` and nothing defines it",
+                            self.export,
+                            import.qualified()
+                        );
+                    };
+                    let Some(t) = h.ty() else {
+                        blocked!("`{}` passes a call with no result", self.export);
+                    };
+                    // **The component-level check.** Two positions that
+                    // flatten alike are not therefore one type.
+                    if !same_type(resolve, t, &param.ty) {
+                        blocked!(
+                            "`{}` passes a value of another component type as `{}` of `{}`",
+                            self.export,
+                            param.name,
+                            import.qualified()
+                        );
+                    }
+                    match push_flat_values(resolve, sizes, &h, &mut self.ops) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    }
+                }
+                let out = match (&func.result, sig.retptr) {
+                    (Some(rt), true) => {
+                        let area = self.locals.fresh(ValType::I32);
+                        allocate(sizes, rt, self.realloc_index, area, &mut self.ops);
+                        self.ops.push(I::LocalGet(area));
+                        self.ops.push(I::Call(*index));
+                        Held::Memory { ty: *rt, ptr: area }
+                    }
+                    (Some(rt), false) => {
+                        self.ops.push(I::Call(*index));
+                        let ls: Vec<u32> = sig
+                            .results
+                            .iter()
+                            .map(|t| self.locals.fresh(core_type(*t)))
+                            .collect();
+                        for l in ls.iter().rev() {
+                            self.ops.push(I::LocalSet(*l));
+                        }
+                        Held::Flat {
+                            ty: *rt,
+                            locals: ls,
+                        }
+                    }
+                    (None, _) => {
+                        self.ops.push(I::Call(*index));
+                        Held::Nothing
+                    }
+                };
+                self.held.insert(*result, out);
+            }
+            Instr::Const { result, value, ty } => {
+                let (wit, op, vt) = match (value, ty) {
+                    (Const::Int(n), Type::Int) => (WitType::S64, I::I64Const(*n), ValType::I64),
+                    (Const::Bool(b), Type::Bool) => {
+                        (WitType::Bool, I::I32Const(i32::from(*b)), ValType::I32)
+                    }
+                    (Const::Float(x), Type::Float) => {
+                        (WitType::F64, I::F64Const((*x).into()), ValType::F64)
+                    }
+                    (other, _) => refuse!(
+                        "a constant that needs the invocation region",
+                        "`{}` holds {other:?}; writing it into memory needs a data \
+                         segment this encoder does not emit",
+                        self.export
+                    ),
+                };
+                let l = self.locals.fresh(vt);
+                self.ops.push(op);
+                self.ops.push(I::LocalSet(l));
+                self.held.insert(
+                    *result,
+                    Held::Flat {
+                        ty: wit,
+                        locals: vec![l],
+                    },
+                );
+            }
+            Instr::Call { callee, .. } => refuse!(
+                "a call to another Pleris declaration",
+                "`{}` calls {callee:?}; a component calls another declaration through \
+                 an import, and linking two compiled components is not encoded yet",
+                self.export
+            ),
+            Instr::Construct { .. } => refuse!(
+                "building a declared record or variant",
+                "`{}` constructs a value of a declared type, which is not encoded yet",
+                self.export
+            ),
+            Instr::Project {
+                result, of, field, ..
+            } => return self.project(*result, *of, *field),
+            Instr::Variant {
+                result,
+                case,
+                payload,
+                ..
+            } => return self.variant(*result, *case, *payload),
+            Instr::Match {
+                result,
+                scrutinee,
+                arms,
+                ..
+            } => return self.matched(*result, *scrutinee, arms),
+        }
+        Encoding::Encoded(())
+    }
+
+    /// **A field of a record**: an address inside its layout, or a slice of
+    /// its flat values.
+    fn project(&mut self, result: ValueId, of: ValueId, field: u32) -> Encoding<()> {
+        let resolve = self.resolve;
+        let Some(h) = self.held.get(&of).cloned() else {
+            blocked!(
+                "`{}` reads a field of {of:?} and nothing defines it",
+                self.export
+            );
+        };
+        let Some(t) = h.ty().copied() else {
+            blocked!("`{}` reads a field of a call with no result", self.export);
+        };
+        let WitType::Id(id) = dealias(resolve, t) else {
+            blocked!(
+                "`{}` reads a field of a value that is not a record",
+                self.export
+            );
+        };
+        let TypeDefKind::Record(r) = &resolve.types[id].kind else {
+            blocked!(
+                "`{}` reads a field of a value that is not a record",
+                self.export
+            );
+        };
+        let Some(field_ty) = r.fields.get(field as usize).map(|f| f.ty) else {
+            blocked!(
+                "`{}` reads field {field} of a record with {} fields",
+                self.export,
+                r.fields.len()
+            );
+        };
+        let out = match h {
+            Held::Memory { ptr, .. } => {
+                let offsets = self.sizes.field_offsets(r.fields.iter().map(|f| &f.ty));
+                let offset = offsets[field as usize].0.size_wasm32() as u64;
+                Held::Memory {
+                    ty: field_ty,
+                    ptr: self.address(ptr, offset),
+                }
+            }
+            Held::Flat { locals, .. } => {
+                // The fields' flat values, in field order: this one's are the
+                // slice after every earlier field's.
+                let mut skip = 0;
+                for f in &r.fields[..field as usize] {
+                    let Some(flats) = flat(resolve, &f.ty) else {
+                        refuse!(
+                            "a field of a record that does not flatten",
+                            "`{}` reads a field past one that does not flatten",
+                            self.export
+                        );
+                    };
+                    skip += flats.len();
+                }
+                let Some(n) = flat(resolve, &field_ty).map(|f| f.len()) else {
+                    refuse!(
+                        "a field that does not flatten",
+                        "`{}` reads a field that does not flatten",
+                        self.export
+                    );
+                };
+                Held::Flat {
+                    ty: field_ty,
+                    locals: locals[skip..skip + n].to_vec(),
+                }
+            }
+            Held::Nothing => blocked!("`{}` reads a field of a call with no result", self.export),
+        };
+        self.held.insert(result, out);
+        Encoding::Encoded(())
+    }
+
+    /// **`Some(x)`, `None`, `Ok(x)`, `Err(e)`**, written into the invocation
+    /// region: the discriminant, then the payload at the offset `SizeAlign`
+    /// gives. The type is the one its use fixes (`expected_types`).
+    fn variant(
+        &mut self,
+        result: ValueId,
+        case: BuiltinCase,
+        payload: Option<ValueId>,
+    ) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let Some(t) = self.expected.get(&result).copied() else {
+            refuse!(
+                "a variant whose component type nothing fixes",
+                "`{}` builds `{case:?}`, and no use of it names a type in the world",
+                self.export
+            );
+        };
+        let Some((disc, payload_ty, offset)) = case_layout(resolve, sizes, t, case) else {
+            blocked!(
+                "`{}` builds `{case:?}` where its use needs another type",
+                self.export
+            );
+        };
+        let area = self.locals.fresh(ValType::I32);
+        allocate(sizes, &t, self.realloc_index, area, &mut self.ops);
+        self.ops.push(I::LocalGet(area));
+        self.ops.push(I::I32Const(disc as i32));
+        self.ops.push(I::I32Store8(MemArg {
+            offset: 0,
+            align: 0,
+            memory_index: 0,
+        }));
+        match (payload, payload_ty) {
+            (None, None) => {}
+            (Some(p), Some(pt)) => {
+                let Some(h) = self.held.get(&p).cloned() else {
+                    blocked!("`{}` wraps {p:?} and nothing defines it", self.export);
+                };
+                let Some(ht) = h.ty() else {
+                    blocked!("`{}` wraps a call with no result", self.export);
+                };
+                if !same_type(resolve, ht, &pt) {
+                    blocked!(
+                        "`{}` wraps a value of another component type in `{case:?}`",
+                        self.export
+                    );
+                }
+                match h {
+                    // The payload's layout is already in the region: copy it.
+                    Held::Memory { ptr, .. } => {
+                        self.ops.push(I::LocalGet(area));
+                        if offset != 0 {
+                            self.ops.push(I::I32Const(offset as i32));
+                            self.ops.push(I::I32Add);
+                        }
+                        self.ops.push(I::LocalGet(ptr));
+                        self.ops
+                            .push(I::I32Const(sizes.size(&pt).size_wasm32() as i32));
+                        self.ops.push(I::MemoryCopy {
+                            src_mem: 0,
+                            dst_mem: 0,
+                        });
+                    }
+                    Held::Flat { locals, .. } => {
+                        match store(resolve, sizes, &pt, area, offset, &locals, &mut self.ops) {
+                            Encoding::Encoded(_) => {}
+                            other => return other.map(|_| unreachable!()),
+                        }
+                    }
+                    Held::Nothing => {
+                        blocked!("`{}` wraps a call with no result", self.export)
+                    }
+                }
+            }
+            _ => blocked!(
+                "`{}` builds `{case:?}` with a payload its type does not have, or without \
+                 one it does",
+                self.export
+            ),
+        }
+        self.held.insert(result, Held::Memory { ty: t, ptr: area });
+        Encoding::Encoded(())
+    }
+
+    /// **Choose by a variant's case**: the discriminant, read from the
+    /// scrutinee's layout, selects an arm; each arm binds its payload and moves
+    /// its value into one holder, checked against the match's component type.
+    fn matched(
+        &mut self,
+        result: ValueId,
+        scrutinee: ValueId,
+        arms: &[super::ir::MatchArm],
+    ) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let Some(Held::Memory { ty: st, ptr }) = self.held.get(&scrutinee).cloned() else {
+            refuse!(
+                "a match over a value not held in memory",
+                "`{}` matches a value held flat; a variant's flat form joins its \
+                 cases' slots, which this encoder does not read",
+                self.export
+            );
+        };
+        let Some(rt) = self.expected.get(&result).copied() else {
+            refuse!(
+                "a match whose component type nothing fixes",
+                "`{}`'s match is used where the world names no type",
+                self.export
+            );
+        };
+        let [first, second] = arms else {
+            blocked!("`{}` matches with {} arms, not 2", self.export, arms.len());
+        };
+        // The result's holder: one local for a single flat scalar, an address
+        // for anything with a layout.
+        let flats = flat(resolve, &rt);
+        let holder = match flats.as_deref() {
+            Some([one]) => Held::Flat {
+                ty: rt,
+                locals: vec![self.locals.fresh(core_type(*one))],
+            },
+            _ => Held::Memory {
+                ty: rt,
+                ptr: self.locals.fresh(ValType::I32),
+            },
+        };
+
+        // Discriminant 1 selects the second-numbered case: `Some` for an
+        // option, `Err` for a result.
+        let (one, zero) = {
+            let d = |a: &super::ir::MatchArm| case_layout(resolve, sizes, st, a.case);
+            match (d(first), d(second)) {
+                (Some((1, ..)), Some((0, ..))) => (first, second),
+                (Some((0, ..)), Some((1, ..))) => (second, first),
+                _ => blocked!(
+                    "`{}` matches cases the scrutinee's type does not have",
+                    self.export
+                ),
+            }
+        };
+        self.ops.push(I::LocalGet(ptr));
+        self.ops.push(I::I32Load8U(MemArg {
+            offset: 0,
+            align: 0,
+            memory_index: 0,
+        }));
+        self.ops.push(I::If(wasm_encoder::BlockType::Empty));
+        match self.arm(ptr, st, one, &holder) {
+            Encoding::Encoded(()) => {}
+            other => return other,
+        }
+        self.ops.push(I::Else);
+        match self.arm(ptr, st, zero, &holder) {
+            Encoding::Encoded(()) => {}
+            other => return other,
+        }
+        self.ops.push(I::End);
+        self.held.insert(result, holder);
+        Encoding::Encoded(())
+    }
+
+    /// One arm: bind the payload, emit the region, move its value.
+    fn arm(
+        &mut self,
+        ptr: u32,
+        st: WitType,
+        arm: &super::ir::MatchArm,
+        holder: &Held,
+    ) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let Some((_, payload_ty, offset)) = case_layout(resolve, sizes, st, arm.case) else {
+            blocked!(
+                "`{}` matches a case its scrutinee does not have",
+                self.export
+            );
+        };
+        if let (Some(b), Some(pt)) = (arm.binding, payload_ty) {
+            let at = self.address(ptr, offset);
+            self.held.insert(b, Held::Memory { ty: pt, ptr: at });
+        }
+        match self.region(&arm.body.instrs) {
+            Encoding::Encoded(()) => {}
+            other => return other,
+        }
+        let Some(value) = self.held.get(&arm.body.value).cloned() else {
+            blocked!("`{}`'s arm ends in a value nothing defines", self.export);
+        };
+        let Some(vt) = value.ty() else {
+            blocked!("`{}`'s arm ends in a call with no result", self.export);
+        };
+        let rt = *holder.ty().expect("a holder has a type");
+        if !same_type(resolve, vt, &rt) {
+            blocked!(
+                "`{}`'s arms produce values of different component types",
+                self.export
+            );
+        }
+        match (holder, &value) {
+            (Held::Memory { ptr: out, .. }, Held::Memory { ptr: v, .. }) => {
+                self.ops.push(I::LocalGet(*v));
+                self.ops.push(I::LocalSet(*out));
+            }
+            (Held::Memory { ptr: out, .. }, Held::Flat { locals: flats, .. }) => {
+                allocate(sizes, &rt, self.realloc_index, *out, &mut self.ops);
+                match store(resolve, sizes, &rt, *out, 0, flats, &mut self.ops) {
+                    Encoding::Encoded(_) => {}
+                    other => return other.map(|_| unreachable!()),
+                }
+            }
+            (Held::Flat { locals: outs, .. }, v) => {
+                match push_flat_values(resolve, sizes, v, &mut self.ops) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                for l in outs.iter().rev() {
+                    self.ops.push(I::LocalSet(*l));
+                }
+            }
+            (_, Held::Nothing) | (Held::Nothing, _) => {
+                blocked!("`{}`'s arm ends in a call with no result", self.export)
+            }
+        }
+        Encoding::Encoded(())
+    }
+}
+
+/// **Write flat values into a value's canonical layout**: the inverse of
+/// [`load`], with the same offsets from `SizeAlign`. Returns how many flat
+/// values it consumed.
+fn store(
+    resolve: &Resolve,
+    sizes: &SizeAlign,
+    ty: &WitType,
+    base: u32,
+    offset: u64,
+    flats: &[u32],
+    ops: &mut Vec<wasm_encoder::Instruction<'static>>,
+) -> Encoding<usize> {
+    use wasm_encoder::Instruction as I;
+    let mem = |align: u32, extra: u64| MemArg {
+        offset: offset + extra,
+        align,
+        memory_index: 0,
+    };
+    let one = |ops: &mut Vec<I<'static>>, op: I<'static>| -> Encoding<usize> {
+        let Some(v) = flats.first() else {
+            blocked!("a store ran out of flat values");
+        };
+        ops.push(I::LocalGet(base));
+        ops.push(I::LocalGet(*v));
+        ops.push(op);
+        Encoding::Encoded(1)
+    };
+    match dealias(resolve, *ty) {
+        WitType::Bool | WitType::U8 | WitType::S8 => one(ops, I::I32Store8(mem(0, 0))),
+        WitType::U16 | WitType::S16 => one(ops, I::I32Store16(mem(1, 0))),
+        WitType::U32 | WitType::S32 | WitType::Char => one(ops, I::I32Store(mem(2, 0))),
+        WitType::U64 | WitType::S64 => one(ops, I::I64Store(mem(3, 0))),
+        WitType::F32 => one(ops, I::F32Store(mem(2, 0))),
+        WitType::F64 => one(ops, I::F64Store(mem(3, 0))),
+        WitType::String => pointer_and_length(base, offset, flats, ops),
+        WitType::Id(id) => match &resolve.types[id].kind {
+            TypeDefKind::List(_) => pointer_and_length(base, offset, flats, ops),
+            TypeDefKind::Record(r) => {
+                let mut used = 0;
+                for (field_offset, field_ty) in sizes.field_offsets(r.fields.iter().map(|f| &f.ty))
+                {
+                    let o = field_offset.size_wasm32() as u64;
+                    match store(
+                        resolve,
+                        sizes,
+                        field_ty,
+                        base,
+                        offset + o,
+                        &flats[used..],
+                        ops,
+                    ) {
+                        Encoding::Encoded(n) => used += n,
+                        other => return other,
+                    }
+                }
+                Encoding::Encoded(used)
+            }
+            other => refuse!(
+                "writing a value of this kind into memory",
+                "{other:?} flattens with joined variant slots, which this encoder does \
+                 not write yet"
+            ),
+        },
+        other => refuse!(
+            "writing a value of this kind into memory",
+            "{other:?} has no store here yet"
+        ),
+    }
+}
+
+/// A string or a list: its pointer and its length, each a 32-bit word.
+fn pointer_and_length(
+    base: u32,
+    offset: u64,
+    flats: &[u32],
+    ops: &mut Vec<wasm_encoder::Instruction<'static>>,
+) -> Encoding<usize> {
+    use wasm_encoder::Instruction as I;
+    let [ptr, len, ..] = flats else {
+        blocked!("a pointer and length need two flat values");
+    };
+    for (v, extra) in [(ptr, 0), (len, 4)] {
+        ops.push(I::LocalGet(base));
+        ops.push(I::LocalGet(*v));
+        ops.push(I::I32Store(MemArg {
+            offset: offset + extra,
+            align: 2,
+            memory_index: 0,
+        }));
+    }
+    Encoding::Encoded(2)
 }
 
 /// Push a held value's flat core values onto the stack.

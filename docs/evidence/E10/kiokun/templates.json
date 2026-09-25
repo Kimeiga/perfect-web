@@ -1,0 +1,349 @@
+[
+  {
+    "path": "kiokun.page.EntryPage",
+    "name": "EntryPage",
+    "params": [
+      "entry"
+    ],
+    "schema": "56dcfea47504b53b",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<main>\n            <form action=\"/search\" method=\"get\" role=\"search\">\n                <input id=\"q\" type=\"search\" name=\"q\" aria-label=\"Search the dictionary\">\n            </form>\n            <h1 id=\"headword\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 0,
+          "value": "entry.key",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</h1>\n            "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "conditional",
+          "id": 1,
+          "value": "entry.chinese",
+          "then": [
+            {
+              "chunk": "static",
+              "value": "\n                <section aria-label=\"Chinese\">\n                    <h2>Chinese</h2>\n                    <ul id=\"chinese\">\n                        "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "each",
+                "id": 2,
+                "collection": "entry.chinese",
+                "binding": "word",
+                "key": "id",
+                "body": [
+                  {
+                    "chunk": "static",
+                    "value": "\n                            <li>\n                                <span class=\"pinyin\">"
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "text",
+                      "id": 3,
+                      "value": "word.pinyin",
+                      "context": "text"
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "</span>\n                                <span class=\"forms\">"
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "text",
+                      "id": 4,
+                      "value": "word.simplified",
+                      "context": "text"
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "</span>\n                                <span class=\"definitions\">"
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "text",
+                      "id": 5,
+                      "value": "word.definitions",
+                      "context": "text"
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "</span>\n                            </li>\n                        "
+                  }
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "\n                    </ul>\n                </section>\n            "
+            }
+          ],
+          "otherwise": []
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "conditional",
+          "id": 6,
+          "value": "entry.japanese",
+          "then": [
+            {
+              "chunk": "static",
+              "value": "\n                <section aria-label=\"Japanese\">\n                    <h2>Japanese</h2>\n                    <ul id=\"japanese\">\n                        "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "each",
+                "id": 7,
+                "collection": "entry.japanese",
+                "binding": "word",
+                "key": "id",
+                "body": [
+                  {
+                    "chunk": "static",
+                    "value": "\n                            <li>\n                                <span class=\"written\">"
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "text",
+                      "id": 8,
+                      "value": "word.written",
+                      "context": "text"
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "</span>\n                                <span class=\"readings\">"
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "text",
+                      "id": 9,
+                      "value": "word.readings",
+                      "context": "text"
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "</span>\n                                <ol>\n                                    "
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "each",
+                      "id": 10,
+                      "collection": "word.senses",
+                      "binding": "sense",
+                      "key": "id",
+                      "body": [
+                        {
+                          "chunk": "static",
+                          "value": "\n                                        <li>"
+                        },
+                        {
+                          "chunk": "dynamic",
+                          "value": {
+                            "part": "text",
+                            "id": 11,
+                            "value": "sense.glosses",
+                            "context": "text"
+                          }
+                        },
+                        {
+                          "chunk": "static",
+                          "value": "</li>\n                                    "
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "\n                                </ol>\n                            </li>\n                        "
+                  }
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "\n                    </ul>\n                </section>\n            "
+            }
+          ],
+          "otherwise": []
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n        </main>"
+      }
+    ]
+  },
+  {
+    "path": "kiokun.page.NotFound",
+    "name": "NotFound",
+    "params": [
+      "word"
+    ],
+    "schema": "7c3dff9db89bbad9",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<main>\n            <h1 id=\"headword\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 0,
+          "value": "word",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</h1>\n            <p>This shard has no entry for it.</p>\n        </main>"
+      }
+    ]
+  },
+  {
+    "path": "kiokun.page.SearchPage",
+    "name": "SearchPage",
+    "params": [
+      "q",
+      "hits"
+    ],
+    "schema": "a68be597775b89ae",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<main>\n            <form action=\"/search\" method=\"get\" role=\"search\">\n                <input data-pw=\"0\" id=\"q\" type=\"search\" name=\"q\" "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "attribute",
+          "id": 0,
+          "owner": 0,
+          "name": "value",
+          "value": "q",
+          "context": "attribute"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": " aria-label=\"Search the dictionary\">\n            </form>\n            <ul id=\"hits\">\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "each",
+          "id": 1,
+          "collection": "hits",
+          "binding": "hit",
+          "key": "id",
+          "body": [
+            {
+              "chunk": "static",
+              "value": "\n                    <li>\n                        <a data-pw=\"1\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "attribute",
+                "id": 2,
+                "owner": 1,
+                "name": "href",
+                "value": "hit.target",
+                "context": "url"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 3,
+                "value": "hit.word",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</a>\n                        <span class=\"language\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 4,
+                "value": "hit.language",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                        <span class=\"pronunciation\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 5,
+                "value": "hit.pronunciation",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                        <span class=\"definition\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 6,
+                "value": "hit.definition",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                    </li>\n                "
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            </ul>\n        </main>"
+      }
+    ]
+  }
+]

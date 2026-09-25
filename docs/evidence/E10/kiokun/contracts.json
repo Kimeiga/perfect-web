@@ -1,0 +1,224 @@
+[
+  {
+    "component_id": "kiokun.page.EntryPage",
+    "capability_mapping": 1,
+    "abi_schema": "f82da1a33f20d27b",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "EntryPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/kiokun-page-entry-page-api@0.1.0",
+          "function": "entry-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "kiokun.page.Lookup",
+    "capability_mapping": 1,
+    "abi_schema": "966e770350c30037",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Entry"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "kiokun:data/entries",
+        "name": "get",
+        "capability": "database.read<Entry>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Entry"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Option",
+              "args": [
+                {
+                  "declared": {
+                    "path": "dictionary.Entry"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Lookup",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/kiokun-page-lookup-api@0.1.0",
+          "function": "lookup"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "kiokun.page.NotFound",
+    "capability_mapping": 1,
+    "abi_schema": "e057db722e727fff",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "NotFound",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/kiokun-page-not-found-api@0.1.0",
+          "function": "not-found"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "kiokun.page.Search",
+    "capability_mapping": 1,
+    "abi_schema": "5c8587d23a5fbf80",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "SearchHit"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "kiokun:data/index",
+        "name": "search",
+        "capability": "database.read<SearchHit>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "SearchHit"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            },
+            {
+              "primitive": "Int"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "dictionary.SearchHit"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Search",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/kiokun-page-search-api@0.1.0",
+          "function": "search"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "kiokun.page.SearchPage",
+    "capability_mapping": 1,
+    "abi_schema": "6f8cae31eed7bad7",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "SearchPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/kiokun-page-search-page-api@0.1.0",
+          "function": "search-page"
+        }
+      }
+    ]
+  }
+]

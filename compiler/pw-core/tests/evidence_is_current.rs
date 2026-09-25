@@ -220,3 +220,83 @@ fn the_committed_handlers_are_what_the_compiler_emits_now() {
          the result, saying in the commit message what changed in the compiled handlers."
     );
 }
+
+/// **The kiokun slice's committed build is what `pw build` produces now.**
+///
+/// `spikes/kiokun/server` serves `docs/evidence/E10/kiokun/` without linking
+/// the compiler, so a stale file there would be a slice running something the
+/// compiler no longer builds. Every file, byte for byte, and no extra ones.
+#[test]
+fn the_committed_kiokun_build_is_what_the_compiler_builds_now() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut units = Vec::new();
+    for dir in [
+        "packages/pw-std",
+        "packages/pw-platform-web",
+        "examples/kiokun",
+    ] {
+        let mut ps: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(dir))
+            .unwrap_or_else(|e| panic!("{dir}: {e}"))
+            .map(|e| e.expect("entry").path())
+            .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+            .collect();
+        ps.sort();
+        for p in ps {
+            let src = std::fs::read_to_string(&p).expect("read");
+            units.push(pw_core::check::Unit {
+                path: p.display().to_string(),
+                hir: lower_file(&src, &parse_tree(&src).green),
+                src,
+            });
+        }
+    }
+    let b = pw_core::build::build(&units).expect("the slice checks");
+    assert!(b.refusals().is_empty(), "{:?}", b.refusals());
+
+    let mut fresh: Vec<(String, Vec<u8>)> = vec![
+        (
+            "templates.json".into(),
+            format!("{}\n", serde_json::to_string_pretty(&b.templates).unwrap()).into_bytes(),
+        ),
+        (
+            "contracts.json".into(),
+            format!("{}\n", serde_json::to_string_pretty(&b.contracts).unwrap()).into_bytes(),
+        ),
+        ("app.wit".into(), b.wit.clone().into_bytes()),
+    ];
+    for (id, built) in &b.components {
+        if let pw_core::backend::component::Built::Component { compiled, .. } = built {
+            fresh.push((
+                format!("components/{id}.wasm"),
+                compiled.component.bytes.clone(),
+            ));
+        }
+    }
+    fresh.sort();
+
+    let dir = root.join("docs/evidence/E10/kiokun");
+    let mut committed: Vec<(String, Vec<u8>)> = Vec::new();
+    for sub in ["", "components"] {
+        for e in std::fs::read_dir(dir.join(sub))
+            .unwrap_or_else(|e| panic!("{}: {e} — run `just e10-kiokun`", dir.display()))
+        {
+            let path = e.expect("entry").path();
+            if path.is_file() {
+                let name = path.strip_prefix(&dir).unwrap().display().to_string();
+                committed.push((name, std::fs::read(&path).expect("read")));
+            }
+        }
+    }
+    committed.sort();
+    let differing: std::collections::BTreeSet<&String> = fresh
+        .iter()
+        .chain(&committed)
+        .filter(|entry| !(fresh.contains(entry) && committed.contains(entry)))
+        .map(|(name, _)| name)
+        .collect();
+    assert!(
+        differing.is_empty(),
+        "docs/evidence/E10/kiokun/ is stale: {differing:?} differ from what `pw build` \
+         produces now. Run `just e10-kiokun` and commit the result."
+    );
+}

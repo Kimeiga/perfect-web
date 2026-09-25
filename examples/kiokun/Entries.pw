@@ -1,0 +1,17 @@
+// @corpus: fixture
+// @id: KIOKUN-Entries
+// @category: the kiokun slice — the entry store
+// @charter: §14 M10
+// @milestone: E10
+//
+// **Supplied by the deployment**, as the store's data layer is (ADR-0032).
+// kiokun.com keeps one DEFLATE-compressed file per word, across 28 shard
+// repositories; the slice's host serves one shard from memory. What Pleris
+// decides is what to do with the answer: `kiokun.page.Lookup`.
+
+module Entries
+
+import dictionary.{ Entry }
+
+fn get(word: String) -> Option<Entry> !{ database.read<Entry> }
+    host "kiokun:data/entries#get"

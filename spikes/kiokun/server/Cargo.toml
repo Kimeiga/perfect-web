@@ -1,0 +1,19 @@
+[package]
+name = "kiokun-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# The kiokun slice's host (E10). One shard of kiokun.com's dictionary, served
+# by the queries and pages `pw build` compiled from `examples/kiokun/`. Like
+# `spikes/own-renderer/server` it links no compiler: the components, contracts
+# and templates are read as data from `docs/evidence/E10/kiokun/`.
+[dependencies]
+pw-host = { path = "../../../runtime/pw-host", features = ["engine"] }
+pw-render = { path = "../../../runtime/pw-render" }
+serde_json = { workspace = true }
+# kiokun stores each word as raw DEFLATE. Verified 2026-09-25 on crates.io:
+# 0.9.1, MIT OR Zlib OR Apache-2.0, the pure-Rust inflater flate2 defaults to.
+miniz_oxide = "0.9.1"

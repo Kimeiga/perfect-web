@@ -6,7 +6,14 @@
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
-**Current milestone:** E10, in progress. **E10-I closed 2026-09-24**
+**Current milestone:** E10. **All five gate items have recorded evidence as
+of 2026-09-25** (see below). Closing E10 is left to the architect's review, with
+these charter tasks not done:
+- task 2's Wasm for compute-heavy modules;
+- task 4's evaluation of memory strategies;
+- task 7's affine annotations beyond effect rows.
+
+ **E10-I closed 2026-09-24**
 ([evidence](evidence/E10/e10-i-2026-09-24.md), [ADR-0032](DECISIONS/ADR-0032-compiled-components.md)):
 `add_to_cart` compiles to a Wasm component, runs through the E8 host with the
 host's own operations, and the dev server's Rust closure path is deleted.
@@ -52,6 +59,26 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: E10 gate item 2, and the kiokun slice.**
+  - The backend compiles `match` over `Option` and `Result`, field reads, and
+    `Some`/`None`/`Ok`/`Err` (ADR-0036). The store's components are
+    byte-identical afterwards.
+  - The kiokun slice (ADR-0037): entry lookup and search over one real shard
+    of kiokun.com.
+    - On the whole shard, the compiled `Lookup` and `EntryPage` looked up and
+      rendered 16,921 entries and followed all 103 in-shard redirects, with 0
+      failures.
+    - 15/15 in three browser engines, with JavaScript on and off.
+  - The differential oracle: all seven compiled declarations agree with
+    independent Rust references over 300 generated cases each, and three wrong
+    references are caught. Evidence:
+    [oracle-2026-09-25.md](evidence/E10/oracle-2026-09-25.md) and
+    [kiokun-2026-09-25.md](evidence/E10/kiokun-2026-09-25.md).
+  - Found:
+    - the platform package depended on the store example;
+    - interpolated attribute strings rendered literally;
+    - the checker does not check exhaustiveness over `Option` and `Result`.
 
 - **2026-09-25: E10 gate item 4, size and performance against baselines.**
   - The store's components are 3,037 to 4,221 bytes, against 5,276 for a
@@ -271,6 +298,8 @@ just e10-build
 just e10-load
 just e10-ownership
 just e10-bench
+just e10-oracle
+KIOKUN_DATA=/path/to/kiokun-data/output_dictionary just e10-kiokun
 just e10-browser chromium
 just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
 just e9-values

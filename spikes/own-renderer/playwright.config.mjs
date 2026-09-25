@@ -53,6 +53,10 @@ export const MUTABLE_PORTS = Object.fromEntries(
 // load a long-animation-frame measurement is trying not to see. It failed
 // exactly that way: gate 8 reported an interaction long frame on a cold start
 // and none on a warm one.
+// The kiokun slice's host (E10): a second application, its own server, and
+// read-only, so every engine shares it.
+export const KIOKUN_PORT = PORT + 40;
+
 const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]
   : [PORT, ...MUTATING.flatMap((suite) => Object.values(MUTABLE_PORTS[suite]))];
@@ -83,5 +87,16 @@ export default defineConfig({
       reuseExistingServer: !!process.env.PW_REUSE,
       timeout: 60_000,
     })),
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : [
+          {
+            command: `../../target/debug/kiokun-server`,
+            env: { PORT: String(KIOKUN_PORT) },
+            port: KIOKUN_PORT,
+            reuseExistingServer: !!process.env.PW_REUSE,
+            timeout: 60_000,
+          },
+        ]),
   ],
 });

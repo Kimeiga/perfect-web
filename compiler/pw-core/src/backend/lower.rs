@@ -38,11 +38,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
-    Block, BlockId, CallableImport, CapabilityId, Const, Function, ImportId, Instr, Lowering,
-    Program, Shape, Terminator, Type, TypeDef, ValueId,
+    Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Const, Function, ImportId, Instr,
+    Lowering, MatchArm, Program, Region, Shape, Terminator, Type, TypeDef, ValueId,
 };
 use crate::contract::ComponentContract;
-use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Span};
+use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Pattern, Span};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
 use crate::resolved::{Builtin, Primitive, ResolvedType, TypeResolution};
 use crate::signatures::Signatures;
@@ -232,6 +232,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         next_value: 0,
         instrs: Vec::new(),
         locals: BTreeMap::new(),
+        types: BTreeMap::new(),
     };
 
     // Parameters first, so a body naming one finds it.
@@ -256,6 +257,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         };
         let v = f.fresh();
         f.locals.insert(p.name.clone(), v);
+        f.types.insert(v, ty.clone());
         params.push((v, ty));
     }
 
@@ -268,7 +270,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
     };
 
     let body = cx.hirs[unit].body(body_id);
-    let result = match f.expr(body, body.root) {
+    let result = match f.expr(body, body.root, Some(&ret)) {
         Lowering::Lowered(v) => v,
         other => return other.map(|_| unreachable!()),
     };
@@ -429,6 +431,9 @@ struct Lower<'a> {
     next_value: u32,
     instrs: Vec<Instr>,
     locals: BTreeMap<String, ValueId>,
+    /// Every value's type, recorded where the value is made. A `match` asks
+    /// what its scrutinee is, and a field access what record it reads.
+    types: BTreeMap<ValueId, Type>,
 }
 
 impl<'a> Lower<'a> {
@@ -436,6 +441,35 @@ impl<'a> Lower<'a> {
         let v = ValueId(self.next_value);
         self.next_value += 1;
         v
+    }
+
+    /// Append an instruction, recording its value's type.
+    fn push(&mut self, instr: Instr) -> ValueId {
+        let v = instr.result();
+        self.types.insert(v, instr.ty().clone());
+        self.instrs.push(instr);
+        v
+    }
+
+    /// Is `name` the language's own, here: `Some`, `None`, `Ok`, `Err` where
+    /// the program declares no term of that name? The typer's rule, so the
+    /// backend cannot read a constructor the checker read as a declaration.
+    fn builtin(&self, name: &str) -> Option<BuiltinCase> {
+        let case = match name {
+            "Some" => BuiltinCase::Some,
+            "None" => BuiltinCase::None,
+            "Ok" => BuiltinCase::Ok,
+            "Err" => BuiltinCase::Err,
+            _ => return None,
+        };
+        if self.locals.contains_key(name) {
+            return None;
+        }
+        matches!(
+            self.cx.ws.resolve_in(self.unit, Namespace::Term, name),
+            Resolution::Unresolved
+        )
+        .then_some(case)
     }
 }
 
@@ -501,7 +535,10 @@ fn ty_resolved(sigs: &Signatures, ty: &ResolvedType, span: &Span) -> Lowering<Ty
 }
 
 impl<'a> Lower<'a> {
-    fn expr(&mut self, body: &Body, e: ExprId) -> Lowering<ValueId> {
+    /// Lower one expression. `expected` is the type its context fixes, if any:
+    /// the declaration's result, a parameter's type, the arms' common type.
+    /// It is how `None` knows what it is `None` of.
+    fn expr(&mut self, body: &Body, e: ExprId, expected: Option<&Type>) -> Lowering<ValueId> {
         let span = body.expr_span(e);
         match body.expr(e) {
             Expr::Literal(l) => {
@@ -550,12 +587,11 @@ impl<'a> Lower<'a> {
                     }
                 };
                 let result = self.fresh();
-                self.instrs.push(Instr::Const {
+                Lowering::Lowered(self.push(Instr::Const {
                     result,
                     value,
                     ty: ty.clone(),
-                });
-                Lowering::Lowered(result)
+                }))
             }
             // A placeholder body. `Unsupported`, not `Blocked`: the program is
             // perfectly well-formed and there is simply nothing to compile.
@@ -564,6 +600,9 @@ impl<'a> Lower<'a> {
                 span,
                 reason: "the declaration is a placeholder".to_string(),
             },
+            Expr::Name(n) if self.builtin(n) == Some(BuiltinCase::None) => {
+                self.variant(BuiltinCase::None, None, expected, span)
+            }
             Expr::Name(n) => match self.locals.get(n) {
                 Some(v) => Lowering::Lowered(*v),
                 None => Lowering::Blocked {
@@ -573,8 +612,22 @@ impl<'a> Lower<'a> {
             },
             Expr::Block { stmts } => {
                 let mut last = None;
-                for s in stmts {
-                    match self.expr(body, *s) {
+                for (i, s) in stmts.iter().enumerate() {
+                    let tail = i + 1 == stmts.len();
+                    if let Expr::Let { pat, init, .. } = body.expr(*s) {
+                        if tail {
+                            return Lowering::Unsupported {
+                                construct: "a block ending in a binding",
+                                span,
+                                reason: "the block's value would be the unit value".to_string(),
+                            };
+                        }
+                        match self.bind(body, *pat, *init, span.clone()) {
+                            Lowering::Lowered(()) => continue,
+                            other => return other.map(|_| unreachable!()),
+                        }
+                    }
+                    match self.expr(body, *s, if tail { expected } else { None }) {
                         Lowering::Lowered(v) => last = Some(v),
                         other => return other,
                     }
@@ -588,15 +641,310 @@ impl<'a> Lower<'a> {
                     },
                 }
             }
-            Expr::Call { callee, args } => self.call(body, *callee, args, span),
+            Expr::Call { callee, args } => match body.expr(*callee) {
+                Expr::Name(n) if self.builtin(n).is_some_and(BuiltinCase::has_payload) => {
+                    let case = self.builtin(n).expect("checked");
+                    let [arg] = args.as_slice() else {
+                        return Lowering::Blocked {
+                            why: format!("`{n}` takes one value"),
+                            span,
+                        };
+                    };
+                    let payload_expected = match (case, expected) {
+                        (BuiltinCase::Some, Some(Type::Option(t))) => Some((**t).clone()),
+                        (BuiltinCase::Ok, Some(Type::Result(t, _))) => Some((**t).clone()),
+                        (BuiltinCase::Err, Some(Type::Result(_, e))) => Some((**e).clone()),
+                        _ => None,
+                    };
+                    let payload = match self.expr(body, arg.value, payload_expected.as_ref()) {
+                        Lowering::Lowered(v) => v,
+                        other => return other,
+                    };
+                    self.variant(case, Some(payload), expected, span)
+                }
+                _ => self.call(body, *callee, args, span),
+            },
+            Expr::Match { scrutinee, arms } => self.matched(body, *scrutinee, arms, expected, span),
+            Expr::Field { base, name } => self.field(body, *base, name, span),
             other => Lowering::Unsupported {
                 construct: construct_name(other),
                 span,
-                reason: "E10-A lowers what `add_to_cart` needs: calls, names, \
-                         literals and blocks"
+                reason: "the backend lowers calls, names, literals, blocks, bindings, \
+                         field reads, and matches over `Option` and `Result`"
                     .to_string(),
             },
         }
+    }
+
+    /// `let x = e` and `let _ = e`: the value bound for the rest of the block.
+    fn bind(
+        &mut self,
+        body: &Body,
+        pat: Option<crate::hir::PatternId>,
+        init: Option<ExprId>,
+        span: Span,
+    ) -> Lowering<()> {
+        let Some(init) = init else {
+            return Lowering::Unsupported {
+                construct: "a binding with no value",
+                span,
+                reason: "`let x` without `= e` has nothing to bind".to_string(),
+            };
+        };
+        let v = match self.expr(body, init, None) {
+            Lowering::Lowered(v) => v,
+            other => return other.map(|_| unreachable!()),
+        };
+        match pat.map(|p| body.pat(p)) {
+            Some(Pattern::Bind { name, .. }) => {
+                self.locals.insert(name.clone(), v);
+                Lowering::Lowered(())
+            }
+            Some(Pattern::Wild) | None => Lowering::Lowered(()),
+            Some(_) => Lowering::Unsupported {
+                construct: "a destructuring binding",
+                span,
+                reason: "`let` binds a name or `_` here".to_string(),
+            },
+        }
+    }
+
+    /// `Some(x)`, `None`, `Ok(x)`, `Err(e)`, typed by what the context
+    /// expects, or by the payload when nothing does.
+    fn variant(
+        &mut self,
+        case: BuiltinCase,
+        payload: Option<ValueId>,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let payload_ty = payload.and_then(|v| self.types.get(&v).cloned());
+        let ty = match (case, expected, payload_ty) {
+            (BuiltinCase::Some | BuiltinCase::None, Some(t @ Type::Option(_)), _) => t.clone(),
+            (BuiltinCase::Ok | BuiltinCase::Err, Some(t @ Type::Result(..)), _) => t.clone(),
+            (BuiltinCase::Some, None, Some(p)) => Type::Option(Box::new(p)),
+            _ => {
+                return Lowering::Unsupported {
+                    construct: "a variant whose type nothing here fixes",
+                    span,
+                    reason: format!(
+                        "`{case:?}` needs the type its context expects, and the context \
+                         names none this backend can read"
+                    ),
+                };
+            }
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Variant {
+            result,
+            case,
+            payload,
+            ty,
+        }))
+    }
+
+    /// A field of a record value, by the index its declaration gives it.
+    fn field(&mut self, body: &Body, base: ExprId, name: &str, span: Span) -> Lowering<ValueId> {
+        let of = match self.expr(body, base, None) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let Some(Type::Nominal(def)) = self.types.get(&of).cloned() else {
+            return Lowering::Unsupported {
+                construct: "a field of something that is not a record",
+                span,
+                reason: format!("`.{name}` is read from a value of no declared record type"),
+            };
+        };
+        let Some(fields) = self.cx.sigs.type_decl(def).and_then(|t| t.record.as_ref()) else {
+            return Lowering::Unsupported {
+                construct: "a field of something that is not a record",
+                span,
+                reason: format!("`.{name}` is read from a type with no record fields"),
+            };
+        };
+        let Some((index, (_, declared))) = fields.iter().enumerate().find(|(_, (n, _))| n == name)
+        else {
+            return Lowering::Blocked {
+                why: format!(
+                    "the record has no field `{name}`; the checker should have refused it"
+                ),
+                span,
+            };
+        };
+        let ty = match ty_resolution(self.cx.sigs, declared, &span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Project {
+            result,
+            of,
+            field: index as u32,
+            ty,
+        }))
+    }
+
+    /// **A match over `Option` or `Result`**, as a structured [`Instr::Match`].
+    /// Every case must have exactly one arm: the encoder emits no fallthrough,
+    /// so a missing case is refused here rather than compiled to a trap.
+    fn matched(
+        &mut self,
+        body: &Body,
+        scrutinee: ExprId,
+        arms: &[crate::hir::MatchArm],
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let scrutinee = match self.expr(body, scrutinee, None) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let (cases, payloads): (Vec<BuiltinCase>, Vec<Option<Type>>) =
+            match self.types.get(&scrutinee).cloned() {
+                Some(Type::Option(t)) => (
+                    vec![BuiltinCase::Some, BuiltinCase::None],
+                    vec![Some(*t), None],
+                ),
+                Some(Type::Result(t, e)) => (
+                    vec![BuiltinCase::Ok, BuiltinCase::Err],
+                    vec![Some(*t), Some(*e)],
+                ),
+                other => {
+                    return Lowering::Unsupported {
+                        construct: "a match over something other than `Option` or `Result`",
+                        span,
+                        reason: match other {
+                            Some(t) => format!("the scrutinee's type is {t:?}"),
+                            None => "the scrutinee's type is not known here".to_string(),
+                        },
+                    };
+                }
+            };
+
+        let mut lowered: Vec<MatchArm> = Vec::new();
+        let mut ty: Option<Type> = expected.cloned();
+        for arm in arms {
+            let (case, bind) = match body.pat(arm.pat) {
+                Pattern::Ctor { path, args } => match (self.builtin(path), args.as_slice()) {
+                    (Some(case), [inner]) if case.has_payload() => match body.pat(*inner) {
+                        Pattern::Bind { name, .. } => (case, Some(name.clone())),
+                        Pattern::Wild => (case, None),
+                        _ => {
+                            return Lowering::Unsupported {
+                                construct: "a nested pattern",
+                                span,
+                                reason: format!("`{path}(..)` binds a name or `_` here"),
+                            };
+                        }
+                    },
+                    (Some(BuiltinCase::None), []) => (BuiltinCase::None, None),
+                    _ => {
+                        return Lowering::Unsupported {
+                            construct: "a pattern this backend does not lower",
+                            span,
+                            reason: format!("`{path}(..)` is not a case of the scrutinee"),
+                        };
+                    }
+                },
+                // `None` parses as a binding of that name; the language's own
+                // `None` where nothing else has the name.
+                Pattern::Bind { name, .. } if self.builtin(name) == Some(BuiltinCase::None) => {
+                    (BuiltinCase::None, None)
+                }
+                _ => {
+                    return Lowering::Unsupported {
+                        construct: "a pattern this backend does not lower",
+                        span,
+                        reason: "an arm names a case: `Some(x)`, `None`, `Ok(x)`, `Err(e)`"
+                            .to_string(),
+                    };
+                }
+            };
+            let Some(at) = cases.iter().position(|c| *c == case) else {
+                return Lowering::Unsupported {
+                    construct: "a pattern this backend does not lower",
+                    span,
+                    reason: format!("`{case:?}` is not a case of the scrutinee"),
+                };
+            };
+            if lowered.iter().any(|a| a.case == case) {
+                return Lowering::Unsupported {
+                    construct: "a case matched twice",
+                    span,
+                    reason: format!("`{case:?}` has two arms; the second can never run"),
+                };
+            }
+
+            // The arm's body, in a region of its own.
+            let outer = std::mem::take(&mut self.instrs);
+            let binding = match (&payloads[at], &bind) {
+                (Some(t), _) => {
+                    let v = self.fresh();
+                    self.types.insert(v, t.clone());
+                    Some(v)
+                }
+                (None, _) => None,
+            };
+            let shadowed = bind
+                .as_ref()
+                .map(|name| (name.clone(), self.locals.get(name).copied()));
+            if let (Some(name), Some(v)) = (&bind, binding) {
+                self.locals.insert(name.clone(), v);
+            }
+            let value = self.expr(body, arm.body, ty.as_ref());
+            if let Some((name, before)) = shadowed {
+                match before {
+                    Some(v) => self.locals.insert(name, v),
+                    None => self.locals.remove(&name),
+                };
+            }
+            let instrs = std::mem::replace(&mut self.instrs, outer);
+            let value = match value {
+                Lowering::Lowered(v) => v,
+                other => return other,
+            };
+            let value_ty = self.types.get(&value).cloned();
+            match (&ty, value_ty) {
+                (None, Some(t)) => ty = Some(t),
+                (Some(t), Some(v)) if *t != v => {
+                    return Lowering::Blocked {
+                        why: format!("the arms produce {t:?} and {v:?}"),
+                        span,
+                    };
+                }
+                _ => {}
+            }
+            lowered.push(MatchArm {
+                case,
+                binding,
+                body: Region { instrs, value },
+            });
+        }
+        if lowered.len() != cases.len() {
+            return Lowering::Unsupported {
+                construct: "a match that does not cover every case",
+                span,
+                reason: format!(
+                    "{} of {} cases have arms, and a missing case would have no code",
+                    lowered.len(),
+                    cases.len()
+                ),
+            };
+        }
+        let Some(ty) = ty else {
+            return Lowering::Blocked {
+                why: "a match whose arms produce no typed value".to_string(),
+                span,
+            };
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Match {
+            result,
+            scrutinee,
+            arms: lowered,
+            ty,
+        }))
     }
 
     /// A call — the one place the host boundary is decided.
@@ -612,14 +960,6 @@ impl<'a> Lower<'a> {
         args: &[crate::hir::Arg],
         span: Span,
     ) -> Lowering<ValueId> {
-        let mut lowered = Vec::new();
-        for a in args {
-            match self.expr(body, a.value) {
-                Lowering::Lowered(v) => lowered.push(v),
-                other => return other,
-            }
-        }
-
         let path = crate::infer::path_of(body, callee);
 
         // **Through `Signatures`, keyed by the path a call site writes.**
@@ -662,6 +1002,22 @@ impl<'a> Lower<'a> {
             };
         };
 
+        // The arguments, each expecting its parameter's declared type.
+        let mut lowered = Vec::new();
+        for (i, a) in args.iter().enumerate() {
+            let expected = match sig.params.get(i).and_then(Option::as_ref) {
+                Some(p) => match ty_resolution(self.cx.sigs, p, &span) {
+                    Lowering::Lowered(t) => Some(t),
+                    _ => None,
+                },
+                None => None,
+            };
+            match self.expr(body, a.value, expected.as_ref()) {
+                Lowering::Lowered(v) => lowered.push(v),
+                other => return other,
+            }
+        }
+
         // What the callee returns, from that signature. Not inferred here.
         let ty = match &sig.returns {
             Some(resolution) => match ty_resolution(self.cx.sigs, resolution, &span) {
@@ -700,19 +1056,23 @@ impl<'a> Lower<'a> {
 
         let result = self.fresh();
         match binding {
-            Some(import) => self.instrs.push(Instr::ImportCall {
-                result,
-                import,
-                args: lowered,
-                ty,
-            }),
-            None => match def {
-                Some(callee) => self.instrs.push(Instr::Call {
+            Some(import) => {
+                self.push(Instr::ImportCall {
                     result,
-                    callee,
+                    import,
                     args: lowered,
                     ty,
-                }),
+                });
+            }
+            None => match def {
+                Some(callee) => {
+                    self.push(Instr::Call {
+                        result,
+                        callee,
+                        args: lowered,
+                        ty,
+                    });
+                }
                 // A call that needs no authority and whose callee has no
                 // resolved identity here — a platform declaration reached
                 // through the prelude. Refused rather than emitted as a call to

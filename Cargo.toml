@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "compiler/pw-core",
     "compiler/pw-cli",
+    "compiler/pw-conformance",
     "compiler/pw-syntax",
     "runtime/pw-document",
     "runtime/pw-host",
@@ -14,6 +15,7 @@ members = [
     "runtime/pw-resume-wasm",
     "runtime/pw-tasks",
     "spikes/compiler-diagnostic",
+    "spikes/kiokun/server",
     "spikes/own-renderer/server",
     "tools/corpus-check",
     "tools/fuzz",

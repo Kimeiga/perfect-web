@@ -1,0 +1,17 @@
+// @corpus: fixture
+// @id: KIOKUN-Index
+// @category: the kiokun slice — search over the shard
+// @charter: §14 M10
+// @milestone: E10
+//
+// **Supplied by the deployment.** kiokun.com searches in SQLite FTS5 on its
+// server, and the matching and ranking are the database's. The slice keeps
+// that division: the host searches one shard with kiokun's own rules, and the
+// query asks it for twenty hits.
+
+module Index
+
+import dictionary.{ SearchHit }
+
+fn search(term: String, limit: Int) -> List<SearchHit> !{ database.read<SearchHit> }
+    host "kiokun:data/index#search"

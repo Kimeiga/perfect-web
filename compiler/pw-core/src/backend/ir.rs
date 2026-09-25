@@ -184,6 +184,60 @@ pub enum Instr {
         field: u32,
         ty: Type,
     },
+    /// Build a case of the language's own `Option` or `Result`: `Some(x)`,
+    /// `None`, `Ok(x)`, `Err(e)`. Separate from `Construct`, whose constructor
+    /// is a declaration: these cases have no `DefId` to name.
+    Variant {
+        result: ValueId,
+        case: BuiltinCase,
+        payload: Option<ValueId>,
+        ty: Type,
+    },
+    /// **Choose by a variant's case**: `match x { Some(y) => .., None => .. }`.
+    ///
+    /// Structured rather than a branch between blocks. Each arm is a region
+    /// whose last value is the arm's value, and the arms' values are the
+    /// result. Wasm's control flow is structured, so a region is what the
+    /// encoder emits directly, with no reconstruction of structure from a
+    /// graph. A value defined inside a region is visible only there.
+    Match {
+        result: ValueId,
+        scrutinee: ValueId,
+        arms: Vec<MatchArm>,
+        ty: Type,
+    },
+}
+
+/// A case of the language's own variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BuiltinCase {
+    Some,
+    None,
+    Ok,
+    Err,
+}
+
+impl BuiltinCase {
+    /// Does this case carry a payload?
+    pub fn has_payload(self) -> bool {
+        !matches!(self, BuiltinCase::None)
+    }
+}
+
+/// One arm of a [`Instr::Match`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm {
+    pub case: BuiltinCase,
+    /// The payload, bound for the arm's body: `y` in `Some(y)`.
+    pub binding: Option<ValueId>,
+    pub body: Region,
+}
+
+/// Instructions whose last value is the region's value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Region {
+    pub instrs: Vec<Instr>,
+    pub value: ValueId,
 }
 
 impl Instr {
@@ -193,7 +247,9 @@ impl Instr {
             | Instr::Call { result, .. }
             | Instr::ImportCall { result, .. }
             | Instr::Construct { result, .. }
-            | Instr::Project { result, .. } => *result,
+            | Instr::Project { result, .. }
+            | Instr::Variant { result, .. }
+            | Instr::Match { result, .. } => *result,
         }
     }
 
@@ -203,7 +259,9 @@ impl Instr {
             | Instr::Call { ty, .. }
             | Instr::ImportCall { ty, .. }
             | Instr::Construct { ty, .. }
-            | Instr::Project { ty, .. } => ty,
+            | Instr::Project { ty, .. }
+            | Instr::Variant { ty, .. }
+            | Instr::Match { ty, .. } => ty,
         }
     }
 }

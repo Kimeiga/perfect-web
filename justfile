@@ -85,7 +85,7 @@ test-unit:
 # `pw check examples/rejected/*.pw` deliberately exits 1 — that is the point —
 # so it is asserted in tests rather than run bare here.
 test-compile:
-    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw packages/*/*.pw
+    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw
     cargo run --quiet -p corpus-check -- examples
     # The accepted corpus as the ONE program it is: the shared library plus
     # every accepted file. Feeding it the rejected files too would ask the
@@ -96,6 +96,9 @@ test-compile:
     # and E6's first rule found two dangling edges in it — a milestone demo
     # nothing checks is a milestone demo that can quietly stop being true.
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw
+    # The kiokun slice (E10): a second application, and the first to use the
+    # platform package without the store's domain.
+    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
 # E7V — the resume-version deployment matrix. Every row of the architect's
@@ -424,6 +427,68 @@ e10-build:
        echo "library, and nothing the store builds depends on them."; \
      } > docs/evidence/E10/build.txt
     @cat docs/evidence/E10/build.txt
+
+# Every compiled server declaration beside an independent Rust reference of
+# what it means, 300 generated cases each, with inputs and data-layer answers
+# generated from the artifact's own types; and three wrong references the
+# oracle must catch.
+#
+# E10 gate item 2 — semantics match the oracle.
+e10-oracle:
+    @{ echo "E10 gate item 2 - compiled semantics against a reference"; echo; \
+       echo "produced by: just e10-oracle"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the differential oracle (compiler/pw-conformance/tests/oracle.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test oracle -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "^oracle: .*|^test result.*"; \
+       echo; echo "== matches, fields and variants, run (compiler/pw-conformance/tests/variants.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test variants -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "^(人|地図) -> .*|^m\.Q: .*|^test [a-z_]+ .*|^test result.*"; \
+       echo; \
+       echo "NOT CLAIMED: the references are Rust statements of each declaration's"; \
+       echo "meaning, written from the source. Koka is the oracle for effects (E9-K)"; \
+       echo "and for the pure subset (just spike-pw-to-koka); none of these seven"; \
+       echo "declarations is pure, so Koka is not run on them."; \
+     } > docs/evidence/E10/oracle.txt
+    @cat docs/evidence/E10/oracle.txt
+
+# `pw build` for examples/kiokun into docs/evidence/E10/kiokun/ (held there by
+# evidence_is_current), the host's tests over the committed sample shard, the
+# browser spec in three engines, and, with KIOKUN_DATA naming a kiokun-data
+# checkout's output_dictionary, every entry of the whole shard.
+#
+# E10 — the kiokun slice: entry lookup and search over one shard.
+e10-kiokun:
+    @cargo build --quiet --locked -p pw-cli -p kiokun-server -p pw-dev-server
+    @rm -rf docs/evidence/E10/kiokun
+    @./target/debug/pw build --out docs/evidence/E10/kiokun packages/pw-std/*.pw \
+      packages/pw-platform-web/*.pw examples/kiokun/*.pw > /dev/null
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @{ echo "E10 - the kiokun slice"; echo; \
+       echo "produced by: just e10-kiokun"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== pw build, examples/kiokun"; echo; \
+       ./target/debug/pw build --out "$(mktemp -d)" packages/pw-std/*.pw \
+         packages/pw-platform-web/*.pw examples/kiokun/*.pw | sed -E 's#-> .*#-> docs/evidence/E10/kiokun#'; \
+       echo; echo "== the sample shard (examples/kiokun/data/han-1char-3/MANIFEST.txt)"; echo; \
+       head -1 examples/kiokun/data/han-1char-3/MANIFEST.txt; \
+       echo; echo "== the host (spikes/kiokun/server)"; echo; \
+       cargo test --locked -p kiokun-server -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "^(sample|person|ren|人|谚|ひと|zzzz-no-such-word): .*|^test [a-z_:]+ .*|^test result.*"; \
+       echo; echo "== the whole shard"; echo; \
+       if [ -n "${KIOKUN_DATA:-}" ]; then \
+         cargo test --locked --release -p kiokun-server whole -- --include-ignored --nocapture 2>&1 \
+           | grep -oE "^whole shard: .*|^test result.*"; \
+       else echo "  (skipped: KIOKUN_DATA does not name a kiokun-data output_dictionary)"; fi; \
+       echo; echo "== in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/kiokun.spec.mjs \
+          --project=chromium --project=firefox --project=webkit --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky" || true; \
+     } > docs/evidence/E10/kiokun.txt
+    @cat docs/evidence/E10/kiokun.txt
 
 # Code size: the store's artifacts as `pw build` writes them, beside two
 # baselines. One is hand-written Rust components (the E0/E8 spike guests, from

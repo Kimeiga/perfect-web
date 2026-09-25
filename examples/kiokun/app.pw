@@ -1,0 +1,112 @@
+// @corpus: fixture
+// @id: KIOKUN-app
+// @category: the kiokun slice — entry lookup, and search over one shard
+// @charter: §14 M10
+// @milestone: E10
+//
+// The proof slice: a small piece of kiokun.com written in Pleris, compiled by
+// `pw build` to Wasm components and templates, and served by a host that
+// supplies one shard of the real dictionary.
+
+module kiokun.page
+
+import Entries
+import Index
+import dictionary.{ Entry, SearchHit }
+
+// **One redirect, followed in the language.** `地図` is the Japanese form of
+// `地圖` and its file holds only `{ key, redirect }`. kiokun.com's page follows
+// it in TypeScript (`+page.ts`); here it is a compiled query.
+public query Lookup(word: String) -> Option<Entry>
+    freshness 1.hours
+    cache     shared
+    key       word
+{
+    match Entries.get(word) {
+        Some(entry) => match entry.redirect {
+            Some(target) => Entries.get(target),
+            None => Some(entry),
+        },
+        None => None,
+    }
+}
+
+public query Search(q: String) -> List<SearchHit>
+    freshness 1.hours
+    cache     shared
+    key       q
+{
+    Index.search(q, 20)
+}
+
+page EntryPage(entry: Entry) {
+    view {
+        <main>
+            <form action="/search" method="get" role="search">
+                <input id="q" type="search" name="q" aria-label="Search the dictionary" />
+            </form>
+            <h1 id="headword">{entry.key}</h1>
+            {#if entry.chinese}
+                <section aria-label="Chinese">
+                    <h2>Chinese</h2>
+                    <ul id="chinese">
+                        {#each entry.chinese as word (word.id)}
+                            <li>
+                                <span class="pinyin">{word.pinyin}</span>
+                                <span class="forms">{word.simplified}</span>
+                                <span class="definitions">{word.definitions}</span>
+                            </li>
+                        {/each}
+                    </ul>
+                </section>
+            {/if}
+            {#if entry.japanese}
+                <section aria-label="Japanese">
+                    <h2>Japanese</h2>
+                    <ul id="japanese">
+                        {#each entry.japanese as word (word.id)}
+                            <li>
+                                <span class="written">{word.written}</span>
+                                <span class="readings">{word.readings}</span>
+                                <ol>
+                                    {#each word.senses as sense (sense.id)}
+                                        <li>{sense.glosses}</li>
+                                    {/each}
+                                </ol>
+                            </li>
+                        {/each}
+                    </ul>
+                </section>
+            {/if}
+        </main>
+    }
+}
+
+page SearchPage(q: String, hits: List<SearchHit>) {
+    view {
+        <main>
+            <form action="/search" method="get" role="search">
+                <input id="q" type="search" name="q" value={q} aria-label="Search the dictionary" />
+            </form>
+            <ul id="hits">
+                {#each hits as hit (hit.id)}
+                    <li>
+                        <a href={hit.target}>{hit.word}</a>
+                        <span class="language">{hit.language}</span>
+                        <span class="pronunciation">{hit.pronunciation}</span>
+                        <span class="definition">{hit.definition}</span>
+                    </li>
+                {/each}
+            </ul>
+        </main>
+    }
+}
+
+page NotFound(word: String) {
+    view {
+        <main>
+            <h1 id="headword">{word}</h1>
+            <p>This shard has no entry for it.</p>
+        </main>
+    }
+}

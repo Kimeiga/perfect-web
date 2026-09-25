@@ -50,14 +50,35 @@ to components and run through the E8 host, and the Rust closure path is deleted.
 The component backend is narrow, and everything outside it is refused by name
 rather than approximated:
 
-- **Straight-line bodies only.** Import calls and scalar constants are
-  supported; values move flat or in their canonical layout. Constructing a
-  record or variant, reading a field, a branch, a call to another compiled
-  declaration, and a string constant are refused.
+- **Straight-line bodies, at E10-I.** Import calls and scalar constants were
+  supported, and values moved flat or in their canonical layout. Matches over
+  `Option` and `Result`, field reads and their cases came after (ADR-0036,
+  below). Constructing a declared record or variant, a call to another
+  compiled declaration, and a string constant are still refused.
 - **The invocation region is provisional.** It is a bump region reclaimed by
   each export's post-return, and nothing can outlive an invocation.
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
+
+**The backend matches over `Option` and `Result`**, reads fields, and builds
+their cases (2026-09-25, ADR-0036). Still refused by name:
+
+- nested patterns;
+- declared records and variants built;
+- calls between compiled declarations;
+- arithmetic, `if`, and string operations.
+
+- **The checker does not check exhaustiveness over `Option` and `Result`.**
+  `match x { Some(y) => .. }` passes `pw check`. The backend refuses to
+  compile it ("does not cover every case"), so no component misses an arm,
+  but the checker should report it first.
+- **Interpolated attribute strings do not render.** `href="/stores/{id}"` is
+  read by the route checker, but the template IR has no part for it and blocks
+  the render, naming `href={value}` as the form that renders.
+- **The standard library's list functions are signatures.** `List.map`,
+  `fold`, `filter` and `length` have stub bodies, and there are no string
+  functions. Pleris programs type-check against them and cannot compute with
+  them.
 
 **Resumable handler bodies are compiled** (2026-09-25, ADR-0033), to one ES
 module each, and the page's elements carry what the handlers read. The set is
