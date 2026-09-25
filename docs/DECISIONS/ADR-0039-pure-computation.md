@@ -130,3 +130,12 @@ one.
 - The differential oracle compares every compiled pure declaration with an
   independent Rust reference over generated inputs, and the Koka oracle
   compares them with Koka where Koka and Pleris both produce a value.
+
+Recorded at `dad1201` in [pure.txt](../evidence/E10/pure.txt) by
+`just e10-pure`:
+- 11 tests against exact `i128` references: every operator's value, or a
+  trap where the reference has no 64-bit value;
+- 9 functions × 240 inputs against Koka 3.2.3: 1,620 values identical to
+  Koka's, 530 traps where an intermediate result did not fit, 10 zero
+  divisors (Koka answered 0 and the dividend);
+- 16 of 16 mutants killed, each by failing tests.
