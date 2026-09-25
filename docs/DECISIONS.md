@@ -182,3 +182,12 @@ body, placeholder, or refused. A `todo` placeholder fails the build only when
 something depends on it (ruling needed). The gate's evidence runs the build
 with neither Koka nor Node on the PATH.
 
+## 2026-09-25: bounded subscribers (E10 gate item 3)
+
+[ADR-0035](DECISIONS/ADR-0035-bounded-subscribers.md): a consumed outbox event
+is deleted. A subscriber holds at most 256 frames, and past that gets one
+`Recovery::Reload`. One that has not asked for 120 s is forgotten, with its
+cached cart fragment, and its next poll is told to reload. A served document's
+cursor is never zero, and the runtime reloads on `Reload`. Measured before:
+3,000 retained events, 600,000 frames, 1,001 entries.
+

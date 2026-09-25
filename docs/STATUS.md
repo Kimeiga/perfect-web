@@ -53,6 +53,17 @@ before integration; the baseline pass is not a substitute.
 
 ## completed gate items
 
+- **2026-09-25: E10 gate item 3, sustained load (ADR-0035).**
+  - Measured first, with no bound in place: 3,000 commands left 3,000 consumed
+    events in the outbox. 1,000 departed visitors and 300 menu changes left
+    600,000 queued frames and 1,001 materialized entries.
+  - Now: 0 events, one `Recovery::Reload` per departed visitor, and nothing
+    held once they have been idle 120 s.
+  - The runtime acts on `Reload`; it had only logged it.
+  - 20,000 compiled `add_to_cart` calls through the host left resident memory
+    flat (24 µs per call in release).
+  - Evidence: [load-2026-09-25.md](evidence/E10/load-2026-09-25.md).
+
 - **2026-09-25: E10 gate item 1, the store builds from source (ADR-0034).**
   - `pw build` writes every artifact of a checked program:
     - the template IR;
@@ -232,6 +243,7 @@ just e10-component
 just e10-i
 just e10-handlers
 just e10-build
+just e10-load
 just e10-browser chromium
 just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
 just e9-values

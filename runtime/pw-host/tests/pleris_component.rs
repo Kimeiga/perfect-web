@@ -381,3 +381,73 @@ fn arguments_for_an_export_the_component_does_not_have_are_refused() {
         .expect_err("no such instance");
     assert!(err.contains("exports no instance"), "{err}");
 }
+
+// --- E10 gate item 3: sustained load --------------------------------------
+
+/// The process's resident set, in KiB, as `ps` reports it on macOS and Linux.
+fn resident_kib() -> u64 {
+    let out = std::process::Command::new("ps")
+        .args(["-o", "rss=", "-p", &std::process::id().to_string()])
+        .output()
+        .expect("ps runs");
+    String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .parse()
+        .expect("ps prints a number")
+}
+
+/// **20,000 calls leave the host's memory where 1,000 left it.**
+///
+/// Each call admits the component, builds a linker from that call's `Granted`,
+/// instantiates it in a fresh store with its own limits, runs it and drops it:
+/// what the development server does per request. A leak anywhere in that path
+/// (a store kept alive, a linker cached per grant, an allocation in the
+/// invocation region that the post-return never resets) grows with the number
+/// of calls. The bound is 16 MiB over 19,000 calls, under a kilobyte a call,
+/// and the measured growth is printed beside it.
+#[test]
+fn sustained_calls_leave_memory_flat() {
+    let c = contract();
+    let bytes = component();
+    let prepared = engine::Prepared::compile(&bytes).expect("compiles");
+    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let [interface, function] = export(&c);
+    let returned = Val::Result(Ok(Some(Box::new(cart("cortado", 2)))));
+    let calls: Calls = Arc::default();
+    let ops = host(&calls, returned.clone());
+    let call = |n: i64| {
+        let out = prepared
+            .call_within(
+                &c,
+                &granted,
+                &limits(),
+                &ops,
+                &[&interface, &function],
+                &[Val::String(format!("item-{n}")), Val::S64(n)],
+            )
+            .expect("runs");
+        assert_eq!(out, vec![returned.clone()]);
+    };
+
+    for n in 0..1_000 {
+        call(n);
+    }
+    calls.lock().unwrap().clear();
+    let warm = resident_kib();
+    let started = std::time::Instant::now();
+    for n in 0..19_000 {
+        call(n);
+        if n % 1_000 == 0 {
+            calls.lock().unwrap().clear();
+        }
+    }
+    let elapsed = started.elapsed();
+    let after = resident_kib();
+    let grown = after.saturating_sub(warm);
+    println!(
+        "sustained: 19000 calls after 1000 warm-up -> resident {warm} KiB -> {after} KiB \
+         (+{grown} KiB), {:.1} µs per call",
+        elapsed.as_secs_f64() * 1e6 / 19_000.0
+    );
+    assert!(grown < 16 * 1024, "grew {grown} KiB over 19,000 calls");
+}

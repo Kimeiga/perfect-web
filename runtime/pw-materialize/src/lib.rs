@@ -324,10 +324,9 @@ impl Materializer {
                  value TEXT NOT NULL
              );
              CREATE TABLE outbox (
-                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                 event       TEXT NOT NULL,
-                 args        TEXT NOT NULL,
-                 consumed_at INTEGER
+                 id    INTEGER PRIMARY KEY AUTOINCREMENT,
+                 event TEXT NOT NULL,
+                 args  TEXT NOT NULL
              );",
         )
         .expect("schema");
@@ -425,7 +424,7 @@ impl Materializer {
         let mut ids = Vec::new();
         for ev in &events {
             tx.execute(
-                "INSERT INTO outbox (event, args, consumed_at) VALUES (?1, ?2, NULL)",
+                "INSERT INTO outbox (event, args) VALUES (?1, ?2)",
                 params![ev.name, ev.args.join("\u{1}")],
             )
             .expect("insert outbox");
@@ -466,11 +465,37 @@ impl Materializer {
         .ok()
     }
 
+    /// Drop an entry. The next reader finds it `Missing` and regenerates it
+    /// from state, so this frees memory and loses nothing: what a host does
+    /// for a reader it has forgotten.
+    pub fn evict(&self, key: &EntryKey) -> bool {
+        self.entries
+            .lock()
+            .expect("entries")
+            .remove(&self.physical(key))
+            .is_some()
+    }
+
+    /// How many materialized entries are held: what a sustained load
+    /// measures beside the outbox.
+    pub fn entry_count(&self) -> usize {
+        self.entries.lock().expect("entries").len()
+    }
+
+    /// How many events the outbox holds: committed and not yet consumed. What
+    /// a sustained load measures, because an event kept after it was consumed
+    /// is memory nothing reads again.
+    pub fn retained_events(&self) -> usize {
+        let db = self.db();
+        db.query_row("SELECT COUNT(*) FROM outbox", [], |r| r.get::<_, i64>(0))
+            .expect("count") as usize
+    }
+
     /// Events committed and not yet consumed, oldest first.
     pub fn pending(&self) -> Vec<Committed> {
         let db = self.db();
         let mut stmt = db
-            .prepare("SELECT id, event, args FROM outbox WHERE consumed_at IS NULL ORDER BY id")
+            .prepare("SELECT id, event, args FROM outbox ORDER BY id")
             .expect("prepare");
         let rows = stmt
             .query_map([], |r| {
@@ -491,13 +516,15 @@ impl Materializer {
         rows.map(|r| r.expect("row")).collect()
     }
 
+    /// A consumed event is deleted. Until 2026-09-25 it was marked with a
+    /// `consumed_at` nothing ever read, and the outbox kept every event ever
+    /// committed: 3,000 rows after 3,000 commands, all consumed (E10 gate item
+    /// 3, `docs/evidence/E10/load.txt`). `AUTOINCREMENT` keeps a deleted id
+    /// from being reused, so the order `pending` reads is still commit order.
     fn consume(&self, id: i64) {
         let db = self.db();
-        db.execute(
-            "UPDATE outbox SET consumed_at = ?2 WHERE id = ?1",
-            params![id, self.clock.now() as i64],
-        )
-        .expect("consume");
+        db.execute("DELETE FROM outbox WHERE id = ?1", params![id])
+            .expect("consume");
     }
 
     /// Read an entry, following the fragment's declared fallback policy.

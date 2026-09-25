@@ -652,6 +652,16 @@ function applyFrame(frame) {
     case "recovery":
       // Never "try anyway".
       log.push(`recovery: ${JSON.stringify(frame.recovery)}`);
+      // A reload is the one recovery the page performs by itself. The server
+      // sends it when it can no longer say what this document missed: the
+      // subscriber fell too far behind, or was forgotten while idle (E10 gate
+      // item 3). Applying later frames to this document would be exactly
+      // "try anyway"; a fresh document comes with a fresh queue. Once, so a
+      // second reload frame in the same batch does not queue a second one.
+      if (frame.recovery?.recovery === "reload" && !window.__pw.reloading) {
+        window.__pw.reloading = true;
+        location.reload();
+      }
       return;
 
     default:

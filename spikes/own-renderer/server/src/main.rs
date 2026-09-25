@@ -76,7 +76,18 @@ use pw_resource::{DevelopmentIdentityKey, EntryIdentity};
 /// sequence number; a subscriber asks for everything after the last sequence
 /// it APPLIED; and the server drops a frame only once a later request proves
 /// the client got past it. Writing to a dead socket now loses nothing.
-#[derive(Default)]
+///
+/// # Why a subscriber is bounded, and forgotten
+///
+/// A frame leaves the queue only when the subscriber acknowledges it, and a
+/// menu change is pushed to every subscriber. So a visitor who closed the tab
+/// kept every later change forever: 1,000 visitors and 300 menu changes held
+/// 600,000 frames (`docs/evidence/E10/load.txt`). A queue now holds at most
+/// [`MAX_WAITING`] frames. A subscriber that falls further behind gets one
+/// `Recovery::Reload` instead, the protocol's answer to "this document cannot
+/// continue", and nothing more until it is re-rendered. A subscriber that has
+/// not asked for [`IDLE`] is forgotten, and if it asks again it is told to
+/// reload, because what it missed can no longer be said.
 struct Subscriber {
     /// The last sequence assigned. Sequences start at ONE, so that the
     /// initial cursor — zero, meaning "nothing acknowledged yet" — is smaller
@@ -84,13 +95,83 @@ struct Subscriber {
     /// subscriber ever received was numbered zero, `since=0` read it as
     /// already acknowledged, and it was never delivered. It cost a real
     /// invalidation and looked like a transport that simply had nothing to say.
+    ///
+    /// Serving a document takes a sequence number too, so a served page's
+    /// cursor is never zero. A poll with a nonzero cursor from a subscriber
+    /// the server has forgotten is then known to be a page that missed
+    /// frames, never mistaken for a new one.
     last_seq: u64,
     frames: Vec<(u64, StreamFrame)>,
+    /// When it last asked for frames or was served a document.
+    seen: std::time::Instant,
+    /// It fell more than [`MAX_WAITING`] frames behind: its queue is one
+    /// `Recovery::Reload`, and further frames are dropped until it is
+    /// re-rendered.
+    behind: bool,
+}
+
+impl Default for Subscriber {
+    fn default() -> Subscriber {
+        Subscriber {
+            last_seq: 0,
+            frames: Vec::new(),
+            seen: std::time::Instant::now(),
+            behind: false,
+        }
+    }
+}
+
+/// The most frames one subscriber may have waiting.
+const MAX_WAITING: usize = 256;
+
+/// How long a subscriber may go without asking before it is forgotten. The
+/// long poll holds for one second and the stream for two, so a live page asks
+/// far more often than this.
+const IDLE: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// `{"cursor":..,"frames":[reload]}`: the batch a forgotten subscriber gets.
+fn reload_batch(cursor: u64) -> String {
+    let frame = StreamFrame::Recovery {
+        protocol: CURRENT,
+        recovery: pw_protocol::Recovery::Reload,
+    };
+    format!(
+        "{{\"cursor\":{cursor},\"frames\":[{}]}}",
+        serde_json::to_string(&frame).expect("frame")
+    )
+}
+
+/// Forget every subscriber that has not asked for [`IDLE`], and say which.
+fn forget_idle(queue: &mut BTreeMap<String, Subscriber>, now: std::time::Instant) -> Vec<String> {
+    let idle: Vec<String> = queue
+        .iter()
+        .filter(|(_, w)| now.saturating_duration_since(w.seen) >= IDLE)
+        .map(|(session, _)| session.clone())
+        .collect();
+    for session in &idle {
+        queue.remove(session);
+    }
+    idle
 }
 
 impl Subscriber {
     fn push(&mut self, frame: StreamFrame) {
+        if self.behind {
+            return;
+        }
         self.last_seq += 1;
+        if self.frames.len() >= MAX_WAITING {
+            self.frames.clear();
+            self.frames.push((
+                self.last_seq,
+                StreamFrame::Recovery {
+                    protocol: CURRENT,
+                    recovery: pw_protocol::Recovery::Reload,
+                },
+            ));
+            self.behind = true;
+            return;
+        }
         self.frames.push((self.last_seq, frame));
     }
 
@@ -597,6 +678,25 @@ impl Server {
         ])
     }
 
+    /// **Forget the subscribers that stopped asking, and what was kept for
+    /// them.** Their queues go, and so do their sessions' materialized cart
+    /// entries: a returning page is served a new document, and `drain`
+    /// regenerates a missing entry from state. 1,000 departed visitors had
+    /// kept 1,001 entries (`docs/evidence/E10/load.txt`).
+    ///
+    /// In its own short hold of the subscriber table, released before any
+    /// entry is evicted: `drain` takes the materializer and then the table,
+    /// so evicting while holding the table would take them the other way.
+    fn forget_idle_subscribers(&self) {
+        let forgotten = {
+            let mut queue = self.pending.lock().expect("pending");
+            forget_idle(&mut queue, std::time::Instant::now())
+        };
+        for session in forgotten {
+            self.materializer.evict(&self.cart_key(&session));
+        }
+    }
+
     /// Consume committed events and regenerate what they invalidate.
     fn drain(&self, session: &str) {
         let key = self.cart_key(session);
@@ -796,6 +896,9 @@ impl Server {
     /// alternative — one shared token — is the public-fragment case, and it is
     /// a different partition rather than a shortcut for this one.
     fn broadcast_menu(&self, op: MenuOp) -> Result<(), String> {
+        // A departed visitor is forgotten before the fan-out, so a change is
+        // not queued for pages nobody is reading.
+        self.forget_idle_subscribers();
         // The subscriber table is taken FIRST and held throughout.
         //
         // It is what serializes a change against a document being served: a
@@ -880,9 +983,14 @@ impl Server {
     /// page does not ask for frames the reload already made meaningless.
     fn serve_document(&self, session: &str) -> (String, u64) {
         self.drain(session);
+        self.forget_idle_subscribers();
         let mut queue = self.pending.lock().expect("pending");
         let waiting = queue.entry(session.to_string()).or_default();
         waiting.frames.clear();
+        waiting.behind = false;
+        waiting.seen = std::time::Instant::now();
+        // The document takes a sequence number, so its cursor is never zero.
+        waiting.last_seq += 1;
         let cursor = waiting.last_seq;
         // Rendered while the table is held, so a change cannot land between
         // the clear and the render and be lost by it.
@@ -1606,12 +1714,26 @@ fn stream_open(
         return;
     }
 
+    // A page with a cursor the server has no subscriber for was forgotten
+    // while idle: what it missed cannot be said, so it is told to reload.
+    if since > 0
+        && !server
+            .pending
+            .lock()
+            .expect("pending")
+            .contains_key(session)
+    {
+        let _ = stream.write_all(format!("{}\n", reload_batch(since)).as_bytes());
+        return;
+    }
+
     // Bounded, like the long poll: a held connection is a held thread, and
     // three engine families times six workers is eighteen of them.
     for _ in 0..80 {
         let batch = {
             let mut queue = server.pending.lock().expect("pending");
             let waiting = queue.entry(session.to_string()).or_default();
+            waiting.seen = std::time::Instant::now();
             waiting.acknowledge(since);
             let (cursor, frames) = waiting.after(since);
             if frames.is_empty() {
@@ -1665,10 +1787,23 @@ fn stream_frames(
         return;
     }
 
+    // Forgotten while idle: see `stream_open`.
+    if since > 0
+        && !server
+            .pending
+            .lock()
+            .expect("pending")
+            .contains_key(session)
+    {
+        respond_json(stream, 200, session, fresh, &reload_batch(since));
+        return;
+    }
+
     for _ in 0..40 {
         {
             let mut queue = server.pending.lock().expect("pending");
             let waiting = queue.entry(session.to_string()).or_default();
+            waiting.seen = std::time::Instant::now();
             // This request is the client's acknowledgement of everything up to
             // `since`: it applied those frames and asked for what follows.
             waiting.acknowledge(since);
@@ -2077,6 +2212,169 @@ mod tests {
             .expect_err("a barren node cannot host a write");
         assert!(err.contains("clear_cart"), "{err}");
         assert_eq!(barren.cart_value("session-1"), 0);
+    }
+
+    /// Everything the server holds per subscriber, summed: frames not yet
+    /// acknowledged, and subscribers.
+    fn held(s: &Server) -> (usize, usize) {
+        let queue = s.pending.lock().unwrap();
+        (queue.values().map(|w| w.frames.len()).sum(), queue.len())
+    }
+
+    /// **Under sustained load, what the server holds stays bounded** (E10
+    /// gate item 3). Each number below was measured before the bound existed,
+    /// and is in `docs/evidence/E10/load.txt`: 3,000 outbox rows after 3,000
+    /// commands, and 600,000 frames for 1,000 departed visitors.
+    #[test]
+    fn sustained_load_leaves_the_server_bounded() {
+        // One session with a subscriber that applies every batch.
+        let s = rendering_server();
+        s.serve_document("steady");
+        for _ in 0..3_000 {
+            s.command(ADD, "steady", &add("espresso", 1), false)
+                .expect("runs");
+            let mut queue = s.pending.lock().unwrap();
+            let w = queue.get_mut("steady").unwrap();
+            let last = w.last_seq;
+            w.acknowledge(last);
+        }
+        let (frames, subscribers) = held(&s);
+        let rows = s.materializer.retained_events();
+        println!(
+            "steady: 3000 commands -> frames {frames}, subscribers {subscribers}, outbox rows {rows}"
+        );
+        assert_eq!((frames, subscribers, rows), (0, 1, 0));
+        assert_eq!(s.cart_value("steady"), 3_000, "and every command committed");
+
+        // Visitors who load the page once and leave, then changes to the menu.
+        let s = rendering_server();
+        for i in 0..1_000 {
+            s.serve_document(&format!("visitor-{i}"));
+        }
+        for i in 0..300 {
+            let name = if i % 2 == 0 { "Gibraltar" } else { "Cortado" };
+            s.broadcast_menu(MenuOp::Rename {
+                id: "cortado".into(),
+                name: name.into(),
+            })
+            .expect("renames");
+        }
+        let (frames, subscribers) = held(&s);
+        println!(
+            "churn: 1000 visitors, 300 menu changes -> frames {frames}, subscribers {subscribers}, \
+             materialized entries {}",
+            s.materializer.entry_count()
+        );
+        assert_eq!(subscribers, 1_000, "none idle yet");
+        assert_eq!(frames, 1_000, "one reload each: every visitor fell behind");
+        for w in s.pending.lock().unwrap().values() {
+            assert!(w.behind);
+            assert!(matches!(
+                w.frames.as_slice(),
+                [(
+                    _,
+                    StreamFrame::Recovery {
+                        recovery: pw_protocol::Recovery::Reload,
+                        ..
+                    }
+                )]
+            ));
+        }
+
+        // Past the idle limit, the next change forgets them all.
+        let long_ago = std::time::Instant::now() - IDLE - std::time::Duration::from_secs(1);
+        for w in s.pending.lock().unwrap().values_mut() {
+            w.seen = long_ago;
+        }
+        s.broadcast_menu(MenuOp::Rename {
+            id: "cortado".into(),
+            name: "Cortado".into(),
+        })
+        .expect("renames");
+        let (frames, subscribers) = held(&s);
+        let entries = s.materializer.entry_count();
+        println!(
+            "idle: after {}s -> frames {frames}, subscribers {subscribers}, materialized entries {entries}",
+            IDLE.as_secs()
+        );
+        assert_eq!((frames, subscribers), (0, 0));
+        assert_eq!(entries, 1, "the shared menu, and no visitor's cart");
+
+        // A visitor who comes back is served a whole document: their cart
+        // entry is regenerated from state, not lost.
+        s.command(ADD, "visitor-7", &add("espresso", 2), false)
+            .expect("runs");
+        let (html, cursor) = s.serve_document("visitor-7");
+        assert!(cursor > 0);
+        assert!(html.contains(">2<"), "the returning visitor's cart: {html}");
+    }
+
+    /// **A queue that reaches its bound becomes one reload, and stays one.**
+    #[test]
+    fn a_subscriber_that_falls_behind_is_told_to_reload() {
+        let mut w = Subscriber::default();
+        let notice = |n: u64| StreamFrame::ResourceChanged {
+            protocol: CURRENT,
+            entry: cart_entry(&format!("session-{n}")),
+            version: Version(n),
+        };
+        for n in 0..MAX_WAITING as u64 {
+            w.push(notice(n));
+        }
+        assert_eq!(w.frames.len(), MAX_WAITING, "at the bound, not past it");
+        assert!(!w.behind);
+        w.push(notice(999));
+        w.push(notice(1000));
+        assert!(w.behind);
+        assert_eq!(w.frames.len(), 1);
+        let (cursor, frames) = w.after(0);
+        assert!(matches!(
+            frames.as_slice(),
+            [StreamFrame::Recovery {
+                recovery: pw_protocol::Recovery::Reload,
+                ..
+            }]
+        ));
+        assert_eq!(
+            cursor,
+            MAX_WAITING as u64 + 1,
+            "the reload took the next sequence"
+        );
+    }
+
+    /// **A page the server has forgotten is told to reload**, through the
+    /// real route: a poll with a cursor for a session with no subscriber.
+    #[test]
+    fn a_forgotten_page_that_polls_is_told_to_reload() {
+        let s = server(dev_topology());
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let at = listener.local_addr().expect("addr");
+        let poll = |since: u64| -> String {
+            std::thread::scope(|scope| {
+                scope.spawn(|| {
+                    let (stream, _) = listener.accept().expect("accept");
+                    handle(&s, stream);
+                });
+                let mut c = TcpStream::connect(at).expect("connect");
+                write!(
+                    c,
+                    "GET /stream?since={since} HTTP/1.1\r\ncookie: pw-session=gone\r\n\r\n"
+                )
+                .expect("request");
+                let mut out = String::new();
+                c.read_to_string(&mut out).expect("response");
+                out
+            })
+        };
+        let reply = poll(7);
+        println!("{}", reply.lines().last().unwrap_or_default());
+        assert!(reply.contains(r#""recovery":"reload""#), "{reply}");
+
+        // The control: a page that has never been served a document, cursor
+        // zero, is subscribed rather than told to reload.
+        let reply = poll(0);
+        assert!(!reply.contains("recovery"), "{reply}");
+        assert!(s.pending.lock().unwrap().contains_key("gone"));
     }
 
     /// A component the build has no contract for is refused, not run.

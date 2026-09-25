@@ -425,6 +425,32 @@ e10-build:
      } > docs/evidence/E10/build.txt
     @cat docs/evidence/E10/build.txt
 
+# The development server under sustained commands and session churn: frames
+# held, subscribers, outbox rows and materialized entries, each bounded. The
+# compiled command called 20,000 times through the E8 host, with resident memory
+# measured before and after. The numbers before the bound existed are in
+# docs/evidence/E10/load-2026-09-25.md.
+#
+# E10 gate item 3 — memory leaks and unbounded resource growth under sustained load.
+e10-load:
+    @{ echo "E10 gate item 3 - sustained load"; echo; \
+       echo "produced by: just e10-load"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the development server (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "^(steady|churn|idle): .*|\{\"cursor\".*|^test tests::(sustained|a_subscriber|a_forgotten)[a-z_]* .*|^test result.*"; \
+       echo; echo "== the compiled command through the E8 host (runtime/pw-host/tests/pleris_component.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test pleris_component sustained -- --nocapture 2>&1 \
+         | grep -oE "^sustained: .*|^test result.*"; \
+       echo; \
+       echo "NOT CLAIMED: per-session DATA is bounded. A cart is the store's data and"; \
+       echo "is kept; what is bounded is what the server holds FOR a subscriber (its"; \
+       echo "frames, its queue, its cached fragment) and what it keeps AFTER use (the"; \
+       echo "outbox)."; \
+     } > docs/evidence/E10/load.txt
+    @cat docs/evidence/E10/load.txt
+
 # Writes the store's modules as `pw emit-handlers` emits them to
 # `docs/evidence/E10/handlers/`, held there by `evidence_is_current`, and
 # records the refusal matrix, the renderer carrying exactly the paths a handler
