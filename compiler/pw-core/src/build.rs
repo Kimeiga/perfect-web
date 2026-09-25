@@ -31,6 +31,9 @@ pub struct Build {
     /// Each contract, in contract order: a component, a declaration with no
     /// component body, or a refusal.
     pub components: Vec<(String, Built)>,
+    /// Each query that reaches no host, as an ES module (ADR-0044), by
+    /// component id.
+    pub modules: Vec<(String, String)>,
     pub contracts: Vec<crate::contract::ComponentContract>,
     pub wit: String,
 }
@@ -90,6 +93,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
     // refuse an unchecked program, through `lower::Checked`.
     let handlers = js::compile(units)?;
     let components = crate::backend::component::compile_all(units)?;
+    let modules = crate::backend::js_pure::modules(units)?;
 
     let hirs: Vec<&crate::hir::Hir> = units.iter().map(|u| &u.hir).collect();
     let ws = crate::resolve::Workspace::build(&hirs);
@@ -104,6 +108,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         templates,
         handlers,
         components,
+        modules,
         contracts,
         wit,
     })

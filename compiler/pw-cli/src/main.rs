@@ -1011,6 +1011,8 @@ fn audit_values_command(paths: &[&String]) -> ExitCode {
 /// DIR/templates.json            the template IR, with handler identities
 /// DIR/handlers/<identity>.mjs   each resumable handler's compiled body
 /// DIR/components/<id>.wasm      each command and query, audited
+/// DIR/modules/<id>.mjs          each query that reaches no host, as an ES
+///                               module (ADR-0044)
 /// DIR/contracts.json            what the host admits each component by
 /// DIR/app.wit                   the worlds the components implement
 /// ```
@@ -1108,6 +1110,10 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
                 }
                 pw_core::backend::component::Built::Refused(_) => {}
             }
+        }
+        for (id, source) in &build.modules {
+            write(&format!("modules/{id}.mjs"), source.as_bytes())?;
+            lines.push(format!("  module     {id}  {} bytes", source.len()));
         }
         Ok(())
     })();

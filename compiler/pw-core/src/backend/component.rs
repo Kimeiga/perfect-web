@@ -413,6 +413,63 @@ fn with_program<R>(
     })
 }
 
+/// **The lowered function a component id names**, and the program it is in,
+/// for a second encoder of the same IR (ADR-0044). The same preparation
+/// [`compile`] makes, so the two backends cannot lower one declaration
+/// differently.
+pub(crate) fn lowered<R>(
+    units: &[crate::check::Unit],
+    component_id: &str,
+    f: impl FnOnce(&super::ir::Function, &super::ir::Program) -> Result<R, String>,
+) -> Result<R, String> {
+    with_program(units, |p| {
+        let (_, world) = p
+            .worlds
+            .iter()
+            .find(|(c, _)| c.component_id == component_id)
+            .ok_or_else(|| format!("no component `{component_id}` in this program"))?;
+        let function = p
+            .lowered
+            .functions
+            .iter()
+            .find(|f| f.def == world.declaration)
+            .ok_or_else(|| {
+                format!(
+                    "`{component_id}` did not lower: {}",
+                    p.refused(world.declaration)
+                )
+            })?;
+        f(function, p.lowered)
+    })
+}
+
+/// Every query that reaches no host, by component id, with its lowered
+/// function: what a second encoder can compile as pure computation
+/// (ADR-0044). One preparation for all of them.
+pub(crate) fn pure_queries<R>(
+    units: &[crate::check::Unit],
+    f: impl FnOnce(&[(String, &super::ir::Function)], &super::ir::Program) -> Result<R, String>,
+) -> Result<R, String> {
+    with_program(units, |p| {
+        let mut pure = Vec::new();
+        for (contract, world) in &p.worlds {
+            let query = crate::resolve::declaration(p.hirs, world.declaration)
+                .is_some_and(|d| d.kind == crate::hir::DeclKind::Query);
+            if let Some(function) = p
+                .lowered
+                .functions
+                .iter()
+                .find(|f| f.def == world.declaration)
+                && query
+                && function.capabilities.is_empty()
+            {
+                pure.push((contract.component_id.clone(), function));
+            }
+        }
+        f(&pure, p.lowered)
+    })
+}
+
 /// **Compile one component of a program, end to end.**
 ///
 /// The one path the CLI, the tests and the development server share, so no

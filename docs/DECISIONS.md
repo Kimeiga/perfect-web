@@ -262,3 +262,10 @@ and an `if`'s condition, are related to the types they take (PW0609), so
 `1 == "a"` no longer checks. `Float.from_int` converts a count. Building it
 found two accepted fixtures dividing a `Float` by an `Int`, which ADR-0039 §2
 refuses.
+
+[ADR-0044](DECISIONS/ADR-0044-pure-computation-in-javascript.md): a query
+that reaches no host also compiles to an ES module, from the same backend IR
+as its component. Every place JavaScript's semantics differ from Pleris's
+(BigInt, Euclidean division, code point order, White_Space) is encoded
+explicitly. The two backends agree on 6,800 generated calls under Node,
+kiokun's shard rule among them.

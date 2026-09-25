@@ -562,6 +562,26 @@ e10-kiokun:
      } > docs/evidence/E10/kiokun.txt
     @cat docs/evidence/E10/kiokun.txt
 
+# ADR-0044: pure computation compiled to JavaScript modules, held to its Wasm
+# component under Node, with the mutation controls. Needs `node`.
+#
+# E10 task 2 — "generated modern JavaScript modules for ... pure computation".
+e10-javascript:
+    @{ echo "ADR-0044 - pure computation as JavaScript modules, against the components"; echo; \
+       echo "produced by: just e10-javascript"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the component and the module, on the same arguments"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: .*|^test result.*"; \
+       echo; echo "== mutation controls (scripts/javascript_mutations.py)"; echo; \
+       python3 scripts/javascript_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a handler that computes, Wasm in the browser, or the modules"; \
+       echo "in a browser engine. They run under Node."; \
+     } > docs/evidence/E10/javascript.txt
+    @grep -E "^javascript:|mutants killed" docs/evidence/E10/javascript.txt
+
 # ADR-0043: an operator's operands and an `if`'s condition typed (PW0609), and
 # `Float.from_int`, with the mutation controls.
 #

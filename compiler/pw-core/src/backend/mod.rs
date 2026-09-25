@@ -47,6 +47,7 @@
 pub mod component;
 pub mod ir;
 pub mod js;
+pub mod js_pure;
 pub mod lower;
 pub mod wasm;
 

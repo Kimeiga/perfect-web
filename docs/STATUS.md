@@ -10,7 +10,8 @@ change below.
 **Current milestone:** E10. **All five gate items have recorded evidence as
 of 2026-09-25** (see below). Closing E10 is left to the architect's review, with
 these charter tasks not done:
-- task 2's Wasm for compute-heavy modules;
+- task 2's Wasm for compute-heavy modules in the browser (its JavaScript
+  modules for pure computation are ADR-0044's);
 - task 4's evaluation of memory strategies;
 - task 7's affine annotations beyond effect rows.
 
@@ -102,6 +103,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0044: a module's values: `BigInt` for `Int`, objects keyed by Pleris
+  field names, and `{ $case, value }` for `Option` and `Result`.
 - ADR-0043: `Float.from_int` names the `Int` to `Float` conversion; there is
   no implicit one.
 - ADR-0042: `{#match e}{:Some(x)} .. {:None} .. {/match}` is the template
@@ -148,6 +151,15 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: E10 task 2, pure computation as JavaScript modules
+  (ADR-0044).** A query that reaches no host compiles to an ES module from
+  the component's own IR. The module and the component agree on 6,800
+  generated calls under Node, kiokun's shard rule among them, and ten mutants
+  that each restore one of JavaScript's own semantics are caught. `pw build`
+  writes the modules. A handler that computes, and Wasm in the browser, are
+  not done. Evidence: `docs/evidence/E10/javascript.txt`
+  (`just e10-javascript`).
 
 - **2026-09-25: operands are typed (ADR-0043).** Not a gate item; the checker
   gap KNOWN_LIMITATIONS named. PW0609 relates operands and conditions to the
