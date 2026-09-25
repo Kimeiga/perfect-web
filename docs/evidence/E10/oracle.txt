@@ -1,7 +1,7 @@
 E10 gate item 2 - compiled semantics against a reference
 
 produced by: just e10-oracle
-commit: 86034d5bed75bac87c431531bd81c3f5c210343e
+commit: f08672bc5e876a4b7e162b09f1a9a9b70ed69ced
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the differential oracle (compiler/pw-conformance/tests/oracle.rs)
@@ -14,19 +14,19 @@ oracle: store.page.clear_cart: 300 generated cases, the component and the refere
 oracle: store.page.Cart: 300 generated cases, the component and the reference agree
 oracle: store.page.Menu: 300 generated cases, the component and the reference agree
 oracle: store.page.Store: 300 generated cases, the component and the reference agree
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
 
 == matches, fields and variants, run (compiler/pw-conformance/tests/variants.rs)
 
 test a_match_over_a_list_is_refused_by_name ... m.Q: `m.Q` did not lower: the backend does not lower a match over something other than `Option` or `Result` yet: the scrutinee's type is List(Str)
-test a_match_that_misses_a_case_is_refused ... m.Q: `m.Q` did not lower: the backend does not lower a match that does not cover every case yet: 1 of 2 cases have arms, and a missing case would have no code
+test a_match_that_misses_a_case_is_refused ... m.Q: the program does not check, so nothing is compiled: [PW0305] match on `Option<String>` is not exhaustive
 test a_missing_word_is_none ... ok
 test a_nested_pattern_is_refused_by_name ... m.Q: `m.Q` did not lower: the backend does not lower a nested pattern yet: `Some(..)` binds a name or `_` here
 test a_stub_is_followed_to_the_entry_it_names ... 地図 -> [Option(Some(Record([("key", String("地圖")), ("redirect", Option(None)), ("gloss", String("map"))])))]
 test a_stub_whose_target_is_missing_is_none ... ok
 test an_entry_is_returned_as_itself ... 人 -> [Option(Some(Record([("key", String("人")), ("redirect", Option(None)), ("gloss", String("person; people"))])))]
 test strings_survive_every_path_intact ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
 
 NOT CLAIMED: the references are Rust statements of each declaration's
 meaning, written from the source. Koka is the oracle for effects (E9-K)

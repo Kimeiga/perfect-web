@@ -117,3 +117,7 @@ should be).** It would replace the two-statement reading in every consumer.
 - `pw-syntax`: `return` holds the value on its line, in an arm and in a block;
   an arm without `=>` is reported.
 - The kiokun slice's two matches in `Lookup` are Proven.
+- **Mutation controls: 14 of 14 killed**, each by failing tests, none by a
+  failed build. `scripts/match_mutations.py` undoes each fix above in turn.
+  Evidence: [match.txt](../evidence/E10/match.txt), `just e10-match`, at
+  `f08672b`.

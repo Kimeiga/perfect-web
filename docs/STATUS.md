@@ -55,6 +55,12 @@ reject an incomplete match whatever the effect row.
   lacks is the new PW0608. What the analysis still cannot read (a literal, a
   pattern nested under `Some`) blocks it, with the reason, and is never proven
   (KNOWN_LIMITATIONS).
+- Mutation controls: 14 of 14 killed. Each of the 14 pieces of the fix,
+  undone in turn, fails the tests ([match.txt](evidence/E10/match.txt),
+  `just e10-match`). The E9
+  evidence and the E10 oracle were re-recorded at the same commit, `f08672b`:
+  E9's counts and its 10 of 10 mutants are unchanged, and the oracle's missing
+  case is now the checker's refusal.
 
 Decisions awaiting a ruling:
 - ADR-0038: a bare pattern name is a constructor whenever some type has one of
@@ -66,6 +72,9 @@ Decisions awaiting a ruling:
   metadata, not identity markup.
 - ADR-0033 / A-023: a string literal has a value only where no escape rule is
   involved, until the language defines escapes.
+- ADR-0034 §3: a placeholder is not a refusal until something depends on it.
+- ADR-0037 §3: kiokun's share-alike data (CC-CEDICT, JMdict, Tatoeba) lives in
+  this repository, attributed; the alternative is to keep only the script.
 
 ADR-0032's other ruling-needed item, the handler sending the pressed loop
 instance, is superseded by ADR-0033.
