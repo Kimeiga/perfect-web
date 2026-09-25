@@ -1,0 +1,40 @@
+ADR-0045 - affine values consumed exactly once, on every path
+
+produced by: just e10-affine
+commit: 29b662827515622855b5983c792fadb0f8039572
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== each witness (examples/generality/affine_not_consumed_once)
+
+both-branches-release.pw                 NEIGHBOUR  
+caught-match.pw                          GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
+caught.pw                                GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
+derived-value-escapes.pw                 NEIGHBOUR  
+escapes.pw                               GENERAL    [PW2005] affine resource `handle: MapHandle` escapes the scope that acquired it
+live-across-try.pw                       GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
+moved-to-the-caller.pw                   NEIGHBOUR  
+never-released.pw                        GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
+parameter-not-released.pw                GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
+parameter-released.pw                    NEIGHBOUR  
+released-before-return.pw                NEIGHBOUR  
+released-in-a-loop.pw                    GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is released inside a loop or a function value, which may run any number of times
+released-twice.pw                        GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is released twice on one path
+
+== the generality suite
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.61s
+
+== mutation controls (scripts/affine_mutations.py)
+
+baseline: 13 passed, 0 failed
+the end of a scope is not an exit: KILLED (1 of 13 tests fail)
+a failing `?` is not an exit: KILLED (1 of 13 tests fail)
+a second release is not counted: KILLED (1 of 13 tests fail)
+a release in a loop counts once: KILLED (1 of 13 tests fail)
+a parameter the declaration promises to release is not followed: KILLED (1 of 13 tests fail)
+the body's value does not move the resource to the caller: KILLED (1 of 13 tests fail)
+a use binding is held to explicit releases: KILLED (1 of 13 tests fail)
+7 of 7 mutants killed
+
+NOT CLAIMED: a borrow. Passing a value to a function whose row does not
+release it is a use; Pleris has no borrow syntax (gate item 5).

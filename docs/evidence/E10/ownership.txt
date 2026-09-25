@@ -1,7 +1,7 @@
 E10 gate item 5 - no ownership syntax for ordinary values; task 10 - deterministic resumable state
 
 produced by: just e10-ownership
-commit: 59fe0fc8fb91d38150b754a790af5860bf441ce1
+commit: 29b662827515622855b5983c792fadb0f8039572
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == what is affine, and what is not (compiler/pw-core/tests/ownership.rs)
