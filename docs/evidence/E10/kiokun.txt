@@ -1,17 +1,19 @@
 E10 - the kiokun slice
 
 produced by: just e10-kiokun
-commit: 86034d5bed75bac87c431531bd81c3f5c210343e
+commit: 72a635ee8de8fbf1f14c93aba3740eb1b9677cd5
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == pw build, examples/kiokun
 
-pw build: 3 template(s), 0 handler(s), 2 component(s), 5 contract(s) -> docs/evidence/E10/kiokun
+pw build: 3 template(s), 0 handler(s), 4 component(s), 7 contract(s) -> docs/evidence/E10/kiokun
   no body    kiokun.page.EntryPage  a Page
   component  kiokun.page.Lookup  3164 bytes (485 core), 2 function(s) audited, imports [kiokun:data/entries#get]
   no body    kiokun.page.NotFound  a Page
-  component  kiokun.page.Search  2411 bytes (362 core), 2 function(s) audited, imports [kiokun:data/index#search]
+  component  kiokun.page.Search  11736 bytes (9247 core), 4 function(s) audited, imports [kiokun:data/index#fold, kiokun:data/index#alias, kiokun:data/index#candidates]
   no body    kiokun.page.SearchPage  a Page
+  component  shards.Place  5343 bytes (4177 core), 1 function(s) audited, imports []
+  component  shards.Places  5570 bytes (4368 core), 1 function(s) audited, imports []
 
 == the sample shard (examples/kiokun/data/han-1char-3/MANIFEST.txt)
 
@@ -19,6 +21,7 @@ kiokun.com shard han-1char-3: 28 files copied byte for byte by scripts/kiokun_sa
 
 == the host (spikes/kiokun/server)
 
+test tests::an_escaped_file_name_is_read_by_its_key ... ok
 test tests::every_entry_in_the_whole_shard_looks_up_and_renders ... ignored, reads a kiokun-data checkout named by KIOKUN_DATA
 test tests::search_ranks_as_kiokun_ranks ... person: 4 hits, first Some(String("人"))
 ren: 1 hits, first Some(String("人"))
@@ -27,24 +30,32 @@ ren: 1 hits, first Some(String("人"))
 ひと: 1 hits, first Some(String("人"))
 zzzz-no-such-word: 0 hits, first None
 test tests::the_compiled_lookup_follows_the_shards_redirects ... ok
+test tests::the_compiled_search_is_kiokuns_ranking ... search: 989 queries, 1371 hits, the compiled ranking and kiokun's agree
+test tests::the_compiled_search_is_kiokuns_ranking_on_the_whole_shard ... ignored, reads a kiokun-data checkout named by KIOKUN_DATA
+test tests::the_compiled_shard_rule_is_kiokuns ... place: 2529 words, the compiled rule and kiokun's agree
+test tests::the_compiled_shard_rule_places_every_word_kiokun_has ... ignored, reads a kiokun-data checkout named by KIOKUN_DATA
 test tests::the_pages_are_the_compiled_templates_with_no_script ... ok
 test tests::the_sample_is_one_shard ... sample: 28 entries, 293 rows, 4 aliases
 test tests::the_shard_rule_is_kiokuns ... ok
-test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.65s
+test result: ok. 8 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 3.04s
 
-== the whole shard
+== the whole shard, and every word kiokun has
 
-whole shard: 17597 entries, 10418 search rows, loaded in 9469 ms
-whole shard: 16921 rendered, 103 redirects followed, 676 not in this shard, 0 failures
-whole shard: compiled Lookup per word p50 19.6 µs, p99 38.8 µs, max 261.3 µs
-whole shard: compiled Search person (20 hits): 2.0 ms
-whole shard: compiled Search ren (6 hits): 2.0 ms
-whole shard: compiled Search 水 (13 hits): 0.4 ms
-whole shard: compiled Search ひと (20 hits): 0.4 ms
-whole shard: compiled Search water (20 hits): 2.0 ms
-whole shard: compiled Search 谚 (1 hits): 0.4 ms
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 10.36s
+whole shard: 17597 entries, 10418 search rows, loaded in 8573 ms
+whole shard: 17597 rendered, 779 redirects followed, 0 not in this shard, 0 failures
+whole shard: compiled Lookup per word p50 20.6 µs, p99 402.4 µs, max 1157.0 µs
+whole shard: compiled Search person (20 hits): 0.7 ms
+whole shard: compiled Search ren (6 hits): 0.3 ms
+whole shard: compiled Search 水 (13 hits): 0.3 ms
+whole shard: compiled Search ひと (20 hits): 0.3 ms
+whole shard: compiled Search water (20 hits): 0.4 ms
+whole shard: compiled Search 谚 (1 hits): 0.3 ms
+whole shard: 33 words kiokun escaped in a file name, each served from its file
+whole shard: 28951 queries, 77225 hits, the compiled ranking and kiokun's agree
+whole shard: compiled Search per query p50 0.25 ms, p99 0.49 ms, max 6.69 ms
+every word: 1485890 words in 28 shards, the compiled rule and kiokun's agree, 33 file names escaped, 0 found outside the subdirectory it names, in 5 s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 68.16s
 
 == in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)
 
-  15 passed (23.2s)
+  15 passed (23.5s)

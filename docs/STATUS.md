@@ -137,7 +137,8 @@ before integration; the baseline pass is not a substitute.
     - kiokun's file names are not its words: its builder writes nine characters
       as `_`, and 33 files are escaped;
     - a component call per word made the load three times slower. Batched,
-      the load is 10.4 s against the Rust loader's 9.5 s.
+      the load took 8.6 s and 10.4 s in two runs, against 9.5 s with
+      kiokun's Rust rule.
   - Evidence: `docs/evidence/E10/kiokun.txt` (`just e10-kiokun`, with
     `KIOKUN_DATA`) and `docs/evidence/E10/kiokun-mutants.txt`
     (`just e10-kiokun-mutants`).
