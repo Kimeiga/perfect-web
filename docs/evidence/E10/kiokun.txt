@@ -1,0 +1,50 @@
+E10 - the kiokun slice
+
+produced by: just e10-kiokun
+commit: 86034d5bed75bac87c431531bd81c3f5c210343e
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== pw build, examples/kiokun
+
+pw build: 3 template(s), 0 handler(s), 2 component(s), 5 contract(s) -> docs/evidence/E10/kiokun
+  no body    kiokun.page.EntryPage  a Page
+  component  kiokun.page.Lookup  3164 bytes (485 core), 2 function(s) audited, imports [kiokun:data/entries#get]
+  no body    kiokun.page.NotFound  a Page
+  component  kiokun.page.Search  2411 bytes (362 core), 2 function(s) audited, imports [kiokun:data/index#search]
+  no body    kiokun.page.SearchPage  a Page
+
+== the sample shard (examples/kiokun/data/han-1char-3/MANIFEST.txt)
+
+kiokun.com shard han-1char-3: 28 files copied byte for byte by scripts/kiokun_sample.py
+
+== the host (spikes/kiokun/server)
+
+test tests::every_entry_in_the_whole_shard_looks_up_and_renders ... ignored, reads a kiokun-data checkout named by KIOKUN_DATA
+test tests::search_ranks_as_kiokun_ranks ... person: 4 hits, first Some(String("人"))
+ren: 1 hits, first Some(String("人"))
+人: 1 hits, first Some(String("人"))
+谚: 1 hits, first Some(String("諺"))
+ひと: 1 hits, first Some(String("人"))
+zzzz-no-such-word: 0 hits, first None
+test tests::the_compiled_lookup_follows_the_shards_redirects ... ok
+test tests::the_pages_are_the_compiled_templates_with_no_script ... ok
+test tests::the_sample_is_one_shard ... sample: 28 entries, 293 rows, 4 aliases
+test tests::the_shard_rule_is_kiokuns ... ok
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+== the whole shard
+
+whole shard: 17597 entries, 10418 search rows, loaded in 9469 ms
+whole shard: 16921 rendered, 103 redirects followed, 676 not in this shard, 0 failures
+whole shard: compiled Lookup per word p50 19.6 µs, p99 38.8 µs, max 261.3 µs
+whole shard: compiled Search person (20 hits): 2.0 ms
+whole shard: compiled Search ren (6 hits): 2.0 ms
+whole shard: compiled Search 水 (13 hits): 0.4 ms
+whole shard: compiled Search ひと (20 hits): 0.4 ms
+whole shard: compiled Search water (20 hits): 2.0 ms
+whole shard: compiled Search 谚 (1 hits): 0.4 ms
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 10.36s
+
+== in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)
+
+  15 passed (23.2s)
