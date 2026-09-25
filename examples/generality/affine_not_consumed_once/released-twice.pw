@@ -1,0 +1,24 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: direct invalid — "exactly once", the other half
+//
+// Released on every path, and twice on one. PW2005 says exactly once; until
+// 2026-09-25 the check asked only whether a release came before each exit, so
+// a second release was never seen.
+
+module generality.affine_twice
+
+import Carts
+import Database
+import context.{ current_session }
+import domain.{ CartError }
+
+command settle() -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    if Carts.is_empty(current_session()) {
+        Database.rollback(tx)
+    }
+    tx.commit()
+}

@@ -562,6 +562,32 @@ e10-kiokun:
      } > docs/evidence/E10/kiokun.txt
     @cat docs/evidence/E10/kiokun.txt
 
+# ADR-0045: an affine value consumed exactly once on every path; the witnesses
+# and the mutation controls.
+#
+# E10 task 7 — affine annotations for scarce resources, expressing a real
+# invariant.
+e10-affine:
+    @{ echo "ADR-0045 - affine values consumed exactly once, on every path"; echo; \
+       echo "produced by: just e10-affine"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== each witness (examples/generality/affine_not_consumed_once)"; echo; \
+       for f in examples/generality/affine_not_consumed_once/*.pw; do \
+         printf '%-40s %-10s ' "$(basename $f)" "$(grep -m1 '@status:' $f | sed 's#// @status: ##')"; \
+         ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw $f 2>&1 \
+           | grep -oE '\[PW2005\][^[]*' | head -1 | sed 's/\x1b\[[0-9;]*m//g' || true; echo; \
+       done; \
+       echo; echo "== the generality suite"; echo; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/affine_mutations.py)"; echo; \
+       python3 scripts/affine_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a borrow. Passing a value to a function whose row does not"; \
+       echo "release it is a use; Pleris has no borrow syntax (gate item 5)."; \
+     } > docs/evidence/E10/affine.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
+
 # ADR-0044: pure computation compiled to JavaScript modules, held to its Wasm
 # component under Node, with the mutation controls. Needs `node`.
 #

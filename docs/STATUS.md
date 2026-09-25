@@ -12,8 +12,11 @@ of 2026-09-25** (see below). Closing E10 is left to the architect's review, with
 these charter tasks not done:
 - task 2's Wasm for compute-heavy modules in the browser (its JavaScript
   modules for pure computation are ADR-0044's);
-- task 4's evaluation of memory strategies;
-- task 7's affine annotations beyond effect rows.
+- task 4's evaluation of memory strategies.
+
+Task 7's affine annotations are the effect rows `resource.acquire<T>` and
+`resource.release<T>`, and since ADR-0045 the invariant they express is
+checked on every path.
 
  **E10-I closed 2026-09-24**
 ([evidence](evidence/E10/e10-i-2026-09-24.md), [ADR-0032](DECISIONS/ADR-0032-compiled-components.md)):
@@ -63,6 +66,13 @@ reject an incomplete match whatever the effect row.
   E9's counts and its 10 of 10 mutants are unchanged, and the oracle's missing
   case is now the checker's refusal.
 
+**Correction, 2026-09-25: PW2005 enforced less than its invariant**
+([ADR-0045](DECISIONS/ADR-0045-affine-exactly-once.md)). "An affine value
+must be consumed exactly once" was checked as "released before each
+`return`". A transaction never ended, one live across a failing `?`, and one
+ended twice all passed `pw check`, and a declaration promising to end a
+transaction parameter was never held to it. Every path is counted now.
+
 **Correction, 2026-09-25: `pw check` did not type an operator's operands**
 ([ADR-0043](DECISIONS/ADR-0043-operands-are-typed.md)). `1 == "a"` checked,
 and so did two accepted fixtures that divide a `Float` by an `Int`: A-017 and
@@ -103,6 +113,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0045: a release in a loop is refused even when the loop runs once; the
+  body's value moves a resource to the caller; a declaration whose row
+  releases `T` owes its `T` parameter one release on every path.
 - ADR-0044: a module's values: `BigInt` for `Int`, objects keyed by Pleris
   field names, and `{ $case, value }` for `Option` and `Result`.
 - ADR-0043: `Float.from_int` names the `Int` to `Float` conversion; there is

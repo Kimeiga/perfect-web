@@ -1,0 +1,22 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — the early exit is a `?`, not a `return`
+//
+// `Carts.clear(..)?` leaves the body when the clear fails, and the transaction
+// is still open on that path. A `?` is an exit as much as a `return` is; until
+// 2026-09-25 the check did not know it was one.
+
+module generality.affine_try
+
+import Carts
+import Database
+import context.{ current_session }
+import domain.{ CartError }
+
+command clear_cart() -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    Carts.clear(current_session())?
+    tx.commit()
+}

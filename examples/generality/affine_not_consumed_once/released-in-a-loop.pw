@@ -1,0 +1,24 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — a release that runs any number of times
+//
+// A loop's body runs zero or more times, so a release in it ends the
+// transaction zero times on an empty list and several on a long one. The
+// commit after the loop makes this the loop's fault alone: counted as a single
+// release, or not at all, the loop would let the rest of the body pass.
+
+module generality.affine_loop
+
+import Carts
+import Database
+import domain.{ CartError }
+
+command settle_all(sessions: List<String>) -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    for s in sessions {
+        Database.rollback(tx)
+    }
+    tx.commit()
+}

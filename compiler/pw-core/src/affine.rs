@@ -17,15 +17,20 @@
 //! — declaring a new resource is a change to a library file, and the diagnostic
 //! names the release functions by reading them back out of the signature table.
 //!
-//! # What this is not
+//! # Every path, counted
 //!
-//! Not a control-flow analysis. A real one builds a graph and asks whether
-//! every path from the acquisition reaches a release; this asks whether a
-//! `return` sits textually between the acquisition and the first release. That
-//! is exactly R-011's shape and it is honest about the cases it misses: a
-//! release inside one branch of an `if` and a return in the other would pass
-//! here. E9C proper is the CFG; this is the corpus's specification met with the
-//! structure that exists.
+//! Each path from the acquisition to where the value leaves its scope (the end
+//! of the block that holds it, a `return`, a failing `?`) must release it
+//! exactly once, or move it to the caller as the body's value. A release inside
+//! a loop or a function value runs any number of times. A declaration whose
+//! row says `resource.release<T>` owes the same to its `T` parameter. A `use`
+//! binding is released by its block and must only not escape. The analysis is
+//! over the statement tree: `pw` has no `goto`, no labelled `break` and no loop
+//! that can carry a resource out. Until 2026-09-25 it asked only whether a
+//! release came before each `return`, so a value never released, one live
+//! across a `?`, and one released twice all passed.
+
+use std::collections::BTreeSet;
 
 use crate::codes;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
@@ -40,6 +45,8 @@ struct Acquired {
     span: Span,
     /// `use x = ..` scopes the value to the block; a plain `let` does not.
     scoped: bool,
+    /// A parameter the declaration's row promises to release.
+    parameter: bool,
 }
 
 pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
@@ -54,17 +61,69 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
+        // A `todo` body is not written yet, so it promises nothing.
+        if matches!(body.expr(body.root), Expr::Block { stmts }
+            if matches!(stmts.as_slice(), [s] if matches!(body.expr(*s), Expr::Name(n) if n == "todo")))
+        {
+            continue;
+        }
         let at = hir.decl_span(id);
         let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
-        for a in acquisitions(body, sigs, &types) {
+        let mut owned = acquisitions(body, sigs, &types);
+        owned.extend(released_parameters(hir, sigs, id, decl, body));
+        for a in owned {
             let releases = releases_of(body, sigs, &types, &a);
             if let Some(escape) = escape_of(body, &a, &module_state) {
                 report_escape(hir, decl, &a, escape, &at, out);
-            } else if let Some(early) = unreleased_path(body, &a, &releases) {
-                report_unconsumed(hir, sigs, decl, &a, early, &at, out);
+            } else if a.scoped {
+                // A `use` block releases its value when it ends.
+                continue;
+            } else if let Some(fault) = fault_of(body, &a, &releases) {
+                report_unconsumed(hir, sigs, decl, &a, fault, &at, out);
             }
         }
     }
+}
+
+/// **A parameter the declaration promises to release** (2026-09-25).
+///
+/// A declaration whose row says `resource.release<T>` takes a `T` in order to
+/// end it, so its body must, exactly once on every path, as `Database.commit`
+/// promises. Until 2026-09-25 only a value acquired in the same body was
+/// followed, and a helper that took a transaction to commit it and did not was
+/// never checked.
+fn released_parameters(
+    hir: &Hir,
+    sigs: &Signatures,
+    id: crate::hir::DeclId,
+    decl: &Decl,
+    body: &Body,
+) -> Vec<Acquired> {
+    let path = match hir.module_of(id) {
+        Some(m) => format!("{m}.{}", decl.name),
+        None => decl.name.clone(),
+    };
+    let Some(sig) = sigs.by_path(&path) else {
+        return Vec::new();
+    };
+    let released: Vec<String> = sig
+        .effects
+        .iter()
+        .filter_map(|e| type_argument(e, "resource.release"))
+        .collect();
+    decl.params
+        .iter()
+        .filter_map(|p| {
+            let ty = p.ty.as_ref()?.written();
+            released.contains(&ty).then(|| Acquired {
+                name: p.name.clone(),
+                ty,
+                span: body.expr_span(body.root),
+                scoped: false,
+                parameter: true,
+            })
+        })
+        .collect()
 }
 
 /// Bindings whose initialiser declares `resource.acquire<T>`.
@@ -111,6 +170,7 @@ fn acquisitions<'a>(
             ty,
             span: body.expr_span(id),
             scoped,
+            parameter: false,
         });
     }
     out
@@ -152,106 +212,241 @@ fn releases_of<'a>(
     out
 }
 
-/// What happens to the resource along the paths through one construct.
-#[derive(Debug, Default, Clone)]
+/// How many times a path has released the value: 0, 1, or 2 for "more than
+/// once".
+type Count = u8;
+
+fn plus(a: Count, b: Count) -> Count {
+    (a + b).min(2)
+}
+
+/// What happens to the value along the paths through one construct.
+#[derive(Debug, Clone)]
 struct Flow {
-    /// EVERY path through this construct releases before leaving it.
-    released: bool,
-    /// Paths that leave the enclosing body without having released.
-    escapes: Vec<Span>,
+    /// The release counts of the paths that continue past the construct.
+    /// Empty when none does: every path left the body.
+    through: BTreeSet<Count>,
+    /// Paths that leave the body inside the construct: where, and having
+    /// released how many times.
+    exits: Vec<(Span, Count)>,
+    /// A release inside a loop or a function value, which runs any number of
+    /// times.
+    repeated: Option<Span>,
 }
 
-/// Does every path from the acquisition reach a release?
-///
-/// This replaced a textual scan — "is there a `return` between the acquisition
-/// and the first release" — which met R-011 and missed the shape where the
-/// release is written first:
-///
-/// ```text
-/// if empty { rollback(tx) } else { return Ok(()) }
-/// ```
-///
-/// Here the release precedes the return in the text and every path is *not*
-/// covered. The witness for that gap lived in
-/// `examples/generality/affine_not_consumed_once/slips-through.pw`; this is
-/// what promoted it.
-///
-/// The analysis is over the statement tree rather than a basic-block graph,
-/// which is enough because `pw` has no `goto`, no labelled break and no loop
-/// that can carry a resource out. Each construct answers two questions: do all
-/// my paths release, and which of my paths leave the body without releasing.
-fn unreleased_path(body: &Body, a: &Acquired, releases: &[Span]) -> Option<Span> {
-    let flow = flow_of(body, body.root, a, releases, &mut false);
-    flow.escapes.first().cloned()
+impl Flow {
+    /// Nothing happens.
+    fn identity() -> Flow {
+        Flow::releasing(0)
+    }
+
+    fn releasing(n: Count) -> Flow {
+        Flow {
+            through: BTreeSet::from([n]),
+            exits: Vec::new(),
+            repeated: None,
+        }
+    }
+
+    /// Every path leaves the body here.
+    fn exit(at: Span) -> Flow {
+        Flow {
+            through: BTreeSet::new(),
+            exits: vec![(at, 0)],
+            repeated: None,
+        }
+    }
+
+    /// This construct, then `next`.
+    fn then(self, next: Flow) -> Flow {
+        let mut exits = self.exits;
+        for c in &self.through {
+            exits.extend(next.exits.iter().map(|(s, k)| (s.clone(), plus(*c, *k))));
+        }
+        let through = self
+            .through
+            .iter()
+            .flat_map(|c| next.through.iter().map(move |k| plus(*c, *k)))
+            .collect();
+        Flow {
+            through,
+            exits,
+            repeated: self.repeated.or(next.repeated),
+        }
+    }
+
+    /// This construct or `other`.
+    fn or(self, other: Flow) -> Flow {
+        Flow {
+            through: self.through.union(&other.through).copied().collect(),
+            exits: [self.exits, other.exits].concat(),
+            repeated: self.repeated.or(other.repeated),
+        }
+    }
 }
 
-fn flow_of(body: &Body, id: ExprId, a: &Acquired, releases: &[Span], live: &mut bool) -> Flow {
-    let span = body.expr_span(id);
+/// **Every path through a scope, counted** (2026-09-25).
+///
+/// PW2005 says "exactly once", and until 2026-09-25 the check asked only
+/// whether a release came before each `return`. A transaction never released,
+/// one live across a failing `?`, and one committed twice all passed. Each
+/// construct now answers how many times each of its paths releases, over the
+/// statement tree: `pw` has no `goto`, no labelled `break` and no loop that can
+/// carry a resource out, so the tree is enough.
+struct Paths<'a> {
+    body: &'a Body,
+    name: &'a str,
+    releases: &'a [Span],
+    /// Where the body's value is produced. The value named there moves to the
+    /// caller, which is its one consumption.
+    tails: BTreeSet<ExprId>,
+}
 
-    // The acquisition itself: the resource is live from here on.
-    if span == a.span {
-        *live = true;
-        return Flow::default();
+impl Paths<'_> {
+    fn seq(&self, stmts: &[ExprId]) -> Flow {
+        let mut flow = Flow::identity();
+        let mut i = 0;
+        while i < stmts.len() && !flow.through.is_empty() {
+            let s = stmts[i];
+            // `return e` is two statements: the value, then the exit. Nothing
+            // after it on this path runs.
+            if matches!(self.body.expr(s), Expr::Name(n) if n == "return") {
+                let value = match stmts.get(i + 1) {
+                    Some(e) if matches!(self.body.expr(*e), Expr::Name(n) if n == self.name) => {
+                        Flow::releasing(1)
+                    }
+                    Some(e) => self.expr(*e),
+                    None => Flow::identity(),
+                };
+                return flow.then(value).then(Flow::exit(self.body.expr_span(s)));
+            }
+            flow = flow.then(self.expr(s));
+            i += 1;
+        }
+        flow
     }
 
-    // A release. Everything after it on this path is covered.
-    if releases.contains(&span) {
-        return Flow {
-            released: true,
-            escapes: Vec::new(),
-        };
+    fn expr(&self, id: ExprId) -> Flow {
+        let span = self.body.expr_span(id);
+        if self.releases.contains(&span) {
+            // Its arguments run first; then it releases.
+            return self.children(id).then(Flow::releasing(1));
+        }
+        match self.body.expr(id) {
+            Expr::Block { stmts } => self.seq(stmts),
+            Expr::If { cond, then, els } => {
+                let e = els.map_or_else(Flow::identity, |e| self.expr(e));
+                self.expr(*cond).then(self.expr(*then).or(e))
+            }
+            Expr::Match { scrutinee, arms } => {
+                let taken = arms
+                    .iter()
+                    .map(|a| self.expr(a.body))
+                    .reduce(Flow::or)
+                    .unwrap_or_else(Flow::identity);
+                self.expr(*scrutinee).then(taken)
+            }
+            // `e?` leaves the body when `e` fails, with what it has released.
+            Expr::Try { value } => self
+                .expr(*value)
+                .then(Flow::exit(span.clone()).or(Flow::identity())),
+            // A loop's body, or a function value's, runs any number of times.
+            Expr::For { .. } | Expr::Lambda { .. } => Flow {
+                through: BTreeSet::from([0]),
+                exits: Vec::new(),
+                repeated: self
+                    .body
+                    .walk_from(id)
+                    .into_iter()
+                    .map(|e| self.body.expr_span(e))
+                    .find(|s| self.releases.contains(s)),
+            },
+            Expr::Name(n) if n == self.name && self.tails.contains(&id) => Flow::releasing(1),
+            _ => self.children(id),
+        }
     }
 
+    fn children(&self, id: ExprId) -> Flow {
+        self.body
+            .children(id)
+            .into_iter()
+            .fold(Flow::identity(), |f, c| f.then(self.expr(c)))
+    }
+}
+
+/// The expressions whose value is the body's.
+fn tails(body: &Body, id: ExprId, out: &mut BTreeSet<ExprId>) {
     match body.expr(id) {
         Expr::Block { stmts } => {
-            let mut out = Flow::default();
-            for s in stmts {
-                if out.released {
-                    // Already released on this path; nothing later can leak it.
-                    break;
-                }
-                let f = flow_of(body, *s, a, releases, live);
-                out.released |= f.released;
-                if !out.released {
-                    out.escapes.extend(f.escapes);
-                }
+            if let Some(last) = stmts.last() {
+                tails(body, *last, out);
             }
-            out
         }
-        Expr::If { cond, then, els } => {
-            let _ = flow_of(body, *cond, a, releases, live);
-            let t = flow_of(body, *then, a, releases, live);
-            let e = els.map(|e| flow_of(body, e, a, releases, live));
-            let mut escapes = t.escapes;
-            let mut released = t.released;
-            match e {
-                // Both branches must release for the whole `if` to.
-                Some(e) => {
-                    released &= e.released;
-                    escapes.extend(e.escapes);
-                }
-                // No else: the fall-through path does not release here.
-                None => released = false,
-            }
-            Flow { released, escapes }
+        Expr::If {
+            then, els: Some(e), ..
+        } => {
+            tails(body, *then, out);
+            tails(body, *e, out);
         }
         Expr::Match { arms, .. } => {
-            let mut released = !arms.is_empty();
-            let mut escapes = Vec::new();
-            for arm in arms {
-                let f = flow_of(body, arm.body, a, releases, live);
-                released &= f.released;
-                escapes.extend(f.escapes);
+            for a in arms {
+                tails(body, a.body, out);
             }
-            Flow { released, escapes }
         }
-        // A `return` while the resource is live and unreleased on this path.
-        Expr::Name(n) if n == "return" && *live => Flow {
-            released: false,
-            escapes: vec![span],
-        },
-        _ => Flow::default(),
+        _ => {
+            out.insert(id);
+        }
     }
+}
+
+/// What the paths from an acquisition do, and what is wrong with them, if
+/// anything: the first problem, in order of what a reader meets.
+enum Fault {
+    /// A path leaves `at`, or ends the scope, not having released.
+    Unreleased(Span),
+    /// A path releases twice before `at`.
+    Twice(Span),
+    /// A release inside a loop or a function value.
+    Repeated(Span),
+}
+
+/// The scope `a` is acquired in: the statements after its binding, in the
+/// block that holds it, or the whole body for a parameter.
+fn fault_of(body: &Body, a: &Acquired, releases: &[Span]) -> Option<Fault> {
+    let mut tail = BTreeSet::new();
+    tails(body, body.root, &mut tail);
+    let paths = Paths {
+        body,
+        name: &a.name,
+        releases,
+        tails: tail,
+    };
+    let (flow, end) = if a.parameter {
+        (paths.expr(body.root), body.expr_span(body.root))
+    } else {
+        let (stmts, at) = body.walk().into_iter().find_map(|b| match body.expr(b) {
+            Expr::Block { stmts } => stmts
+                .iter()
+                .position(|s| body.expr_span(*s) == a.span)
+                .map(|i| (stmts[i + 1..].to_vec(), body.expr_span(b))),
+            _ => None,
+        })?;
+        (paths.seq(&stmts), at)
+    };
+    if let Some(r) = flow.repeated {
+        return Some(Fault::Repeated(r));
+    }
+    for (at, count) in &flow.exits {
+        match count {
+            0 => return Some(Fault::Unreleased(at.clone())),
+            2 => return Some(Fault::Twice(at.clone())),
+            _ => {}
+        }
+    }
+    if flow.through.contains(&0) {
+        return Some(Fault::Unreleased(end));
+    }
+    flow.through.contains(&2).then_some(Fault::Twice(end))
 }
 
 /// An assignment that puts the value somewhere the acquiring scope cannot see.
@@ -336,7 +531,7 @@ fn report_unconsumed(
     sigs: &Signatures,
     decl: &Decl,
     a: &Acquired,
-    early: Span,
+    fault: Fault,
     at: &Span,
     out: &mut Vec<Diagnostic>,
 ) {
@@ -351,36 +546,70 @@ fn report_unconsumed(
             .collect::<Vec<_>>()
             .join(" or ")
     };
+    let (reason, message, primary, repair) = match fault {
+        Fault::Unreleased(span) => (
+            "affine_value_not_consumed_on_every_path",
+            format!(
+                "affine resource `{}: {}` is not consumed on every path",
+                a.name, a.ty
+            ),
+            span,
+            format!("end `{}` on this path, with {ways}", a.name),
+        ),
+        Fault::Twice(span) => (
+            "affine_value_consumed_twice",
+            format!(
+                "affine resource `{}: {}` is released twice on one path",
+                a.name, a.ty
+            ),
+            span,
+            format!("end `{}` once on each path", a.name),
+        ),
+        Fault::Repeated(span) => (
+            "affine_value_released_repeatedly",
+            format!(
+                "affine resource `{}: {}` is released inside a loop or a function value, \
+                 which may run any number of times",
+                a.name, a.ty
+            ),
+            span,
+            format!("end `{}` once, outside the loop", a.name),
+        ),
+    };
+    let acquired = if a.parameter {
+        format!(
+            "`{}` is a parameter `{}` promises to release",
+            a.name, decl.name
+        )
+    } else {
+        format!("`{}` is acquired here", a.name)
+    };
     out.push(Diagnostic {
         code: codes::AFFINE_NOT_CONSUMED_ONCE.id,
         invariant: codes::AFFINE_NOT_CONSUMED_ONCE.invariant,
-        reason: "affine_value_not_consumed_on_every_path",
+        reason,
         detector: Detector::PatternMatrix,
         severity: Severity::Error,
-        message: format!(
-            "affine resource `{}: {}` is not consumed on every path",
-            a.name, a.ty
-        ),
-        primary_span: early,
+        message,
+        primary_span: primary,
         related: vec![
             Related {
                 span: a.span.clone(),
-                label: format!("`{}` is acquired here", a.name),
+                label: acquired,
             },
             Related {
                 span: at.clone(),
-                label: format!("`{}` must end it before every exit", decl.name),
+                label: format!("`{}` must end it exactly once on every path", decl.name),
             },
         ],
         explanation: Some(format!(
-            "This path leaves `{}` open. A transaction must end exactly once, in \
-             {ways} — not ending it holds whatever it locked until something else \
-             times out, and ending it twice is a different bug that this same rule \
-             is what makes visible.",
-            a.name
+            "A {} must end exactly once, with {ways}. Not ending it holds whatever \
+             it locked until something else times out, and ending it twice is a \
+             different bug that this same rule is what makes visible.",
+            a.ty
         )),
         repairs: vec![Repair {
-            description: format!("end `{}` on this path before returning", a.name),
+            description: repair,
             replacement: None,
         }],
     });

@@ -1,0 +1,26 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — the value is a parameter, not an acquisition
+//
+// `finish` declares `resource.release<DatabaseTransaction>`: it takes the
+// transaction in order to end it, as `Database.commit` does. One path ends it
+// and the other does not. Until 2026-09-25 only a value acquired in the same
+// body was followed, so a helper that promised to end a transaction was never
+// held to it.
+
+module generality.affine_parameter
+
+import Carts
+import Database
+import context.{ current_session }
+import domain.{ CartError }
+import domain.{ DatabaseTransaction }
+
+fn finish(tx: DatabaseTransaction, keep: Bool) -> Result<(), CartError>
+    !{ database.transaction, resource.release<DatabaseTransaction> }
+{
+    if keep {
+        return Ok(())
+    }
+    Database.rollback(tx)
+}

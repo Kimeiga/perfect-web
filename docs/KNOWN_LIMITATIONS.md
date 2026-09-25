@@ -121,6 +121,11 @@ inlined. Still refused by name:
   `to_lower_ascii`; `Float` has `from_int` (ADR-0043). There is no slicing, no Unicode case mapping, and no map
   or set type. `sum`, `maximum` and `enumerate` still have placeholder
   bodies.
+- **An affine value has no borrow** (ADR-0045). A function whose row does not
+  release a transaction may use it, and one whose row does must end it once
+  on every path. There is no way to say "this function reads the value and
+  hands it back"; a `use` block releases its value and is the scoped form. A
+  release inside a loop is refused even when the loop would run once.
 - **A function is not a value.** A lambda or a declaration's name is compiled
   where a list operation runs it; stored, returned, or passed to any other
   declaration, it is refused.

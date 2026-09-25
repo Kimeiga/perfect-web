@@ -1,0 +1,20 @@
+// @status: NEIGHBOUR
+// @invariant: affine_not_consumed_once
+// @dimension: valid neighbour — the value is the body's result
+//
+// `open` acquires a transaction and returns it, which moves it to the caller:
+// that is its one consumption here. A rule that demanded a release in every
+// body holding one would refuse every function that opens a resource for
+// someone else.
+
+module generality.affine_moved
+
+import Database
+import domain.{ DatabaseTransaction }
+
+fn open() -> DatabaseTransaction
+    !{ database.transaction, resource.acquire<DatabaseTransaction> }
+{
+    let tx = Database.begin()
+    tx
+}

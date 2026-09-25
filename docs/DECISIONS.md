@@ -269,3 +269,9 @@ as its component. Every place JavaScript's semantics differ from Pleris's
 (BigInt, Euclidean division, code point order, White_Space) is encoded
 explicitly. The two backends agree on 6,800 generated calls under Node,
 kiokun's shard rule among them.
+
+[ADR-0045](DECISIONS/ADR-0045-affine-exactly-once.md): PW2005's invariant,
+"exactly once, in the scope that acquired it", is checked on every path:
+the end of a scope and a failing `?` are exits, a second release is
+counted, and a release in a loop is refused. A declaration whose row
+promises to release a parameter must. No syntax is added.

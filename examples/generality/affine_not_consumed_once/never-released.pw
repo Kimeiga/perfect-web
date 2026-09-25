@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — no release at all, and no early exit
+//
+// The transaction is opened and the body ends without ending it. Until
+// 2026-09-25 the check followed only `return`s, so a body with none passed:
+// the analysis asked whether each exit was preceded by a release, and the
+// fall-through end of the scope was not an exit it knew about.
+
+module generality.affine_never
+
+import Carts
+import Database
+import context.{ current_session }
+import domain.{ CartError }
+
+command clear_cart() -> Result<(), CartError>
+    requires SignedIn
+{
+    let tx = Database.begin()
+    Carts.clear(current_session())
+    Ok(())
+}

@@ -1,0 +1,21 @@
+// @status: NEIGHBOUR
+// @invariant: affine_not_consumed_once
+// @dimension: valid neighbour — a helper that ends what it promises to end
+//
+// The control for `parameter-not-released.pw`: every path ends the
+// transaction exactly once, one by committing and one by rolling back.
+
+module generality.affine_parameter_ok
+
+import Database
+import domain.{ CartError }
+import domain.{ DatabaseTransaction }
+
+fn finish(tx: DatabaseTransaction, keep: Bool) -> Result<(), CartError>
+    !{ database.transaction, resource.release<DatabaseTransaction> }
+{
+    if keep {
+        return tx.commit()
+    }
+    Database.rollback(tx)
+}
