@@ -23,7 +23,11 @@ mkdir -p "$EVIDENCE"
 # `--nocapture`, because the import lists ARE the evidence. A summary line
 # saying three tests passed is a claim about a test run; the fourteen interface
 # names the refusal enumerates are the finding.
-out="$(cd "$REPO_ROOT" && cargo test -p pw-host --features engine -- --nocapture --test-threads=1 2>&1)"
+#
+# `--include-ignored`: every test that reads a guest is ignored in an ordinary
+# `cargo test --workspace`, which has not built the guests (tests/artifact.rs
+# says why). This script checked above that they are built.
+out="$(cd "$REPO_ROOT" && cargo test -p pw-host --features engine -- --include-ignored --nocapture --test-threads=1 2>&1)"
 echo "$out"
 
 {

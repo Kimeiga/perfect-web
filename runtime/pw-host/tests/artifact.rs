@@ -27,8 +27,16 @@
 //!
 //! ```text
 //! just spike-wasmtime      # builds the guests
-//! just e8-host             # runs this
+//! just e8-host             # runs this, with --include-ignored
 //! ```
+//!
+//! Each test that reads a guest is `#[ignore]`d, with that reason. Since E10-I
+//! the development server runs compiled commands, so it depends on `pw-host`
+//! with `engine`, and Cargo unifies that feature into every
+//! `cargo test --workspace`. That made this file part of `just ci` on a
+//! checkout where nothing had built the guests, and on 2026-09-25 CI failed
+//! on exactly that (run 36095701735). An ignored test is listed as ignored,
+//! with its reason; a `cfg` would make it vanish from the output.
 
 #![cfg(feature = "engine")]
 
@@ -88,6 +96,7 @@ fn topology() -> Topology {
 }
 
 #[test]
+#[ignore = "reads the guests `just spike-wasmtime` builds; `just e8-host` runs it"]
 fn the_declared_component_imports_exactly_what_its_world_says() {
     let actual = imports(guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm"));
     println!("minimal guest imports: {actual:?}");
@@ -117,6 +126,7 @@ fn the_declared_component_imports_exactly_what_its_world_says() {
 }
 
 #[test]
+#[ignore = "reads the guests `just spike-wasmtime` builds; `just e8-host` runs it"]
 fn the_std_component_is_refused_for_authority_nobody_asked_for() {
     // The adversarial case, and it is the ordinary build. Fourteen `wasi:*`
     // interfaces the WIT world never mentions, injected by std's runtime
@@ -196,6 +206,7 @@ fn a_component_that_cannot_be_read_is_not_treated_as_importing_nothing() {
 /// implementation of instantiation's own rule, and the two would agree until a
 /// component imported something the check did not model.
 #[test]
+#[ignore = "reads the guests `just spike-wasmtime` builds; `just e8-host` runs it"]
 fn a_granted_component_instantiates_and_an_ungranted_one_does_not() {
     let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
     let bytes = std::fs::read(&path)
@@ -248,6 +259,7 @@ fn a_granted_component_instantiates_and_an_ungranted_one_does_not() {
 /// "cannot" is a claim about the API's shape, and an `Option` that some caller
 /// unwraps with a default would break it silently.
 #[test]
+#[ignore = "reads the guests `just spike-wasmtime` builds; `just e8-host` runs it"]
 fn a_refused_admission_yields_no_granted_to_link_from() {
     let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
     let actual = imports(path);
@@ -291,6 +303,7 @@ fn a_refused_admission_yields_no_granted_to_link_from() {
 /// compiled into the host is one nobody can raise for a component that
 /// legitimately needs more.
 #[test]
+#[ignore = "reads the guests `just spike-wasmtime` builds; `just e8-host` runs it"]
 fn an_instance_runs_within_the_budget_its_deployment_declares() {
     let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
     let bytes = std::fs::read(&path)
@@ -360,6 +373,7 @@ fn an_instance_runs_within_the_budget_its_deployment_declares() {
 /// component's appetite into everyone's outage, which is the thing limits exist
 /// to prevent.
 #[test]
+#[ignore = "reads the guests `just spike-wasmtime` builds; `just e8-host` runs it"]
 fn a_memory_ceiling_denies_growth_rather_than_aborting() {
     let path = guest("guest-minimal", "spike_wasmtime_guest_minimal.wasm");
     let bytes = std::fs::read(&path)
@@ -422,6 +436,7 @@ fn a_memory_ceiling_denies_growth_rather_than_aborting() {
 /// refused or linked; this shows it being **used**, and a capability system
 /// that has only ever been observed saying no has not been observed working.
 #[test]
+#[ignore = "reads the guests `just spike-wasmtime` builds; `just e8-host` runs it"]
 fn a_granted_guest_calls_the_host_and_receives_its_answer() {
     use wasmtime::component::Val;
 

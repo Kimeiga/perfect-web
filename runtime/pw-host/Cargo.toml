@@ -10,9 +10,15 @@ publish = false
 #
 # Everything the host decides — topology, placement, the import audit — is
 # decided on data, and data does not need a Wasm engine to be checked. Keeping
-# the engine behind a feature means `just ci` proves the decisions and
-# `just e8-host` proves they hold against a real component, rather than the
-# whole workspace paying for an engine most of it never touches.
+# the engine behind a feature means a crate that only decides never links one.
+#
+# Since E10-I the workspace does pay for it: the development server runs
+# compiled commands, so it depends on this crate with `engine`, and Cargo
+# unifies the feature into `cargo test --workspace`. That is the cost of the
+# dev server running what the compiler built rather than a Rust stand-in. The
+# tests that need guests built by `just spike-wasmtime` are `#[ignore]`d there
+# and run by `just e8-host`; `tests/pleris_component.rs` reads only committed
+# evidence, so it runs in `just ci`.
 [features]
 default = []
 engine = ["dep:wasmtime"]
