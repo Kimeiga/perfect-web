@@ -61,9 +61,6 @@ rather than approximated:
   instance and the literal quantity; the command it reaches is compiled.
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
-- **The three-engine browser result is observed, not recorded.** The host's
-  disk filled during E10-I and macOS purged the Playwright browsers.
-  `browser-suite.txt` records Chromium only.
 
 ## Research requirements are not implemented guarantees
 

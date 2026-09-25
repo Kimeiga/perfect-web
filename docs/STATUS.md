@@ -52,8 +52,8 @@ before integration; the baseline pass is not a substitute.
     a core-identical but component-different import.
   - The dev server's commands run the compiled components, and its closures
     are deleted.
-  - Browser suite: Chromium 86/86 ×3, recorded. Three engines 258/258 ×3,
-    observed only; the host's disk filled, and macOS purged the browsers.
+  - Browser suite: three engines, 258/258 in three consecutive runs,
+    recorded (`docs/evidence/E10/browser-suite.txt`).
   - Found on the way: `imports_of` reported type exports as imports, which
     corrected E8's audit counts. Per-call compilation also amplified a
     pre-existing Firefox flake; components are now compiled once.
@@ -195,9 +195,9 @@ commands retain their real toolchain requirements. `just doctor` is read-only;
 and 3 GB free, almost all of it used outside this repository. Shell commands
 failed until the repository's incremental build cache (3.6 GB, regenerable) was
 removed. Builds since use `CARGO_INCREMENTAL=0`. macOS purged
-`~/Library/Caches`, which included every Playwright browser build, so the
-three-engine browser run could not be re-recorded. Chromium was reinstalled
-(about 350 MB) and recorded.
+`~/Library/Caches`, which included every Playwright browser build. The browsers
+were reinstalled once about 25 GB was released, and the three-engine run was
+recorded then.
 
 The September 16 resource repair used the pinned Rust 1.97.1 and locked registry
 snapshot locally on Linux x86_64. Its full workspace run completed with a captured

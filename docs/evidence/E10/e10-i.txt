@@ -1,0 +1,64 @@
+E10-I - the compiled command runs through the host
+
+produced by: just e10-i
+commit: 1209a9409d0f684dd0ea5b16dd1bffa93794a5e7
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== 4-6. compile, wrap with wit-component, audit against the world
+
+store.page.add_to_cart: world store-page-add-to-cart — 4221 bytes (423 bytes of core module)
+  imports pw:host/session#read
+  imports store:data/carts#add
+  component-level audit: 3 functions agree with the world
+store.page.clear_cart: world store-page-clear-cart — 3797 bytes (409 bytes of core module)
+  imports pw:host/session#read
+  imports store:data/carts#clear
+  component-level audit: 3 functions agree with the world
+
+== the committed artifacts are the compiler's current output
+
+test the_component_imports_exactly_the_operations_the_function_calls ... ok
+test add_to_cart_compiles_to_a_component_an_independent_validator_accepts ... ok
+test the_component_has_exactly_the_types_its_world_fixed ... ok
+test an_import_whose_component_type_differs_is_refused_though_its_core_type_does_not ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test the_check_would_notice_a_change ... ok
+test the_committed_wit_is_what_the_compiler_emits_now ... ok
+test the_committed_components_are_what_the_compiler_builds_now ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test the_encoder_never_decides_from_a_name ... ok
+test an_unimplemented_instruction_is_refused_rather_than_faked ... ok
+test every_capability_a_function_calls_has_an_import ... ok
+test an_import_whose_declared_abi_disagrees_with_its_call_site_is_refused ... ok
+test one_capability_authorizes_two_callables_with_different_abis ... ok
+test every_component_imports_only_what_its_contract_allows ... ok
+test every_store_command_and_query_encodes_to_a_valid_core_module ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+== 7-8. the E8 host admits and runs them (runtime/pw-host/tests/pleris_component.rs)
+
+a failing data layer: [Result(Err(Some(Variant("cart-expired", None))))]
+refused without database.write<Carts>: Refuse([Ungranted { node: "origin-1", capability: "database.write<Carts>" }])
+ungranted write refused by the engine: component imports instance `store:data/carts`, but a matching implementation was not found in the linker
+compiled add_to_cart imports: ["pw:host/session#read", "store:data/carts#add"]
+the host saw: [("pw:host/session#read", []), ("store:data/carts#add", [String("session-7"), String("cortado"), S64(2)])]
+the command returned: [Result(Ok(Some(Record([("lines", List([Record([("item-id", String("cortado")), ("quantity", S64(2)), ("unit-price", Record([("minor-units", S64(450))]))])]))]))))]
+starved of fuel: wasm trap: all fuel consumed by WebAssembly
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+== 9. the development server's commands are the compiled components
+
+test tests::the_commands_run_as_compiled_components ... ok
+test tests::a_command_is_refused_on_a_node_that_does_not_grant_its_capability ... ok
+test tests::an_unknown_component_is_refused_rather_than_defaulted ... ok
+test tests::the_same_command_runs_where_the_capability_exists ... ok
+test tests::a_failing_command_commits_neither_state_nor_event ... ok
+test tests::the_compiled_command_carries_its_arguments_to_the_data_layer ... ok
+test tests::clear_cart_is_authorised_separately ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+NOT CLAIMED: resumable handler BODIES are compiled. The browser's
+handler for add_to_cart still posts the pressed instance and the
+literal quantity; the COMMAND it reaches is compiled Pleris.
+NOT CLAIMED: the data layer (store:data/carts) is Pleris. It is the
+deployment's, as the contract says (owner: external) - NEXT step 10.
