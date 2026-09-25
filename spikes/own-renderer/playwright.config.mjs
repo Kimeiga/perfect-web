@@ -29,7 +29,15 @@ const ENGINES = ["chromium", "firefox", "webkit"];
 /// exactly as two engines did, and the second time it presented as frames
 /// arriving in a different order rather than as a wrong list — which is much
 /// harder to read as interference.
-const MUTATING = ["keyed-list", "transport", "performance"];
+///
+/// `public-fragment` since 2026-09-25. It renames a menu item and back, which
+/// broadcasts a patch to every page on its host, and it had been running on the
+/// shared one. A store page there that had just updated its cart received
+/// another test's rename as its latest batch, and `store.spec.mjs`'s "only
+/// cart-related part ids update" read the rename. That happened once in fifteen
+/// three-engine runs, and was then reproduced on demand by renaming from a
+/// second context. Appended, so the other suites keep their ports.
+const MUTATING = ["keyed-list", "transport", "performance", "public-fragment"];
 
 export const MUTABLE_PORTS = Object.fromEntries(
   MUTATING.map((suite, s) => [
