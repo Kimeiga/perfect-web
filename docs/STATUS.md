@@ -9,14 +9,30 @@
 **Current milestone:** E10, in progress. **E10-I closed 2026-09-24**
 ([evidence](evidence/E10/e10-i-2026-09-24.md), [ADR-0032](DECISIONS/ADR-0032-compiled-components.md)):
 `add_to_cart` compiles to a Wasm component, runs through the E8 host with the
-host's own operations, and the dev server's Rust closure path is deleted. E9
-closed the same day (E9-V1..V6, [evidence](evidence/E9/value-relations-2026-09-24.md),
+host's own operations, and the dev server's Rust closure path is deleted.
+**Resumable handler bodies compile to JavaScript modules since 2026-09-25**
+([evidence](evidence/E10/handlers-2026-09-25.md), [ADR-0033](DECISIONS/ADR-0033-compiled-handlers.md)),
+so the store's behaviour is compiled from `.pw`: the page's handlers and the
+commands they reach. E9 closed on 2026-09-24 (E9-V1..V6,
+[evidence](evidence/E9/value-relations-2026-09-24.md),
 [ADR-0031](DECISIONS/ADR-0031-value-relations.md)). Next: the rest of E10, and
 the kiokun proof slice. See [NEXT](NEXT.md).
 
-Two ADR-0032 decisions also await a ruling:
-- the contract locates each export in its component;
-- a handler sends the pressed loop instance.
+**Correction, 2026-09-25:** GitHub CI failed on the pushed E10-I merge
+`26feb6b`, although `just ci` had passed locally. The dev server's `engine`
+feature turned on E8's guest tests in every workspace build, and a clean
+checkout has no guests. Fixed in `83af93c`, and CI is green on it. Recorded in
+[the E10-I evidence](evidence/E10/e10-i-2026-09-24.md).
+
+Decisions awaiting a ruling:
+- ADR-0032: the contract locates each export in its component.
+- ADR-0033 / A-022: captured values carried on the element are resume
+  metadata, not identity markup.
+- ADR-0033 / A-023: a string literal has a value only where no escape rule is
+  involved, until the language defines escapes.
+
+ADR-0032's other ruling-needed item, the handler sending the pressed loop
+instance, is superseded by ADR-0033.
 
 Three ADR-0031 decisions were made without an architect ruling and are offered
 for reversal:
@@ -36,6 +52,23 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: compiled resumable handlers (E10, ADR-0033).**
+  - `backend/js.rs` compiles each handler's body to an ES module;
+    `pw emit-handlers` writes `<identity>.mjs`. The store's `add_to_cart`
+    handler is `context.command("store.page.add_to_cart",
+    [context.captures["item"]["id"], 1])`.
+  - Every fact is read from the stage that owns it. `values::named` is
+    extracted from the typer, and `contract::component_id` replaces three
+    derivations.
+  - The element carries exactly the capture paths the handler reads (`item.id`).
+  - The host types the browser's arguments by the artifact's own parameters and
+    refuses the rest with 400.
+  - The dev server has one command path. The server-written modules, the
+    address resolution and the per-command glue are deleted.
+  - Found: `clear_cart` never committed its state; the Wasm IR's string
+    constants were source tokens. Both are fixed.
+  - `just ci` passes. Browser suite: see the evidence file.
 
 - **2026-09-24: E10-I, a Pleris-compiled command through the E8 host.**
   - `backend/wasm.rs` now emits Canonical-ABI core modules, with every
@@ -151,14 +184,19 @@ these compiler changes do not independently re-establish those milestones.
   without `x` is unknown rather than refused. This is the first follow-up after
   E10-I, recorded in KNOWN_LIMITATIONS; it was not one of E9-V1..V6.
 - **The rest of E10 is open.** The component backend is narrow. It lacks:
-  - compiled resumable handler bodies;
   - records and variants written into the region;
   - branches;
   - calls between compiled declarations;
   - a compiled data layer;
   - an automatic memory strategy.
 
-  Each missing construct is refused by name.
+  Each missing construct is refused by name. The handler backend is narrow
+  too: one command call per handler, with no local computation, branches or
+  event parameter. Captures are not a patched part.
+- **CI's cost is not yet measured on a warm cache.** Since E10-I every
+  workspace build compiles Wasmtime. The two runs since took 5m06s (stopped at
+  `test-unit`) and 5m29s, both on a cold cache; earlier runs took 2m28s to
+  2m47s.
 - **Broader proposals remain proposals.** Temporal authorization, compatibility
   across live versions, commitment/unknown outcomes, composed budgets, and
   browser-owned editing behavior are recorded in the census. Their presence in
@@ -176,7 +214,9 @@ python3 -m unittest discover -s research/failures/tools -p 'test_*.py' -v
 node --test spikes/layout-phase-scheduler/test/loaf.test.mjs
 just e10-component
 just e10-i
+just e10-handlers
 just e10-browser chromium
+just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
 just e9-values
 cargo test --locked -p pw-core --test value_relations --test corpus_history
 python3 scripts/e9_value_mutations.py
@@ -198,6 +238,14 @@ removed. Builds since use `CARGO_INCREMENTAL=0`. macOS purged
 `~/Library/Caches`, which included every Playwright browser build. The browsers
 were reinstalled once about 25 GB was released, and the three-engine run was
 recorded then.
+
+**2026-09-25: the Playwright builds were purged again.** Free space fell to
+6.9 GB while the workspace built Wasmtime into several test binaries (`target/`
+is 8.8 GB). macOS then emptied `~/Library/Caches` again, and the Cargo
+registry's unpacked sources with it: 44 crates remain unpacked, and builds run
+from compiled artifacts. The three browsers were reinstalled (Playwright 1.58.0:
+Chromium 145.0.7632.6, Firefox 146.0.1, WebKit 26.0). Wasmtime 47.0.4's API was
+checked against docs.rs, because its source was no longer on disk.
 
 The September 16 resource repair used the pinned Rust 1.97.1 and locked registry
 snapshot locally on Linux x86_64. Its full workspace run completed with a captured

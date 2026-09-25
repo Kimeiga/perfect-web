@@ -376,6 +376,96 @@ pub fn instance_token_of(each: PartId, item: &Value, key_field: &str, env: &Env)
     env.domain.instance_token(&env.path, each, &raw)
 }
 
+/// A JavaScript number holds every integer up to 2^53 exactly. The compiled
+/// handler reads its captures with `JSON.parse`, so an integer past that would
+/// reach it as a different number.
+const EXACT_INTEGER: u64 = 1 << 53;
+
+/// A captured value as the document carries it. Raw HTML is not a value a
+/// handler can capture: it is bytes with an authority attached, and neither
+/// survives serialization into an attribute.
+fn capture_json(v: &Value, name: &str) -> Result<serde_json::Value, Blocked> {
+    Ok(match v {
+        Value::Text(s) => serde_json::Value::String(s.clone()),
+        Value::Bool(b) => serde_json::Value::Bool(*b),
+        Value::Int(i) if i.unsigned_abs() <= EXACT_INTEGER => serde_json::Value::from(*i),
+        Value::Int(i) => {
+            return Err(Blocked::UnrepresentedConstruct {
+                reason: format!(
+                    "{i} is outside ±2^53, so a handler would read it as a different number"
+                ),
+                at: name.to_string(),
+            });
+        }
+        Value::List(items) => serde_json::Value::Array(
+            items
+                .iter()
+                .map(|i| capture_json(i, name))
+                .collect::<Result<_, _>>()?,
+        ),
+        Value::Record(fields) => serde_json::Value::Object(
+            fields
+                .iter()
+                .map(|(k, v)| Ok((k.clone(), capture_json(v, name)?)))
+                .collect::<Result<_, Blocked>>()?,
+        ),
+        Value::Raw { .. } => {
+            return Err(Blocked::UnrepresentedConstruct {
+                reason: "raw HTML cannot be captured by a handler".into(),
+                at: name.to_string(),
+            });
+        }
+    })
+}
+
+/// The value at a capture path, `item.id`: the longest prefix the environment
+/// holds directly, then record fields one segment at a time.
+fn value_at<'e>(env: &'e Env, path: &str) -> Option<&'e Value> {
+    let segments: Vec<&str> = path.split('.').collect();
+    for split in (1..=segments.len()).rev() {
+        let Some(mut v) = env.values.get(&segments[..split].join(".")) else {
+            continue;
+        };
+        for field in &segments[split..] {
+            match v {
+                Value::Record(fields) => v = fields.get(*field)?,
+                _ => return None,
+            }
+        }
+        return Some(v);
+    }
+    None
+}
+
+/// `{"item": {"id": ..}}` for the path `item.id`: the nesting the compiled
+/// handler reads, `context.captures["item"]["id"]`.
+fn insert_at(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    path: &str,
+    value: serde_json::Value,
+) -> Result<(), Blocked> {
+    let conflict = || Blocked::UnrepresentedConstruct {
+        reason: "one capture path runs through another's value".into(),
+        at: path.to_string(),
+    };
+    let (parents, leaf) = match path.rsplit_once('.') {
+        Some((parents, leaf)) => (parents.split('.').collect::<Vec<_>>(), leaf),
+        None => (Vec::new(), path),
+    };
+    let mut at = object;
+    for segment in parents {
+        at = at
+            .entry(segment.to_string())
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()))
+            .as_object_mut()
+            .ok_or_else(conflict)?;
+    }
+    if at.insert(leaf.to_string(), value).is_some() {
+        return Err(conflict());
+    }
+    Ok(())
+}
+
 pub fn render(t: &Template, env: &Env, others: &[Template]) -> Result<String, Blocked> {
     let mut out = String::new();
     emit(&t.chunks, env, others, &mut out)?;
@@ -472,7 +562,27 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
         // Behaviour, not markup. The browser runtime attaches it after
         // `decide`; the server emits nothing, because the element already
         // carries the `data-pw` that says which element it is.
-        Part::Event { .. } => Ok(()),
+        // An event handler writes no markup of its own (the runtime attaches
+        // it after `decide`) except what it READS of its captures: the paths
+        // `pw_core::resume::capture_paths` derived, serialized onto the element
+        // so the compiled handler reads them from the document rather than
+        // asking the server what the button meant.
+        Part::Event { captures, .. } => {
+            if captures.is_empty() {
+                return Ok(());
+            }
+            let mut object = serde_json::Map::new();
+            for path in captures {
+                let v = value_at(env, path).ok_or(Blocked::MissingValue { path: path.clone() })?;
+                insert_at(&mut object, path, capture_json(v, path)?)?;
+            }
+            let json = serde_json::Value::Object(object).to_string();
+            out.push_str(&format!(
+                " data-pw-captures=\"{}\"",
+                escape::attribute(&json)
+            ));
+            Ok(())
+        }
 
         Part::Conditional {
             id,

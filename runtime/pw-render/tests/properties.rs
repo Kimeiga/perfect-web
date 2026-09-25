@@ -522,7 +522,7 @@ fn an_element_local_part_anchors_on_the_element_not_on_a_comment() {
 fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
     // The element already carries `data-pw`, which is what the runtime needs to
     // find it. Emitting anything more would be inventing a second encoding of
-    // the same fact.
+    // the same fact. A handler that reads nothing it captured carries nothing.
     let tpl = t(vec![
         Chunk::Static("<button data-pw=\"3\">".into()),
         Chunk::Dynamic(Part::Event {
@@ -531,6 +531,7 @@ fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
             event: "press".into(),
             handler: "add_to_cart".into(),
             name: "add_to_cart".into(),
+            captures: vec![],
         }),
         Chunk::Static("Add</button>".into()),
     ]);
@@ -538,6 +539,120 @@ fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
         render(&tpl, &Env::new(), &[]).unwrap(),
         "<button data-pw=\"3\">Add</button>"
     );
+}
+
+// --- E10: what a compiled handler reads, carried by its element -------------
+
+fn button_capturing(paths: &[&str]) -> Template {
+    t(vec![
+        Chunk::Static("<button data-pw=\"3\"".into()),
+        Chunk::Dynamic(Part::Event {
+            id: PartId(9),
+            owner: ElementId(3),
+            event: "press".into(),
+            handler: "e1ab9fca1f6fc15b".into(),
+            name: "add_to_cart".into(),
+            captures: paths.iter().map(|p| p.to_string()).collect(),
+        }),
+        Chunk::Static(">Add</button>".into()),
+    ])
+}
+
+fn item(id: &str, name: &str) -> Value {
+    Value::Record(BTreeMap::from([
+        ("id".to_string(), Value::Text(id.into())),
+        ("name".to_string(), Value::Text(name.into())),
+    ]))
+}
+
+/// The attribute's value, unescaped the way a browser's `dataset` reads it.
+fn captures_of(html: &str) -> serde_json::Value {
+    let start = html.find("data-pw-captures=\"").expect("the attribute") + 18;
+    let end = start + html[start..].find('"').expect("its end");
+    let raw = html[start..end]
+        .replace("&quot;", "\"")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&#39;", "'")
+        .replace("&#96;", "`")
+        .replace("&amp;", "&");
+    serde_json::from_str(&raw).expect("JSON")
+}
+
+#[test]
+fn an_element_carries_exactly_the_paths_its_handler_reads() {
+    // `item.id` and not the whole item: a field the handler does not read is
+    // not in the document, where a patch could leave it stale.
+    let env = Env::new().set("item", item("cortado", "Cortado"));
+    let html = render(&button_capturing(&["item.id"]), &env, &[]).unwrap();
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "cortado" } }),
+        "{html}"
+    );
+
+    // Two paths through one capture nest under one key.
+    let html = render(&button_capturing(&["item.id", "item.name"]), &env, &[]).unwrap();
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "cortado", "name": "Cortado" } })
+    );
+
+    // A capture read whole is carried whole.
+    let html = render(&button_capturing(&["item"]), &env, &[]).unwrap();
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "cortado", "name": "Cortado" } })
+    );
+}
+
+#[test]
+fn a_captured_value_survives_the_attribute_exactly() {
+    // Quotes, angle brackets and ampersands inside the value: the attribute is
+    // escaped once, and what the browser reads back is the value.
+    let env = Env::new().set("item", item("a\"b<c>&d'e", "x"));
+    let html = render(&button_capturing(&["item.id"]), &env, &[]).unwrap();
+    assert!(
+        !html[html.find("data-pw-captures").unwrap()..].starts_with("data-pw-captures=\"{\"item")
+    );
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "a\"b<c>&d'e" } }),
+        "{html}"
+    );
+}
+
+#[test]
+fn a_capture_that_cannot_be_carried_blocks_the_render() {
+    // A path with nothing behind it.
+    let env = Env::new().set("item", item("cortado", "Cortado"));
+    assert!(matches!(
+        render(&button_capturing(&["item.price"]), &env, &[]),
+        Err(Blocked::MissingValue { .. })
+    ));
+
+    // An integer a JavaScript number cannot hold exactly: the handler would
+    // read a different number than the document was rendered with.
+    let exact = Env::new().set("n", Value::Int(1 << 53));
+    assert!(render(&button_capturing(&["n"]), &exact, &[]).is_ok());
+    let inexact = Env::new().set("n", Value::Int((1 << 53) + 1));
+    assert!(matches!(
+        render(&button_capturing(&["n"]), &inexact, &[]),
+        Err(Blocked::UnrepresentedConstruct { .. })
+    ));
+
+    // Raw HTML is bytes with an authority attached; neither is a value.
+    let raw = Env::new().set(
+        "h",
+        Value::Raw {
+            html: "<b>x</b>".into(),
+            capability: "html.trusted".into(),
+        },
+    );
+    assert!(matches!(
+        render(&button_capturing(&["h"]), &raw, &[]),
+        Err(Blocked::UnrepresentedConstruct { .. })
+    ));
 }
 
 // --- E7-R: identity domains and instance tokens --------------------------

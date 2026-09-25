@@ -394,3 +394,34 @@ relations type such a read as the member's result.
 **Validated by** the language reference stating property-call syntax.
 **If false:** `self.style` must be written `self.style()`, and the corpus
 changes accordingly.
+
+## A-022 — captured values are resume metadata, not identity markup
+
+**Status:** `open`, ruling needed (2026-09-25, ADR-0033 §3).
+
+An element with a resumable handler carries the values its handler reads of
+its captures (`data-pw-captures`), including a resource key such as a menu
+item's id. That is read as charter §8.5's "metadata needed to resume
+interactions", which lists resource keys among what a handler may capture. It
+is not read as the identity markup that the 2026-08 ruling ("never put raw
+domain keys into identity markup merely for renderer convenience") governs.
+
+**Validated by** an architect ruling. **If false:** captures are resolved by
+reference, with the browser sending the instance address and the server
+re-deriving the render environment to find the value. A compiled handler then
+cannot compute its arguments in the browser.
+
+## A-023 — only an escape-free string literal has a value
+
+**Status:** `open`, ruling needed (2026-09-25, ADR-0033 §6).
+
+`"espresso"` denotes `espresso`. A string with a backslash, and a `"""`
+string, denote nothing until the language states its escape rules and its
+multi-line rule. Backends that produce a value (the handler backend, the Wasm
+lowering) refuse them. The Koka and Marko backends still pass the token through
+to their targets' rules.
+
+**Validated by** the language reference stating string escapes. **If false**
+(if escapes should follow some existing language's rules): one decoder in
+`Literal::string_value`, with every backend reading it.
+

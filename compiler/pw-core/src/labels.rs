@@ -301,7 +301,7 @@ impl<'a> Labels<'a> {
 }
 
 /// The names a pattern binds, with their spans.
-fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, Span)> {
+pub(crate) fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, Span)> {
     let mut out = Vec::new();
     let mut stack = vec![pat];
     while let Some(p) = stack.pop() {

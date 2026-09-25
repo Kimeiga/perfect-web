@@ -372,7 +372,7 @@ pub struct ValueRelation {
 // --- the typer ---------------------------------------------------------------------
 
 /// What a call resolves to.
-enum Target<'s> {
+pub(crate) enum Target<'s> {
     /// `f(a, b)` and `m.f(a, b)`: every supplied argument is a parameter.
     Callable(&'s Signature),
     /// `x.f(a)`: `x` is the first parameter.
@@ -416,6 +416,68 @@ struct Callee {
 struct Solved {
     result: Ty,
     relations: Vec<ValueRelation>,
+}
+
+/// What a call's written path names.
+pub(crate) enum Named<'s> {
+    /// The callee is not a path, or its path names nothing. `x.f(a)` may still
+    /// be a member call.
+    Nothing,
+    /// It names something ambiguously, or names something a call cannot
+    /// target.
+    Refused,
+    Target(Target<'s>),
+}
+
+/// **Which declaration a call's path names.** The one rule, with two readers:
+/// the typer, and the handler backend (`backend::js`). A handler compiled to
+/// call a different declaration than the one the checker checked would run
+/// unchecked code, and nothing downstream would notice.
+///
+/// A dotted path resolves as a path. A bare name is a term first, and a type
+/// only where no term has that name: `PositiveInt(1)` builds an opaque value,
+/// and `Store(id)` calls the query `Store` even where a type `Store` exists
+/// too (A-003).
+pub(crate) fn named<'s>(
+    sigs: &'s Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    body: &Body,
+    callee: ExprId,
+) -> Named<'s> {
+    let path = path_of(body, callee);
+    if path.is_empty() {
+        return Named::Nothing;
+    }
+    let term = match path.contains('.') {
+        true => ws.resolve_path(at, &path),
+        false => ws.resolve_in(at, Namespace::Term, &path),
+    };
+    let def = match term {
+        Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
+        // Ambiguity is its own diagnostic; never a type verdict.
+        Resolution::Ambiguous(_) => return Named::Refused,
+        Resolution::Unresolved if !path.contains('.') => {
+            match ws.resolve_in(at, Namespace::Type, &path) {
+                Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
+                _ => return Named::Nothing,
+            }
+        }
+        Resolution::Unresolved => return Named::Nothing,
+    };
+    if let Some(sig) = sigs.by_def(def) {
+        return Named::Target(Target::Callable(sig));
+    }
+    let Some(facts) = sigs.type_decl(def) else {
+        return Named::Refused;
+    };
+    if facts.record.is_some() {
+        return Named::Target(Target::Record(def));
+    }
+    if facts.representation.is_some() {
+        return Named::Target(Target::Opaque(def));
+    }
+    Named::Refused
 }
 
 impl<'a> Typer<'a> {
@@ -774,37 +836,10 @@ impl<'a> Typer<'a> {
     /// Resolve a call's target by identity. `None` when it reaches nothing
     /// this analysis can describe — which is silence, not a verdict.
     fn target(&self, call: ExprId, callee: ExprId) -> Option<Target<'a>> {
-        let path = path_of(self.body, callee);
-        if !path.is_empty() {
-            let term = match path.contains('.') {
-                true => self.ws.resolve_path(self.at, &path),
-                false => self.ws.resolve_in(self.at, Namespace::Term, &path),
-            };
-            let found = match term {
-                Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
-                // Ambiguity is its own diagnostic; never a type verdict.
-                Resolution::Ambiguous(_) => return None,
-                Resolution::Unresolved if !path.contains('.') => {
-                    match self.ws.resolve_in(self.at, Namespace::Type, &path) {
-                        Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
-                        _ => None,
-                    }
-                }
-                Resolution::Unresolved => None,
-            };
-            if let Some(def) = found {
-                if let Some(sig) = self.sigs.by_def(def) {
-                    return Some(Target::Callable(sig));
-                }
-                let facts = self.sigs.type_decl(def)?;
-                if facts.record.is_some() {
-                    return Some(Target::Record(def));
-                }
-                if facts.representation.is_some() {
-                    return Some(Target::Opaque(def));
-                }
-                return None;
-            }
+        match named(self.sigs, self.ws, self.at, self.body, callee) {
+            Named::Target(t) => return Some(t),
+            Named::Refused => return None,
+            Named::Nothing => {}
         }
         // `x.f(a)`, where `x` is a value whose type declares `f`.
         let Expr::Field { base, name } = self.body.expr(callee) else {

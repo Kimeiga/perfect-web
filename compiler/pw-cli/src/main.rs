@@ -1012,6 +1012,81 @@ fn audit_values_command(paths: &[&String]) -> ExitCode {
 /// Writes the component to `out`, and prints what it imports and whether its
 /// component-level types agree with its world — read back through
 /// `wit-component`'s decoder, not through anything that wrote it.
+/// `pw emit-handlers --out DIR`: every resumable handler, as `DIR/<identity>.mjs`.
+///
+/// All or nothing. A page whose handlers were partly written would render
+/// buttons that cannot work, so any refusal writes no file and fails the
+/// build, naming each refused handler and why.
+fn emit_handlers_command(paths: &[&String], out: &str) -> ExitCode {
+    let mut units = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        units.push(pw_core::check::Unit {
+            path: path.to_string(),
+            src,
+            hir,
+        });
+    }
+    let compiled = match pw_core::backend::js::compile(&units) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("pw: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut modules = Vec::new();
+    let mut refused = 0;
+    for c in &compiled {
+        match &c.module {
+            pw_core::backend::wasm::Encoding::Encoded(m) => modules.push((c, m)),
+            other => {
+                refused += 1;
+                eprintln!(
+                    "pw: a handler in `{}` was not compiled: {other}",
+                    c.declaration
+                );
+            }
+        }
+    }
+    if refused > 0 {
+        eprintln!("pw: {refused} handler(s) refused; nothing written");
+        return ExitCode::FAILURE;
+    }
+    if let Err(e) = std::fs::create_dir_all(out) {
+        eprintln!("pw: cannot create {out}: {e}");
+        return ExitCode::from(2);
+    }
+    for (c, m) in &modules {
+        let file = std::path::Path::new(out).join(format!("{}.mjs", m.identity));
+        if let Err(e) = std::fs::write(&file, &m.source) {
+            eprintln!("pw: cannot write {}: {e}", file.display());
+            return ExitCode::from(2);
+        }
+        println!(
+            "handler {} `{}` in `{}` calls `{}` ({} bytes)",
+            m.identity,
+            m.name,
+            c.declaration,
+            m.command,
+            m.source.len()
+        );
+    }
+    println!("{} handler(s) written to {out}", modules.len());
+    ExitCode::SUCCESS
+}
+
 fn emit_component_command(paths: &[&String], component_id: &str, out: &str) -> ExitCode {
     let mut units = Vec::new();
     for path in paths {
@@ -1137,11 +1212,13 @@ fn run() -> ExitCode {
             | "emit-wit"
             | "audit-values"
             | "emit-component"
+            | "emit-handlers"
     ) || paths.is_empty()
     {
         eprintln!(
             "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
-             emit-contracts|emit-template|emit-wit|audit-values|emit-component> <path.pw>... [--plain]"
+             emit-contracts|emit-template|emit-wit|audit-values|emit-component|emit-handlers> \
+             <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -1157,7 +1234,24 @@ fn run() -> ExitCode {
         eprintln!(
             "  emit-component --component ID --out FILE  compile one component to a Wasm component"
         );
+        eprintln!(
+            "  emit-handlers --out DIR  compile every resumable handler to DIR/<identity>.mjs"
+        );
         return ExitCode::from(2);
+    }
+
+    if cmd == "emit-handlers" {
+        let out = args
+            .iter()
+            .position(|a| a == "--out")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
+        let Some(out) = out else {
+            eprintln!("usage: pw emit-handlers --out DIR <path.pw>...");
+            return ExitCode::from(2);
+        };
+        let sources: Vec<&String> = paths.iter().copied().filter(|p| **p != out).collect();
+        return emit_handlers_command(&sources, &out);
     }
 
     if cmd == "emit-component" {

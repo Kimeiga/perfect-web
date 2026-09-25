@@ -229,6 +229,14 @@ pub enum Part {
         /// have nothing to ask for.
         #[serde(default)]
         name: String,
+        /// **What the handler reads of its captures**, as field paths:
+        /// `item.id` in `resumable(captures = { item }) => add_to_cart(item.id,
+        /// ..)`. The renderer serializes each path's value onto the element,
+        /// nested by segment, and the compiled handler reads it there (E10,
+        /// 2026-09-25). One derivation, `resume::capture_paths`, for both.
+        /// Empty for a handler that reads nothing it captured.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        captures: Vec<String>,
     },
     /// A region rendered only when a condition holds.
     Conditional {
@@ -607,7 +615,7 @@ struct Lowering<'a> {
 /// the handler is not a lambda that calls a named thing — in which case there
 /// is no separately loadable behaviour to name, and the runtime says so rather
 /// than guessing.
-fn called_name(body: &Body, expr: crate::hir::ExprId) -> String {
+pub(crate) fn called_name(body: &Body, expr: crate::hir::ExprId) -> String {
     let Expr::Lambda { body: inner, .. } = body.expr(expr) else {
         return String::new();
     };
@@ -748,12 +756,17 @@ fn lower_element(
                 AttrValue::Expr(e) => called_name(body, *e),
                 _ => String::new(),
             };
+            let captures = match &a.value {
+                AttrValue::Expr(e) => crate::resume::capture_paths(body, *e),
+                _ => Vec::new(),
+            };
             out.push(Chunk::Dynamic(Part::Event {
                 id: ix.part(),
                 owner: owner.expect("an element with a handler owns an identity"),
                 event: event.to_string(),
                 handler,
                 name,
+                captures,
             }));
             continue;
         }

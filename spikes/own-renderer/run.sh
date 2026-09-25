@@ -27,10 +27,18 @@ PAGES=(
 # The store page: the real E4/E5 demo, rendered by the own renderer. Its
 # program is the whole library, because the template IR needs the handler
 # identity the resume artifacts derived and that is a whole-program answer.
+#
+# With the standard packages it imports, since 2026-09-25. That is the unit set
+# `pw check` accepts and `just e10-component` compiles the commands from. The
+# template IR (which names each handler's identity) and the compiled handlers
+# (filed under that identity) are emitted from it, so the two cannot come from
+# different programs.
 STORE=(
+  "$REPO_ROOT/packages/pw-std/"*.pw
+  "$REPO_ROOT/packages/pw-platform-web/"*.pw
   "$REPO_ROOT/examples/domain.pw"
   "$REPO_ROOT/examples/lib/"*.pw
-  "$REPO_ROOT/examples/store/app.pw"
+  "$REPO_ROOT/examples/store/"*.pw
 )
 
 echo "== 1. the pages are checked before they are rendered =="
@@ -58,6 +66,11 @@ cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-
   --identity-key "own-renderer-spike-key" \
   --runtime /pw-runtime.mjs < "$SPIKE/store-ir.json"
 cp "$SPIKE/public/pw-runtime.mjs" "$OUT/"
+
+echo
+echo "== 3c. the store's resumable handlers, compiled from their bodies (E10) =="
+cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
+  emit-handlers --out "$OUT/handlers" "${STORE[@]}"
 cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" \
   -p pw-resume-wasm --target wasm32-unknown-unknown --release
 cp "$REPO_ROOT/target/wasm32-unknown-unknown/release/pw_resume_wasm.wasm" "$OUT/pw-resume.wasm"

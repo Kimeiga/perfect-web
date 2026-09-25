@@ -165,3 +165,58 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
         );
     }
 }
+
+/// **The committed handler modules are what the compiler emits now.**
+///
+/// `docs/evidence/E10/handlers/<identity>.mjs` is what `just e10-handlers`
+/// recorded `pw emit-handlers` writing for the store. A stale one would record
+/// a handler the compiler no longer produces, under an identity the document
+/// may no longer name. The directory holds exactly the current set.
+#[test]
+fn the_committed_handlers_are_what_the_compiler_emits_now() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let units: Vec<pw_core::check::Unit> = store_sources(&root)
+        .into_iter()
+        .enumerate()
+        .map(|(i, src)| pw_core::check::Unit {
+            path: format!("{i}.pw"),
+            hir: lower_file(&src, &parse_tree(&src).green),
+            src,
+        })
+        .collect();
+    let dir = root.join("docs/evidence/E10/handlers");
+    let mut fresh: Vec<(String, String)> = pw_core::backend::js::compile(&units)
+        .expect("the store checks")
+        .into_iter()
+        .map(|c| match c.module {
+            pw_core::backend::wasm::Encoding::Encoded(m) => {
+                (format!("{}.mjs", m.identity), m.source)
+            }
+            other => panic!("a handler in `{}` was not compiled: {other}", c.declaration),
+        })
+        .collect();
+    fresh.sort();
+    let mut committed: Vec<(String, String)> = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("{}: {e} — run `just e10-handlers`", dir.display()))
+        .map(|e| {
+            let path = e.expect("entry").path();
+            (
+                path.file_name().unwrap().to_string_lossy().to_string(),
+                std::fs::read_to_string(&path).expect("read"),
+            )
+        })
+        .collect();
+    committed.sort();
+    let differing: std::collections::BTreeSet<&String> = fresh
+        .iter()
+        .chain(&committed)
+        .filter(|entry| !(fresh.contains(entry) && committed.contains(entry)))
+        .map(|(name, _)| name)
+        .collect();
+    assert!(
+        differing.is_empty(),
+        "docs/evidence/E10/handlers/ is stale: {differing:?} differ between what is \
+         committed and what the compiler emits now. Run `just e10-handlers` and commit \
+         the result, saying in the commit message what changed in the compiled handlers."
+    );
+}

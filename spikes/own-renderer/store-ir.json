@@ -58,7 +58,10 @@
                 "owner": 0,
                 "event": "press",
                 "handler": "e1ab9fca1f6fc15b",
-                "name": "add_to_cart"
+                "name": "add_to_cart",
+                "captures": [
+                  "item.id"
+                ]
               }
             },
             {

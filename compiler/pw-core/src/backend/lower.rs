@@ -394,17 +394,11 @@ fn primitive(name: &str) -> Option<Type> {
 }
 
 fn component_id(cx: &Context<'_>, unit: usize, decl: &Decl) -> String {
-    let module = cx.hirs[unit]
-        .all_decls()
+    let hir = cx.hirs[unit];
+    hir.all_decls()
         .find(|(_, d)| std::ptr::eq(*d, decl))
-        .and_then(|(id, _)| cx.hirs[unit].module_of(id))
-        .unwrap_or_default()
-        .to_string();
-    if module.is_empty() {
-        decl.name.clone()
-    } else {
-        format!("{module}.{}", decl.name)
-    }
+        .map(|(id, _)| crate::contract::component_id(hir, id))
+        .unwrap_or_else(|| decl.name.clone())
 }
 
 fn decl_def(cx: &Context<'_>, unit: usize, decl: &Decl) -> Option<DefId> {
@@ -520,7 +514,19 @@ impl<'a> Lower<'a> {
                             };
                         }
                     },
-                    Literal::Str(s) => (Const::Str(s.clone()), Type::Str),
+                    // The string's VALUE, not its token: until 2026-09-25 this
+                    // held the token, quotes included, which nothing noticed
+                    // because the encoder refuses constants that need memory.
+                    Literal::Str(s) => match l.string_value() {
+                        Some(v) => (Const::Str(v.to_string()), Type::Str),
+                        None => {
+                            return Lowering::Unsupported {
+                                construct: "a string literal whose escapes the language does not define",
+                                span,
+                                reason: format!("`{s}` means something only under an escape rule"),
+                            };
+                        }
+                    },
                     Literal::UnterminatedStr(_) => {
                         return Lowering::Blocked {
                             why: "an unterminated string; the program did not parse".to_string(),

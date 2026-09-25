@@ -283,6 +283,13 @@ test.describe("instance identity — the three Add buttons", () => {
     // Architect ruling: "Never put raw domain keys into identity markup merely
     // for renderer convenience." A comment is no more private than an
     // attribute — both are read by anything that can read the document.
+    //
+    // `data-pw-captures` is excluded by name, and only it. It is not identity
+    // markup: it carries what the page's author declared the handler captures,
+    // narrowed to the paths the compiled handler reads (E10, 2026-09-25), the
+    // "only the metadata needed to resume interactions" of charter §8.5, whose
+    // list of what a handler may capture includes resource keys. Every other
+    // `data-pw*` attribute is still held to the ruling.
     await ready(page);
     const html = await page.content();
     const keys = ["espresso", "cortado", "cold-brew"];
@@ -291,7 +298,7 @@ test.describe("instance identity — the three Add buttons", () => {
         html,
         `\`${key}\` must not appear in identity markup`,
       ).not.toMatch(new RegExp(`pw:[se]\\d+@[^-]*${key}`));
-      expect(html).not.toMatch(new RegExp(`data-pw[^=]*="[^"]*${key}`));
+      expect(html).not.toMatch(new RegExp(`data-pw(?!-captures=)[^=]*="[^"]*${key}`));
     }
     // The control: the tokens ARE there, so the assertion is about their
     // content rather than about their absence.

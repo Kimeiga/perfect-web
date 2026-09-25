@@ -426,10 +426,10 @@ impl Server {
         )
     }
 
-    /// **`add_to_cart`, as the compiler built it.**
+    /// **Run a command the compiler built, by its component id.**
     ///
-    /// No Rust computes this command's result. The component runs the
-    /// compiled body of
+    /// No code here knows which command it is running. The component runs
+    /// its compiled body, for example
     ///
     /// ```text
     /// command add_to_cart(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
@@ -439,18 +439,20 @@ impl Server {
     /// ```
     ///
     /// and what this server supplies is the DEPLOYMENT: the platform's session
-    /// operation, and `store:data/carts#add`, its data layer. The data layer
-    /// STAGES the new lines; only if the component returns `Ok` are the state
-    /// and its event committed together (ADR-0019), so a command that fails —
-    /// or traps — commits nothing and the browser receives nothing.
+    /// operation, and [`Server::data_layer`], all of `store:data/carts`. The
+    /// linker gives the component only what its contract was granted and its
+    /// artifact imports. Every write STAGES; only if the component returns
+    /// without an `Err` are the staged cart and its event committed together
+    /// (ADR-0019), so a command that fails, or traps, commits nothing and the
+    /// browser receives nothing.
     ///
     /// `fail` makes the data layer answer `cart-expired`, the rollback path the
     /// browser tests exercise.
-    fn add_to_cart(
+    fn command(
         &self,
+        component_id: &str,
         session: &str,
-        item: &str,
-        quantity: i64,
+        args: &[Val],
         fail: bool,
     ) -> Result<(), String> {
         // One lock across the call and the commit: two presses in the same
@@ -460,56 +462,20 @@ impl Server {
             let mut carts = self.carts.lock().expect("carts");
             let current = carts.get(session).cloned().unwrap_or_default();
             let staged: Arc<Mutex<Option<Lines>>> = Arc::default();
+            let mut host = Self::data_layer(session, current, staged.clone(), fail);
+            host.insert(
+                "pw:host/session#read".to_string(),
+                Self::session_operation(session),
+            );
 
-            let for_add = staged.clone();
-            let this_session = session.to_string();
-            let add: HostFn = Arc::new(move |args: &[Val]| {
-                let [Val::String(s), Val::String(item), Val::S64(quantity)] = args else {
-                    return Err(format!("carts#add received {args:?}"));
-                };
-                // The session the component passes is the one the host gave
-                // it; anything else is a component acting for someone else.
-                if *s != this_session {
-                    return Err("carts#add was passed another session".to_string());
-                }
-                if fail {
-                    return Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                        "cart-expired".into(),
-                        None,
-                    )))))]);
-                }
-                let mut lines = current.clone();
-                match lines.iter_mut().find(|(i, _)| i == item) {
-                    Some((_, q)) => *q += quantity,
-                    None => lines.push((item.clone(), *quantity)),
-                }
-                let cart = cart_value(&lines);
-                *for_add.lock().expect("staged") = Some(lines);
-                Ok(vec![Val::Result(Ok(Some(Box::new(cart))))])
-            });
-            let host = BTreeMap::from([
-                (
-                    "pw:host/session#read".to_string(),
-                    Self::session_operation(session),
-                ),
-                ("store:data/carts#add".to_string(), add),
-            ]);
-
-            let out = self.run(
-                "store.page.add_to_cart",
-                &host,
-                &[Val::String(item.to_string()), Val::S64(quantity)],
-            )?;
-            match out.as_slice() {
-                [Val::Result(Ok(_))] => {}
-                [Val::Result(Err(e))] => return Err(format!("add_to_cart failed: {e:?}")),
-                other => return Err(format!("add_to_cart returned {other:?}")),
+            let out = self.run(component_id, &host, args)?;
+            if let [Val::Result(Err(e))] = out.as_slice() {
+                return Err(format!("{component_id} failed: {e:?}"));
             }
-            let lines = staged
-                .lock()
-                .expect("staged")
-                .take()
-                .ok_or("add_to_cart succeeded without its data layer writing")?;
+            let Some(lines) = staged.lock().expect("staged").take() else {
+                // Nothing was written, so there is nothing to commit.
+                return Ok(());
+            };
             let total: i64 = lines.iter().map(|(_, q)| q).sum();
             self.materializer.command(|tx| {
                 Materializer::set_state(tx, &format!("cart:{session}"), &total.to_string());
@@ -527,73 +493,108 @@ impl Server {
         Ok(())
     }
 
-    /// **`clear_cart`, as the compiler built it**, through the same path.
-    fn clear_cart(&self, session: &str) -> Result<(), String> {
-        {
-            let mut carts = self.carts.lock().expect("carts");
-            let cleared: Arc<Mutex<bool>> = Arc::default();
-            let for_clear = cleared.clone();
-            let this_session = session.to_string();
-            let clear: HostFn = Arc::new(move |args: &[Val]| {
-                let [Val::String(s)] = args else {
-                    return Err(format!("carts#clear received {args:?}"));
-                };
-                if *s != this_session {
-                    return Err("carts#clear was passed another session".to_string());
-                }
-                *for_clear.lock().expect("cleared") = true;
-                Ok(vec![Val::Result(Ok(Some(Box::new(cart_value(&[])))))])
-            });
-            let host = BTreeMap::from([
-                (
-                    "pw:host/session#read".to_string(),
-                    Self::session_operation(session),
-                ),
-                ("store:data/carts#clear".to_string(), clear),
-            ]);
-            let out = self.run("store.page.clear_cart", &host, &[])?;
-            match out.as_slice() {
-                [Val::Result(Ok(_))] => {}
-                other => return Err(format!("clear_cart returned {other:?}")),
-            }
-            if !*cleared.lock().expect("cleared") {
-                return Err("clear_cart succeeded without its data layer clearing".into());
-            }
-            self.materializer.command::<String>(|_tx| {
-                Ok(vec![pw_materialize::Event::new(
-                    "Events.CartChanged",
-                    &[session],
-                )])
-            })?;
-            carts.insert(session.to_string(), Vec::new());
-        }
-        self.drain(session);
-        Ok(())
+    /// **A command whose arguments arrived from a browser, as JSON.**
+    ///
+    /// A compiled handler runs in the user's browser, so its arguments are a
+    /// claim. They are typed by the command component's OWN parameters, read
+    /// from the artifact by the host, and refused otherwise, before anything
+    /// runs. The outer error is a malformed request (the arguments); the inner
+    /// one is a command that ran and did not commit.
+    fn command_json(
+        &self,
+        component_id: &str,
+        session: &str,
+        json: &[serde_json::Value],
+    ) -> Result<Result<(), String>, String> {
+        let loaded = self
+            .components
+            .get(component_id)
+            .ok_or_else(|| format!("no compiled component for `{component_id}`"))?;
+        let export = self
+            .contracts
+            .iter()
+            .find(|c| c.component_id == component_id)
+            .and_then(|c| c.exports.first())
+            .and_then(|e| e.component.clone())
+            .ok_or_else(|| format!("`{component_id}`'s contract does not locate its export"))?;
+        let args = loaded
+            .prepared
+            .arguments(&[&export.interface, &export.function], json)?;
+        Ok(self.command(component_id, session, &args, false))
     }
 
-    /// The menu item a pressed Add button's loop instance holds.
+    /// **The deployment's data layer: `store:data/carts`, whole.**
     ///
-    /// The browser sends the instance's ADDRESS — it holds nothing else about
-    /// the item — and the item is resolved with the same token derivation the
-    /// renderer used to emit that instance, over the menu as the server holds
-    /// it now. An address naming no current item resolves to nothing.
-    fn menu_item_at(&self, address: &str) -> Option<String> {
-        let (template, each) = self.menu_part();
-        let token = address
-            .split('|')
-            .next()?
-            .rsplit('/')
-            .next()?
-            .split_once('@')?
-            .1;
-        let items = self.menu.lock().expect("menu").clone();
-        let env = self.menu_env(&items);
-        let _ = template;
-        items.iter().find_map(|(id, _)| {
-            (pw_render::instance_token_of(PartId(each.0), &item(id, ""), "id", &env).to_string()
-                == token)
-                .then(|| id.clone())
-        })
+    /// Every operation the interface declares, whichever command is running;
+    /// the host links only those the component imports and was granted. Each
+    /// write stages the session's new lines in `staged`, and nothing here
+    /// commits. A command's `Ok` does that, in [`Server::command`]. The
+    /// session an operation is passed must be the one the host gave the
+    /// component, or the component is acting for someone else.
+    fn data_layer(
+        session: &str,
+        current: Lines,
+        staged: Arc<Mutex<Option<Lines>>>,
+        fail: bool,
+    ) -> BTreeMap<String, HostFn> {
+        let expired = || {
+            vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                "cart-expired".into(),
+                None,
+            )))))]
+        };
+        let op = |name: &'static str,
+                  f: fn(&mut Lines, &[Val]) -> Result<(), String>|
+         -> (String, HostFn) {
+            let this_session = session.to_string();
+            let current = current.clone();
+            let staged = staged.clone();
+            let run: HostFn = Arc::new(move |args: &[Val]| {
+                let Some(Val::String(s)) = args.first() else {
+                    return Err(format!("carts#{name} received {args:?}"));
+                };
+                if *s != this_session {
+                    return Err(format!("carts#{name} was passed another session"));
+                }
+                if fail {
+                    return Ok(expired());
+                }
+                let mut staged = staged.lock().expect("staged");
+                let mut lines = staged.clone().unwrap_or_else(|| current.clone());
+                f(&mut lines, &args[1..])?;
+                let cart = cart_value(&lines);
+                if name != "current" {
+                    *staged = Some(lines);
+                }
+                Ok(vec![Val::Result(Ok(Some(Box::new(cart))))])
+            });
+            (format!("store:data/carts#{name}"), run)
+        };
+        BTreeMap::from([
+            op("add", |lines, args| {
+                let [Val::String(item), Val::S64(quantity)] = args else {
+                    return Err(format!("carts#add received {args:?}"));
+                };
+                match lines.iter_mut().find(|(i, _)| i == item) {
+                    Some((_, q)) => *q += quantity,
+                    None => lines.push((item.clone(), *quantity)),
+                }
+                Ok(())
+            }),
+            op("clear", |lines, args| {
+                if !args.is_empty() {
+                    return Err(format!("carts#clear received {args:?}"));
+                }
+                lines.clear();
+                Ok(())
+            }),
+            op("current", |_, args| {
+                if !args.is_empty() {
+                    return Err(format!("carts#current received {args:?}"));
+                }
+                Ok(())
+            }),
+        ])
     }
 
     /// Consume committed events and regenerate what they invalidate.
@@ -909,18 +910,33 @@ impl Server {
         )
     }
 
-    /// Which handler an identity names, if this build has it.
+    /// Every handler identity this build's templates name.
     ///
     /// Answered from the compiler's template IR rather than from a list here.
     /// A list would be a second answer to "which handlers exist", and the
     /// first thing it would do is disagree.
-    fn handler_named(&self, identity: &str) -> Option<String> {
-        self.templates.iter().find_map(|t| {
-            t.manifest().into_iter().find_map(|p| {
-                (p.kind == "event" && p.value == identity && !p.name.is_empty())
-                    .then(|| p.name.clone())
-            })
-        })
+    fn handler_identities(&self) -> std::collections::BTreeSet<String> {
+        self.templates
+            .iter()
+            .flat_map(|t| t.manifest())
+            .filter(|p| p.kind == "event" && !p.value.is_empty())
+            .map(|p| p.value.clone())
+            .collect()
+    }
+
+    /// Where `pw emit-handlers` wrote the module for a handler identity.
+    fn handler_module(&self, identity: &str) -> std::path::PathBuf {
+        self.dist.join("handlers").join(format!("{identity}.mjs"))
+    }
+
+    /// Handler identities the document names and no compiled module exists
+    /// for. The server refuses to start while there are any: a document whose
+    /// buttons cannot load their code is a build that did not finish.
+    fn uncompiled_handlers(&self) -> Vec<String> {
+        self.handler_identities()
+            .into_iter()
+            .filter(|id| !self.handler_module(id).is_file())
+            .collect()
     }
 
     /// The graph the materializer consumes.
@@ -1189,6 +1205,16 @@ fn main() {
     let templates: Vec<Template> = serde_json::from_str(&ir).expect("the template IR parses");
 
     let server = Arc::new(Server::new(dist.into(), templates));
+    let missing = server.uncompiled_handlers();
+    if !missing.is_empty() {
+        eprintln!(
+            "pw dev server: no compiled module for handler(s) {} under {}/handlers; \
+             run spikes/own-renderer/run.sh, which runs `pw emit-handlers`",
+            missing.join(", "),
+            server.dist.display()
+        );
+        std::process::exit(1);
+    }
     let listener = TcpListener::bind(("127.0.0.1", port)).expect("bind");
     println!("pw dev server on {port}");
 
@@ -1221,58 +1247,102 @@ fn handle(server: &Server, mut stream: TcpStream) {
     let session = session_of(&headers);
     let fresh = !headers.contains("pw-session=");
 
+    // The body, when the request declares one. Bounded: a command's arguments
+    // are a few values, and a length nothing checks is an allocation anyone
+    // can ask for.
+    const MAX_BODY: usize = 64 * 1024;
+    let length = headers
+        .lines()
+        .find_map(|l| {
+            let (k, v) = l.split_once(':')?;
+            k.trim()
+                .eq_ignore_ascii_case("content-length")
+                .then(|| v.trim().parse::<usize>().ok())?
+        })
+        .unwrap_or(0);
+    if length > MAX_BODY {
+        respond(
+            &mut stream,
+            413,
+            "text/plain; charset=utf-8",
+            &session,
+            fresh,
+            b"request body too large",
+        );
+        return;
+    }
+    let mut body = vec![0; length];
+    if reader.read_exact(&mut body).is_err() {
+        return;
+    }
+
     let route = path.split('?').next().unwrap_or("/");
     let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
 
     match (method, route) {
-        ("POST", "/command/add_to_cart") => {
-            // The command's arguments: the item — named directly, or by the
-            // loop instance the pressed button belongs to — and the quantity.
-            // Missing either is a malformed request, not a command to guess.
-            let arg = |name: &str| {
-                query.split('&').find_map(|kv| {
-                    let (k, v) = kv.split_once('=')?;
-                    (k == name).then(|| percent_decode(v))
-                })
+        // **A command the compiler built, by its component id**: what a
+        // compiled handler calls (`context.command(id, args)` in
+        // `dist/handlers/<identity>.mjs`). The body is the arguments, as a JSON
+        // array, typed here by the component's own parameters; the guard admits
+        // only components this server hosts, so an unknown id falls through to
+        // the 404 below rather than to a default.
+        ("POST", route)
+            if route
+                .strip_prefix("/command/")
+                .is_some_and(|id| server.components.contains_key(id)) =>
+        {
+            let id = &route["/command/".len()..];
+            let args = match serde_json::from_slice::<Vec<serde_json::Value>>(&body) {
+                Ok(args) => args,
+                Err(e) => {
+                    let why =
+                        serde_json::Value::String(format!("the body is not a JSON array: {e}"));
+                    respond_json(
+                        &mut stream,
+                        400,
+                        &session,
+                        fresh,
+                        &format!("{{\"committed\":false,\"error\":{why}}}"),
+                    );
+                    return;
+                }
             };
-            let item =
-                arg("item").or_else(|| arg("instance").and_then(|a| server.menu_item_at(&a)));
-            let quantity = arg("quantity").and_then(|q| q.parse::<i64>().ok());
-            let (Some(item), Some(quantity)) = (item, quantity) else {
-                respond_json(&mut stream, 400, &session, fresh, "{\"committed\":false}");
-                return;
-            };
-            let result = server.add_to_cart(&session, &item, quantity, false);
-            if let Err(e) = &result
-                && std::env::var("PW_TRACE").is_ok()
-            {
-                eprintln!("add_to_cart: {e}");
+            match server.command_json(id, &session, &args) {
+                // A malformed request: nothing ran.
+                Err(e) => {
+                    let why = serde_json::Value::String(e);
+                    respond_json(
+                        &mut stream,
+                        400,
+                        &session,
+                        fresh,
+                        &format!("{{\"committed\":false,\"error\":{why}}}"),
+                    );
+                }
+                Ok(result) => {
+                    if let Err(e) = &result
+                        && std::env::var("PW_TRACE").is_ok()
+                    {
+                        eprintln!("{id}: {e}");
+                    }
+                    let ok = result.is_ok();
+                    respond_json(
+                        &mut stream,
+                        202,
+                        &session,
+                        fresh,
+                        &format!("{{\"committed\":{ok}}}"),
+                    );
+                }
             }
-            let ok = result.is_ok();
-            respond_json(
-                &mut stream,
-                202,
-                &session,
-                fresh,
-                &format!("{{\"committed\":{ok}}}"),
-            );
-        }
-        ("POST", "/command/clear_cart") => {
-            // The second command, and the reason it exists is E7-L: two
-            // handlers are what make "the exact handler was loaded" a claim
-            // that can be false. It goes through the same path — commit state
-            // and event together, then drain.
-            let ok = server.clear_cart(&session).is_ok();
-            respond_json(
-                &mut stream,
-                202,
-                &session,
-                fresh,
-                &format!("{{\"committed\":{ok}}}"),
-            );
         }
         ("POST", "/command/add_and_fail") => {
-            let _ = server.add_to_cart(&session, "espresso", 1, true);
+            let _ = server.command(
+                "store.page.add_to_cart",
+                &session,
+                &[Val::String("espresso".into()), Val::S64(1)],
+                true,
+            );
             respond_json(&mut stream, 500, &session, fresh, "{\"committed\":false}");
         }
         ("POST", "/command/menu_changed") => {
@@ -1381,10 +1451,12 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // the module DOES; the identity is which version of it this document
         // was rendered against.
         //
-        // Generating the module here is the dev host standing in for E9's code
-        // generator. What is real is the boundary: the document does not carry
-        // it, the browser asks for it by identity, and the server refuses an
-        // identity this build does not have.
+        // The module is the COMPILER's (E10, 2026-09-25): `pw emit-handlers`
+        // compiled the handler's body to `dist/handlers/<identity>.mjs`, and
+        // this route serves that file unchanged. Until then the server wrote a
+        // module here itself. An identity this build's templates do not name
+        // is refused before the file system is asked, so a request can only
+        // ever reach a file the compiler named.
         ("GET", route) if route.starts_with("/handler/") => {
             let id = route
                 .trim_start_matches("/handler/")
@@ -1393,7 +1465,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             // module map treats it as a new specifier, because a failed load
             // is cached forever otherwise. The identity is still the path.
             let id = id.split('?').next().unwrap_or(id);
-            let Some(name) = server.handler_named(id) else {
+            if !server.handler_identities().contains(id) {
                 // An identity this build does not know. Refused rather than
                 // guessed: serving *some* handler for an unknown identity is
                 // how a stale document ends up running new code.
@@ -1406,36 +1478,25 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     b"no such handler",
                 );
                 return;
-            };
-            // Deliberately tiny, and deliberately not a bundle. Every handler
-            // is its own module, because "the exact handler was fetched" is
-            // only observable if handlers are separable.
-            // `add_to_cart(item.id, PositiveInt(1))` passes the captured item
-            // — which the browser knows only as the loop instance it pressed —
-            // and the literal quantity. The handler body is not compiled from
-            // Pleris yet (KNOWN_LIMITATIONS: resumable handler bodies); the
-            // COMMAND it calls is.
-            let args = match name.as_str() {
-                "add_to_cart" => {
-                    "?instance=\" + encodeURIComponent(context?.instance ?? \"\") + \"&quantity=1"
-                }
-                _ => "",
-            };
-            let body = format!(
-                "// handler {name}, identity {id}\n\
-                 export const name = {name:?};\n\
-                 export async function run(context) {{\n\
-                 \x20 await fetch(\"/command/{name}{args}\", {{ method: \"POST\" }});\n\
-                 }}\n"
-            );
-            respond(
-                &mut stream,
-                200,
-                "text/javascript; charset=utf-8",
-                &session,
-                fresh,
-                body.as_bytes(),
-            );
+            }
+            match std::fs::read(server.handler_module(id)) {
+                Ok(module) => respond(
+                    &mut stream,
+                    200,
+                    "text/javascript; charset=utf-8",
+                    &session,
+                    fresh,
+                    &module,
+                ),
+                Err(_) => respond(
+                    &mut stream,
+                    404,
+                    "text/plain; charset=utf-8",
+                    &session,
+                    fresh,
+                    b"this handler was not compiled",
+                ),
+            }
         }
         ("GET", "/menu") => {
             let items = server.menu.lock().expect("menu");
@@ -1485,6 +1546,18 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 body.as_bytes(),
             );
         }
+        // A command this server does not host, including the address-resolving
+        // `/command/add_to_cart?instance=..` route E10 deleted. Named, rather
+        // than left to the 405 below: the method is right and the command is
+        // not there.
+        ("POST", route) if route.starts_with("/command/") => respond(
+            &mut stream,
+            404,
+            "text/plain; charset=utf-8",
+            &session,
+            fresh,
+            b"no such command",
+        ),
         ("GET", _) => serve_file(server, &mut stream, route, &session, fresh),
         _ => respond(&mut stream, 405, "text/plain", &session, fresh, b"method"),
     }
@@ -1690,36 +1763,6 @@ fn document(body: &str, templates: &[Template], cursor: u64) -> String {
     )
 }
 
-/// A query-string value, `%XX`-decoded. A malformed escape decodes to
-/// nothing rather than to a guess.
-fn percent_decode(v: &str) -> String {
-    let bytes = v.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'%' if i + 2 < bytes.len() => {
-                let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("");
-                match u8::from_str_radix(hex, 16) {
-                    Ok(b) => out.push(b),
-                    Err(_) => return String::new(),
-                }
-                i += 3;
-            }
-            b'%' => return String::new(),
-            b'+' => {
-                out.push(b' ');
-                i += 1;
-            }
-            b => {
-                out.push(b);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8(out).unwrap_or_default()
-}
-
 fn session_of(headers: &str) -> String {
     headers
         .split("pw-session=")
@@ -1786,6 +1829,14 @@ mod tests {
         Server::on(std::path::PathBuf::from("."), Vec::new(), topology)
     }
 
+    const ADD: &str = "store.page.add_to_cart";
+    const CLEAR: &str = "store.page.clear_cart";
+
+    /// `add_to_cart`'s arguments, as the component takes them.
+    fn add(item: &str, quantity: i64) -> [Val; 2] {
+        [Val::String(item.into()), Val::S64(quantity)]
+    }
+
     /// With the compiler's template IR, for a test whose second command
     /// regenerates the fragment the first one materialized.
     fn rendering_server() -> Server {
@@ -1806,7 +1857,7 @@ mod tests {
     fn a_command_is_refused_on_a_node_that_does_not_grant_its_capability() {
         let s = server(barren());
         let err = s
-            .add_to_cart("session-1", "espresso", 1, false)
+            .command(ADD, "session-1", &add("espresso", 1), false)
             .expect_err("a barren node cannot host a write");
         assert!(
             err.contains("add_to_cart") && err.contains("barren"),
@@ -1820,7 +1871,7 @@ mod tests {
     #[test]
     fn the_same_command_runs_where_the_capability_exists() {
         let s = server(dev_topology());
-        s.add_to_cart("session-1", "espresso", 1, false)
+        s.command(ADD, "session-1", &add("espresso", 1), false)
             .expect("the dev origin grants the write");
         assert_eq!(s.cart_value("session-1"), 1);
     }
@@ -1832,11 +1883,11 @@ mod tests {
     #[test]
     fn the_compiled_command_carries_its_arguments_to_the_data_layer() {
         let s = rendering_server();
-        s.add_to_cart("session-9", "cortado", 2, false)
+        s.command(ADD, "session-9", &add("cortado", 2), false)
             .expect("runs");
-        s.add_to_cart("session-9", "espresso", 1, false)
+        s.command(ADD, "session-9", &add("espresso", 1), false)
             .expect("runs");
-        s.add_to_cart("session-9", "cortado", 1, false)
+        s.command(ADD, "session-9", &add("cortado", 1), false)
             .expect("runs");
         let lines = s.carts.lock().unwrap().get("session-9").cloned().unwrap();
         assert_eq!(
@@ -1858,10 +1909,10 @@ mod tests {
     #[test]
     fn a_failing_command_commits_neither_state_nor_event() {
         let s = rendering_server();
-        s.add_to_cart("session-3", "espresso", 1, false)
+        s.command(ADD, "session-3", &add("espresso", 1), false)
             .expect("runs");
         let err = s
-            .add_to_cart("session-3", "cortado", 5, true)
+            .command(ADD, "session-3", &add("cortado", 5), true)
             .expect_err("the data layer refuses");
         assert!(
             err.contains("cart-expired"),
@@ -1870,30 +1921,138 @@ mod tests {
         assert_eq!(s.cart_value("session-3"), 1, "the failed add left nothing");
     }
 
-    /// **No Rust closure computes a command.** Structural, because the
-    /// failure it guards against — a body quietly reimplemented beside the
-    /// component — would pass every behavioural test above.
+    /// **No Rust closure computes a command, and no Rust writes a handler.**
+    /// Structural, because the failure it guards against — a body quietly
+    /// reimplemented beside the component, or a handler module written here
+    /// instead of compiled — would pass every behavioural test above.
+    ///
+    /// The needles are assembled, so this test's own text cannot match them.
     #[test]
-    fn the_commands_run_as_compiled_components() {
+    fn the_commands_and_handlers_are_the_compilers() {
         let src = include_str!("main.rs");
-        for (command, id) in [
-            (
-                "fn add_to_cart(",
-                "self.run(\n                \"store.page.add_to_cart\"",
-            ),
-            ("fn clear_cart(", "self.run(\"store.page.clear_cart\""),
+        let server_code = &src[..src.find("#[cfg(test)]").expect("the tests")];
+        let start = server_code.find("fn command(").expect("the command path");
+        let body =
+            &server_code[start..start + server_code[start..].find("\n    }\n").expect("its end")];
+        assert!(
+            body.contains("self.run(component_id, &host, args)"),
+            "every command runs its compiled component"
+        );
+        for gone in [
+            ["fn add_to_", "cart("].concat(),
+            ["fn clear_", "cart("].concat(),
+            ["fn menu_item", "_at("].concat(),
+            ["export async ", "function run"].concat(),
         ] {
-            let start = src.find(command).expect("the command");
-            let body = &src[start..start + src[start..].find("\n    }\n").expect("its end")];
             assert!(
-                body.contains(id),
-                "`{command}` must run its compiled component"
-            );
-            assert!(
-                !body.contains("+ 1"),
-                "`{command}` computes something itself"
+                !server_code.contains(&gone),
+                "`{gone}` is back: per-command Rust, or a handler written by the server"
             );
         }
+    }
+
+    /// **A command's arguments from a browser are typed by the component.**
+    ///
+    /// What `dist/handlers/<identity>.mjs` sends: `context.command(id, args)`
+    /// posts the arguments as JSON, and they are converted by the parameter
+    /// types the ARTIFACT declares before anything runs.
+    #[test]
+    fn a_browsers_arguments_are_typed_by_the_components_own_parameters() {
+        let s = rendering_server();
+        let ran = s
+            .command_json(
+                ADD,
+                "session-5",
+                &[serde_json::json!("cortado"), serde_json::json!(2)],
+            )
+            .expect("well-formed");
+        ran.expect("and it committed");
+        assert_eq!(s.cart_value("session-5"), 2);
+
+        // Refused before anything runs, each for its own reason.
+        for (args, why) in [
+            (
+                vec![serde_json::json!("cortado")],
+                "takes 2 argument(s); 1 were sent",
+            ),
+            (
+                vec![serde_json::json!(2), serde_json::json!(2)],
+                "expected a string",
+            ),
+            (
+                vec![serde_json::json!("cortado"), serde_json::json!(1.5)],
+                "expected an integer",
+            ),
+            (
+                vec![serde_json::json!("cortado"), serde_json::json!("2")],
+                "expected an integer",
+            ),
+            (
+                vec![serde_json::json!("cortado"), serde_json::json!(u64::MAX)],
+                "is outside",
+            ),
+        ] {
+            let err = s
+                .command_json(ADD, "session-5", &args)
+                .expect_err("malformed");
+            assert!(err.contains(why), "{args:?}: {err}");
+        }
+        assert_eq!(
+            s.cart_value("session-5"),
+            2,
+            "no refused request moved the state"
+        );
+
+        let err = s
+            .command_json("store.page.nothing_declares_this", "session-5", &[])
+            .expect_err("not hosted");
+        assert!(err.contains("no compiled component"), "{err}");
+    }
+
+    /// **`clear_cart` commits its state as well as its event.** Until the
+    /// command path was one path, `clear_cart` committed only the event, and
+    /// the materializer's `cart:<session>` state kept the old total.
+    #[test]
+    fn every_command_commits_its_state_and_its_event_together() {
+        let s = rendering_server();
+        s.command(ADD, "session-6", &add("espresso", 3), false)
+            .expect("runs");
+        assert_eq!(s.materializer.state("cart:session-6").as_deref(), Some("3"));
+        s.command_json(CLEAR, "session-6", &[])
+            .expect("well-formed")
+            .expect("and it committed");
+        assert_eq!(s.cart_value("session-6"), 0);
+        assert_eq!(
+            s.materializer.state("cart:session-6").as_deref(),
+            Some("0"),
+            "the cleared cart's state, not the old total"
+        );
+    }
+
+    /// **The server will not start without the compiler's handler modules.**
+    /// It reads the identities from the template IR and looks for each module
+    /// where `pw emit-handlers` writes it.
+    #[test]
+    fn a_document_whose_handlers_were_not_compiled_is_refused() {
+        let s = rendering_server();
+        let named = s.handler_identities();
+        assert_eq!(named.len(), 2, "add_to_cart and clear_cart: {named:?}");
+        assert_eq!(
+            s.uncompiled_handlers(),
+            named.iter().cloned().collect::<Vec<_>>(),
+            "`.` has no handlers directory, so every one is missing"
+        );
+
+        let dist = std::env::temp_dir().join(format!("pw-dev-handlers-{}", std::process::id()));
+        std::fs::create_dir_all(dist.join("handlers")).expect("a scratch dist");
+        for id in &named {
+            std::fs::write(dist.join("handlers").join(format!("{id}.mjs")), "").expect("a module");
+        }
+        let templates: Vec<Template> =
+            serde_json::from_str(include_str!("../../store-ir.json")).expect("the template IR");
+        let built = Server::on(dist.clone(), templates, dev_topology());
+        assert!(built.uncompiled_handlers().is_empty());
+        let _ = std::fs::remove_dir_all(&dist);
     }
 
     /// Each command is authorised on its own contract.
@@ -1914,7 +2073,7 @@ mod tests {
         // the barren case CAN run the whole command.
         let barren = server(barren());
         let err = barren
-            .clear_cart("session-1")
+            .command(CLEAR, "session-1", &[], false)
             .expect_err("a barren node cannot host a write");
         assert!(err.contains("clear_cart"), "{err}");
         assert_eq!(barren.cart_value("session-1"), 0);

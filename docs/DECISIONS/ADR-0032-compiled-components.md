@@ -109,6 +109,10 @@ and a structural test keeps them deleted.
 
 ### 8. Handler arguments (ruling needed)
 
+**Superseded 2026-09-25 by [ADR-0033](ADR-0033-compiled-handlers.md):** the
+handler's body is compiled, and it sends the arguments it computes. The text
+below is the decision as it stood at E10-I.
+
 The browser handler for `add_to_cart(item.id, PositiveInt(1))` sends the
 pressed loop instance's address and the literal quantity. The server resolves
 the address to the item with the derivation that rendered it. Resumable handler

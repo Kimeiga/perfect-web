@@ -377,24 +377,67 @@ e10-i:
        echo; echo "== 9. the development server's commands are the compiled components"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
        echo; \
-       echo "NOT CLAIMED: resumable handler BODIES are compiled. The browser's"; \
-       echo "handler for add_to_cart still posts the pressed instance and the"; \
-       echo "literal quantity; the COMMAND it reaches is compiled Pleris."; \
+       echo "NOT CLAIMED here: resumable handler BODIES are compiled. At E10-I the"; \
+       echo "browser's handler posted the pressed instance and the literal"; \
+       echo "quantity. They are compiled since 2026-09-25: just e10-handlers."; \
        echo "NOT CLAIMED: the data layer (store:data/carts) is Pleris. It is the"; \
        echo "deployment's, as the contract says (owner: external) - NEXT step 10."; \
      } > docs/evidence/E10/e10-i.txt
     @grep -E "^test result|the command returned" docs/evidence/E10/e10-i.txt
+
+# Writes the store's modules as `pw emit-handlers` emits them to
+# `docs/evidence/E10/handlers/`, held there by `evidence_is_current`, and
+# records the refusal matrix, the renderer carrying exactly the paths a handler
+# reads, the host typing a browser's arguments by the component's own
+# parameters, and the development server's one command path.
+#
+# E10 — resumable handler bodies, compiled to JavaScript modules (ADR-0033).
+e10-handlers:
+    @rm -rf docs/evidence/E10/handlers
+    @{ echo "E10 - resumable handlers, compiled to JavaScript modules"; echo; \
+       echo "produced by: just e10-handlers"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the store's handlers, as pw emit-handlers writes them"; echo; \
+       cargo run --quiet --locked -p pw-cli -- emit-handlers --out docs/evidence/E10/handlers \
+         packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw; \
+       for f in docs/evidence/E10/handlers/*.mjs; do echo; echo "-- $f"; cat "$f"; done; \
+       echo; echo "== the compiler: modules, event parts, contracts, refusals (compiler/pw-core/tests/handlers.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "refused \`.*|^test [a-z_]+ .*|^test result.*"; \
+       echo; echo "== the committed modules are the compiler's current output"; echo; \
+       cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer carries exactly the paths a handler reads (runtime/pw-render/tests/properties.rs)"; echo; \
+       cargo test --locked -p pw-render --test properties 2>&1 | grep -E "^test (an_element|a_captured|a_capture|an_event)|^test result"; \
+       echo; echo "== the host types a browser's arguments by the artifact's own parameters (runtime/pw-host/tests/pleris_component.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test pleris_component -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE '^\[.*\]: .*|^test (json|arguments)[a-z_]+ .*|^test result.*'; \
+       echo; echo "== the development server: one command path, compiled handlers only (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
+       echo; \
+       echo "NOT CLAIMED: captures are a patched part. An element carries what its"; \
+       echo "handler reads as rendered; the store reads only item.id, the loop key."; \
+       echo "NOT CLAIMED: an opaque type's invariant is checked at the boundary."; \
+       echo "PositiveInt arrives as an s64; the language states no invariant for it."; \
+       echo "NOT CLAIMED: handler parameters, local computation, branches, or"; \
+       echo "multi-statement bodies compile. Each is refused by name."; \
+     } > docs/evidence/E10/handlers.txt
+    @grep -E "^test result|written to|refused \`" docs/evidence/E10/handlers.txt | head -20
 
 # E10-I in the browser: the store page whose Add and Clear buttons reach the
 # COMPILED commands, in all three engine families, three full runs — a flake
 # shows up as a run that differs. Needs the Playwright browsers
 # (`pnpm --filter pw-own-renderer-spike exec playwright install chromium firefox
 # webkit`), so it is not part of `just ci`.
-e10-browser engines="chromium firefox webkit":
+#
+# `out` names the evidence file: E10-I recorded `browser-suite.txt`, the
+# compiled handlers (ADR-0033) `handlers-browser-suite.txt`.
+e10-browser engines="chromium firefox webkit" out="docs/evidence/E10/browser-suite.txt":
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
-    @{ echo "E10-I - the store's compiled commands, in browser engines: {{engines}}"; echo; \
-       echo "produced by: just e10-browser {{engines}}"; \
+    @{ echo "E10 - the store page, compiled commands and handlers, in browser engines: {{engines}}"; echo; \
+       echo "produced by: just e10-browser \"{{engines}}\" {{out}}"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        for i in 1 2 3; do \
@@ -404,8 +447,8 @@ e10-browser engines="chromium firefox webkit":
            | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
            | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky|did not run" || true; \
        done; \
-     } > docs/evidence/E10/browser-suite.txt
-    @cat docs/evidence/E10/browser-suite.txt
+     } > {{out}}
+    @cat {{out}}
 
 # E8. The artifact audit, against real Wasm components.
 #

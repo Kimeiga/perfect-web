@@ -302,6 +302,123 @@ pub fn check(
 /// Returns the expression as well as its name, because what is captured may be
 /// a chain — and it is the chain's type and label that decide, not the root
 /// binding's.
+/// The names a `resumable(captures = { .. })` descriptor captures, in the
+/// order written. The same walk the capture schema is built from, so the
+/// values a document carries and the schema its manifest names cannot list
+/// different captures.
+pub(crate) fn capture_names(body: &crate::hir::Body, descriptor: ExprId) -> Vec<String> {
+    captures(body, descriptor)
+        .into_iter()
+        .map(|(name, _, _)| name)
+        .collect()
+}
+
+/// **What a handler reads of its captures**, as field paths: `item.id` in
+/// `resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))`.
+///
+/// One derivation with two readers. The renderer serializes exactly these onto
+/// the element (`template_ir::Part::Event::captures`), nested by segment from
+/// the rendering environment's root, and the compiled handler reads exactly
+/// these (`backend::js`). A read through a capture is its longest field chain;
+/// a capture used whole is its own path; a capture the body never reads is not
+/// listed. The document carries what the handler needs, and the capture SCHEMA,
+/// which `decide` compares, still names every capture.
+///
+/// Carrying less than the whole value is also what keeps it from going stale
+/// in the common case: the store's handler reads `item.id`, the key of the
+/// keyed loop it is rendered in, which a keyed patch never changes. Any other
+/// field can change under a patch that does not re-render the element
+/// (KNOWN_LIMITATIONS: captures are not a patched part).
+///
+/// Conservative where a name could mean something else. A capture whose root
+/// the handler rebinds, through its parameters or any pattern inside it, is
+/// carried whole: a field path taken through the wrong binding could name a
+/// field the capture does not have, and the page would fail to render.
+pub(crate) fn capture_paths(body: &crate::hir::Body, lambda: ExprId) -> Vec<String> {
+    let Expr::Lambda {
+        descriptor: Some(d),
+        params,
+        body: inner,
+    } = body.expr(lambda)
+    else {
+        return Vec::new();
+    };
+    let captured = capture_names(body, *d);
+    let mut rebound: std::collections::BTreeSet<String> = params
+        .iter()
+        .flat_map(|p| crate::labels::bound_names(body, *p))
+        .map(|(n, _)| n)
+        .collect();
+    for e in body.walk_from(*inner) {
+        let pats = match body.expr(e) {
+            Expr::Let { pat: Some(p), .. } | Expr::For { pat: Some(p), .. } => vec![*p],
+            Expr::Match { arms, .. } => arms.iter().map(|a| a.pat).collect(),
+            Expr::Lambda { params, .. } => params.clone(),
+            _ => Vec::new(),
+        };
+        rebound.extend(
+            pats.into_iter()
+                .flat_map(|p| crate::labels::bound_names(body, p))
+                .map(|(n, _)| n),
+        );
+    }
+
+    let mut read = std::collections::BTreeSet::new();
+    let mut inner_links = std::collections::BTreeSet::new();
+    for e in body.walk_from(*inner) {
+        if inner_links.contains(&e) {
+            continue;
+        }
+        // `item.describe()` calls a method; it does not read a field named
+        // `describe`. The receiver below it is still visited.
+        if let Expr::Call { callee, .. } = body.expr(e)
+            && matches!(body.expr(*callee), Expr::Field { .. })
+        {
+            inner_links.insert(*callee);
+            continue;
+        }
+        let Some(path) = field_chain(body, e) else {
+            continue;
+        };
+        let Some(capture) = captured.iter().find(|c| covers(c, &path)) else {
+            continue;
+        };
+        let mut link = e;
+        while let Expr::Field { base, .. } = body.expr(link) {
+            inner_links.insert(*base);
+            link = *base;
+        }
+        let root = capture.split('.').next().unwrap_or(capture);
+        read.insert(if rebound.contains(root) {
+            capture.clone()
+        } else {
+            path
+        });
+    }
+    // A path under another one is already carried by it.
+    read.iter()
+        .filter(|p| !read.iter().any(|q| q != *p && covers(q, p)))
+        .cloned()
+        .collect()
+}
+
+/// `item.id` for `Field { Name(item), id }`; nothing for any other shape.
+pub(crate) fn field_chain(body: &crate::hir::Body, e: ExprId) -> Option<String> {
+    match body.expr(e) {
+        Expr::Name(n) => Some(n.clone()),
+        Expr::Field { base, name } => field_chain(body, *base).map(|b| format!("{b}.{name}")),
+        _ => None,
+    }
+}
+
+/// Is `path` the value `capture` names, or a field inside it?
+pub(crate) fn covers(capture: &str, path: &str) -> bool {
+    path == capture
+        || path
+            .strip_prefix(capture)
+            .is_some_and(|rest| rest.starts_with('.'))
+}
+
 fn captures(body: &crate::hir::Body, descriptor: ExprId) -> Vec<(String, Span, ExprId)> {
     let Expr::Call { callee, args } = body.expr(descriptor) else {
         return Vec::new();

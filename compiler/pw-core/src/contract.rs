@@ -799,6 +799,21 @@ fn component_calls(
     out
 }
 
+/// **A declaration's component id**: `module.Name`, or `Name` in the root
+/// module.
+///
+/// The one derivation. A contract is filed under it, a component dependency
+/// names it, and a compiled handler calls a command by it (`backend::js`). A
+/// second derivation that disagreed would send a handler's call to a component
+/// the host has no contract for, which is a refusal at best.
+pub fn component_id(hir: &Hir, id: crate::hir::DeclId) -> String {
+    let name = &hir.decl(id).name;
+    match hir.module_of(id) {
+        Some(module) if !module.is_empty() => format!("{module}.{name}"),
+        _ => name.clone(),
+    }
+}
+
 /// Derive every component's contract from a checked program.
 ///
 /// One pass, from the same signatures and the same placement solver every other
@@ -846,15 +861,9 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             hir.all_decls()
                 .filter(|(_, d)| component_kind(d.kind).is_some())
                 .map(|(id, d)| {
-                    let module = hir.module_of(id).unwrap_or_default().to_string();
-                    let path = if module.is_empty() {
-                        d.name.clone()
-                    } else {
-                        format!("{module}.{}", d.name)
-                    };
                     (
                         crate::resolve::DefId { unit, decl: id.0 },
-                        (path, d.name.clone()),
+                        (component_id(hir, id), d.name.clone()),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -898,12 +907,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // then E5's solver would find nowhere either could run, because the
             // union of their demands is unsatisfiable. Aggregating by module
             // over-grants and under-places at the same time.
-            let module = hir.module_of(id).unwrap_or_default().to_string();
-            let component_id = if module.is_empty() {
-                decl.name.clone()
-            } else {
-                format!("{module}.{}", decl.name)
-            };
+            let component_id = component_id(hir, id);
 
             // What this component performs, EXCLUDING its resumable handlers.
             //

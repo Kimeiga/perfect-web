@@ -56,11 +56,31 @@ rather than approximated:
   declaration, and a string constant are refused.
 - **The invocation region is provisional.** It is a bump region reclaimed by
   each export's post-return, and nothing can outlive an invocation.
-- **Resumable handler bodies are not compiled.** `add_to_cart(item.id,
-  PositiveInt(1))` in the page is a dev-server handler posting the pressed
-  instance and the literal quantity; the command it reaches is compiled.
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
+
+**Resumable handler bodies are compiled** (2026-09-25, ADR-0033), to one ES
+module each, and the page's elements carry what the handlers read. The set is
+narrow:
+
+- **One command call per handler.** Its arguments may be captured values and
+  their fields, literals, and opaque constructors over a primitive. Local
+  computation, branches, multi-statement bodies and handler parameters (the
+  event) are refused, and so is a command parameter that is not a primitive or
+  an opaque type over one.
+- **Captures are not a patched part.** An element carries the capture paths
+  its handler reads, as rendered. A patch that changes a captured field without
+  re-rendering the element leaves the old value there: for example, E7-P's
+  keyed rename, which replaces only the item's text. The store's handler reads
+  only `item.id`, the loop's key, which a keyed patch never changes.
+- **Opaque invariants are not checked at the boundary.** The host types a
+  browser's arguments by the component's parameters: `PositiveInt` arrives as
+  an `s64`, and any `s64` is accepted. `opaque type PositiveInt = Int` states
+  no invariant that could be checked.
+- **String escapes are not defined** (A-023). A string literal containing a
+  backslash, and a `"""` string, have no value in the handler backend or the
+  Wasm lowering, and both refuse them. The Koka and Marko backends pass the
+  token through to their targets' escape rules.
 
 ## Research requirements are not implemented guarantees
 

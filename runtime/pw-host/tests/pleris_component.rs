@@ -299,3 +299,85 @@ fn the_instance_runs_within_its_fuel() {
     println!("starved of fuel: {err}");
     assert!(err.to_lowercase().contains("fuel"), "{err}");
 }
+
+// --- E10: arguments that arrive as JSON, from a compiled handler -----------
+
+/// **A browser's arguments are typed by the component's own parameters.**
+///
+/// The compiled handler for `add_to_cart(item.id, PositiveInt(1))` runs in the
+/// user's browser and sends `["cortado", 1]`. The host converts it by the
+/// parameter types the ARTIFACT declares, `(string, s64)`, and refuses anything
+/// else before the component runs.
+#[test]
+fn json_arguments_are_typed_by_the_export_they_are_for() {
+    let c = contract();
+    let prepared = engine::Prepared::compile(&component()).expect("compiles");
+    let [interface, function] = export(&c);
+    let at = [interface.as_str(), function.as_str()];
+
+    let args = prepared
+        .arguments(&at, &[serde_json::json!("cortado"), serde_json::json!(2)])
+        .expect("well-typed");
+    assert_eq!(args, vec![Val::String("cortado".into()), Val::S64(2)]);
+
+    for (json, why) in [
+        (
+            vec![serde_json::json!("cortado")],
+            "takes 2 argument(s); 1 were sent",
+        ),
+        (
+            vec![
+                serde_json::json!("a"),
+                serde_json::json!(1),
+                serde_json::json!(1),
+            ],
+            "takes 2 argument(s); 3 were sent",
+        ),
+        (
+            vec![serde_json::json!(7), serde_json::json!(1)],
+            "expected a string",
+        ),
+        (
+            vec![serde_json::json!("a"), serde_json::json!(1.5)],
+            "expected an integer",
+        ),
+        (
+            vec![serde_json::json!("a"), serde_json::json!(true)],
+            "expected an integer",
+        ),
+        (
+            vec![serde_json::json!("a"), serde_json::json!(null)],
+            "expected an integer",
+        ),
+        (
+            vec![serde_json::json!("a"), serde_json::json!(u64::MAX)],
+            "is outside",
+        ),
+    ] {
+        let err = prepared.arguments(&at, &json).expect_err("refused");
+        println!("{json:?}: {err}");
+        assert!(err.contains(why), "{json:?}: {err}");
+    }
+
+    // The extremes of `s64` are the type's, not JavaScript's: the host takes
+    // the whole range the parameter declares.
+    let edge = prepared
+        .arguments(&at, &[serde_json::json!("a"), serde_json::json!(i64::MIN)])
+        .expect("in range");
+    assert_eq!(edge[1], Val::S64(i64::MIN));
+}
+
+#[test]
+fn arguments_for_an_export_the_component_does_not_have_are_refused() {
+    let c = contract();
+    let prepared = engine::Prepared::compile(&component()).expect("compiles");
+    let [interface, _] = export(&c);
+    let err = prepared
+        .arguments(&[&interface, "remove-from-cart"], &[])
+        .expect_err("no such function");
+    assert!(err.contains("exports no function"), "{err}");
+    let err = prepared
+        .arguments(&["pw:app/nothing", "add-to-cart"], &[])
+        .expect_err("no such instance");
+    assert!(err.contains("exports no instance"), "{err}");
+}

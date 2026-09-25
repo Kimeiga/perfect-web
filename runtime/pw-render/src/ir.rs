@@ -119,6 +119,11 @@ pub enum Part {
         /// the identity, and E7-L needs both — see `pw_core::template_ir`.
         #[serde(default)]
         name: String,
+        /// What the handler reads of its captures, as paths (`item.id`); each
+        /// value is serialized onto the element for the compiled handler to
+        /// read. See `pw_core::resume::capture_paths`.
+        #[serde(default)]
+        captures: Vec<String>,
     },
     /// A region rendered only when a condition holds.
     Conditional {

@@ -159,3 +159,15 @@ from the world, with every number from `wit-parser`, one encoder, and upstream
 and by decoding the artifact. The host runs a component with the deployment's
 operations, compiled once. The contract locates each export (ruling needed). The
 dev server's command closures are deleted. Closes E10-I.
+
+## 2026-09-25: compiled resumable handlers (E10)
+
+[ADR-0033](DECISIONS/ADR-0033-compiled-handlers.md): a resumable handler's body
+compiles to an ES module (`pw emit-handlers`). Each fact the backend needs is
+read from the stage that owns it: identity, name, callee, component id and
+capture paths. The component id now has one derivation instead of three. An
+element carries exactly the capture paths its handler reads (ruling needed).
+The browser's arguments are typed by the command component's own parameters.
+The dev server has one command path, which fixes `clear_cart`'s uncommitted
+state. A string literal has a value only where no escape rule is involved
+(ruling needed). Supersedes ADR-0032 §8.

@@ -418,6 +418,27 @@ function loadHandler(identity) {
   return pending;
 }
 
+/**
+ * A command, as a compiled handler calls one: the command's component id and
+ * the arguments the handler computed.
+ *
+ * The server types the arguments by the command component's own parameters
+ * and refuses anything else. A refusal is thrown, so the press fails visibly.
+ * A command that ran and did not commit is not a refusal: the page learns what
+ * happened from the resource, as it does when a command commits.
+ */
+async function command(component, args) {
+  const response = await fetch(`/command/${encodeURIComponent(component)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  if (!response.ok) {
+    throw new Error(`command ${component} refused: HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
 async function attach() {
   // Marked, so activation cost is a MEASUREMENT rather than a wall-clock guess
   // taken from outside. `performance.measure` attributes the work to this
@@ -462,8 +483,7 @@ async function attach() {
       continue;
     }
 
-    for (const [i, el] of owners.entries()) {
-      const at = addresses[i];
+    for (const el of owners) {
       el.addEventListener("click", async (e) => {
         e.preventDefault();
         try {
@@ -479,19 +499,24 @@ async function attach() {
           //
           // A response carrying the value would make the UI change because an
           // endpoint said so, which is the thing E6 exists to replace.
-          // The pressed instance's address: the one thing the browser holds
-          // about the item a loop's handler captured. The server resolves it
-          // with the derivation that emitted it (E10-I).
-          await module.run({ instance: at });
+          //
+          // The module is the handler's compiled BODY (E10, 2026-09-25). It
+          // reads what it captured from this element, where the renderer
+          // serialized exactly the paths it reads, and calls its command with
+          // the arguments it computed.
+          await module.run({
+            captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
+            command,
+          });
         } catch (error) {
-          // A load that fails is VISIBLE and leaves the button usable. A
-          // silent failure here is the worst outcome available: the press did
-          // nothing, the page looks fine, and the next press is the user's
-          // only way to find out.
+          // A load or a refused command is VISIBLE and leaves the button
+          // usable. A silent failure here is the worst outcome available: the
+          // press did nothing, the page looks fine, and the next press is the
+          // user's only way to find out.
           loaded.delete(part.value);
           attempts.set(part.value, (attempts.get(part.value) ?? 0) + 1);
           el.dataset.pwHandlerError = "1";
-          log.push(`handler ${part.value} failed to load: ${error.message ?? error}`);
+          log.push(`handler ${part.value} failed: ${error.message ?? error}`);
           window.__pw.handlerErrors = (window.__pw.handlerErrors ?? 0) + 1;
         }
       });

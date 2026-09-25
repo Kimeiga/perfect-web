@@ -573,13 +573,10 @@ pub fn package(
     let mut decls: BTreeMap<String, (DefId, &Decl)> = BTreeMap::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, d) in hir.all_decls() {
-            let module = hir.module_of(id).unwrap_or_default();
-            let path = if module.is_empty() {
-                d.name.clone()
-            } else {
-                format!("{module}.{}", d.name)
-            };
-            decls.insert(path, (DefId { unit, decl: id.0 }, d));
+            decls.insert(
+                crate::contract::component_id(hir, id),
+                (DefId { unit, decl: id.0 }, d),
+            );
         }
     }
 

@@ -2,7 +2,13 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Current: E10-I closed; the rest of E10, then the kiokun proof slice
+## Current: E10-I closed, handlers compiled; the rest of E10, then the kiokun proof slice
+
+**2026-09-25:** resumable handler bodies compile to ES modules
+([ADR-0033](DECISIONS/ADR-0033-compiled-handlers.md),
+[evidence](evidence/E10/handlers-2026-09-25.md)). The store page's behaviour is
+compiled from `.pw` end to end, from the handler to the command component.
+Item 3 below is done.
 
 E10-I closed on 2026-09-24 ([ADR-0032](DECISIONS/ADR-0032-compiled-components.md),
 [evidence](evidence/E10/e10-i-2026-09-24.md)). The locked order's steps 4-9 are
@@ -33,7 +39,11 @@ done:
 
    Each lands with a refusal test and a mutation control, in the style of
    `wasm_encoding.rs`.
-3. **Compiled resumable handler bodies**, then step 10.
+3. ~~**Compiled resumable handler bodies**~~ DONE 2026-09-25 (ADR-0033). Then
+   step 10. Two things the handler work left open, in order of need:
+   - captures as a patched part, so that a captured field a patch changes is
+     re-carried (KNOWN_LIMITATIONS);
+   - the event as a handler parameter, for inputs and forms.
 
 The first follow-up in the checker is unchanged: member existence, the next
 value relation after E9-V.

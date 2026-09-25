@@ -973,6 +973,130 @@ pub mod engine {
                 args,
             )
         }
+
+        /// **Arguments that arrived as JSON, typed by the export's own
+        /// parameters.**
+        ///
+        /// A compiled handler runs in the user's browser, so what reaches the
+        /// server is a claim about arguments, not values this system produced.
+        /// Each one is converted by the type the COMPONENT declares for its
+        /// parameter, read from the artifact, and anything else is refused: the
+        /// wrong count, the wrong kind, an integer outside its type's range, a
+        /// number with a fraction where an integer is declared. Scalars and
+        /// strings are accepted; every other parameter type is refused by name
+        /// until a command needs it.
+        ///
+        /// This checks the ABI's types, not what an opaque type's name
+        /// promises. `PositiveInt` arrives as an `s64`, and the language does
+        /// not yet state an invariant that could be checked here.
+        pub fn arguments(
+            &self,
+            export: &[&str],
+            json: &[serde_json::Value],
+        ) -> Result<Vec<wasmtime::component::Val>, String> {
+            let func = export_type(&self.engine, &self.component, export)?;
+            let params: Vec<(&str, wasmtime::component::types::Type)> = func.params().collect();
+            if params.len() != json.len() {
+                return Err(format!(
+                    "`{}` takes {} argument(s); {} were sent",
+                    export.join("#"),
+                    params.len(),
+                    json.len()
+                ));
+            }
+            params
+                .iter()
+                .zip(json)
+                .enumerate()
+                .map(|(i, ((name, ty), v))| {
+                    from_json(ty, v, &format!("argument {} (`{name}`)", i + 1))
+                })
+                .collect()
+        }
+    }
+
+    /// The type of an exported function, found by its path in the component.
+    fn export_type(
+        engine: &wasmtime::Engine,
+        component: &wasmtime::component::Component,
+        export: &[&str],
+    ) -> Result<wasmtime::component::types::ComponentFunc, String> {
+        let [interface, function] = export else {
+            return Err(format!(
+                "an export path is `interface`, `function`; got {export:?}"
+            ));
+        };
+        let ty = component.component_type();
+        let instance = ty
+            .exports(engine)
+            .find(|(name, _)| name == interface)
+            .and_then(|(_, item)| match item.ty {
+                ComponentItem::ComponentInstance(instance) => Some(instance),
+                _ => None,
+            })
+            .ok_or_else(|| format!("the component exports no instance `{interface}`"))?;
+        instance
+            .exports(engine)
+            .find(|(name, _)| name == function)
+            .and_then(|(_, item)| match item.ty {
+                ComponentItem::ComponentFunc(func) => Some(func),
+                _ => None,
+            })
+            .ok_or_else(|| format!("`{interface}` exports no function `{function}`"))
+    }
+
+    /// One JSON value, as a value of this component type, or why not.
+    fn from_json(
+        ty: &wasmtime::component::types::Type,
+        v: &serde_json::Value,
+        at: &str,
+    ) -> Result<wasmtime::component::Val, String> {
+        use wasmtime::component::Val;
+        use wasmtime::component::types::Type;
+        let expected = |what: &str| format!("{at}: expected {what}, got {v}");
+        let int = |min: i128, max: i128| -> Result<i128, String> {
+            let n = v
+                .as_i64()
+                .map(i128::from)
+                .or_else(|| v.as_u64().map(i128::from))
+                .ok_or_else(|| expected("an integer"))?;
+            if n < min || n > max {
+                return Err(format!("{at}: {n} is outside {min}..={max}"));
+            }
+            Ok(n)
+        };
+        let float = || {
+            v.as_f64()
+                .filter(|f| f.is_finite())
+                .ok_or_else(|| expected("a finite number"))
+        };
+        Ok(match ty {
+            Type::Bool => Val::Bool(v.as_bool().ok_or_else(|| expected("a boolean"))?),
+            Type::S8 => Val::S8(int(i8::MIN.into(), i8::MAX.into())? as i8),
+            Type::U8 => Val::U8(int(0, u8::MAX.into())? as u8),
+            Type::S16 => Val::S16(int(i16::MIN.into(), i16::MAX.into())? as i16),
+            Type::U16 => Val::U16(int(0, u16::MAX.into())? as u16),
+            Type::S32 => Val::S32(int(i32::MIN.into(), i32::MAX.into())? as i32),
+            Type::U32 => Val::U32(int(0, u32::MAX.into())? as u32),
+            Type::S64 => Val::S64(int(i64::MIN.into(), i64::MAX.into())? as i64),
+            Type::U64 => Val::U64(int(0, u64::MAX.into())? as u64),
+            Type::Float32 => Val::Float32(float()? as f32),
+            Type::Float64 => Val::Float64(float()?),
+            Type::Char => {
+                let s = v.as_str().ok_or_else(|| expected("one character"))?;
+                let mut chars = s.chars();
+                match (chars.next(), chars.next()) {
+                    (Some(c), None) => Val::Char(c),
+                    _ => return Err(expected("one character")),
+                }
+            }
+            Type::String => Val::String(v.as_str().ok_or_else(|| expected("a string"))?.into()),
+            other => {
+                return Err(format!(
+                    "{at}: a parameter of type {other:?} is not accepted from a browser"
+                ));
+            }
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
