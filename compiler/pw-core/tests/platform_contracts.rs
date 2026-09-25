@@ -385,7 +385,9 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-09-25: `List`'s operations are `intrinsic` declarations with no
     // bodies, where `map` had returned `[]` and `length` 0, and `string.pw`
     // declares the `String` module (ADR-0040). The compiler supplies both.
-    const EXPECTED: u64 = 0x84ba70b0afba8208;
+    // Later the same day `List.group_by` joined them, for kiokun's ranking
+    // (ADR-0041).
+    const EXPECTED: u64 = 0xa430c06974b3116c;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

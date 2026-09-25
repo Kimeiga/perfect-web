@@ -36,6 +36,16 @@ interface kiokun-page-search-page-api {
     search-page: func(arg0: string, arg1: list<dictionary-search-hit>);
 }
 
+interface shards-place-api {
+    use pw:types/types.{dictionary-placement};
+    place: func(arg0: string) -> dictionary-placement;
+}
+
+interface shards-places-api {
+    use pw:types/types.{dictionary-placement};
+    places: func(arg0: list<string>) -> list<dictionary-placement>;
+}
+
 world kiokun-page-entry-page {
     export kiokun-page-entry-page-api;
 }
@@ -56,6 +66,14 @@ world kiokun-page-search {
 
 world kiokun-page-search-page {
     export kiokun-page-search-page-api;
+}
+
+world shards-place {
+    export shards-place-api;
+}
+
+world shards-places {
+    export shards-places-api;
 }
 
 package pw:types {
@@ -93,6 +111,21 @@ package pw:types {
             definition: string,
             common: bool,
         }
+        record dictionary-placement {
+            shard: string,
+            subdirectory: string,
+        }
+        record dictionary-row {
+            word: string,
+            target: string,
+            language: string,
+            pronunciation: string,
+            reading: string,
+            definition: string,
+            folded: string,
+            words: list<string>,
+            common: bool,
+        }
     }
 }
 
@@ -102,8 +135,10 @@ package kiokun:data {
         get: func(arg0: string) -> option<dictionary-entry>;
     }
     interface index {
-        use pw:types/types.{dictionary-search-hit};
-        search: func(arg0: string, arg1: s64) -> list<dictionary-search-hit>;
+        use pw:types/types.{dictionary-row};
+        alias: func(arg0: string) -> option<string>;
+        candidates: func(arg0: string) -> list<dictionary-row>;
+        fold: func(arg0: string) -> string;
     }
 }
 

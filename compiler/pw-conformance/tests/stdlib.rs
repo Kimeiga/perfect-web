@@ -125,6 +125,10 @@ public query Lengths(texts: List<String>) -> List<Int> { List.map(texts, String.
 
 public query Twice(xs: List<Int>) -> List<Int> { List.map(xs, double) }
 
+public query Runs(words: List<Word>) -> List<List<Int>> {
+    List.map(List.group_by(words, w => w.text), run => List.map(run, w => w.score))
+}
+
 public query Totals(rows: List<List<Int>>) -> List<Int> {
     List.map(rows, row => List.fold(row, 0, (total, x) => total + x))
 }
@@ -439,4 +443,38 @@ fn what_stays_outside_is_refused_by_name() {
         unknown.contains("an intrinsic this backend does not know"),
         "{unknown}"
     );
+}
+
+#[test]
+fn group_by_finds_runs_of_equal_keys() {
+    let runs = compiled("s.Runs");
+    let mut rng = Rng(0x9b);
+    for _ in 0..CASES {
+        // Few distinct texts, so runs are long and common.
+        let words: Vec<(String, i64)> = (0..rng.below(20))
+            .map(|_| {
+                (
+                    ["a", "人", "", "a"][rng.below(4) as usize].to_string(),
+                    rng.int(),
+                )
+            })
+            .collect();
+        let mut want: Vec<Vec<i64>> = Vec::new();
+        let mut last: Option<&str> = None;
+        for (text, score) in &words {
+            match (last, want.last_mut()) {
+                (Some(l), Some(run)) if l == text => run.push(*score),
+                _ => want.push(vec![*score]),
+            }
+            last = Some(text);
+        }
+        assert_eq!(
+            call(
+                &runs,
+                &[Val::List(words.iter().map(|(t, s)| word(t, *s)).collect())]
+            ),
+            Ok(Val::List(want.iter().map(|r| ints(r)).collect())),
+            "{words:?}"
+        );
+    }
 }

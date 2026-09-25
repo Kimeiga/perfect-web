@@ -12,7 +12,10 @@ module kiokun.page
 
 import Entries
 import Index
-import dictionary.{ Entry, SearchHit }
+import List
+import String
+import shards
+import dictionary.{ Entry, Row, SearchHit }
 
 // **One redirect, followed in the language.** `地図` is the Japanese form of
 // `地圖` and its file holds only `{ key, redirect }`. kiokun.com's page follows
@@ -31,12 +34,184 @@ public query Lookup(word: String) -> Option<Entry>
     }
 }
 
+// **kiokun's ranking, in Pleris** (ADR-0041). kiokun.com's `/api/search`
+// scores each row: for a query in Chinese characters or kana, an exact word
+// 1000, the entry a stub names 900, an exact kana reading 875, a word prefix
+// 500, a prefix of the stub's entry or of the kana reading 450; for a Latin
+// query, a definition 1000, a reading 900, a reading prefix 600, a
+// definition prefix 500, a whole word of a definition 100. One hit per entry:
+// its best row by score, then a common word's before a rare one's, with the
+// languages it matched in. Hits are ordered by score, then commonness, then
+// the shorter word, then the entry.
 public query Search(q: String) -> List<SearchHit>
     freshness 1.hours
     cache     shared
     key       q
 {
-    Index.search(q, 20)
+    let term = String.trim(q)
+    if term == "" {
+        []
+    } else {
+        let points = String.codepoints(term)
+        let cjk = List.any(points, c => shards.is_han(c) | is_kana(c))
+        let kana_only = List.all(points, is_kana)
+        let lower = Index.fold(term)
+        let reading = hiragana(term)
+        let alias = Index.alias(term)
+        let scored = List.map(Index.candidates(term), r => Scored {
+            row: r,
+            score: if cjk { cjk_score(r, term, reading, alias, kana_only) } else { latin_score(r, lower) },
+        })
+        let matched = List.filter(scored, s => s.score > 0)
+        let entries = List.group_by(List.sort_by(matched, by_target), s => s.row.target)
+        let ranked = List.sort_by(List.map(entries, hit), by_rank)
+        List.map(List.take(ranked, 20), r => r.hit)
+    }
+}
+
+// A row and its score.
+type Scored = Scored {
+    row: Row,
+    score: Int,
+}
+
+// A hit and the score of the row it came from.
+type Ranked = Ranked {
+    hit: SearchHit,
+    score: Int,
+}
+
+// Hiragana U+3040..U+309F and katakana U+30A0..U+30FF.
+fn is_kana(c: Int) -> Bool {
+    c >= 12352 & c <= 12543
+}
+
+// Katakana to hiragana, as kiokun compares kana: U+30A1..U+30F6 less 0x60.
+fn hiragana(text: String) -> String {
+    String.from_codepoints(List.map(String.codepoints(text), c => if c >= 12449 & c <= 12534 { c - 96 } else { c }))
+}
+
+fn names(alias: Option<String>, word: String) -> Bool {
+    match alias {
+        Some(target) => target == word,
+        None => false,
+    }
+}
+
+fn begins_with_alias(alias: Option<String>, word: String) -> Bool {
+    match alias {
+        Some(target) => String.starts_with(word, target),
+        None => false,
+    }
+}
+
+fn cjk_score(r: Row, term: String, reading: String, alias: Option<String>, kana_only: Bool) -> Int {
+    if r.word == term {
+        1000
+    } else {
+        if names(alias, r.word) {
+            900
+        } else {
+            if kana_only & r.reading == reading {
+                875
+            } else {
+                if String.starts_with(r.word, term) {
+                    500
+                } else {
+                    if begins_with_alias(alias, r.word) | (kana_only & String.starts_with(r.reading, reading)) { 450 } else { 0 }
+                }
+            }
+        }
+    }
+}
+
+fn latin_score(r: Row, lower: String) -> Int {
+    if r.folded == lower {
+        1000
+    } else {
+        if r.reading == lower {
+            900
+        } else {
+            if r.reading != "" & String.starts_with(r.reading, lower) {
+                600
+            } else {
+                if String.starts_with(r.folded, lower) {
+                    500
+                } else {
+                    if List.any(r.words, w => w == lower) { 100 } else { 0 }
+                }
+            }
+        }
+    }
+}
+
+// By entry, keeping the index's order within one: the sort is stable.
+fn by_target(a: Scored, b: Scored) -> Int {
+    if a.row.target < b.row.target { -1 } else { if a.row.target > b.row.target { 1 } else { 0 } }
+}
+
+// Is `a` a better row than `b`: a higher score, or the same score and a
+// common word where `b`'s is not.
+fn better(a: Scored, b: Scored) -> Bool {
+    a.score > b.score | (a.score == b.score & a.row.common & !b.row.common)
+}
+
+// No row: every real one is better.
+fn nothing() -> Scored {
+    Scored {
+        row: Row {
+            word: "",
+            target: "",
+            language: "",
+            pronunciation: "",
+            reading: "",
+            definition: "",
+            folded: "",
+            words: [],
+            common: false,
+        },
+        score: -1,
+    }
+}
+
+// One entry's hit: its best row, the languages it matched in, and whether
+// any of its matching words is common.
+fn hit(rows: List<Scored>) -> Ranked {
+    let best = List.fold(rows, nothing(), (b, s) => if better(s, b) { s } else { b })
+    let chinese = List.any(rows, s => s.row.language == "chinese")
+    let japanese = List.any(rows, s => s.row.language == "japanese")
+    let languages = if chinese & japanese { "chinese · japanese" } else { if chinese { "chinese" } else { "japanese" } }
+    Ranked {
+        hit: SearchHit {
+            id: best.row.target,
+            word: best.row.word,
+            target: best.row.target,
+            language: languages,
+            pronunciation: best.row.pronunciation,
+            definition: best.row.definition,
+            common: List.any(rows, s => s.row.common),
+        },
+        score: best.score,
+    }
+}
+
+// Score, then commonness, then the shorter word, then the entry.
+fn by_rank(a: Ranked, b: Ranked) -> Int {
+    if a.score != b.score {
+        if a.score > b.score { -1 } else { 1 }
+    } else {
+        if a.hit.common != b.hit.common {
+            if a.hit.common { -1 } else { 1 }
+        } else {
+            let la = String.length(a.hit.word)
+            let lb = String.length(b.hit.word)
+            if la != lb {
+                if la < lb { -1 } else { 1 }
+            } else {
+                if a.hit.target < b.hit.target { -1 } else { if a.hit.target > b.hit.target { 1 } else { 0 } }
+            }
+        }
+    }
 }
 
 page EntryPage(entry: Entry) {
@@ -106,7 +281,7 @@ page NotFound(word: String) {
     view {
         <main>
             <h1 id="headword">{word}</h1>
-            <p>This shard has no entry for it.</p>
+            <p>There is no entry for it here.</p>
         </main>
     }
 }

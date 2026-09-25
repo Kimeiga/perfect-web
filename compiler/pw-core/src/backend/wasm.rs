@@ -2112,6 +2112,9 @@ impl Enc<'_> {
         if kind == K::SortBy {
             return self.sort_by(result, rt, ptr, len, et, params, body);
         }
+        if kind == K::GroupBy {
+            return self.group_by(result, rt, ptr, len, et, params, body);
+        }
         let i = self.locals.fresh(ValType::I32);
         self.ops.extend([I::I32Const(0), I::LocalSet(i)]);
         match kind {
@@ -2319,7 +2322,7 @@ impl Enc<'_> {
                     );
                 }
             }
-            K::SortBy => unreachable!("sorted above"),
+            K::SortBy | K::GroupBy => unreachable!("encoded above"),
         }
         Encoding::Encoded(())
     }
@@ -2523,6 +2526,154 @@ impl Enc<'_> {
             Held::Flat {
                 ty: rt,
                 locals: vec![src, len],
+            },
+        );
+        Encoding::Encoded(())
+    }
+
+    /// **Runs of equal keys**, as views: each group is a pointer into the
+    /// list and a length, so nothing is copied (ADR-0040). The key is a
+    /// `String`, compared by bytes with the previous element's.
+    #[allow(clippy::too_many_arguments)]
+    fn group_by(
+        &mut self,
+        result: ValueId,
+        rt: WitType,
+        ptr: u32,
+        len: u32,
+        et: WitType,
+        params: &[ValueId],
+        body: &super::ir::Region,
+    ) -> Encoding<()> {
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let (esize, _) = self.layout(&et);
+        let Some(group_ty) = self.element_of(rt) else {
+            blocked!("`{}` groups into a type that is not a list", self.export);
+        };
+        let (gsize, galign) = self.layout(&group_ty);
+        let out = self.alloc_array(len, gsize, galign);
+        let fresh = |this: &mut Self| this.locals.fresh(ValType::I32);
+        let (i, groups, start, prev_p, prev_l, differs, at) = (
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+        );
+        let eq = self.helpers.index(Helper::StrEq);
+        // Close the run [start, end): its view at `out + groups * gsize`.
+        let close = |this: &mut Self, end: Vec<I<'static>>| {
+            let mut v = vec![
+                I::LocalGet(out),
+                I::LocalGet(groups),
+                I::I32Const(gsize as i32),
+                I::I32Mul,
+                I::I32Add,
+                I::LocalSet(at),
+                I::LocalGet(at),
+                I::LocalGet(ptr),
+                I::LocalGet(start),
+                I::I32Const(esize as i32),
+                I::I32Mul,
+                I::I32Add,
+                I::I32Store(MemArg {
+                    offset: 0,
+                    align: 2,
+                    memory_index: 0,
+                }),
+                I::LocalGet(at),
+            ];
+            v.extend(end);
+            v.extend([
+                I::LocalGet(start),
+                I::I32Sub,
+                I::I32Store(MemArg {
+                    offset: 4,
+                    align: 2,
+                    memory_index: 0,
+                }),
+                I::LocalGet(groups),
+                I::I32Const(1),
+                I::I32Add,
+                I::LocalSet(groups),
+            ]);
+            this.ops.extend(v);
+        };
+        self.ops.extend([
+            I::I32Const(0),
+            I::LocalSet(i),
+            I::Block(Empty),
+            I::Loop(Empty),
+            I::LocalGet(i),
+            I::LocalGet(len),
+            I::I32GeU,
+            I::BrIf(1),
+        ]);
+        let item_at = self.element_address(ptr, i, esize);
+        if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) = self.loop_body(
+            &[(
+                params[0],
+                Held::Memory {
+                    ty: et,
+                    ptr: item_at,
+                },
+            )],
+            body,
+        ) {
+            return other;
+        }
+        let key = match self.flat_locals(body.value) {
+            Encoding::Encoded((t, ls)) if dealias(self.resolve, t) == WitType::String => ls,
+            Encoding::Encoded(_) => {
+                blocked!("`{}` groups by a key that is not a String", self.export)
+            }
+            other => return other.map(|_| unreachable!()),
+        };
+        // A run ends where the key differs from the previous element's.
+        self.ops.extend([
+            I::LocalGet(i),
+            I::If(Empty),
+            I::LocalGet(prev_p),
+            I::LocalGet(prev_l),
+            I::LocalGet(key[0]),
+            I::LocalGet(key[1]),
+            I::Call(eq),
+            I::I32Eqz,
+            I::LocalSet(differs),
+            I::LocalGet(differs),
+            I::If(Empty),
+        ]);
+        close(self, vec![I::LocalGet(i)]);
+        self.ops.extend([
+            I::LocalGet(i),
+            I::LocalSet(start),
+            I::End,
+            I::End,
+            I::LocalGet(key[0]),
+            I::LocalSet(prev_p),
+            I::LocalGet(key[1]),
+            I::LocalSet(prev_l),
+            I::LocalGet(i),
+            I::I32Const(1),
+            I::I32Add,
+            I::LocalSet(i),
+            I::Br(0),
+            I::End,
+            I::End,
+            // The last run, when there was any element.
+            I::LocalGet(len),
+            I::If(Empty),
+        ]);
+        close(self, vec![I::LocalGet(len)]);
+        self.ops.push(I::End);
+        self.held.insert(
+            result,
+            Held::Flat {
+                ty: rt,
+                locals: vec![out, groups],
             },
         );
         Encoding::Encoded(())

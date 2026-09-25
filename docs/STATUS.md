@@ -62,7 +62,25 @@ reject an incomplete match whatever the effect row.
   E9's counts and its 10 of 10 mutants are unchanged, and the oracle's missing
   case is now the checker's refusal.
 
+**Correction, 2026-09-25: E9's value relations left a generic call's `let`
+binding uninstantiated** ([ADR-0041](DECISIONS/ADR-0041-kiokun-in-pleris.md)).
+E9 claims generic callables are instantiated per call.
+- `infer.rs` typed `let ys = List.filter(xs, ..)` with `filter`'s declared
+  `List<T>`, and the value relations skip names already bound. So `ys` stayed
+  `List<type parameter 0>`.
+- A later call over `ys` was then refused (PW0605) for a mismatch the typer had
+  made.
+- Such a binding is now solved like any call, with a regression test in
+  `compiler/pw-core/tests/value_relations.rs`. The E9 evidence is re-recorded.
+
+**Correction, 2026-09-25: a statement keyword could name a value.**
+`let query = ..` parsed. Then every later `query` in an expression read as a
+`query ..` statement, and the program checked while meaning something else.
+The parser now refuses such a name (PW0009, ADR-0041, ruling needed).
+
 Decisions awaiting a ruling:
+- ADR-0041: a binding or parameter cannot be named with a statement keyword
+  (PW0009); contextual keywords are the alternative.
 - ADR-0040: `String.to_lower_ascii` maps `A`–`Z` only; Unicode case mapping is
   not decided.
 - ADR-0039 §1: `Int` traps where its exact result does not fit; `/` and `%`
@@ -101,6 +119,28 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: kiokun's shard rule and ranking, in Pleris (ADR-0041).** Not a
+  gate item; the test of E10 task 2's computation that `docs/NEXT.md` named.
+  - `examples/kiokun/Shards.pw` and `app.pw` state kiokun's rule and ranking.
+    They compile to `shards.Place`, `shards.Places` and a 12 KB
+    `kiokun.page.Search`, and the host keeps only the index and the files.
+  - On a kiokun-data checkout, the compiled rule agrees with kiokun's on all
+    1,485,890 words.
+  - The compiled ranking agrees with kiokun's Rust ranking on 28,951 queries
+    and 77,225 hits over the whole shard. p50 is 0.25 ms a query.
+  - A lookup now reaches every shard, so all 17,597 of the shard's entries
+    render, stubs included.
+  - Found and fixed:
+    - the E9 `let` defect and the keyword names (corrections above);
+    - `List.group_by` was missing;
+    - kiokun's file names are not its words: its builder writes nine characters
+      as `_`, and 33 files are escaped;
+    - a component call per word made the load three times slower. Batched,
+      the load is 10.4 s against the Rust loader's 9.5 s.
+  - Evidence: `docs/evidence/E10/kiokun.txt` (`just e10-kiokun`, with
+    `KIOKUN_DATA`) and `docs/evidence/E10/kiokun-mutants.txt`
+    (`just e10-kiokun-mutants`).
 
 - **2026-09-25: E10 task 2, the standard library compiled (ADR-0040).**
   - `List`'s operations and a new `String` module are `intrinsic`

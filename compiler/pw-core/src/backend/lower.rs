@@ -1430,6 +1430,7 @@ impl<'a> Lower<'a> {
             },
             EachKind::Fold => seed_ty.clone(),
             EachKind::SortBy => Some(Type::Int),
+            EachKind::GroupBy => Some(Type::Str),
             _ => Some(Type::Bool),
         };
         let Given::Expr(f) = function else {
@@ -1461,6 +1462,9 @@ impl<'a> Lower<'a> {
             EachKind::Any | EachKind::All => need(Type::Bool).map(|_| Type::Bool),
             EachKind::Find => need(Type::Bool).map(|_| Type::Option(Box::new(element))),
             EachKind::SortBy => need(Type::Int).map(|_| Type::List(Box::new(element))),
+            EachKind::GroupBy => {
+                need(Type::Str).map(|_| Type::List(Box::new(Type::List(Box::new(element)))))
+            }
             EachKind::Fold => match seed_ty.clone() {
                 Some(a) => need(a.clone()).map(|_| a),
                 None => Err("the fold's seed has no type".to_string()),
@@ -2211,14 +2215,30 @@ fn intrinsic_argument(op: Intrinsic, k: usize, prior: &[Type]) -> Option<Type> {
     }
 }
 
+/// Every expression kind by name: a refusal says which construct it is,
+/// never "this expression".
 fn construct_name(e: &Expr) -> &'static str {
     match e {
+        Expr::Name(_) => "a name",
+        Expr::Literal(_) => "a literal",
         Expr::Field { .. } => "a field access",
+        Expr::Call { .. } => "a call",
         Expr::Lambda { .. } => "a lambda",
         Expr::Binary { .. } => "a binary operator",
         Expr::Cast { .. } => "a cast",
         Expr::Try { .. } => "a `?` propagation",
         Expr::Interpolated { .. } => "an interpolated string",
-        _ => "this expression",
+        Expr::Unary { .. } => "a unary operator",
+        Expr::Block { .. } => "a block",
+        Expr::If { .. } => "an `if`",
+        Expr::Match { .. } => "a `match`",
+        Expr::For { .. } => "a `for` loop",
+        Expr::Record { name: None, .. } => "a record with no type name",
+        Expr::Record { .. } => "a record",
+        Expr::List { .. } => "a list",
+        Expr::Let { .. } => "a binding where a value is needed",
+        Expr::Keyword { .. } => "a body-level statement",
+        Expr::Template { .. } => "markup",
+        Expr::Error => "an expression that did not parse",
     }
 }

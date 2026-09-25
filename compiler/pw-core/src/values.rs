@@ -96,6 +96,18 @@ pub enum Ty {
 }
 
 impl Ty {
+    /// Does this mention a type parameter of a declaration other than `own`:
+    /// a callee's `T` that no call instantiated?
+    fn mentions_foreign_parameter(&self, own: Option<DefId>) -> bool {
+        match self {
+            Ty::Parameter { binder, .. } => Some(*binder) != own,
+            Ty::Builtin(_, args) | Ty::Nominal(_, args) => {
+                args.iter().any(|a| a.mentions_foreign_parameter(own))
+            }
+            _ => false,
+        }
+    }
+
     pub fn of(t: &ResolvedType) -> Ty {
         Ty::from_key(&t.semantic_key())
     }
@@ -557,6 +569,20 @@ impl<'a> Typer<'a> {
             shadowed,
             piped,
         };
+
+        // **A binding typed with a callee's own `T` is no type.** `infer.rs`
+        // types `let ys = List.filter(xs, ..)` by `filter`'s declared result,
+        // `List<T>`, with nothing instantiating `T`; and the loop below skipped
+        // every name already bound. So `ys` was `List<type parameter 0>`, and
+        // a correct `List.sort_by(ys, compare)` was refused (PW0605) for a
+        // mismatch the typer had made. Found 2026-09-25, writing kiokun's
+        // ranking in Pleris. Such a binding is dropped, and the call is solved
+        // below.
+        let own = typer.own_def();
+        typer
+            .locals
+            .borrow_mut()
+            .retain(|_, t| !t.mentions_foreign_parameter(own));
 
         // An unannotated `let` takes its initialiser's type. Iterated, because
         // `let a = f()` then `let b = g(a)` needs `a` first; bounded, because

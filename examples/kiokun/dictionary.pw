@@ -58,3 +58,27 @@ type SearchHit = SearchHit {
     definition: String,
     common: Bool,
 }
+
+// Where a word's file is, by kiokun's shard rule: which of the 28 shards it
+// belongs to, and the subdirectory it sits in, as
+// `<subdirectory>/<word>.json.deflate`.
+type Placement = Placement {
+    shard: String,
+    subdirectory: String,
+}
+
+// One searchable row, as the index returns it: one definition of one word.
+// `folded` and `words` are the definition as the index's tokenizer reads it,
+// case-folded and split into words, the division kiokun.com keeps: its SQLite
+// FTS5 tokenizer folds case, and its application ranks.
+type Row = Row {
+    word: String,
+    target: String,
+    language: String,
+    pronunciation: String,
+    reading: String,
+    definition: String,
+    folded: String,
+    words: List<String>,
+    common: Bool,
+}

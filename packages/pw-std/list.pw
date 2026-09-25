@@ -61,6 +61,11 @@ fn find<T>(items: List<T>, f: fn(T) -> Bool) -> Option<T> !{}
 fn sort_by<T>(items: List<T>, compare: fn(T, T) -> Int) -> List<T> !{}
     intrinsic "list.sort_by"
 
+// Runs of consecutive elements with equal keys, in order: sort by the key
+// first to group every element that has it.
+fn group_by<T>(items: List<T>, key: fn(T) -> String) -> List<List<T>> !{}
+    intrinsic "list.group_by"
+
 // The language has no tuple type, so a position and an element cannot be one
 // value's type yet. The result is therefore not annotated — a hole, not a
 // claim — and `for (i, v) in List.enumerate(xs)` binds by pattern.

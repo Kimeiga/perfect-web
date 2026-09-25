@@ -4,14 +4,28 @@
 // @charter: §14 M10
 // @milestone: E10
 //
-// **Supplied by the deployment.** kiokun.com searches in SQLite FTS5 on its
-// server, and the matching and ranking are the database's. The slice keeps
-// that division: the host searches one shard with kiokun's own rules, and the
-// query asks it for twenty hits.
+// **Supplied by the deployment**: what kiokun.com's SQLite FTS5 index does.
+// It finds the rows a query could match, and its tokenizer folds case and
+// splits text into words. The ranking is the application's, and since
+// 2026-09-25 it is Pleris (`kiokun.page.Search`, ADR-0041): until then the
+// host ranked too, and this module declared one `search` that returned the
+// twenty hits.
 
 module Index
 
-import dictionary.{ SearchHit }
+import dictionary.{ Row }
 
-fn search(term: String, limit: Int) -> List<SearchHit> !{ database.read<SearchHit> }
-    host "kiokun:data/index#search"
+// Every row whose word, reading or definition could match `term`: the rows
+// whose word starts with it or with the entry its stub names, whose reading
+// starts with its hiragana or its folded form, or whose folded definition
+// starts with it or holds it as a word. A superset of what ranks.
+fn candidates(term: String) -> List<Row> !{ database.read<Row> }
+    host "kiokun:data/index#candidates"
+
+// The tokenizer's case folding.
+fn fold(term: String) -> String !{ database.read<Row> }
+    host "kiokun:data/index#fold"
+
+// The entry a stub names, when `term` is a stub's key: `地図` names `地圖`.
+fn alias(term: String) -> Option<String> !{ database.read<Row> }
+    host "kiokun:data/index#alias"

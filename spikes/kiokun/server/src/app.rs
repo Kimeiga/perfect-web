@@ -2,8 +2,8 @@
 //! the shard as their data layer, and the compiled pages render the result.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use pw_host::engine::{HostFn, Prepared, Val};
 use pw_host::{ComponentContract, Granted, Limits, Node, Topology, admit};
@@ -76,12 +76,57 @@ impl Query {
     }
 }
 
-/// The slice: its shard, its two compiled queries, its three pages.
+/// The slice: its shard, its compiled queries, its three pages.
 pub struct App {
     pub index: Arc<Index>,
     templates: Vec<Template>,
     lookup: Query,
     search: Query,
+    place: Arc<Query>,
+    #[cfg(test)]
+    places: Query,
+    /// Where kiokun's files are: any word's is found here by the compiled
+    /// rule, whichever shard it is in.
+    dir: PathBuf,
+    /// Entries read on demand, outside the loaded shard.
+    read: Arc<Mutex<BTreeMap<String, Option<Val>>>>,
+}
+
+/// The compiled `shards.Place`'s answer: the shard and the subdirectory.
+fn placement(place: &Query, word: &str) -> Result<(String, String), String> {
+    located(place.call(&BTreeMap::new(), &[Val::String(word.to_string())])?)
+}
+
+/// The compiled `shards.Places`, a thousand words a call: a call is a fresh
+/// instance, and a word each made loading a shard three times slower
+/// (ADR-0041).
+fn placements(places: &Query, words: &[String]) -> Result<Vec<(String, String)>, String> {
+    let mut out = Vec::with_capacity(words.len());
+    for chunk in words.chunks(1000) {
+        let list = chunk.iter().map(|w| Val::String(w.clone())).collect();
+        match places.call(&BTreeMap::new(), &[Val::List(list)])? {
+            Val::List(found) if found.len() == chunk.len() => {
+                for f in found {
+                    out.push(located(f)?);
+                }
+            }
+            other => return Err(format!("Places returned {other:?}")),
+        }
+    }
+    Ok(out)
+}
+
+fn located(v: Val) -> Result<(String, String), String> {
+    match v {
+        Val::Record(fields) => {
+            let get = |name: &str| match fields.iter().find(|(k, _)| k == name) {
+                Some((_, Val::String(s))) => Ok(s.clone()),
+                other => Err(format!("a placement's `{name}` is {other:?}")),
+            };
+            Ok((get("shard")?, get("subdirectory")?))
+        }
+        other => Err(format!("a placement is {other:?}")),
+    }
 }
 
 /// A page to send: its status and its HTML.
@@ -91,8 +136,10 @@ pub struct Page {
 }
 
 impl App {
-    /// `build` is a `pw build` output directory for `examples/kiokun/`.
-    pub fn load(build: &Path, index: Index) -> Result<App, String> {
+    /// `build` is a `pw build` output directory for `examples/kiokun/`, and
+    /// `dir` holds kiokun's files: `shard` is loaded from it and searched, and
+    /// any other word's file is read from it on demand.
+    pub fn load(build: &Path, dir: &Path, shard: &str) -> Result<App, String> {
         let read = |name: &str| {
             let path = build.join(name);
             std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))
@@ -100,35 +147,94 @@ impl App {
         let contracts = ComponentContract::from_json(&read("contracts.json")?)?;
         let templates: Vec<Template> =
             serde_json::from_str(&read("templates.json")?).map_err(|e| e.to_string())?;
+        let place = Arc::new(Query::load(build, &contracts, "shards.Place")?);
+        let places = Query::load(build, &contracts, "shards.Places")?;
+        let shard = crate::shard::Shard::load(dir, shard, &|ws| placements(&places, ws))?;
         Ok(App {
-            index: Arc::new(index),
+            index: Arc::new(Index::build(shard)),
             lookup: Query::load(build, &contracts, "kiokun.page.Lookup")?,
             search: Query::load(build, &contracts, "kiokun.page.Search")?,
+            place,
+            #[cfg(test)]
+            places,
+            dir: dir.to_path_buf(),
+            read: Arc::new(Mutex::new(BTreeMap::new())),
             templates,
         })
     }
 
+    /// Where a word's file is, by the compiled rule.
+    #[cfg(test)]
+    pub fn place(&self, word: &str) -> Result<(String, String), String> {
+        placement(&self.place, word)
+    }
+
+    /// Where each word's file is, by the compiled rule, in few calls.
+    #[cfg(test)]
+    pub fn places(&self, words: &[String]) -> Result<Vec<(String, String)>, String> {
+        placements(&self.places, words)
+    }
+
     /// The deployment's data layer, as host operations.
     fn data_layer(&self) -> BTreeMap<String, HostFn> {
-        let get = self.index.clone();
-        let search = self.index.clone();
+        let (index, place, dir, read) = (
+            self.index.clone(),
+            self.place.clone(),
+            self.dir.clone(),
+            self.read.clone(),
+        );
+        let get: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(word)] => match index.get(word) {
+                Val::Option(None) => {
+                    // Outside the loaded shard: its file, where the compiled
+                    // rule says it is, if kiokun has one.
+                    if let Some(known) = read.lock().expect("cache").get(word) {
+                        return Ok(vec![Val::Option(known.clone().map(Box::new))]);
+                    }
+                    let (_, sub) = placement(&place, word)?;
+                    let path = dir.join(&sub).join(crate::shard::file_name(word));
+                    // kiokun's escape gives several words one file name:
+                    // the file is this word's only if it records this word.
+                    let found = match path.exists() {
+                        true => {
+                            let raw = crate::shard::read_entry(&path)?;
+                            crate::shard::key_of(&raw)
+                                .is_none_or(|k| &k == word)
+                                .then(|| crate::data::entry(&raw))
+                        }
+                        false => None,
+                    };
+                    read.lock()
+                        .expect("cache")
+                        .insert(word.clone(), found.clone());
+                    Ok(vec![Val::Option(found.map(Box::new))])
+                }
+                known => Ok(vec![known]),
+            },
+            other => Err(format!("entries#get received {other:?}")),
+        });
+        let index = self.index.clone();
+        let candidates: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(q)] => Ok(vec![Val::List(index.candidates(q))]),
+            other => Err(format!("index#candidates received {other:?}")),
+        });
+        let index = self.index.clone();
+        let fold: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(q)] => Ok(vec![Val::String(index.fold(q))]),
+            other => Err(format!("index#fold received {other:?}")),
+        });
+        let index = self.index.clone();
+        let alias: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(q)] => Ok(vec![Val::Option(
+                index.alias(q).map(|a| Box::new(Val::String(a))),
+            )]),
+            other => Err(format!("index#alias received {other:?}")),
+        });
         BTreeMap::from([
-            (
-                "kiokun:data/entries#get".to_string(),
-                Arc::new(move |args: &[Val]| match args {
-                    [Val::String(word)] => Ok(vec![get.get(word)]),
-                    other => Err(format!("entries#get received {other:?}")),
-                }) as HostFn,
-            ),
-            (
-                "kiokun:data/index#search".to_string(),
-                Arc::new(move |args: &[Val]| match args {
-                    [Val::String(q), Val::S64(limit)] => Ok(vec![Val::List(
-                        search.search(q, (*limit).clamp(0, 100) as usize),
-                    )]),
-                    other => Err(format!("index#search received {other:?}")),
-                }) as HostFn,
-            ),
+            ("kiokun:data/entries#get".to_string(), get),
+            ("kiokun:data/index#candidates".to_string(), candidates),
+            ("kiokun:data/index#fold".to_string(), fold),
+            ("kiokun:data/index#alias".to_string(), alias),
         ])
     }
 

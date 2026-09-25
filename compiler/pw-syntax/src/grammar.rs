@@ -649,6 +649,7 @@ impl<'a> P<'a> {
                 break;
             }
             self.start(K::Param);
+            self.not_a_statement_keyword("a parameter");
             if !self.name("a parameter name") {
                 self.finish();
                 self.skip_balanced(Kind::LParen, Kind::RParen);
@@ -1444,10 +1445,29 @@ impl<'a> P<'a> {
         self.finish();
     }
 
+    /// **A statement keyword cannot name a value.** `let query = ..` parsed,
+    /// and then every use of `query` in an expression parsed as a `query ..`
+    /// statement: the program checked, because the checker reads such a
+    /// statement as a value of no known type, and meant something else. Found
+    /// 2026-09-25, writing kiokun's ranking in Pleris.
+    fn not_a_statement_keyword(&mut self, what: &str) {
+        if self.at(Kind::Ident) && STMT_KEYWORDS.contains(&self.cur_text()) {
+            let word = self.cur_text().to_string();
+            self.error(
+                "PW0009",
+                format!(
+                    "`{word}` is a statement keyword and cannot name {what}: a use of it \
+                     would read as a `{word} ..` statement"
+                ),
+            );
+        }
+    }
+
     fn let_stmt(&mut self) {
         self.start(K::LetStmt);
         self.bump(); // let
         self.eat_kw("mut");
+        self.not_a_statement_keyword("a binding");
         self.name("a binding name");
         if self.eat(Kind::Colon) {
             self.type_ref();
@@ -2002,6 +2022,7 @@ impl<'a> P<'a> {
             self.start(K::LetDecl);
             self.bump();
             self.eat_kw("mut");
+            self.not_a_statement_keyword("a binding");
             self.name("a binding name");
             if self.eat(Kind::Colon) {
                 self.type_ref();
@@ -2827,6 +2848,24 @@ mod tests {
             .filter(|n| n.kind() == K::NameExpr && n.text().to_string().trim() == "return")
             .count();
         assert_eq!(returns, 2);
+    }
+
+    #[test]
+    fn a_statement_keyword_cannot_name_a_value() {
+        for src in [
+            "fn f() -> Int {\n    let query = 1\n    query\n}\n",
+            "fn f(query: Int) -> Int {\n    query\n}\n",
+        ] {
+            let p = parse_tree(src);
+            assert!(
+                p.errors
+                    .iter()
+                    .any(|e| e.message.contains("`query` is a statement keyword")),
+                "{src:?}: {:?}",
+                p.errors
+            );
+        }
+        parse_ok("fn f(term: Int) -> Int {\n    let queried = term\n    queried\n}\n");
     }
 
     #[test]

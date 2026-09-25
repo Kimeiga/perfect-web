@@ -102,8 +102,8 @@ inlined. Still refused by name:
   read by the route checker, but the template IR has no part for it and blocks
   the render, naming `href={value}` as the form that renders.
 - **The standard library is small** (ADR-0040). `List` has `length`, `get`,
-  `take`, `concat`, `map`, `filter`, `fold`, `any`, `all`, `find` and
-  `sort_by`; `String` has `length`, `codepoints`, `from_codepoints`,
+  `take`, `concat`, `map`, `filter`, `fold`, `any`, `all`, `find`, `sort_by`
+  and `group_by` (by a `String` key, adjacent runs); `String` has `length`, `codepoints`, `from_codepoints`,
   `starts_with`, `ends_with`, `contains`, `join`, `trim` and
   `to_lower_ascii`. There is no slicing, no Unicode case mapping, and no map
   or set type. `sum`, `maximum` and `enumerate` still have placeholder
@@ -111,6 +111,22 @@ inlined. Still refused by name:
 - **A function is not a value.** A lambda or a declaration's name is compiled
   where a list operation runs it; stored, returned, or passed to any other
   declaration, it is refused.
+- **A statement keyword cannot name a value** (PW0009, ADR-0041, ruling
+  needed). `let query = ..` is refused rather than read as a `query ..`
+  statement at every use.
+
+**The kiokun slice** (ADR-0037, ADR-0041) is one shard of kiokun.com, with
+its logic in Pleris and its data layer in the host:
+- **Search covers the loaded shard only.** A lookup reaches every shard.
+  kiokun.com searches in SQLite FTS5, and an index over every shard is the
+  deployment's.
+- **The index is Rust.** Candidate retrieval, case folding and a stub's target
+  are the host's, as the database's are kiokun.com's. The ranking is Pleris.
+- **Korean entries render their heading only.** The slice's `Entry` has
+  Chinese and Japanese words; kiokun's `korean_words` are not read.
+- **A call is a fresh instance** (ADR-0032). Bulk work needs a query over a
+  list, as `shards.Places` is: a call a word made the whole shard's load three
+  times slower.
 
 **Resumable handler bodies are compiled** (2026-09-25, ADR-0033), to one ES
 module each, and the page's elements carry what the handlers read. The set is

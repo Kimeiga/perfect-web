@@ -37,6 +37,7 @@ signature, which the checker and the value relations read as they read any.
 | | `concat(a, b)` | `a`'s elements, then `b`'s |
 | | `map`, `filter`, `fold`, `any`, `all`, `find` | as usual; `find` is the first match |
 | | `sort_by(xs, compare)` | stable; `compare(a, b) > 0` puts `b` first |
+| | `group_by(xs, key)` | runs of adjacent elements with equal `String` keys, each a view of `xs`; added by ADR-0041 |
 | `String` | `length` | code points, not bytes |
 | | `codepoints`, `from_codepoints` | a `List<Int>` of Unicode scalar values; a value that is not one traps |
 | | `starts_with`, `ends_with`, `contains` | by code points, which is by bytes for UTF-8 |

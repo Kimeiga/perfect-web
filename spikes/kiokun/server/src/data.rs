@@ -1,19 +1,24 @@
-//! **The deployment's data layer**: `kiokun:data/entries#get` and
-//! `kiokun:data/index#search`, over one shard.
+//! **The deployment's data layer**: `kiokun:data/entries#get`, and the index
+//! the compiled `Search` ranks from: `index#candidates`, `index#fold` and
+//! `index#alias`, over one shard.
 //!
 //! An entry is converted from kiokun's JSON to the slice's `dictionary.Entry`,
-//! as the component's world types it. Search reimplements kiokun.com's rules
+//! as the component's world types it. The index is what kiokun.com's SQLite
+//! FTS5 does: it finds the rows a query could match, and its tokenizer folds
+//! case and splits definitions into words. The ranking is Pleris since
+//! 2026-09-25 (ADR-0041). [`Index::search`] is kiokun.com's ranking in Rust
 //! (sveltekit-app `src/routes/api/search/+server.ts`, as recorded in
-//! `docs/evidence/E10/kiokun-2026-09-25.md`) over this shard's entries, in
-//! memory, where kiokun.com runs them in SQLite FTS5. It is a reimplementation
-//! with the same scores and tie-breaks. Parity with FTS5's tokenizer, and with
-//! kiokun's alias table beyond simplified-form stubs, is not claimed.
+//! `docs/evidence/E10/kiokun-2026-09-25.md`), kept as the reference the
+//! compiled one is held to. Parity with FTS5's tokenizer, and with kiokun's
+//! alias table beyond simplified-form stubs, is not claimed.
 
 use std::collections::BTreeMap;
 
 use pw_host::engine::Val;
 
-use crate::shard::{Shard, is_han};
+use crate::shard::Shard;
+#[cfg(test)]
+use crate::shard::is_han;
 
 fn text(v: &serde_json::Value, key: &str) -> String {
     v.get(key)
@@ -138,7 +143,64 @@ pub struct Row {
     /// row's reading is its hiragana and a Latin query does not match it.
     pub reading: String,
     pub definition: String,
+    /// The definition case-folded, and split into words, as the index's
+    /// tokenizer reads it.
+    pub folded: String,
+    pub words: Vec<String>,
     pub common: bool,
+}
+
+/// The tokenizer's words: the folded text split at every character that is
+/// not alphanumeric, as kiokun's whole-word match splits it.
+fn words_of(folded: &str) -> Vec<String> {
+    folded
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+impl Row {
+    fn new(
+        word: String,
+        target: String,
+        language: &'static str,
+        pronunciation: String,
+        reading: String,
+        definition: String,
+        common: bool,
+    ) -> Row {
+        let folded = definition.to_lowercase();
+        Row {
+            words: words_of(&folded),
+            folded,
+            word,
+            target,
+            language,
+            pronunciation,
+            reading,
+            definition,
+            common,
+        }
+    }
+
+    /// The row as the world's `row` record, in `dictionary.Row`'s order.
+    fn val(&self) -> Val {
+        record(vec![
+            ("word", Val::String(self.word.clone())),
+            ("target", Val::String(self.target.clone())),
+            ("language", Val::String(self.language.to_string())),
+            ("pronunciation", Val::String(self.pronunciation.clone())),
+            ("reading", Val::String(self.reading.clone())),
+            ("definition", Val::String(self.definition.clone())),
+            ("folded", Val::String(self.folded.clone())),
+            (
+                "words",
+                Val::List(self.words.iter().map(|w| Val::String(w.clone())).collect()),
+            ),
+            ("common", Val::Bool(self.common)),
+        ])
+    }
 }
 
 /// The shard's entries and its search rows.
@@ -160,6 +222,7 @@ pub fn hiragana(s: &str) -> String {
 }
 
 /// Hiragana (U+3040–309F) and katakana (U+30A0–30FF), adjacent blocks.
+#[cfg(test)]
 fn is_kana(c: char) -> bool {
     matches!(u32::from(c), 0x3040..=0x30FF)
 }
@@ -182,15 +245,15 @@ impl Index {
                     .unwrap_or_default()
                     .to_lowercase();
                 for d in definitions(w) {
-                    rows.push(Row {
-                        word: text(w, "trad"),
-                        target: key.clone(),
-                        language: "chinese",
-                        pronunciation: pinyin(w),
-                        reading: plain.clone(),
-                        definition: d,
-                        common: false,
-                    });
+                    rows.push(Row::new(
+                        text(w, "trad"),
+                        key.clone(),
+                        "chinese",
+                        pinyin(w),
+                        plain.clone(),
+                        d,
+                        false,
+                    ));
                 }
             }
             for w in list(json, "japanese_words") {
@@ -207,15 +270,15 @@ impl Index {
                     if g.is_empty() {
                         continue;
                     }
-                    rows.push(Row {
-                        word: word.clone(),
-                        target: key.clone(),
-                        language: "japanese",
-                        reading: hiragana(&pronunciation),
-                        pronunciation: pronunciation.clone(),
-                        definition: g,
-                        common: common(w),
-                    });
+                    rows.push(Row::new(
+                        word.clone(),
+                        key.clone(),
+                        "japanese",
+                        pronunciation.clone(),
+                        hiragana(&pronunciation),
+                        g,
+                        common(w),
+                    ));
                 }
             }
         }
@@ -231,7 +294,47 @@ impl Index {
         Val::Option(self.shard.entries.get(word).map(|e| Box::new(entry(e))))
     }
 
-    /// `index#search`: kiokun's matching and ranking over this shard.
+    /// `index#candidates`: every row the query could match, in the index's
+    /// order. A row matches only if its word starts with the query or with the
+    /// entry the query's stub names, its reading starts with the query's
+    /// hiragana or its folded form, or its folded definition starts with that
+    /// form or holds it as a word; so this is a superset of every row the
+    /// compiled ranking scores above zero. The query arrives trimmed.
+    pub fn candidates(&self, query: &str) -> Vec<Val> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let lower = self.fold(query);
+        let reading = hiragana(query);
+        let alias = self.alias(query);
+        self.rows
+            .iter()
+            .filter(|r| {
+                r.word.starts_with(query)
+                    || alias.as_deref().is_some_and(|a| r.word.starts_with(a))
+                    || r.reading.starts_with(&reading)
+                    || r.reading.starts_with(&lower)
+                    || r.folded.starts_with(&lower)
+                    || r.words.contains(&lower)
+            })
+            .map(Row::val)
+            .collect()
+    }
+
+    /// `index#fold`: the tokenizer's case folding.
+    pub fn fold(&self, query: &str) -> String {
+        query.to_lowercase()
+    }
+
+    /// `index#alias`: the entry a stub names.
+    pub fn alias(&self, query: &str) -> Option<String> {
+        self.aliases.get(query).cloned()
+    }
+
+    /// **kiokun's ranking, in Rust**: the reference `kiokun.page.Search` is
+    /// held to (ADR-0041). It was `index#search` until 2026-09-25, when the
+    /// ranking moved into Pleris.
+    #[cfg(test)]
     pub fn search(&self, query: &str, limit: usize) -> Vec<Val> {
         let q = query.trim();
         if q.is_empty() {

@@ -295,6 +295,9 @@ pub enum EachKind {
     /// The elements ordered by the body, a comparison: a positive value puts
     /// the second first. Stable.
     SortBy,
+    /// Runs of consecutive elements whose body values, a key, are equal: a
+    /// list of views into the list, in order.
+    GroupBy,
 }
 
 /// A first-order operation of the standard library (ADR-0040).
@@ -341,6 +344,7 @@ impl Operation {
             "list.all" => Operation::Each(E::All),
             "list.find" => Operation::Each(E::Find),
             "list.sort_by" => Operation::Each(E::SortBy),
+            "list.group_by" => Operation::Each(E::GroupBy),
             "list.length" => Operation::Intrinsic(I::ListLength),
             "list.get" => Operation::Intrinsic(I::ListGet),
             "list.take" => Operation::Intrinsic(I::ListTake),

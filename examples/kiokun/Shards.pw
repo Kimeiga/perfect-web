@@ -1,0 +1,77 @@
+// @corpus: fixture
+// @id: KIOKUN-Shards
+// @category: the kiokun slice — kiokun's shard rule
+// @charter: §14 M10
+// @milestone: E10
+//
+// **kiokun's shard rule, in Pleris** (ADR-0041). kiokun-data's `src/main.rs`
+// and the SvelteKit app's `src/lib/shard-utils.ts` state it: count the word's
+// Han characters; hash every character, `h = h * 31 + codepoint`, in 32 bits;
+// zero Han characters is `non-han-{h % 4 + 1}`, one is `han-1char-{h % 8 + 1}`,
+// two `han-2char-..`, three or more `han-3plus-..`; and the file sits in the
+// subdirectory `h & 0xFF`, two hex digits. The slice's host held this in Rust
+// until 2026-09-25, and now asks the compiled `Place` instead.
+
+module shards
+
+import List
+import String
+import dictionary.{ Placement }
+
+fn within(c: Int, low: Int, high: Int) -> Bool {
+    c >= low & c <= high
+}
+
+// CJK Unified Ideographs, Extensions A to I, and the compatibility blocks,
+// in decimal: U+4E00..U+9FFF, U+3400..U+4DBF, U+20000..U+2A6DF,
+// U+2A700..U+2B73F, U+2B740..U+2B81F, U+2B820..U+2CEAF, U+2CEB0..U+2EBEF,
+// U+30000..U+3134F, U+31350..U+323AF, U+2EBF0..U+2EE5F, U+F900..U+FAFF,
+// U+2F800..U+2FA1F.
+fn is_han(c: Int) -> Bool {
+    within(c, 19968, 40959) | within(c, 13312, 19903) | within(c, 131072, 173791) | within(c, 173824, 177983) | within(c, 177984, 178207) | within(c, 178208, 183983) | within(c, 183984, 191471) | within(c, 196608, 201551) | within(c, 201552, 205743) | within(c, 191472, 192095) | within(c, 63744, 64255) | within(c, 194560, 195103)
+}
+
+// `h = h * 31 + codepoint`, kept to 32 bits: only its low bits are read, so
+// this agrees with kiokun's Rust `usize` and its app's `u32`.
+fn hash(word: String) -> Int {
+    List.fold(String.codepoints(word), 0, (h, c) => (h * 31 + c) % 4294967296)
+}
+
+fn shard_of(word: String) -> String {
+    let h = hash(word)
+    let hans = List.length(List.filter(String.codepoints(word), is_han))
+    if hans == 0 {
+        "non-han-{h % 4 + 1}"
+    } else {
+        if hans == 1 {
+            "han-1char-{h % 8 + 1}"
+        } else {
+            if hans == 2 { "han-2char-{h % 8 + 1}" } else { "han-3plus-{h % 8 + 1}" }
+        }
+    }
+}
+
+// One lowercase hexadecimal digit, as a code point.
+fn hex(digit: Int) -> Int {
+    if digit < 10 { 48 + digit } else { 87 + digit }
+}
+
+fn subdirectory(word: String) -> String {
+    let low = hash(word) % 256
+    String.from_codepoints([hex(low / 16), hex(low % 16)])
+}
+
+fn place(word: String) -> Placement {
+    Placement { shard: shard_of(word), subdirectory: subdirectory(word) }
+}
+
+// Where `word`'s file is.
+public query Place(word: String) -> Placement {
+    place(word)
+}
+
+// Where each word's file is: a directory's files in one call, where `Place`
+// would be one call each.
+public query Places(words: List<String>) -> List<Placement> {
+    List.map(words, place)
+}

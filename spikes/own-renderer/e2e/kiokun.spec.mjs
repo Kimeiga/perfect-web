@@ -32,7 +32,7 @@ test("a word this shard does not have is a 404", async ({ page }) => {
   const response = await page.goto("/無");
   expect(response.status()).toBe(404);
   await expect(page.locator("#headword")).toHaveText("無");
-  await expect(page.locator("main p")).toHaveText("This shard has no entry for it.");
+  await expect(page.locator("main p")).toHaveText("There is no entry for it here.");
 });
 
 test("searching, then following a result", async ({ page }) => {

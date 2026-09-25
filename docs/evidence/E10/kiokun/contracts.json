@@ -126,12 +126,12 @@
   {
     "component_id": "kiokun.page.Search",
     "capability_mapping": 1,
-    "abi_schema": "5c8587d23a5fbf80",
+    "abi_schema": "c348c49ea4f3b3f7",
     "required_capabilities": [
       {
         "family": "database",
         "operation": "read",
-        "argument": "SearchHit"
+        "argument": "Row"
       }
     ],
     "allowed_placements": [
@@ -140,22 +140,50 @@
     "imports": [
       {
         "interface": "kiokun:data/index",
-        "name": "search",
-        "capability": "database.read<SearchHit>",
+        "name": "alias",
+        "capability": "database.read<Row>",
         "capabilities": [
           {
             "family": "database",
             "operation": "read",
-            "argument": "SearchHit"
+            "argument": "Row"
           }
         ],
         "signature": {
           "params": [
             {
               "primitive": "String"
-            },
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Option",
+              "args": [
+                {
+                  "primitive": "String"
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "kiokun:data/index",
+        "name": "candidates",
+        "capability": "database.read<Row>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Row"
+          }
+        ],
+        "signature": {
+          "params": [
             {
-              "primitive": "Int"
+              "primitive": "String"
             }
           ],
           "result": {
@@ -164,11 +192,35 @@
               "args": [
                 {
                   "declared": {
-                    "path": "dictionary.SearchHit"
+                    "path": "dictionary.Row"
                   }
                 }
               ]
             }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "kiokun:data/index",
+        "name": "fold",
+        "capability": "database.read<Row>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Row"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "primitive": "String"
           }
         },
         "owner": "external",
@@ -217,6 +269,64 @@
         "component": {
           "interface": "pw:app/kiokun-page-search-page-api@0.1.0",
           "function": "search-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "shards.Place",
+    "capability_mapping": 1,
+    "abi_schema": "8cf2f22ff10b3c2d",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "Place",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/shards-place-api@0.1.0",
+          "function": "place"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "shards.Places",
+    "capability_mapping": 1,
+    "abi_schema": "542673aa22732b21",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "Places",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/shards-places-api@0.1.0",
+          "function": "places"
         }
       }
     ]

@@ -284,6 +284,7 @@ fn kiokun() -> Vec<pw_core::check::Unit> {
         "examples/kiokun/dictionary.pw",
         "examples/kiokun/Entries.pw",
         "examples/kiokun/Index.pw",
+        "examples/kiokun/Shards.pw",
         "examples/kiokun/app.pw",
     ]);
     let borrowed: Vec<(&str, &str)> = program
@@ -398,23 +399,294 @@ fn the_kiokun_lookup_agrees_with_its_reference() {
     );
 }
 
+// --- kiokun's search and shard rule, stated in Rust ------------------------------
+
+fn text(v: &Val) -> String {
+    match v {
+        Val::String(s) => s.clone(),
+        other => panic!("not a string: {other:?}"),
+    }
+}
+
+fn is_han(c: char) -> bool {
+    matches!(u32::from(c),
+        0x4E00..=0x9FFF | 0x3400..=0x4DBF | 0x20000..=0x2A6DF | 0x2A700..=0x2B73F
+        | 0x2B740..=0x2B81F | 0x2B820..=0x2CEAF | 0x2CEB0..=0x2EBEF | 0x30000..=0x3134F
+        | 0x31350..=0x323AF | 0x2EBF0..=0x2EE5F | 0xF900..=0xFAFF | 0x2F800..=0x2FA1F)
+}
+
+fn is_kana(c: char) -> bool {
+    matches!(u32::from(c), 0x3040..=0x30FF)
+}
+
+fn hiragana(s: &str) -> String {
+    s.chars()
+        .map(|c| match u32::from(c) {
+            k @ 0x30A1..=0x30F6 => char::from_u32(k - 0x60).unwrap_or(c),
+            _ => c,
+        })
+        .collect()
+}
+
+/// `kiokun.page.Search`, stated from the declaration: the index's answers
+/// for the trimmed query, each row scored, one hit per entry, twenty at most.
+fn search(args: &[Val], host: &mut dyn FnMut(&str, Vec<Val>) -> Val) -> Val {
+    search_taking(args, host, 20)
+}
+
+fn search_taking(args: &[Val], host: &mut dyn FnMut(&str, Vec<Val>) -> Val, limit: usize) -> Val {
+    let term = text(&args[0]).trim().to_string();
+    if term.is_empty() {
+        return Val::List(Vec::new());
+    }
+    let cjk = term.chars().any(|c| is_han(c) || is_kana(c));
+    let kana_only = term.chars().all(is_kana);
+    let lower = text(&host(
+        "kiokun:data/index#fold",
+        vec![Val::String(term.clone())],
+    ));
+    let reading = hiragana(&term);
+    let alias = match host("kiokun:data/index#alias", vec![Val::String(term.clone())]) {
+        Val::Option(Some(a)) => Some(text(&a)),
+        _ => None,
+    };
+    let Val::List(rows) = host(
+        "kiokun:data/index#candidates",
+        vec![Val::String(term.clone())],
+    ) else {
+        panic!("candidates is a list")
+    };
+    struct Scored {
+        row: Val,
+        score: i64,
+    }
+    let f = |r: &Val, name: &str| field(r, name);
+    let score = |r: &Val| -> i64 {
+        let (word, rreading) = (text(&f(r, "word")), text(&f(r, "reading")));
+        if cjk {
+            if word == term {
+                1000
+            } else if alias.as_deref() == Some(word.as_str()) {
+                900
+            } else if kana_only && rreading == reading {
+                875
+            } else if word.starts_with(&term) {
+                500
+            } else if alias.as_deref().is_some_and(|a| word.starts_with(a))
+                || (kana_only && rreading.starts_with(&reading))
+            {
+                450
+            } else {
+                0
+            }
+        } else {
+            let folded = text(&f(r, "folded"));
+            let Val::List(words) = f(r, "words") else {
+                panic!("words")
+            };
+            if folded == lower {
+                1000
+            } else if rreading == lower {
+                900
+            } else if !rreading.is_empty() && rreading.starts_with(&lower) {
+                600
+            } else if folded.starts_with(&lower) {
+                500
+            } else if words.iter().any(|w| text(w) == lower) {
+                100
+            } else {
+                0
+            }
+        }
+    };
+    let mut scored: Vec<Scored> = rows
+        .iter()
+        .map(|r| Scored {
+            row: r.clone(),
+            score: score(r),
+        })
+        .filter(|s| s.score > 0)
+        .collect();
+    // One hit per entry: grouped by target, the index's order kept within.
+    scored.sort_by_key(|s| text(&f(&s.row, "target")));
+    let common = |s: &Scored| f(&s.row, "common") == Val::Bool(true);
+    let mut ranked: Vec<(i64, Val)> = Vec::new();
+    for group in scored.chunk_by(|a, b| f(&a.row, "target") == f(&b.row, "target")) {
+        let mut best: Option<&Scored> = None;
+        for s in group {
+            let better = match best {
+                None => true,
+                Some(b) => s.score > b.score || (s.score == b.score && common(s) && !common(b)),
+            };
+            if better {
+                best = Some(s);
+            }
+        }
+        let best = best.expect("a group has a row");
+        let chinese = group
+            .iter()
+            .any(|s| text(&f(&s.row, "language")) == "chinese");
+        let japanese = group
+            .iter()
+            .any(|s| text(&f(&s.row, "language")) == "japanese");
+        let language = match (chinese, japanese) {
+            (true, true) => "chinese · japanese",
+            (true, false) => "chinese",
+            _ => "japanese",
+        };
+        let target = f(&best.row, "target");
+        ranked.push((
+            best.score,
+            Val::Record(vec![
+                ("id".into(), target.clone()),
+                ("word".into(), f(&best.row, "word")),
+                ("target".into(), target),
+                ("language".into(), Val::String(language.into())),
+                ("pronunciation".into(), f(&best.row, "pronunciation")),
+                ("definition".into(), f(&best.row, "definition")),
+                ("common".into(), Val::Bool(group.iter().any(common))),
+            ]),
+        ));
+    }
+    ranked.sort_by(|(sa, a), (sb, b)| {
+        sb.cmp(sa)
+            .then_with(|| {
+                (f(b, "common") == Val::Bool(true)).cmp(&(f(a, "common") == Val::Bool(true)))
+            })
+            .then_with(|| {
+                text(&f(a, "word"))
+                    .chars()
+                    .count()
+                    .cmp(&text(&f(b, "word")).chars().count())
+            })
+            .then_with(|| text(&f(a, "target")).cmp(&text(&f(b, "target"))))
+    });
+    Val::List(ranked.into_iter().take(limit).map(|(_, h)| h).collect())
+}
+
+/// An index whose rows are built around each query: its prefixes, its
+/// hiragana, its folded form, and strings from a small pool, so exact
+/// matches, prefixes, stubs, ties and groups all occur. Up to 80 rows over up
+/// to 44 entries, so a result can hold more than the twenty it keeps.
+fn index_around_query(rng: &mut Rng, _: &Types) -> Box<Answer> {
+    const POOL: [&str; 8] = ["人", "人人", "ひと", "ヒト", "a", "Ab", "", "谚"];
+    let n = rng.below(80) as usize;
+    let draws: Vec<u64> = (0..n * 12 + 8).map(|_| rng.next()).collect();
+    Box::new(move |op, a| {
+        let term = match a {
+            [Val::String(t)] => t.clone(),
+            _ => String::new(),
+        };
+        let mut d = draws.iter().copied();
+        let mut next = || d.next().unwrap_or(0);
+        let pick = |next: &mut dyn FnMut() -> u64| -> String {
+            let prefix: String = term.chars().take((next() % 3) as usize + 1).collect();
+            match next() % 6 {
+                0 => term.clone(),
+                1 => prefix,
+                2 => hiragana(&term),
+                3 => term.to_lowercase(),
+                _ => POOL[(next() % POOL.len() as u64) as usize].to_string(),
+            }
+        };
+        match op {
+            "kiokun:data/index#fold" => Val::String(match next() % 3 {
+                0 => pick(&mut next),
+                _ => term.to_lowercase(),
+            }),
+            "kiokun:data/index#alias" => Val::Option(match next() % 3 {
+                0 => Some(Box::new(Val::String(pick(&mut next)))),
+                _ => None,
+            }),
+            _ => Val::List(
+                (0..n)
+                    .map(|_| {
+                        let words = (0..next() % 3)
+                            .map(|_| Val::String(pick(&mut next)))
+                            .collect();
+                        Val::Record(vec![
+                            ("word".into(), Val::String(pick(&mut next))),
+                            (
+                                "target".into(),
+                                Val::String(match next() % 2 {
+                                    0 => POOL[(next() % 4) as usize].to_string(),
+                                    _ => format!("e{}", next() % 40),
+                                }),
+                            ),
+                            (
+                                "language".into(),
+                                Val::String(["chinese", "japanese"][(next() % 2) as usize].into()),
+                            ),
+                            ("pronunciation".into(), Val::String(pick(&mut next))),
+                            ("reading".into(), Val::String(pick(&mut next))),
+                            ("definition".into(), Val::String(pick(&mut next))),
+                            ("folded".into(), Val::String(pick(&mut next))),
+                            ("words".into(), Val::List(words)),
+                            ("common".into(), Val::Bool(next() % 2 == 0)),
+                        ])
+                    })
+                    .collect(),
+            ),
+        }
+    })
+}
+
 #[test]
 fn the_kiokun_search_agrees_with_its_reference() {
     differential(
         "kiokun.page.Search",
         &Runnable::new(compile(&kiokun(), "kiokun.page.Search")),
-        |args, host| {
-            host(
-                "kiokun:data/index#search",
-                vec![args[0].clone(), Val::S64(20)],
-            )
+        search,
+        index_around_query,
+    );
+}
+
+#[test]
+fn the_kiokun_shard_rule_agrees_with_its_reference() {
+    fn place(args: &[Val], _: &mut dyn FnMut(&str, Vec<Val>) -> Val) -> Val {
+        let word = text(&args[0]);
+        let h = word
+            .chars()
+            .fold(0u32, |h, c| h.wrapping_mul(31).wrapping_add(u32::from(c)));
+        let shard = match word.chars().filter(|c| is_han(*c)).count() {
+            0 => format!("non-han-{}", h % 4 + 1),
+            1 => format!("han-1char-{}", h % 8 + 1),
+            2 => format!("han-2char-{}", h % 8 + 1),
+            _ => format!("han-3plus-{}", h % 8 + 1),
+        };
+        Val::Record(vec![
+            ("shard".into(), Val::String(shard)),
+            (
+                "subdirectory".into(),
+                Val::String(format!("{:02x}", h & 0xFF)),
+            ),
+        ])
+    }
+    differential(
+        "shards.Place",
+        &Runnable::new(compile(&kiokun(), "shards.Place")),
+        place,
+        fixed,
+    );
+    // `Places` is `Place` over a list: the host loads a directory a call.
+    differential(
+        "shards.Places",
+        &Runnable::new(compile(&kiokun(), "shards.Places")),
+        |args, host| match &args[0] {
+            Val::List(words) => Val::List(
+                words
+                    .iter()
+                    .map(|w| place(std::slice::from_ref(w), host))
+                    .collect(),
+            ),
+            other => panic!("Places takes a list, not {other:?}"),
         },
         fixed,
     );
 }
 
 /// **The oracle can disagree.** Three references, each wrong in one detail a
-/// miscompilation could share: the limit the query passes, whether the
+/// miscompilation could share: how many hits the search keeps, whether the
 /// redirect is followed, and whether the session is read first. Each must be
 /// caught, or the agreement above measures nothing.
 #[test]
@@ -431,11 +703,8 @@ fn the_oracle_notices_a_reference_that_is_wrong() {
     let lookup = Runnable::new(compile(&kiokun(), "kiokun.page.Lookup"));
     let add = Runnable::new(compile(&store(), "store.page.add_to_cart"));
     let results = [
-        caught("Search, limit 21", &search, |args, host| {
-            host(
-                "kiokun:data/index#search",
-                vec![args[0].clone(), Val::S64(21)],
-            )
+        caught("Search, twenty-one hits", &search, |args, host| {
+            search_taking(args, host, 21)
         }),
         caught("Lookup, no redirect", &lookup, |args, host| {
             host("kiokun:data/entries#get", vec![args[0].clone()])
@@ -455,6 +724,9 @@ fn the_oracle_notices_a_reference_that_is_wrong() {
 /// The data layer the mutation controls run against: a table for `Lookup`,
 /// a fixed answer for everything else.
 fn fixed_or_table(rng: &mut Rng, t: &Types) -> Box<Answer> {
+    if t.results.contains_key("kiokun:data/index#candidates") {
+        return index_around_query(rng, t);
+    }
     if let Some(entry_ty) = t.results.get("kiokun:data/entries#get") {
         // One entry that redirects to another: the redirect-ignoring reference
         // then makes one call where the component makes two.

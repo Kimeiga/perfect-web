@@ -241,3 +241,11 @@ as `host` is. `map`, `filter`, `fold`, `any`, `all`, `find` and a stable
 `take`, `concat`, and the string operations are routines in the component.
 `to_lower_ascii` maps `A`–`Z` only (ruling needed). Building it found that
 `(a, b) => e` had never parsed.
+
+[ADR-0041](DECISIONS/ADR-0041-kiokun-in-pleris.md): kiokun's shard rule and
+its search ranking are Pleris, compiled to `shards.Place`, `shards.Places` and
+`kiokun.page.Search`; the host keeps the index and the files. The Rust rule and
+ranking stay as the references every compiled answer is compared with, on
+every word kiokun has. Building it found that the E9 value relations left a
+generic call's `let` binding uninstantiated, that a statement keyword could
+name a value, and that kiokun's file names are not its words.

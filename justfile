@@ -548,11 +548,11 @@ e10-kiokun:
        head -1 examples/kiokun/data/han-1char-3/MANIFEST.txt; \
        echo; echo "== the host (spikes/kiokun/server)"; echo; \
        cargo test --locked -p kiokun-server -- --nocapture --test-threads=1 2>&1 \
-         | grep -oE "(sample|person|ren|人|谚|ひと|zzzz-no-such-word): .*|^test [a-z_:]+ .*|^test result.*"; \
-       echo; echo "== the whole shard"; echo; \
+         | grep -oE "(sample|person|ren|人|谚|ひと|zzzz-no-such-word|place|search): .*|^test [a-z_:]+ .*|^test result.*"; \
+       echo; echo "== the whole shard, and every word kiokun has"; echo; \
        if [ -n "${KIOKUN_DATA:-}" ]; then \
-         cargo test --locked --release -p kiokun-server whole -- --include-ignored --nocapture 2>&1 \
-           | grep -oE "^whole shard: .*|^test result.*"; \
+         cargo test --locked --release -p kiokun-server -- --ignored --nocapture --test-threads=1 2>&1 \
+           | grep -oE "^(whole shard|every word): .*|^test result.*"; \
        else echo "  (skipped: KIOKUN_DATA does not name a kiokun-data output_dictionary)"; fi; \
        echo; echo "== in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/kiokun.spec.mjs \
@@ -561,6 +561,22 @@ e10-kiokun:
          | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky" || true; \
      } > docs/evidence/E10/kiokun.txt
     @cat docs/evidence/E10/kiokun.txt
+
+# ADR-0041's mutation controls: each piece of kiokun's logic in Pleris, and of
+# the defects found building it, undone in turn, must fail a test.
+#
+# E10 — the kiokun slice's shard rule and ranking, in Pleris.
+e10-kiokun-mutants:
+    @{ echo "ADR-0041 - kiokun's shard rule and ranking in Pleris: mutation controls"; echo; \
+       echo "produced by: just e10-kiokun-mutants"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       python3 scripts/kiokun_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: search over every shard. Search is over the loaded shard;"; \
+       echo "a lookup reaches every shard."; \
+     } > docs/evidence/E10/kiokun-mutants.txt
+    @grep -E "mutants killed" docs/evidence/E10/kiokun-mutants.txt
 
 # Code size: the store's artifacts as `pw build` writes them, beside two
 # baselines. One is hand-written Rust components (the E0/E8 spike guests, from

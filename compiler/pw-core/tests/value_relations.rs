@@ -314,6 +314,34 @@ fn v2_list_map_infers_its_result_from_the_callback() {
 }
 
 #[test]
+fn v2_an_unannotated_binding_of_a_generic_call_is_instantiated() {
+    // `let ys = List.filter(xs, ..)` is a `List<P>`. The pre-E9 inference
+    // typed it by `filter`'s declared result, `List<T>`, and the value
+    // relations kept that binding: so `List.sort_by(ys, compare)` was refused
+    // for a `T` nothing had instantiated. Found 2026-09-25, writing kiokun's
+    // ranking in Pleris.
+    let src = |compare: &str| {
+        format!(
+            "module l\n\nimport List\n\ntype P = P {{\n    n: Int,\n}}\n\n\
+             type Q = Q {{\n    m: Int,\n}}\n\n\
+             fn by_p(a: P, b: P) -> Int {{ a.n - b.n }}\n\n\
+             fn by_q(a: Q, b: Q) -> Int {{ a.m - b.m }}\n\n\
+             fn f(xs: List<P>) -> List<P> {{\n    \
+             let ys = List.filter(xs, fn(p) p.n > 0)\n    \
+             List.sort_by(ys, {compare})\n}}\n"
+        )
+    };
+    assert!(
+        codes_with_std(&src("by_p")).is_empty(),
+        "{:?}",
+        codes_with_std(&src("by_p"))
+    );
+    // And the binding is typed, not merely silent: the wrong comparison is
+    // refused.
+    assert_eq!(codes_with_std(&src("by_q")), ["PW0605"]);
+}
+
+#[test]
 fn v2_a_declared_function_is_a_value_of_its_function_type() {
     let src = |f: &str| {
         format!(
