@@ -17,6 +17,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SPIKE="$REPO_ROOT/spikes/own-renderer"
 EVIDENCE="$REPO_ROOT/docs/evidence/E7"
 PORT="${PORT:-3141}"
+# E10 re-runs this instrument against its own changes (`just e10-bench`), and
+# must not overwrite the E7 record it compares against.
+OUT_FILE="${EVIDENCE_FILE:-$EVIDENCE/performance.txt}"
+PRODUCED_BY="${PRODUCED_BY:-just e7-performance}"
 
 if [ ! -d "$SPIKE/dist" ]; then
   echo "dist/ is missing - run 'just spike-own-renderer' first" >&2
@@ -28,11 +32,11 @@ out="$(PW_PERFORMANCE=1 PORT="$PORT" pnpm exec playwright test e2e/performance.s
   --project=chromium --workers=1 --reporter=list 2>&1 | sed 's/\x1b\[[0-9;]*m//g')"
 echo "$out"
 
-mkdir -p "$EVIDENCE"
+mkdir -p "$(dirname "$OUT_FILE")"
 {
   echo "E7 gate items 7-10 — the own renderer's cost, measured"
   echo
-  echo "produced by: just e7-performance"
+  echo "produced by: $PRODUCED_BY"
   echo "engine:      chromium (Long Animation Frame API is Chromium-only)"
   echo "workers:     1 (a loaded machine measures the load)"
   echo
@@ -44,6 +48,6 @@ mkdir -p "$EVIDENCE"
   echo "$out" | grep -E "^ *EVIDENCE" | sed 's/^ *EVIDENCE */  /'
   echo
   echo "$out" | tail -3
-} > "$EVIDENCE/performance.txt"
+} > "$OUT_FILE"
 echo
-echo "evidence written to $EVIDENCE/performance.txt"
+echo "evidence written to $OUT_FILE"

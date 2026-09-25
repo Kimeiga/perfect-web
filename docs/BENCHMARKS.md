@@ -1,8 +1,9 @@
 # Benchmarks
 
-**There are no benchmarks yet.** Benchmarking begins in Milestone 3
-(charter §14 M3 task 8); baselines against Next/React, SvelteKit and Marko are
-charter §18.1.
+**The first recorded benchmarks are E10's** (2026-09-25, below). The
+framework comparisons against Next/React, SvelteKit and Marko are charter
+§18.1's and are still not established; benchmarking against them begins with
+Milestone 3's task 8.
 
 This file exists so that when numbers do appear, they appear in the required
 form rather than as anecdotes.
@@ -43,6 +44,20 @@ plus route-specific code. Reporting either alone is misleading.
 
 Count **downloaded** and **inline** JS separately: they cost differently
 (request + parse + cache vs bytes in the HTML).
+
+## E10: the compiled store, against its own baselines (2026-09-25)
+
+Recorded to §18.5: commit in the raw file; Apple M2 Pro, macOS, arm64;
+Chromium 145.0.7632.6 through Playwright 1.58.0; localhost, no shaping; warm
+(a warm-up round, and 11 page loads per runtime); medians with ranges;
+`just e10-bench`; raw file `docs/evidence/E10/bench.txt`, written up in
+[bench-2026-09-25.md](evidence/E10/bench-2026-09-25.md).
+
+```text
+component add_to_cart            4,221 B (1,386 gz)   Rust no_std guest 5,276 B (2,451 gz)
+host call, median (release)     21.1 µs               Rust no_std guest 22.1 µs; native op 0.30 µs
+browser activation, median      15.50 ms (11 samples)  runtime before E10 handlers 15.70 ms
+```
 
 ## Milestone 0 spike measurements — NOT benchmarks
 

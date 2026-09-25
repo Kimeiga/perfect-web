@@ -425,6 +425,51 @@ e10-build:
      } > docs/evidence/E10/build.txt
     @cat docs/evidence/E10/build.txt
 
+# Code size: the store's artifacts as `pw build` writes them, beside two
+# baselines. One is hand-written Rust components (the E0/E8 spike guests, from
+# `just spike-wasmtime`). The other is the runtime E7 recorded. Performance: the
+# compiled command, a hand-written Rust guest and the native operation, through
+# one host API, in release; then E7's own browser instrument, re-run into E10's
+# file so E7's record is untouched.
+#
+# E10 gate item 4 — code size and performance, recorded against baselines.
+e10-bench:
+    @cargo build --quiet --locked -p pw-cli
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @EVIDENCE_FILE="$(pwd)/docs/evidence/E10/performance-e7-instrument.txt" PRODUCED_BY="just e10-bench" \
+      bash spikes/own-renderer/performance.sh > /dev/null
+    @{ echo "E10 gate item 4 - code size and performance against baselines"; echo; \
+       echo "produced by: just e10-bench"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "host: $(uname -m) $(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)"; echo; \
+       out="$(mktemp -d)"; \
+       ./target/debug/pw build --out "$out" packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw > /dev/null; \
+       echo "== code size: the store's artifacts (bytes, gzip -9 bytes)"; \
+       (cd "$out" && for f in components/*.wasm handlers/*.mjs; do \
+         printf '  %6d  %6d  %s\n' "$(wc -c < "$f")" "$(gzip -9c "$f" | wc -c)" "$f"; done); \
+       rm -rf "$out"; \
+       echo; echo "== code size: baselines (bytes, gzip -9 bytes)"; \
+       for f in spikes/wasmtime-component/guest-minimal/target/wasm32-wasip2/release/spike_wasmtime_guest_minimal.wasm \
+                spikes/wasmtime-component/guest/target/wasm32-wasip2/release/spike_wasmtime_guest.wasm; do \
+         if [ -f "$f" ]; then printf '  %6d  %6d  %s\n' "$(wc -c < "$f")" "$(gzip -9c "$f" | wc -c)" "$f (hand-written Rust)"; \
+         else echo "  (absent: $f - run just spike-wasmtime)"; fi; done; \
+       echo "  server-written handler modules before ADR-0033: add_to_cart 255, clear_cart 180 (reconstructed from 83af93c's format string)"; \
+       printf '  %6d  %6d  %s\n' "$(wc -c < spikes/own-renderer/public/pw-runtime.mjs)" "$(gzip -9c spikes/own-renderer/public/pw-runtime.mjs | wc -c)" "pw-runtime.mjs now"; \
+       echo "  E7's record: $(grep -oE 'interactive-script-bytes=[0-9]+' docs/evidence/E7/performance.txt) $(grep -oE 'interactive-wasm-bytes=[0-9]+' docs/evidence/E7/performance.txt)"; \
+       echo; echo "== the host, release: runtime/pw-host/tests/bench.rs"; echo; \
+       cargo test --quiet --locked --release -p pw-host --features engine --test bench -- --include-ignored --nocapture --test-threads=1 2>&1 \
+         | grep -E "^bench:|^test result"; \
+       echo; echo "== the browser: activation, the runtime before compiled handlers and now (chromium, 1 worker)"; echo; \
+       bash spikes/own-renderer/activation-compare.sh 83af93c 11; \
+       echo; echo "== the browser: E7's instrument, re-run (full record: performance-e7-instrument.txt)"; echo; \
+       echo "  E7's record (2026-08-07, an older Chromium; activation is one sample):"; grep -E "interactive-script-bytes|interactive-wasm-bytes|activation-ms|interaction-long-frames|runtime-layout-reads" docs/evidence/E7/performance.txt | sed 's/^ */    /'; \
+       echo "  now (activation is one sample; the comparison above is the measurement):"; grep -E "interactive-script-bytes|interactive-wasm-bytes|activation-ms|interaction-long-frames|runtime-layout-reads" docs/evidence/E10/performance-e7-instrument.txt | sed 's/^ */    /'; \
+     } > docs/evidence/E10/bench.txt
+    @cat docs/evidence/E10/bench.txt
+
 # What the store and the accepted corpus make affine, and why: only types an
 # effect row acquires. No store value is affine or annotated, and the language
 # has no borrow, lifetime or move syntax. With it, charter M10 task 10's

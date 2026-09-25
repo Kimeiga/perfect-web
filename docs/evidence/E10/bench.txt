@@ -1,0 +1,50 @@
+E10 gate item 4 - code size and performance against baselines
+
+produced by: just e10-bench
+commit: 858df975955edc46c6e42a69baf57faddac2bd61 + uncommitted changes
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+host: arm64 Apple M2 Pro
+
+== code size: the store's artifacts (bytes, gzip -9 bytes)
+    3520    1183  components/store.page.Cart.wasm
+    3037    1047  components/store.page.Menu.wasm
+    3037    1048  components/store.page.Store.wasm
+    4221    1386  components/store.page.add_to_cart.wasm
+    3797    1305  components/store.page.clear_cart.wasm
+     246     205  handlers/5e53c6a9aaee307a.mjs
+     281     227  handlers/e1ab9fca1f6fc15b.mjs
+
+== code size: baselines (bytes, gzip -9 bytes)
+    5276    2451  spikes/wasmtime-component/guest-minimal/target/wasm32-wasip2/release/spike_wasmtime_guest_minimal.wasm (hand-written Rust)
+   43837   16271  spikes/wasmtime-component/guest/target/wasm32-wasip2/release/spike_wasmtime_guest.wasm (hand-written Rust)
+  server-written handler modules before ADR-0033: add_to_cart 255, clear_cart 180 (reconstructed from 83af93c's format string)
+   30211   10972  pw-runtime.mjs now
+  E7's record: interactive-script-bytes=28471 interactive-wasm-bytes=74222
+
+== the host, release: runtime/pw-host/tests/bench.rs
+
+bench: compile the Rust no_std guest (5276 bytes): 2.0 ms
+bench: the Rust no_std guest's lookup through the host: median 21.169 µs per call (min 20.953, max 21.278; 7 rounds x 2000 calls)
+bench: store.page.add_to_cart through the host: median 20.236 µs per call (min 19.795, max 20.448; 7 rounds x 2000 calls)
+bench: the data layer's add, called natively: median 0.303 µs per call (min 0.302, max 0.305; 7 rounds x 200000 calls)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+== the browser: activation, the runtime before compiled handlers and now (chromium, 1 worker)
+
+  before (83af93c)       median  15.70 ms   samples: 8.00 14.60 15.50 15.60 15.70 15.70 15.80 16.00 16.00 17.00 17.10 
+  now (858df97)          median  15.50 ms   samples: 4.10 11.40 14.50 14.80 15.20 15.50 15.60 16.90 17.20 17.70 18.80 
+
+== the browser: E7's instrument, re-run (full record: performance-e7-instrument.txt)
+
+  E7's record (2026-08-07, an older Chromium; activation is one sample):
+    interactive-script-bytes=28471
+    interactive-wasm-bytes=74222
+    activation-ms=22.70
+    interaction-long-frames=0 worst-ms=0.0 forced-attr-exposed=false
+    runtime-layout-reads=0
+  now (activation is one sample; the comparison above is the measurement):
+    interactive-script-bytes=30211
+    interactive-wasm-bytes=74222
+    activation-ms=18.70
+    interaction-long-frames=0 worst-ms=0.0 forced-attr-exposed=false
+    runtime-layout-reads=0

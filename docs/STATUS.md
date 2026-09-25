@@ -53,6 +53,18 @@ before integration; the baseline pass is not a substitute.
 
 ## completed gate items
 
+- **2026-09-25: E10 gate item 4, size and performance against baselines.**
+  - The store's components are 3,037 to 4,221 bytes, against 5,276 for a
+    hand-written Rust `no_std` guest and 43,837 with `std`.
+  - Through the same host, `add_to_cart` costs 21.1 µs a call and the Rust
+    guest 22.1 µs. The native operation costs 0.30 µs, so per-call
+    instantiation dominates; that is named, not reduced.
+  - Browser activation shows no measurable change against the pre-E10 runtime
+    (15.50 against 15.70 ms median, 11 samples each).
+  - Correction made while recording: a one-sample comparison with E7's record
+    had shown a fivefold gain that is not real.
+  - Evidence: [bench-2026-09-25.md](evidence/E10/bench-2026-09-25.md).
+
 - **2026-09-25: E10 gate item 5 and task 10.**
   - Only effect-row producers make a value affine: `DatabaseConnection`,
     `DatabaseTransaction` and `MapHandle`, in the store and in the accepted
@@ -255,6 +267,7 @@ just e10-handlers
 just e10-build
 just e10-load
 just e10-ownership
+just e10-bench
 just e10-browser chromium
 just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
 just e9-values
