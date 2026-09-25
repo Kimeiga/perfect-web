@@ -552,7 +552,7 @@ e10-kiokun:
        echo; echo "== the whole shard, and every word kiokun has"; echo; \
        if [ -n "${KIOKUN_DATA:-}" ]; then \
          cargo test --locked --release -p kiokun-server -- --ignored --nocapture --test-threads=1 2>&1 \
-           | grep -oE "^(whole shard|every word): .*|^test result.*"; \
+           | grep -oE "(whole shard|every word): .*|^test result.*"; \
        else echo "  (skipped: KIOKUN_DATA does not name a kiokun-data output_dictionary)"; fi; \
        echo; echo "== in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/kiokun.spec.mjs \
