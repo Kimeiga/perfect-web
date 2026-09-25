@@ -8,7 +8,7 @@ module generality.no_world
 
 import Stores
 import device
-import domain.{ Location }
+import device.{ Location }
 import domain.{ Store, StoreId }
 import domain.{ StoreError }
 

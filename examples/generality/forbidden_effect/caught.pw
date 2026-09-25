@@ -8,7 +8,7 @@
 module generality.view_fetch_depth
 
 import Estimates
-import domain.{ Location }
+import device.{ Location }
 import domain.{ StoreError }
 import domain.{ DeliveryEstimate, EstimateError }
 

@@ -11,7 +11,17 @@
 
 module device
 
-import domain.{ Location }
+// A point on the earth. Device-bound: it exists where the device is, which is
+// what makes reading it from an origin-placed query a placement error.
+//
+// Declared here since 2026-09-25. It was declared in the store example's
+// `examples/domain.pw` and imported from there, so every program using the
+// platform package had to include the store's domain. A second application
+// (the kiokun slice) was the first to notice.
+type Location = Location {
+    lat: Int,
+    lng: Int,
+}
 
 fn current_location() -> Location !{ device.location } { todo }
 

@@ -7,7 +7,7 @@
 module generality.place_browser_ok
 
 import device
-import domain.{ Location }
+import device.{ Location }
 
 component Locator() {
     placement browser

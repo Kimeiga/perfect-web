@@ -78,13 +78,6 @@ opaque type DatabaseConnection = String
 // function that produced it says so.
 opaque type DatabaseTransaction = String
 
-// A point on the earth. Device-bound: it exists where the device is, which is
-// what makes reading it from an origin-placed query a placement error.
-type Location = Location {
-    lat: Int,
-    lng: Int,
-}
-
 type StoreError =
     | NotFound
     | Unavailable

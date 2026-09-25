@@ -377,7 +377,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // import `capability.SessionId`.
     // 2026-09-16: List explicitly imports decode.Unknown and decode.Decoder;
     // all written platform parameter/result types now resolve in their module.
-    const EXPECTED: u64 = 0x0f87ace5767164be;
+    // 2026-09-25: `device.pw` declares `type Location` instead of importing it
+    // from `examples/domain.pw`. The platform package imported a type from the
+    // store example, so every program using the platform had to include the
+    // store's domain; the kiokun slice, the second application, was the first
+    // to notice. The platform package now checks on its own.
+    const EXPECTED: u64 = 0x10cee9db783809b4;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
