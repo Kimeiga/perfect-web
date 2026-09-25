@@ -30,10 +30,13 @@ release (`docs/evidence/E10/memory.txt`):
 
 | query | calls | instructions p50 / p99 / max | peak memory | instantiate p50 | call p50 |
 |---|---|---|---|---|---|
-| `shards.Place` | 19,597 | 1,626 / 6,679 / 12,615 | 64 KiB for all | 7.5 µs | 0.9 µs |
-| `shards.Places`, 1,000 words | 20 | 2.2 M / 4.4 M / 4.7 M | 128–320 KiB | 9.6 µs | 300 µs |
-| `kiokun.page.Lookup` | 17,597 | 498 / 1,548 / 6,348 | 64 KiB for all | 7.3 µs | 7.2 µs |
-| `kiokun.page.Search` | 28,951 | 8,159 / 337,524 / 26.2 M | 64 KiB for 98.9%; 3.2 MB at most | 13.9 µs | 213 µs |
+| `shards.Place` | 19,597 | 1,626 / 6,679 / 12,615 | 64 KiB for all | 7.8 µs | 0.9 µs |
+| `shards.Places`, 1,000 words | 20 | 2.2 M / 4.4 M / 4.7 M | 128–320 KiB | 9.5 µs | 276 µs |
+| `kiokun.page.Lookup` | 17,597 | 498 / 1,548 / 6,348 | 64 KiB for all | 7.6 µs | 7.2 µs |
+| `kiokun.page.Search` | 28,951 | 8,159 / 337,524 / 26.2 M | 64 KiB for 98.9%; 3.2 MB at most | 13.8 µs | 213 µs |
+
+The instruction counts and peaks are the same in every run; the times moved
+by a few percent between runs.
 
 Three things follow.
 - **Memory management costs no instructions.** Reclaiming a region is
@@ -44,8 +47,8 @@ Three things follow.
   the call ends: scored, filtered, sorted, grouped and ranked. Its twenty
   hits are a small fraction of that.
 - **The fresh instance costs more than most calls.** A call to `Place` does
-  0.9 µs of work inside 7.5 µs of instantiation, and `Lookup` 7.2 µs inside
-  7.3. Per-call instantiation, not memory, is where the time goes.
+  0.9 µs of work beside 7.8 µs of instantiation, and `Lookup` 7.2 µs beside
+  7.6. Per-call instantiation, not memory, is where the time goes.
 
 ## Decision
 

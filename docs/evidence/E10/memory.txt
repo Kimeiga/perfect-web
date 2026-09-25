@@ -1,0 +1,20 @@
+ADR-0046 - memory strategies: what each call costs
+
+produced by: just e10-memory
+commit: bc9eb4c4b92576e2e8374236cc59514220d6b7d4
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+machine: arm64, Apple M2 Pro
+
+memory: shard han-1char-3 (17597 entries)
+memory: Place: 19597 calls; instructions p50 1626 p99 6679 max 12615; peak memory 64 KiB x19597; instantiate p50 7.8 µs; call p50 0.9 µs p99 1.7 µs
+memory: Place: the most work, 12615 instructions and 64 KiB, was "高フルクトース・コーン・シロップ"
+memory: Places: 20 calls; instructions p50 2207524 p99 4417413 max 4671177; peak memory 128 KiB x1, 192 KiB x15, 256 KiB x2, 320 KiB x2; instantiate p50 9.5 µs; call p50 275.8 µs p99 370.5 µs
+memory: Lookup: 17597 calls; instructions p50 498 p99 1548 max 6348; peak memory 64 KiB x17597; instantiate p50 7.6 µs; call p50 7.2 µs p99 384.8 µs
+memory: Lookup: the most work, 6348 instructions and 64 KiB, was "上"
+memory: Search: 28951 calls; instructions p50 8159 p99 337524 max 26171752; peak memory 64 KiB x28653, 128 KiB x158, 192 KiB x53, 256 KiB x25, 320 KiB x14, 384 KiB x8, 448 KiB x8, 512 KiB x6, 576 KiB x6, 640 KiB x2, 768 KiB x4, 832 KiB x2, 896 KiB x2, 1472 KiB x2, 1600 KiB x2, 1664 KiB x2, 3072 KiB x2, 3200 KiB x2; instantiate p50 13.8 µs; call p50 212.6 µs p99 447.0 µs
+memory: Search: the most work, 26171752 instructions and 3200 KiB, was "T"
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 18.56s
+
+NOT CLAIMED: reference counting, Wasm GC and reuse analysis were not built and
+measured against the region. ADR-0046 argues from these numbers and the
+invocation model.
