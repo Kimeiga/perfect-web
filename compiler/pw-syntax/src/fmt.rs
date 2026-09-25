@@ -158,7 +158,7 @@ impl Fmt {
         if self.at_line_start {
             self.indent = self.indent_for(t);
             self.write_indent();
-        } else if self.needs_space_before(t.kind(), parent) {
+        } else if self.needs_space_before(t, parent) {
             self.out.push(' ');
         }
 
@@ -185,7 +185,8 @@ impl Fmt {
         }
     }
 
-    fn needs_space_before(&self, kind: K, parent: &SyntaxNode) -> bool {
+    fn needs_space_before(&self, t: &SyntaxToken, parent: &SyntaxNode) -> bool {
+        let kind = t.kind();
         let prev = self.out.chars().next_back().unwrap_or(' ');
         if prev == ' ' {
             return false;
@@ -246,11 +247,11 @@ impl Fmt {
         if prev == '<' && (in_type_position(parent) || in_policy(parent)) {
             return false;
         }
-        // A prefix operator hugs its operand. The operand is usually a *child*
-        // node of the `UnaryExpr`, so asking whether the operand's own parent
-        // is a `UnaryExpr` answers the wrong question and yields `! available`.
-        if matches!(prev, '!' | '-') && parent.ancestors().take(3).any(|a| a.kind() == K::UnaryExpr)
-        {
+        // A prefix operator hugs its operand. Asked of the operator itself:
+        // the operand's first token can sit at any depth below the
+        // `UnaryExpr`. Its parent alone yielded `! available`, and three
+        // ancestors yielded `! b.row.common` (2026-09-25).
+        if matches!(prev, '!' | '-') && follows_a_prefix_operator(t) {
             return false;
         }
         true
@@ -313,13 +314,16 @@ impl Fmt {
             if open >= start || !self.src[open..start].contains('\n') {
                 continue;
             }
+            let line = self.src[..open].matches('\n').count();
             // The token that closes a construct belongs to the outer level:
             // `}` lines up with the line that opened the block, not with its
-            // contents.
+            // contents. So do the brackets opened on that line with it: the
+            // `}` of `f(x, r => R {` closes the call's line too, and counting
+            // the call put `})` a level in (2026-09-25).
             if last_significant(&a).is_some_and(|l| l.text_range() == t.text_range()) {
+                counted_lines.push(line);
                 continue;
             }
-            let line = self.src[..open].matches('\n').count();
             if counted_lines.contains(&line) {
                 continue;
             }
@@ -371,6 +375,16 @@ fn first_significant(n: &SyntaxNode) -> Option<SyntaxToken> {
     n.descendants_with_tokens()
         .filter_map(|e| e.into_token())
         .find(|t| !t.kind().is_trivia() && t.kind() != K::Eof)
+}
+
+/// Is the significant token before `t` a `UnaryExpr`'s operator?
+fn follows_a_prefix_operator(t: &SyntaxToken) -> bool {
+    let mut prev = t.prev_token();
+    while let Some(p) = prev.as_ref().filter(|p| p.kind().is_trivia()) {
+        prev = p.prev_token();
+    }
+    prev.and_then(|p| p.parent())
+        .is_some_and(|op| op.kind() == K::UnaryExpr)
 }
 
 /// Keywords after which `(` opens a grouping, not a call.
@@ -539,6 +553,19 @@ mod tests {
             out, "fn f() {\n    if a {\n        g()\n    }\n}\n",
             "got:\n{out}"
         );
+    }
+
+    #[test]
+    fn a_prefix_operator_hugs_an_operand_at_any_depth() {
+        let src = "fn f(a: Bool, b: R) -> Bool {\n    !a & !b.row.common & a - -1 > 0\n}\n";
+        assert_eq!(format_source(src), src);
+    }
+
+    #[test]
+    fn a_bracket_closing_a_line_of_brackets_lines_up_with_that_line() {
+        let src =
+            "fn f() {\n    let s = List.map(xs, r => S {\n        row: r,\n    })\n    s\n}\n";
+        assert_eq!(format_source(src), src);
     }
 
     #[test]
