@@ -38,6 +38,15 @@ test("a word kiokun does not have is a 404", async ({ page }) => {
   await expect(page.locator("main p")).toHaveText("There is no entry for it here.");
 });
 
+test("a search that finds nothing says so, and the empty page does not", async ({ page }) => {
+  // `SearchPage`'s `{:else if q}` (ADR-0042).
+  await page.goto("/search?q=zzzz");
+  await expect(page.locator("#nothing")).toHaveText("No entry matches zzzz.");
+  expect(await page.locator("#hits").count()).toBe(0);
+  await page.goto("/");
+  expect(await page.locator("#nothing").count()).toBe(0);
+});
+
 test("searching, then following a result", async ({ page }) => {
   await page.goto("/");
   await page.locator("#q").fill("person");

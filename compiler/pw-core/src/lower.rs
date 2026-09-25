@@ -178,31 +178,76 @@ impl Lowerer<'_> {
         while let Some(open) = rest.find('{') {
             let after = &rest[open + 1..];
             let Some(close) = after.find('}') else { break };
-            let hole = &after[..close];
-            let hole_at = base + open + 1;
-            if !hole.trim().is_empty() && hole_at >= HOLE_PREFIX.len() {
-                let pad = hole_at - HOLE_PREFIX.len();
-                let mut synthetic = String::with_capacity(hole_at + hole.len() + 1);
-                synthetic.push_str(HOLE_PREFIX);
-                synthetic.push_str(&" ".repeat(pad));
-                synthetic.push_str(hole);
-                synthetic.push('}');
-
-                let parsed = pw_syntax::parse_tree(&synthetic);
-                let mut sub = Lowerer {
-                    hir: std::mem::take(&mut self.hir),
-                    src: &synthetic,
-                };
-                if let Some(e) = first_expr(&parsed.green) {
-                    let id = sub.expr(b, &e);
-                    out.push(id);
-                }
-                self.hir = sub.hir;
+            if let Some(id) = self.expression_at(b, &after[..close], base + open + 1) {
+                out.push(id);
             }
             base = base + open + 1 + close + 1;
             rest = &after[close + 1..];
         }
         out
+    }
+
+    /// One expression written at `at` in the real file: a string's hole, or
+    /// the subject a block marker carries (`c` in `{#if c}`). Lowered with the
+    /// real grammar, like every other expression.
+    fn expression_at(&mut self, b: &mut BodyBuilder, hole: &str, at: usize) -> Option<ExprId> {
+        if hole.trim().is_empty() || at < HOLE_PREFIX.len() {
+            return None;
+        }
+        let pad = at - HOLE_PREFIX.len();
+        let mut synthetic = String::with_capacity(at + hole.len() + 1);
+        synthetic.push_str(HOLE_PREFIX);
+        synthetic.push_str(&" ".repeat(pad));
+        synthetic.push_str(hole);
+        synthetic.push('}');
+
+        let parsed = pw_syntax::parse_tree(&synthetic);
+        let mut sub = Lowerer {
+            hir: std::mem::take(&mut self.hir),
+            src: &synthetic,
+        };
+        let id = first_expr(&parsed.green).map(|e| sub.expr(b, &e));
+        self.hir = sub.hir;
+        id
+    }
+
+    /// The expression a block marker carries after one of `prefixes`: `c` in
+    /// `{#if c}` or `{:else if c}`, `e` in `{#match e}`.
+    fn marker_expression(
+        &mut self,
+        b: &mut BodyBuilder,
+        node: &SyntaxNode,
+        prefixes: &[&str],
+    ) -> Option<ExprId> {
+        let raw = text(self.src, node);
+        let lead = raw.len() - raw.trim_start().len();
+        let t = raw.trim_start();
+        let prefix = prefixes.iter().find(|p| {
+            t.strip_prefix(**p)
+                .is_some_and(|r| r.starts_with(char::is_whitespace))
+        })?;
+        let inner = t[prefix.len()..].trim_end().strip_suffix('}')?;
+        self.expression_at(b, inner, span_of(node).start + lead + prefix.len())
+    }
+
+    /// `{:else}`, `{:else if c}`, `{:Some(x)}`: a block's branch marker, kept
+    /// at its place (ADR-0042).
+    fn branch(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> NodeId {
+        let marker = text(self.src, node);
+        let condition = self.marker_expression(b, node, &["{:else if"]);
+        let inner = marker
+            .trim()
+            .trim_start_matches("{:")
+            .trim_end_matches('}')
+            .trim();
+        b.node(
+            Node::Branch {
+                arm: constructor_arm(inner),
+                marker,
+                condition,
+            },
+            span_of(node),
+        )
     }
 
     fn decl(&mut self, node: &SyntaxNode) -> Option<DeclId> {
@@ -941,6 +986,12 @@ impl Lowerer<'_> {
                 for (_, n, _) in b.nodes.iter().skip(first) {
                     match n {
                         Node::Interpolation(e) => parts.push(*e),
+                        Node::Block {
+                            subject: Some(e), ..
+                        }
+                        | Node::Branch {
+                            condition: Some(e), ..
+                        } => parts.push(*e),
                         Node::Element { attrs, .. } => {
                             parts.extend(attrs.iter().filter_map(|a| match a.value {
                                 AttrValue::Expr(e) => Some(e),
@@ -1197,39 +1248,57 @@ impl Lowerer<'_> {
                 b.node(Node::Text(t), span)
             }
             K::MarkupBlock => {
-                // The opening marker is the block's first interpolation; its
-                // children are everything between it and the closing one.
-                let directive = node
+                // The opening marker is the block's first interpolation, and
+                // the closing one its last, when it was closed. Every `{:..}`
+                // marker between them stays at its place, as a `Branch`: until
+                // 2026-09-25 they were dropped here, and `{#if a}A{:else}B{/if}`
+                // rendered A and B together (ADR-0042).
+                let open = node.children().find(|c| c.kind() == K::Interpolation);
+                let close = node
                     .children()
-                    .find(|c| c.kind() == K::Interpolation)
-                    .map(|i| text(self.src, &i))
-                    .unwrap_or_default();
-                // The block's own markers are children of it too — the opening
-                // one first and the closing one last. Filtering by what they
-                // ARE rather than by position also drops a `{:else}` in the
-                // middle, which a positional skip would have kept as content.
-                let children = node
-                    .children()
-                    .filter(|c| is_markup(c.kind()) && !is_block_marker(self.src, c))
-                    .map(|c| self.markup(b, &c))
-                    .collect();
+                    .filter(|c| c.kind() == K::Interpolation)
+                    .last()
+                    .filter(|c| Some(c) != open.as_ref())
+                    .filter(|c| text(self.src, c).trim_start().starts_with("{/"));
+                let directive = open.as_ref().map(|i| text(self.src, i)).unwrap_or_default();
+                let subject = open
+                    .as_ref()
+                    .and_then(|o| self.marker_expression(b, o, &["{#if", "{#match"]));
+                let mut children = Vec::new();
+                for c in node.children().filter(|c| is_markup(c.kind())) {
+                    if Some(&c) == open.as_ref() || Some(&c) == close.as_ref() {
+                        continue;
+                    }
+                    children.push(match is_block_marker(self.src, &c) {
+                        true => self.branch(b, &c),
+                        false => self.markup(b, &c),
+                    });
+                }
                 b.node(
                     Node::Block {
                         directive,
                         children,
+                        subject,
+                        close: close.map(|c| text(self.src, &c)).unwrap_or_default(),
                     },
                     span,
                 )
             }
             K::Interpolation => {
                 // A bare `{/each}` or `{:else}` outside a block: keep it, so
-                // recovery still yields something walkable.
+                // recovery still yields something walkable, and the markup
+                // rules refuse it (PW5019).
                 let raw = text(self.src, node);
-                if raw.starts_with("{#") || raw.starts_with("{/") || raw.starts_with("{:") {
+                if raw.starts_with("{:") {
+                    return self.branch(b, node);
+                }
+                if raw.starts_with("{#") || raw.starts_with("{/") {
                     return b.node(
                         Node::Block {
                             directive: raw,
                             children: vec![],
+                            subject: None,
+                            close: String::new(),
                         },
                         span,
                     );
@@ -1259,7 +1328,22 @@ impl Lowerer<'_> {
                     Some(e) => AttrValue::Expr(self.expr(b, &e)),
                     None => AttrValue::None,
                 },
-                None => AttrValue::Static(v.text().to_string()),
+                // `href="/stores/{id}"`: a string with holes, lowered as one,
+                // so what reads a string's holes reads these (ADR-0042). Until
+                // 2026-09-25 it stayed static text with braces in it.
+                None => {
+                    let raw = text(self.src, &v);
+                    let parts = match raw.contains('{') {
+                        true => self.interpolations(b, &raw, span_of(&v).start),
+                        false => Vec::new(),
+                    };
+                    match parts.is_empty() {
+                        true => AttrValue::Static(v.text().to_string()),
+                        false => AttrValue::Expr(
+                            b.expr(Expr::Interpolated { text: raw, parts }, span_of(&v)),
+                        ),
+                    }
+                }
             },
         };
         Attr {
@@ -1456,6 +1540,28 @@ fn is_expr(k: K) -> bool {
             | K::TemplateRegion
             | K::Field
     )
+}
+
+/// `Some(x)` in `{:Some(x)}`: a constructor and at most one name it binds.
+/// `None` for anything else, `else` included, which the markup rules judge.
+fn constructor_arm(inner: &str) -> Option<(String, Option<String>)> {
+    let ident = |s: &str| {
+        let mut c = s.chars();
+        c.next().is_some_and(|f| f.is_alphabetic() || f == '_')
+            && c.all(|x| x.is_alphanumeric() || x == '_')
+    };
+    let (name, binding) = match inner.split_once('(') {
+        Some((n, rest)) => (n.trim(), Some(rest.strip_suffix(')')?.trim())),
+        None => (inner, None),
+    };
+    if !name.starts_with(|c: char| c.is_uppercase()) || !ident(name) {
+        return None;
+    }
+    match binding {
+        None => Some((name.to_string(), None)),
+        Some(b) if ident(b) => Some((name.to_string(), Some(b.to_string()))),
+        Some(_) => None,
+    }
 }
 
 /// Is this node one of a block's own `{#..}` / `{/..}` / `{:..}` markers?

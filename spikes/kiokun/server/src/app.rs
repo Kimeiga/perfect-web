@@ -270,32 +270,29 @@ impl App {
         Ok(document(title, &body))
     }
 
-    /// `/<word>`: the entry, or 404 with the not-found page.
+    /// `/<word>`: `WordPage`, which takes the compiled `Lookup`'s `Option`
+    /// apart itself (ADR-0042); 404 when it is `None`.
     pub fn entry_page(&self, word: &str) -> Result<Page, String> {
-        match self.lookup(word)? {
-            Some(entry) => {
-                let value = value(&entry).ok_or("the entry has no value")?;
-                let key = match &value {
-                    Value::Record(fields) => match fields.get("key") {
-                        Some(Value::Text(k)) => k.clone(),
-                        _ => word.to_string(),
-                    },
-                    _ => word.to_string(),
-                };
-                Ok(Page {
-                    status: 200,
-                    html: self.render("EntryPage", &key, Env::new().set("entry", value))?,
-                })
-            }
-            None => Ok(Page {
-                status: 404,
-                html: self.render(
-                    "NotFound",
-                    word,
-                    Env::new().set("word", Value::Text(word.to_string())),
-                )?,
+        let found = self.lookup(word)?;
+        let key = match found.as_ref() {
+            Some(Val::Record(fields)) => fields.iter().find_map(|(k, v)| match (k.as_str(), v) {
+                ("key", Val::String(key)) => Some(key.clone()),
+                _ => None,
             }),
-        }
+            _ => None,
+        };
+        let status = if found.is_some() { 200 } else { 404 };
+        let entry = value(&Val::Option(found.map(Box::new))).ok_or("the entry has no value")?;
+        Ok(Page {
+            status,
+            html: self.render(
+                "WordPage",
+                key.as_deref().unwrap_or(word),
+                Env::new()
+                    .set("word", Value::Text(word.to_string()))
+                    .set("entry", entry),
+            )?,
+        })
     }
 
     /// `/search?q=`: the compiled `Search`'s hits.
@@ -317,9 +314,18 @@ impl App {
 
 /// A component value as the renderer reads it. A WIT record field is named in
 /// kebab-case and a template reads the Pleris name, so `unit-price` becomes
-/// `unit_price`. `None` is absent: a template that reads it is refused by the
-/// renderer rather than shown an invented empty value.
+/// `unit_price`. An `Option` or a `Result` is a variant, which a template
+/// takes apart with `{#match}` (ADR-0042).
 pub fn value(v: &Val) -> Option<Value> {
+    let case = |case: &str, payload: Option<&Val>| {
+        Some(Value::Variant {
+            case: case.to_string(),
+            payload: match payload {
+                Some(p) => Some(Box::new(value(p)?)),
+                None => None,
+            },
+        })
+    };
     Some(match v {
         Val::String(s) => Value::Text(s.clone()),
         Val::Bool(b) => Value::Bool(*b),
@@ -331,7 +337,10 @@ pub fn value(v: &Val) -> Option<Value> {
                 .filter_map(|(k, v)| Some((k.replace('-', "_"), value(v)?)))
                 .collect(),
         ),
-        Val::Option(Some(inner)) => value(inner)?,
+        Val::Option(Some(inner)) => case("Some", Some(inner))?,
+        Val::Option(None) => case("None", None)?,
+        Val::Result(Ok(ok)) => case("Ok", ok.as_deref())?,
+        Val::Result(Err(err)) => case("Err", err.as_deref())?,
         _ => return None,
     })
 }

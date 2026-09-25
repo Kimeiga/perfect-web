@@ -1,34 +1,5 @@
 [
   {
-    "component_id": "kiokun.page.EntryPage",
-    "capability_mapping": 1,
-    "abi_schema": "f82da1a33f20d27b",
-    "required_capabilities": [],
-    "allowed_placements": [
-      "build",
-      "browser",
-      "edge",
-      "origin"
-    ],
-    "imports": [],
-    "exports": [
-      {
-        "name": "EntryPage",
-        "kind": "page",
-        "binding": {
-          "local": "direct",
-          "remote": {
-            "kind": "transferable"
-          }
-        },
-        "component": {
-          "interface": "pw:app/kiokun-page-entry-page-api@0.1.0",
-          "function": "entry-page"
-        }
-      }
-    ]
-  },
-  {
     "component_id": "kiokun.page.Lookup",
     "capability_mapping": 1,
     "abi_schema": "966e770350c30037",
@@ -90,35 +61,6 @@
         "component": {
           "interface": "pw:app/kiokun-page-lookup-api@0.1.0",
           "function": "lookup"
-        }
-      }
-    ]
-  },
-  {
-    "component_id": "kiokun.page.NotFound",
-    "capability_mapping": 1,
-    "abi_schema": "e057db722e727fff",
-    "required_capabilities": [],
-    "allowed_placements": [
-      "build",
-      "browser",
-      "edge",
-      "origin"
-    ],
-    "imports": [],
-    "exports": [
-      {
-        "name": "NotFound",
-        "kind": "page",
-        "binding": {
-          "local": "direct",
-          "remote": {
-            "kind": "transferable"
-          }
-        },
-        "component": {
-          "interface": "pw:app/kiokun-page-not-found-api@0.1.0",
-          "function": "not-found"
         }
       }
     ]
@@ -269,6 +211,35 @@
         "component": {
           "interface": "pw:app/kiokun-page-search-page-api@0.1.0",
           "function": "search-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "kiokun.page.WordPage",
+    "capability_mapping": 1,
+    "abi_schema": "1b44088df51a559f",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "WordPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/kiokun-page-word-page-api@0.1.0",
+          "function": "word-page"
         }
       }
     ]

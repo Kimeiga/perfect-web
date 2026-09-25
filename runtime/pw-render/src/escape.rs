@@ -64,6 +64,28 @@ pub fn attribute(value: &str) -> String {
     out
 }
 
+/// A value inside a URL whose text the author wrote around it:
+/// `href="/stores/{id}"` (ADR-0042).
+///
+/// Percent-encoded as a URI component: every UTF-8 byte but RFC 3986's
+/// unreserved characters, `A-Z a-z 0-9 - . _ ~`. So the value is one
+/// component, whatever it holds. It cannot end a path segment, start a query
+/// or a fragment, or name a scheme, because `/ ? # :` are all encoded. That
+/// is what the route checker assumes of `/stores/{id}` (PW5009): one segment.
+/// What remains is inert in an attribute as well.
+pub fn url_component(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() * 3);
+    for b in value.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 /// Schemes that execute rather than locate.
 const DANGEROUS_SCHEMES: &[&str] = &["javascript:", "vbscript:", "data:"];
 

@@ -40,8 +40,11 @@ done:
    refused: declared variants built or matched, recursion, generic callees.
    The standard library came next (ADR-0040): `List` and `String`, compiled.
    kiokun's shard rule and ranking followed (ADR-0041); the host keeps only
-   the index and the files. Next: the template gaps (an interpolated
-   attribute, `else`, `Option`), then kiokun's pages written with them.
+   the index and the files. The template gaps followed (ADR-0042): `{:else}`,
+   which was a silent miscompile, `{#match}` over `Option` and `Result`, and
+   interpolated attributes. kiokun's pages use all three. Next: E10's
+   remaining charter tasks, 4 (memory strategies, measured) and 7 (affine
+   annotations), and pure computation in the JavaScript backend.
 3. ~~**Compiled resumable handler bodies**~~ DONE 2026-09-25 (ADR-0033). Then
    step 10. Two things the handler work left open, in order of need:
    - captures as a patched part, so that a captured field a patch changes is

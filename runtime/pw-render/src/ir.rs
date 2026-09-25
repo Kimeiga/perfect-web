@@ -145,6 +145,23 @@ pub enum Part {
         key: Option<String>,
         body: Vec<Chunk>,
     },
+    /// `{#match value}{:Some(x)} .. {:None} .. {/match}`: the arm whose case
+    /// the value is, with the case's payload bound to the arm's name
+    /// (ADR-0042).
+    Match {
+        id: PartId,
+        value: String,
+        arms: Vec<Arm>,
+    },
+    /// `href="/stores/{id}"`: static text and values, each value escaped for
+    /// the attribute's context (ADR-0042).
+    InterpolatedAttribute {
+        id: PartId,
+        owner: ElementId,
+        name: String,
+        segments: Vec<Segment>,
+        context: Context,
+    },
     /// Another template, rendered in place.
     Component {
         id: PartId,
@@ -172,7 +189,39 @@ pub enum Part {
     Blocked { reason: String, at: String },
 }
 
+/// One arm of a [`Part::Match`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Arm {
+    /// `Some`, `None`, `Ok` or `Err`.
+    pub case: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
+    pub body: Vec<Chunk>,
+}
+
+/// A piece of an interpolated attribute: text escaped at build time, or a
+/// value's path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "segment", content = "value")]
+pub enum Segment {
+    Static(String),
+    Value(String),
+}
+
 impl Part {
+    /// The chunk lists nested in this part, in document order. Every walk
+    /// descends through this, so no walk can miss a part's regions.
+    pub fn nested(&self) -> Vec<&[Chunk]> {
+        match self {
+            Part::Conditional {
+                then, otherwise, ..
+            } => vec![then, otherwise],
+            Part::Each { body, .. } => vec![body],
+            Part::Match { arms, .. } => arms.iter().map(|a| a.body.as_slice()).collect(),
+            _ => Vec::new(),
+        }
+    }
+
     /// This part's identity, or `None` for a `Blocked` one — which has no
     /// identity because it is never rendered.
     pub fn id(&self) -> Option<PartId> {
@@ -183,6 +232,8 @@ impl Part {
             | Part::Event { id, .. }
             | Part::Conditional { id, .. }
             | Part::Each { id, .. }
+            | Part::Match { id, .. }
+            | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
             | Part::RawHtml { id, .. } => *id,
             Part::Blocked { .. } => return None,
@@ -194,7 +245,8 @@ impl Part {
         match self {
             Part::Attribute { owner, .. }
             | Part::BooleanAttribute { owner, .. }
-            | Part::Event { owner, .. } => Some(*owner),
+            | Part::Event { owner, .. }
+            | Part::InterpolatedAttribute { owner, .. } => Some(*owner),
             _ => None,
         }
     }
@@ -202,12 +254,14 @@ impl Part {
     /// How this kind of part is anchored.
     pub fn anchor(&self) -> Option<Anchor> {
         Some(match self {
-            Part::Attribute { .. } | Part::BooleanAttribute { .. } | Part::Event { .. } => {
-                Anchor::Element
-            }
+            Part::Attribute { .. }
+            | Part::BooleanAttribute { .. }
+            | Part::Event { .. }
+            | Part::InterpolatedAttribute { .. } => Anchor::Element,
             Part::Text { .. }
             | Part::Conditional { .. }
             | Part::Each { .. }
+            | Part::Match { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
             Part::Blocked { .. } => return None,
@@ -222,6 +276,8 @@ impl Part {
             Part::Event { .. } => "event",
             Part::Conditional { .. } => "conditional",
             Part::Each { .. } => "each",
+            Part::Match { .. } => "match",
+            Part::InterpolatedAttribute { .. } => "interpolated_attribute",
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
             Part::Blocked { .. } => "blocked",
@@ -308,7 +364,17 @@ impl Template {
                         | Part::Attribute { value, .. }
                         | Part::BooleanAttribute { value, .. }
                         | Part::RawHtml { value, .. }
-                        | Part::Conditional { value, .. } => value.clone(),
+                        | Part::Conditional { value, .. }
+                        | Part::Match { value, .. } => value.clone(),
+                        // Every value the attribute reads, in order.
+                        Part::InterpolatedAttribute { segments, .. } => segments
+                            .iter()
+                            .filter_map(|s| match s {
+                                Segment::Value(v) => Some(v.as_str()),
+                                Segment::Static(_) => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
                         Part::Each { collection, .. } => collection.clone(),
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
@@ -319,15 +385,8 @@ impl Template {
                         _ => String::new(),
                     },
                 });
-                match p {
-                    Part::Conditional {
-                        then, otherwise, ..
-                    } => {
-                        walk(then, out);
-                        walk(otherwise, out);
-                    }
-                    Part::Each { body, .. } => walk(body, out),
-                    _ => {}
+                for inner in p.nested() {
+                    walk(inner, out);
                 }
             }
         }
@@ -345,16 +404,11 @@ impl Template {
         fn walk<'a>(chunks: &'a [Chunk], out: &mut Vec<&'a Part>) {
             for c in chunks {
                 let Chunk::Dynamic(p) = c else { continue };
-                match p {
-                    Part::Blocked { .. } => out.push(p),
-                    Part::Conditional {
-                        then, otherwise, ..
-                    } => {
-                        walk(then, out);
-                        walk(otherwise, out);
-                    }
-                    Part::Each { body, .. } => walk(body, out),
-                    _ => {}
+                if let Part::Blocked { .. } = p {
+                    out.push(p);
+                }
+                for inner in p.nested() {
+                    walk(inner, out);
                 }
             }
         }

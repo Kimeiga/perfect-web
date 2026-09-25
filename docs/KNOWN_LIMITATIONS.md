@@ -98,9 +98,20 @@ inlined. Still refused by name:
   constructor, and against another type it is PW0608.
 - **`return` is a statement, not an expression.** Its value is the statement
   after it, in a block or on its line in a match arm (ADR-0038).
-- **Interpolated attribute strings do not render.** `href="/stores/{id}"` is
-  read by the route checker, but the template IR has no part for it and blocks
-  the render, naming `href={value}` as the form that renders.
+- **Template matches take apart `Option` and `Result` only** (ADR-0042). A
+  declared sum type's constructors in `{#match}` are refused (PW5019), as the
+  component backend refuses them. `{:else}` in `{#each}` is refused;
+  `{#if xs}` around the list says the same.
+- **An interpolated attribute is refused in a `style`**, and a URL with holes
+  must begin with text (ADR-0042). A hole must be a value path.
+- **Nothing emits patches for the new template parts.** A `{#match}` region
+  or an interpolated attribute renders on the server; the dev server's patch
+  generator is written per operation, and the store uses neither. kiokun's
+  pages are static.
+- **A name that resolves to nothing is refused only in a call.**
+  `{nothing.here}` in a template, or `let x = nothing`, passes `pw check`. The
+  resolver checks calls and policy terms (`check.rs`), and a value relation
+  reads such a name as unknown rather than refusing it.
 - **The standard library is small** (ADR-0040). `List` has `length`, `get`,
   `take`, `concat`, `map`, `filter`, `fold`, `any`, `all`, `find`, `sort_by`
   and `group_by` (by a `String` key, adjacent runs); `String` has `length`, `codepoints`, `from_codepoints`,

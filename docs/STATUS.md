@@ -62,6 +62,22 @@ reject an incomplete match whatever the effect row.
   E9's counts and its 10 of 10 mutants are unchanged, and the oracle's missing
   case is now the checker's refusal.
 
+**Correction, 2026-09-25: `{:else}` in a template was a silent miscompile**
+([ADR-0042](DECISIONS/ADR-0042-template-branches-and-attributes.md)).
+`{#if a}A{:else}B{/if}` passed `pw check` and `pw build`. It rendered A and B
+together when `a` held, and neither when it did not. The HIR lowering dropped
+every `{:..}` marker. Nothing checked that a block closed with its own name,
+and an unknown directive passed `pw check`. All are fixed:
+- markers are kept as branches;
+- a malformed block is PW5019;
+- a template `{#match}` is exhaustive (PW0305).
+
+**Correction, 2026-09-25: a secret in an attribute string checked clean.**
+`<a href="/pay/{key}">` with `key: Secret<Payments>` passed `pw check`: the
+hole was static text, which no privacy rule reads. Neither renderer
+interpolated attribute strings, so nothing leaked. An attribute's holes are
+expressions now (ADR-0042), and the page is PW5003.
+
 **Correction, 2026-09-25: E9's value relations left a generic call's `let`
 binding uninstantiated** ([ADR-0041](DECISIONS/ADR-0041-kiokun-in-pleris.md)).
 E9 claims generic callables are instantiated per call.
@@ -79,6 +95,10 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0042: `{#match e}{:Some(x)} .. {:None} .. {/match}` is the template
+  syntax for taking an `Option` or a `Result` apart.
+- ADR-0042: a value interpolated into a URL attribute is one URI component,
+  and the URL must begin with the author's text.
 - ADR-0041: a binding or parameter cannot be named with a statement keyword
   (PW0013); contextual keywords are the alternative.
 - ADR-0040: `String.to_lower_ascii` maps `A`–`Z` only; Unicode case mapping is
@@ -119,6 +139,19 @@ recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The 
 before integration; the baseline pass is not a substitute.
 
 ## completed gate items
+
+- **2026-09-25: the template gaps (ADR-0042).** Not a gate item; `docs/NEXT.md`
+  named them after ADR-0041.
+  - `{:else}` and `{:else if}` are branches.
+  - `{#match}` takes an `Option` or a `Result` apart, exhaustively, with its
+    payload bound and typed.
+  - An attribute interpolates, and each value is escaped for its context. In
+    a URL, each value is one URI component.
+  - kiokun's two word pages are one, `WordPage`, and its search links are
+    `href="/{hit.target}"`.
+  - Found and fixed: `{:else}` was a silent miscompile, and a secret in an
+    attribute string checked clean (corrections above).
+  - Evidence: `docs/evidence/E10/templates.txt` (`just e10-templates`).
 
 - **2026-09-25: kiokun's shard rule and ranking, in Pleris (ADR-0041).** Not a
   gate item; the test of E10 task 2's computation that `docs/NEXT.md` named.

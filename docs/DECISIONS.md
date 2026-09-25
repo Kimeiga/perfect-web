@@ -249,3 +249,10 @@ ranking stay as the references every compiled answer is compared with, on
 every word kiokun has. Building it found that the E9 value relations left a
 generic call's `let` binding uninstantiated, that a statement keyword could
 name a value, and that kiokun's file names are not its words.
+
+[ADR-0042](DECISIONS/ADR-0042-template-branches-and-attributes.md): a
+template block's markers are kept and checked (PW5019), `{:else}` and
+`{:else if}` are branches, `{#match}` takes an `Option` or a `Result` apart,
+and an attribute interpolates, each value escaped for its context (a URI
+component in a URL). It fixes a silent miscompile: `{:else}` was dropped, and
+both branches rendered together.

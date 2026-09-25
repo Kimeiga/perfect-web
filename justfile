@@ -562,6 +562,29 @@ e10-kiokun:
      } > docs/evidence/E10/kiokun.txt
     @cat docs/evidence/E10/kiokun.txt
 
+# ADR-0042's template branches and attributes: the checker's refusals and the
+# IR (pw-core), what renders (pw-render), and the mutation controls.
+#
+# E10 — `{:else}`, `{#match}` and interpolated attributes.
+e10-templates:
+    @{ echo "ADR-0042 - template branches and interpolated attributes"; echo; \
+       echo "produced by: just e10-templates"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker and the IR (compiler/pw-core/tests/template_blocks.rs)"; echo; \
+       cargo test --locked -p pw-core --test template_blocks -- --test-threads=1 2>&1 \
+         | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer (runtime/pw-render/tests/branches.rs)"; echo; \
+       cargo test --locked -p pw-render --test branches -- --test-threads=1 2>&1 \
+         | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/template_mutations.py)"; echo; \
+       python3 scripts/template_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: patches for a match region or an interpolated attribute."; \
+       echo "They render on the server; no patch generator emits them yet."; \
+     } > docs/evidence/E10/templates.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/templates.txt
+
 # ADR-0041's mutation controls: each piece of kiokun's logic in Pleris, and of
 # the defects found building it, undone in turn, must fail a test.
 #

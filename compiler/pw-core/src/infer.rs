@@ -164,6 +164,44 @@ impl<'a> Types<'a> {
             }
         }
 
+        // The same rule for a `{#match}` arm (ADR-0042):
+        //
+        //     Option<Entry>          Result<T, E>
+        //         | {:Some(e)}           | {:Ok(v)}  {:Err(x)}
+        //     e : Entry              v : T     x : E
+        for n in body.walk_markup(&roots) {
+            let crate::hir::Node::Block {
+                subject: Some(s),
+                children,
+                ..
+            } = body.node(n)
+            else {
+                continue;
+            };
+            let Some(ty) = types.of(body, *s) else {
+                continue;
+            };
+            for c in children {
+                let crate::hir::Node::Branch {
+                    arm: Some((case, Some(name))),
+                    ..
+                } = body.node(*c)
+                else {
+                    continue;
+                };
+                let payload = match (ty.as_builtin(), case.as_str()) {
+                    (Some(Builtin::Option), "Some") | (Some(Builtin::Result), "Ok") => {
+                        ty.args().first()
+                    }
+                    (Some(Builtin::Result), "Err") => ty.args().get(1),
+                    _ => None,
+                };
+                if let Some(p) = payload.cloned() {
+                    types.bindings.insert(name.clone(), p);
+                }
+            }
+        }
+
         // A CALLBACK's parameter takes the element type of the collection the
         // callback is applied to.
         //

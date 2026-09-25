@@ -701,9 +701,18 @@ pub fn local_bindings_from(body: &crate::hir::Body, root: crate::hir::ExprId) ->
             // introduces no scope — so `for badge in badges { badge.width() }`
             // reported `badge` as an undeclared name.
             Expr::For { pat: Some(p), .. } => pattern_names(body, *p, &mut out),
-            // A `{#each xs as x (k)}` binds `x` for its children.
+            // A `{#each xs as x (k)}` binds `x` for its children, and a
+            // `{:Some(x)}` arm binds `x` for its own (ADR-0042).
             Expr::Template { roots, .. } => {
                 for n in body.walk_markup(roots) {
+                    if let Node::Branch {
+                        arm: Some((_, Some(name))),
+                        ..
+                    } = body.node(n)
+                    {
+                        out.insert(name.clone());
+                        continue;
+                    }
                     let Node::Block { directive, .. } = body.node(n) else {
                         continue;
                     };

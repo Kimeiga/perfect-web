@@ -12,18 +12,9 @@
 
 package pw:app@0.1.0;
 
-interface kiokun-page-entry-page-api {
-    use pw:types/types.{dictionary-entry};
-    entry-page: func(arg0: dictionary-entry);
-}
-
 interface kiokun-page-lookup-api {
     use pw:types/types.{dictionary-entry};
     lookup: func(arg0: string) -> option<dictionary-entry>;
-}
-
-interface kiokun-page-not-found-api {
-    not-found: func(arg0: string);
 }
 
 interface kiokun-page-search-api {
@@ -36,6 +27,11 @@ interface kiokun-page-search-page-api {
     search-page: func(arg0: string, arg1: list<dictionary-search-hit>);
 }
 
+interface kiokun-page-word-page-api {
+    use pw:types/types.{dictionary-entry};
+    word-page: func(arg0: string, arg1: option<dictionary-entry>);
+}
+
 interface shards-place-api {
     use pw:types/types.{dictionary-placement};
     place: func(arg0: string) -> dictionary-placement;
@@ -46,17 +42,9 @@ interface shards-places-api {
     places: func(arg0: list<string>) -> list<dictionary-placement>;
 }
 
-world kiokun-page-entry-page {
-    export kiokun-page-entry-page-api;
-}
-
 world kiokun-page-lookup {
     import kiokun:data/entries;
     export kiokun-page-lookup-api;
-}
-
-world kiokun-page-not-found {
-    export kiokun-page-not-found-api;
 }
 
 world kiokun-page-search {
@@ -66,6 +54,10 @@ world kiokun-page-search {
 
 world kiokun-page-search-page {
     export kiokun-page-search-page-api;
+}
+
+world kiokun-page-word-page {
+    export kiokun-page-word-page-api;
 }
 
 world shards-place {

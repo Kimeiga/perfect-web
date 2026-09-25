@@ -40,7 +40,7 @@ pub use identity::{
     Anchor, ElementId, IdentityDomain, InstanceFrame, InstancePath, InstanceToken, LocalPartId,
     PartAddress, Partition, TemplateSchemaId,
 };
-pub use ir::{Chunk, Context, Part, PartEntry, PartId, Template};
+pub use ir::{Arm, Chunk, Context, Part, PartEntry, PartId, Segment, Template};
 
 use std::collections::BTreeMap;
 
@@ -137,6 +137,13 @@ pub enum Value {
         html: String,
         capability: String,
     },
+    /// `Some(v)`, `None`, `Ok(v)` or `Err(e)`: a case and its payload, which
+    /// `{#match}` takes apart (ADR-0042). It has no text form, and it is not
+    /// a condition: `{#if}` on one is refused.
+    Variant {
+        case: String,
+        payload: Option<Box<Value>>,
+    },
 }
 
 impl Value {
@@ -158,7 +165,21 @@ impl Value {
             Value::Int(i) => *i != 0,
             Value::Text(s) => !s.is_empty(),
             Value::List(v) => !v.is_empty(),
-            Value::Record(_) | Value::Raw { .. } => true,
+            Value::Record(_) | Value::Raw { .. } | Value::Variant { .. } => true,
+        }
+    }
+
+    /// The value as a condition. An `Option` or a `Result` is not one: which
+    /// case it is decides a `{#match}`, and `Some(false)` must not read as
+    /// true in an `{#if}`.
+    fn condition(&self, path: &str) -> Result<bool, Blocked> {
+        match self {
+            Value::Variant { .. } => Err(Blocked::UnrepresentedConstruct {
+                reason: "an Option or a Result is taken apart with `{#match}`, not tested"
+                    .to_string(),
+                at: path.to_string(),
+            }),
+            v => Ok(v.truthy()),
         }
     }
 }
@@ -287,15 +308,12 @@ fn find_part(chunks: &[Chunk], want: PartId) -> Option<&Part> {
         if p.id() == Some(want) {
             return Some(p);
         }
-        let nested = match p {
-            Part::Conditional {
-                then, otherwise, ..
-            } => find_part(then, want).or_else(|| find_part(otherwise, want)),
-            Part::Each { body, .. } => find_part(body, want),
-            _ => None,
-        };
-        if nested.is_some() {
-            return nested;
+        if let Some(found) = p
+            .nested()
+            .into_iter()
+            .find_map(|inner| find_part(inner, want))
+        {
+            return Some(found);
         }
     }
     None
@@ -412,6 +430,14 @@ fn capture_json(v: &Value, name: &str) -> Result<serde_json::Value, Blocked> {
         Value::Raw { .. } => {
             return Err(Blocked::UnrepresentedConstruct {
                 reason: "raw HTML cannot be captured by a handler".into(),
+                at: name.to_string(),
+            });
+        }
+        // A compiled handler takes no Option or Result apart (ADR-0033), so
+        // there is no encoding it would read.
+        Value::Variant { case, .. } => {
+            return Err(Blocked::UnrepresentedConstruct {
+                reason: format!("`{case}` cannot be captured by a handler"),
                 at: name.to_string(),
             });
         }
@@ -548,7 +574,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             let v = env.get(value).ok_or(Blocked::MissingValue {
                 path: value.clone(),
             })?;
-            if v.truthy() {
+            if v.condition(value)? {
                 out.push_str(name);
             } else if out.ends_with(' ') {
                 // Remove the separator the IR emitted for an attribute that
@@ -593,7 +619,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             let v = env.get(value).ok_or(Blocked::MissingValue {
                 path: value.clone(),
             })?;
-            let branch = if v.truthy() { then } else { otherwise };
+            let branch = if v.condition(value)? { then } else { otherwise };
             out.push_str(&format!("<!--pw:s{id}-->"));
             emit(branch, env, others, out)?;
             out.push_str(&format!("<!--pw:e{id}-->"));
@@ -682,6 +708,76 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                 }
             }
             out.push_str(&format!("<!--pw:e{id}-->"));
+            Ok(())
+        }
+
+        // The arm whose case the value is, its payload bound (ADR-0042). A
+        // range, as a conditional is: the runtime replaces it whole.
+        Part::Match { id, value, arms } => {
+            let v = env.get(value).ok_or(Blocked::MissingValue {
+                path: value.clone(),
+            })?;
+            let Value::Variant { case, payload } = v else {
+                return Err(Blocked::UnrepresentedConstruct {
+                    reason: "a `{#match}` takes an Option or a Result apart".to_string(),
+                    at: value.clone(),
+                });
+            };
+            let arm = arms.iter().find(|a| a.case == *case).ok_or_else(|| {
+                Blocked::UnrepresentedConstruct {
+                    reason: format!("no arm renders `{case}`"),
+                    at: value.clone(),
+                }
+            })?;
+            let scoped = match (&arm.binding, payload) {
+                (Some(name), Some(p)) => env.with(name, (**p).clone()),
+                (Some(_), None) => {
+                    return Err(Blocked::UnrepresentedConstruct {
+                        reason: format!("`{case}` has no payload to bind"),
+                        at: value.clone(),
+                    });
+                }
+                (None, _) => env.clone(),
+            };
+            out.push_str(&format!("<!--pw:s{id}-->"));
+            emit(&arm.body, &scoped, others, out)?;
+            out.push_str(&format!("<!--pw:e{id}-->"));
+            Ok(())
+        }
+
+        // Text as written, and each value escaped for the attribute's context:
+        // a URI component in a URL, attribute-escaped elsewhere (ADR-0042).
+        Part::InterpolatedAttribute {
+            name,
+            segments,
+            context,
+            ..
+        } => {
+            let mut value = String::new();
+            for s in segments {
+                match s {
+                    Segment::Static(t) => value.push_str(t),
+                    Segment::Value(path) => {
+                        let v = env
+                            .get(path)
+                            .and_then(Value::as_str)
+                            .ok_or(Blocked::MissingValue { path: path.clone() })?;
+                        value.push_str(&match context {
+                            Context::Url => escape::url_component(&v),
+                            Context::Attribute => escape::attribute(&v),
+                            other => {
+                                return Err(Blocked::UnrepresentedConstruct {
+                                    reason: format!(
+                                        "a value interpolated into a {other:?} attribute"
+                                    ),
+                                    at: name.clone(),
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            out.push_str(&format!("{name}=\"{value}\""));
             Ok(())
         }
 

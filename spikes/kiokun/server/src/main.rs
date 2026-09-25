@@ -4,7 +4,7 @@
 //! ```text
 //! GET /             the search page, empty
 //! GET /search?q=    the compiled `Search`, rendered by `SearchPage`
-//! GET /<word>       the compiled `Lookup`: `EntryPage`, or 404 with `NotFound`
+//! GET /<word>       the compiled `Lookup`, rendered by `WordPage`: 404 for `None`
 //! ```
 //!
 //! The components, contracts and templates are read from
@@ -176,6 +176,13 @@ mod tests {
     /// about the sample's 28 entries, and the whole shard has its own test.
     fn app() -> app::App {
         load_from(&root().join("examples/kiokun/data").join(SHARD)).expect("the slice loads")
+    }
+
+    /// The page without its part anchors (`<!--pw:s3-->`), for reading text.
+    fn bare(html: &str) -> String {
+        html.split("<!--")
+            .map(|p| p.split_once("-->").map_or(p, |(_, rest)| rest))
+            .collect()
     }
 
     fn field<'a>(v: &'a Val, name: &str) -> &'a Val {
@@ -424,19 +431,37 @@ mod tests {
         assert_eq!(status, 200, "the redirect, followed");
         assert!(html.contains("諺"), "{html}");
 
+        // `WordPage`'s `{:None}` arm (ADR-0042).
         let (status, html) = route(&a, "GET", "/%E7%84%A1");
         assert_eq!(status, 404);
+        assert!(
+            bare(&html).contains("<h1 id=\"headword\">無</h1>"),
+            "{html}"
+        );
         assert!(html.contains("There is no entry for it here."), "{html}");
+        assert!(!html.contains("pinyin"), "one arm renders: {html}");
 
         let (status, html) = route(&a, "GET", "/search?q=person");
         assert_eq!(status, 200);
-        // Relative, from `/search`: the entry at `/人`.
-        assert!(html.contains("href=\"人\""), "{html}");
+        // `/{hit.target}`: the entry's path, its word one URI component.
+        assert!(html.contains("href=\"/%E4%BA%BA\""), "{html}");
         assert!(
             html.contains("value=\"person\""),
             "the query stays in the box: {html}"
         );
+        assert!(!html.contains("id=\"nothing\""), "{html}");
         assert!(!html.contains("<script"));
+
+        // `{:else if q}`: said when a query found nothing, not on the empty
+        // page.
+        let (_, html) = route(&a, "GET", "/search?q=zzzz");
+        assert!(bare(&html).contains("No entry matches zzzz."), "{html}");
+        assert!(!html.contains("id=\"hits\""), "{html}");
+        let (_, html) = route(&a, "GET", "/");
+        assert!(
+            !html.contains("id=\"nothing\"") && !html.contains("id=\"hits\""),
+            "{html}"
+        );
 
         assert_eq!(route(&a, "GET", "/%FF").0, 400, "not UTF-8");
         assert_eq!(route(&a, "GET", "/人/人").0, 400, "two segments");
@@ -537,7 +562,7 @@ mod tests {
 
     /// **The whole shard**: 17,597 real entries from a kiokun-data checkout,
     /// every one looked up by the compiled `Lookup` and rendered by the compiled
-    /// `EntryPage`, and every in-shard redirect followed. `just e10-kiokun`
+    /// `WordPage`, and every in-shard redirect followed. `just e10-kiokun`
     /// runs it with `KIOKUN_DATA` set, in release.
     #[test]
     #[ignore = "reads a kiokun-data checkout named by KIOKUN_DATA"]

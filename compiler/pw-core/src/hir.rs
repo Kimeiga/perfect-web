@@ -974,7 +974,29 @@ pub enum Node {
     /// it now would be guessing.
     Block {
         directive: String,
+        /// Everything between the opening and closing markers, in order, with
+        /// each `{:..}` marker kept at its place as a [`Node::Branch`]
+        /// (ADR-0042). Until 2026-09-25 the markers were dropped, so
+        /// `{#if a}A{:else}B{/if}` rendered A and B together.
         children: Vec<NodeId>,
+        /// `c` in `{#if c}`, `e` in `{#match e}`: a real expression, so the
+        /// value relations and the privacy walks see it. `None` for `{#each}`,
+        /// whose directive is read as written.
+        subject: Option<ExprId>,
+        /// The closing marker as written, `{/if}`; empty when the block was
+        /// never closed.
+        close: String,
+    },
+    /// `{:else}`, `{:else if c}`, `{:Some(x)}`: one of a block's branch
+    /// markers, at its place among the block's children (ADR-0042).
+    Branch {
+        /// As written.
+        marker: String,
+        /// `c` in `{:else if c}`.
+        condition: Option<ExprId>,
+        /// `("Some", Some("x"))` for `{:Some(x)}`, `("None", None)` for
+        /// `{:None}`: a `{#match}` arm.
+        arm: Option<(String, Option<String>)>,
     },
 }
 

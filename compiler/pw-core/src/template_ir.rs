@@ -49,7 +49,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hir::{AttrValue, Body, Expr, Hir, Node, NodeId};
+use crate::hir::{AttrValue, Body, Expr, ExprId, Hir, Node, NodeId};
 
 /// Where a value sits in the document, which decides how it is escaped.
 ///
@@ -258,6 +258,24 @@ pub enum Part {
         key: Option<String>,
         body: Vec<Chunk>,
     },
+    /// `{#match value}{:Some(x)} .. {:None} .. {/match}` (ADR-0042): the arm
+    /// whose case the value is, with the case's payload bound to the arm's
+    /// name. A range part, as a conditional is.
+    Match {
+        id: PartId,
+        value: String,
+        arms: Vec<Arm>,
+    },
+    /// `href="/stores/{id}"` (ADR-0042): static text and values, each value
+    /// escaped for the attribute's context. In a URL, each value is a URI
+    /// component, so it cannot add a segment, a query, a fragment or a scheme.
+    InterpolatedAttribute {
+        id: PartId,
+        owner: ElementId,
+        name: String,
+        segments: Vec<Segment>,
+        context: Context,
+    },
     /// Another template, rendered in place.
     Component {
         id: PartId,
@@ -285,7 +303,41 @@ pub enum Part {
     Blocked { reason: String, at: String },
 }
 
+/// One arm of a [`Part::Match`]: its case, the name its payload is bound to,
+/// and what it renders.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Arm {
+    /// `Some`, `None`, `Ok` or `Err`.
+    pub case: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
+    pub body: Vec<Chunk>,
+}
+
+/// A piece of an interpolated attribute: text as written, or a value's path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "segment", content = "value")]
+pub enum Segment {
+    /// Escaped at build time, as a static attribute is.
+    Static(String),
+    Value(String),
+}
+
 impl Part {
+    /// The chunk lists nested in this part, in document order. Every walk
+    /// over the IR descends through this, so a part with regions cannot be
+    /// missed by one walk and seen by another.
+    pub fn nested(&self) -> Vec<&[Chunk]> {
+        match self {
+            Part::Conditional {
+                then, otherwise, ..
+            } => vec![then, otherwise],
+            Part::Each { body, .. } => vec![body],
+            Part::Match { arms, .. } => arms.iter().map(|a| a.body.as_slice()).collect(),
+            _ => Vec::new(),
+        }
+    }
+
     /// This part's identity, or `None` for a `Blocked` one — which has no
     /// identity because it is never rendered.
     pub fn id(&self) -> Option<PartId> {
@@ -296,6 +348,8 @@ impl Part {
             | Part::Event { id, .. }
             | Part::Conditional { id, .. }
             | Part::Each { id, .. }
+            | Part::Match { id, .. }
+            | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
             | Part::RawHtml { id, .. } => *id,
             Part::Blocked { .. } => return None,
@@ -307,7 +361,8 @@ impl Part {
         match self {
             Part::Attribute { owner, .. }
             | Part::BooleanAttribute { owner, .. }
-            | Part::Event { owner, .. } => Some(*owner),
+            | Part::Event { owner, .. }
+            | Part::InterpolatedAttribute { owner, .. } => Some(*owner),
             _ => None,
         }
     }
@@ -315,12 +370,14 @@ impl Part {
     /// How this kind of part is anchored.
     pub fn anchor(&self) -> Option<Anchor> {
         Some(match self {
-            Part::Attribute { .. } | Part::BooleanAttribute { .. } | Part::Event { .. } => {
-                Anchor::Element
-            }
+            Part::Attribute { .. }
+            | Part::BooleanAttribute { .. }
+            | Part::Event { .. }
+            | Part::InterpolatedAttribute { .. } => Anchor::Element,
             Part::Text { .. }
             | Part::Conditional { .. }
             | Part::Each { .. }
+            | Part::Match { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
             Part::Blocked { .. } => return None,
@@ -335,6 +392,8 @@ impl Part {
             Part::Event { .. } => "event",
             Part::Conditional { .. } => "conditional",
             Part::Each { .. } => "each",
+            Part::Match { .. } => "match",
+            Part::InterpolatedAttribute { .. } => "interpolated_attribute",
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
             Part::Blocked { .. } => "blocked",
@@ -454,7 +513,17 @@ impl Template {
                         | Part::Attribute { value, .. }
                         | Part::BooleanAttribute { value, .. }
                         | Part::RawHtml { value, .. }
-                        | Part::Conditional { value, .. } => value.clone(),
+                        | Part::Conditional { value, .. }
+                        | Part::Match { value, .. } => value.clone(),
+                        // Every value the attribute reads, in order.
+                        Part::InterpolatedAttribute { segments, .. } => segments
+                            .iter()
+                            .filter_map(|s| match s {
+                                Segment::Value(v) => Some(v.as_str()),
+                                Segment::Static(_) => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
                         Part::Each { collection, .. } => collection.clone(),
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
@@ -465,15 +534,8 @@ impl Template {
                         _ => String::new(),
                     },
                 });
-                match p {
-                    Part::Conditional {
-                        then, otherwise, ..
-                    } => {
-                        walk(then, out);
-                        walk(otherwise, out);
-                    }
-                    Part::Each { body, .. } => walk(body, out),
-                    _ => {}
+                for inner in p.nested() {
+                    walk(inner, out);
                 }
             }
         }
@@ -491,16 +553,11 @@ impl Template {
         fn walk<'a>(chunks: &'a [Chunk], out: &mut Vec<&'a Part>) {
             for c in chunks {
                 let Chunk::Dynamic(p) = c else { continue };
-                match p {
-                    Part::Blocked { .. } => out.push(p),
-                    Part::Conditional {
-                        then, otherwise, ..
-                    } => {
-                        walk(then, out);
-                        walk(otherwise, out);
-                    }
-                    Part::Each { body, .. } => walk(body, out),
-                    _ => {}
+                if let Part::Blocked { .. } = p {
+                    out.push(p);
+                }
+                for inner in p.nested() {
+                    walk(inner, out);
                 }
             }
         }
@@ -682,7 +739,14 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
         Node::Block {
             directive,
             children,
-        } => lower_block(body, directive, children, ctx, ix, out),
+            subject,
+            ..
+        } => lower_block(body, directive, children, *subject, ctx, ix, out),
+        // A marker outside any block. The markup rules refuse it (PW5019).
+        Node::Branch { marker, .. } => out.push(Chunk::Dynamic(Part::Blocked {
+            reason: format!("`{marker}` stands outside any block"),
+            at: marker.clone(),
+        })),
     }
 }
 
@@ -774,18 +838,14 @@ fn lower_element(
             AttrValue::None => {
                 out.push(Chunk::Static(format!(" {}", a.name)));
             }
-            // `href="/stores/{id}"`: a string with a hole. The route checker
-            // reads the hole, as a link to a declared route; the template IR
-            // has no part that renders one. Until 2026-09-25 it wrote the
-            // braces out, and a document linked to `/stores/{id}` as if that
-            // were the address. The kiokun slice's first render showed it.
+            // A `{` that opens no expression: `title="{}"`. A string with
+            // holes lowers as one (`AttrValue::Expr`, below); what is left
+            // here is a brace the author may have meant as a hole, and writing
+            // it out would publish `/stores/{id}` as an address, as happened
+            // before ADR-0042.
             AttrValue::Static(v) if unquote(v).contains('{') => {
                 out.push(Chunk::Dynamic(Part::Blocked {
-                    reason: format!(
-                        "`{name}` interpolates inside an attribute string, which the \
-                         template IR does not represent yet; write `{name}={{value}}`",
-                        name = a.name
-                    ),
+                    reason: format!("`{}` has a `{{` that opens no expression", a.name),
                     at: format!("{}={}", a.name, v),
                 }));
             }
@@ -801,6 +861,16 @@ fn lower_element(
                     a.name,
                     escape_static_attribute(unquote(v))
                 )));
+            }
+            // `href="/stores/{id}"` (ADR-0042).
+            AttrValue::Expr(e) if matches!(body.expr(*e), Expr::Interpolated { .. }) => {
+                out.push(Chunk::Static(" ".to_string()));
+                let owner = owner.expect("an element with a dynamic attribute owns an identity");
+                if let Expr::Interpolated { text, parts } = body.expr(*e) {
+                    out.push(Chunk::Dynamic(interpolated_attribute(
+                        body, &a.name, text, parts, owner, ix,
+                    )));
+                }
             }
             AttrValue::Expr(e) => {
                 let value = crate::infer::path_of(body, *e);
@@ -851,6 +921,7 @@ fn lower_block(
     body: &Body,
     directive: &str,
     children: &[NodeId],
+    subject: Option<ExprId>,
     ctx: &Lowering<'_>,
     ix: &mut Indexer,
     out: &mut Vec<Chunk>,
@@ -860,13 +931,28 @@ fn lower_block(
     // order agree — a patch stream that arrives in id order arrives in a order
     // the runtime can apply without buffering.
     let id = ix.part();
-    let mut inner = Vec::new();
-    for c in children {
-        lower_node(body, *c, ctx, ix, &mut inner);
-    }
-    let inner = coalesce(inner);
+    let (lead, branches) = split_branches(body, children);
+    let blocked = |reason: String| {
+        Chunk::Dynamic(Part::Blocked {
+            reason,
+            at: d.to_string(),
+        })
+    };
+    // `c` in `{#if c}`: a value path, as every template value is.
+    let subject_path = subject
+        .map(|e| crate::infer::path_of(body, e))
+        .filter(|p| !p.is_empty());
 
     if let Some((binding, collection, key)) = parse_each(d) {
+        if !branches.is_empty() {
+            out.push(blocked(
+                "`{#each}` takes no branch marker; `{#if xs}` around the list says \
+                 `{:else}`"
+                    .to_string(),
+            ));
+            return;
+        }
+        let inner = lower_run(body, &lead, ctx, ix);
         out.push(Chunk::Dynamic(Part::Each {
             id,
             collection,
@@ -876,13 +962,48 @@ fn lower_block(
         }));
         return;
     }
-    if let Some(cond) = parse_if(d) {
-        out.push(Chunk::Dynamic(Part::Conditional {
-            id,
-            value: cond,
-            then: inner,
-            otherwise: Vec::new(),
-        }));
+    if opens(d, "{#if") {
+        let Some(value) = subject_path else {
+            out.push(blocked(
+                "an `{#if}` condition must be a value path".to_string(),
+            ));
+            return;
+        };
+        out.push(conditional(body, id, value, &lead, &branches, ctx, ix));
+        return;
+    }
+    if opens(d, "{#match") {
+        let Some(value) = subject_path else {
+            out.push(blocked(
+                "a `{#match}` subject must be a value path".to_string(),
+            ));
+            return;
+        };
+        let stray = lead.iter().any(|n| match body.node(*n) {
+            Node::Text(t) => !t.trim().is_empty(),
+            _ => true,
+        });
+        if stray {
+            out.push(blocked(
+                "a `{#match}` holds only its arms: nothing may come before the first".to_string(),
+            ));
+            return;
+        }
+        let mut arms = Vec::new();
+        for (marker, run) in &branches {
+            let Some((case, binding)) = marker.arm else {
+                out.push(blocked(
+                    "a `{#match}` arm is `{:Some(x)}` or `{:None}`".to_string(),
+                ));
+                return;
+            };
+            arms.push(Arm {
+                case: case.clone(),
+                binding: binding.clone(),
+                body: lower_run(body, run, ctx, ix),
+            });
+        }
+        out.push(Chunk::Dynamic(Part::Match { id, value, arms }));
         return;
     }
     // Not represented. Blocked rather than dropped: a region the IR does not
@@ -912,10 +1033,175 @@ fn parse_each(d: &str) -> Option<(String, String, Option<String>)> {
     Some((binding.to_string(), collection.trim().to_string(), key))
 }
 
-/// `{#if signed_in}` -> `Some("signed_in")`.
-fn parse_if(d: &str) -> Option<String> {
-    let inner = d.strip_prefix("{#if")?.strip_suffix('}')?.trim();
-    (!inner.is_empty()).then(|| inner.to_string())
+/// `href="/stores/{id}"`: static text and value paths, each value escaped for
+/// the attribute's context when rendered (ADR-0042).
+fn interpolated_attribute(
+    body: &Body,
+    name: &str,
+    text: &str,
+    parts: &[ExprId],
+    owner: ElementId,
+    ix: &mut Indexer,
+) -> Part {
+    let blocked = |reason: &str| Part::Blocked {
+        reason: reason.to_string(),
+        at: format!("{name}={text}"),
+    };
+    let context = Context::of_attribute(name);
+    if BOOLEAN_ATTRIBUTES.contains(&name) {
+        return blocked("a boolean attribute's value is its presence, not text");
+    }
+    if context == Context::Style {
+        return blocked("escaping inside a CSS declaration is not decided (ADR-0042)");
+    }
+    let mut segments = Vec::new();
+    let mut holes = parts.iter();
+    let mut rest = unquote(text);
+    while let Some(open) = rest.find('{') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('}') else { break };
+        if open > 0 {
+            segments.push(Segment::Static(escape_static_attribute(&rest[..open])));
+        }
+        if after[..close].trim().is_empty() {
+            return blocked("`{}` holds no expression");
+        }
+        let Some(hole) = holes.next() else {
+            return blocked("a hole in the attribute did not parse");
+        };
+        let path = crate::infer::path_of(body, *hole);
+        if path.is_empty() {
+            return blocked(
+                "a hole in an attribute must be a value path, as `{..}` between tags is",
+            );
+        }
+        segments.push(Segment::Value(path));
+        rest = &after[close + 1..];
+    }
+    if !rest.is_empty() {
+        segments.push(Segment::Static(escape_static_attribute(rest)));
+    }
+    // The author's text fixes a URL's scheme and where its path starts; a
+    // value only fills in components.
+    if context == Context::Url && !matches!(segments.first(), Some(Segment::Static(_))) {
+        return blocked(
+            "a URL with holes must begin with text, which fixes its scheme; a URL \
+             that is wholly a value is written `name={value}`",
+        );
+    }
+    Part::InterpolatedAttribute {
+        id: ix.part(),
+        owner,
+        name: name.to_string(),
+        segments,
+        context,
+    }
+}
+
+/// Does the directive open a block named `head`: `{#if ..}`, not `{#iffy}`?
+fn opens(d: &str, head: &str) -> bool {
+    d.strip_prefix(head)
+        .is_some_and(|r| r.starts_with(char::is_whitespace) || r.starts_with('}'))
+}
+
+/// A branch marker's fields: as written, its condition, and the arm it names.
+struct Marker<'b> {
+    written: &'b str,
+    condition: Option<ExprId>,
+    arm: &'b Option<(String, Option<String>)>,
+}
+
+/// A block's children split at its branch markers: the run before the first
+/// marker, then each marker with the run after it (ADR-0042).
+fn split_branches<'b>(
+    body: &'b Body,
+    children: &[NodeId],
+) -> (Vec<NodeId>, Vec<(Marker<'b>, Vec<NodeId>)>) {
+    let mut lead = Vec::new();
+    let mut branches: Vec<(Marker<'b>, Vec<NodeId>)> = Vec::new();
+    for c in children {
+        match (body.node(*c), branches.last_mut()) {
+            (
+                Node::Branch {
+                    marker,
+                    condition,
+                    arm,
+                },
+                _,
+            ) => branches.push((
+                Marker {
+                    written: marker,
+                    condition: *condition,
+                    arm,
+                },
+                Vec::new(),
+            )),
+            (_, Some((_, run))) => run.push(*c),
+            (_, None) => lead.push(*c),
+        }
+    }
+    (lead, branches)
+}
+
+/// Some nodes, lowered in order and coalesced.
+fn lower_run(body: &Body, nodes: &[NodeId], ctx: &Lowering<'_>, ix: &mut Indexer) -> Vec<Chunk> {
+    let mut out = Vec::new();
+    for n in nodes {
+        lower_node(body, *n, ctx, ix, &mut out);
+    }
+    coalesce(out)
+}
+
+/// `{#if a} A {:else if b} B {:else} C {/if}`: a conditional on `a` whose
+/// `otherwise` is a conditional on `b`, whose `otherwise` is C. Ids follow the
+/// document: the nested conditional's comes after A's parts.
+fn conditional(
+    body: &Body,
+    id: PartId,
+    value: String,
+    then: &[NodeId],
+    rest: &[(Marker<'_>, Vec<NodeId>)],
+    ctx: &Lowering<'_>,
+    ix: &mut Indexer,
+) -> Chunk {
+    let then = lower_run(body, then, ctx, ix);
+    let blocked = |reason: &str, at: &str| {
+        vec![Chunk::Dynamic(Part::Blocked {
+            reason: reason.to_string(),
+            at: at.to_string(),
+        })]
+    };
+    let otherwise = match rest.split_first() {
+        None => Vec::new(),
+        Some(((marker, run), more)) => match marker.condition {
+            Some(c) => {
+                let nested = ix.part();
+                match Some(crate::infer::path_of(body, c)).filter(|p| !p.is_empty()) {
+                    Some(v) => vec![conditional(body, nested, v, run, more, ctx, ix)],
+                    None => blocked(
+                        "an `{:else if}` condition must be a value path",
+                        marker.written,
+                    ),
+                }
+            }
+            None if marker.written.trim() == "{:else}"
+                && marker.arm.is_none()
+                && more.is_empty() =>
+            {
+                lower_run(body, run, ctx, ix)
+            }
+            None => blocked(
+                "an `{#if}` takes `{:else if c}` markers and one `{:else}`, last",
+                marker.written,
+            ),
+        },
+    };
+    Chunk::Dynamic(Part::Conditional {
+        id,
+        value,
+        then,
+        otherwise,
+    })
 }
 
 /// The template's semantic identity.
@@ -988,6 +1274,36 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                             feed(h, binding.as_bytes());
                             feed(h, key.as_deref().unwrap_or("-").as_bytes());
                             walk(h, body);
+                        }
+                        Part::Match { value, arms, .. } => {
+                            feed(h, value.as_bytes());
+                            for a in arms {
+                                feed(h, b"|");
+                                feed(h, a.case.as_bytes());
+                                feed(h, a.binding.as_deref().unwrap_or("-").as_bytes());
+                                walk(h, &a.body);
+                            }
+                        }
+                        Part::InterpolatedAttribute {
+                            name,
+                            segments,
+                            context,
+                            ..
+                        } => {
+                            feed(h, name.as_bytes());
+                            for s in segments {
+                                match s {
+                                    Segment::Static(t) => {
+                                        feed(h, b"S");
+                                        feed(h, t.as_bytes());
+                                    }
+                                    Segment::Value(v) => {
+                                        feed(h, b"V");
+                                        feed(h, v.as_bytes());
+                                    }
+                                }
+                            }
+                            feed(h, format!("{context:?}").as_bytes());
                         }
                         Part::Component { path, args, .. } => {
                             feed(h, path.as_bytes());

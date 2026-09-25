@@ -214,74 +214,80 @@ fn by_rank(a: Ranked, b: Ranked) -> Int {
     }
 }
 
-page EntryPage(entry: Entry) {
+// A word's page, whether kiokun has it or not (ADR-0042). The host answers 404
+// for `None`. ADR-0037 split this into two pages while templates had no
+// `Option`.
+page WordPage(word: String, entry: Option<Entry>) {
     view {
         <main>
             <form action="/search" method="get" role="search">
                 <input id="q" type="search" name="q" aria-label="Search the dictionary" />
             </form>
-            <h1 id="headword">{entry.key}</h1>
-            {#if entry.chinese}
-                <section aria-label="Chinese">
-                    <h2>Chinese</h2>
-                    <ul id="chinese">
-                        {#each entry.chinese as word (word.id)}
-                            <li>
-                                <span class="pinyin">{word.pinyin}</span>
-                                <span class="forms">{word.simplified}</span>
-                                <span class="definitions">{word.definitions}</span>
-                            </li>
-                        {/each}
-                    </ul>
-                </section>
-            {/if}
-            {#if entry.japanese}
-                <section aria-label="Japanese">
-                    <h2>Japanese</h2>
-                    <ul id="japanese">
-                        {#each entry.japanese as word (word.id)}
-                            <li>
-                                <span class="written">{word.written}</span>
-                                <span class="readings">{word.readings}</span>
-                                <ol>
-                                    {#each word.senses as sense (sense.id)}
-                                        <li>{sense.glosses}</li>
-                                    {/each}
-                                </ol>
-                            </li>
-                        {/each}
-                    </ul>
-                </section>
-            {/if}
+            {#match entry}
+                {:Some(e)}
+                    <h1 id="headword">{e.key}</h1>
+                    {#if e.chinese}
+                        <section aria-label="Chinese">
+                            <h2>Chinese</h2>
+                            <ul id="chinese">
+                                {#each e.chinese as c (c.id)}
+                                    <li>
+                                        <span class="pinyin">{c.pinyin}</span>
+                                        <span class="forms">{c.simplified}</span>
+                                        <span class="definitions">{c.definitions}</span>
+                                    </li>
+                                {/each}
+                            </ul>
+                        </section>
+                    {/if}
+                    {#if e.japanese}
+                        <section aria-label="Japanese">
+                            <h2>Japanese</h2>
+                            <ul id="japanese">
+                                {#each e.japanese as j (j.id)}
+                                    <li>
+                                        <span class="written">{j.written}</span>
+                                        <span class="readings">{j.readings}</span>
+                                        <ol>
+                                            {#each j.senses as sense (sense.id)}
+                                                <li>{sense.glosses}</li>
+                                            {/each}
+                                        </ol>
+                                    </li>
+                                {/each}
+                            </ul>
+                        </section>
+                    {/if}
+                {:None}
+                    <h1 id="headword">{word}</h1>
+                    <p>There is no entry for it here.</p>
+            {/match}
         </main>
     }
 }
 
+// A link names its entry's page by the path: `/{hit.target}` is one URI
+// component, so a word holding `/` or `?` still names one page (ADR-0042).
 page SearchPage(q: String, hits: List<SearchHit>) {
     view {
         <main>
             <form action="/search" method="get" role="search">
                 <input id="q" type="search" name="q" value={q} aria-label="Search the dictionary" />
             </form>
-            <ul id="hits">
-                {#each hits as hit (hit.id)}
-                    <li>
-                        <a href={hit.target}>{hit.word}</a>
-                        <span class="language">{hit.language}</span>
-                        <span class="pronunciation">{hit.pronunciation}</span>
-                        <span class="definition">{hit.definition}</span>
-                    </li>
-                {/each}
-            </ul>
-        </main>
-    }
-}
-
-page NotFound(word: String) {
-    view {
-        <main>
-            <h1 id="headword">{word}</h1>
-            <p>There is no entry for it here.</p>
+            {#if hits}
+                <ul id="hits">
+                    {#each hits as hit (hit.id)}
+                        <li>
+                            <a href="/{hit.target}">{hit.word}</a>
+                            <span class="language">{hit.language}</span>
+                            <span class="pronunciation">{hit.pronunciation}</span>
+                            <span class="definition">{hit.definition}</span>
+                        </li>
+                    {/each}
+                </ul>
+            {:else if q}
+                <p id="nothing">No entry matches {q}.</p>
+            {/if}
         </main>
     }
 }

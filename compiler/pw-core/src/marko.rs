@@ -383,10 +383,27 @@ fn emit_node(
             Ok(())
         }
 
+        Node::Branch { marker, .. } => Err(format!(
+            "the `{}` marker is not modelled yet",
+            marker.trim_matches(|c| c == '{' || c == '}').trim()
+        )),
+
         Node::Block {
             directive,
             children,
+            ..
         } => {
+            // A branch marker inside the loop is not modelled (ADR-0042).
+            if let Some(Node::Branch { marker, .. }) = children
+                .iter()
+                .map(|c| body.node(*c))
+                .find(|n| matches!(n, Node::Branch { .. }))
+            {
+                return Err(format!(
+                    "the `{}` marker is not modelled yet",
+                    marker.trim_matches(|c| c == '{' || c == '}').trim()
+                ));
+            }
             let each = parse_each(directive).ok_or_else(|| {
                 format!(
                     "the `{}` directive is not modelled yet",
@@ -605,6 +622,10 @@ fn emit_inline(body: &Body, id: NodeId, ctx: &Ctx<'_>, out: &mut String) -> Resu
         Node::Block { directive, .. } => Err(format!(
             "a `{}` block cannot appear inside inline content",
             directive.trim_matches(|c| c == '{' || c == '}').trim()
+        )),
+        Node::Branch { marker, .. } => Err(format!(
+            "the `{}` marker is not modelled yet",
+            marker.trim_matches(|c| c == '{' || c == '}').trim()
         )),
         Node::Element {
             tag,

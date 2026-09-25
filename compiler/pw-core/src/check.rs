@@ -1056,6 +1056,7 @@ fn check_unit_with(
         );
         crate::capability::capability_arguments(&unit.hir, decl, types, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
+        template_blocks(&unit.hir, sigs, id, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
 
@@ -2642,6 +2643,317 @@ fn permitted_children(tag: &str) -> Option<&'static [&'static str]> {
 /// None of these needs effect inference: they are properties of the tree the
 /// author wrote. They are grouped because they share the walk, not because they
 /// share an invariant — each pushes its own code.
+/// **A template block's markers, read** (ADR-0042).
+///
+/// Until 2026-09-25 nothing read them. `{:else}` was dropped, so both of an
+/// `if`'s branches rendered together; `{#if a} .. {/each}` closed the `if`;
+/// and an unknown directive passed `pw check`, refused only when rendered.
+fn template_blocks(
+    hir: &Hir,
+    sigs: &Signatures,
+    id: crate::hir::DeclId,
+    decl: &Decl,
+    out: &mut Vec<Diagnostic>,
+) {
+    use crate::resolved::Builtin;
+    let Some(body_id) = decl.body else { return };
+    let body = hir.body(body_id);
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    if roots.is_empty() {
+        return;
+    }
+    let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
+    let at = hir.decl_span(id);
+    let related = || {
+        vec![Related {
+            span: at.clone(),
+            label: format!("`{}` renders this", decl.name),
+        }]
+    };
+    let malformed = |span: hir::Span, message: String| Diagnostic {
+        code: crate::codes::MALFORMED_TEMPLATE_BLOCK.id,
+        invariant: crate::codes::MALFORMED_TEMPLATE_BLOCK.invariant,
+        reason: "malformed_template_block",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message,
+        primary_span: span,
+        related: related(),
+        explanation: Some(
+            "A block's markers decide what renders. A marker the block does not take \
+             is not ignored safely: until 2026-09-25 a dropped `{:else}` rendered both \
+             of an `if`'s branches at once."
+                .to_string(),
+        ),
+        repairs: Vec::new(),
+    };
+
+    let mut inside = BTreeSet::new();
+    for n in body.walk_markup(&roots) {
+        let Node::Block {
+            directive,
+            children,
+            subject,
+            close,
+        } = body.node(n)
+        else {
+            continue;
+        };
+        let d = directive.trim();
+        let span = body.node_span(n);
+        // Each branch marker with what it carries: as written, whether it has
+        // a condition, and the arm it names.
+        type Marker<'b> = (
+            hir::NodeId,
+            String,
+            bool,
+            &'b Option<(String, Option<String>)>,
+        );
+        let branches: Vec<Marker<'_>> = children
+            .iter()
+            .filter_map(|c| match body.node(*c) {
+                Node::Branch {
+                    marker,
+                    condition,
+                    arm,
+                } => Some((*c, marker.trim().to_string(), condition.is_some(), arm)),
+                _ => None,
+            })
+            .collect();
+        inside.extend(branches.iter().map(|b| b.0));
+        // A stray closer, which recovery keeps as a block of its own.
+        if d.starts_with("{/") {
+            out.push(malformed(span, format!("`{d}` closes no block")));
+            continue;
+        }
+        let name: String = d
+            .trim_start_matches("{#")
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        if !matches!(name.as_str(), "if" | "each" | "match") {
+            out.push(malformed(
+                span,
+                format!(
+                    "`{d}` is not a template block: the blocks are `{{#if}}`, `{{#each}}` \
+                     and `{{#match}}`"
+                ),
+            ));
+            continue;
+        }
+        let closer = close
+            .trim()
+            .trim_start_matches("{/")
+            .trim_end_matches('}')
+            .trim();
+        if close.is_empty() {
+            out.push(malformed(
+                span.clone(),
+                format!("`{{#{name}}}` is never closed"),
+            ));
+        } else if closer != name {
+            out.push(malformed(
+                span.clone(),
+                format!(
+                    "`{{#{name}}}` closes with `{}`, not `{{/{name}}}`",
+                    close.trim()
+                ),
+            ));
+        }
+        match name.as_str() {
+            "each" => {
+                if let Some((b, marker, ..)) = branches.first() {
+                    out.push(malformed(
+                        body.node_span(*b),
+                        format!(
+                            "`{{#each}}` takes no `{marker}`; `{{#if xs}}` around the list \
+                             says what renders when it is empty"
+                        ),
+                    ));
+                }
+            }
+            "if" => {
+                for (i, (b, marker, else_if, _)) in branches.iter().enumerate() {
+                    let last = i + 1 == branches.len();
+                    if !(*else_if || (marker == "{:else}" && last)) {
+                        out.push(malformed(
+                            body.node_span(*b),
+                            format!(
+                                "an `{{#if}}` takes `{{:else if c}}` markers and one \
+                                 `{{:else}}`, last; not `{marker}` here"
+                            ),
+                        ));
+                    }
+                }
+                // An `Option` or a `Result` is taken apart, not tested.
+                if let Some(s) = subject
+                    && let Some(ty) = types.of(body, *s)
+                    && matches!(ty.as_builtin(), Some(Builtin::Option | Builtin::Result))
+                {
+                    let written = crate::infer::path_of(body, *s);
+                    out.push(Diagnostic {
+                        code: crate::codes::OPTION_USED_AS_VALUE.id,
+                        invariant: crate::codes::OPTION_USED_AS_VALUE.invariant,
+                        reason: "optional_tested_by_if",
+                        detector: Detector::PatternMatrix,
+                        severity: Severity::Error,
+                        message: format!(
+                            "`{{#if {written}}}` tests a value that may be absent; \
+                             `{{#match {written}}}` takes it apart"
+                        ),
+                        primary_span: span.clone(),
+                        related: related(),
+                        explanation: None,
+                        repairs: vec![Repair {
+                            description: format!(
+                                "write `{{#match {written}}}{{:Some(x)}} .. {{:None}} .. {{/match}}`"
+                            ),
+                            replacement: None,
+                        }],
+                    });
+                }
+            }
+            "match" => {
+                // `{#match}`: nothing before the first arm.
+                let stray = children
+                    .iter()
+                    .take_while(|c| !matches!(body.node(**c), Node::Branch { .. }))
+                    .any(|c| !matches!(body.node(*c), Node::Text(t) if t.trim().is_empty()));
+                if stray {
+                    out.push(malformed(
+                        span.clone(),
+                        "a `{#match}` holds only its arms: nothing may come before the first"
+                            .to_string(),
+                    ));
+                }
+                let family = |case: &str| match case {
+                    "Some" | "None" => Some("Option"),
+                    "Ok" | "Err" => Some("Result"),
+                    _ => None,
+                };
+                let subject_family =
+                    subject
+                        .and_then(|s| types.of(body, s))
+                        .map(|ty| match ty.as_builtin() {
+                            Some(Builtin::Option) => Ok("Option"),
+                            Some(Builtin::Result) => Ok("Result"),
+                            _ => Err(ty.to_string()),
+                        });
+                if let Some(Err(other)) = &subject_family {
+                    out.push(malformed(
+                        span.clone(),
+                        format!(
+                            "a `{{#match}}` takes an `Option` or a `Result` apart, and its \
+                             subject is `{other}`"
+                        ),
+                    ));
+                    continue;
+                }
+                let mut seen: Vec<String> = Vec::new();
+                let mut typed: Option<&str> = subject_family.and_then(Result::ok);
+                for (b, marker, _, arm) in &branches {
+                    let Some((case, _)) = arm else {
+                        out.push(malformed(
+                            body.node_span(*b),
+                            format!(
+                                "`{marker}` is not an arm: a `{{#match}}` arm is \
+                                 `{{:Some(x)}}`, `{{:None}}`, `{{:Ok(v)}}` or `{{:Err(e)}}`"
+                            ),
+                        ));
+                        continue;
+                    };
+                    let Some(f) = family(case) else {
+                        out.push(malformed(
+                            body.node_span(*b),
+                            format!(
+                                "`{case}` is a declared type's constructor; a template \
+                                 matches `Option` and `Result` only (ADR-0042)"
+                            ),
+                        ));
+                        continue;
+                    };
+                    match typed {
+                        Some(t) if t != f => out.push(Diagnostic {
+                            code: crate::codes::PATTERN_CONSTRUCTOR.id,
+                            invariant: crate::codes::PATTERN_CONSTRUCTOR.invariant,
+                            reason: "pattern_names_a_constructor_its_type_lacks",
+                            detector: Detector::PatternMatrix,
+                            severity: Severity::Error,
+                            message: format!("`{case}` is not a constructor of `{t}`"),
+                            primary_span: body.node_span(*b),
+                            related: related(),
+                            explanation: None,
+                            repairs: Vec::new(),
+                        }),
+                        Some(_) => {}
+                        None => typed = Some(f),
+                    }
+                    if seen.contains(case) {
+                        out.push(malformed(
+                            body.node_span(*b),
+                            format!("a second `{{:{case}}}` arm can never render"),
+                        ));
+                    }
+                    seen.push(case.clone());
+                }
+                let Some(t) = typed else { continue };
+                let cases: &[&str] = if t == "Option" {
+                    &["Some", "None"]
+                } else {
+                    &["Ok", "Err"]
+                };
+                let missing: Vec<&str> = cases
+                    .iter()
+                    .copied()
+                    .filter(|c| !seen.iter().any(|s| s == c))
+                    .collect();
+                if !missing.is_empty() {
+                    out.push(Diagnostic {
+                        code: "PW0305",
+                        invariant: "a match must cover every value its scrutinee can take",
+                        reason: "non_exhaustive_match",
+                        detector: Detector::PatternMatrix,
+                        severity: Severity::Error,
+                        message: format!("`{d}` does not cover `{}`", missing.join("` or `")),
+                        primary_span: span.clone(),
+                        related: related(),
+                        explanation: Some(
+                            "A template match is exhaustive, as every match is (ADR-0011): \
+                             an arm that renders nothing is written, not implied."
+                                .to_string(),
+                        ),
+                        repairs: missing
+                            .iter()
+                            .map(|m| Repair {
+                                description: format!("add a `{{:{m}}}` arm"),
+                                replacement: None,
+                            })
+                            .collect(),
+                    });
+                }
+            }
+            // Any other directive was refused above.
+            _ => {}
+        }
+    }
+    // A marker no block holds.
+    for n in body.walk_markup(&roots) {
+        if let Node::Branch { marker, .. } = body.node(n)
+            && !inside.contains(&n)
+        {
+            out.push(malformed(
+                body.node_span(n),
+                format!("`{}` stands outside any block", marker.trim()),
+            ));
+        }
+    }
+}
+
 fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);

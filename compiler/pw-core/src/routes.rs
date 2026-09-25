@@ -84,8 +84,15 @@ pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
                 if a.name != "href" {
                     continue;
                 }
-                let AttrValue::Static(raw) = &a.value else {
-                    continue;
+                // `href="/stores/{id}"` is a string with holes since ADR-0042,
+                // and its text as written is what matches a route pattern.
+                let raw = match &a.value {
+                    AttrValue::Static(raw) => raw,
+                    AttrValue::Expr(e) => match body.expr(*e) {
+                        Expr::Interpolated { text, .. } => text,
+                        _ => continue,
+                    },
+                    AttrValue::None => continue,
                 };
                 let target = raw.trim_matches('"');
                 if !is_internal(target) || table.iter().any(|r| matches(r, target)) {

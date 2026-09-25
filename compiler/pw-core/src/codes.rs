@@ -296,6 +296,10 @@ codes! {
         "interactive behaviour belongs on an element that can receive it";
     CONTROL_WITHOUT_LABEL = "PW5014" / control_without_label / 1, Markup,
         "a form control must have something that names it";
+    // ADR-0042. Until 2026-09-25 nothing read a block's markers: `{:else}`
+    // was dropped and both of an `if`'s branches rendered together.
+    MALFORMED_TEMPLATE_BLOCK = "PW5019" / malformed_template_block / 1, Markup,
+        "a template block closes with its own name and holds only the markers it takes";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //
