@@ -1,0 +1,32 @@
+ADR-0064 - a label carried through a call
+
+produced by: just e10-labels
+commit: 81a3164ba1ca06cc6ab006efbf3acdad92cbc33e
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== labels through calls (compiler/pw-core/tests/labels_through_calls.rs)
+
+test a_result_that_mentions_no_parameter_keeps_its_contract ... ok
+test an_element_taken_out_of_a_list_keeps_its_label ... ok
+test a_piped_argument_is_matched_to_its_parameter ... ok
+test a_fold_keeps_what_it_accumulates ... ok
+test a_programs_own_generic_function_keeps_its_arguments_labels ... ok
+test a_method_calls_receiver_is_its_first_argument ... ok
+test a_list_mapped_keeps_what_its_function_computes ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+== mutation controls (scripts/label_call_mutations.py)
+
+baseline: 7 passed, 0 failed
+a declared call's result keeps its contract alone: KILLED (6 of 7 tests fail)
+a result's type parameters are not found: KILLED (6 of 7 tests fail)
+an argument a parameter brings in is not joined: KILLED (6 of 7 tests fail)
+a piped value is not its call's first argument: KILLED (1 of 7 tests fail)
+a method call's receiver is not its first argument: KILLED (1 of 7 tests fail)
+a function is labelled public: KILLED (3 of 7 tests fail)
+an undeclared call leaves out its receiver: KILLED (1 of 7 tests fail)
+7 of 7 mutants killed
+
+NOT CLAIMED: an implicit flow, such as an element chosen by a secret
+index. NOT CLAIMED: a declaration that states how its result's label is
+made; the rule stands in for one.
