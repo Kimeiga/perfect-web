@@ -85,7 +85,7 @@ so every component in it was refused, not only the one naming it. Such a
 name is written `%list` now, which WIT reads as the identifier `list`, so
 values and the host see it unescaped. Found writing ADR-0059's tests.
 Evidence: [wit-names.txt](evidence/E10/wit-names.txt)
-(`just e10-wit-names`).
+(`just e10-wit-names`): five of five mutants killed.
 
 **Correction, 2026-09-26: four kinds of wrong program passed `pw check`
 with a declared sum type** ([ADR-0059](DECISIONS/ADR-0059-declared-sum-types.md)):

@@ -1,0 +1,25 @@
+WIT's reserved names, escaped
+
+produced by: just e10-wit-names
+commit: f74b7e56db6d4ad989f74085be75160ccca6a7d3
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== through the E8 host (compiler/pw-conformance/tests/wit_names.rs)
+
+test a_field_named_by_a_keyword_is_named_unescaped ... ok
+test a_query_named_by_a_keyword_is_exported_under_its_name ... ok
+test a_case_named_by_a_keyword_is_built_and_named_unescaped ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+== mutation controls (scripts/wit_name_mutations.py)
+
+baseline: 3 passed, 0 failed
+a keyword is written bare: KILLED (3 of 3 tests fail)
+`list` is not known to be a keyword: KILLED (3 of 3 tests fail)
+a field's name is written unescaped: KILLED (3 of 3 tests fail)
+a case's name is written unescaped: KILLED (3 of 3 tests fail)
+a function's name is written unescaped: KILLED (3 of 3 tests fail)
+5 of 5 mutants killed
+
+NOT CLAIMED: a host interface or operation named by a keyword. Its name
+is the author's WIT, written verbatim from its host clause.
