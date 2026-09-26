@@ -1,0 +1,23 @@
+ADR-0110 - a resumable handler reads what it captures
+
+produced by: just e10-handler-captures
+commit: 6c08b34f2dd4f90f07ea8416f25a814a3a59f97d
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== handler captures (compiler/pw-core/tests/handler_captures.rs)
+
+test a_page_parameter_is_captured_too ... ok
+test a_shorthand_field_reads_its_name ... ok
+test a_handler_reads_what_it_captures ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+== mutation controls (scripts/handler_capture_mutations.py)
+
+baseline: 3 passed, 0 failed
+the rule does not run: KILLED (3 of 3 tests fail)
+a capture is not read as one: KILLED (3 of 3 tests fail)
+what the handler binds is not its own: KILLED (1 of 3 tests fail)
+a declaration's name is a binding: KILLED (3 of 3 tests fail)
+a shorthand field is not a read: KILLED (1 of 3 tests fail)
+each read is reported: KILLED (1 of 3 tests fail)
+6 of 6 mutants killed
