@@ -1,0 +1,19 @@
+ADR-0111 - a shorthand field reads its capture
+
+produced by: just e10-capture-shorthand
+commit: a3ce1ca3a9235faef0101312ea783208ea8d3ad0
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== a shorthand field (compiler/pw-core/tests/capture_shorthand.rs)
+
+test a_handler_builds_a_record_from_a_capture ... ok
+test a_capture_read_through_a_shorthand_field_is_read ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+== mutation controls (scripts/capture_shorthand_mutations.py)
+
+baseline: 2 passed, 0 failed
+a shorthand field is no capture path: KILLED (1 of 2 tests fail)
+a shorthand field mentions nothing: KILLED (2 of 2 tests fail)
+a shorthand field reads bindings only: KILLED (1 of 2 tests fail)
+3 of 3 mutants killed
