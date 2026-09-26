@@ -1034,6 +1034,15 @@ pub fn nondeterministic(effect: &str) -> bool {
     matches!(family_of(effect), "random") || effect.starts_with("clock.wall")
 }
 
+/// Does `effect` change the state a query reads? A write, or a transaction,
+/// which exists to hold writes (ADR-0100).
+fn writes(effect: &str) -> bool {
+    matches!(
+        effect.split('<').next().unwrap_or(effect).trim(),
+        "database.write" | "database.transaction"
+    )
+}
+
 pub fn forbidden_in(
     decl: &Decl,
     reuse: Reuse,
@@ -1090,6 +1099,16 @@ pub fn forbidden_in(
         (View | Component | Page, "database") => {
             Some("a view renders; it cannot reach the database while doing so")
         }
+        // Charter §7.5: a query is a keyed remote READ, cached, deduplicated
+        // and retried as reads are; a mutation is a command's, with its
+        // authorization, idempotency and invalidation. A write inside a query
+        // happens once for every reader of a cache entry, and again on every
+        // retry (ADR-0100).
+        (Query | Subscription, "database") if writes(effect) => Some(
+            "a query reads: a write inside one happens once for every reader of its \
+             cache entry, and again on every retry, where a command declares its \
+             idempotency and what it invalidates",
+        ),
         (View | Component | Page, "network") => {
             Some("a view renders; fetching during render is what streaming exists to avoid")
         }
@@ -1295,6 +1314,61 @@ mod tests {
         };
         assert!(found.undeclared(None).is_empty());
         assert_eq!(found.undeclared(Some(&[])).len(), 1);
+    }
+
+    /// **A query reads** (ADR-0100): a write, or the transaction that holds
+    /// one, is a command's.
+    #[test]
+    fn a_query_may_read_and_not_write() {
+        use crate::hir::DeclKind;
+        let query = crate::hir::Decl {
+            name: "Q".into(),
+            name_span: 0..0,
+            kind: DeclKind::Query,
+            params: vec![],
+            ret: None,
+            variants: None,
+            fields: None,
+            opaque_of: None,
+            type_params: vec![],
+            policies: vec![],
+            imports: vec![],
+            visibility: None,
+            declared_effects: Some(vec![]),
+            body: None,
+            children: vec![],
+            mutable: false,
+        };
+        for effect in ["database.write<Carts>", "database.transaction"] {
+            assert!(
+                forbidden_in(&query, Reuse::PerReader, None, effect).is_some(),
+                "{effect}"
+            );
+        }
+        assert!(forbidden_in(&query, Reuse::PerReader, None, "database.read<Carts>").is_none());
+        let subscription = crate::hir::Decl {
+            kind: DeclKind::Subscription,
+            ..query.clone()
+        };
+        assert!(
+            forbidden_in(
+                &subscription,
+                Reuse::PerReader,
+                None,
+                "database.write<Carts>"
+            )
+            .is_some()
+        );
+        let command = crate::hir::Decl {
+            kind: DeclKind::Command,
+            ..query
+        };
+        for effect in ["database.write<Carts>", "database.transaction"] {
+            assert!(
+                forbidden_in(&command, Reuse::PerReader, None, effect).is_none(),
+                "a command writes: {effect}"
+            );
+        }
     }
 
     #[test]

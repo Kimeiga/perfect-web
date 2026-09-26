@@ -1254,6 +1254,20 @@ e10-results-handled:
      } > docs/evidence/E10/results-handled.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/results-handled.txt
 
+# ADR-0100: a query reads. Its tests, and the mutation controls.
+e10-query-reads:
+    @{ echo "ADR-0100 - a query reads"; echo; \
+       echo "produced by: just e10-query-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== query reads (compiler/pw-core/tests/query_reads.rs, effects.rs)"; echo; \
+       cargo test --locked -p pw-core --test query_reads 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-core --lib a_query_may_read_and_not_write 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/query_read_mutations.py)"; echo; \
+       python3 scripts/query_read_mutations.py; \
+     } > docs/evidence/E10/query-reads.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/query-reads.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

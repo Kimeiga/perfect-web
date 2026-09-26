@@ -701,3 +701,10 @@ a session's data was refused a shared cache. Each is written once now
 rollback's or a clear's, one of them `@expect: clean`. A `Result` whose value
 nothing uses is refused (PW0618): `?` returns it, `match` handles it, and a
 binding that says so discards it by name.
+
+## 2026-09-26: a query reads (E10)
+
+[ADR-0100](DECISIONS/ADR-0100-a-query-reads.md): a query whose body cleared
+a cart checked, and the platform caches, deduplicates and retries a query as
+a read. A query or a subscription that writes or opens a transaction is
+refused (PW0401); a mutation is a command's.

@@ -78,6 +78,17 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a query reads**
+([ADR-0100](DECISIONS/ADR-0100-a-query-reads.md)). A `session query` whose
+body was `Carts.clear(current_session())` checked. The platform caches,
+deduplicates and retries a query as a read, so the write happened once per
+cache entry, and again on every retry, with no idempotency key and nothing
+invalidated. A query or a subscription that writes or opens a transaction is
+refused now (PW0401).
+
+Evidence: [query-reads.txt](evidence/E10/query-reads.txt)
+(`just e10-query-reads`).
+
 **Correction, 2026-09-26: failures were dropped, in a fixture that claimed
 to be clean**
 ([ADR-0099](DECISIONS/ADR-0099-a-failure-is-handled.md)). A statement's
