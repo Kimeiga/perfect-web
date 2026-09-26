@@ -1,0 +1,16 @@
+ADR-0070 - an assignment to a field has the field's type
+
+produced by: just e10-field-assignment
+commit: 3555fa44f532cf77ba4aa2bc39f7c0f3d1fbd18b
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== a field's assignment (compiler/pw-core/tests/field_assignment.rs)
+
+test an_assignment_to_a_field_has_the_fields_type ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+== mutation controls (scripts/field_assignment_mutations.py)
+
+baseline: 1 passed, 0 failed
+an assignment to a field relates nothing: KILLED (1 of 1 tests fail)
+1 of 1 mutants killed
