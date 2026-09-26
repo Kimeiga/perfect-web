@@ -56,6 +56,8 @@ pub enum Domain {
     Word(&'static [&'static str]),
     /// `30.seconds`, `0.seconds`.
     Duration,
+    /// A duration greater than zero: `2.seconds` (ADR-0109).
+    Budget,
     /// A type the program declares: `idempotent_by InteractionId`.
     TypeRef,
     /// A parameter of the declaration being written: `key id`. A cache key
@@ -261,7 +263,10 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "cache" => Domain::Word(&["shared", "private"]),
         "partition" => Domain::Word(&["public", "private"]),
         "consistency" => Domain::Word(&["strong", "snapshot", "read_your_writes", "eventual"]),
-        "freshness" | "timeout" => Domain::Duration,
+        "freshness" => Domain::Duration,
+        // A budget: a request is given it, and ends when it is spent. Zero
+        // ends every request before it starts (ADR-0109).
+        "timeout" => Domain::Budget,
         "fallback" => Domain::Word(&["last_known_good", "empty"]),
         "stampede" => Domain::Word(&["single_flight"]),
         "regenerate" => Domain::Word(&["on_invalidation"]),
@@ -483,6 +488,8 @@ pub enum ValueFault {
     Word(&'static [&'static str]),
     /// Not a duration.
     Duration,
+    /// A duration of zero, where the domain is a budget (ADR-0109).
+    ZeroBudget,
     /// Not a world.
     World(String),
     /// A flag written with a value.
@@ -517,6 +524,11 @@ pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
             (!words.contains(&word)).then_some(ValueFault::Word(words))
         }
         Domain::Duration => duration(value).is_none().then_some(ValueFault::Duration),
+        Domain::Budget => match duration(value) {
+            None => Some(ValueFault::Duration),
+            Some(0) => Some(ValueFault::ZeroBudget),
+            Some(_) => None,
+        },
         Domain::Worlds => value
             .split(',')
             .map(str::trim)

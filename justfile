@@ -1388,6 +1388,20 @@ e10-queries-name-resources:
      } > docs/evidence/E10/queries-name-resources.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/queries-name-resources.txt
 
+# ADR-0109: a timeout is a budget above zero. Its test, and the mutation
+# controls.
+e10-timeouts:
+    @{ echo "ADR-0109 - a timeout is a budget above zero"; echo; \
+       echo "produced by: just e10-timeouts"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== timeouts (compiler/pw-core/tests/timeouts.rs)"; echo; \
+       cargo test --locked -p pw-core --test timeouts 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/timeout_mutations.py)"; echo; \
+       python3 scripts/timeout_mutations.py; \
+     } > docs/evidence/E10/timeouts.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/timeouts.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

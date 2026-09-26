@@ -776,3 +776,11 @@ name check bound a keyword statement's first word, so `let menu = query
 Nonexistent(id)` in a page checked, and the graph kept the read as a dangling
 edge no rule reports for a page. The resource a `query` or `subscription`
 statement names is resolved now (PW0021).
+
+## 2026-09-26: a timeout is a budget above zero (E10)
+
+[ADR-0109](DECISIONS/ADR-0109-a-timeout-is-a-budget-above-zero.md):
+`timeout 0.seconds` checked, being a duration, and the resource runtime ends a
+flight once its budget is spent, so the query could never answer. A
+timeout's domain is a duration above zero now (PW0335); a freshness of zero
+is still a promise.

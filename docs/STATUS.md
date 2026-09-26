@@ -78,6 +78,14 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a timeout is a budget above zero**
+([ADR-0109](DECISIONS/ADR-0109-a-timeout-is-a-budget-above-zero.md)).
+`timeout 0.seconds` checked, and the resource runtime expires a flight once
+its budget is spent, so the query could never answer. A timeout is a duration
+above zero now (PW0335).
+
+Evidence: [timeouts.txt](evidence/E10/timeouts.txt) (`just e10-timeouts`).
+
 **2026-09-26: a query names a resource that exists**
 ([ADR-0108](DECISIONS/ADR-0108-a-query-names-a-resource-that-exists.md)).
 `let menu = query Nonexistent(id)` in a page checked. The name check bound a

@@ -578,6 +578,9 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
                     ValueFault::Duration => {
                         format!("`{value}` is not a duration: a count and a unit, `30.seconds`")
                     }
+                    ValueFault::ZeroBudget => {
+                        format!("`{value}` is no time: every request would end before it starts")
+                    }
                     ValueFault::World(w) => format!(
                         "`{w}` is not a world: {}",
                         listed(
