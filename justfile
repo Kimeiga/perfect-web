@@ -1316,6 +1316,20 @@ e10-fragments-reached:
      } > docs/evidence/E10/fragments-reached.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/fragments-reached.txt
 
+# ADR-0104: the dev server commits the events a command declares. The
+# server's tests, and the mutation controls.
+e10-committed-events:
+    @{ echo "ADR-0104 - the dev server commits the events a command declares"; echo; \
+       echo "produced by: just e10-committed-events"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the dev server (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/committed_events_mutations.py)"; echo; \
+       python3 scripts/committed_events_mutations.py; \
+     } > docs/evidence/E10/committed-events.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/declared-events.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

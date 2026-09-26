@@ -164,8 +164,13 @@ no write reaches~~ (ADR-0103). Next, in order:
    ~~**a command's write held to the fragments built on it**~~, done
    (ADR-0103): a fragment built from a query with a window kept a renamed
    store for good;
-2. **the dev server emits `CartChanged` after any cart write**, whatever
-   the command declares; it reads no command's `emits` (ADR-0101).
+2. ~~**the dev server emits `CartChanged` after any cart write**~~, done
+   (ADR-0104): it commits the events a command declares. Next, the event a
+   command's own arguments key, which needs the compiled command to return
+   its events (ruling needed);
+3. **an optimistic target no command invalidates**: `optimistic Cart(..)`
+   without `invalidates` or an event `Cart` hears keeps the speculation on
+   the page as if committed (ADR-0025's reconciliation).
 
 Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates

@@ -308,9 +308,10 @@ awaited in order. What remains:
   it emits carries the key of the entry it wrote. A reader with a positive
   `freshness` is exempt (A-026), and a row naming only the family,
   `!{ database }`, matches nothing (A-025).
-- **The dev server emits `CartChanged` after any cart write**, whatever the
-  command declares; it reads no command's `emits` (ADR-0101). A command that
-  emits nothing works there and nowhere else (NEXT).
+- **The dev server computes one event key: `current_session()`**
+  (ADR-0104). It commits the events a command declares, and refuses a
+  command whose event carries anything else, such as its own argument, until
+  a compiled command returns its events (ruling needed).
 - **A `style` attribute's value is escaped by refusing what executes**
   (`expression(`, a script scheme in `url(`), then as an attribute. A style
   can still load a URL the value names. A `<style>` element holds text only

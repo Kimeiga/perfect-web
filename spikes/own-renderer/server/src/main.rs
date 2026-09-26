@@ -230,6 +230,9 @@ struct Server {
     /// `store:data/carts#add` is its operation, and the compiled command calls
     /// it through the host.
     carts: Mutex<BTreeMap<String, Lines>>,
+    /// The graph the compiler emitted: what each command emits and what each
+    /// entry listens for. Read once; a test replaces it.
+    graph: pw_materialize::Graph,
     /// The compiled components, by component id, read from
     /// `docs/evidence/E10/` as the compiler wrote them. Data, like the
     /// contracts: this server links no compiler. Compiled once, with the
@@ -389,6 +392,7 @@ impl Server {
             templates,
             clock,
             materializer,
+            graph: pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses"),
             carts: Mutex::new(BTreeMap::new()),
             components: components(),
             menu: Mutex::new(default_menu()),
@@ -549,6 +553,10 @@ impl Server {
                 Self::session_operation(session),
             );
 
+            // What the command declares it emits (ADR-0104), computed before
+            // it runs: a value this server cannot compute is refused, and a
+            // refused command has written nothing.
+            let events = declared_events(&self.graph, component_id, session)?;
             let out = self.run(component_id, &host, args)?;
             if let [Val::Result(Err(e))] = out.as_slice() {
                 return Err(format!("{component_id} failed: {e:?}"));
@@ -560,10 +568,7 @@ impl Server {
             let total: i64 = lines.iter().map(|(_, q)| q).sum();
             self.materializer.command(|tx| {
                 Materializer::set_state(tx, &format!("cart:{session}"), &total.to_string());
-                Ok::<_, String>(vec![pw_materialize::Event::new(
-                    "Events.CartChanged",
-                    &[session],
-                )])
+                Ok::<_, String>(events)
             })?;
             carts.insert(session.to_string(), lines);
         }
@@ -700,8 +705,9 @@ impl Server {
     /// Consume committed events and regenerate what they invalidate.
     fn drain(&self, session: &str) {
         let key = self.cart_key(session);
-        let graph = self.graph();
-        let invalidated = self.materializer.drain(&graph, std::slice::from_ref(&key));
+        let invalidated = self
+            .materializer
+            .drain(&self.graph, std::slice::from_ref(&key));
         let value = self.cart_value(session);
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!(
@@ -1047,11 +1053,6 @@ impl Server {
             .collect()
     }
 
-    /// The graph the materializer consumes.
-    fn graph(&self) -> pw_materialize::Graph {
-        pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses")
-    }
-
     fn render_store(&self, session: &str) -> String {
         let template = self
             .templates
@@ -1294,6 +1295,41 @@ fn menu_value(items: &[(String, String)]) -> Value {
 /// size the scrollbar jumps as items are realized, which is the visible defect
 /// that makes people abandon containment and reach for virtualization.
 const STYLE: &str = "#menu li { content-visibility: auto; contain-intrinsic-size: auto 42px; }";
+
+/// **The events a command declares it emits**, with their values
+/// (ADR-0104).
+///
+/// Read from the command's `emits` edges in the compiler's graph: `emits
+/// CartChanged(current_session())` is `Events.CartChanged` carrying the
+/// session. Until 2026-09-26 this server committed `CartChanged` after any
+/// cart write, whatever the command declared, so a command that emitted
+/// nothing worked here and nowhere else. A value the server cannot compute
+/// is refused, never guessed.
+fn declared_events(
+    graph: &pw_materialize::Graph,
+    command: &str,
+    session: &str,
+) -> Result<Vec<pw_materialize::Event>, String> {
+    graph
+        .edges
+        .iter()
+        .filter(|e| e.kind == pw_materialize::EdgeKind::Emits && e.from == command)
+        .map(|e| {
+            let values = e
+                .key
+                .iter()
+                .map(|arg| match arg.as_str() {
+                    "current_session()" => Ok(session),
+                    other => Err(format!(
+                        "`{command}` emits `{}` with `{other}`, which this server cannot compute",
+                        e.to
+                    )),
+                })
+                .collect::<Result<Vec<&str>, String>>()?;
+            Ok(pw_materialize::Event::new(&e.to, &values))
+        })
+        .collect()
+}
 
 /// The graph, as `pw emit-graph` produced it. Read at build time so the server
 /// cannot drift from the compiler's answer between runs.
@@ -2073,6 +2109,10 @@ mod tests {
             body.contains("self.run(component_id, &host, args)"),
             "every command runs its compiled component"
         );
+        assert!(
+            !body.contains(&["\"Events", "."].concat()),
+            "a command's events are the ones it declares (ADR-0104), never named here"
+        );
         for gone in [
             ["fn add_to_", "cart("].concat(),
             ["fn clear_", "cart("].concat(),
@@ -2162,6 +2202,67 @@ mod tests {
             Some("0"),
             "the cleared cart's state, not the old total"
         );
+    }
+
+    /// **A command commits the events it declares, and no others**
+    /// (ADR-0104). `add_to_cart` declares `emits
+    /// CartChanged(current_session())`, so its cart's entry moves. Declaring
+    /// none, the write commits and nothing is told: until 2026-09-26 this
+    /// server committed `CartChanged` whatever the command declared.
+    #[test]
+    fn a_command_commits_the_events_it_declares() {
+        let s = rendering_server();
+        assert_eq!(
+            declared_events(&s.graph, ADD, "session-7").expect("computable"),
+            [pw_materialize::Event::new(
+                &["Events", ".CartChanged"].concat(),
+                &["session-7"]
+            )],
+            "exactly the one it declares"
+        );
+        s.drain("session-7");
+        let before = s.version("session-7");
+        s.command(ADD, "session-7", &add("espresso", 1), false)
+            .expect("runs");
+        assert_ne!(s.version("session-7"), before, "the declared event");
+
+        let mut s = rendering_server();
+        s.graph
+            .edges
+            .retain(|e| !(e.from == ADD && e.kind == pw_materialize::EdgeKind::Emits));
+        s.drain("session-7");
+        let before = s.version("session-7");
+        s.command(ADD, "session-7", &add("espresso", 1), false)
+            .expect("runs");
+        assert_eq!(s.cart_value("session-7"), 1, "the write committed");
+        assert_eq!(
+            s.version("session-7"),
+            before,
+            "and no event reached the cart"
+        );
+    }
+
+    /// **A value the server cannot compute is refused before the command
+    /// runs** (ADR-0104), and nothing is written.
+    #[test]
+    fn an_event_value_the_server_cannot_compute_is_refused() {
+        let mut s = rendering_server();
+        for e in s
+            .graph
+            .edges
+            .iter_mut()
+            .filter(|e| e.from == ADD && e.kind == pw_materialize::EdgeKind::Emits)
+        {
+            e.key = vec!["item".to_string()];
+        }
+        let err = s
+            .command(ADD, "session-8", &add("espresso", 1), false)
+            .expect_err("`item` is not computed here");
+        assert!(
+            err.contains("add_to_cart") && err.contains("`item`"),
+            "{err}"
+        );
+        assert_eq!(s.cart_value("session-8"), 0, "nothing was written");
     }
 
     /// **The server will not start without the compiler's handler modules.**

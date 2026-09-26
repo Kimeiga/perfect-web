@@ -78,6 +78,19 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: the dev server committed an event no command
+declared**
+([ADR-0104](DECISIONS/ADR-0104-the-dev-server-commits-what-a-command-declares.md)).
+After any cart write it committed `CartChanged`, whatever the command's
+`emits` said, so a command declaring no event updated the page here and would
+nowhere else. It commits the events a command declares now, read from the
+compiler's graph, and refuses a key it cannot compute before the command
+runs. The store's commands declare `CartChanged`, and its browser suite
+passes as before.
+
+Evidence: [committed-events.txt](evidence/E10/committed-events.txt)
+(`just e10-committed-events`).
+
 **2026-09-26: a write reaches the fragments built on it**
 ([ADR-0103](DECISIONS/ADR-0103-a-write-reaches-the-fragments-built-on-it.md)).
 A fragment is rebuilt only when an event reaches it. One built from a query

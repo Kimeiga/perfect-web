@@ -736,3 +736,11 @@ query with a staleness window kept a renamed store for good, since the
 command emitted nothing and PW5106 left the query to expire. A command now
 emits an event that reaches each fragment built on what it writes (PW5106);
 `invalidates` does not reach a fragment.
+
+## 2026-09-26: the dev server commits the events a command declares (E10)
+
+[ADR-0104](DECISIONS/ADR-0104-the-dev-server-commits-what-a-command-declares.md):
+the dev server committed `CartChanged` after any cart write, whatever the
+command declared, which hid ADR-0101's finding at run time. It now reads the
+command's `emits` edges from the compiler's graph, commits those events, and
+refuses a key it cannot compute before the command runs.
