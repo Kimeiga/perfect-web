@@ -79,7 +79,10 @@ impl Context {
     /// The context an attribute's value occupies, from its name.
     ///
     /// A table, because it is a fact about HTML rather than about this program.
-    /// `href` is a URL in every document ever written.
+    /// `href` is a URL in every document ever written, however it is spelled:
+    /// HTML lowercases an attribute's name, so `HREF` is `href`. Until
+    /// 2026-09-26 the name was read as written, and `HREF={msg}` was escaped
+    /// as an ordinary attribute, which refuses no scheme (ADR-0095).
     pub fn of_attribute(name: &str) -> Context {
         const URL_ATTRS: &[&str] = &[
             "href",
@@ -93,7 +96,8 @@ impl Context {
             "ping",
             "srcset",
         ];
-        let bare = name.rsplit(':').next().unwrap_or(name);
+        let bare = name.rsplit(':').next().unwrap_or(name).to_ascii_lowercase();
+        let bare = bare.as_str();
         if URL_ATTRS.contains(&bare) {
             Context::Url
         } else if bare == "style" {

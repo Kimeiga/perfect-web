@@ -661,3 +661,11 @@ whatever the name. An `on:` attribute names a declared event now (PW5022).
 which makes none of them inert: `msg` ran; so did `href="javascript:go({id})"`.
 A template writes no script, no inline handler, no script URL, no `srcdoc`
 and no value into a stylesheet (PW5023).
+
+## 2026-09-26: an attribute's context is read as HTML reads its name (E10)
+
+[ADR-0095](DECISIONS/ADR-0095-an-attributes-context-is-read-as-html-reads-its-name.md):
+the template IR chose a value's escaping from the attribute's name as
+written, so `<a HREF={msg}>` was escaped as an ordinary attribute and
+`msg = "javascript:alert(1)"` ran. The name is read as HTML reads it now,
+lowercased.

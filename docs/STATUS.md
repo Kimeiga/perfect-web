@@ -78,6 +78,17 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: `HREF={msg}` escaped no scheme**
+([ADR-0095](DECISIONS/ADR-0095-an-attributes-context-is-read-as-html-reads-its-name.md)).
+The template IR chose a value's escaping from the attribute's name as
+written, and HTML lowercases it. So `<a HREF={msg}>`, `<img Src={msg}>` and
+`<p STYLE={msg}>` were escaped as ordinary attributes, and `msg =
+"javascript:alert(1)"` ran. `HREF="javascript:go()"` also escaped ADR-0094's
+rule. The name is read as HTML reads it now.
+
+Evidence: [attribute-case.txt](evidence/E10/attribute-case.txt)
+(`just e10-attribute-case`).
+
 **Correction, 2026-09-26: a value a program writes could run as a script**
 ([ADR-0094](DECISIONS/ADR-0094-a-template-writes-no-code.md)). The renderer
 escapes a value as text, an attribute, a URL or a style, and four places
