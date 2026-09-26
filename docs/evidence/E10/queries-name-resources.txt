@@ -1,0 +1,19 @@
+ADR-0108 - a query names a resource that exists
+
+produced by: just e10-queries-name-resources
+commit: 5fdc2973790b6236a792651539db633d11fce2f9
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== queries name resources (compiler/pw-core/tests/queries_name_resources.rs)
+
+test a_subscription_names_one_that_exists ... ok
+test a_query_names_a_resource_that_exists ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+== mutation controls (scripts/query_name_mutations.py)
+
+baseline: 2 passed, 0 failed
+a query's first word is bound, as before: KILLED (2 of 2 tests fail)
+the resource's name is not resolved: KILLED (2 of 2 tests fail)
+a subscription's first word is bound: KILLED (1 of 2 tests fail)
+3 of 3 mutants killed
