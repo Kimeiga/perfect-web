@@ -1,0 +1,30 @@
+ADR-0103 - a write reaches the fragments built on it
+
+produced by: just e10-fragments-reached
+commit: e41e852f4155e88ad07a3f7a6f8585a5ed35077c
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== fragments reached (compiler/pw-core/tests/writes_reach_fragments.rs)
+
+test naming_the_query_does_not_reach_the_fragment ... ok
+test a_fragment_that_reads_in_its_body_is_held_too ... ok
+test an_event_reaches_a_fragment_through_what_it_reads ... ok
+test the_write_is_underlined_and_the_fragment_named ... ok
+test a_fragment_hears_of_a_write_to_what_it_is_built_from ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+== ADR-0101's readers, unchanged
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+== mutation controls (scripts/fragment_reach_mutations.py)
+
+baseline: 5 passed, 0 failed
+a fragment is not a reader: KILLED (5 of 5 tests fail)
+a fragment's own reads are not its: KILLED (1 of 5 tests fail)
+a query with a window reads nothing a fragment shows: KILLED (4 of 5 tests fail)
+a fragment is reached as a query is: KILLED (1 of 5 tests fail)
+an event reaches a fragment's listeners only: KILLED (1 of 5 tests fail)
+any emitted event reaches a fragment: KILLED (1 of 5 tests fail)
+every dependency is named: KILLED (1 of 5 tests fail)
+7 of 7 mutants killed
