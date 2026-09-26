@@ -1,7 +1,7 @@
 ADR-0040 - the standard library's lists and strings, compiled
 
 produced by: just e10-stdlib
-commit: fcf35e9c48250e96e141c52bd6be56e400872c5d
+commit: a6639f0e8a4a932c2e5a9badd5ed075abad96198
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == against Vec and str (compiler/pw-conformance/tests/stdlib.rs)
@@ -18,7 +18,7 @@ test sum_and_maximum_compute ... ok
 test text_is_rebuilt_from_code_points_and_bad_ones_trap ... ok
 test what_stays_outside_is_refused_by_name ... r.Q: `r.Q` did not lower: the backend does not lower an empty list whose element type nothing fixes yet: `[]` needs the type its context expects
 r.Q: `r.Q` did not lower: the backend does not lower an intrinsic this backend does not know yet: `shuffle` is declared `intrinsic "list.shuffle"`
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.36s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.21s
 
 == mutation controls (scripts/stdlib_mutations.py)
 
@@ -41,7 +41,8 @@ an intrinsic is not read from its declaration: KILLED (11 of 82 tests fail)
 a parenthesised list is not a lambda's parameters: KILLED (12 of 82 tests fail)
 16 of 16 mutants killed
 
-NOT CLAIMED: Unicode case mapping. to_lower_ascii maps A-Z only.
+NOT CLAIMED here: Unicode case mapping, which is ADR-0056's
+(just e10-case). to_lower_ascii maps A-Z only.
 NOT CLAIMED here: a function stored, returned or passed to a program's
 own declaration. It is a value since 2026-09-25 (ADR-0052):
 just e10-function-values.
