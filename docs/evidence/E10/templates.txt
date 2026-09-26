@@ -1,13 +1,15 @@
 ADR-0042 - template branches and interpolated attributes
 
 produced by: just e10-templates
-commit: 3767c3fc3a900fa64abfe92d6c2d8b049d122c0a
+commit: 39878663877afcdb29adc6b339250f9c3c3d59a8
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker and the IR (compiler/pw-core/tests/template_blocks.rs)
 
+test a_declared_sum_type_is_taken_apart_in_a_template ... ok
 test a_malformed_block_is_refused ... ok
 test a_secret_in_an_attributes_hole_is_refused_as_one_in_its_value_is ... ok
+test a_template_match_over_a_declared_type_is_checked_as_any_match ... ok
 test a_url_that_begins_with_a_value_or_a_style_with_holes_is_refused ... ok
 test a_well_formed_page_has_no_diagnostic ... ok
 test an_arms_binding_has_its_payloads_type ... ok
@@ -16,11 +18,12 @@ test an_unclosed_block_is_refused ... ok
 test else_if_nests_a_conditional_in_the_otherwise_branch ... ok
 test else_is_the_other_branch_not_more_of_the_first ... ok
 test match_takes_an_option_apart_with_its_payload_bound ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
 
 == the renderer (runtime/pw-render/tests/branches.rs)
 
 test a_conditional_renders_exactly_one_branch_and_refuses_a_variant ... ok
+test a_declared_case_renders_with_each_field_bound ... ok
 test a_match_refuses_what_it_cannot_take_apart ... ok
 test a_match_renders_the_arm_its_case_names_with_the_payload_bound ... ok
 test a_part_inside_an_arm_can_be_rendered_alone ... ok
@@ -28,27 +31,27 @@ test a_value_cannot_give_a_url_a_scheme_or_another_segment ... ok
 test a_value_in_a_url_is_one_component_whatever_it_holds ... ok
 test a_variant_has_no_text_form ... ok
 test an_interpolated_attribute_refuses_a_missing_value ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 == mutation controls (scripts/template_mutations.py)
 
-baseline: 26 passed, 0 failed
-the lowering drops `{:else}` again: KILLED (6 of 26 tests fail)
-an attribute's holes are static text again: KILLED (2 of 26 tests fail)
-`{:else}` renders nothing: KILLED (2 of 26 tests fail)
-`{:else if}` loses its branch: KILLED (1 of 26 tests fail)
-a URL may begin with a value: KILLED (1 of 26 tests fail)
-a block may close with another's name: KILLED (1 of 26 tests fail)
-an unknown directive passes `pw check`: KILLED (1 of 26 tests fail)
-an `{#if}` takes any marker: KILLED (1 of 26 tests fail)
-`{:else}` in `{#each}` passes: KILLED (1 of 26 tests fail)
-a template match need not be exhaustive: KILLED (1 of 26 tests fail)
-`{#if}` over an Option passes: KILLED (2 of 26 tests fail)
-an arm's binding has no type: KILLED (1 of 26 tests fail)
-a match renders its first arm whatever the case: KILLED (3 of 26 tests fail)
-an arm's payload is not bound: KILLED (3 of 26 tests fail)
-a value in a URL is attribute-escaped, not one component: KILLED (3 of 26 tests fail)
-an Option reads as a condition: KILLED (1 of 26 tests fail)
+baseline: 31 passed, 0 failed
+the lowering drops `{:else}` again: KILLED (8 of 31 tests fail)
+an attribute's holes are static text again: KILLED (2 of 31 tests fail)
+`{:else}` renders nothing: KILLED (2 of 31 tests fail)
+`{:else if}` loses its branch: KILLED (1 of 31 tests fail)
+a URL may begin with a value: KILLED (1 of 31 tests fail)
+a block may close with another's name: KILLED (1 of 31 tests fail)
+an unknown directive passes `pw check`: KILLED (1 of 31 tests fail)
+an `{#if}` takes any marker: KILLED (1 of 31 tests fail)
+`{:else}` in `{#each}` passes: KILLED (1 of 31 tests fail)
+a template match need not be exhaustive: KILLED (2 of 31 tests fail)
+`{#if}` over an Option passes: KILLED (2 of 31 tests fail)
+an arm's binding has no type: KILLED (1 of 31 tests fail)
+a match renders its first arm whatever the case: KILLED (4 of 31 tests fail)
+an arm's payload is not bound: KILLED (4 of 31 tests fail)
+a value in a URL is attribute-escaped, not one component: KILLED (3 of 31 tests fail)
+an Option reads as a condition: KILLED (1 of 31 tests fail)
 16 of 16 mutants killed
 
 NOT CLAIMED: patches for a match region or an interpolated attribute.
