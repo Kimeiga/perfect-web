@@ -246,6 +246,11 @@ public query TextPart(text: String, a: Int, b: Int) -> String { String.slice(tex
 public query FloatTotal(xs: List<Float>) -> Float { List.sum(xs) }
 
 public query FloatMax(xs: List<Float>) -> Option<Float> { List.maximum(xs) }
+
+// ADR-0056: Unicode case mapping, from one set of tables in both.
+public query CaseLower(text: String) -> String { String.to_lower(text) }
+
+public query CaseUpper(text: String) -> String { String.to_upper(text) }
 ";
 
 const CASES: usize = 200;
@@ -276,12 +281,15 @@ impl Rng {
         }
     }
     fn string(&mut self) -> String {
-        const POOLS: [&str; 5] = [
+        const POOLS: [&str; 6] = [
             "abcXYZ ",
             "人水ひと",
             "\u{FF61}\u{1F600}\u{10000}\u{FFFD}",
             " \t\n\u{85}\u{A0}\u{3000}\u{FEFF}\u{2028}",
             "aAbB_-.",
+            // Cased beyond ASCII (ADR-0056): each grows, shrinks or is one
+            // Unicode maps specially.
+            "ßẞİıſΣςΐДЖǅﬃ𐐀𐐨",
         ];
         let pool: Vec<char> = POOLS[self.below(POOLS.len() as u64) as usize]
             .chars()
@@ -563,4 +571,59 @@ fn kiokuns_shard_rule_as_a_module_agrees_with_its_component() {
     println!(
         "javascript: kiokun's {queries} shard queries, {calls} calls, component and module agree"
     );
+}
+
+/// **The module's case mapping is Rust's, code point by code point**
+/// (ADR-0056). `tests/case_mapping.rs` holds the component to the same, so
+/// the two agree on every code point Unicode maps, not only on the ones a
+/// generated string happens to contain.
+#[test]
+fn the_modules_case_mapping_is_rusts_for_every_code_point() {
+    let us = units(&[("j.pw", PROGRAM)]);
+    let dir = std::env::temp_dir().join(format!("pw-js-case-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("temp");
+    for id in ["j.CaseLower", "j.CaseUpper"] {
+        let module = pw_core::backend::js_pure::module(&us, id).unwrap_or_else(|e| panic!("{e}"));
+        std::fs::write(dir.join(format!("{id}.mjs")), module).expect("write");
+    }
+    let changed: Vec<char> = (0..=char::MAX as u32)
+        .filter_map(char::from_u32)
+        .filter(|c| {
+            c.to_lowercase().ne(std::iter::once(*c)) || c.to_uppercase().ne(std::iter::once(*c))
+        })
+        .collect();
+    let texts: Vec<String> = changed.chunks(400).map(|c| c.iter().collect()).collect();
+    std::fs::write(
+        dir.join("texts.json"),
+        serde_json::to_string(&texts).expect("json"),
+    )
+    .expect("write");
+    std::fs::write(
+        dir.join("case.mjs"),
+        "import { readFileSync } from \"node:fs\";\n\
+         const texts = JSON.parse(readFileSync(\"texts.json\", \"utf8\"));\n\
+         const lower = await import(\"./j.CaseLower.mjs\");\n\
+         const upper = await import(\"./j.CaseUpper.mjs\");\n\
+         console.log(JSON.stringify(texts.map((t) => [lower.run(t), upper.run(t)])));\n",
+    )
+    .expect("write");
+    let out = std::process::Command::new("node")
+        .arg("case.mjs")
+        .current_dir(&dir)
+        .output()
+        .expect("node runs");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let got: Vec<(String, String)> = serde_json::from_slice(&out.stdout).expect("json");
+    assert_eq!(got.len(), texts.len());
+    for (t, (lo, up)) in texts.iter().zip(&got) {
+        let want_lo: String = t.chars().flat_map(char::to_lowercase).collect();
+        let want_up: String = t.chars().flat_map(char::to_uppercase).collect();
+        assert_eq!(lo, &want_lo, "lower {t:?}");
+        assert_eq!(up, &want_up, "upper {t:?}");
+    }
+    std::fs::remove_dir_all(&dir).ok();
 }

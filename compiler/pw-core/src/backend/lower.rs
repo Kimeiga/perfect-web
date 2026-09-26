@@ -1855,7 +1855,10 @@ impl<'a> Lower<'a> {
                 [Some(Type::Str), Some(Type::Str)],
             ) => Type::Bool,
             (I::StrJoin, [Some(Type::List(t)), Some(Type::Str)]) if **t == Type::Str => Type::Str,
-            (I::StrTrim | I::StrToLowerAscii, [Some(Type::Str)]) => Type::Str,
+            (
+                I::StrTrim | I::StrToLowerAscii | I::StrToLower | I::StrToUpper,
+                [Some(Type::Str)],
+            ) => Type::Str,
             (I::FloatFromInt, [Some(Type::Int)]) => Type::Float,
             (op, types) => {
                 return Lowering::Blocked {
@@ -3421,7 +3424,9 @@ fn intrinsic_argument(op: Intrinsic, k: usize, prior: &[Type]) -> Option<Type> {
             | I::StrEndsWith
             | I::StrContains
             | I::StrTrim
-            | I::StrToLowerAscii,
+            | I::StrToLowerAscii
+            | I::StrToLower
+            | I::StrToUpper,
             _,
         )
         | (I::StrJoin, 1) => Some(Type::Str),

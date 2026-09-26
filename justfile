@@ -526,7 +526,8 @@ e10-stdlib:
        echo; echo "== mutation controls (scripts/stdlib_mutations.py)"; echo; \
        python3 scripts/stdlib_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: Unicode case mapping. to_lower_ascii maps A-Z only."; \
+       echo "NOT CLAIMED here: Unicode case mapping, which is ADR-0056's"; \
+       echo "(just e10-case). to_lower_ascii maps A-Z only."; \
        echo "NOT CLAIMED here: a function stored, returned or passed to a program's"; \
        echo "own declaration. It is a value since 2026-09-25 (ADR-0052):"; \
        echo "just e10-function-values."; \
@@ -634,6 +635,30 @@ e10-function-values:
      } > docs/evidence/E10/function-values.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/function-values.txt
 
+# ADR-0056: Unicode case mapping. The tables against Rust for every code
+# point, the component and the module against Rust and each other, and the
+# mutation controls. Needs `node`.
+e10-case:
+    @{ echo "ADR-0056 - Unicode case mapping"; echo; \
+       echo "produced by: just e10-case"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the tables (compiler/pw-core/tests/case_mapping.rs)"; echo; \
+       cargo test --locked -p pw-core --test case_mapping 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component through the host (pw-conformance/tests/case_mapping.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test case_mapping 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the module under Node, and the component against it"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -E "^javascript: [0-9]+ queries|case_mapping|^test result"; \
+       echo; echo "== mutation controls (scripts/case_mutations.py)"; echo; \
+       python3 scripts/case_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: Unicode's Final_Sigma rule. A word-final capital sigma"; \
+       echo "lowers to sigma, not final sigma. NOT CLAIMED: case folding, or a"; \
+       echo "locale's rules."; \
+     } > docs/evidence/E10/case.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/case.txt
+
 # ADR-0055: slicing, and the standard library's placeholders computed. The
 # operations against Vec and str, the component against the JavaScript
 # module, and the mutation controls.
@@ -650,8 +675,8 @@ e10-slices:
        echo; echo "== mutation controls (scripts/slice_mutations.py)"; echo; \
        python3 scripts/slice_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: String.split, List.range, or an Int sum. Unicode case"; \
-       echo "mapping, maps and sets are not claimed here."; \
+       echo "NOT CLAIMED: String.split, List.range, or an Int sum. Maps and sets"; \
+       echo "are not claimed here, nor Unicode case mapping (ADR-0056)."; \
      } > docs/evidence/E10/slices.txt
     @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/slices.txt
 

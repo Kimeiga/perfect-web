@@ -39,6 +39,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::resolve::DefId;
 
+use super::case::{self, Case};
 use super::ir::{
     BinaryOp, BuiltinCase, Const, EachKind, Function, Instr, Intrinsic, Program, Region, Shape,
     Terminator, Type, UnaryOp, ValueId,
@@ -216,6 +217,25 @@ const HELPERS: &[(&str, &[&str], &str)] = &[
          return b > a ? xs.slice(Number(a), Number(b)) : [];\n}",
     ),
     (
+        "case_map",
+        &[],
+        "// Each code point mapped by a case table the component's data segment\n\
+         // holds too (ADR-0056): not `toLowerCase`, whose Unicode is the\n\
+         // engine's. A table is its ranges and its multi entries, four numbers\n\
+         // each, sorted by their first.\n\
+         function case_map(s, { ranges, multi }) {\n  \
+         // How many entries come before cp: first below it, or not above it.\n  \
+         const before = (t, cp, inclusive) => {\n    let lo = 0, hi = t.length / 4;\n    \
+         while (lo < hi) {\n      const mid = (lo + hi) >> 1;\n      \
+         if (inclusive ? t[mid * 4] <= cp : t[mid * 4] < cp) lo = mid + 1;\n      else hi = mid;\n    }\n    \
+         return lo;\n  };\n  let out = \"\";\n  for (const ch of s) {\n    const cp = ch.codePointAt(0);\n    \
+         const m = before(multi, cp, false);\n    if (m < multi.length / 4 && multi[m * 4] === cp) {\n      \
+         for (let k = 1; k <= 3 && multi[m * 4 + k] !== 0; k++) out += String.fromCodePoint(multi[m * 4 + k]);\n      \
+         continue;\n    }\n    const r = before(ranges, cp, true) - 1;\n    \
+         const on = r >= 0 && cp <= ranges[r * 4 + 1] && (cp - ranges[r * 4]) % ranges[r * 4 + 3] === 0;\n    \
+         out += String.fromCodePoint(on ? cp + ranges[r * 4 + 2] : cp);\n  }\n  return out;\n}",
+    ),
+    (
         "lower_ascii",
         &[],
         "// `A`-`Z` only (ADR-0040).\n\
@@ -262,11 +282,18 @@ impl<'p> Emitter<'p> {
                 break;
             }
         }
-        let prelude: Vec<&str> = HELPERS
+        // The case tables, generated rather than written (ADR-0056).
+        let tables: Vec<String> = [("case_lower", Case::Lower), ("case_upper", Case::Upper)]
+            .into_iter()
+            .filter(|(name, _)| used.contains(name))
+            .map(|(name, c)| case_table(name, c))
+            .collect();
+        let mut prelude: Vec<&str> = HELPERS
             .iter()
             .filter(|(name, _, _)| used.contains(name))
             .map(|(_, _, source)| *source)
             .collect();
+        prelude.extend(tables.iter().map(String::as_str));
         let params: Vec<String> = function.params.iter().map(|(v, _)| val(*v)).collect();
         let mut before: Vec<&str> = prelude;
         before.extend(callees.iter().map(String::as_str));
@@ -685,6 +712,18 @@ impl<'p> Emitter<'p> {
                     Intrinsic::StrToLowerAscii => {
                         format!("{}({})", self.uses("lower_ascii"), arg(0))
                     }
+                    Intrinsic::StrToLower => format!(
+                        "{}({}, {})",
+                        self.uses("case_map"),
+                        arg(0),
+                        self.uses("case_lower")
+                    ),
+                    Intrinsic::StrToUpper => format!(
+                        "{}({}, {})",
+                        self.uses("case_map"),
+                        arg(0),
+                        self.uses("case_upper")
+                    ),
                     // `Number(bigint)` is the nearest value, ties to even, as
                     // `f64.convert_i64_s` is.
                     Intrinsic::FloatFromInt => format!("Number({})", arg(0)),
@@ -702,6 +741,53 @@ impl<'p> Emitter<'p> {
 
 fn val(v: ValueId) -> String {
     format!("v{}", v.0)
+}
+
+/// A case table as a module constant: the numbers the component's data
+/// segment holds, eight entries to a line.
+fn case_table(name: &str, c: Case) -> String {
+    let t = case::table(c);
+    let lines = |words: Vec<[i64; 4]>| -> String {
+        words
+            .chunks(8)
+            .map(|row| {
+                let row: Vec<String> = row
+                    .iter()
+                    .map(|w| w.map(|x| x.to_string()).join(", "))
+                    .collect();
+                format!("    {},", row.join(", "))
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let ranges = lines(
+        t.ranges
+            .iter()
+            .map(|r| [r.lo as i64, r.hi as i64, r.delta as i64, r.stride as i64])
+            .collect(),
+    );
+    let multi = lines(
+        t.multi
+            .iter()
+            .map(|m| {
+                [
+                    m.from as i64,
+                    m.to[0] as i64,
+                    m.to[1] as i64,
+                    m.to[2] as i64,
+                ]
+            })
+            .collect(),
+    );
+    let (major, minor, update) = char::UNICODE_VERSION;
+    format!(
+        "// Unicode {major}.{minor}.{update}'s {} case, per code point (ADR-0056).\n\
+         const {name} = {{\n  ranges: [\n{ranges}\n  ],\n  multi: [\n{multi}\n  ],\n}};",
+        match c {
+            Case::Lower => "lower",
+            Case::Upper => "upper",
+        }
+    )
 }
 
 /// A float as JavaScript reads it back exactly.

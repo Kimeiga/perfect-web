@@ -78,6 +78,18 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: Unicode case mapping**
+([ADR-0056](DECISIONS/ADR-0056-unicode-case-mapping.md)).
+- `String.to_lower` and `String.to_upper` map each code point as Unicode
+  17.0 does, including mappings to several code points.
+- The component and the module read one set of tables, generated from the
+  compiler's `char`, and never a platform's mapping.
+- A test pins the Unicode version. The first version of that test assumed
+  16.0, which a Rust outside the workspace knows; the pinned 1.97.1 knows
+  17.0.
+
+Evidence: [case.txt](evidence/E10/case.txt) (`just e10-case`).
+
 **2026-09-25: slicing, and the placeholders computed**
 ([ADR-0055](DECISIONS/ADR-0055-slices-and-placeholders.md)).
 - `List.drop`, `List.slice`, `List.reverse` and `String.slice` compile, in
@@ -250,6 +262,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0056: case mapping is per code point, so a word-final capital sigma
+  lowers to `σ`, not `ς`.
 - ADR-0055: `List.maximum` returns an `Option`, `None` for an empty list,
   rather than negative infinity; `List.enumerate` is removed, since the
   language has no tuple type.
@@ -283,7 +297,8 @@ Decisions awaiting a ruling:
   and the URL must begin with the author's text.
 - ADR-0041: a binding or parameter cannot be named with a statement keyword
   (PW0013); contextual keywords are the alternative.
-- ADR-0040: `String.to_lower_ascii` maps `A`–`Z` only; Unicode case mapping is
+- ADR-0040 (Unicode case mapping is ADR-0056's since 2026-09-25):
+  `String.to_lower_ascii` maps `A`–`Z` only; Unicode case mapping is
   not decided.
 - ADR-0039 §1: `Int` traps where its exact result does not fit; `/` and `%`
   are Euclidean, as Koka's are; a zero divisor traps, where Koka answers 0.

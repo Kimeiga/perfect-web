@@ -400,7 +400,9 @@ fn the_trusted_platform_contract_is_hashed() {
     // where their placeholder bodies answered 0.0, and `maximum` returns an
     // `Option<Float>`. `List.enumerate`, which answered `[]` with no result
     // type, is removed: the language has no tuple type.
-    const EXPECTED: u64 = 0x4efd52c07ab56544;
+    // 2026-09-25: `String` declares `to_lower` and `to_upper`, Unicode 17.0's
+    // mapping per code point, from tables the compiler generates (ADR-0056).
+    const EXPECTED: u64 = 0x588d4516026a38aa;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

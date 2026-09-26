@@ -335,3 +335,9 @@ tree, where it was a spelling that never resolved with type arguments.
 slice a view. `sum` and `maximum` are Pleris in `list.pw`, where their
 placeholders answered 0.0; `maximum` is an `Option`. `enumerate`, which
 answered `[]`, is removed: the language has no tuple type.
+
+[ADR-0056](DECISIONS/ADR-0056-unicode-case-mapping.md): `String.to_lower`
+and `String.to_upper` map each code point as Unicode 17.0 does, from
+tables generated from the compiler's own `char` mapping. The component
+holds them in its data segment and the module as constants, so neither
+reads a platform's mapping. A final sigma lowers to `σ`.

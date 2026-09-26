@@ -140,13 +140,16 @@ refused by name:
     `group_by` (by a `String` key, adjacent runs), `sum` and `maximum` (of
     `Float`s).
   - `String` has `length`, `slice`, `codepoints`, `from_codepoints`,
-    `starts_with`, `ends_with`, `contains`, `join`, `trim` and
-    `to_lower_ascii`.
+    `starts_with`, `ends_with`, `contains`, `join`, `trim`,
+    `to_lower_ascii`, and `to_lower` and `to_upper` (ADR-0056).
   - `Float` has `from_int` (ADR-0043).
 
-  There is no `split`, no `range`, no Unicode case mapping, and no map or
-  set type. `enumerate` is removed, since the language has no tuple type
-  (ADR-0055).
+  There is no `split`, no `range`, and no map or set type. `enumerate` is
+  removed, since the language has no tuple type (ADR-0055).
+- **Case mapping is per code point** (ADR-0056). A word-final capital sigma
+  lowers to `σ`, where Unicode's default conversion gives `ς`. There is no
+  case folding and no locale rule. The mapping is Unicode 17.0's, as the
+  pinned Rust knows it.
 - **An affine value has no borrow** (ADR-0045). A function whose row does not
   release a transaction may use it, and one whose row does must end it once
   on every path. There is no way to say "this function reads the value and

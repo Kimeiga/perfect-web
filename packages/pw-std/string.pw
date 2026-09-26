@@ -45,3 +45,14 @@ fn slice(text: String, start: Int, end: Int) -> String !{}
 // `A`-`Z` to `a`-`z`, and nothing else (ADR-0040, ruling needed).
 fn to_lower_ascii(text: String) -> String !{}
     intrinsic "string.to_lower_ascii"
+
+// **Unicode case mapping** (ADR-0056): each code point's lower or upper case,
+// as Unicode 17.0 maps it, one code point at a time. `ß` uppers to `SS` and
+// `İ` lowers to `i` and a combining dot. No rule looks at a code point's
+// neighbours, so a word-final capital sigma lowers to `σ`, not `ς` (ruling
+// needed).
+fn to_lower(text: String) -> String !{}
+    intrinsic "string.to_lower"
+
+fn to_upper(text: String) -> String !{}
+    intrinsic "string.to_upper"

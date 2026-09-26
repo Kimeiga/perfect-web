@@ -404,6 +404,10 @@ pub enum Intrinsic {
     StrSlice,
     /// `A`-`Z` only.
     StrToLowerAscii,
+    /// Each code point's lower case, from `case::table` (ADR-0056).
+    StrToLower,
+    /// Each code point's upper case, from `case::table` (ADR-0056).
+    StrToUpper,
     /// The nearest `Float`, ties to even: exact up to 2^53 (ADR-0043).
     FloatFromInt,
 }
@@ -448,6 +452,8 @@ impl Operation {
             "string.trim" => Operation::Intrinsic(I::StrTrim),
             "string.slice" => Operation::Intrinsic(I::StrSlice),
             "string.to_lower_ascii" => Operation::Intrinsic(I::StrToLowerAscii),
+            "string.to_lower" => Operation::Intrinsic(I::StrToLower),
+            "string.to_upper" => Operation::Intrinsic(I::StrToUpper),
             "float.from_int" => Operation::Intrinsic(I::FloatFromInt),
             _ => return None,
         })

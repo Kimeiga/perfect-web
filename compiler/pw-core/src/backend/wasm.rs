@@ -59,7 +59,7 @@
 //! property of this file, stated once, rather than an assumption spread through
 //! the encoder.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use wasm_encoder::{
     CodeSection, ConstExpr, DataSection, ElementSection, Elements, EntityType, ExportKind,
@@ -73,6 +73,7 @@ use wit_parser::{
     WasmExportKind, WasmImport, WorldId, WorldItem, WorldKey,
 };
 
+use super::case::{self, Case};
 use super::ir::{
     BinaryOp, BuiltinCase, CallableImport, Const, Instr, Shape, Terminator, Type, TypeDef, UnaryOp,
     ValueId, all_instrs,
@@ -653,6 +654,9 @@ const DATA_BASE: i32 = HEAP_BASE;
 /// and its region starts where it always did.
 struct Literals {
     at: BTreeMap<String, u32>,
+    /// Each case table a body maps with (ADR-0056): the address of its
+    /// ranges, their count, the address of its multi entries, their count.
+    tables: BTreeMap<Case, [u32; 4]>,
     bytes: Vec<u8>,
 }
 
@@ -660,8 +664,10 @@ impl Literals {
     fn of(functions: &[&super::ir::Function]) -> Literals {
         let mut out = Literals {
             at: BTreeMap::new(),
+            tables: BTreeMap::new(),
             bytes: Vec::new(),
         };
+        let mut cases = BTreeSet::new();
         let mut add = |s: &str| {
             if !out.at.contains_key(s) {
                 out.at
@@ -681,9 +687,36 @@ impl Literals {
                         add("true");
                         add("false");
                     }
+                    Instr::Intrinsic {
+                        op: super::ir::Intrinsic::StrToLower,
+                        ..
+                    } => {
+                        cases.insert(Case::Lower);
+                    }
+                    Instr::Intrinsic {
+                        op: super::ir::Intrinsic::StrToUpper,
+                        ..
+                    } => {
+                        cases.insert(Case::Upper);
+                    }
                     _ => {}
                 }
             }
+        }
+        // After the strings, so a body that maps no case keeps its layout;
+        // each table's words 4-aligned.
+        for case in cases {
+            let t = case::table(case);
+            while !(DATA_BASE as usize + out.bytes.len()).is_multiple_of(4) {
+                out.bytes.push(0);
+            }
+            let ranges = DATA_BASE as u32 + out.bytes.len() as u32;
+            let multi = ranges + 16 * t.ranges.len() as u32;
+            out.bytes.extend(t.bytes());
+            out.tables.insert(
+                case,
+                [ranges, t.ranges.len() as u32, multi, t.multi.len() as u32],
+            );
         }
         out
     }
@@ -3856,6 +3889,28 @@ impl Enc<'_> {
                 ty: rt,
                 locals: call(self, Helper::Utf8Count, &flats[0].1),
             },
+            N::StrToLower | N::StrToUpper => {
+                let case = match op {
+                    N::StrToLower => Case::Lower,
+                    _ => Case::Upper,
+                };
+                let Some(table) = self.literals.tables.get(&case).copied() else {
+                    blocked!(
+                        "`{}` maps case with no table in the data segment",
+                        self.export
+                    );
+                };
+                let mut inputs = vec![flats[0].1[0], flats[0].1[1]];
+                for x in table {
+                    let l = self.locals.fresh(ValType::I32);
+                    self.ops.extend([I::I32Const(x as i32), I::LocalSet(l)]);
+                    inputs.push(l);
+                }
+                Held::Flat {
+                    ty: rt,
+                    locals: call(self, Helper::CaseMap, &inputs),
+                }
+            }
             N::StrSlice => {
                 let inputs = [flats[0].1[0], flats[0].1[1], flats[1].1[0], flats[2].1[0]];
                 Held::Flat {
@@ -4314,6 +4369,67 @@ fn bytes_differ(a: u32, b: u32, i: u32) -> Vec<wasm_encoder::Instruction<'static
 }
 
 /// `i += 1`.
+/// Encode the code point in `c` as UTF-8 at the address in `at`, and move
+/// `at` past it.
+fn encode_utf8(at: u32, c: u32) -> Vec<wasm_encoder::Instruction<'static>> {
+    use wasm_encoder::BlockType::Empty;
+    use wasm_encoder::Instruction as I;
+    let unit = |shift: i32, mask: i32, tag: i32, offset: u64| {
+        let mut v = vec![I::LocalGet(at), I::LocalGet(c)];
+        if shift > 0 {
+            v.extend([I::I32Const(shift), I::I32ShrU]);
+        }
+        v.extend([
+            I::I32Const(mask),
+            I::I32And,
+            I::I32Const(tag),
+            I::I32Or,
+            byte_to(offset),
+        ]);
+        v
+    };
+    let advance = |n: i32| [I::LocalGet(at), I::I32Const(n), I::I32Add, I::LocalSet(at)];
+    let mut v = vec![
+        I::LocalGet(c),
+        I::I32Const(0x80),
+        I::I32LtU,
+        I::If(Empty),
+        I::LocalGet(at),
+        I::LocalGet(c),
+        byte_to(0),
+    ];
+    v.extend(advance(1));
+    v.extend([
+        I::Else,
+        I::LocalGet(c),
+        I::I32Const(0x800),
+        I::I32LtU,
+        I::If(Empty),
+    ]);
+    v.extend(unit(6, 0x1F, 0xC0, 0));
+    v.extend(unit(0, 0x3F, 0x80, 1));
+    v.extend(advance(2));
+    v.extend([
+        I::Else,
+        I::LocalGet(c),
+        I::I32Const(0x10000),
+        I::I32LtU,
+        I::If(Empty),
+    ]);
+    v.extend(unit(12, 0x0F, 0xE0, 0));
+    v.extend(unit(6, 0x3F, 0x80, 1));
+    v.extend(unit(0, 0x3F, 0x80, 2));
+    v.extend(advance(3));
+    v.push(I::Else);
+    v.extend(unit(18, 0x07, 0xF0, 0));
+    v.extend(unit(12, 0x3F, 0x80, 1));
+    v.extend(unit(6, 0x3F, 0x80, 2));
+    v.extend(unit(0, 0x3F, 0x80, 3));
+    v.extend(advance(4));
+    v.extend([I::End, I::End, I::End]);
+    v
+}
+
 fn increment(i: u32) -> [wasm_encoder::Instruction<'static>; 4] {
     use wasm_encoder::Instruction as I;
     [I::LocalGet(i), I::I32Const(1), I::I32Add, I::LocalSet(i)]
@@ -4947,6 +5063,166 @@ fn string_helper(
                 ops,
             )
         }
+        // params 0 p, 1 l, 2 ranges, 3 ranges', 4 multi, 5 multi'; locals
+        // 6 i, 7 out, 8 at (the output's end), 9 b0, 10 cp, 11 n, 12 from,
+        // 13 lo, 14 hi, 15 mid, 16 entry, 17 c. Each entry is 16 bytes, its
+        // first word the code point it is found by.
+        Helper::CaseMap => {
+            let word = |offset: u64| {
+                I::I32Load(MemArg {
+                    offset,
+                    align: 2,
+                    memory_index: 0,
+                })
+            };
+            // lo = how many of the `count` entries at `base` come before
+            // cp: their first word below it, or, `inclusive`, not above it.
+            let search = |base: u32, count: u32, inclusive: bool| {
+                vec![
+                    I::I32Const(0),
+                    I::LocalSet(13),
+                    I::LocalGet(count),
+                    I::LocalSet(14),
+                    I::Block(Empty),
+                    I::Loop(Empty),
+                    I::LocalGet(13),
+                    I::LocalGet(14),
+                    I::I32GeU,
+                    I::BrIf(1),
+                    I::LocalGet(13),
+                    I::LocalGet(14),
+                    I::I32Add,
+                    I::I32Const(1),
+                    I::I32ShrU,
+                    I::LocalSet(15),
+                    I::LocalGet(base),
+                    I::LocalGet(15),
+                    I::I32Const(4),
+                    I::I32Shl,
+                    I::I32Add,
+                    word(0),
+                    I::LocalGet(10),
+                    if inclusive { I::I32LeU } else { I::I32LtU },
+                    I::If(Empty),
+                    I::LocalGet(15),
+                    I::I32Const(1),
+                    I::I32Add,
+                    I::LocalSet(13),
+                    I::Else,
+                    I::LocalGet(15),
+                    I::LocalSet(14),
+                    I::End,
+                    I::Br(0),
+                    I::End,
+                    I::End,
+                ]
+            };
+            let mut ops = alloc(
+                1,
+                vec![I::LocalGet(1), I::I32Const(case::GROWTH as i32), I::I32Mul],
+                7,
+            );
+            ops.extend([
+                I::LocalGet(7),
+                I::LocalSet(8),
+                I::I32Const(0),
+                I::LocalSet(6),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(6),
+                I::LocalGet(1),
+                I::I32GeU,
+                I::BrIf(1),
+                I::LocalGet(0),
+                I::LocalGet(6),
+                I::I32Add,
+                I::LocalSet(12),
+            ]);
+            ops.extend(decode_utf8(12, 9, 10, 11));
+            ops.extend([I::LocalGet(6), I::LocalGet(11), I::I32Add, I::LocalSet(6)]);
+            // A code point that maps to more than one: up to three, the
+            // first zero ending them. Then the next code point.
+            ops.extend(search(4, 5, false));
+            ops.extend([
+                I::LocalGet(13),
+                I::LocalGet(5),
+                I::I32LtU,
+                I::If(Empty),
+                I::LocalGet(4),
+                I::LocalGet(13),
+                I::I32Const(4),
+                I::I32Shl,
+                I::I32Add,
+                I::LocalTee(16),
+                word(0),
+                I::LocalGet(10),
+                I::I32Eq,
+                I::If(Empty),
+                I::Block(Empty),
+            ]);
+            for offset in [4, 8, 12] {
+                ops.extend([
+                    I::LocalGet(16),
+                    word(offset),
+                    I::LocalTee(17),
+                    I::I32Eqz,
+                    I::BrIf(0),
+                ]);
+                ops.extend(encode_utf8(8, 17));
+            }
+            ops.extend([I::End, I::Br(2), I::End, I::End]);
+            // Otherwise the last range starting at or before it, if it
+            // covers it on its stride; else it is itself.
+            ops.extend(search(2, 3, true));
+            ops.extend([
+                I::LocalGet(10),
+                I::LocalSet(17),
+                I::LocalGet(13),
+                I::If(Empty),
+                I::LocalGet(2),
+                I::LocalGet(13),
+                I::I32Const(1),
+                I::I32Sub,
+                I::I32Const(4),
+                I::I32Shl,
+                I::I32Add,
+                I::LocalSet(16),
+                I::LocalGet(10),
+                I::LocalGet(16),
+                word(4),
+                I::I32LeU,
+                I::If(Empty),
+                I::LocalGet(10),
+                I::LocalGet(16),
+                word(0),
+                I::I32Sub,
+                I::LocalGet(16),
+                word(12),
+                I::I32RemU,
+                I::I32Eqz,
+                I::If(Empty),
+                I::LocalGet(10),
+                I::LocalGet(16),
+                word(8),
+                I::I32Add,
+                I::LocalSet(17),
+                I::End,
+                I::End,
+                I::End,
+            ]);
+            ops.extend(encode_utf8(8, 17));
+            ops.extend([
+                I::Br(0),
+                I::End,
+                I::End,
+                I::LocalGet(7),
+                I::LocalGet(8),
+                I::LocalGet(7),
+                I::I32Sub,
+                I::End,
+            ]);
+            (vec![(12, ValType::I32)], ops)
+        }
         Helper::StrEq | Helper::StrCmp | Helper::IntToString => {
             unreachable!("written in Helper::body")
         }
@@ -5453,6 +5729,9 @@ enum Helper {
     /// `(p, l, start, end) -> (p, l)`: a view of code points `start` up to
     /// `end`, each an `i64` clamped to the string (ADR-0055).
     Slice,
+    /// `(p, l, ranges, ranges', multi, multi') -> (p, l)`: each code point
+    /// mapped by a case table in the data segment (ADR-0056).
+    CaseMap,
 }
 
 struct Helpers {
@@ -5492,6 +5771,7 @@ impl Helper {
                 vec![ValType::I32, ValType::I32, ValType::I64, ValType::I64],
                 vec![ValType::I32; 2],
             ),
+            Helper::CaseMap => (vec![ValType::I32; 6], vec![ValType::I32; 2]),
         }
     }
 
@@ -5515,7 +5795,8 @@ impl Helper {
             | Helper::Join
             | Helper::Trim
             | Helper::LowerAscii
-            | Helper::Slice => string_helper(self, realloc_index),
+            | Helper::Slice
+            | Helper::CaseMap => string_helper(self, realloc_index),
             // params: 0 p1, 1 l1, 2 p2, 3 l2; local 4 i
             Helper::StrEq => (
                 vec![(1, ValType::I32)],
