@@ -1,7 +1,7 @@
 ADR-0071 - what a template's blocks and events take
 
 produced by: just e10-template-operands
-commit: 6370a75a18532e214a685af4e3d7b739196c1f67
+commit: e68873926fd01b82298d49c9142ea8d83d38938f
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == a template's operands (compiler/pw-core/tests/template_operands.rs)
@@ -10,12 +10,12 @@ test an_option_condition_is_reported_once ... ok
 test an_each_runs_over_a_list ... ok
 test an_event_attribute_is_given_a_function ... ok
 test an_if_tests_a_value_with_a_truth ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
 
 == the store's relations, each decided (compiler/pw-core/tests/value_relations.rs)
 
 test the_store_program_is_decided_not_merely_silent ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.06s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.04s
 
 == mutation controls (scripts/template_operand_mutations.py)
 
