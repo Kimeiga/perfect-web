@@ -1,0 +1,23 @@
+ADR-0072 - an element named with a capital letter is a view
+
+produced by: just e10-view-elements
+commit: a7a2654dff6ea1d3bb8dc3a7f0845d3b98fc8328
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== view elements (compiler/pw-core/tests/view_elements.rs)
+
+test a_view_imported_from_another_module_is_refused ... ok
+test a_capitalised_tag_names_a_view ... ok
+test a_view_used_in_a_view_is_refused ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/view_element_mutations.py)
+
+baseline: 3 passed, 0 failed
+the rule is not run: KILLED (3 of 3 tests fail)
+an element named with a capital letter is not read: KILLED (3 of 3 tests fail)
+an element named in lowercase is read as a view: KILLED (3 of 3 tests fail)
+a tag's name resolves to nothing: KILLED (3 of 3 tests fail)
+an imported view is not resolved: KILLED (1 of 3 tests fail)
+a view is not told from another declaration: KILLED (3 of 3 tests fail)
+6 of 6 mutants killed
