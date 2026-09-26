@@ -341,6 +341,23 @@ impl<'p> Emitter<'p> {
                 };
                 self.line(&format!("const {r} = {lit};"));
             }
+            // `return e` and `?`'s failure (ADR-0051). The placeholder is
+            // declared, never read.
+            Instr::Return { value, .. } => {
+                self.line(&format!("return {};", val(*value)));
+                self.line(&format!("let {r};"));
+            }
+            // A mutable binding: a JavaScript variable (ADR-0051).
+            Instr::Local { init, .. } => {
+                self.line(&format!("let {r} = {};", val(*init)));
+            }
+            Instr::Set { local, value, .. } => {
+                self.line(&format!("{} = {};", val(*local), val(*value)));
+                self.line(&format!("const {r} = undefined;"));
+            }
+            Instr::Get { local, .. } => {
+                self.line(&format!("const {r} = {};", val(*local)));
+            }
             // A function compiled beside the query (ADR-0050).
             Instr::Call {
                 callee,
@@ -511,6 +528,20 @@ impl<'p> Emitter<'p> {
                     };
                     self.types.insert(*p, t);
                 }
+                // `for x in xs` (ADR-0051): a loop in the function's own body,
+                // so a `return` in it leaves the function.
+                if *kind == EachKind::For {
+                    let xs = val(*list);
+                    self.line(&format!("for (const {} of {xs}) {{", val(params[0])));
+                    self.depth += 1;
+                    for i in &body.instrs {
+                        self.instr(i)?;
+                    }
+                    self.depth -= 1;
+                    self.line("}");
+                    self.line(&format!("const {r} = undefined;"));
+                    return Ok(());
+                }
                 let f = self.lambda(params, body)?;
                 let xs = val(*list);
                 let expr = match kind {
@@ -535,6 +566,7 @@ impl<'p> Emitter<'p> {
                         format!("((f) => [...{xs}].sort((a, b) => {sign}(f(a, b))))({f})")
                     }
                     EachKind::GroupBy => format!("{}({xs}, {f})", self.uses("group_by")),
+                    EachKind::For => unreachable!("a loop is emitted above"),
                 };
                 self.line(&format!("const {r} = {expr};"));
             }

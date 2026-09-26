@@ -137,6 +137,58 @@ fn largest(xs: List<Int>, i: Int, best: Option<Int>) -> Option<Int> {
 
 public query Largest(xs: List<Int>) -> Option<Int> { largest(xs, 0, None) }
 
+// ADR-0051: an early `return`, `?`, and `for` loops with `mut` bindings.
+public query Clamp(n: Int) -> Int {
+    if n < 0 {
+        return 0
+    }
+    if n > 100 {
+        return 100
+    }
+    n
+}
+
+public query FirstEven(xs: List<Int>) -> Option<Int> {
+    for x in xs {
+        if x % 2 == 0 {
+            return Some(x)
+        }
+    }
+    None
+}
+
+public query Total(xs: List<Int>) -> Int {
+    let mut total = 0
+    for x in xs {
+        total = total + x
+    }
+    total
+}
+
+public query Stitched(words: List<Word>) -> String {
+    let mut out = \"\"
+    for w in words {
+        out = \"{out}{w.text}/\"
+    }
+    out
+}
+
+fn half(n: Int) -> Result<Int, String> {
+    if n % 2 == 0 { Ok(n / 2) } else { Err(\"odd: {n}\") }
+}
+
+public query Quarter(n: Int) -> Result<Int, String> {
+    let h = half(n)?
+    let q = half(h)?
+    Ok(q)
+}
+
+public query SumOf(xs: List<Int>, i: Int) -> Option<Int> {
+    let a = List.get(xs, i)?
+    let b = List.get(xs, i + 1)?
+    Some(a + b)
+}
+
 // ADR-0049: a string's escapes are the language's, the same in both.
 public query Escapes() -> String { \"tab\\there \\\"q\\\" \\\\ \\{x\\} \\u{1F600}\\n\" }
 
@@ -308,6 +360,9 @@ fn canonical(v: &Val) -> serde_json::Value {
         }),
         Val::Option(Some(x)) => json!({ "some": canonical(x) }),
         Val::Option(None) => json!({ "none": null }),
+        // `{ $case: "ok", value }` and `{ $case: "err", value }` (ADR-0044).
+        Val::Result(Ok(Some(x))) => json!({ "ok": canonical(x) }),
+        Val::Result(Err(Some(e))) => json!({ "err": canonical(e) }),
         other => panic!("not compared: {other:?}"),
     }
 }

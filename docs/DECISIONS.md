@@ -305,3 +305,9 @@ and generic callees compile. A call is inlined until it recurses; the
 recursion is compiled beside the export, once per instance, and called, in
 the component and the JavaScript module. A generic callee is instantiated
 from its arguments. Existing artifacts are byte-identical.
+
+[ADR-0051](DECISIONS/ADR-0051-early-return-and-loops.md): an early `return`,
+`?`, and `for` loops with `let mut` bindings compile, in the component and
+the module. A callee that returns early is compiled beside its export. The
+checker refuses an assignment to a binding that is not `let mut` (PW0611),
+and relates the assigned value to the binding's type (PW0607).

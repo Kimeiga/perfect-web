@@ -606,6 +606,29 @@ e10-affine:
      } > docs/evidence/E10/affine.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
 
+# ADR-0051: an early `return`, `?`, and `for` loops compile, and the checker
+# says what may be assigned. The compiled bodies through the host, the
+# component against the JavaScript module, and the mutation controls.
+e10-control-flow:
+    @{ echo "ADR-0051 - an early return, ?, and for loops compile"; echo; \
+       echo "produced by: just e10-control-flow"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== compiled bodies through the host (pw-conformance/tests/control_flow.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test control_flow 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what may be assigned (compiler/pw-core/tests/assignments.rs)"; echo; \
+       cargo test --locked -p pw-core --test assignments 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module, on the same arguments"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*"; \
+       echo; echo "== mutation controls (scripts/control_flow_mutations.py)"; echo; \
+       python3 scripts/control_flow_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a function value, a return or assignment inside a lambda,"; \
+       echo "or an assignment to a field."; \
+     } > docs/evidence/E10/control-flow.txt
+    @grep -E "^javascript:|mutants killed" docs/evidence/E10/control-flow.txt
+
 # ADR-0050: recursion and generic callees compile. The compiled recursions
 # through the host, the component against the JavaScript module, and the
 # mutation controls.

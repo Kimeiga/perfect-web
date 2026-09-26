@@ -270,6 +270,7 @@ impl Lowerer<'_> {
         }
 
         let kind = decl_kind_of(node, self.src);
+        let mutable = kind == DeclKind::Let && own_tokens(node).iter().any(|t| t.text() == "mut");
         let name = first_name(node).unwrap_or_default();
         let name_span = first_name_span(node).unwrap_or_else(|| span_of(node));
         let declared_effects = node
@@ -296,6 +297,7 @@ impl Lowerer<'_> {
                 declared_effects,
                 body: None,
                 children: Vec::new(),
+                mutable,
             },
             span_of(node),
         ));

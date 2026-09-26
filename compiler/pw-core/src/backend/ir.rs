@@ -281,6 +281,37 @@ pub enum Instr {
         items: Vec<ValueId>,
         ty: Type,
     },
+    /// **Leave the function with `value`** (ADR-0051): `return e`, and the
+    /// failing side of `e?`. Nothing after it in its region runs. `result`
+    /// stands for the region's value, of the type the region needs, and is
+    /// never read.
+    Return {
+        result: ValueId,
+        value: ValueId,
+        ty: Type,
+    },
+    /// **A mutable binding**, `let mut x = e` (ADR-0051): `result` names the
+    /// variable, which holds `init` until a [`Instr::Set`].
+    Local {
+        result: ValueId,
+        init: ValueId,
+        ty: Type,
+    },
+    /// `x = e`: the variable `local` holds `value` from here on. Its own
+    /// value is the unit value.
+    Set {
+        result: ValueId,
+        local: ValueId,
+        value: ValueId,
+        ty: Type,
+    },
+    /// What the variable `local` holds here: a copy, which a later `Set` does
+    /// not change.
+    Get {
+        result: ValueId,
+        local: ValueId,
+        ty: Type,
+    },
 }
 
 /// What a loop over a list computes (ADR-0040).
@@ -304,6 +335,10 @@ pub enum EachKind {
     /// Runs of consecutive elements whose body values, a key, are equal: a
     /// list of views into the list, in order.
     GroupBy,
+    /// **`for x in xs { .. }`** (ADR-0051): the body runs once per element,
+    /// for what it does to the variables around it and for a `return` it may
+    /// make; its value is discarded, and the loop's is the unit value.
+    For,
 }
 
 /// A first-order operation of the standard library (ADR-0040).
@@ -455,7 +490,11 @@ impl Instr {
             | Instr::Format { result, .. }
             | Instr::Each { result, .. }
             | Instr::Intrinsic { result, .. }
-            | Instr::MakeList { result, .. } => *result,
+            | Instr::MakeList { result, .. }
+            | Instr::Return { result, .. }
+            | Instr::Local { result, .. }
+            | Instr::Set { result, .. }
+            | Instr::Get { result, .. } => *result,
         }
     }
 
@@ -475,7 +514,11 @@ impl Instr {
             | Instr::Format { ty, .. }
             | Instr::Each { ty, .. }
             | Instr::Intrinsic { ty, .. }
-            | Instr::MakeList { ty, .. } => ty,
+            | Instr::MakeList { ty, .. }
+            | Instr::Return { ty, .. }
+            | Instr::Local { ty, .. }
+            | Instr::Set { ty, .. }
+            | Instr::Get { ty, .. } => ty,
         }
     }
 

@@ -464,13 +464,41 @@ fn what_stays_outside_is_refused_by_name() {
     );
     assert!(float_rem.contains("`%` on a Float"), "{float_rem}");
 
-    let early = refused(
-        "module r\n\npublic query Q(a: Int) -> Int {\n    if a > 0 { return 1 } else { 0 }\n}\n",
+    // An early `return` was refused here until 2026-09-25 (ADR-0051).
+    let early = Runnable::new(compile(
+        &units(&[(
+            "r.pw",
+            "module r\n\npublic query Q(a: Int) -> Int {\n    if a > 0 { return 1 } else { 0 }\n}\n",
+        )]),
+        "r.Q",
+    ));
+    assert_eq!(
+        early.call(&BTreeMap::new(), &[Val::S64(5)]),
+        Ok(vec![Val::S64(1)])
+    );
+    assert_eq!(
+        early.call(&BTreeMap::new(), &[Val::S64(-5)]),
+        Ok(vec![Val::S64(0)])
+    );
+
+    // A lambda a list operation runs is compiled into its loop, so a
+    // `return` or an assignment there would leave or change the function
+    // around it (ADR-0051).
+    let lambda_return = refused(
+        "module r\n\nimport List\n\npublic query Q(xs: List<Int>) -> List<Int> {\n    List.map(xs, x => {\n        return 1\n    })\n}\n",
         "r.Q",
     );
     assert!(
-        early.contains("an early `return`") || early.contains("does not check"),
-        "{early}"
+        lambda_return.contains("a `return` inside a function value"),
+        "{lambda_return}"
+    );
+    let lambda_assign = refused(
+        "module r\n\nimport List\n\npublic query Q(xs: List<Int>) -> Int {\n    let mut n = 0\n    let ys = List.map(xs, x => {\n        n = n + x\n        x\n    })\n    n\n}\n",
+        "r.Q",
+    );
+    assert!(
+        lambda_assign.contains("an assignment inside a function value"),
+        "{lambda_assign}"
     );
 
     let no_else = refused(

@@ -1235,6 +1235,7 @@ mod tests {
             declared_effects: Some(vec![]),
             body: None,
             children: vec![],
+            mutable: false,
         };
         assert!(forbidden_in(&view, Reuse::PerReader, None, "database.read").is_some());
         assert!(forbidden_in(&view, Reuse::PerReader, None, "network.fetch").is_some());

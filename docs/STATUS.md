@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: an early `return`, `?`, and `for` loops compile**
+([ADR-0051](DECISIONS/ADR-0051-early-return-and-loops.md)). The IR gains
+`Return`, and `Local`, `Set` and `Get` for `let mut` bindings; a `for` loop
+is a list loop whose body's value is discarded. A callee that returns early
+is compiled beside its export, so its `return` leaves it and not its
+caller. The checker now says what may be assigned. A binding must be
+`let mut` (PW0611), where a parameter or a plain `let` was assignable
+before. The assigned value must have the binding's type (PW0607), where
+`x = "a"` for an `Int` `x` passed.
+
 **2026-09-25: recursion and generic callees compile**
 ([ADR-0050](DECISIONS/ADR-0050-recursion-and-generic-callees.md)). A call is
 still inlined, and one that recurses is compiled beside its export, once per
@@ -176,6 +186,7 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0051: `for` over a list is the only loop; there is no `while`.
 - ADR-0050: a callee is inlined until it recurses, and only the recursion is
   a call, rather than every declaration being a function of its component.
 - ADR-0048: an opaque type's representation is read as `.value`, only in the

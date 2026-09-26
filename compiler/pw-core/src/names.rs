@@ -80,6 +80,12 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
         .filter(|(_, d)| d.kind != crate::hir::DeclKind::Import)
         .map(|(_, d)| d.name.clone())
         .collect();
+    // A module-level `let mut` may be assigned from a body (ADR-0051).
+    let module_mutable: BTreeSet<String> = hir
+        .all_decls()
+        .filter(|(_, d)| d.mutable)
+        .map(|(_, d)| d.name.clone())
+        .collect();
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -101,12 +107,17 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             unit,
             constructors: &constructors,
             scopes: vec![outer, decl.params.iter().map(|p| p.name.clone()).collect()],
+            mutable: vec![module_mutable.clone(), BTreeSet::new()],
+            immutable: Vec::new(),
             visited: BTreeSet::new(),
             found: Vec::new(),
         };
         walk.expr(body.root);
         for (span, name) in walk.found {
             out.push(diagnostic(hir, id, decl, span, &name));
+        }
+        for (span, name) in walk.immutable {
+            out.push(immutable_target(hir, id, decl, span, &name));
         }
     }
     out
@@ -152,6 +163,10 @@ struct Walk<'a> {
     constructors: &'a BTreeSet<String>,
     /// Innermost last. A `let` adds to the innermost.
     scopes: Vec<BTreeSet<String>>,
+    /// The names bound `let mut`, in the same scopes (ADR-0051).
+    mutable: Vec<BTreeSet<String>>,
+    /// Assignments to a binding that is not `let mut`.
+    immutable: Vec<(Span, String)>,
     /// Every expression walked, so a template part reached through a nested
     /// region is not walked again in the outer template's scope.
     visited: BTreeSet<ExprId>,
@@ -172,8 +187,21 @@ impl Walk<'_> {
 
     fn scoped(&mut self, names: BTreeSet<String>, f: impl FnOnce(&mut Self)) {
         self.scopes.push(names);
+        self.mutable.push(BTreeSet::new());
         f(self);
         self.scopes.pop();
+        self.mutable.pop();
+    }
+
+    /// Is the binding `name` refers to here a `let mut` one? The innermost
+    /// scope that binds it decides.
+    fn is_mutable(&self, name: &str) -> bool {
+        self.scopes
+            .iter()
+            .zip(&self.mutable)
+            .rev()
+            .find(|(s, _)| s.contains(name))
+            .is_some_and(|(_, m)| m.contains(name))
     }
 
     /// Does a name no scope binds mean something here?
@@ -248,8 +276,44 @@ impl Walk<'_> {
                 if let Some(p) = *pat {
                     let mut names = BTreeSet::new();
                     self.pattern_names(p, &mut names);
+                    // `let x` rebinds `x`: a `mut` from an earlier binding of
+                    // the name in this scope is not this one's.
+                    let innermost = self.mutable.last_mut().expect("a scope");
+                    for n in &names {
+                        innermost.remove(n);
+                    }
+                    if let Pattern::Bind {
+                        name,
+                        mutable: true,
+                    } = self.body.pat(p)
+                    {
+                        innermost.insert(name.clone());
+                    }
                     self.bind(names);
                 }
+            }
+            // `x = e` (ADR-0051): `x` must be a `let mut` binding in scope. An
+            // unbound `x` is the name rule's to report.
+            Expr::Binary {
+                op: crate::hir::BinOp::Assign,
+                lhs,
+                rhs,
+            } => {
+                let (lhs, rhs) = (*lhs, *rhs);
+                if let Expr::Name(n) = self.body.expr(lhs) {
+                    let n = n.clone();
+                    self.visited.insert(lhs);
+                    if self.bound(&n) || self.resolves(&n) {
+                        if !self.is_mutable(&n) {
+                            self.immutable.push((self.body.expr_span(lhs), n));
+                        }
+                    } else {
+                        self.name(&n, self.body.expr_span(lhs));
+                    }
+                } else {
+                    self.expr(lhs);
+                }
+                self.expr(rhs);
             }
             Expr::Lambda {
                 descriptor,
@@ -577,6 +641,32 @@ fn each(directive: &str) -> Option<(String, String)> {
     let (collection, rest) = inner.split_once(" as ")?;
     let binding = rest.split(['(', ' ']).next()?.trim();
     (!binding.is_empty()).then(|| (collection.trim().to_string(), binding.to_string()))
+}
+
+/// `x = e` where `x` is not `let mut` (PW0611, ADR-0051).
+fn immutable_target(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) -> Diagnostic {
+    Diagnostic {
+        code: crate::codes::ASSIGN_IMMUTABLE.id,
+        invariant: crate::codes::ASSIGN_IMMUTABLE.invariant,
+        reason: "assignment_to_immutable_binding",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!("`{name}` is assigned, and it is not a `let mut` binding"),
+        primary_span: span,
+        related: vec![Related {
+            span: hir.decl_span(id),
+            label: format!("in `{}`", decl.name),
+        }],
+        explanation: Some(
+            "a binding holds one value unless it is declared `let mut`; a parameter, a \
+             pattern's name and a declaration are never assigned"
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: format!("declare it `let mut {name} = ..`, or bind a new name"),
+            replacement: None,
+        }],
+    }
 }
 
 fn diagnostic(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) -> Diagnostic {

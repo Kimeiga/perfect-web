@@ -1166,6 +1166,7 @@ mod tests {
             declared_effects: None,
             body: None,
             children: vec![],
+            mutable: false,
         }
     }
 }

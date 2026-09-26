@@ -237,6 +237,10 @@ codes! {
     // read `box.x` from a snapshot of a `Rect`, which has no `x` (ADR-0048).
     UNKNOWN_MEMBER = "PW0610" / unknown_member / 1, Types,
         "a read or a call through a value must name a member its type has";
+    // ADR-0051: `x = e` compiles now, and until 2026-09-25 nothing said which
+    // bindings may be assigned: a parameter, or a `let` without `mut`, was.
+    ASSIGN_IMMUTABLE = "PW0611" / assign_immutable / 1, Types,
+        "an assignment's target must be a binding declared `let mut`";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

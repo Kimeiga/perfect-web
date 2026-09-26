@@ -73,11 +73,13 @@ their cases (2026-09-25, ADR-0036). **It computes** (2026-09-25, ADR-0039):
 `Int` and `Float` arithmetic, comparisons, `&`, `|`, `!`, `if`, string
 literals, interpolation, pipelines, records built, and calls to other
 declarations, inlined, or compiled beside the export when they recurse, at
-the types a generic callee's arguments give it (ADR-0050). Still refused by
-name:
+the types a generic callee's arguments give it (ADR-0050). An early
+`return`, `?`, `for` loops and `let mut` bindings compile (ADR-0051). Still
+refused by name:
 
 - nested patterns, and a declared variant built or matched;
-- an early `return`, an assignment, and a loop;
+- a `return`, a `?` or an assignment inside a lambda a list operation runs,
+  and an assignment to a field (ADR-0051);
 - `%` on a `Float`, and a `Float` interpolated: their semantics are not
   decided;
 - list and string operations beyond the ones the standard library declares

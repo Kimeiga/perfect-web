@@ -272,6 +272,9 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         inlining: vec![def],
         subst: BTreeMap::new(),
         internal: &internal,
+        vars: BTreeSet::new(),
+        in_lambda: 0,
+        ret: Type::Unit,
     };
 
     // Parameters first, so a body naming one finds it.
@@ -307,6 +310,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         },
         None => Type::Unit,
     };
+    f.ret = ret.clone();
 
     let body = cx.hirs[unit].body(body_id);
     let result = match f.expr(body, body.root, Some(&ret)) {
@@ -381,6 +385,9 @@ fn lower_internal(
         inlining: vec![def],
         subst,
         internal,
+        vars: BTreeSet::new(),
+        in_lambda: 0,
+        ret: Type::Unit,
     };
     let mut params = Vec::new();
     for (index, p) in decl.params.iter().enumerate() {
@@ -407,6 +414,7 @@ fn lower_internal(
         },
         None => Type::Unit,
     };
+    f.ret = ret.clone();
     let body = cx.hirs[def.unit].body(body_id);
     let result = match f.expr(body, body.root, Some(&ret)) {
         Lowering::Lowered(v) => v,
@@ -600,6 +608,15 @@ struct Lower<'a> {
     subst: BTreeMap<(DefId, u32), Type>,
     /// The functions compiled beside this export.
     internal: &'a RefCell<Internal>,
+    /// The values that name mutable bindings, `let mut` (ADR-0051): a use
+    /// of one reads what it holds there.
+    vars: BTreeSet<ValueId>,
+    /// How many function values being lowered enclose this point: the
+    /// lambdas a list operation runs (ADR-0040). A `return`, a `?` or an
+    /// assignment inside one would leave or change something outside it.
+    in_lambda: usize,
+    /// What the function being lowered returns: what `return` and `?` give.
+    ret: Type,
 }
 
 /// **Instantiate a declared type against the type a value has** (ADR-0050):
@@ -862,15 +879,12 @@ impl<'a> Lower<'a> {
                     ty: Type::Bool,
                 }))
             }
-            Expr::Name(n) if n == "return" => Lowering::Unsupported {
-                construct: "an early `return`",
-                span,
-                reason: "a body's value is its last expression here; a `return` part-way \
-                         through would need a jump out of every enclosing region"
-                    .to_string(),
-            },
-            Expr::Name(n) => match self.locals.get(n) {
-                Some(v) => Lowering::Lowered(*v),
+            // A `return` with nothing after it in its block (ADR-0051).
+            Expr::Name(n) if n == "return" => self.early_return(body, None, expected, span),
+            Expr::Name(n) => match self.locals.get(n).copied() {
+                // A mutable binding is read as what it holds here (ADR-0051).
+                Some(v) if self.vars.contains(&v) => Lowering::Lowered(self.read(v)),
+                Some(v) => Lowering::Lowered(v),
                 None => Lowering::Blocked {
                     why: format!("`{n}` is not bound here"),
                     span,
@@ -880,6 +894,12 @@ impl<'a> Lower<'a> {
                 let mut last = None;
                 for (i, s) in stmts.iter().enumerate() {
                     let tail = i + 1 == stmts.len();
+                    // **`return e`** (ADR-0051): the grammar keeps `return` as a
+                    // statement and its value as the next one. Nothing after
+                    // them in the block runs.
+                    if matches!(body.expr(*s), Expr::Name(n) if n == "return") {
+                        return self.early_return(body, stmts.get(i + 1).copied(), expected, span);
+                    }
                     if let Expr::Let { pat, init, .. } = body.expr(*s) {
                         if tail {
                             return Lowering::Unsupported {
@@ -939,11 +959,27 @@ impl<'a> Lower<'a> {
                 then,
                 els: Some(els),
             } => self.branch(body, *cond, *then, *els, expected, span),
+            // A statement: its value is the unit value, whichever way it goes
+            // (ADR-0051). Where a value is needed it has none when the
+            // condition is false, and is refused.
+            Expr::If {
+                cond,
+                then,
+                els: None,
+            } if expected.is_none_or(|t| *t == Type::Unit) => {
+                self.statement_if(body, *cond, *then, span)
+            }
             Expr::If { els: None, .. } => Lowering::Unsupported {
                 construct: "an `if` without `else`",
                 span,
                 reason: "it has no value when its condition is false".to_string(),
             },
+            Expr::For {
+                pat,
+                iterable,
+                body: inner,
+            } => self.for_loop(body, *pat, *iterable, *inner, span),
+            Expr::Try { value } => self.propagate(body, *value, span),
             Expr::Interpolated { text, parts } => self.interpolated(body, text, parts, span),
             Expr::Record {
                 name: Some(name),
@@ -1089,11 +1125,12 @@ impl<'a> Lower<'a> {
                 };
             }
             B::And | B::Or => unreachable!("handled above"),
-            B::Transition | B::Assign => {
+            B::Assign => return self.assign(body, lhs, rhs, span),
+            B::Transition => {
                 return Lowering::Unsupported {
-                    construct: "an assignment",
+                    construct: "a keyframe transition",
                     span,
-                    reason: "a compiled body binds each name once".to_string(),
+                    reason: "`a -> b` is an animation's, and nothing here computes it".to_string(),
                 };
             }
         };
@@ -1228,8 +1265,13 @@ impl<'a> Lower<'a> {
             other => return other.map(|_| unreachable!()),
         };
         let els_ty = self.types.get(&els.value).cloned();
+        let (mut then, mut els) = (then, els);
+        // A branch that returns has no value of its own, and takes the
+        // other's type (ADR-0051).
         let ty = match (then_ty, els_ty) {
             (Some(a), Some(b)) if a == b => a,
+            (_, Some(b)) if diverges(&then) => b,
+            (Some(a), _) if diverges(&els) => a,
             (a, b) => {
                 return Lowering::Blocked {
                     why: format!("the branches produce {a:?} and {b:?}"),
@@ -1237,6 +1279,9 @@ impl<'a> Lower<'a> {
                 };
             }
         };
+        for r in [&mut then, &mut els] {
+            self.retype_divergent(r, &ty);
+        }
         let result = self.fresh();
         Lowering::Lowered(self.push(Instr::If {
             result,
@@ -1652,6 +1697,8 @@ impl<'a> Lower<'a> {
                 Some(a) => need(a.clone()).map(|_| a),
                 None => Err("the fold's seed has no type".to_string()),
             },
+            // A `for` loop, which no list operation is (ADR-0051).
+            EachKind::For => Err("`for` is a loop, not a list operation".to_string()),
         };
         let ty = match ty {
             Ok(t) => t,
@@ -1744,7 +1791,9 @@ impl<'a> Lower<'a> {
                 for (name, v) in names.iter().zip(&bound) {
                     self.locals.insert(name.clone(), *v);
                 }
+                self.in_lambda += 1;
                 let region = self.region(body, inner, expected);
+                self.in_lambda -= 1;
                 self.locals = scope;
                 region.map(|r| (bound, r))
             }
@@ -1927,8 +1976,11 @@ impl<'a> Lower<'a> {
         // **A recursion is a call** (ADR-0050): the callee is compiled once,
         // beside the export, at this instance, and called. Until 2026-09-25
         // it was refused: calls are inlined (ADR-0039 §4), and an inlined
-        // recursion has no end.
-        if self.inlining.contains(&callee) {
+        // recursion has no end. So is a callee with a `return` or a `?`
+        // (ADR-0051), which leaves the callee and would, inlined, leave its
+        // caller.
+        let callee_body = self.cx.hirs[callee.unit].body(body_id);
+        if self.inlining.contains(&callee) || exits_early(callee_body) {
             let key = (callee, instance.clone());
             let begun = !self.internal.borrow_mut().started.insert(key);
             if !begun {
@@ -1982,6 +2034,327 @@ impl<'a> Lower<'a> {
         }
     }
 
+    /// **`return e`** (ADR-0051): `e`, of the function's result type, and the
+    /// function left with it. The value the enclosing region stands for is a
+    /// placeholder of the type it expects, never read.
+    fn early_return(
+        &mut self,
+        body: &Body,
+        value: Option<ExprId>,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        if self.in_lambda > 0 {
+            return Lowering::Unsupported {
+                construct: "a `return` inside a function value",
+                span,
+                reason: "the lambda a list operation runs is compiled into its loop; a \
+                         `return` there would leave the function around it"
+                    .to_string(),
+            };
+        }
+        let ret = self.ret.clone();
+        let v = match value {
+            Some(e) => match self.expr(body, e, Some(&ret)) {
+                Lowering::Lowered(v) => v,
+                other => return other,
+            },
+            None => self.unit(),
+        };
+        if self.types.get(&v) != Some(&ret) {
+            return Lowering::Blocked {
+                why: format!(
+                    "`return` gives a {:?}, and the function returns {ret:?}",
+                    self.types.get(&v)
+                ),
+                span,
+            };
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Return {
+            result,
+            value: v,
+            ty: expected.cloned().unwrap_or(Type::Unit),
+        }))
+    }
+
+    /// The unit value.
+    fn unit(&mut self) -> ValueId {
+        let result = self.fresh();
+        self.push(Instr::Const {
+            result,
+            value: Const::Unit,
+            ty: Type::Unit,
+        })
+    }
+
+    /// What the variable `local` holds here.
+    fn read(&mut self, local: ValueId) -> ValueId {
+        let ty = self.types.get(&local).cloned().unwrap_or(Type::Unit);
+        let result = self.fresh();
+        self.push(Instr::Get { result, local, ty })
+    }
+
+    /// A region that returns, retyped to what its siblings produce: its
+    /// placeholder stands for a value of that type (ADR-0051).
+    fn retype_divergent(&mut self, r: &mut Region, ty: &Type) {
+        if let Some(Instr::Return { result, ty: t, .. }) = r.instrs.last_mut()
+            && *result == r.value
+        {
+            *t = ty.clone();
+            self.types.insert(*result, ty.clone());
+        }
+    }
+
+    /// **`x = e`** (ADR-0051): `e`, of the variable's type, held by it from
+    /// here on.
+    fn assign(&mut self, body: &Body, lhs: ExprId, rhs: ExprId, span: Span) -> Lowering<ValueId> {
+        let Expr::Name(n) = body.expr(lhs) else {
+            return Lowering::Unsupported {
+                construct: "an assignment to something that is not a binding",
+                span,
+                reason: "a variable is assigned; a field of a value is not".to_string(),
+            };
+        };
+        let Some(var) = self
+            .locals
+            .get(n)
+            .copied()
+            .filter(|v| self.vars.contains(v))
+        else {
+            return Lowering::Blocked {
+                why: format!("`{n}` is not a mutable binding; the checker refuses it (PW0611)"),
+                span,
+            };
+        };
+        if self.in_lambda > 0 {
+            return Lowering::Unsupported {
+                construct: "an assignment inside a function value",
+                span,
+                reason: "a lambda a list operation runs does not change the bindings \
+                         around it"
+                    .to_string(),
+            };
+        }
+        let ty = self.types.get(&var).cloned().unwrap_or(Type::Unit);
+        let v = match self.expr(body, rhs, Some(&ty)) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        if self.types.get(&v) != Some(&ty) {
+            return Lowering::Blocked {
+                why: format!(
+                    "`{n}` holds a {ty:?}, and is assigned a {:?}",
+                    self.types.get(&v)
+                ),
+                span,
+            };
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Set {
+            result,
+            local: var,
+            value: v,
+            ty: Type::Unit,
+        }))
+    }
+
+    /// **`if c { .. }` as a statement** (ADR-0051): the branch runs for what
+    /// it does, and the `if`'s value is the unit value either way.
+    fn statement_if(
+        &mut self,
+        body: &Body,
+        cond: ExprId,
+        then: ExprId,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let cond = match self.typed(body, cond, &Type::Bool) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let outer = std::mem::take(&mut self.instrs);
+        let v = self.expr(body, then, None);
+        let value = match v {
+            Lowering::Lowered(v) if self.types.get(&v) == Some(&Type::Unit) => v,
+            Lowering::Lowered(v)
+                if diverges(&Region {
+                    instrs: self.instrs.clone(),
+                    value: v,
+                }) =>
+            {
+                self.retype_last_return();
+                v
+            }
+            Lowering::Lowered(_) => self.unit(),
+            other => {
+                self.instrs = outer;
+                return other;
+            }
+        };
+        let instrs = std::mem::replace(&mut self.instrs, outer);
+        let then = Region { instrs, value };
+        let outer = std::mem::take(&mut self.instrs);
+        let unit = self.unit();
+        let els = Region {
+            instrs: std::mem::replace(&mut self.instrs, outer),
+            value: unit,
+        };
+        let _ = span;
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::If {
+            result,
+            cond,
+            then,
+            els,
+            ty: Type::Unit,
+        }))
+    }
+
+    /// The last instruction is a `return` standing for a unit value.
+    fn retype_last_return(&mut self) {
+        if let Some(Instr::Return { result, ty, .. }) = self.instrs.last_mut() {
+            *ty = Type::Unit;
+            self.types.insert(*result, Type::Unit);
+        }
+    }
+
+    /// **`for x in xs { .. }`** (ADR-0051): the body once per element, with
+    /// `x` bound; its value discarded, and the loop's the unit value.
+    fn for_loop(
+        &mut self,
+        body: &Body,
+        pat: Option<crate::hir::PatternId>,
+        iterable: ExprId,
+        inner: ExprId,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let Some(Pattern::Bind { name, .. }) = pat.map(|p| body.pat(p)).cloned() else {
+            return Lowering::Unsupported {
+                construct: "a `for` pattern that is not a name",
+                span,
+                reason: "`for x in xs` binds one name here".to_string(),
+            };
+        };
+        let list = match self.expr(body, iterable, None) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let Some(Type::List(et)) = self.types.get(&list).cloned() else {
+            return Lowering::Blocked {
+                why: "`for` over a value that is not a list".to_string(),
+                span,
+            };
+        };
+        let x = self.fresh();
+        self.types.insert(x, *et);
+        let scope = self.locals.clone();
+        self.locals.insert(name, x);
+        let outer = std::mem::take(&mut self.instrs);
+        let v = self.expr(body, inner, None);
+        let unit = self.unit();
+        let instrs = std::mem::replace(&mut self.instrs, outer);
+        self.locals = scope;
+        if let other @ (Lowering::Unsupported { .. } | Lowering::Blocked { .. }) = v {
+            return other;
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Each {
+            result,
+            kind: EachKind::For,
+            list,
+            seed: None,
+            params: vec![x],
+            body: Region {
+                instrs,
+                value: unit,
+            },
+            ty: Type::Unit,
+        }))
+    }
+
+    /// **`e?`** (ADR-0051): `e`'s success, or the function left with its
+    /// failure: `None` from an `Option`, `Err(x)` from a `Result`.
+    fn propagate(&mut self, body: &Body, value: ExprId, span: Span) -> Lowering<ValueId> {
+        if self.in_lambda > 0 {
+            return Lowering::Unsupported {
+                construct: "a `?` inside a function value",
+                span,
+                reason: "the lambda a list operation runs is compiled into its loop; a \
+                         `?` there would leave the function around it"
+                    .to_string(),
+            };
+        }
+        let v = match self.expr(body, value, None) {
+            Lowering::Lowered(v) => v,
+            other => return other,
+        };
+        let vt = self.types.get(&v).cloned();
+        let ret = self.ret.clone();
+        let (ok, fail, inner, carries) = match (&vt, &ret) {
+            (Some(Type::Option(t)), Type::Option(_)) => {
+                (BuiltinCase::Some, BuiltinCase::None, (**t).clone(), None)
+            }
+            (Some(Type::Result(t, e)), Type::Result(_, f)) if e == f => (
+                BuiltinCase::Ok,
+                BuiltinCase::Err,
+                (**t).clone(),
+                Some((**e).clone()),
+            ),
+            _ => {
+                return Lowering::Blocked {
+                    why: format!(
+                        "`?` on a {vt:?} in a function returning {ret:?}; the checker refuses it"
+                    ),
+                    span,
+                };
+            }
+        };
+        let x = self.fresh();
+        self.types.insert(x, inner.clone());
+        let succeeded = MatchArm {
+            case: ok,
+            binding: Some(x),
+            body: Region {
+                instrs: Vec::new(),
+                value: x,
+            },
+        };
+        let outer = std::mem::take(&mut self.instrs);
+        let e = carries.map(|t| {
+            let e = self.fresh();
+            self.types.insert(e, t);
+            e
+        });
+        let failure = self.fresh();
+        self.push(Instr::Variant {
+            result: failure,
+            case: fail,
+            payload: e,
+            ty: ret,
+        });
+        let left = self.fresh();
+        self.push(Instr::Return {
+            result: left,
+            value: failure,
+            ty: inner.clone(),
+        });
+        let failed = MatchArm {
+            case: fail,
+            binding: e,
+            body: Region {
+                instrs: std::mem::replace(&mut self.instrs, outer),
+                value: left,
+            },
+        };
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Match {
+            result,
+            scrutinee: v,
+            arms: vec![succeeded, failed],
+            ty: inner,
+        }))
+    }
+
     /// `let x = e` and `let _ = e`: the value bound for the rest of the block.
     fn bind(
         &mut self,
@@ -2002,6 +2375,28 @@ impl<'a> Lower<'a> {
             other => return other.map(|_| unreachable!()),
         };
         match pat.map(|p| body.pat(p)) {
+            // `let mut x = e`: a variable, holding `e` until assigned
+            // (ADR-0051).
+            Some(Pattern::Bind {
+                name,
+                mutable: true,
+            }) => {
+                let Some(ty) = self.types.get(&v).cloned() else {
+                    return Lowering::Blocked {
+                        why: format!("`{name}`'s first value has no type"),
+                        span,
+                    };
+                };
+                let var = self.fresh();
+                self.push(Instr::Local {
+                    result: var,
+                    init: v,
+                    ty,
+                });
+                self.vars.insert(var);
+                self.locals.insert(name.clone(), var);
+                Lowering::Lowered(())
+            }
             Some(Pattern::Bind { name, .. }) => {
                 self.locals.insert(name.clone(), v);
                 Lowering::Lowered(())
@@ -2210,8 +2605,11 @@ impl<'a> Lower<'a> {
                 Lowering::Lowered(v) => v,
                 other => return other,
             };
+            let region = Region { instrs, value };
             let value_ty = self.types.get(&value).cloned();
+            // An arm that returns has no value of its own (ADR-0051).
             match (&ty, value_ty) {
+                _ if diverges(&region) => {}
                 (None, Some(t)) => ty = Some(t),
                 (Some(t), Some(v)) if *t != v => {
                     return Lowering::Blocked {
@@ -2224,8 +2622,16 @@ impl<'a> Lower<'a> {
             lowered.push(MatchArm {
                 case,
                 binding,
-                body: Region { instrs, value },
+                body: region,
             });
+        }
+        if ty.is_none() && lowered.iter().all(|a| diverges(&a.body)) {
+            ty = Some(Type::Unit);
+        }
+        if let Some(t) = &ty {
+            for arm in &mut lowered {
+                self.retype_divergent(&mut arm.body, t);
+            }
         }
         if lowered.len() != cases.len() {
             return Lowering::Unsupported {
@@ -2425,6 +2831,31 @@ impl<'a> Lower<'a> {
             },
         }
     }
+}
+
+/// Does this region end by leaving the function (ADR-0051)?
+fn diverges(r: &Region) -> bool {
+    matches!(r.instrs.last(), Some(Instr::Return { result, .. }) if *result == r.value)
+}
+
+/// **Does a body leave early**: a `return` or a `?` outside every lambda
+/// (ADR-0051)? Such a callee is compiled beside its export and called, since
+/// inlined, its `return` would leave its caller.
+fn exits_early(body: &Body) -> bool {
+    let mut lambdas = BTreeSet::new();
+    for id in body.walk() {
+        if let Expr::Lambda { body: inner, .. } = body.expr(id) {
+            lambdas.extend(body.walk_from(*inner));
+        }
+    }
+    body.walk().into_iter().any(|id| {
+        !lambdas.contains(&id)
+            && match body.expr(id) {
+                Expr::Name(n) => n == "return",
+                Expr::Try { .. } => true,
+                _ => false,
+            }
+    })
 }
 
 /// An argument to an intrinsic, as it arrives: a piped value already lowered,

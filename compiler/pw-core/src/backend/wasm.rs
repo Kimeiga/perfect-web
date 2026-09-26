@@ -918,6 +918,20 @@ fn passed(resolve: &Resolve, t: &WitType) -> Passed {
     }
 }
 
+/// **How the function being encoded is left** (ADR-0051), at its end and at
+/// every `return`: an export's result as the world's signature takes it, a
+/// callee's as [`Passed`] says.
+#[derive(Clone)]
+enum Exit {
+    Export {
+        result: Option<WitType>,
+        retptr: bool,
+    },
+    Callee {
+        result: Option<(WitType, Passed)>,
+    },
+}
+
 /// A function compiled beside the export: its index, and how it passes its
 /// parameters and its result.
 struct Callee {
@@ -953,6 +967,10 @@ fn export_body(
         literals: shared.literals,
         helpers,
         callees: shared.callees,
+        exit: Exit::Export {
+            result: export_fn.result,
+            retptr: export_sig.retptr,
+        },
         export: &function.export,
         ops: Vec::new(),
         locals: Locals {
@@ -1009,46 +1027,11 @@ fn export_body(
             entry.terminator
         );
     };
-    let Some(h) = enc.held.get(v).cloned() else {
-        blocked!("`{}` returns {v:?} and nothing defines it", function.export);
-    };
-    match (&export_fn.result, &h) {
-        (None, _) => {}
-        (Some(rt), h) => {
-            let Some(t) = h.ty() else {
-                blocked!("`{}` returns a call with no result", function.export);
-            };
-            if !same_type(resolve, t, rt) {
-                blocked!(
-                    "`{}` returns a value of another component type than the world declares",
-                    function.export
-                );
-            }
-            match (export_sig.retptr, h) {
-                // The value already has its canonical layout at an address:
-                // that address IS the result.
-                (true, Held::Memory { ptr, .. }) => enc.ops.push(I::LocalGet(*ptr)),
-                (true, Held::Nothing) => {
-                    blocked!("`{}` returns a call with no result", function.export)
-                }
-                // A flat value returned by pointer is stored into the region
-                // first, the way a constructed variant is.
-                (true, Held::Flat { ty, locals: flats }) => {
-                    let area = enc.locals.fresh(ValType::I32);
-                    allocate(sizes, ty, realloc_index, area, &mut enc.ops);
-                    match store(resolve, sizes, ty, area, 0, flats, &mut enc.ops) {
-                        Encoding::Encoded(_) => {}
-                        other => return other.map(|_| unreachable!()),
-                    }
-                    enc.ops.push(I::LocalGet(area));
-                }
-                (false, h) => match push_flat_values(resolve, sizes, h, &mut enc.ops) {
-                    Encoding::Encoded(()) => {}
-                    other => return other.map(|_| unreachable!()),
-                },
-            }
-        }
+    match enc.leave(*v) {
+        Encoding::Encoded(()) => {}
+        other => return other.map(|_| unreachable!()),
     }
+    let _ = (sizes, realloc_index);
     enc.ops.push(I::End);
 
     Encoding::Encoded(enc.finish())
@@ -1082,6 +1065,9 @@ fn internal_body(
         literals: shared.literals,
         helpers,
         callees: shared.callees,
+        exit: Exit::Callee {
+            result: me.result.clone(),
+        },
         export: &function.export,
         ops: Vec::new(),
         locals: Locals {
@@ -1132,14 +1118,9 @@ fn internal_body(
             entry.terminator
         );
     };
-    if let Some((ty, passing)) = &me.result {
-        let Some(h) = enc.held.get(v).cloned() else {
-            blocked!("`{}` returns {v:?} and nothing defines it", function.export);
-        };
-        match enc.pass(&h, ty, passing) {
-            Encoding::Encoded(()) => {}
-            other => return other.map(|_| unreachable!()),
-        }
+    match enc.leave(*v) {
+        Encoding::Encoded(()) => {}
+        other => return other.map(|_| unreachable!()),
     }
     enc.ops.push(I::End);
     Encoding::Encoded(enc.finish())
@@ -1174,6 +1155,7 @@ fn expected_types(
         wit,
         imports,
         callees,
+        result,
     };
     cx.region(&entry.instrs, &mut out);
     out
@@ -1186,6 +1168,8 @@ struct Expecting<'a> {
     wit: &'a BTreeMap<Type, WitType>,
     imports: &'a BTreeMap<String, (u32, WasmSignature, WitFunction)>,
     callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
+    /// The function's own result, which every `return` gives.
+    result: Option<WitType>,
 }
 
 impl Expecting<'_> {
@@ -1218,6 +1202,17 @@ fn expect_region(cx: &Expecting<'_>, instrs: &[Instr], out: &mut BTreeMap<ValueI
                     }
                 }
             }
+            Instr::Return { value, .. } => {
+                if let Some(t) = cx.result {
+                    out.entry(*value).or_insert(t);
+                }
+            }
+            Instr::Local { result, init, ty } => {
+                if let Some(t) = out.get(result).copied().or_else(|| wit.get(ty).copied()) {
+                    out.entry(*init).or_insert(t);
+                }
+            }
+            Instr::Each { body, .. } => cx.region(&body.instrs, out),
             Instr::Match { result, arms, .. } => {
                 if let Some(t) = out.get(result).copied() {
                     for arm in arms {
@@ -1318,6 +1313,7 @@ struct Enc<'a> {
     literals: &'a Literals,
     helpers: &'a mut Helpers,
     callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
+    exit: Exit,
     export: &'a str,
     ops: Vec<wasm_encoder::Instruction<'static>>,
     locals: Locals,
@@ -1340,6 +1336,65 @@ impl Enc<'_> {
             f.instruction(op);
         }
         f
+    }
+
+    /// **Put the function's result where its caller takes it** (ADR-0051):
+    /// at its end, and before every `return`.
+    fn leave(&mut self, v: ValueId) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let exit = self.exit.clone();
+        let result = match &exit {
+            Exit::Export { result, .. } => *result,
+            Exit::Callee { result } => result.as_ref().map(|(t, _)| *t),
+        };
+        let Some(rt) = result else {
+            return Encoding::Encoded(());
+        };
+        let Some(h) = self.held.get(&v).cloned() else {
+            blocked!("`{}` returns {v:?} and nothing defines it", self.export);
+        };
+        let Some(t) = h.ty() else {
+            blocked!("`{}` returns a call with no result", self.export);
+        };
+        if !same_type(resolve, t, &rt) {
+            blocked!(
+                "`{}` returns a value of another component type than it declares",
+                self.export
+            );
+        }
+        match exit {
+            Exit::Callee {
+                result: Some((ty, passing)),
+            } => self.pass(&h, &ty, &passing),
+            Exit::Callee { result: None } => Encoding::Encoded(()),
+            Exit::Export { retptr, .. } => {
+                match (retptr, &h) {
+                    // The value already has its canonical layout at an
+                    // address: that address IS the result.
+                    (true, Held::Memory { ptr, .. }) => self.ops.push(I::LocalGet(*ptr)),
+                    (true, Held::Nothing) => {
+                        blocked!("`{}` returns a call with no result", self.export)
+                    }
+                    // A flat value returned by pointer is stored into the
+                    // region first, the way a constructed variant is.
+                    (true, Held::Flat { ty, locals: flats }) => {
+                        let area = self.locals.fresh(ValType::I32);
+                        allocate(sizes, ty, self.realloc_index, area, &mut self.ops);
+                        match store(resolve, sizes, ty, area, 0, flats, &mut self.ops) {
+                            Encoding::Encoded(_) => {}
+                            other => return other.map(|_| unreachable!()),
+                        }
+                        self.ops.push(I::LocalGet(area));
+                    }
+                    (false, h) => match push_flat_values(resolve, sizes, h, &mut self.ops) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    },
+                }
+                Encoding::Encoded(())
+            }
+        }
     }
 
     /// Push a value the way a function compiled beside the export takes it
@@ -1499,6 +1554,14 @@ impl Enc<'_> {
                     },
                 );
             }
+            // The unit value: a statement's, which nothing holds.
+            Instr::Const {
+                result,
+                value: Const::Unit,
+                ..
+            } => {
+                self.held.insert(*result, Held::Nothing);
+            }
             Instr::Const { result, value, ty } => {
                 let (wit, op, vt) = match (value, ty) {
                     (Const::Int(n), Type::Int) => (WitType::S64, I::I64Const(*n), ValType::I64),
@@ -1609,6 +1672,67 @@ impl Enc<'_> {
             Instr::Concat { result, parts, .. } => return self.concat(*result, parts),
             Instr::Format { result, value, .. } => return self.format(*result, *value),
             Instr::MakeList { result, items, ty } => return self.make_list(*result, items, ty),
+            // `return e` and `?`'s failure (ADR-0051): the result where the
+            // caller takes it, and out. What follows in the region is never
+            // reached; the placeholder is a holder of the type it needs.
+            Instr::Return { result, value, ty } => {
+                match self.leave(*value) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.ops.push(I::Return);
+                let placeholder = match ty {
+                    Type::Unit => Held::Nothing,
+                    t => match self.type_of(*result, t) {
+                        Some(rt) => self.holder(rt),
+                        None => Held::Nothing,
+                    },
+                };
+                self.held.insert(*result, placeholder);
+            }
+            // A mutable binding (ADR-0051): a holder of its own, which each
+            // assignment moves a value into and each read copies out of.
+            Instr::Local { result, init, ty } => {
+                let Some(rt) = self.type_of(*result, ty) else {
+                    refuse!(
+                        "a variable whose component type nothing fixes",
+                        "`{}` binds a {ty:?} with no component type here",
+                        self.export
+                    );
+                };
+                let holder = self.holder(rt);
+                match self.move_into(*init, &holder) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.held.insert(*result, holder);
+            }
+            Instr::Set {
+                result,
+                local,
+                value,
+                ..
+            } => {
+                let Some(holder) = self.held.get(local).cloned() else {
+                    blocked!("`{}` assigns a variable nothing binds", self.export);
+                };
+                match self.move_into(*value, &holder) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.held.insert(*result, Held::Nothing);
+            }
+            Instr::Get { result, local, .. } => {
+                let Some(Some(rt)) = self.held.get(local).map(|h| h.ty().copied()) else {
+                    blocked!("`{}` reads a variable nothing binds", self.export);
+                };
+                let copy = self.holder(rt);
+                match self.move_into(*local, &copy) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.held.insert(*result, copy);
+            }
             Instr::Intrinsic {
                 result,
                 op,
@@ -1967,6 +2091,23 @@ impl Enc<'_> {
         };
         if dealias(self.resolve, ct) != WitType::Bool {
             blocked!("`{}` branches on a value that is not a Bool", self.export);
+        }
+        // A statement (ADR-0051): each branch runs for what it does.
+        if *ty == Type::Unit {
+            self.ops.push(I::LocalGet(c[0]));
+            self.ops.push(I::If(wasm_encoder::BlockType::Empty));
+            match self.region(&then.instrs) {
+                Encoding::Encoded(()) => {}
+                other => return other,
+            }
+            self.ops.push(I::Else);
+            match self.region(&els.instrs) {
+                Encoding::Encoded(()) => {}
+                other => return other,
+            }
+            self.ops.push(I::End);
+            self.held.insert(result, Held::Nothing);
+            return Encoding::Encoded(());
         }
         let Some(rt) = self.type_of(result, ty) else {
             refuse!(
@@ -2404,6 +2545,33 @@ impl Enc<'_> {
         };
         let (esize, ealign) = self.layout(&et);
         let (ptr, len) = (ls[0], ls[1]);
+        // `for x in xs` (ADR-0051): the body once per element, its value
+        // discarded.
+        if kind == K::For {
+            let i = self.locals.fresh(ValType::I32);
+            self.ops.extend([I::I32Const(0), I::LocalSet(i)]);
+            self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
+            self.ops
+                .extend([I::LocalGet(i), I::LocalGet(len), I::I32GeU, I::BrIf(1)]);
+            let at = self.element_address(ptr, i, esize);
+            let item = Held::Memory { ty: et, ptr: at };
+            if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+                self.loop_body(&[(params[0], item)], body)
+            {
+                return other;
+            }
+            self.ops.extend([
+                I::LocalGet(i),
+                I::I32Const(1),
+                I::I32Add,
+                I::LocalSet(i),
+                I::Br(0),
+                I::End,
+                I::End,
+            ]);
+            self.held.insert(result, Held::Nothing);
+            return Encoding::Encoded(());
+        }
         let Some(rt) = self.type_of(result, ty) else {
             refuse!(
                 "a list operation whose component type nothing fixes",
@@ -2628,7 +2796,7 @@ impl Enc<'_> {
                     );
                 }
             }
-            K::SortBy | K::GroupBy => unreachable!("encoded above"),
+            K::SortBy | K::GroupBy | K::For => unreachable!("encoded above"),
         }
         Encoding::Encoded(())
     }
@@ -3401,19 +3569,23 @@ impl Enc<'_> {
                 self.export
             );
         };
-        let Some(rt) = self.type_of(result, ty) else {
-            refuse!(
-                "a match whose component type nothing fixes",
-                "`{}`'s match is used where the world names no type",
-                self.export
-            );
-        };
         let [first, second] = arms else {
             blocked!("`{}` matches with {} arms, not 2", self.export, arms.len());
         };
         // The result's holder: locals for a value that flattens without
-        // variant slots, an address for anything else.
-        let holder = self.holder(rt);
+        // variant slots, an address for anything else. A match whose arms
+        // are statements has none (ADR-0051).
+        let holder = match ty {
+            Type::Unit => Held::Nothing,
+            _ => match self.type_of(result, ty) {
+                Some(rt) => self.holder(rt),
+                None => refuse!(
+                    "a match whose component type nothing fixes",
+                    "`{}`'s match is used where the world names no type",
+                    self.export
+                ),
+            },
+        };
 
         // Discriminant 1 selects the second-numbered case: `Some` for an
         // option, `Err` for a result.
@@ -3467,6 +3639,9 @@ impl Enc<'_> {
         if let (Some(b), Some(pt)) = (arm.binding, payload_ty) {
             let at = self.address(ptr, offset);
             self.held.insert(b, Held::Memory { ty: pt, ptr: at });
+        }
+        if matches!(holder, Held::Nothing) {
+            return self.region(&arm.body.instrs);
         }
         self.settle(&arm.body, holder)
     }

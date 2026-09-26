@@ -404,6 +404,7 @@ mod tests {
                 declared_effects: None,
                 body: None,
                 children: vec![],
+                mutable: false,
             };
             let (m, bad) = manifest_of(&d);
             assert!(bad.is_empty(), "`{v}` must be understood: {bad:?}");

@@ -490,6 +490,9 @@ pub struct Decl {
     pub body: Option<BodyId>,
     /// Declarations nested inside this one, e.g. a `fn` inside a `component`.
     pub children: Vec<DeclId>,
+    /// `let mut x = ..` at module level: a binding a body may assign
+    /// (ADR-0051). False for every other declaration.
+    pub mutable: bool,
 }
 
 impl Decl {

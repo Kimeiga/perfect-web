@@ -333,6 +333,8 @@ pub enum RelationKind {
     /// An operator's operand, or an `if`'s condition, against the type it
     /// takes (PW0609).
     Operand,
+    /// `x = e`: `e` against the type `x` holds (PW0607, ADR-0051).
+    Assignment,
     /// `value.name`: the member a read or a call names, against the members
     /// the value's type has (PW0610, ADR-0048).
     Member,
@@ -1575,7 +1577,8 @@ impl<'a> Typer<'a> {
             BinOp::Cmp(c) => c.as_str(),
             BinOp::And => "&",
             BinOp::Or => "|",
-            BinOp::Pipe | BinOp::Transition | BinOp::Assign => return Vec::new(),
+            BinOp::Assign => return self.assignment(id, lhs, rhs),
+            BinOp::Pipe | BinOp::Transition => return Vec::new(),
         };
         let left = format!("the left side of `{sym}`");
         let right = format!("the right side of `{sym}`, like its left,");
@@ -1593,6 +1596,35 @@ impl<'a> Typer<'a> {
                 self.operand(id, rhs, &right, &self.of(lhs)),
             ],
         }
+    }
+
+    /// **`x = e`**: `e` has the type `x` holds (ADR-0051). An assignment to a
+    /// field, or to a name whose type is not known, relates nothing here.
+    fn assignment(&self, id: ExprId, lhs: ExprId, rhs: ExprId) -> Vec<ValueRelation> {
+        let Expr::Name(x) = self.body.expr(lhs) else {
+            return Vec::new();
+        };
+        let declared = self.name(x);
+        let actual = self.of(rhs);
+        let mut s = Subst::default();
+        let outcome = match unify(&mut s, &declared, &actual) {
+            Verdict::Agree => Outcome::Agree,
+            Verdict::Undecided => Outcome::Undecided(Undecided::Unknown),
+            Verdict::Disagree => Outcome::Disagree {
+                expected: self.display(&declared),
+                actual: self.display(&actual),
+            },
+        };
+        vec![ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Assignment,
+            span: self.body.expr_span(rhs),
+            target: x.clone(),
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary: (self.body.expr_span(id), format!("`{x}` is assigned here")),
+        }]
     }
 
     /// One operand against the type it takes.
@@ -2140,6 +2172,19 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  representation are still two types",
             )
             .repair(format!("make it a `{expected}`")),
+            RelationKind::Assignment => Diagnostic::error(
+                crate::codes::BINDING_TYPE.id,
+                crate::codes::BINDING_TYPE.invariant,
+                Detector::Signature,
+                format!(
+                    "`{}` holds `{expected}` and is assigned `{actual}`",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("assignment_disagrees_with_binding")
+            .explain("a mutable binding holds values of the type it was first bound with")
+            .repair(format!("assign a `{expected}`, or bind a new name")),
             RelationKind::Member if expected == OPTIONAL_CONTENTS => Diagnostic::error(
                 crate::codes::OPTION_USED_AS_VALUE.id,
                 crate::codes::OPTION_USED_AS_VALUE.invariant,
