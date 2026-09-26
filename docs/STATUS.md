@@ -85,7 +85,9 @@ decoder reads a string token: `\n` `\t` `\r` `\\` `\"` `\{` `\}` and
 PW0014. The backends refused such strings, or passed the token to their
 targets' rules. Each now encodes the value in its own syntax, Koka's checked
 against Koka 3.2.3. The Marko adapter rendered an interpolated string as its
-token, braces and all; it joins the pieces now.
+token, braces and all; it joins the pieces now. Evidence:
+[strings.txt](evidence/E10/strings.txt) (`just e10-strings`), 16 of 16
+mutants killed.
 
 **Correction, 2026-09-25: a member no type has was never refused**
 ([ADR-0048](DECISIONS/ADR-0048-members-exist.md)). A read or call through a
