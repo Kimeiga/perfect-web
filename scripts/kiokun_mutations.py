@@ -50,7 +50,9 @@ MUTANTS = [
     (
         "a statement keyword can name a value",
         GRAMMAR,
-        "        if self.at(Kind::Ident) && STMT_KEYWORDS.contains(&self.cur_text()) {",
+        """        if self.at(Kind::Ident)
+            && (STMT_KEYWORDS.contains(&self.cur_text()) || self.cur_text() == "derived")
+        {""",
         "        if false {",
     ),
     (

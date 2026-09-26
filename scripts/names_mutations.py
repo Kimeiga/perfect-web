@@ -181,8 +181,7 @@ MUTANTS = [
         """                // A named argument, as in a call: `observe intersection(self,
                 // threshold = 0.1)`. Until 2026-09-25 this list read `threshold
                 // = 0.1` as an assignment to a name nothing declares (ADR-0047).
-                if self.at(Kind::Ident)
-                    && (self.nth_is(1, Kind::Eq) || self.nth_is(1, Kind::Colon))
+                if self.at(Kind::Ident) && (self.nth_is(1, Kind::Eq) || self.nth_is(1, Kind::Colon))
                 {
                     self.bump();
                     self.bump();
