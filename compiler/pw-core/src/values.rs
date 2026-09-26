@@ -93,6 +93,13 @@ pub enum Ty {
     Var(u32),
     /// The program does not say.
     Unknown,
+    /// **Any type: the value holds at every one** (ADR-0065). `None` is an
+    /// `Option` of anything, `[]` a `List` of anything, `todo` any value,
+    /// and `Maybe.Nothing` a `Maybe` of anything. It agrees with every type,
+    /// where [`Ty::Unknown`], which the program does not state, decides
+    /// nothing. Never a generic function's unknown result, which one of its
+    /// parameters may link to another: that stays unknown.
+    Any,
 }
 
 impl Ty {
@@ -190,6 +197,9 @@ impl Verdict {
 #[derive(Debug, Default)]
 struct Subst {
     bound: BTreeMap<u32, Ty>,
+    /// Variables met by a value of any type and by nothing that fixes one:
+    /// `T` in `List.get([], 0)`. Each closes to [`Ty::Any`] (ADR-0065).
+    any: BTreeSet<u32>,
 }
 
 impl Subst {
@@ -207,6 +217,7 @@ impl Subst {
     /// a hole. The only way a type leaves a call.
     fn close(&self, t: &Ty) -> Ty {
         match self.resolve(t) {
+            Ty::Var(v) if self.any.contains(&v) => Ty::Any,
             Ty::Var(_) => Ty::Unknown,
             Ty::Builtin(c, args) => Ty::Builtin(c, args.iter().map(|a| self.close(a)).collect()),
             Ty::Nominal(d, args) => Ty::Nominal(d, args.iter().map(|a| self.close(a)).collect()),
@@ -234,6 +245,12 @@ fn unify(s: &mut Subst, expected: &Ty, actual: &Ty) -> Verdict {
     let (e, a) = (s.resolve(expected), s.resolve(actual));
     match (&e, &a) {
         (Ty::Var(v), Ty::Var(w)) if v == w => Verdict::Agree,
+        // A value of any type fixes no variable: `List.concat([], ["a"])`
+        // is a `List<String>`, whichever side comes first (ADR-0065).
+        (Ty::Var(v), Ty::Any) | (Ty::Any, Ty::Var(v)) => {
+            s.any.insert(*v);
+            Verdict::Agree
+        }
         (Ty::Var(v), t) | (t, Ty::Var(v)) => {
             if t.is_unknown() || s.occurs(*v, t) {
                 return Verdict::Undecided;
@@ -241,6 +258,7 @@ fn unify(s: &mut Subst, expected: &Ty, actual: &Ty) -> Verdict {
             s.bound.insert(*v, t.clone());
             Verdict::Agree
         }
+        (Ty::Any, _) | (_, Ty::Any) => Verdict::Agree,
         (Ty::Unknown, _) | (_, Ty::Unknown) => Verdict::Undecided,
         (
             Ty::Parameter {
@@ -298,6 +316,7 @@ fn all(s: &mut Subst, expected: &[Ty], actual: &[Ty]) -> Verdict {
 fn join(a: Ty, b: Ty) -> Ty {
     match (a, b) {
         (Ty::Unknown, t) | (t, Ty::Unknown) => t,
+        (Ty::Any, t) | (t, Ty::Any) => t,
         (Ty::Primitive(p), Ty::Primitive(q)) if p == q => Ty::Primitive(p),
         (Ty::Builtin(c1, a1), Ty::Builtin(c2, a2)) if c1 == c2 && a1.len() == a2.len() => {
             Ty::Builtin(
@@ -651,6 +670,37 @@ pub(crate) fn bare_case(
     }
 }
 
+/// **The type parameters of `binder` no field mentions** (ADR-0065): each is
+/// free in a value built from those fields, which holds at every type it
+/// could be.
+fn unmentioned(ws: &Workspace, binder: DefId, fields: &[Option<TypeResolution>]) -> BTreeSet<u32> {
+    fn mentions(t: &ResolvedType, binder: DefId, i: u32) -> bool {
+        t.parameter_binding() == Some((binder, i))
+            || t.args().iter().any(|a| mentions(a, binder, i))
+    }
+    let arity = ws.type_arity(binder).unwrap_or(0) as u32;
+    (0..arity)
+        .filter(|i| {
+            !fields.iter().any(|f| {
+                f.as_ref()
+                    .and_then(TypeResolution::resolved)
+                    .is_some_and(|t| mentions(t, binder, *i))
+            })
+        })
+        .collect()
+}
+
+/// `t` with every [`Ty::Any`] in it made unknown: a mutable binding holds
+/// one type, whatever its first value holds at (ADR-0065).
+fn one_type(t: Ty) -> Ty {
+    match t {
+        Ty::Any => Ty::Unknown,
+        Ty::Builtin(c, args) => Ty::Builtin(c, args.into_iter().map(one_type).collect()),
+        Ty::Nominal(d, args) => Ty::Nominal(d, args.into_iter().map(one_type).collect()),
+        other => other,
+    }
+}
+
 /// Is this one name, as a directive writes one?
 fn is_ident(s: &str) -> bool {
     s.starts_with(|c: char| c.is_alphabetic() || c == '_')
@@ -780,6 +830,14 @@ impl<'a> Typer<'a> {
                         {
                             Ty::Primitive(p)
                         }
+                        // A value of any type is the number the other side is
+                        // (ADR-0065).
+                        (Ty::Primitive(p), Ty::Any) | (Ty::Any, Ty::Primitive(p))
+                            if matches!(p, Primitive::Int | Primitive::Float) =>
+                        {
+                            Ty::Primitive(p)
+                        }
+                        (Ty::Any, Ty::Any) => Ty::Any,
                         _ => Ty::Unknown,
                     }
                 }
@@ -825,6 +883,7 @@ impl<'a> Typer<'a> {
                 .reduce(join)
                 .unwrap_or(Ty::Unknown),
             Expr::Record { name: Some(_), .. } => self.construct(id).result,
+            // `[]` is a list of anything (ADR-0065).
             Expr::List { items } => Ty::Builtin(
                 Builtin::List,
                 vec![
@@ -832,7 +891,7 @@ impl<'a> Typer<'a> {
                         .iter()
                         .map(|i| self.of(*i))
                         .reduce(join)
-                        .unwrap_or(Ty::Unknown),
+                        .unwrap_or(Ty::Any),
                 ],
             ),
             _ => Ty::Unknown,
@@ -868,7 +927,9 @@ impl<'a> Typer<'a> {
         let own = matches!(term, Resolution::Unresolved);
         match n {
             "true" | "false" if own => Ty::Primitive(Primitive::Bool),
-            "None" if own => Ty::Builtin(Builtin::Option, vec![Ty::Unknown]),
+            "None" if own => Ty::Builtin(Builtin::Option, vec![Ty::Any]),
+            // It never returns, so it is a value of every type (ADR-0065).
+            "todo" if own => Ty::Any,
             // Charter §7.5A: `self` in a UI declaration is its own element, a
             // language fact rather than something a library declares.
             "self" if own && self.is_ui() => self
@@ -896,7 +957,18 @@ impl<'a> Typer<'a> {
         else {
             return Ty::Unknown;
         };
-        let s = Subst::default();
+        // A parameter the case's fields do not mention holds at every type:
+        // `Maybe.Nothing` is a `Maybe` of anything (ADR-0065). One they do
+        // mention links the function's parameter to its result, and stays
+        // unknown.
+        let s = Subst {
+            any: unmentioned(
+                self.ws,
+                def,
+                &fields.iter().map(|f| Some(f.clone())).collect::<Vec<_>>(),
+            ),
+            ..Subst::default()
+        };
         let result = s.close(&self.applied(def).instantiate(def));
         if fields.is_empty() {
             return result;
@@ -1330,6 +1402,14 @@ impl<'a> Typer<'a> {
 
         let mut relations = Vec::new();
         let mut s = Subst::default();
+        // A value built of fields that mention none of its type's `U` holds
+        // at every `U`: `Either.Left(1)` is an `Either<Int, _>` (ADR-0065).
+        if matches!(
+            target,
+            Target::Record(_) | Target::Case(..) | Target::Opaque(_)
+        ) {
+            s.any.extend(unmentioned(self.ws, binder, &params));
+        }
         let result = result.map(|r| r.instantiate(binder));
         let span = self.body.expr_span(id);
 
@@ -1448,8 +1528,8 @@ impl<'a> Typer<'a> {
         };
         let v = self.of(arg.value);
         Some(match n.as_str() {
-            "Ok" => Ty::Builtin(Builtin::Result, vec![v, Ty::Unknown]),
-            "Err" => Ty::Builtin(Builtin::Result, vec![Ty::Unknown, v]),
+            "Ok" => Ty::Builtin(Builtin::Result, vec![v, Ty::Any]),
+            "Err" => Ty::Builtin(Builtin::Result, vec![Ty::Any, v]),
             _ => Ty::Builtin(Builtin::Option, vec![v]),
         })
     }
@@ -1538,6 +1618,14 @@ impl<'a> Typer<'a> {
                 ),
             });
         }
+        s.any.extend(unmentioned(
+            self.ws,
+            def,
+            &declared
+                .iter()
+                .map(|(_, r)| Some(r.clone()))
+                .collect::<Vec<_>>(),
+        ));
         Solved {
             result: s.close(&self.applied(def).instantiate(def)),
             relations,
@@ -1597,6 +1685,7 @@ impl<'a> Typer<'a> {
                 name.unwrap_or_else(|| format!("type parameter {index}"))
             }
             Ty::Var(_) | Ty::Unknown => "?".to_string(),
+            Ty::Any => "_".to_string(),
         }
     }
 
@@ -1627,7 +1716,24 @@ impl<'a> Typer<'a> {
                     ty: None,
                     init: Some(init),
                 } if matches!(self.body.pat(*pat), Pattern::Bind { .. }) => {
-                    added |= self.bind(Binder::Pattern(*pat), self.of(*init));
+                    // A `let mut` holds one type: `let mut xs = []` is a list
+                    // of what is assigned to it, not of anything (ADR-0065).
+                    let t = match self.body.pat(*pat) {
+                        Pattern::Bind { mutable: true, .. } => one_type(self.of(*init)),
+                        _ => self.of(*init),
+                    };
+                    added |= self.bind(Binder::Pattern(*pat), t);
+                }
+                // `x = e` completes a `let mut`'s type where its first value
+                // left it incomplete.
+                Expr::Binary {
+                    op: BinOp::Assign,
+                    lhs,
+                    rhs,
+                } => {
+                    if let Some(b) = self.lexical.binder(*lhs) {
+                        added |= self.bind(b, one_type(self.of(*rhs)));
+                    }
                 }
                 Expr::Keyword { keyword, args, .. } if keyword == "use" => {
                     if let Some(init) = args.first() {
@@ -2113,7 +2219,7 @@ impl<'a> Typer<'a> {
     fn number(&self, id: ExprId, value: ExprId, what: &str) -> ValueRelation {
         let actual = self.of(value);
         let outcome = match &actual {
-            Ty::Primitive(Primitive::Int | Primitive::Float) => Outcome::Agree,
+            Ty::Primitive(Primitive::Int | Primitive::Float) | Ty::Any => Outcome::Agree,
             Ty::Unknown | Ty::Parameter { .. } | Ty::Var(_) => {
                 Outcome::Undecided(Undecided::Unknown)
             }
@@ -2379,16 +2485,17 @@ fn returns(
         ));
     }
     // Each `e?` returns `e`'s failure early: an `Err` of the same error type,
-    // or a `None`. Its success type is not returned, so it is a hole.
+    // or a `None`. Its success type is not returned, so it is any type
+    // (ADR-0065).
     for site in typer.propagations() {
         let Expr::Try { value } = typer.body.expr(site) else {
             continue;
         };
         let returned = match typer.of(*value) {
             Ty::Builtin(Builtin::Result, args) if args.len() == 2 => {
-                Ty::Builtin(Builtin::Result, vec![Ty::Unknown, args[1].clone()])
+                Ty::Builtin(Builtin::Result, vec![Ty::Any, args[1].clone()])
             }
-            Ty::Builtin(Builtin::Option, _) => Ty::Builtin(Builtin::Option, vec![Ty::Unknown]),
+            Ty::Builtin(Builtin::Option, _) => Ty::Builtin(Builtin::Option, vec![Ty::Any]),
             _ => Ty::Unknown,
         };
         out.push(typer.relate(

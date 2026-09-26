@@ -729,6 +729,33 @@ e10-labels:
      } > docs/evidence/E10/labels.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/labels.txt
 
+# ADR-0065: a value that holds at every type. Its tests, what the value
+# relations decide over the store, kiokun and the accepted corpus, and the
+# mutation controls.
+e10-any:
+    @cargo build --quiet --locked -p pw-cli
+    @{ echo "ADR-0065 - a value that holds at every type"; echo; \
+       echo "produced by: just e10-any"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== None, [], Err, todo, a free parameter, a let mut (compiler/pw-core/tests/any_type.rs)"; echo; \
+       cargo test --locked -p pw-core --test any_type 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what the value relations decide: the store program"; echo; \
+       ./target/debug/pw audit-values packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw; \
+       echo; echo "== what the value relations decide: kiokun"; echo; \
+       ./target/debug/pw audit-values packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw; \
+       echo; echo "== what the value relations decide: the accepted corpus as one program"; echo; \
+       ./target/debug/pw audit-values packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw; \
+       echo; echo "== mutation controls (scripts/any_type_mutations.py)"; echo; \
+       python3 scripts/any_type_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a generic function's result its arguments do not fix, which"; \
+       echo "stays unknown. Each undecided relation above is counted, never agreement."; \
+     } > docs/evidence/E10/any.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/any.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

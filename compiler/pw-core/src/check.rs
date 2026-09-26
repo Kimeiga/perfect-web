@@ -1183,7 +1183,7 @@ fn subject(site: &MatchSite<'_>, scrutinee: ExprId) -> Result<Subject, (String, 
         return typed_subject(env, sigs, &crate::values::Ty::of(t), written);
     }
     match crate::values::type_of(sigs, ws, *at, *module, decl, body, scrutinee) {
-        (crate::values::Ty::Unknown | crate::values::Ty::Var(_), _) => {
+        (crate::values::Ty::Unknown | crate::values::Ty::Var(_) | crate::values::Ty::Any, _) => {
             Err(("the scrutinee's type is unknown here".into(), None))
         }
         (ty, name) => typed_subject(env, sigs, &ty, name),
@@ -1336,7 +1336,10 @@ impl Instances<'_> {
             return t.clone();
         }
         let id = self.program.declare_opaque(&self.name(ty), Type::Str);
-        if matches!(ty, crate::values::Ty::Unknown | crate::values::Ty::Var(_)) {
+        if matches!(
+            ty,
+            crate::values::Ty::Unknown | crate::values::Ty::Var(_) | crate::values::Ty::Any
+        ) {
             self.unknown.insert(id);
         }
         let t = Type::Opaque(id);
@@ -1365,7 +1368,7 @@ impl Instances<'_> {
                 let bare = path.rsplit('.').next().unwrap_or(path);
                 format!("{bare}{}", args(xs))
             }
-            Ty::Parameter { .. } | Ty::Var(_) | Ty::Unknown => "_".to_string(),
+            Ty::Parameter { .. } | Ty::Var(_) | Ty::Unknown | Ty::Any => "_".to_string(),
         }
     }
 }

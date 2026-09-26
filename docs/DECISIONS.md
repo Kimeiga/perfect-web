@@ -415,3 +415,12 @@ type mentions a type parameter the result mentions, so a secret passed
 through `List.get`, `List.map`, `List.fold` or a program's own generic
 function stays secret. A lambda is labelled by what it computes, and a call
 no declaration answers by all that goes into it, its receiver included.
+
+## 2026-09-26: a value that holds at every type (E10)
+
+[ADR-0065](DECISIONS/ADR-0065-a-value-of-any-type.md): `None`, `[]`, `Ok` and
+`Err`, `todo`, an early return, and a generic value whose parameter no field
+mentions hold at every type their hole could be, and the value relations
+decide them. A variable such a value meets is not fixed by it, a function's
+link between its parameter and its result is kept, and a `let mut` holds one
+type, completed by an assignment.

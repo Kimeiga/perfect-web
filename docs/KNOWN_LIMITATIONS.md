@@ -26,12 +26,20 @@ agreement:
   needed). Until 2026-09-26 no case had a type, and `Shape.Bogus(1)` passed.
 - **Named-argument calls** are Undecided: a signature does not carry parameter
   names. None occurs in the corpus.
-- **A value with a hole that means any type is undecided.** `None`, `[]`,
-  `Err(e)` against a declared result, `todo`, and a generic opaque value
-  built from its representation (`Secret("")`) each have a part nothing
-  states. Each is undecided where it is well-typed. They are all 20 of
-  kiokun's undecided relations since ADR-0063, which gave every name the
-  binding it means.
+- **What the value relations still leave undecided** since ADR-0065, which
+  typed a value that holds at every type (`None`, `[]`, `todo`, ..): 1 of the
+  store's relations, 1 of kiokun's, 18 of the accepted corpus's. Each is its
+  own construct:
+  - a `measure { .. }` block;
+  - a dimensioned literal (`8.px`);
+  - a `derived` value;
+  - a painter's context;
+  - a declared function named as a value (`Money.add`);
+  - a handle from a `use` of a host call;
+  - a type named as a value (`Element`).
+
+  A declared function's result that its arguments do not fix stays unknown
+  (ruling needed).
 - **A record literal whose first field is shorthand** (`P { x }`) parses as
   the name `P` followed by a block `{ x }`. A brace is a record only as `{ }`
   or `{ name:`, so that `if x { .. }` stays a block. `let p = P { x }`

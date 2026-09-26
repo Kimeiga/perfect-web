@@ -88,8 +88,8 @@ matched (ADR-0059, done), which found four ways a wrong program passed
 Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
 1. ~~a privacy label carried through a declared function~~, done
    (ADR-0064), with an undeclared call's receiver;
-2. a value with a hole that means any type (`None`, `[]`, `Err(e)`, `todo`,
-   `Secret("")`), which is all 20 of kiokun's undecided relations;
+2. ~~a value with a hole that means any type~~, done (ADR-0065): 41 of the
+   store's undecided relations to 1, 20 of kiokun's to 1;
 3. the name check and the call check read scopes as `crate::lexical` does:
    a call to a function value outside its scope is not reported, and
    `(x) => x + 1` does not bind its `x` (both found 2026-09-26);

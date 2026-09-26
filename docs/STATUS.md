@@ -131,6 +131,23 @@ signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
 
+**2026-09-26: a value that holds at every type**
+([ADR-0065](DECISIONS/ADR-0065-a-value-of-any-type.md)).
+- `None`, `[]`, `Ok` and `Err`, `todo`, an early return, and a generic value
+  whose parameter no field mentions (`Maybe.Nothing`) each hold at every type
+  their hole could be. The value relations decide them, where each was
+  undecided.
+- Undecided relations fall from 41 to 1 in the store, from 20 to 1 in
+  kiokun, and from 70 to 18 in the accepted corpus. Every relation decided
+  before is decided the same. What remains is other constructs: `measure`
+  blocks, dimensioned literals, `derived`, a painter's context.
+- A `let mut` holds one type, completed by an assignment: `let mut xs = []`
+  then `xs = [n]` is a `List<Int>`.
+- A function's link is kept: `Maybe.Just` named as a value is not a function
+  of anything.
+
+Evidence: [any.txt](evidence/E10/any.txt) (`just e10-any`).
+
 **2026-09-26: a label carried through a call**
 ([ADR-0064](DECISIONS/ADR-0064-a-label-through-a-call.md)).
 - A declared call's result joins its declaration's label with the label of
@@ -465,6 +482,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0065: a declared function's result its arguments do not fix stays
+  unknown rather than any type, since a host function may answer at no type
+  its arguments fix.
 - ADR-0064: a declared call's result carries the labels of the arguments
   that bring in the type parameters it mentions, standing in for signatures
   that state how a result's label is made.
