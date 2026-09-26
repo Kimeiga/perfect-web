@@ -655,6 +655,24 @@ e10-handlers-compute:
      } > docs/evidence/E10/handlers-compute.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-compute.txt
 
+# The 2026-09-26 correction: a Pleris name WIT reserves (`List`, `own`) is
+# escaped in the generated WIT text. Each query run through the E8 host, and
+# the mutation controls.
+e10-wit-names:
+    @{ echo "WIT's reserved names, escaped"; echo; \
+       echo "produced by: just e10-wit-names"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== through the E8 host (compiler/pw-conformance/tests/wit_names.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test wit_names 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/wit_name_mutations.py)"; echo; \
+       python3 scripts/wit_name_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a host interface or operation named by a keyword. Its name"; \
+       echo "is the author's WIT, written verbatim from its host clause."; \
+     } > docs/evidence/E10/wit-names.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/wit-names.txt
+
 # ADR-0059: declared sum types. The checker's typing of a case where it is
 # written, each case built and matched through the E8 host against a Rust
 # model, the component against the JavaScript module, and the mutation

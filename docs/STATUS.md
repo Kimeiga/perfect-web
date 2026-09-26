@@ -78,6 +78,15 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a Pleris name WIT reserves broke the whole
+build.** A case `List`, a field `own` or a query `Own` became a WIT keyword
+(`list`, `own`), written bare. The program's WIT package then did not parse,
+so every component in it was refused, not only the one naming it. Such a
+name is written `%list` now, which WIT reads as the identifier `list`, so
+values and the host see it unescaped. Found writing ADR-0059's tests.
+Evidence: [wit-names.txt](evidence/E10/wit-names.txt)
+(`just e10-wit-names`).
+
 **Correction, 2026-09-26: four kinds of wrong program passed `pw check`
 with a declared sum type** ([ADR-0059](DECISIONS/ADR-0059-declared-sum-types.md)):
 - `Shape.Circle("x")`, a field of the wrong type: a case had no type at all.

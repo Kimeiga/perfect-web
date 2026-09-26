@@ -135,6 +135,66 @@ pub fn ident(name: &str) -> String {
     }
 }
 
+/// **WIT's keywords**, as `wit-parser` 0.257.1's lexer reads them
+/// (`src/ast/lex.rs`).
+const KEYWORDS: &[&str] = &[
+    "use",
+    "type",
+    "func",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "s8",
+    "s16",
+    "s32",
+    "s64",
+    "f32",
+    "f64",
+    "char",
+    "resource",
+    "own",
+    "borrow",
+    "record",
+    "flags",
+    "variant",
+    "enum",
+    "bool",
+    "string",
+    "option",
+    "result",
+    "future",
+    "stream",
+    "error-context",
+    "list",
+    "map",
+    "as",
+    "from",
+    "static",
+    "interface",
+    "tuple",
+    "world",
+    "import",
+    "export",
+    "package",
+    "constructor",
+    "include",
+    "with",
+    "async",
+];
+
+/// **An identifier as WIT text writes it**: `%` before a keyword, which WIT
+/// reads as the identifier without it. A case `List`, or a field `own`, is
+/// the identifier `list` or `own` in the `Resolve`, where nothing is escaped.
+/// Until 2026-09-26 such a name was written bare, and the whole package did
+/// not parse, so every component of the program was refused.
+fn escaped(id: &str) -> String {
+    match KEYWORDS.contains(&id) {
+        true => format!("%{id}"),
+        false => id.to_string(),
+    }
+}
+
 /// Every name that must survive mangling, checked for collisions in one place.
 fn no_collisions(names: impl IntoIterator<Item = String>) -> Result<(), WitError> {
     let mut seen: BTreeMap<String, String> = BTreeMap::new();
@@ -447,7 +507,7 @@ fn wit_resolved(ty: &ResolvedType, types: &Types, at: &str) -> Result<String, Wi
     types
         .by_def
         .get(&def)
-        .map(|path| ident(path))
+        .map(|path| escaped(&ident(path)))
         .ok_or_else(bad)
 }
 
@@ -499,7 +559,10 @@ fn wit_func(
             }
         }
     };
-    Ok((format!("{ident}: func({}){ret};", params.join(", ")), used))
+    Ok((
+        format!("{}: func({}){ret};", escaped(ident), params.join(", ")),
+        used,
+    ))
 }
 
 /// One component's world.
@@ -878,21 +941,21 @@ fn render_types(types: &Types, wanted: &BTreeSet<String>) -> Result<String, WitE
                     // A WIT record must have at least one field. A Pleris type
                     // with none carries no information, and a nameable type
                     // carrying none is the nearest honest thing.
-                    out.push_str(&format!("    type {} = tuple<>;\n", ident(name)));
+                    out.push_str(&format!("    type {} = tuple<>;\n", escaped(&ident(name))));
                     continue;
                 }
-                out.push_str(&format!("    record {} {{\n", ident(name)));
+                out.push_str(&format!("    record {} {{\n", escaped(&ident(name))));
                 for (f, ty) in fields {
                     out.push_str(&format!(
                         "        {}: {},\n",
-                        ident(f),
+                        escaped(&ident(f)),
                         wit_type(ty, types, name)?
                     ));
                 }
                 out.push_str("    }\n");
             }
             TypeDef::Variant { cases, .. } => {
-                out.push_str(&format!("    variant {} {{\n", ident(name)));
+                out.push_str(&format!("    variant {} {{\n", escaped(&ident(name))));
                 for (case, fields) in cases {
                     let payload = match fields.as_slice() {
                         [] => String::new(),
@@ -905,14 +968,14 @@ fn render_types(types: &Types, wanted: &BTreeSet<String>) -> Result<String, WitE
                                 .join(", ")
                         ),
                     };
-                    out.push_str(&format!("        {}{},\n", ident(case), payload));
+                    out.push_str(&format!("        {}{},\n", escaped(&ident(case)), payload));
                 }
                 out.push_str("    }\n");
             }
             TypeDef::Alias { of, .. } => {
                 out.push_str(&format!(
                     "    type {} = {};\n",
-                    ident(name),
+                    escaped(&ident(name)),
                     wit_type(of, types, name)?
                 ));
             }
@@ -959,7 +1022,7 @@ fn render(type_text: &str, apis: &[Api], worlds: &[World], hosts: &[HostPackage]
     for a in apis {
         out.push_str(&format!("interface {} {{\n", a.name));
         if !a.uses.is_empty() {
-            let names: Vec<String> = a.uses.iter().map(|u| ident(u)).collect();
+            let names: Vec<String> = a.uses.iter().map(|u| escaped(&ident(u))).collect();
             out.push_str(&format!(
                 "    use {TYPES_PACKAGE}/types.{{{}}};\n",
                 names.join(", ")
@@ -972,7 +1035,7 @@ fn render(type_text: &str, apis: &[Api], worlds: &[World], hosts: &[HostPackage]
     }
 
     for w in worlds {
-        out.push_str(&format!("world {} {{\n", w.name));
+        out.push_str(&format!("world {} {{\n", escaped(&w.name)));
         for i in &w.imports {
             out.push_str(&format!("    import {i};\n"));
         }
@@ -997,7 +1060,7 @@ fn render(type_text: &str, apis: &[Api], worlds: &[World], hosts: &[HostPackage]
         for (iface, (uses, funcs)) in &h.interfaces {
             out.push_str(&format!("    interface {iface} {{\n"));
             if !uses.is_empty() {
-                let names: Vec<String> = uses.iter().map(|u| ident(u)).collect();
+                let names: Vec<String> = uses.iter().map(|u| escaped(&ident(u))).collect();
                 out.push_str(&format!(
                     "        use {TYPES_PACKAGE}/types.{{{}}};\n",
                     names.join(", ")
