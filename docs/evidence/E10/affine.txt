@@ -1,7 +1,7 @@
 ADR-0045 - affine values consumed exactly once, on every path
 
 produced by: just e10-affine
-commit: 29b662827515622855b5983c792fadb0f8039572
+commit: 9ec62c136d1136fecc6f3b1200cb674376331c2d
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == each witness (examples/generality/affine_not_consumed_once)
@@ -22,7 +22,7 @@ released-twice.pw                        GENERAL    [PW2005] affine resource `tx
 
 == the generality suite
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.61s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.88s
 
 == mutation controls (scripts/affine_mutations.py)
 

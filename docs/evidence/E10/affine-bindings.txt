@@ -1,0 +1,23 @@
+ADR-0080 - the affine rule follows bindings, not names
+
+produced by: just e10-affine-bindings
+commit: 9ec62c136d1136fecc6f3b1200cb674376331c2d
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== affine bindings (compiler/pw-core/tests/affine_bindings.rs)
+
+test a_lambdas_own_name_is_not_the_transaction ... ok
+test an_inner_transaction_does_not_end_an_outer_one ... ok
+test a_local_bound_to_a_release_is_that_release ... ok
+test a_transaction_given_to_a_function_value_is_refused ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+== mutation controls (scripts/affine_binding_mutations.py)
+
+baseline: 4 passed, 0 failed
+a use is any name spelled like the value: KILLED (2 of 4 tests fail)
+a local bound to a release counts nothing: KILLED (1 of 4 tests fail)
+a binding that may be reassigned is read as its first value: KILLED (1 of 4 tests fail)
+a value given to a function value is not refused: KILLED (1 of 4 tests fail)
+a binding holding a function is not a function value: KILLED (1 of 4 tests fail)
+5 of 5 mutants killed
