@@ -1,0 +1,29 @@
+ADR-0081 - a named argument is given to the parameter of its name
+
+produced by: just e10-named-arguments
+commit: 2aaae6f64cc607058b9a39e93fe43fe0abc86bac
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the checker and the labels (compiler/pw-core/tests/named_arguments.rs)
+
+test a_function_values_parameters_have_no_names ... ok
+test a_label_is_carried_from_the_argument_named ... ok
+test a_named_argument_is_related_to_its_parameter ... ok
+test a_named_argument_names_a_parameter_once ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+== the call, through the E8 host (compiler/pw-conformance/tests/named_arguments.rs)
+
+test a_named_argument_is_passed_to_its_parameter ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+== mutation controls (scripts/named_argument_mutations.py)
+
+baseline: 5 passed, 0 failed
+a named argument is related to the parameter in its place: KILLED (2 of 5 tests fail)
+a named argument that names no parameter is not refused: KILLED (1 of 5 tests fail)
+a positional argument may follow a named one: KILLED (1 of 5 tests fail)
+a function value's arguments may be named: KILLED (1 of 5 tests fail)
+a label is carried from the argument in the parameter's place: KILLED (1 of 5 tests fail)
+the backend passes arguments in written order: KILLED (1 of 5 tests fail)
+6 of 6 mutants killed
