@@ -149,6 +149,10 @@ codes! {
     // correctly refused to run on it, and nothing told the author. E9-V5.
     UNRESOLVED_TYPE = "PW0026" / unresolved_type / 1, Resolution,
         "a written type must name a type visible here, applied to exactly its parameters";
+    // ADR-0087: a view, a page, an event or an effect called as a function
+    // passed `pw check` until 2026-09-26, answered for as a call to nothing.
+    NOT_A_TERM = "PW0027" / not_a_term / 1, Resolution,
+        "a call names a function, a data operation, or a type it builds";
 
     // --- declaration rules (PW01xx-PW03xx) --------------------------------
     RETRY_NOT_IDEMPOTENT = "PW0312" / retry_not_idempotent / 1, DeclarationRules,

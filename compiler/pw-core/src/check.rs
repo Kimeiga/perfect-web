@@ -285,6 +285,21 @@ fn unresolved_uses(
                 continue;
             };
             let path = path_of(body, *callee);
+            // A name some scope binds is the value it holds, whatever a
+            // declaration elsewhere is called (ADR-0066).
+            let bound = match &lexical {
+                Some(lx) if matches!(body.expr(*callee), Expr::Name(_)) => {
+                    lx.binder(*callee).is_some()
+                }
+                _ => path
+                    .split('.')
+                    .next()
+                    .is_some_and(|h| in_scope.contains(h) && !declared.contains(h)),
+            };
+            if !bound && let Some(def) = names_no_term(workspace, unit, &path) {
+                out.push(not_a_term(hirs, hir, decl, body, id, &path, def));
+                continue;
+            }
             let Some((head, _)) = path.split_once('.') else {
                 // **A BARE call.**
                 //
@@ -385,6 +400,95 @@ fn unresolved_uses(
         }
     }
     out
+}
+
+/// **What a call names, when it names no term** (ADR-0087): the declaration
+/// a view, a page, an event or an effect is, where no function or type has
+/// the name. A call names a term, or a type it builds (`resolve::Namespace`);
+/// the rest are rendered, emitted or performed, and never called.
+fn names_no_term(
+    workspace: &crate::resolve::Workspace,
+    unit: usize,
+    path: &str,
+) -> Option<crate::resolve::DefId> {
+    use crate::resolve::{Namespace, Resolution};
+    let found = |ns| match path.contains('.') {
+        true => workspace.resolve_path_in(unit, ns, path),
+        false => workspace.resolve_in(unit, ns, path),
+    };
+    if [Namespace::Term, Namespace::Type]
+        .into_iter()
+        .any(|ns| found(ns) != Resolution::Unresolved)
+    {
+        return None;
+    }
+    [Namespace::Ui, Namespace::Event, Namespace::Effect]
+        .into_iter()
+        .find_map(|ns| match found(ns) {
+            Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
+            _ => None,
+        })
+}
+
+fn not_a_term(
+    hirs: &[&Hir],
+    hir: &Hir,
+    decl: &Decl,
+    body: &Body,
+    id: ExprId,
+    path: &str,
+    def: crate::resolve::DefId,
+) -> Diagnostic {
+    let kind = crate::resolve::declaration(hirs, def).map(|d| d.kind);
+    let (what, how) = match kind {
+        Some(DeclKind::View) => ("a view", "Markup renders a view; it is not called."),
+        Some(DeclKind::Component) => (
+            "a component",
+            "Markup renders a component; it is not called.",
+        ),
+        Some(DeclKind::Page) => (
+            "a page",
+            "A page is reached by its route; it is not called.",
+        ),
+        Some(DeclKind::Materialize) => (
+            "a materialization",
+            "The materializer decides when a materialization runs, from the \
+             dependency graph; nothing in a program calls one.",
+        ),
+        Some(DeclKind::Event) => (
+            "an event",
+            "A command emits an event by declaring `emits`, and a resource \
+             listens with `invalidates_on`; an event is never a value.",
+        ),
+        _ => (
+            "an effect",
+            "An effect is performed by calling an operation whose row declares \
+             it; its name appears only in effect rows.",
+        ),
+    };
+    Diagnostic {
+        code: crate::codes::NOT_A_TERM.id,
+        invariant: crate::codes::NOT_A_TERM.invariant,
+        reason: "not_a_term",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!("`{path}` is {what}, which a call cannot name"),
+        primary_span: body.expr_span(id),
+        related: vec![Related {
+            span: hir.decl_span(decl_id_of(hir, decl)),
+            label: format!("called inside `{}`", decl.name),
+        }],
+        explanation: Some(format!(
+            "A call names a function, a data operation, or a type it builds. \
+             {how} Until 2026-09-26 such a call checked: every analysis \
+             answered for it as it does for a call to nothing, and the value \
+             it was said to produce had no type."
+        )),
+        repairs: vec![Repair {
+            description: format!("use `{path}` as {what} is used, or call a function"),
+            replacement: None,
+        }],
+    }
 }
 
 /// **An element named with a capital letter** (ADR-0072).

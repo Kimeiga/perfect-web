@@ -78,6 +78,18 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a call names a term**
+([ADR-0087](DECISIONS/ADR-0087-a-call-names-a-term.md)). A call to a view,
+a page, an event or an effect checked: `let e = CartChanged(s, 3)`,
+`secret(1)`, and `fn f() -> Int { Badge(1) }`, a view returned where an
+`Int` is declared. The rule for a bare call accepted a name that resolved in
+any namespace, and every analysis answered for the call as for a call to
+nothing. A call names a function, a data operation, or a type it builds now
+(PW0027).
+
+Evidence: [call-names.txt](evidence/E10/call-names.txt)
+(`just e10-call-names`).
+
 **2026-09-26: a function crosses no boundary**
 ([ADR-0086](DECISIONS/ADR-0086-a-function-crosses-no-boundary.md)). A
 resumable handler that captured a function, a view's `fn(Int) -> ()`

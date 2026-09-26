@@ -595,3 +595,10 @@ resumable handler that captured a function checked, and the build refused it
 for a name that "names no declaration". A value that is or holds a function
 crosses no boundary now: PW5008 for a capture, untransferable for a call to
 another placement.
+
+## 2026-09-26: a call names a term (E10)
+
+[ADR-0087](DECISIONS/ADR-0087-a-call-names-a-term.md): a call to a view, a
+page, an event or an effect checked, answered for as a call to nothing, and
+`fn f() -> Int { Badge(1) }` returned a view where an `Int` is declared. A
+call names a function, a data operation, or a type it builds (PW0027).

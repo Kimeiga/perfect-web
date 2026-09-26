@@ -128,6 +128,21 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    - captures and patches for templates;
    - a record literal whose first field is shorthand (ADR-0063).
 
+**Found 2026-09-26 probing policy clauses, taken up before the list above.**
+~~A call to a view, a page, an event or an effect~~, refused (ADR-0087).
+Next, in order:
+1. **a clause's keys.** `depends_on`, `invalidates` and `emits` name a
+   declaration and pass it terms, and nothing resolves, counts or types
+   them: `invalidates Cart(nosuch)` and `invalidates Cart(item)` check. The
+   store's own `emits CartChanged(current_session())` gives a
+   `Session<SessionId>` to an event declared with a `SessionId`;
+2. **a listener's key.** What each argument of `invalidates_on` binds, and
+   the materializer's matching, which reads an event's arguments as a set:
+   `InventoryChanged(store 47, item 3)` is deferred forever, and store 47's
+   menu stays fresh (A-009, the store's `MenuFragment`);
+3. **a policy operator's arguments.** `retry transport_only(maxx = 2, ..)`
+   and `max = "two"` check.
+
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe
 the state at those dates and are superseded by this section where applicable.

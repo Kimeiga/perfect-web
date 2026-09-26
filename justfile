@@ -1072,6 +1072,19 @@ e10-function-captures:
      } > docs/evidence/E10/function-captures.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/function-captures.txt
 
+# ADR-0087: a call names a term. Its tests, and the mutation controls.
+e10-call-names:
+    @{ echo "ADR-0087 - a call names a term"; echo; \
+       echo "produced by: just e10-call-names"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== call names (compiler/pw-core/tests/calls_name_terms.rs)"; echo; \
+       cargo test --locked -p pw-core --test calls_name_terms 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/call_name_mutations.py)"; echo; \
+       python3 scripts/call_name_mutations.py; \
+     } > docs/evidence/E10/call-names.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/call-names.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation
