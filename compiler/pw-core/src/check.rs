@@ -125,6 +125,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(unresolved_uses(&workspace, &sigs, &hirs, i, &u.hir));
         // ADR-0072: an element named with a capital letter is a view.
         per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
+        // ADR-0094: a template writes no code.
+        per_unit.extend(code_in_markup(&u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0091: a listener binds its declaration's key.
@@ -768,6 +770,173 @@ pub(crate) fn listed<S: AsRef<str>>(words: &[S]) -> String {
         Some((last, [])) => last.clone(),
         Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
     }
+}
+
+/// **A template writes no code** (ADR-0094).
+///
+/// The renderer escapes a value by where it sits: text, an attribute, a URL,
+/// a style, or raw HTML behind a capability. Four places are none of those.
+/// A `<script>` element's text and an inline handler (`onclick`) are
+/// JavaScript, `srcdoc` is a document whose scripts run on this page's
+/// origin, and a `<style>` element's text is a stylesheet. Until 2026-09-26
+/// a value in each was escaped as text or an attribute, which neutralizes
+/// none of them. Code written there by hand is code the language never
+/// checks, and is refused with it: handlers are bound with `on:`.
+fn code_in_markup(hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        for n in body.walk_markup(&roots) {
+            let Node::Element {
+                tag,
+                attrs,
+                children,
+                ..
+            } = body.node(n)
+            else {
+                continue;
+            };
+            let mut found: Vec<(crate::hir::Span, String, &str)> = Vec::new();
+            let tag = tag.to_ascii_lowercase();
+            if tag == "script" {
+                found.push((
+                    body.node_span(n),
+                    "`<script>` is code the language never checks".to_string(),
+                    "bind a handler with `on:`, or compute the value in the program",
+                ));
+            }
+            if tag == "style"
+                && children
+                    .iter()
+                    .any(|c| !matches!(body.node(*c), Node::Text(_)))
+            {
+                found.push((
+                    body.node_span(n),
+                    "`<style>` holds a value a program writes, inside a stylesheet".to_string(),
+                    "give the value to a `style` attribute, which escapes it as a style",
+                ));
+            }
+            for a in attrs {
+                let name = a.name.to_ascii_lowercase();
+                if let Some(event) = name.strip_prefix("on")
+                    && !event.is_empty()
+                    && event.chars().all(|c| c.is_ascii_alphabetic())
+                {
+                    found.push((
+                        a.span.clone(),
+                        format!("`{}` is code the language never checks", a.name),
+                        "bind a handler with `on:`",
+                    ));
+                }
+                // What the author wrote: static text, or a string with holes.
+                let written = match &a.value {
+                    AttrValue::Static(text) => Some(text.as_str()),
+                    AttrValue::Expr(e) => match body.expr(*e) {
+                        Expr::Interpolated { text, .. } => Some(text.as_str()),
+                        _ => None,
+                    },
+                    AttrValue::None => None,
+                };
+                if let Some(text) = written
+                    && crate::template_ir::Context::of_attribute(&a.name)
+                        == crate::template_ir::Context::Url
+                    && let Some(why) = executing_url(text.trim_matches(|c| c == '"' || c == '\''))
+                {
+                    found.push((
+                        a.span.clone(),
+                        format!("`{}` {why}", a.name),
+                        "link to a location, and run code through a handler bound with `on:`",
+                    ));
+                }
+                if name == "srcdoc" {
+                    found.push((
+                        a.span.clone(),
+                        "`srcdoc` is a document written inline, and its scripts run on this \
+                         page's origin"
+                            .to_string(),
+                        "load the document with `src`",
+                    ));
+                }
+            }
+            for (span, message, repair) in found {
+                out.push(Diagnostic {
+                    code: crate::codes::CODE_IN_MARKUP.id,
+                    invariant: crate::codes::CODE_IN_MARKUP.invariant,
+                    reason: "code_in_markup",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message,
+                    primary_span: span,
+                    related: vec![Related {
+                        span: hir.decl_span(decl_id),
+                        label: format!("`{}` renders this", decl.name),
+                    }],
+                    explanation: Some(
+                        "The renderer escapes a value by where it sits: text, an attribute, a \
+                         URL, a style. A script, an inline handler, a `srcdoc` document and a \
+                         stylesheet are none of those, and no escaping makes a value in them \
+                         inert. Until 2026-09-26 `<script>{msg}</script>` and \
+                         `onclick={msg}` checked and built, and ran `msg`."
+                            .to_string(),
+                    ),
+                    repairs: vec![Repair {
+                        description: repair.to_string(),
+                        replacement: None,
+                    }],
+                });
+            }
+        }
+    }
+    out
+}
+
+/// **What is wrong with a URL an author wrote, where it runs code** (ADR-0094).
+///
+/// `javascript:go()` is a script, and a value written after it runs too: a
+/// browser percent-decodes the URL before it runs, so an encoded `id` in
+/// `javascript:go({id})` is code again. A scheme a value completes,
+/// `jav{x}ascript:`, is one no author wrote. Whitespace and controls are
+/// dropped first, as a browser's URL parser drops them. `data:` is left to
+/// the author: an image can be one, and a document in one runs on an opaque
+/// origin.
+fn executing_url(text: &str) -> Option<String> {
+    const HOLE: char = '\u{1}';
+    let mut written = String::new();
+    let mut rest = text;
+    while let Some(open) = rest.find('{') {
+        written.push_str(&rest[..open]);
+        let Some(close) = rest[open..].find('}') else {
+            rest = &rest[open..];
+            break;
+        };
+        written.push(HOLE);
+        rest = &rest[open + close + 1..];
+    }
+    written.push_str(rest);
+    let url: String = written
+        .chars()
+        .filter(|c| *c == HOLE || *c > ' ')
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let end =
+        url.find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-' | HOLE)))?;
+    if !url[end..].starts_with(':') {
+        return None;
+    }
+    let scheme = &url[..end];
+    if scheme.contains(HOLE) {
+        return Some("takes its scheme from a value".to_string());
+    }
+    ["javascript", "vbscript"]
+        .contains(&scheme)
+        .then(|| format!("begins with `{scheme}:`, a URL that runs code"))
 }
 
 /// **An element named with a capital letter** (ADR-0072).

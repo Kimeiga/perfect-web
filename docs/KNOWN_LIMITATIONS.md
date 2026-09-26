@@ -296,6 +296,10 @@ awaited in order. What remains:
   every analysis. Its values are checked by their domains (ADR-0089).
 - **Which declarations a policy belongs to is checked for the four graph
   clauses only** (ADR-0092).
+- **A `style` attribute's value is escaped by refusing what executes**
+  (`expression(`, a script scheme in `url(`), then as an attribute. A style
+  can still load a URL the value names. A `<style>` element holds text only
+  (ADR-0094), and a stylesheet's braces open holes, so none is written.
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.

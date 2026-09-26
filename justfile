@@ -1173,6 +1173,19 @@ e10-declared-events:
      } > docs/evidence/E10/declared-events.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/declared-events.txt
 
+# ADR-0094: a template writes no code. Its tests, and the mutation controls.
+e10-code-in-markup:
+    @{ echo "ADR-0094 - a template writes no code"; echo; \
+       echo "produced by: just e10-code-in-markup"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== code in markup (compiler/pw-core/tests/code_in_markup.rs)"; echo; \
+       cargo test --locked -p pw-core --test code_in_markup 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/code_in_markup_mutations.py)"; echo; \
+       python3 scripts/code_in_markup_mutations.py; \
+     } > docs/evidence/E10/code-in-markup.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/code-in-markup.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -652,3 +652,12 @@ materialization depends (PW5105).
 `on:clik={go}` checked, skipped by the rule that reads the platform's
 `events`, and ran by accident, since the runtime listens for a click
 whatever the name. An `on:` attribute names a declared event now (PW5022).
+
+## 2026-09-26: a template writes no code (E10)
+
+[ADR-0094](DECISIONS/ADR-0094-a-template-writes-no-code.md):
+`<script>{msg}</script>`, `onclick={msg}`, `srcdoc={msg}` and
+`<style>{msg}</style>` checked and built, escaped as text or an attribute,
+which makes none of them inert: `msg` ran; so did `href="javascript:go({id})"`.
+A template writes no script, no inline handler, no script URL, no `srcdoc`
+and no value into a stylesheet (PW5023).

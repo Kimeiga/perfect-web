@@ -78,6 +78,26 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a value a program writes could run as a script**
+([ADR-0094](DECISIONS/ADR-0094-a-template-writes-no-code.md)). The renderer
+escapes a value as text, an attribute, a URL or a style, and four places
+are none of those. Each of these checked and built:
+- `<script>{msg}</script>`, a text part, runs `msg` as the page loads;
+- `<button onclick={msg}>`, an attribute part, runs it when pressed;
+- `<iframe srcdoc={msg}>` decodes back into a document that runs on this
+  origin;
+- `<style>{msg}</style>` is a stylesheet a value writes into, although the
+  IR documents a `style` element as the Style context;
+- `<a href="javascript:go({id})">` runs `id` too, since a browser
+  percent-decodes the URL first.
+
+A template writes no script, no inline handler, no script URL, no `srcdoc`
+and no value into a stylesheet now (PW5023). Nothing in the corpus wrote any
+of them.
+
+Evidence: [code-in-markup.txt](evidence/E10/code-in-markup.txt)
+(`just e10-code-in-markup`).
+
 **2026-09-26: an element handles an event the platform declares**
 ([ADR-0093](DECISIONS/ADR-0093-an-element-handles-an-event-the-platform-declares.md)).
 `<button on:clik={go}>` checked. The platform declares its events in
