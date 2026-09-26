@@ -84,7 +84,8 @@ still inlined, and one that recurses is compiled beside its export, once per
 instance, and called: in the Wasm component and in the JavaScript module
 alike. A generic callee is instantiated from its arguments. Programs with no
 recursion compile as they did: the store's and kiokun's 19 artifacts are
-byte-identical to `fd95b59`'s.
+byte-identical to `fd95b59`'s. Evidence: [recursion.txt](evidence/E10/recursion.txt)
+(`just e10-recursion`), 7 of 7 mutants killed.
 
 **2026-09-25: a string's escapes are the language's**
 ([ADR-0049](DECISIONS/ADR-0049-string-escapes.md), settling A-023). One
