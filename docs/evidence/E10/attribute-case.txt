@@ -1,0 +1,18 @@
+ADR-0095 - an attribute's context is read as HTML reads its name
+
+produced by: just e10-attribute-case
+commit: 82b3c492133795bbad66a061c4a51a35acc5b22c
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== attribute case (compiler/pw-core/tests/attribute_case.rs)
+
+test an_attributes_context_ignores_its_case ... ok
+test a_script_url_is_refused_however_its_attribute_is_spelled ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/attribute_case_mutations.py)
+
+baseline: 2 passed, 0 failed
+an attribute's name is read as written: KILLED (2 of 2 tests fail)
+a namespaced name is read whole: KILLED (1 of 2 tests fail)
+2 of 2 mutants killed
