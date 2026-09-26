@@ -1,0 +1,18 @@
+ADR-0106 - pw check reports each file by its place
+
+produced by: just e10-same-name
+commit: 0cd41652e2fe6bb5d0ae5b6ba8fad7dc95bf0a17
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== two files of one name (compiler/pw-cli/tests/same_name.rs)
+
+test each_file_keeps_its_own_answers_under_one_name ... ok
+test a_file_is_reported_though_another_has_its_name ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+== mutation controls (scripts/same_name_mutations.py)
+
+baseline: 2 passed, 0 failed
+a file is named by its file name alone: KILLED (1 of 2 tests fail)
+a file's answers are read by its name: KILLED (1 of 2 tests fail)
+2 of 2 mutants killed
