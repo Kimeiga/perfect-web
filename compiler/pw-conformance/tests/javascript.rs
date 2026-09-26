@@ -20,6 +20,8 @@ const PROGRAM: &str = "module j
 import List
 import String
 import Float
+import Map
+import Set
 
 type Word = Word { text: String, score: Int }
 
@@ -251,6 +253,48 @@ public query FloatMax(xs: List<Float>) -> Option<Float> { List.maximum(xs) }
 public query CaseLower(text: String) -> String { String.to_lower(text) }
 
 public query CaseUpper(text: String) -> String { String.to_upper(text) }
+
+// ADR-0057: maps and sets, arrays in ascending key order in both.
+public query Tally(words: List<String>) -> List<Int> {
+    let mut counts: Map<String, Int> = Map.empty()
+    for w in words {
+        let n = match Map.get(counts, w) {
+            Some(c) => c + 1,
+            None => 1,
+        }
+        counts = Map.insert(counts, w, n)
+    }
+    Map.values(counts)
+}
+
+public query ByText(words: List<Word>) -> List<String> {
+    Map.keys(Map.from_lists(List.map(words, w => w.text), words))
+}
+
+public query ScoreOf(words: List<Word>, k: String) -> Option<Word> {
+    Map.get(Map.remove(Map.from_lists(List.map(words, w => w.text), words), \"\"), k)
+}
+
+public query Unique(xs: List<Int>) -> List<Int> { Set.to_list(Set.from_list(xs)) }
+
+public query Overlap(xs: List<Int>, ys: List<Int>) -> List<Int> {
+    Set.to_list(Set.intersection(Set.from_list(xs), Set.from_list(ys)))
+}
+
+public query Either(xs: List<String>, ys: List<String>) -> List<String> {
+    Set.to_list(Set.union(Set.from_list(xs), Set.from_list(ys)))
+}
+
+public query Only(xs: List<Int>, ys: List<Int>) -> List<Int> {
+    Set.to_list(Set.difference(Set.insert(Set.from_list(xs), 0), Set.from_list(ys)))
+}
+
+public query Given(m: Map<String, Int>) -> Int { Map.size(m) }
+
+// Keyed by a text's length, so keys repeat, and the last of each is kept.
+public query LastOf(words: List<Word>) -> List<Int> {
+    List.map(Map.values(Map.from_lists(List.map(words, w => String.length(w.text)), words)), w => w.score)
+}
 ";
 
 const CASES: usize = 200;
@@ -341,6 +385,9 @@ fn val(rng: &mut Rng, ty: &Type, depth: u32) -> Val {
                 .map(|f| (f.name.to_string(), val(rng, &f.ty, depth + 1)))
                 .collect(),
         ),
+        // A map's entry (ADR-0057). A generated map is rarely in order, so
+        // the entry check is what the two are held to on most of them.
+        Type::Tuple(t) => Val::Tuple(t.types().map(|ty| val(rng, &ty, depth + 1)).collect()),
         other => panic!("not generated: {other:?}"),
     }
 }
@@ -389,7 +436,9 @@ fn js(v: &Val) -> String {
         }
         Val::Bool(b) => b.to_string(),
         Val::String(s) => serde_json::to_string(s).unwrap(),
-        Val::List(xs) => format!("[{}]", xs.iter().map(js).collect::<Vec<_>>().join(", ")),
+        Val::List(xs) | Val::Tuple(xs) => {
+            format!("[{}]", xs.iter().map(js).collect::<Vec<_>>().join(", "))
+        }
         Val::Record(fs) => format!(
             "{{ {} }}",
             fs.iter()
@@ -415,7 +464,10 @@ fn canonical(v: &Val) -> serde_json::Value {
         Val::Float64(f) => json!({ "f": format!("{:016x}", f.to_bits()) }),
         Val::Bool(b) => json!({ "b": b }),
         Val::String(s) => json!({ "s": s }),
-        Val::List(xs) => json!({ "l": xs.iter().map(canonical).collect::<Vec<_>>() }),
+        // A tuple is a JavaScript array, as a list is (ADR-0057).
+        Val::List(xs) | Val::Tuple(xs) => {
+            json!({ "l": xs.iter().map(canonical).collect::<Vec<_>>() })
+        }
         Val::Record(fs) => json!({
             "r": fs.iter().map(|(k, v)| (k.replace('-', "_"), canonical(v))).collect::<serde_json::Map<_, _>>()
         }),
@@ -465,21 +517,39 @@ for (const [id, list] of Object.entries(cases)) {
 /// Every query in `ids`, compiled both ways from `us`, called with the same
 /// generated arguments. Returns (queries, calls, trapped in both).
 fn agree(us: &[pw_core::check::Unit], ids: &[String], seed: u64) -> (usize, usize, usize) {
-    let dir = std::env::temp_dir().join(format!("pw-js-{}-{seed:x}", std::process::id()));
+    let mut rng = Rng(seed);
+    let cases: Vec<(String, Vec<Vec<Val>>)> = ids
+        .iter()
+        .map(|id| {
+            let tys = params(&Runnable::new(compile(us, id)));
+            let calls = (0..CASES)
+                .map(|_| tys.iter().map(|t| val(&mut rng, t, 0)).collect())
+                .collect();
+            (id.clone(), calls)
+        })
+        .collect();
+    agree_on(us, &cases, seed)
+}
+
+/// Each query, compiled both ways from `us`, called with the arguments
+/// given for it. Returns (queries, calls, trapped in both).
+fn agree_on(
+    us: &[pw_core::check::Unit],
+    cases: &[(String, Vec<Vec<Val>>)],
+    tag: u64,
+) -> (usize, usize, usize) {
+    let dir = std::env::temp_dir().join(format!("pw-js-{}-{tag:x}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("temp");
     let ops: BTreeMap<String, HostFn> = BTreeMap::new();
-    let mut rng = Rng(seed);
     let mut cases_js = Vec::new();
     let mut expected: Vec<(String, String, serde_json::Value)> = Vec::new();
-    for id in ids {
+    for (id, calls) in cases {
         let module = pw_core::backend::js_pure::module(us, id).unwrap_or_else(|e| panic!("{e}"));
         std::fs::write(dir.join(format!("{id}.mjs")), &module).expect("write");
         let r = Runnable::new(compile(us, id));
-        let tys = params(&r);
         let mut list = Vec::new();
-        for _ in 0..CASES {
-            let args: Vec<Val> = tys.iter().map(|t| val(&mut rng, t, 0)).collect();
-            let want = match r.call(&ops, &args) {
+        for args in calls {
+            let want = match r.call(&ops, args) {
                 Ok(v) => canonical(&v[0]),
                 Err(_) => serde_json::json!({ "trap": true }),
             };
@@ -523,7 +593,7 @@ fn agree(us: &[pw_core::check::Unit], ids: &[String], seed: u64) -> (usize, usiz
         traps += usize::from(want.get("trap").is_some());
     }
     std::fs::remove_dir_all(&dir).ok();
-    (ids.len(), expected.len(), traps)
+    (cases.len(), expected.len(), traps)
 }
 
 #[test]
@@ -626,4 +696,24 @@ fn the_modules_case_mapping_is_rusts_for_every_code_point() {
         assert_eq!(up, &want_up, "upper {t:?}");
     }
     std::fs::remove_dir_all(&dir).ok();
+}
+
+/// **A map the module is given is checked as the component checks it**
+/// (ADR-0057): in order, out of order, a key twice, and in code point order
+/// that UTF-16's order reverses. A generated map is rarely any of these.
+#[test]
+fn the_modules_entry_check_is_the_components() {
+    let us = units(&[("j.pw", PROGRAM)]);
+    let entry = |k: &str, v: i64| Val::Tuple(vec![Val::String(k.to_string()), Val::S64(v)]);
+    let maps = [
+        vec![entry("a", 1), entry("b", 2)],
+        vec![entry("b", 1), entry("a", 2)],
+        vec![entry("a", 1), entry("a", 2)],
+        vec![entry("\u{FF61}", 1), entry("\u{1F600}", 2)],
+        vec![entry("\u{1F600}", 1), entry("\u{FF61}", 2)],
+        vec![],
+    ];
+    let calls = maps.into_iter().map(|m| vec![Val::List(m)]).collect();
+    let (queries, calls, traps) = agree_on(&us, &[("j.Given".to_string(), calls)], 0x57);
+    assert_eq!((queries, calls, traps), (1, 6, 3));
 }

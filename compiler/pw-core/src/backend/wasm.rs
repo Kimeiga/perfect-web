@@ -69,7 +69,7 @@ use wasm_encoder::{
 use wit_parser::abi::{AbiVariant, FlatTypes, WasmSignature, WasmType};
 use wit_parser::{
     Field, Function as WitFunction, LiftLowerAbi, ManglingAndAbi, Record, Resolve, Result_,
-    SizeAlign, Type as WitType, TypeDef as WitTypeDef, TypeDefKind, TypeOwner, WasmExport,
+    SizeAlign, Tuple, Type as WitType, TypeDef as WitTypeDef, TypeDefKind, TypeOwner, WasmExport,
     WasmExportKind, WasmImport, WorldId, WorldItem, WorldKey,
 };
 
@@ -646,6 +646,10 @@ pub fn core_module_with(
     Encoding::Encoded(module.finish())
 }
 
+/// A map's value (ADR-0057): its type and its offset in the entry. A set's
+/// entry has none.
+type MapValue = Option<(WitType, u64)>;
+
 /// Where the string literals start. The region starts after them.
 const DATA_BASE: i32 = HEAP_BASE;
 
@@ -814,6 +818,17 @@ impl TypeCx<'_> {
             Type::List(inner) => {
                 let inner = self.wit(resolve, inner)?;
                 anonymous(resolve, TypeDefKind::List(inner))
+            }
+            // `list<tuple<K, V>>` and `list<T>`, as the world writes them
+            // (ADR-0057).
+            Type::Map(k, v) => {
+                let types = vec![self.wit(resolve, k)?, self.wit(resolve, v)?];
+                let entry = anonymous(resolve, TypeDefKind::Tuple(Tuple { types }));
+                anonymous(resolve, TypeDefKind::List(entry))
+            }
+            Type::Set(t) => {
+                let t = self.wit(resolve, t)?;
+                anonymous(resolve, TypeDefKind::List(t))
             }
             Type::Result(ok, err) => {
                 let ok = match **ok {
@@ -2807,6 +2822,380 @@ impl Enc<'_> {
         )
     }
 
+    /// A value's flat core values, loaded from `addr + offset` into fresh
+    /// locals.
+    fn load_flat(&mut self, ty: WitType, addr: u32, offset: u64) -> Encoding<Vec<u32>> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let Some(flats) = flat(resolve, &ty) else {
+            refuse!(
+                "a value that does not flatten",
+                "`{}` reads a key too large to hold in locals",
+                self.export
+            );
+        };
+        match load(resolve, sizes, &ty, addr, offset, &mut self.ops) {
+            Encoding::Encoded(()) => {}
+            other => return other.map(|_| unreachable!()),
+        }
+        let ls: Vec<u32> = flats
+            .iter()
+            .map(|t| self.locals.fresh(core_type(*t)))
+            .collect();
+        for l in ls.iter().rev() {
+            self.ops.push(I::LocalSet(*l));
+        }
+        Encoding::Encoded(ls)
+    }
+
+    /// **The order of two keys** (ADR-0057), each its flat values: -1, 0 or
+    /// 1, in a fresh `i32`. An `Int` by value; a `String` by its bytes,
+    /// which is code point order.
+    fn key_order(&mut self, key: WitType, x: &[u32], y: &[u32]) -> Encoding<u32> {
+        use wasm_encoder::Instruction as I;
+        let out = self.locals.fresh(ValType::I32);
+        match dealias(self.resolve, key) {
+            WitType::S64 => self.ops.extend([
+                I::LocalGet(x[0]),
+                I::LocalGet(y[0]),
+                I::I64GtS,
+                I::LocalGet(x[0]),
+                I::LocalGet(y[0]),
+                I::I64LtS,
+                I::I32Sub,
+                I::LocalSet(out),
+            ]),
+            WitType::String => {
+                let index = self.helpers.index(Helper::StrCmp);
+                self.ops.extend([
+                    I::LocalGet(x[0]),
+                    I::LocalGet(x[1]),
+                    I::LocalGet(y[0]),
+                    I::LocalGet(y[1]),
+                    I::Call(index),
+                    I::LocalSet(out),
+                ]);
+            }
+            other => refuse!(
+                "a map or set keyed by a type other than Int or String",
+                "`{}` orders keys of {other:?}",
+                self.export
+            ),
+        }
+        Encoding::Encoded(out)
+    }
+
+    /// **The order of the keys at two addresses** (ADR-0057).
+    fn order_at(&mut self, key: WitType, a: u32, b: u32) -> Encoding<u32> {
+        let x = match self.load_flat(key, a, 0) {
+            Encoding::Encoded(x) => x,
+            other => return other.map(|_| unreachable!()),
+        };
+        let y = match self.load_flat(key, b, 0) {
+            Encoding::Encoded(y) => y,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.key_order(key, &x, &y)
+    }
+
+    /// **Where `probe` goes** among `len` entries of `size` bytes at `ptr`,
+    /// each led by its key (ADR-0057): the first entry whose key is not below
+    /// `probe`, and whether that key is `probe`. Two fresh `i32`s.
+    fn search(
+        &mut self,
+        key: WitType,
+        ptr: u32,
+        len: u32,
+        size: u32,
+        probe: &[u32],
+    ) -> Encoding<(u32, u32)> {
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let fresh = |this: &mut Self| this.locals.fresh(ValType::I32);
+        let (lo, hi, mid, found) = (fresh(self), fresh(self), fresh(self), fresh(self));
+        self.ops.extend([
+            I::I32Const(0),
+            I::LocalSet(lo),
+            I::LocalGet(len),
+            I::LocalSet(hi),
+            I::Block(Empty),
+            I::Loop(Empty),
+            I::LocalGet(lo),
+            I::LocalGet(hi),
+            I::I32GeU,
+            I::BrIf(1),
+            I::LocalGet(lo),
+            I::LocalGet(hi),
+            I::I32Add,
+            I::I32Const(1),
+            I::I32ShrU,
+            I::LocalSet(mid),
+        ]);
+        let at = self.element_address(ptr, mid, size);
+        let k = match self.load_flat(key, at, 0) {
+            Encoding::Encoded(k) => k,
+            other => return other.map(|_| unreachable!()),
+        };
+        let o = match self.key_order(key, &k, probe) {
+            Encoding::Encoded(o) => o,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.ops.extend([
+            I::LocalGet(o),
+            I::I32Const(0),
+            I::I32LtS,
+            I::If(Empty),
+            I::LocalGet(mid),
+            I::I32Const(1),
+            I::I32Add,
+            I::LocalSet(lo),
+            I::Else,
+            I::LocalGet(mid),
+            I::LocalSet(hi),
+            I::End,
+            I::Br(0),
+            I::End,
+            I::End,
+            I::I32Const(0),
+            I::LocalSet(found),
+            I::LocalGet(lo),
+            I::LocalGet(len),
+            I::I32LtU,
+            I::If(Empty),
+        ]);
+        let at = self.element_address(ptr, lo, size);
+        let k = match self.load_flat(key, at, 0) {
+            Encoding::Encoded(k) => k,
+            other => return other.map(|_| unreachable!()),
+        };
+        let o = match self.key_order(key, &k, probe) {
+            Encoding::Encoded(o) => o,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.ops
+            .extend([I::LocalGet(o), I::I32Eqz, I::LocalSet(found), I::End]);
+        Encoding::Encoded((lo, found))
+    }
+
+    /// **Two sets merged** (ADR-0057): both ascending, so one pass, into
+    /// room for both. Its address and count.
+    fn merged(
+        &mut self,
+        op: super::ir::Intrinsic,
+        entry: WitType,
+        key: WitType,
+        (pa, la): (u32, u32),
+        (pb, lb): (u32, u32),
+    ) -> Encoding<(u32, u32)> {
+        use super::ir::Intrinsic as N;
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let (esize, ealign) = self.layout(&entry);
+        let fresh = |this: &mut Self| this.locals.fresh(ValType::I32);
+        let (total, i, j, count, o) = (
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+            fresh(self),
+        );
+        self.ops.extend([
+            I::LocalGet(la),
+            I::LocalGet(lb),
+            I::I32Add,
+            I::LocalSet(total),
+        ]);
+        let out = self.alloc_array(total, esize, ealign);
+        self.ops.extend([
+            I::I32Const(0),
+            I::LocalSet(i),
+            I::I32Const(0),
+            I::LocalSet(j),
+            I::I32Const(0),
+            I::LocalSet(count),
+            I::Block(Empty),
+            I::Loop(Empty),
+        ]);
+        // Done: a union when both are, an intersection when either is, a
+        // difference when the first is.
+        match op {
+            N::SetUnion => self.ops.extend([
+                I::LocalGet(i),
+                I::LocalGet(la),
+                I::I32GeU,
+                I::LocalGet(j),
+                I::LocalGet(lb),
+                I::I32GeU,
+                I::I32And,
+                I::BrIf(1),
+            ]),
+            N::SetIntersection => self.ops.extend([
+                I::LocalGet(i),
+                I::LocalGet(la),
+                I::I32GeU,
+                I::LocalGet(j),
+                I::LocalGet(lb),
+                I::I32GeU,
+                I::I32Or,
+                I::BrIf(1),
+            ]),
+            _ => self
+                .ops
+                .extend([I::LocalGet(i), I::LocalGet(la), I::I32GeU, I::BrIf(1)]),
+        }
+        // o: below zero takes the first's element, above the second's, zero
+        // both; one that has run out gives way to the other.
+        self.ops.extend([
+            I::LocalGet(j),
+            I::LocalGet(lb),
+            I::I32GeU,
+            I::If(Empty),
+            I::I32Const(-1),
+            I::LocalSet(o),
+            I::Else,
+            I::LocalGet(i),
+            I::LocalGet(la),
+            I::I32GeU,
+            I::If(Empty),
+            I::I32Const(1),
+            I::LocalSet(o),
+            I::Else,
+        ]);
+        let a = self.element_address(pa, i, esize);
+        let b = self.element_address(pb, j, esize);
+        let order = match self.order_at(key, a, b) {
+            Encoding::Encoded(x) => x,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.ops
+            .extend([I::LocalGet(order), I::LocalSet(o), I::End, I::End]);
+        let take = |this: &mut Self, from: u32, at: u32| {
+            let to = this.element_address(out, count, esize);
+            let src = this.element_address(from, at, esize);
+            this.copy(to, src, esize);
+            this.ops.extend(increment(count));
+        };
+        self.ops
+            .extend([I::LocalGet(o), I::I32Const(0), I::I32LtS, I::If(Empty)]);
+        if op != N::SetIntersection {
+            take(self, pa, i);
+        }
+        self.ops.extend(increment(i));
+        self.ops.extend([
+            I::Else,
+            I::LocalGet(o),
+            I::I32Const(0),
+            I::I32GtS,
+            I::If(Empty),
+        ]);
+        if op == N::SetUnion {
+            take(self, pb, j);
+        }
+        self.ops.extend(increment(j));
+        self.ops.push(I::Else);
+        if op != N::SetDifference {
+            take(self, pa, i);
+        }
+        self.ops.extend(increment(i));
+        self.ops.extend(increment(j));
+        self.ops.extend([I::End, I::End, I::Br(0), I::End, I::End]);
+        Encoding::Encoded((out, count))
+    }
+
+    /// **A map's or a set's shape** (ADR-0057): its element, the element's
+    /// key, and, for a map, the value's type and its offset in the entry.
+    fn entry_of(&self, list: WitType) -> Option<(WitType, WitType, MapValue)> {
+        let entry = self.element_of(list)?;
+        match dealias(self.resolve, entry) {
+            WitType::Id(id) => match &self.resolve.types[id].kind {
+                TypeDefKind::Tuple(t) if t.types.len() == 2 => {
+                    let offsets = self.sizes.field_offsets(t.types.iter());
+                    let value_at = offsets[1].0.size_wasm32() as u64;
+                    Some((entry, t.types[0], Some((t.types[1], value_at))))
+                }
+                _ => None,
+            },
+            _ => Some((entry, entry, None)),
+        }
+    }
+
+    /// **A map's or a set's entries sorted by key, each key once**
+    /// (ADR-0057): `len` entries at `ptr` into a new array, stably, and of
+    /// each run of equal keys the last kept. Its address and count.
+    fn sorted(&mut self, ptr: u32, len: u32, entry: WitType, key: WitType) -> Encoding<(u32, u32)> {
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let (esize, ealign) = self.layout(&entry);
+        let sorted = match self.merge_sort(ptr, len, entry, &mut |this, a, b, take| {
+            let o = match this.order_at(key, a, b) {
+                Encoding::Encoded(o) => o,
+                other => return other.map(|_| unreachable!()),
+            };
+            this.ops
+                .extend([I::LocalGet(o), I::I32Const(0), I::I32LeS, I::LocalSet(take)]);
+            Encoding::Encoded(())
+        }) {
+            Encoding::Encoded(s) => s,
+            other => return other.map(|_| unreachable!()),
+        };
+        let out = self.alloc_array(len, esize, ealign);
+        let fresh = |this: &mut Self| this.locals.fresh(ValType::I32);
+        let (i, count, next, keep) = (fresh(self), fresh(self), fresh(self), fresh(self));
+        self.ops.extend([
+            I::I32Const(0),
+            I::LocalSet(i),
+            I::I32Const(0),
+            I::LocalSet(count),
+            I::Block(Empty),
+            I::Loop(Empty),
+            I::LocalGet(i),
+            I::LocalGet(len),
+            I::I32GeU,
+            I::BrIf(1),
+            // Kept when it is the last, or the next key is another.
+            I::I32Const(1),
+            I::LocalSet(keep),
+            I::LocalGet(i),
+            I::I32Const(1),
+            I::I32Add,
+            I::LocalTee(next),
+            I::LocalGet(len),
+            I::I32LtU,
+            I::If(Empty),
+        ]);
+        let a = self.element_address(sorted, i, esize);
+        let b = self.element_address(sorted, next, esize);
+        let o = match self.order_at(key, a, b) {
+            Encoding::Encoded(o) => o,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.ops.extend([
+            I::LocalGet(o),
+            I::I32Const(0),
+            I::I32Ne,
+            I::LocalSet(keep),
+            I::End,
+            I::LocalGet(keep),
+            I::If(Empty),
+        ]);
+        let to = self.element_address(out, count, esize);
+        let from = self.element_address(sorted, i, esize);
+        self.copy(to, from, esize);
+        self.ops.extend([
+            I::LocalGet(count),
+            I::I32Const(1),
+            I::I32Add,
+            I::LocalSet(count),
+            I::End,
+            I::LocalGet(next),
+            I::LocalSet(i),
+            I::Br(0),
+            I::End,
+            I::End,
+        ]);
+        Encoding::Encoded((out, count))
+    }
+
     /// **`min(max(n, 0), len)`**, as an `i32`: a count or a position, an
     /// `i64` local, clamped to a list of `len` elements, an `i32` local.
     fn clamped(&mut self, n: u32, len: u32) -> u32 {
@@ -3274,8 +3663,8 @@ impl Enc<'_> {
         Encoding::Encoded(())
     }
 
-    /// **A stable merge sort**, bottom-up, between two buffers (ADR-0040
-    /// §5). The comparison is emitted once, in the merge step.
+    /// **`List.sort_by`**: the merge sort below, the comparison the
+    /// function argument (ADR-0040 §5), emitted once, in the merge step.
     #[allow(clippy::too_many_arguments)]
     fn sort_by(
         &mut self,
@@ -3287,6 +3676,57 @@ impl Enc<'_> {
         params: &[ValueId],
         body: &super::ir::Region,
     ) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let sorted = self.merge_sort(ptr, len, et, &mut |this, a, b, take| {
+            if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) = this
+                .loop_body(
+                    &[
+                        (params[0], Held::Memory { ty: et, ptr: a }),
+                        (params[1], Held::Memory { ty: et, ptr: b }),
+                    ],
+                    body,
+                )
+            {
+                return other;
+            }
+            let order = match this.flat_locals(body.value) {
+                Encoding::Encoded((_, c)) => c[0],
+                other => return other.map(|_| unreachable!()),
+            };
+            this.ops.extend([
+                I::LocalGet(order),
+                I::I64Const(0),
+                I::I64LeS,
+                I::LocalSet(take),
+            ]);
+            Encoding::Encoded(())
+        });
+        let sorted = match sorted {
+            Encoding::Encoded(s) => s,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.held.insert(
+            result,
+            Held::Flat {
+                ty: rt,
+                locals: vec![sorted, len],
+            },
+        );
+        Encoding::Encoded(())
+    }
+
+    /// **A stable merge sort**, bottom-up, between two buffers (ADR-0040
+    /// §5), into a new array: its address, in an `i32`. `take_first(a, b,
+    /// take)`, given the addresses of two competing elements, `a` from the
+    /// earlier run, sets the `i32` local `take` to 1 when `a` goes first. It
+    /// is emitted once, in the merge step.
+    fn merge_sort(
+        &mut self,
+        ptr: u32,
+        len: u32,
+        et: WitType,
+        take_first: &mut dyn FnMut(&mut Self, u32, u32, u32) -> Encoding<()>,
+    ) -> Encoding<u32> {
         use wasm_encoder::BlockType::Empty;
         use wasm_encoder::Instruction as I;
         let (esize, ealign) = self.layout(&et);
@@ -3371,7 +3811,7 @@ impl Enc<'_> {
         self.ops.extend([I::Block(Empty), I::Loop(Empty)]);
         self.ops
             .extend([I::LocalGet(k), I::LocalGet(hi), I::I32GeU, I::BrIf(1)]);
-        // take = j >= hi ? 1 : (i >= mid ? 0 : compare(src[i], src[j]) <= 0)
+        // take = j >= hi ? 1 : (i >= mid ? 0 : take_first(src[i], src[j]))
         self.ops.extend([
             I::LocalGet(j),
             I::LocalGet(hi),
@@ -3390,27 +3830,12 @@ impl Enc<'_> {
         ]);
         let a = self.element_address(src, i, esize);
         let b = self.element_address(src, j, esize);
-        if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) = self.loop_body(
-            &[
-                (params[0], Held::Memory { ty: et, ptr: a }),
-                (params[1], Held::Memory { ty: et, ptr: b }),
-            ],
-            body,
-        ) {
-            return other;
+        if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+            take_first(self, a, b, take)
+        {
+            return other.map(|_| unreachable!());
         }
-        let order = match self.flat_locals(body.value) {
-            Encoding::Encoded((_, c)) => c[0],
-            other => return other.map(|_| unreachable!()),
-        };
-        self.ops.extend([
-            I::LocalGet(order),
-            I::I64Const(0),
-            I::I64LeS,
-            I::LocalSet(take),
-            I::End,
-            I::End,
-        ]);
+        self.ops.extend([I::End, I::End]);
         let to = self.element_address(dst, k, esize);
         self.ops.extend([I::LocalGet(take), I::If(Empty)]);
         let from_i = self.element_address(src, i, esize);
@@ -3468,14 +3893,7 @@ impl Enc<'_> {
             I::End,
             I::End,
         ]);
-        self.held.insert(
-            result,
-            Held::Flat {
-                ty: rt,
-                locals: vec![src, len],
-            },
-        );
-        Encoding::Encoded(())
+        Encoding::Encoded(src)
     }
 
     /// **Runs of equal keys**, as views: each group is a pointer into the
@@ -3889,6 +4307,347 @@ impl Enc<'_> {
                 ty: rt,
                 locals: call(self, Helper::Utf8Count, &flats[0].1),
             },
+            // --- maps and sets (ADR-0057) ------------------------------------
+            N::MapEmpty | N::SetEmpty => {
+                let Some(et) = self.element_of(rt) else {
+                    blocked!(
+                        "`{}` makes an empty map of a type that is not one",
+                        self.export
+                    );
+                };
+                let (esize, ealign) = self.layout(&et);
+                let zero = self.locals.fresh(ValType::I32);
+                self.ops.extend([I::I32Const(0), I::LocalSet(zero)]);
+                let out = self.alloc_array(zero, esize, ealign);
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![out, zero],
+                }
+            }
+            N::MapSize | N::SetSize => {
+                let n = self.locals.fresh(ValType::I64);
+                self.ops
+                    .extend([I::LocalGet(flats[0].1[1]), I::I64ExtendI32U, I::LocalSet(n)]);
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![n],
+                }
+            }
+            N::MapContains | N::SetContains => {
+                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let Some((entry, key, _)) = self.entry_of(flats[0].0) else {
+                    blocked!("`{}` looks into a value that is not a map", self.export);
+                };
+                let (esize, _) = self.layout(&entry);
+                let (_, found) = match self.search(key, ptr, len, esize, &flats[1].1) {
+                    Encoding::Encoded(x) => x,
+                    other => return other.map(|_| unreachable!()),
+                };
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![found],
+                }
+            }
+            N::MapGet => {
+                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let Some((entry, key, Some((vt, voff)))) = self.entry_of(flats[0].0) else {
+                    blocked!("`{}` looks into a value that is not a map", self.export);
+                };
+                let ((esize, _), (vsize, _)) = (self.layout(&entry), self.layout(&vt));
+                let (at, found) = match self.search(key, ptr, len, esize, &flats[1].1) {
+                    Encoding::Encoded(x) => x,
+                    other => return other.map(|_| unreachable!()),
+                };
+                let Some((_, _, offset)) =
+                    case_layout(self.resolve, self.sizes, rt, BuiltinCase::Some)
+                else {
+                    blocked!("`{}` answers a map's value in a non-option", self.export);
+                };
+                let area = self.locals.fresh(ValType::I32);
+                allocate(self.sizes, &rt, self.realloc_index, area, &mut self.ops);
+                self.ops.extend([
+                    I::LocalGet(area),
+                    I::LocalGet(found),
+                    I::I32Store8(MemArg {
+                        offset: 0,
+                        align: 0,
+                        memory_index: 0,
+                    }),
+                    I::LocalGet(found),
+                    I::If(Empty),
+                ]);
+                let (payload, value) = (
+                    self.locals.fresh(ValType::I32),
+                    self.locals.fresh(ValType::I32),
+                );
+                let from = self.element_address(ptr, at, esize);
+                self.ops.extend([
+                    I::LocalGet(area),
+                    I::I32Const(offset as i32),
+                    I::I32Add,
+                    I::LocalSet(payload),
+                    I::LocalGet(from),
+                    I::I32Const(voff as i32),
+                    I::I32Add,
+                    I::LocalSet(value),
+                ]);
+                self.copy(payload, value, vsize);
+                self.ops.push(I::End);
+                Held::Memory { ty: rt, ptr: area }
+            }
+            // A new array: the entries before the key's place, the new entry,
+            // then the rest, less the one it replaces.
+            N::MapInsert | N::SetInsert | N::MapRemove | N::SetRemove => {
+                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let Some((entry, key, value)) = self.entry_of(flats[0].0) else {
+                    blocked!("`{}` changes a value that is not a map", self.export);
+                };
+                let (esize, ealign) = self.layout(&entry);
+                let (at, found) = match self.search(key, ptr, len, esize, &flats[1].1) {
+                    Encoding::Encoded(x) => x,
+                    other => return other.map(|_| unreachable!()),
+                };
+                let adds = matches!(op, N::MapInsert | N::SetInsert);
+                let fresh = |this: &mut Self| this.locals.fresh(ValType::I32);
+                let (count, head, skip, tail, gap) = (
+                    fresh(self),
+                    fresh(self),
+                    fresh(self),
+                    fresh(self),
+                    fresh(self),
+                );
+                // count = len - found (+ 1 when adding); skip = at + found;
+                // tail = len - skip; gap = at (+ 1 when adding).
+                self.ops.extend([
+                    I::LocalGet(len),
+                    I::LocalGet(found),
+                    I::I32Sub,
+                    I::I32Const(i32::from(adds)),
+                    I::I32Add,
+                    I::LocalSet(count),
+                    I::LocalGet(at),
+                    I::LocalGet(found),
+                    I::I32Add,
+                    I::LocalSet(skip),
+                    I::LocalGet(len),
+                    I::LocalGet(skip),
+                    I::I32Sub,
+                    I::LocalSet(tail),
+                    I::LocalGet(at),
+                    I::I32Const(i32::from(adds)),
+                    I::I32Add,
+                    I::LocalSet(gap),
+                    I::LocalGet(at),
+                    I::I32Const(esize as i32),
+                    I::I32Mul,
+                    I::LocalSet(head),
+                ]);
+                let out = self.alloc_array(count, esize, ealign);
+                self.ops.extend([
+                    I::LocalGet(out),
+                    I::LocalGet(ptr),
+                    I::LocalGet(head),
+                    I::MemoryCopy {
+                        src_mem: 0,
+                        dst_mem: 0,
+                    },
+                ]);
+                let from = self.element_address(ptr, skip, esize);
+                let to = self.element_address(out, gap, esize);
+                self.ops.extend([
+                    I::LocalGet(to),
+                    I::LocalGet(from),
+                    I::LocalGet(tail),
+                    I::I32Const(esize as i32),
+                    I::I32Mul,
+                    I::MemoryCopy {
+                        src_mem: 0,
+                        dst_mem: 0,
+                    },
+                ]);
+                if adds {
+                    let slot = self.element_address(out, at, esize);
+                    match self.store_at(args[1], key, slot, 0) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    }
+                    if let Some((vt, voff)) = value {
+                        match self.store_at(args[2], vt, slot, voff) {
+                            Encoding::Encoded(()) => {}
+                            other => return other,
+                        }
+                    }
+                }
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![out, count],
+                }
+            }
+            N::MapKeys | N::MapValues => {
+                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let Some((entry, key, Some((vt, voff)))) = self.entry_of(flats[0].0) else {
+                    blocked!("`{}` reads a value that is not a map", self.export);
+                };
+                let (field, at) = match op {
+                    N::MapKeys => (key, 0),
+                    _ => (vt, voff),
+                };
+                let ((esize, _), (fsize, falign)) = (self.layout(&entry), self.layout(&field));
+                let out = self.alloc_array(len, fsize, falign);
+                let (i, src) = (
+                    self.locals.fresh(ValType::I32),
+                    self.locals.fresh(ValType::I32),
+                );
+                self.ops.extend([
+                    I::I32Const(0),
+                    I::LocalSet(i),
+                    I::Block(Empty),
+                    I::Loop(Empty),
+                    I::LocalGet(i),
+                    I::LocalGet(len),
+                    I::I32GeU,
+                    I::BrIf(1),
+                ]);
+                let to = self.element_address(out, i, fsize);
+                let entry_at = self.element_address(ptr, i, esize);
+                self.ops.extend([
+                    I::LocalGet(entry_at),
+                    I::I32Const(at as i32),
+                    I::I32Add,
+                    I::LocalSet(src),
+                ]);
+                self.copy(to, src, fsize);
+                self.ops.extend(increment(i));
+                self.ops.extend([I::Br(0), I::End, I::End]);
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![out, len],
+                }
+            }
+            // A set is its list, ascending.
+            N::SetToList => Held::Flat {
+                ty: rt,
+                locals: flats[0].1.clone(),
+            },
+            N::MapFromLists => {
+                let ((kp, kl), (vp, vl)) = (
+                    (flats[0].1[0], flats[0].1[1]),
+                    (flats[1].1[0], flats[1].1[1]),
+                );
+                let Some((entry, key, Some((vt, voff)))) = self.entry_of(rt) else {
+                    blocked!("`{}` builds a map of a type that is not one", self.export);
+                };
+                let ((esize, ealign), (ksize, _), (vsize, _)) =
+                    (self.layout(&entry), self.layout(&key), self.layout(&vt));
+                // Lists of two lengths stop the invocation.
+                self.ops
+                    .extend([I::LocalGet(kl), I::LocalGet(vl), I::I32Ne]);
+                trap_if(&mut self.ops);
+                let pairs = self.alloc_array(kl, esize, ealign);
+                let (i, value_to) = (
+                    self.locals.fresh(ValType::I32),
+                    self.locals.fresh(ValType::I32),
+                );
+                self.ops.extend([
+                    I::I32Const(0),
+                    I::LocalSet(i),
+                    I::Block(Empty),
+                    I::Loop(Empty),
+                    I::LocalGet(i),
+                    I::LocalGet(kl),
+                    I::I32GeU,
+                    I::BrIf(1),
+                ]);
+                let to = self.element_address(pairs, i, esize);
+                let k_from = self.element_address(kp, i, ksize);
+                self.copy(to, k_from, ksize);
+                let v_from = self.element_address(vp, i, vsize);
+                self.ops.extend([
+                    I::LocalGet(to),
+                    I::I32Const(voff as i32),
+                    I::I32Add,
+                    I::LocalSet(value_to),
+                ]);
+                self.copy(value_to, v_from, vsize);
+                self.ops.extend(increment(i));
+                self.ops.extend([I::Br(0), I::End, I::End]);
+                let (out, count) = match self.sorted(pairs, kl, entry, key) {
+                    Encoding::Encoded(x) => x,
+                    other => return other.map(|_| unreachable!()),
+                };
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![out, count],
+                }
+            }
+            N::SetFromList => {
+                let Some((entry, key, _)) = self.entry_of(rt) else {
+                    blocked!("`{}` builds a set of a type that is not one", self.export);
+                };
+                let (out, count) = match self.sorted(flats[0].1[0], flats[0].1[1], entry, key) {
+                    Encoding::Encoded(x) => x,
+                    other => return other.map(|_| unreachable!()),
+                };
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![out, count],
+                }
+            }
+            N::SetUnion | N::SetIntersection | N::SetDifference => {
+                let Some((entry, key, _)) = self.entry_of(rt) else {
+                    blocked!("`{}` merges values that are not sets", self.export);
+                };
+                let a = (flats[0].1[0], flats[0].1[1]);
+                let b = (flats[1].1[0], flats[1].1[1]);
+                let (out, count) = match self.merged(op, entry, key, a, b) {
+                    Encoding::Encoded(x) => x,
+                    other => return other.map(|_| unreachable!()),
+                };
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![out, count],
+                }
+            }
+            // From outside (ADR-0057): each key below the next, or a trap.
+            N::MapCheck | N::SetCheck => {
+                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let Some((entry, key, _)) = self.entry_of(flats[0].0) else {
+                    blocked!("`{}` checks a value that is not a map", self.export);
+                };
+                let (esize, _) = self.layout(&entry);
+                let (i, before) = (
+                    self.locals.fresh(ValType::I32),
+                    self.locals.fresh(ValType::I32),
+                );
+                self.ops.extend([
+                    I::I32Const(1),
+                    I::LocalSet(i),
+                    I::Block(Empty),
+                    I::Loop(Empty),
+                    I::LocalGet(i),
+                    I::LocalGet(len),
+                    I::I32GeU,
+                    I::BrIf(1),
+                    I::LocalGet(i),
+                    I::I32Const(1),
+                    I::I32Sub,
+                    I::LocalSet(before),
+                ]);
+                let a = self.element_address(ptr, before, esize);
+                let b = self.element_address(ptr, i, esize);
+                let o = match self.order_at(key, a, b) {
+                    Encoding::Encoded(o) => o,
+                    other => return other.map(|_| unreachable!()),
+                };
+                self.ops.extend([I::LocalGet(o), I::I32Const(0), I::I32GeS]);
+                trap_if(&mut self.ops);
+                self.ops.extend(increment(i));
+                self.ops.extend([I::Br(0), I::End, I::End]);
+                Held::Flat {
+                    ty: rt,
+                    locals: vec![ptr, len],
+                }
+            }
             N::StrToLower | N::StrToUpper => {
                 let case = match op {
                     N::StrToLower => Case::Lower,
@@ -5399,6 +6158,26 @@ fn store(
         WitType::String => pointer_and_length(base, offset, flats, ops),
         WitType::Id(id) => match &resolve.types[id].kind {
             TypeDefKind::List(_) => pointer_and_length(base, offset, flats, ops),
+            // A map's entry (ADR-0057): laid out as a record of its types.
+            TypeDefKind::Tuple(t) => {
+                let mut used = 0;
+                for (field_offset, field_ty) in sizes.field_offsets(t.types.iter()) {
+                    let o = field_offset.size_wasm32() as u64;
+                    match store(
+                        resolve,
+                        sizes,
+                        field_ty,
+                        base,
+                        offset + o,
+                        &flats[used..],
+                        ops,
+                    ) {
+                        Encoding::Encoded(n) => used += n,
+                        other => return other,
+                    }
+                }
+                Encoding::Encoded(used)
+            }
             TypeDefKind::Record(r) => {
                 let mut used = 0;
                 for (field_offset, field_ty) in sizes.field_offsets(r.fields.iter().map(|f| &f.ty))
@@ -5540,6 +6319,16 @@ fn load(
             TypeDefKind::Record(r) => {
                 let offsets = sizes.field_offsets(r.fields.iter().map(|f| &f.ty));
                 for (field_offset, field_ty) in offsets {
+                    let o = field_offset.size_wasm32() as u64;
+                    match load(resolve, sizes, field_ty, ptr, offset + o, ops) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    }
+                }
+            }
+            // A map's entry (ADR-0057), as a record of its types.
+            TypeDefKind::Tuple(t) => {
+                for (field_offset, field_ty) in sizes.field_offsets(t.types.iter()) {
                     let o = field_offset.size_wasm32() as u64;
                     match load(resolve, sizes, field_ty, ptr, offset + o, ops) {
                         Encoding::Encoded(()) => {}

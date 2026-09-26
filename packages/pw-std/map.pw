@@ -1,0 +1,44 @@
+// @corpus: platform
+// @id: STD-map
+// @category: standard library — collections
+// @charter: §7.1
+// @milestone: E10
+
+module Map
+
+// **Values by key** (ADR-0057). A key is an `Int` or a `String`, and a map's
+// entries are in ascending key order: an `Int` by value, a `String` by code
+// point. Each operation answers a new map; a map does not change. A map a
+// query is given is checked on entry, its keys ascending and each once, and
+// one that is not stops the invocation.
+
+fn empty<K, V>() -> Map<K, V> !{}
+    intrinsic "map.empty"
+
+fn size<K, V>(map: Map<K, V>) -> Int !{}
+    intrinsic "map.size"
+
+fn get<K, V>(map: Map<K, V>, key: K) -> Option<V> !{}
+    intrinsic "map.get"
+
+fn contains<K, V>(map: Map<K, V>, key: K) -> Bool !{}
+    intrinsic "map.contains"
+
+// The value under `key`, added, or replacing the one there.
+fn insert<K, V>(map: Map<K, V>, key: K, value: V) -> Map<K, V> !{}
+    intrinsic "map.insert"
+
+fn remove<K, V>(map: Map<K, V>, key: K) -> Map<K, V> !{}
+    intrinsic "map.remove"
+
+// In ascending key order, as `values` is.
+fn keys<K, V>(map: Map<K, V>) -> List<K> !{}
+    intrinsic "map.keys"
+
+fn values<K, V>(map: Map<K, V>) -> List<V> !{}
+    intrinsic "map.values"
+
+// Each value under the key at its position. A later key replaces an earlier
+// one, and two lists of different lengths stop the invocation.
+fn from_lists<K, V>(keys: List<K>, values: List<V>) -> Map<K, V> !{}
+    intrinsic "map.from_lists"

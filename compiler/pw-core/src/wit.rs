@@ -434,6 +434,9 @@ fn wit_resolved(ty: &ResolvedType, types: &Types, at: &str) -> Result<String, Wi
             Builtin::List => format!("list<{}>", mapped(0)?),
             Builtin::Option => format!("option<{}>", mapped(0)?),
             Builtin::Result => format!("result<{}, {}>", mapped(0)?, mapped(1)?),
+            // In ascending key order, each key once (ADR-0057).
+            Builtin::Map => format!("list<tuple<{}, {}>>", mapped(0)?, mapped(1)?),
+            Builtin::Set => format!("list<{}>", mapped(0)?),
             // A function is not a value that crosses a component boundary.
             Builtin::Function => return Err(bad()),
         });

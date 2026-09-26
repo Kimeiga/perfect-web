@@ -144,8 +144,16 @@ refused by name:
     `to_lower_ascii`, and `to_lower` and `to_upper` (ADR-0056).
   - `Float` has `from_int` (ADR-0043).
 
-  There is no `split`, no `range`, and no map or set type. `enumerate` is
-  removed, since the language has no tuple type (ADR-0055).
+  - `Map` and `Set` (ADR-0057), keyed by an `Int` or a `String`, in
+    ascending key order.
+
+  There is no `split` and no `range`. `enumerate` is removed, since the
+  language has no tuple type (ADR-0055).
+- **A map's key is an `Int` or a `String`** (ADR-0057), and another key type
+  is refused by name. A map or set a query is given, or a host answers, is
+  checked on arrival and one out of order stops the invocation; one inside
+  another value is refused, since nothing would check it. A `for` loop reads
+  a map or set through `Map.keys` or `Set.to_list`.
 - **Case mapping is per code point** (ADR-0056). A word-final capital sigma
   lowers to `σ`, where Unicode's default conversion gives `ς`. There is no
   case folding and no locale rule. The mapping is Unicode 17.0's, as the

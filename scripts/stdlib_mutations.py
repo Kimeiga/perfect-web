@@ -48,8 +48,8 @@ MUTANTS = [
     (
         "sort_by takes the right element on a tie",
         WASM,
-        "            I::LocalGet(order),\n            I::I64Const(0),\n            I::I64LeS,",
-        "            I::LocalGet(order),\n            I::I64Const(0),\n            I::I64LtS,",
+        "                I::LocalGet(order),\n                I::I64Const(0),\n                I::I64LeS,",
+        "                I::LocalGet(order),\n                I::I64Const(0),\n                I::I64LtS,",
     ),
     (
         "get refuses index 0",

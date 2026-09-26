@@ -402,7 +402,9 @@ fn the_trusted_platform_contract_is_hashed() {
     // type, is removed: the language has no tuple type.
     // 2026-09-25: `String` declares `to_lower` and `to_upper`, Unicode 17.0's
     // mapping per code point, from tables the compiler generates (ADR-0056).
-    const EXPECTED: u64 = 0x588d4516026a38aa;
+    // 2026-09-25: `map.pw` and `set.pw` declare the `Map` and `Set` modules,
+    // over the language's `Map<K, V>` and `Set<T>` (ADR-0057).
+    const EXPECTED: u64 = 0x93c244402bb16dde;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

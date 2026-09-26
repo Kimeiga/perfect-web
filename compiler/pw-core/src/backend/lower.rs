@@ -303,6 +303,38 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         params.push((v, ty));
     }
 
+    // **A map or set from outside is checked on entry** (ADR-0057): its keys
+    // ascending, each once, or the invocation stops. A binary search over
+    // anything else answers wrongly. One inside another value is refused:
+    // nothing checks it.
+    for (p, (v, ty)) in decl.params.iter().zip(&params) {
+        let op = match ty {
+            Type::Map(..) => Intrinsic::MapCheck,
+            Type::Set(..) => Intrinsic::SetCheck,
+            t if holds_collection(cx, t, &mut Vec::new()) => {
+                return Lowering::Unsupported {
+                    construct: "a map or set inside a parameter's value",
+                    span: p.span.clone(),
+                    reason: format!(
+                        "`{}` would reach the body unchecked; only a map or set that is \
+                         itself the parameter is checked on entry (ADR-0057)",
+                        p.name
+                    ),
+                };
+            }
+            _ => continue,
+        };
+        let checked = f.fresh();
+        f.push(Instr::Intrinsic {
+            result: checked,
+            op,
+            args: vec![*v],
+            ty: ty.clone(),
+        });
+        f.types.insert(checked, ty.clone());
+        f.locals.insert(p.name.clone(), checked);
+    }
+
     let ret = match &signature.returns {
         Some(resolution) => match ty_resolution(cx.sigs, resolution, &span) {
             Lowering::Lowered(t) => t,
@@ -873,6 +905,27 @@ fn ty_resolved_with(
             },
             Builtin::Option => arg(0).map(|a| Type::Option(Box::new(a))),
             Builtin::List => arg(0).map(|a| Type::List(Box::new(a))),
+            // A map's key and a set's element are ordered: an `Int` or a
+            // `String` (ADR-0057, ruling needed).
+            Builtin::Map | Builtin::Set => {
+                let key = match arg(0) {
+                    Lowering::Lowered(k @ (Type::Int | Type::Str)) => k,
+                    Lowering::Lowered(other) => {
+                        return Lowering::Unsupported {
+                            construct: "a map or set keyed by a type other than Int or String",
+                            span: span.clone(),
+                            reason: format!(
+                                "a {other:?} key has no order the backends share (ADR-0057)"
+                            ),
+                        };
+                    }
+                    other => return other,
+                };
+                match b {
+                    Builtin::Set => Lowering::Lowered(Type::Set(Box::new(key))),
+                    _ => arg(1).map(|v| Type::Map(Box::new(key), Box::new(v))),
+                }
+            }
             // `fn(A, B) -> R`: its parameters, then its result (ADR-0052).
             Builtin::Function => {
                 let mut all = Vec::new();
@@ -1690,7 +1743,7 @@ impl<'a> Lower<'a> {
                         other => return other,
                     }
                 }
-                self.apply(i, values, span)
+                self.apply(i, values, expected, span)
             }
             Operation::Each(kind) => self.each(body, kind, &given, expected, span),
         }
@@ -1833,11 +1886,71 @@ impl<'a> Lower<'a> {
         }))
     }
 
-    /// An operation on values, typed by its arguments.
-    fn apply(&mut self, op: Intrinsic, args: Vec<ValueId>, span: Span) -> Lowering<ValueId> {
+    /// An operation on values, typed by its arguments, or, for an empty map
+    /// or set, by the type its context expects.
+    fn apply(
+        &mut self,
+        op: Intrinsic,
+        args: Vec<ValueId>,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
         use Intrinsic as I;
         let types: Vec<Option<Type>> = args.iter().map(|v| self.types.get(v).cloned()).collect();
         let ty = match (op, types.as_slice()) {
+            (I::MapEmpty, []) => match expected {
+                Some(t @ Type::Map(..)) => t.clone(),
+                _ => {
+                    return Lowering::Unsupported {
+                        construct: "an empty map whose types nothing fixes",
+                        span,
+                        reason: "`Map.empty()` needs the type its context expects".to_string(),
+                    };
+                }
+            },
+            (I::SetEmpty, []) => match expected {
+                Some(t @ Type::Set(..)) => t.clone(),
+                _ => {
+                    return Lowering::Unsupported {
+                        construct: "an empty set whose type nothing fixes",
+                        span,
+                        reason: "`Set.empty()` needs the type its context expects".to_string(),
+                    };
+                }
+            },
+            (I::MapSize, [Some(Type::Map(..))]) | (I::SetSize, [Some(Type::Set(..))]) => Type::Int,
+            (I::MapGet, [Some(Type::Map(k, v)), Some(key)]) if **k == *key => {
+                Type::Option(v.clone())
+            }
+            (I::MapContains, [Some(Type::Map(k, _)), Some(key)]) if **k == *key => Type::Bool,
+            (I::MapInsert, [Some(m @ Type::Map(k, v)), Some(key), Some(value)])
+                if **k == *key && **v == *value =>
+            {
+                m.clone()
+            }
+            (I::MapRemove, [Some(m @ Type::Map(k, _)), Some(key)]) if **k == *key => m.clone(),
+            (I::MapKeys, [Some(Type::Map(k, _))]) => Type::List(k.clone()),
+            (I::MapValues, [Some(Type::Map(_, v))]) => Type::List(v.clone()),
+            (I::MapFromLists, [Some(Type::List(k)), Some(Type::List(v))])
+                if matches!(**k, Type::Int | Type::Str) =>
+            {
+                Type::Map(k.clone(), v.clone())
+            }
+            (I::MapCheck, [Some(m @ Type::Map(..))]) | (I::SetCheck, [Some(m @ Type::Set(..))]) => {
+                m.clone()
+            }
+            (I::SetFromList, [Some(Type::List(t))]) if matches!(**t, Type::Int | Type::Str) => {
+                Type::Set(t.clone())
+            }
+            (I::SetContains, [Some(Type::Set(t)), Some(x)]) if **t == *x => Type::Bool,
+            (I::SetInsert | I::SetRemove, [Some(s @ Type::Set(t)), Some(x)]) if **t == *x => {
+                s.clone()
+            }
+            (I::SetToList, [Some(Type::Set(t))]) => Type::List(t.clone()),
+            (
+                I::SetUnion | I::SetIntersection | I::SetDifference,
+                [Some(a @ Type::Set(_)), Some(b)],
+            ) if a == b => a.clone(),
             (I::ListLength, [Some(Type::List(_))]) => Type::Int,
             (I::ListGet, [Some(Type::List(t)), Some(Type::Int)]) => Type::Option(t.clone()),
             (I::ListTake | I::ListDrop, [Some(t @ Type::List(_)), Some(Type::Int)]) => t.clone(),
@@ -1987,7 +2100,7 @@ impl<'a> Lower<'a> {
                 let value = match crate::resolve::declaration(self.cx.hirs, def)
                     .and_then(crate::backend::intrinsic_binding)
                 {
-                    Some(Ok(Operation::Intrinsic(i))) => self.apply(i, bound.clone(), span),
+                    Some(Ok(Operation::Intrinsic(i))) => self.apply(i, bound.clone(), None, span),
                     Some(_) => Lowering::Unsupported {
                         construct: "a list operation passed as a function",
                         span,
@@ -3345,13 +3458,41 @@ impl<'a> Lower<'a> {
                     },
                     None => Type::Unit,
                 };
+                // A map or set the host answers is checked as a query's
+                // parameter is (ADR-0057); one inside another value is
+                // refused, since nothing checks it.
+                let check = match &ty {
+                    Type::Map(..) => Some(Intrinsic::MapCheck),
+                    Type::Set(..) => Some(Intrinsic::SetCheck),
+                    t if holds_collection(self.cx, t, &mut Vec::new()) => {
+                        return Lowering::Unsupported {
+                            construct: "a map or set inside a host's answer",
+                            span,
+                            reason: "only a map or set that is itself the answer is checked \
+                                     when it arrives (ADR-0057)"
+                                .to_string(),
+                        };
+                    }
+                    _ => None,
+                };
                 self.push(Instr::ImportCall {
                     result,
                     import,
                     args: lowered,
-                    ty,
+                    ty: ty.clone(),
                 });
-                Lowering::Lowered(result)
+                match check {
+                    Some(op) => {
+                        let checked = self.fresh();
+                        Lowering::Lowered(self.push(Instr::Intrinsic {
+                            result: checked,
+                            op,
+                            args: vec![result],
+                            ty,
+                        }))
+                    }
+                    None => Lowering::Lowered(result),
+                }
             }
             None => match def {
                 // Compiled Pleris: inlined, so the component still exports
@@ -3374,6 +3515,34 @@ impl<'a> Lower<'a> {
 }
 
 /// Does this region end by leaving the function (ADR-0051)?
+/// Does a value of this type hold a map or a set, anywhere inside it: in a
+/// list, an option, a result or a record's field?
+fn holds_collection(cx: &Context<'_>, t: &Type, seen: &mut Vec<DefId>) -> bool {
+    match t {
+        Type::Map(..) | Type::Set(..) => true,
+        Type::List(a) | Type::Option(a) => holds_collection(cx, a, seen),
+        Type::Result(a, b) => holds_collection(cx, a, seen) || holds_collection(cx, b, seen),
+        Type::Nominal(def) => {
+            if seen.contains(def) {
+                return false;
+            }
+            seen.push(*def);
+            let Some(decl) = cx.sigs.type_decl(*def) else {
+                return false;
+            };
+            let fields = decl.record.iter().flatten().map(|(_, r)| r);
+            let rep = decl.representation.iter();
+            fields.chain(rep).any(|r| {
+                matches!(
+                    ty_resolution(cx.sigs, r, &Span::default()),
+                    Lowering::Lowered(ft) if holds_collection(cx, &ft, seen)
+                )
+            })
+        }
+        Type::Int | Type::Float | Type::Bool | Type::Str | Type::Unit | Type::Function(..) => false,
+    }
+}
+
 fn diverges(r: &Region) -> bool {
     matches!(r.instrs.last(), Some(Instr::Return { result, .. }) if *result == r.value)
 }
@@ -3413,6 +3582,20 @@ fn intrinsic_argument(op: Intrinsic, k: usize, prior: &[Type]) -> Option<Type> {
         (I::ListGet | I::ListTake | I::ListDrop, 1) => Some(Type::Int),
         (I::ListSlice | I::StrSlice, 1 | 2) => Some(Type::Int),
         (I::StrSlice, 0) => Some(Type::Str),
+        // A key or an element where the map or set before it fixes it.
+        (I::MapGet | I::MapContains | I::MapRemove | I::MapInsert, 1) => match prior.first() {
+            Some(Type::Map(k, _)) => Some((**k).clone()),
+            _ => None,
+        },
+        (I::MapInsert, 2) => match prior.first() {
+            Some(Type::Map(_, v)) => Some((**v).clone()),
+            _ => None,
+        },
+        (I::SetContains | I::SetInsert | I::SetRemove, 1) => match prior.first() {
+            Some(Type::Set(t)) => Some((**t).clone()),
+            _ => None,
+        },
+        (I::SetUnion | I::SetIntersection | I::SetDifference, 1) => prior.first().cloned(),
         (I::ListConcat, 1) => prior.first().cloned(),
         (I::StrFromCodepoints, 0) => Some(Type::List(Box::new(Type::Int))),
         (I::StrJoin, 0) => Some(Type::List(Box::new(Type::Str))),

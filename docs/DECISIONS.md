@@ -341,3 +341,9 @@ and `String.to_upper` map each code point as Unicode 17.0 does, from
 tables generated from the compiler's own `char` mapping. The component
 holds them in its data segment and the module as constants, so neither
 reads a platform's mapping. A final sigma lowers to `σ`.
+
+[ADR-0057](DECISIONS/ADR-0057-maps-and-sets.md): `Map<K, V>` and `Set<T>`,
+keyed by an `Int` or a `String`, in ascending key order: in the component
+`list<tuple<K, V>>` and `list<T>`, searched in binary and changed by
+copying; in the module sorted arrays. A map or set from outside is checked
+on arrival. `List.sort_by`'s merge sort takes a comparison now.

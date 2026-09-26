@@ -103,6 +103,10 @@ pub enum Builtin {
     List,
     Option,
     Result,
+    /// `Map<K, V>`: values by key, in ascending key order (ADR-0057).
+    Map,
+    /// `Set<T>`: distinct values, in ascending order (ADR-0057).
+    Set,
     /// `fn(A, B) -> R`: its arguments are the parameter types, then the
     /// result. Semantic only — no boundary representation exists for a
     /// function, and every ABI consumer refuses it rather than lowering it.
@@ -115,6 +119,8 @@ impl Builtin {
             "List" => Builtin::List,
             "Option" => Builtin::Option,
             "Result" => Builtin::Result,
+            "Map" => Builtin::Map,
+            "Set" => Builtin::Set,
             "fn" => Builtin::Function,
             _ => return None,
         })
@@ -125,6 +131,8 @@ impl Builtin {
             Builtin::List => "List",
             Builtin::Option => "Option",
             Builtin::Result => "Result",
+            Builtin::Map => "Map",
+            Builtin::Set => "Set",
             Builtin::Function => "fn",
         }
     }
@@ -275,8 +283,8 @@ pub fn resolve(
         // Checking only for missing arguments accepted `Result<Int>` and
         // `Option<Int, String>` as successful semantic types.
         let arity_ok = match b {
-            Builtin::List | Builtin::Option => args.len() == 1,
-            Builtin::Result => args.len() == 2,
+            Builtin::List | Builtin::Option | Builtin::Set => args.len() == 1,
+            Builtin::Result | Builtin::Map => args.len() == 2,
             // At least the result; any number of parameters.
             Builtin::Function => !args.is_empty(),
         };

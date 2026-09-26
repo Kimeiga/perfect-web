@@ -217,6 +217,48 @@ const HELPERS: &[(&str, &[&str], &str)] = &[
          return b > a ? xs.slice(Number(a), Number(b)) : [];\n}",
     ),
     (
+        "key_order",
+        &["compare"],
+        "// The order of two keys (ADR-0057): an Int by value, a String by code\n\
+         // point, as the component orders them.\n\
+         function key_order(a, b) {\n  return typeof a === \"bigint\" ? (a < b ? -1 : a > b ? 1 : 0) : compare(a, b);\n}",
+    ),
+    (
+        "place",
+        &["key_order"],
+        "// Where `key` goes among entries sorted by `of`: the first not below it,\n\
+         // and whether it is there.\n\
+         function place(xs, key, of) {\n  let lo = 0, hi = xs.length;\n  while (lo < hi) {\n    \
+         const mid = (lo + hi) >> 1;\n    if (key_order(of(xs[mid]), key) < 0) lo = mid + 1;\n    else hi = mid;\n  }\n  \
+         return [lo, lo < xs.length && key_order(of(xs[lo]), key) === 0];\n}",
+    ),
+    (
+        "by_key",
+        &["key_order"],
+        "// Sorted by key, stably, and of each run of equal keys the last.\n\
+         function by_key(xs, of) {\n  const s = [...xs].sort((a, b) => key_order(of(a), of(b)));\n  \
+         return s.filter((x, i) => i + 1 === s.length || key_order(of(x), of(s[i + 1])) !== 0);\n}",
+    ),
+    (
+        "checked",
+        &["key_order", "trap"],
+        "// A map or set from outside: each key below the next, or a trap.\n\
+         function checked(xs, of) {\n  for (let i = 1; i < xs.length; i++)\n    \
+         if (key_order(of(xs[i - 1]), of(xs[i])) >= 0) trap(\"a map or set out of order\");\n  return xs;\n}",
+    ),
+    (
+        "merged",
+        &["key_order"],
+        "// Two ascending sets in one pass: what to keep of an element only the\n\
+         // first has, only the second has, and both have.\n\
+         function merged(a, b, first, second, both) {\n  const out = [];\n  let i = 0, j = 0;\n  \
+         while (i < a.length || j < b.length) {\n    \
+         const o = j >= b.length ? -1 : i >= a.length ? 1 : key_order(a[i], b[j]);\n    \
+         if (o < 0) { if (first) out.push(a[i]); i++; }\n    \
+         else if (o > 0) { if (second) out.push(b[j]); j++; }\n    \
+         else { if (both) out.push(a[i]); i++; j++; }\n  }\n  return out;\n}",
+    ),
+    (
         "case_map",
         &[],
         "// Each code point mapped by a case table the component's data segment\n\
@@ -727,6 +769,86 @@ impl<'p> Emitter<'p> {
                     // `Number(bigint)` is the nearest value, ties to even, as
                     // `f64.convert_i64_s` is.
                     Intrinsic::FloatFromInt => format!("Number({})", arg(0)),
+                    // Maps and sets (ADR-0057): arrays in ascending key
+                    // order, a map's entries `[key, value]`.
+                    Intrinsic::MapEmpty | Intrinsic::SetEmpty => "[]".to_string(),
+                    Intrinsic::MapSize | Intrinsic::SetSize => format!("BigInt({}.length)", arg(0)),
+                    Intrinsic::MapGet => {
+                        let (some, none) = (self.uses("some"), self.uses("none"));
+                        format!(
+                            "((p) => p[1] ? {some}({m}[p[0]][1]) : {none})({}({m}, {k}, (e) => e[0]))",
+                            self.uses("place"),
+                            m = arg(0),
+                            k = arg(1)
+                        )
+                    }
+                    Intrinsic::MapContains => {
+                        format!(
+                            "{}({}, {}, (e) => e[0])[1]",
+                            self.uses("place"),
+                            arg(0),
+                            arg(1)
+                        )
+                    }
+                    Intrinsic::SetContains => {
+                        format!(
+                            "{}({}, {}, (e) => e)[1]",
+                            self.uses("place"),
+                            arg(0),
+                            arg(1)
+                        )
+                    }
+                    Intrinsic::MapInsert => format!(
+                        "((p) => [...{m}.slice(0, p[0]), [{k}, {v}], ...{m}.slice(p[0] + (p[1] ? 1 : 0))])({}({m}, {k}, (e) => e[0]))",
+                        self.uses("place"),
+                        m = arg(0),
+                        k = arg(1),
+                        v = arg(2)
+                    ),
+                    Intrinsic::SetInsert => format!(
+                        "((p) => [...{s}.slice(0, p[0]), {x}, ...{s}.slice(p[0] + (p[1] ? 1 : 0))])({}({s}, {x}, (e) => e))",
+                        self.uses("place"),
+                        s = arg(0),
+                        x = arg(1)
+                    ),
+                    Intrinsic::MapRemove | Intrinsic::SetRemove => format!(
+                        "((p) => p[1] ? [...{xs}.slice(0, p[0]), ...{xs}.slice(p[0] + 1)] : {xs})({}({xs}, {k}, {of}))",
+                        self.uses("place"),
+                        xs = arg(0),
+                        k = arg(1),
+                        of = if matches!(op, Intrinsic::MapRemove) {
+                            "(e) => e[0]"
+                        } else {
+                            "(e) => e"
+                        }
+                    ),
+                    Intrinsic::MapKeys => format!("{}.map((e) => e[0])", arg(0)),
+                    Intrinsic::MapValues => format!("{}.map((e) => e[1])", arg(0)),
+                    Intrinsic::MapFromLists => format!(
+                        "((ks, vs) => {{ if (ks.length !== vs.length) {}(\"lists of two lengths\"); return {}(ks.map((k, i) => [k, vs[i]]), (e) => e[0]); }})({}, {})",
+                        self.uses("trap"),
+                        self.uses("by_key"),
+                        arg(0),
+                        arg(1)
+                    ),
+                    Intrinsic::SetFromList => {
+                        format!("{}({}, (e) => e)", self.uses("by_key"), arg(0))
+                    }
+                    Intrinsic::SetToList => arg(0),
+                    Intrinsic::SetUnion | Intrinsic::SetIntersection | Intrinsic::SetDifference => {
+                        let keep = match op {
+                            Intrinsic::SetUnion => "true, true, true",
+                            Intrinsic::SetIntersection => "false, false, true",
+                            _ => "true, false, false",
+                        };
+                        format!("{}({}, {}, {keep})", self.uses("merged"), arg(0), arg(1))
+                    }
+                    Intrinsic::MapCheck => {
+                        format!("{}({}, (e) => e[0])", self.uses("checked"), arg(0))
+                    }
+                    Intrinsic::SetCheck => {
+                        format!("{}({}, (e) => e)", self.uses("checked"), arg(0))
+                    }
                 };
                 self.line(&format!("const {r} = {expr};"));
             }

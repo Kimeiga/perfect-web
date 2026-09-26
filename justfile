@@ -635,6 +635,29 @@ e10-function-values:
      } > docs/evidence/E10/function-values.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/function-values.txt
 
+# ADR-0057: maps and sets. Each operation against BTreeMap and BTreeSet, the
+# checks on what arrives from outside, the component against the JavaScript
+# module, and the mutation controls. Needs `node`.
+e10-maps:
+    @{ echo "ADR-0057 - maps and sets"; echo; \
+       echo "produced by: just e10-maps"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== against BTreeMap and BTreeSet (compiler/pw-conformance/tests/maps.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test maps 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*|test the_modules_entry_check.*|^test result.*"; \
+       echo; echo "== mutation controls (scripts/map_mutations.py)"; echo; \
+       python3 scripts/map_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a key of a type other than Int or String, which is refused"; \
+       echo "by name. NOT CLAIMED: a map or set inside a parameter's value or a"; \
+       echo "host's answer, which is refused because nothing would check it; or a"; \
+       echo "for loop over a map or set, which reads it through keys or to_list."; \
+     } > docs/evidence/E10/maps.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/maps.txt
+
 # ADR-0056: Unicode case mapping. The tables against Rust for every code
 # point, the component and the module against Rust and each other, and the
 # mutation controls. Needs `node`.
@@ -649,7 +672,7 @@ e10-case:
        cargo test --locked -p pw-conformance --test case_mapping 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the module under Node, and the component against it"; echo; \
        cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
-         | grep -E "^javascript: [0-9]+ queries|case_mapping|^test result"; \
+         | grep -oE "javascript: [0-9]+ queries.*|test the_modules_case_mapping.*|^test result.*"; \
        echo; echo "== mutation controls (scripts/case_mutations.py)"; echo; \
        python3 scripts/case_mutations.py; \
        echo; \

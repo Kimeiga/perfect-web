@@ -479,7 +479,8 @@ pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {
     match ty.as_builtin()? {
         Builtin::List => ty.args().first(),
         Builtin::Result | Builtin::Option => element_of_type(ty.args().first()?),
-        Builtin::Function => None,
+        // A map or a set is read through `Map.keys` or `Set.to_list`.
+        Builtin::Function | Builtin::Map | Builtin::Set => None,
     }
 }
 

@@ -95,6 +95,13 @@ pub enum Type {
     Result(Box<Type>, Box<Type>),
     Option(Box<Type>),
     List(Box<Type>),
+    /// **`Map<K, V>`** (ADR-0057): its entries in ascending key order, each
+    /// key once, laid out as `list<tuple<K, V>>`. A key is an `Int` or a
+    /// `String`.
+    Map(Box<Type>, Box<Type>),
+    /// **`Set<T>`** (ADR-0057): its elements ascending, each once, laid out
+    /// as `list<T>`.
+    Set(Box<Type>),
     /// **A function value**, by its parameters and its result (ADR-0052).
     /// It never crosses the component boundary.
     Function(Vec<Type>, Box<Type>),
@@ -119,11 +126,11 @@ impl Type {
     fn walk(&self, f: &mut impl FnMut(&Type)) {
         f(self);
         match self {
-            Type::Result(a, b) => {
+            Type::Result(a, b) | Type::Map(a, b) => {
                 a.walk(f);
                 b.walk(f);
             }
-            Type::Option(a) | Type::List(a) => a.walk(f),
+            Type::Option(a) | Type::List(a) | Type::Set(a) => a.walk(f),
             Type::Function(ps, r) => {
                 for p in ps {
                     p.walk(f);
@@ -410,6 +417,35 @@ pub enum Intrinsic {
     StrToUpper,
     /// The nearest `Float`, ties to even: exact up to 2^53 (ADR-0043).
     FloatFromInt,
+    // Maps and sets (ADR-0057). A lookup is a binary search on the key; a
+    // change is a new value, copied.
+    MapEmpty,
+    MapSize,
+    MapGet,
+    MapContains,
+    /// Adds the entry, or replaces the value under its key.
+    MapInsert,
+    MapRemove,
+    MapKeys,
+    MapValues,
+    /// The value at each position under the key at the same position; a
+    /// later key replaces an earlier one; lists of two lengths trap.
+    MapFromLists,
+    /// A map from outside, checked: its keys ascending, each once, or it
+    /// traps. Its value is the map.
+    MapCheck,
+    SetEmpty,
+    SetFromList,
+    SetSize,
+    SetContains,
+    SetInsert,
+    SetRemove,
+    SetToList,
+    SetUnion,
+    SetIntersection,
+    SetDifference,
+    /// A set from outside, checked as `MapCheck` checks a map.
+    SetCheck,
 }
 
 /// **An `intrinsic` declaration's operation**, by the name its policy gives.
@@ -455,6 +491,25 @@ impl Operation {
             "string.to_lower" => Operation::Intrinsic(I::StrToLower),
             "string.to_upper" => Operation::Intrinsic(I::StrToUpper),
             "float.from_int" => Operation::Intrinsic(I::FloatFromInt),
+            "map.empty" => Operation::Intrinsic(I::MapEmpty),
+            "map.size" => Operation::Intrinsic(I::MapSize),
+            "map.get" => Operation::Intrinsic(I::MapGet),
+            "map.contains" => Operation::Intrinsic(I::MapContains),
+            "map.insert" => Operation::Intrinsic(I::MapInsert),
+            "map.remove" => Operation::Intrinsic(I::MapRemove),
+            "map.keys" => Operation::Intrinsic(I::MapKeys),
+            "map.values" => Operation::Intrinsic(I::MapValues),
+            "map.from_lists" => Operation::Intrinsic(I::MapFromLists),
+            "set.empty" => Operation::Intrinsic(I::SetEmpty),
+            "set.from_list" => Operation::Intrinsic(I::SetFromList),
+            "set.size" => Operation::Intrinsic(I::SetSize),
+            "set.contains" => Operation::Intrinsic(I::SetContains),
+            "set.insert" => Operation::Intrinsic(I::SetInsert),
+            "set.remove" => Operation::Intrinsic(I::SetRemove),
+            "set.to_list" => Operation::Intrinsic(I::SetToList),
+            "set.union" => Operation::Intrinsic(I::SetUnion),
+            "set.intersection" => Operation::Intrinsic(I::SetIntersection),
+            "set.difference" => Operation::Intrinsic(I::SetDifference),
             _ => return None,
         })
     }

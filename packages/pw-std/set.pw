@@ -1,0 +1,44 @@
+// @corpus: platform
+// @id: STD-set
+// @category: standard library — collections
+// @charter: §7.1
+// @milestone: E10
+
+module Set
+
+// **Distinct values** (ADR-0057), `Int`s or `String`s, in ascending order: an
+// `Int` by value, a `String` by code point. Each operation answers a new set.
+// A set a query is given is checked on entry, ascending and each value once,
+// and one that is not stops the invocation.
+
+fn empty<T>() -> Set<T> !{}
+    intrinsic "set.empty"
+
+fn from_list<T>(items: List<T>) -> Set<T> !{}
+    intrinsic "set.from_list"
+
+fn size<T>(set: Set<T>) -> Int !{}
+    intrinsic "set.size"
+
+fn contains<T>(set: Set<T>, item: T) -> Bool !{}
+    intrinsic "set.contains"
+
+fn insert<T>(set: Set<T>, item: T) -> Set<T> !{}
+    intrinsic "set.insert"
+
+fn remove<T>(set: Set<T>, item: T) -> Set<T> !{}
+    intrinsic "set.remove"
+
+// Ascending.
+fn to_list<T>(set: Set<T>) -> List<T> !{}
+    intrinsic "set.to_list"
+
+fn union<T>(a: Set<T>, b: Set<T>) -> Set<T> !{}
+    intrinsic "set.union"
+
+fn intersection<T>(a: Set<T>, b: Set<T>) -> Set<T> !{}
+    intrinsic "set.intersection"
+
+// What `a` has and `b` does not.
+fn difference<T>(a: Set<T>, b: Set<T>) -> Set<T> !{}
+    intrinsic "set.difference"

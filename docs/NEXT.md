@@ -62,8 +62,8 @@ compile (ADR-0051, done). A function is a value (ADR-0052, done). A lambda's
 parameters take the types its use declares (ADR-0053, done: a correction
 found on the way). An opaque value is built and read inside a component
 (ADR-0054, done). Slicing, and `sum` and `maximum` computed (ADR-0055, done).
-Unicode case mapping (ADR-0056, done). Next: maps and sets, then handlers
-that compute.
+Unicode case mapping (ADR-0056, done). Maps and sets (ADR-0057, done).
+Next: handlers that compute.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

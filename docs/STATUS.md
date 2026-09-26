@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: maps and sets**
+([ADR-0057](DECISIONS/ADR-0057-maps-and-sets.md)).
+- `Map<K, V>` and `Set<T>` are language types with standard-library
+  modules. Keys are `Int`s or `String`s, in ascending order.
+- The component lays them out as the world writes them, `list<tuple<K, V>>`
+  and `list<T>`. The module holds sorted arrays.
+- A map or set a query is given, or a host answers, is checked on arrival.
+
+Evidence: [maps.txt](evidence/E10/maps.txt) (`just e10-maps`).
+
 **2026-09-25: Unicode case mapping**
 ([ADR-0056](DECISIONS/ADR-0056-unicode-case-mapping.md)).
 - `String.to_lower` and `String.to_upper` map each code point as Unicode
@@ -262,6 +272,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0057: a map's key is an `Int` or a `String`; entries are in
+  ascending key order, not insertion order; a map or set from outside out
+  of order is refused, not sorted.
 - ADR-0056: case mapping is per code point, so a word-final capital sigma
   lowers to `σ`, not `ς`.
 - ADR-0055: `List.maximum` returns an `Option`, `None` for an empty list,
