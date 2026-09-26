@@ -1,0 +1,24 @@
+ADR-0099 - a failure is handled
+
+produced by: just e10-results-handled
+commit: f0c678f9f79af99d1cb660db5c17f74803895af9
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== results handled (compiler/pw-core/tests/results_handled.rs)
+
+test a_discarded_value_is_not_a_result ... ok
+test a_statements_result_is_handled ... ok
+test a_returned_result_is_used ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/results_handled_mutations.py)
+
+baseline: 3 passed, 0 failed
+the rule does not run: KILLED (2 of 3 tests fail)
+a unit body's last value is used: KILLED (1 of 3 tests fail)
+a statement's value is used: KILLED (1 of 3 tests fail)
+a returned value is dropped: KILLED (1 of 3 tests fail)
+a code clause's block is dropped: KILLED (1 of 3 tests fail)
+a loop's body is used: KILLED (1 of 3 tests fail)
+a lambda's body is dropped: KILLED (1 of 3 tests fail)
+7 of 7 mutants killed
