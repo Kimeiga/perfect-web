@@ -1,0 +1,20 @@
+ADR-0096 - a template moves no URL
+
+produced by: just e10-moved-urls
+commit: c4773f9f690ebced2413e983ca7542e7c1a18fbd
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== moved URLs (compiler/pw-core/tests/platform_markup.rs)
+
+test a_template_writes_no_base ... ok
+test an_animation_sets_no_link_and_no_handler ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/moved_url_mutations.py)
+
+baseline: 2 passed, 0 failed
+a base element is written: KILLED (1 of 2 tests fail)
+an animation is not asked what it sets: KILLED (1 of 2 tests fail)
+an animation may set a URL: KILLED (1 of 2 tests fail)
+an animation may set a handler: KILLED (1 of 2 tests fail)
+4 of 4 mutants killed
