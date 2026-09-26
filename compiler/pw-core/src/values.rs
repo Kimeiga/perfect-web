@@ -2339,7 +2339,7 @@ impl<'a> Typer<'a> {
                     // `<map-container resource={StoreMap} center={c} />` mounts
                     // a resource, and its attributes are the resource's
                     // arguments (A-007), not text.
-                    let mounts = attrs.iter().any(|a| a.name == "resource");
+                    let mounts = attrs.iter().any(crate::template_ir::mounts);
                     for a in attrs {
                         // A value the element writes: as text, or as a boolean
                         // attribute's presence (ADR-0074). Not written: a

@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a stream and a mounted resource do not build**
+([ADR-0075](DECISIONS/ADR-0075-a-stream-and-a-mounted-resource-do-not-build.md)).
+Each lowered as a literal element: A-008's `<stream>` was refused by
+`pw build` for its `query` attribute, and A-007's
+`<map-container resource={StoreMap} center={center} />` built a page that
+fails when rendered, with a resource nothing mounts. The template IR refuses
+both by name now.
+
+Evidence: [streams.txt](evidence/E10/streams.txt) (`just e10-streams`).
+
 **Correction, 2026-09-26: ADR-0071 left `{:else if o}` over an `Option`
 related to nothing, and nothing related what a template writes**
 ([ADR-0074](DECISIONS/ADR-0074-what-a-template-writes-has-a-text-form.md)).

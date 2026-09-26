@@ -136,7 +136,7 @@ MUTANTS = [
     (
         "a mounted resource's arguments are written as text",
         VALUES,
-        '                    let mounts = attrs.iter().any(|a| a.name == "resource");',
+        "                    let mounts = attrs.iter().any(crate::template_ir::mounts);",
         "                    let mounts = false;",
     ),
 ]

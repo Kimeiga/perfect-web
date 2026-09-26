@@ -159,11 +159,10 @@ refused by name:
 - **A `Float` is not written by a template** (ADR-0074). It has no format
   yet, so `{price}` over a `Float` is refused (PW0609); the host drops a
   `Float` it is given.
-- **A stream and a mounted resource do not build.** The template IR has no
-  representation for `<stream query={..}>`, its `<ready>` and `<failed>`
-  parts, or an element that mounts a resource (A-007): each lowers as a
-  literal element, and its computed attributes do not build (ADR-0073). The
-  Marko adapter renders a stream (ADR-0017).
+- **A stream and a mounted resource do not build** (ADR-0075). The template
+  IR has no representation for `<stream query={..}>` or for an element that
+  mounts a resource (`resource={StoreMap}`, A-007), and refuses each by
+  name. The Marko adapter renders a stream (ADR-0017).
 - **A view is not used in another view** (ADR-0072). `<Money value={p} />`,
   as the charter writes it (§8.1), is refused (PW5020): views do not compose
   yet. Until 2026-09-26 it built as an unknown HTML element. How a view

@@ -499,3 +499,11 @@ absent is taken apart (PW0600), in `{:else if}` too, which ADR-0071 left to
 nothing; a boolean attribute has a truth; and a loop's list and key are read
 through fields their values have (PW0610). Each passed `pw check` and failed
 when rendered.
+
+## 2026-09-26: a stream and a mounted resource do not build (E10)
+
+[ADR-0075](DECISIONS/ADR-0075-a-stream-and-a-mounted-resource-do-not-build.md):
+the template IR refuses a `<stream>` and an element that mounts a resource
+by name, where each lowered as a literal element: a stream was refused for
+its `query` attribute, and A-007's mounted resource built a page that fails
+when rendered.

@@ -793,6 +793,14 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
     }
 }
 
+/// **Does this attribute mount a resource?** `resource={StoreMap}` does
+/// (A-007): its element hosts the resource, and the element's other
+/// attributes are the resource's arguments. RDFa's `resource="/x"` is an
+/// ordinary attribute (ADR-0075).
+pub(crate) fn mounts(a: &crate::hir::Attr) -> bool {
+    a.name == "resource" && matches!(a.value, AttrValue::Expr(_))
+}
+
 /// The element being lowered, as one value.
 ///
 /// Four of these travelled as separate parameters and clippy was right to
@@ -818,6 +826,27 @@ fn lower_element(
         children,
         self_closing,
     } = el;
+    // Not compiled by this renderer (ADR-0075): a streamed region, which the
+    // Marko adapter renders (ADR-0017), and an element that mounts a resource
+    // (A-007). Until 2026-09-26 each lowered as a literal element: a
+    // `<stream>` with a `query` attribute, and a `<map-container>` whose
+    // resource was never mounted.
+    if tag == "stream" {
+        out.push(Chunk::Dynamic(Part::Blocked {
+            reason: "a `<stream>` is not compiled by this renderer; the Marko adapter \
+                     renders one (ADR-0017)"
+                .to_string(),
+            at: "<stream>".to_string(),
+        }));
+        return;
+    }
+    if attrs.iter().any(mounts) {
+        out.push(Chunk::Dynamic(Part::Blocked {
+            reason: "an element that mounts a resource is not compiled".to_string(),
+            at: format!("<{tag} resource={{..}}>"),
+        }));
+        return;
+    }
     // An element gets an identity only if it OWNS something dynamic. Charter
     // §14 M7 task 3: stable IDs for dynamic parts "without making static HTML
     // noisy", and the invariant that gives it meaning is that a static region
