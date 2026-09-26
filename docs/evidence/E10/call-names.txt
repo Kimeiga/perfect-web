@@ -1,0 +1,22 @@
+ADR-0087 - a call names a term
+
+produced by: just e10-call-names
+commit: f64dde8418366cc053af8317c2c022c57e855706
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== call names (compiler/pw-core/tests/calls_name_terms.rs)
+
+test a_call_names_no_effect ... ok
+test a_term_or_a_type_that_shares_the_name_is_what_a_call_names ... ok
+test a_call_names_no_event ... ok
+test a_binding_that_shares_the_name_is_its_value ... ok
+test a_call_names_no_view_and_no_page ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+== mutation controls (scripts/call_name_mutations.py)
+
+baseline: 5 passed, 0 failed
+a call that names no term is not refused: KILLED (3 of 5 tests fail)
+a binding that shares the name is not its value: KILLED (1 of 5 tests fail)
+a function or a type that shares the name is not what a call names: KILLED (1 of 5 tests fail)
+3 of 3 mutants killed
