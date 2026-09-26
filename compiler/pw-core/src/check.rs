@@ -115,7 +115,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     let graph = crate::graph::Graph::build(&hirs, &workspace);
     // ADR-0101: what a command's write has to reach, over every unit, since
     // a command in one module writes what a query in another reads.
-    let readers = cached_readers(&inference, &hirs);
+    let readers = cached_readers(&inference, &graph, &hirs);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -695,27 +695,34 @@ struct Reader {
     id: hir::DeclId,
     /// The domains it reads: `Carts` for `database.read<Carts>`.
     reads: BTreeSet<String>,
+    /// A materialization, rebuilt only when an event reaches it (ADR-0103).
+    fragment: bool,
+    /// For a materialization, each dependency that reads the database, with
+    /// what it reads. Empty for a query.
+    built_from: Vec<(String, BTreeSet<String>)>,
 }
 
 /// Every query, subscription and resource that reads the database and
-/// declares no staleness window.
+/// declares no staleness window, and every materialization built from one
+/// that reads it, whatever its window.
 ///
 /// A positive `freshness` is left out: its entries may be that stale by its
-/// own declaration, and expire. **(ruling needed)**
-fn cached_readers(inference: &crate::effects::Inference, hirs: &[&Hir]) -> Vec<Reader> {
+/// own declaration, and expire. **(ruling needed)** A materialization does
+/// not expire: it is rebuilt only when an event reaches it (ADR-0103).
+fn cached_readers(
+    inference: &crate::effects::Inference,
+    graph: &crate::graph::Graph,
+    hirs: &[&Hir],
+) -> Vec<Reader> {
     let mut out = Vec::new();
+    // What each resource reads, by its node, for the fragments built on it.
+    let mut read_by: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             if !matches!(
                 decl.kind,
                 DeclKind::Query | DeclKind::Subscription | DeclKind::Resource
             ) {
-                continue;
-            }
-            if decl
-                .policy("freshness")
-                .is_some_and(|f| crate::policy::duration(&f.value).is_some_and(|ms| ms > 0))
-            {
                 continue;
             }
             let reads: BTreeSet<String> = inference
@@ -727,12 +734,63 @@ fn cached_readers(inference: &crate::effects::Inference, hirs: &[&Hir]) -> Vec<R
             if reads.is_empty() {
                 continue;
             }
+            let path = crate::graph::path_of(hir, id);
+            read_by.insert(path.clone(), (decl.name.clone(), reads.clone()));
+            if decl
+                .policy("freshness")
+                .is_some_and(|f| crate::policy::duration(&f.value).is_some_and(|ms| ms > 0))
+            {
+                continue;
+            }
             out.push(Reader {
-                path: crate::graph::path_of(hir, id),
+                path,
                 name: decl.name.clone(),
                 unit,
                 id,
                 reads,
+                fragment: false,
+                built_from: Vec::new(),
+            });
+        }
+    }
+    // One level: `depends_on` is a materialization's alone (ADR-0092), so
+    // what a fragment reads, nothing reads through.
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != DeclKind::Materialize {
+                continue;
+            }
+            let path = crate::graph::path_of(hir, id);
+            let built_from: Vec<(String, BTreeSet<String>)> = graph
+                .edges
+                .iter()
+                .filter(|e| e.kind == crate::graph::EdgeKind::Reads && e.from == path)
+                .filter_map(|e| read_by.get(&e.to).cloned())
+                .collect();
+            // And what it reads itself: a materialize block may hold
+            // statements after its policies.
+            let reads: BTreeSet<String> = built_from
+                .iter()
+                .flat_map(|(_, r)| r.iter().cloned())
+                .chain(
+                    inference
+                        .effective_effects(unit, hir, id)
+                        .iter()
+                        .filter_map(|e| crate::effects::database_domain(e, "read"))
+                        .map(str::to_string),
+                )
+                .collect();
+            if reads.is_empty() {
+                continue;
+            }
+            out.push(Reader {
+                path,
+                name: decl.name.clone(),
+                unit,
+                id,
+                reads,
+                fragment: true,
+                built_from,
             });
         }
     }
@@ -791,7 +849,20 @@ fn writes_invalidated(
             .unwrap_or_default();
         for r in readers {
             let shared: Vec<&str> = writes.intersection(&r.reads).map(String::as_str).collect();
-            if shared.is_empty() || graph.invalidates(&path, &r.path) {
+            // A fragment is rebuilt when an event reaches it, directly or
+            // through what it reads (ADR-0102), and the materializer reads
+            // no command's `invalidates` (ADR-0103).
+            let fragment = r.fragment;
+            let reached = if fragment {
+                graph.edges.iter().any(|e| {
+                    e.from == path
+                        && e.kind == EdgeKind::Emits
+                        && graph.affected_by(&e.to).contains(&r.path)
+                })
+            } else {
+                graph.invalidates(&path, &r.path)
+            };
+            if shared.is_empty() || reached {
                 continue;
             }
             let reader = if r.unit == unit {
@@ -809,6 +880,78 @@ fn writes_invalidated(
                 span: hir.decl_span(id),
                 label: format!("`{}` is the command", decl.name),
             }];
+            if fragment {
+                let via: Vec<&str> = r
+                    .built_from
+                    .iter()
+                    .filter(|(_, reads)| shared.iter().any(|d| reads.contains(*d)))
+                    .map(|(name, _)| name.as_str())
+                    .collect();
+                // What it is built from that reads the write, or itself.
+                let source = if via.is_empty() {
+                    "which reads it".to_string()
+                } else {
+                    format!("which is built from `{}`", via.join("`, `"))
+                };
+                if r.unit == unit {
+                    related.push(Related {
+                        span: hir.decl_span(r.id),
+                        label: if via.is_empty() {
+                            format!("`{}` reads `{}`", r.name, shared.join("`, `"))
+                        } else {
+                            format!(
+                                "`{}` is built from `{}`, which reads `{}`",
+                                r.name,
+                                via.join("`, `"),
+                                shared.join("`, `")
+                            )
+                        },
+                    });
+                }
+                let events: Vec<String> = graph
+                    .nodes
+                    .iter()
+                    .filter(|n| matches!(n.kind, NodeKind::Event))
+                    .filter(|n| graph.affected_by(&n.path).contains(&r.path))
+                    .map(|n| format!("`{}`", n.name))
+                    .collect();
+                out.push(Diagnostic {
+                    code: crate::codes::WRITE_NOT_INVALIDATED.id,
+                    invariant: crate::codes::WRITE_NOT_INVALIDATED.invariant,
+                    reason: "write_not_invalidated",
+                    detector: Detector::ResourceGraph,
+                    severity: Severity::Error,
+                    message: format!(
+                        "`{}` writes `{}`, and no event it emits reaches `{reader}`, {source}",
+                        decl.name,
+                        shared.join("`, `")
+                    ),
+                    primary_span: at,
+                    related,
+                    explanation: Some(format!(
+                        "A materialization is rebuilt only when an event reaches it: \
+                         `regenerate` is `on_invalidation`, so it has no staleness window, \
+                         and the materializer reads committed events, not a command's \
+                         `invalidates`. `{reader}` reads what `{}` writes, itself or through \
+                         what it depends on, so after the write it keeps what it rendered \
+                         until an event reaches it, by its own `invalidates_on` or through \
+                         what it depends on.",
+                        decl.name
+                    )),
+                    repairs: vec![Repair {
+                        description: if events.is_empty() {
+                            format!(
+                                "emit an event, and have `{reader}` listen for it with \
+                                 `invalidates_on`"
+                            )
+                        } else {
+                            format!("emit {}, which reaches `{reader}`", events.join(" or "))
+                        },
+                        replacement: None,
+                    }],
+                });
+                continue;
+            }
             if r.unit == unit {
                 related.push(Related {
                     span: hir.decl_span(r.id),

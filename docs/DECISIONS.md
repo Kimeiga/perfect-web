@@ -727,3 +727,12 @@ depends on a store that listens for `StoreChanged`, and kept the old store
 after one. An event now reaches each entry that reads what it reaches, at
 the key the read supplies, and a key the read does not supply matches any
 value.
+
+## 2026-09-26: a write reaches the fragments built on it (E10)
+
+[ADR-0103](DECISIONS/ADR-0103-a-write-reaches-the-fragments-built-on-it.md):
+a fragment is rebuilt only when an event reaches it, and one built from a
+query with a staleness window kept a renamed store for good, since the
+command emitted nothing and PW5106 left the query to expire. A command now
+emits an event that reaches each fragment built on what it writes (PW5106);
+`invalidates` does not reach a fragment.

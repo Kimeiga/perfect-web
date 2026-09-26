@@ -78,6 +78,19 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a write reaches the fragments built on it**
+([ADR-0103](DECISIONS/ADR-0103-a-write-reaches-the-fragments-built-on-it.md)).
+A fragment is rebuilt only when an event reaches it. One built from a query
+with `freshness 5.minutes`, or reading the store in its own body, kept a
+renamed store for good: the command emitted nothing, and PW5106 left the
+query to expire. A command now emits an
+event that reaches each fragment built on what it writes (PW5106).
+`invalidates` does not reach a fragment, because the materializer reads
+events.
+
+Evidence: [fragments-reached.txt](evidence/E10/fragments-reached.txt)
+(`just e10-fragments-reached`).
+
 **Correction, 2026-09-26: the materializer stopped at an event's
 listeners**
 ([ADR-0102](DECISIONS/ADR-0102-an-event-reaches-what-reads-what-it-invalidates.md)).

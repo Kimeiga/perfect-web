@@ -1300,6 +1300,22 @@ e10-read-through:
      } > docs/evidence/E10/read-through.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/read-through.txt
 
+# ADR-0103: a write reaches the fragments built on it. Its tests, ADR-0101's
+# it must keep passing, and the mutation controls.
+e10-fragments-reached:
+    @{ echo "ADR-0103 - a write reaches the fragments built on it"; echo; \
+       echo "produced by: just e10-fragments-reached"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== fragments reached (compiler/pw-core/tests/writes_reach_fragments.rs)"; echo; \
+       cargo test --locked -p pw-core --test writes_reach_fragments 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== ADR-0101's readers, unchanged"; echo; \
+       cargo test --locked -p pw-core --test writes_invalidated 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/fragment_reach_mutations.py)"; echo; \
+       python3 scripts/fragment_reach_mutations.py; \
+     } > docs/evidence/E10/fragments-reached.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/fragments-reached.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation
