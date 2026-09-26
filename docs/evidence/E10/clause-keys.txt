@@ -1,0 +1,30 @@
+ADR-0088 - a clause names a declaration of its kind, and gives it its key
+
+produced by: just e10-clause-keys
+commit: 3a8ca1f6d525c07e3cc2000882384feaa0b9f486
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== clause keys (compiler/pw-core/tests/clause_keys.rs)
+
+test a_clause_is_read_where_it_is_written ... ok
+test the_program_is_clean ... ok
+test a_key_names_what_scope_binds ... ok
+test an_event_is_given_what_it_carries ... ok
+test a_clause_names_a_declaration_of_its_kind ... ok
+test a_resource_is_given_its_key ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/clause_key_mutations.py)
+
+baseline: 6 passed, 0 failed
+a clause's keys are not lowered: KILLED (4 of 6 tests fail)
+a key's arguments are not roots: KILLED (4 of 6 tests fail)
+a key is not related to what it names: KILLED (2 of 6 tests fail)
+a key's name is looked up as a term: KILLED (1 of 6 tests fail)
+a key of another kind is related: KILLED (1 of 6 tests fail)
+an `emits` clause names no kind of declaration: KILLED (1 of 6 tests fail)
+an event has no signature: KILLED (1 of 6 tests fail)
+a resource fits any clause: KILLED (1 of 6 tests fail)
+an event fits any clause: KILLED (1 of 6 tests fail)
+a clause is read from its collapsed value: KILLED (1 of 6 tests fail)
+10 of 10 mutants killed
