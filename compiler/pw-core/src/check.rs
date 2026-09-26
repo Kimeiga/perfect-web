@@ -123,6 +123,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     for (i, u) in units.iter().enumerate() {
         let per_unit = resolution.entry(i).or_default();
         per_unit.extend(unresolved_uses(&workspace, &sigs, &hirs, i, &u.hir));
+        // ADR-0072: an element named with a capital letter is a view.
+        per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
         // ADR-0047: a name used as a value resolves too, in lexical scope.
         per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));
         // Every effect row, against the declarations. Reported beside the
@@ -376,6 +378,91 @@ fn unresolved_uses(
                 )),
                 repairs: vec![Repair {
                     description: format!("add `import {head}`, or declare it"),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// **An element named with a capital letter** (ADR-0072).
+///
+/// HTML lowercases every tag it parses, so `<Money>` is never HTML. The
+/// charter writes a view used in another view that way:
+/// `<Money value={item.price} />` (§8.1). Until 2026-09-26 nothing read such a
+/// tag. It built as an unknown element named `Money`: the view's markup was
+/// never rendered, and its props were checked by nothing. A view used in
+/// another view is not compiled yet, so it is refused, and so is a tag that
+/// names no view.
+fn view_elements(
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    use crate::resolve::Resolution;
+
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        for n in body.walk_markup(&roots) {
+            let Node::Element { tag, .. } = body.node(n) else {
+                continue;
+            };
+            if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
+                continue;
+            }
+            let named = match workspace.resolve(unit, tag) {
+                Resolution::Local(def) | Resolution::Imported { def, .. } => {
+                    crate::resolve::declaration(hirs, def).map(|d| d.kind)
+                }
+                Resolution::Unresolved | Resolution::Ambiguous(_) => None,
+            };
+            let (message, repair) = match named {
+                Some(DeclKind::View | DeclKind::Component | DeclKind::Page) => (
+                    format!(
+                        "`<{tag}>` uses `{tag}` inside another view, and a view used in \
+                         another view is not compiled yet"
+                    ),
+                    format!("write `{tag}`'s markup here until views compose"),
+                ),
+                Some(_) => (
+                    format!("`<{tag}>` names a declaration that is not a view"),
+                    "an element is an HTML element, written in lowercase, or a view".to_string(),
+                ),
+                None => (
+                    format!("`<{tag}>` names no view in scope"),
+                    format!("import `{tag}`, declare it, or write an HTML element in lowercase"),
+                ),
+            };
+            out.push(Diagnostic {
+                code: crate::codes::VIEW_ELEMENT.id,
+                invariant: crate::codes::VIEW_ELEMENT.invariant,
+                reason: "view_element",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: body.node_span(n),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id),
+                    label: format!("`{}` renders this", decl.name),
+                }],
+                explanation: Some(
+                    "HTML lowercases every tag it parses, so an element named with a capital \
+                     letter is a view. Until 2026-09-26 one built as an unknown HTML element: \
+                     the view's markup was never rendered."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: repair,
                     replacement: None,
                 }],
             });

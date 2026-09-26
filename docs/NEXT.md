@@ -99,10 +99,10 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    an `Int` literal's range~~, done (ADR-0069), ~~an assignment to a
    field~~, done (ADR-0070), and ~~what a template's blocks and events
    take~~, done (ADR-0071); all found probing for wrong programs that check.
-   Next, a view used in another view, as the charter's `<Money value={..} />`
-   is: it builds as an unknown HTML element named `Money`, its props are
-   checked by nothing, and the view's markup is never rendered (found after
-   ADR-0071). Then the name check's own scope walk onto `crate::lexical`;
+   ~~A view used in another view~~, refused (ADR-0072): it built as an
+   unknown HTML element. Composing views needs a ruling on the design, and
+   inlining at compile time is the proposal. Next, the name check's own
+   scope walk onto `crate::lexical`;
 4. a function passed to a generic declaration in the backend (found writing
    ADR-0062's tests), then a generic type at the boundary, a WIT type per
    instance;

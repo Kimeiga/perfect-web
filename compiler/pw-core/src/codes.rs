@@ -345,6 +345,11 @@ codes! {
     // was dropped and both of an `if`'s branches rendered together.
     MALFORMED_TEMPLATE_BLOCK = "PW5019" / malformed_template_block / 1, Markup,
         "a template block closes with its own name and holds only the markers it takes";
+    // ADR-0072. Until 2026-09-26 `<Money value={p} />` built as an HTML
+    // element named `Money`: the view's markup was never rendered, and its
+    // props were checked by nothing.
+    VIEW_ELEMENT = "PW5020" / view_element / 1, Markup,
+        "an element named with a capital letter is a view the compiler composes";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

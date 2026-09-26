@@ -78,6 +78,20 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a view used in another view built as an unknown
+HTML element** ([ADR-0072](DECISIONS/ADR-0072-an-element-named-with-a-capital-is-a-view.md)).
+The charter writes one view inside another as `<Money value={item.price} />`
+(§8.1). Nothing read such an element: it checked, and built as a literal
+`<Money>` tag. The view's markup was never rendered, and its props were
+checked by nothing, so a prop of the wrong type, one left out, and one the
+view does not take each passed. No example composed views, so nothing
+shipped this way. PW5020 refuses the element until views compose, and
+refuses a tag that names no view. How a view composes needs a ruling (ADR-0072 sets
+out two designs).
+
+Evidence: [view-elements.txt](evidence/E10/view-elements.txt)
+(`just e10-view-elements`).
+
 **Correction, 2026-09-26: an `elif` chain compiled as its first branch and
 its next condition, and calls through function values were checked by
 nothing** ([ADR-0068](DECISIONS/ADR-0068-what-each-construct-takes.md)).
@@ -578,6 +592,11 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0072: how a view composes, inlined into the parent's template at
+  compile time (the proposal) or rendered in place at run time; until then
+  a view used in another view is refused.
+- ADR-0071: a template condition keeps the renderer's truth (a number, a
+  string, a list, a record), where a code `if` takes a `Bool` alone.
 - ADR-0068: the branches of an `if` or a `match` are related to each other
   only where its value is used, not where it is a statement.
 - ADR-0066: a nested declaration sees the enclosing bindings in scope where

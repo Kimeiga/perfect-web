@@ -851,6 +851,20 @@ e10-template-operands:
      } > docs/evidence/E10/template-operands.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/template-operands.txt
 
+# ADR-0072: an element named with a capital letter is a view. Its tests, and
+# the mutation controls.
+e10-view-elements:
+    @{ echo "ADR-0072 - an element named with a capital letter is a view"; echo; \
+       echo "produced by: just e10-view-elements"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== view elements (compiler/pw-core/tests/view_elements.rs)"; echo; \
+       cargo test --locked -p pw-core --test view_elements 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/view_element_mutations.py)"; echo; \
+       python3 scripts/view_element_mutations.py; \
+     } > docs/evidence/E10/view-elements.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/view-elements.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

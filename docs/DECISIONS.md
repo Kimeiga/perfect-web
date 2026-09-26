@@ -473,3 +473,11 @@ related nothing.
 collection is a list, an `{#if}` or `{:else if}` condition is not a declared
 sum type (PW0609), and an event attribute is given a function (PW0614). Each
 of the three passed `pw check`, and the first two failed only when rendered.
+
+## 2026-09-26: an element named with a capital letter is a view (E10)
+
+[ADR-0072](DECISIONS/ADR-0072-an-element-named-with-a-capital-is-a-view.md):
+`<Money value={p} />`, a view used in another view as the charter writes it
+(§8.1), built as an unknown HTML element, its markup never rendered and its
+props checked by nothing. It is refused (PW5020) until views compose, and so
+is a tag that names no view. How a view composes needs a ruling.

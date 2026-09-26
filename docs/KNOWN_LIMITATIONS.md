@@ -153,6 +153,11 @@ refused by name:
   `{#if xs}` around the list says the same.
 - **An interpolated attribute is refused in a `style`**, and a URL with holes
   must begin with text (ADR-0042). A hole must be a value path.
+- **A view is not used in another view** (ADR-0072). `<Money value={p} />`,
+  as the charter writes it (§8.1), is refused (PW5020): views do not compose
+  yet. Until 2026-09-26 it built as an unknown HTML element. How a view
+  composes needs a ruling: inlined at compile time, or rendered in place at
+  run time.
 - **Nothing emits patches for the new template parts.** A `{#match}` region
   or an interpolated attribute renders on the server; the dev server's patch
   generator is written per operation, and the store uses neither. kiokun's
