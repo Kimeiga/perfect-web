@@ -65,6 +65,9 @@ pub enum Via {
     Helper { helper: String, callee: String },
     /// Inside a lambda handed to another function.
     Callback { passed_to: String, callee: String },
+    /// Named as a value, `List.map(xs, stamp)`: it may be called wherever
+    /// the value goes (ADR-0078).
+    Value { callee: String },
 }
 
 impl Via {
@@ -72,9 +75,10 @@ impl Via {
     /// get here. A diagnostic about an escape hatch has to name the hatch.
     pub fn callee(&self) -> &str {
         match self {
-            Via::Direct { callee } | Via::Helper { callee, .. } | Via::Callback { callee, .. } => {
-                callee
-            }
+            Via::Direct { callee }
+            | Via::Helper { callee, .. }
+            | Via::Callback { callee, .. }
+            | Via::Value { callee } => callee,
         }
     }
 
@@ -93,6 +97,9 @@ impl Via {
             Via::Callback { passed_to, callee } => {
                 format!("the callback passed to `{passed_to}` calls `{callee}`")
             }
+            Via::Value { callee } => format!(
+                "`{callee}` is named as a value here, and performs it wherever the value is called"
+            ),
         }
     }
 }
@@ -239,18 +246,38 @@ impl<'a> Inference<'a> {
 
         // A helper that does not declare a row still has effects. Propagate
         // until nothing changes — the effect set is finite, so this terminates.
+        //
+        // Everything a body performs, as a declaration's own row is checked
+        // against: its calls, the members it reads, and the declarations it
+        // names as values (ADR-0078). Until 2026-09-26 this counted calls
+        // alone, so a helper that declares no row and reads `el.offsetWidth`,
+        // or calls `clock.now` through a local, gave a view that called it
+        // no effect.
+        let sigs = self.sigs;
+        let typed: Vec<(usize, crate::hir::DeclId, &Body, crate::infer::Types<'_>)> = hirs
+            .iter()
+            .enumerate()
+            .flat_map(|(unit, hir)| {
+                hir.all_decls().filter_map(move |(id, d)| {
+                    let body = hir.body(d.body?);
+                    Some((
+                        unit,
+                        id,
+                        body,
+                        crate::infer::Types::of_decl(sigs, hir, id, body),
+                    ))
+                })
+            })
+            .collect();
         for _ in 0..8 {
             let mut changed = false;
-            for (unit, hir) in hirs.iter().enumerate() {
-                for (id, d) in hir.all_decls() {
-                    let Some(body_id) = d.body else { continue };
-                    let found = self.infer_at(unit, hir.body(body_id));
-                    let entry = self.known.entry(self.def_of(unit, id)).or_default();
-                    let before = entry.len();
-                    entry.extend(found.effects);
-                    if entry.len() != before {
-                        changed = true;
-                    }
+            for (unit, id, body, types) in &typed {
+                let found = self.infer_in_at(*unit, body, types);
+                let entry = self.known.entry(self.def_of(*unit, *id)).or_default();
+                let before = entry.len();
+                entry.extend(found.effects);
+                if entry.len() != before {
+                    changed = true;
                 }
             }
             if !changed {
@@ -273,7 +300,70 @@ impl<'a> Inference<'a> {
     ) -> Inferred {
         let mut out = self.infer_at(unit, body);
         self.member_effects(body, types, &mut out);
+        self.value_effects(unit, body, types, &mut out);
         out
+    }
+
+    /// **A declaration named as a value** (ADR-0078): `List.map(xs, stamp)`,
+    /// `let f = clock.now`, `Box { f: stamp }`. What it names may be called
+    /// wherever the value goes, so its effects are performed here, as a
+    /// lambda's are where it is written. Until 2026-09-26 only a call
+    /// counted, and an effect travelled through a function value unseen: a
+    /// view declared `!{}` read the clock through `List.map(xs, stamp)`,
+    /// which R-037's invariant forbids, and passed.
+    fn value_effects(
+        &self,
+        unit: usize,
+        body: &Body,
+        types: &crate::infer::Types<'_>,
+        out: &mut Inferred,
+    ) {
+        // A callee is the call walk's, and a path's head is not a value.
+        let mut not_values: BTreeSet<ExprId> = BTreeSet::new();
+        for id in body.walk() {
+            match body.expr(id) {
+                Expr::Call { callee, .. } => {
+                    not_values.insert(*callee);
+                }
+                Expr::Field { base, .. } => {
+                    not_values.insert(*base);
+                }
+                _ => {}
+            }
+        }
+        for id in body.walk() {
+            if not_values.contains(&id) {
+                continue;
+            }
+            let path = match body.expr(id) {
+                // A binding in scope is its value, not a declaration's.
+                Expr::Name(_) if types.lexical().binder(id).is_some() => continue,
+                Expr::Name(n) => n.clone(),
+                Expr::Field { .. } => path_of(body, id),
+                _ => continue,
+            };
+            if path.is_empty() {
+                continue;
+            }
+            let effects: Vec<Effect> = match self.sigs.by_path(&path) {
+                Some(sig) => sig.effects.clone(),
+                None => self
+                    .resolved(unit, &path)
+                    .and_then(|def| self.known.get(&def))
+                    .map(|s| s.iter().cloned().collect())
+                    .unwrap_or_default(),
+            };
+            for e in effects {
+                out.effects.insert(e.clone());
+                out.sources.push(Source {
+                    effect: e,
+                    span: body.expr_span(id),
+                    via: Via::Value {
+                        callee: path.clone(),
+                    },
+                });
+            }
+        }
     }
 
     /// Effects reached through a member: `anchor.offsetWidth`,

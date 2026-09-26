@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: forbidden_effect
+// @dimension: indirect invalid — the effect travels through a function value
+//
+// Structurally different from R-037: the callback handed to `List.map` is a
+// declaration named as a value, not a lambda written in place. Until
+// 2026-09-26 only a call counted, so this view read geometry during render
+// and passed `pw check` (ADR-0078). The view declares the effect, which must
+// not help.
+
+module generality.view_measure_by_name
+
+import browser.{ ElementRef }
+import List
+
+fn width(el: ElementRef) -> Float !{ layout.measure } {
+    el.offsetWidth
+}
+
+view Widths(items: List<ElementRef>) !{ layout.measure } {
+    let widths = List.map(items, width)
+    <ul aria-label="Widths"></ul>
+}

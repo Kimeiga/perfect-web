@@ -78,6 +78,23 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: an effect travelled through a function value
+unseen, so a view could read the clock or the page's geometry**
+([ADR-0078](DECISIONS/ADR-0078-an-effect-is-performed-where-its-function-is-named.md)).
+A view has an empty effect row, and R-037 states that a generic helper
+cannot launder its callback's effects. The inference counted calls. So a
+view declared `!{}` passed while reading the clock through
+`List.map(xs, stamp)`, `let f = clock.now` then `f()`, a helper given
+`stamp`, or a record field holding it: R-037's invariant held only for a
+callback written as a lambda. The rows of helpers that declare none counted
+calls alone, so a view calling one that read `el.offsetWidth` passed too.
+A declaration named as a value now performs its effects where it is named,
+and a new generality witness pins the named-callback case. No existing
+program was affected.
+
+Evidence: [effects-through-values.txt](evidence/E10/effects-through-values.txt)
+(`just e10-effects-through-values`).
+
 **2026-09-26: a call through a field holding a function is checked**
 ([ADR-0077](DECISIONS/ADR-0077-a-call-through-a-field.md)). `r.f(x)`, with
 `f` a field of type `fn(Int) -> Int`, resolved to nothing: a wrong argument,
@@ -666,6 +683,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0078: a function type states no effect row, so an effect is counted
+  where its function is named rather than where it is called; the
+  alternative is effect rows on function types, as Koka's are.
 - ADR-0073: a computed template hole checks and does not build; compiling
   one, as a value the page computes before it renders, is not decided.
 - ADR-0072: how a view composes, inlined into the parent's template at

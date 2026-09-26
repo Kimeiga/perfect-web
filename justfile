@@ -939,6 +939,22 @@ e10-field-calls:
      } > docs/evidence/E10/field-calls.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/field-calls.txt
 
+# ADR-0078: an effect is performed where its function is named. Its tests,
+# the generality witnesses, and the mutation controls.
+e10-effects-through-values:
+    @{ echo "ADR-0078 - an effect is performed where its function is named"; echo; \
+       echo "produced by: just e10-effects-through-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== effects through values (compiler/pw-core/tests/effects_through_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test effects_through_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the generality witnesses (compiler/pw-core/tests/generality.rs)"; echo; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/effect_value_mutations.py)"; echo; \
+       python3 scripts/effect_value_mutations.py; \
+     } > docs/evidence/E10/effects-through-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/effects-through-values.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

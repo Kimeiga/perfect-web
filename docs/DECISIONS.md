@@ -521,3 +521,12 @@ built with a dead arm. PW0333 refuses each.
 `f` is a field holding a function, resolved to nothing, so its arguments,
 its arity and its result passed unchecked. ADR-0068's relations check it
 now.
+
+## 2026-09-26: an effect is performed where its function is named (E10)
+
+[ADR-0078](DECISIONS/ADR-0078-an-effect-is-performed-where-its-function-is-named.md):
+a view declared `!{}` read the clock through `List.map(xs, stamp)`, a
+local, a helper's parameter or a record field, since only a call counted;
+R-037's invariant held only for a lambda. A declaration named as a value
+performs its effects where it is named, and a helper declaring no row
+carries its members' and its values' effects too.

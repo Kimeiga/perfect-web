@@ -9,6 +9,7 @@ from `undeclared_effect`.
 | direct invalid | `caught.pw` | a network fetch two helpers below a view, WITH the row declared |
 | indirect invalid | `painter.pw` | a painter reaching the document, identified by its row rather than a declaration kind |
 | indirect invalid | `build-page-clock.pw` | a build-placed page reading the wall clock |
+| indirect invalid | `named-callback.pw` | a geometry read through a declaration named as a value and handed to `List.map`, not a lambda (ADR-0078) |
 | neighbour | `handler-may-fetch.pw` | the same fetch inside an event handler — it does not run during render |
 | neighbour | `query-may-fetch.pw` | the same fetch in a query, which is what queries are for |
 | neighbour | `page-may-read-clock.pw` | the same clock read in a page rendered per request |
