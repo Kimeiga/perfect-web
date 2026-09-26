@@ -103,6 +103,26 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
 
     let sources: Vec<&str> = units.iter().map(|u| u.src.as_str()).collect();
     let templates = templates(&hirs, &sources, &sigs);
+    // A part the renderer refuses is a template that fails every render.
+    // `pw emit-template` refuses one; until 2026-09-26 `pw build` wrote it
+    // (ADR-0073).
+    let blocked: Vec<String> = templates
+        .iter()
+        .flat_map(|t| {
+            t.blocked().into_iter().filter_map(move |b| match b {
+                crate::template_ir::Part::Blocked { reason, at } => {
+                    Some(format!("{}: `{at}`: {reason}", t.path))
+                }
+                _ => None,
+            })
+        })
+        .collect();
+    if !blocked.is_empty() {
+        return Err(format!(
+            "a template part the renderer cannot render: {}",
+            blocked.join("; ")
+        ));
+    }
 
     Ok(Build {
         templates,

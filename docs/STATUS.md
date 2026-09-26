@@ -78,6 +78,28 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: `pw build` wrote templates that fail every
+render, and keyed loops on the wrong field**
+([ADR-0073](DECISIONS/ADR-0073-a-template-reads-each-value-by-path.md)).
+- **A computed hole built.** `{n + 1}`, `title={"lit"}` and
+  `disabled={!b}` lowered with an empty path, and `{mk().a}` with `.a`, so
+  every render failed. `{#if !b}` lowered to a part the renderer refuses,
+  which `pw emit-template` refused and `pw build` wrote.
+- **A `style:` directive built as an attribute named `style:width`**, which a
+  browser ignores.
+- **A loop's key was its last segment.** `(k.r.id)` keyed on `k.id`, and
+  `(item.id)` in a loop over `x` on `x.id`, silently. The last-segment
+  audit had filed that site as syntax that resolves nothing.
+
+A computed hole is valid Pleris that this backend cannot render: it checks,
+and `pw build` refuses it with the reason. A key is read from the loop's
+element along its whole path, and one read from another name is PW5021. No
+built program was affected: the store's and kiokun's keys are all
+`(x.id)`, and their holes are paths.
+
+Evidence: [template-values.txt](evidence/E10/template-values.txt)
+(`just e10-template-values`).
+
 **Correction, 2026-09-26: a view used in another view built as an unknown
 HTML element** ([ADR-0072](DECISIONS/ADR-0072-an-element-named-with-a-capital-is-a-view.md)).
 The charter writes one view inside another as `<Money value={item.price} />`
@@ -592,6 +614,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0073: a computed template hole checks and does not build; compiling
+  one, as a value the page computes before it renders, is not decided.
 - ADR-0072: how a view composes, inlined into the parent's template at
   compile time (the proposal) or rendered in place at run time; until then
   a view used in another view is refused.

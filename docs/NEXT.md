@@ -101,8 +101,11 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    take~~, done (ADR-0071); all found probing for wrong programs that check.
    ~~A view used in another view~~, refused (ADR-0072): it built as an
    unknown HTML element. Composing views needs a ruling on the design, and
-   inlining at compile time is the proposal. Next, the name check's own
-   scope walk onto `crate::lexical`;
+   inlining at compile time is the proposal. ~~What a template reads by
+   path~~, done (ADR-0073): `pw build` wrote templates that fail every
+   render, and keyed loops on the wrong field. Next, the name check's own
+   scope walk onto `crate::lexical`, which reads a computed `{#each}` list
+   as a name that does not resolve;
 4. a function passed to a generic declaration in the backend (found writing
    ADR-0062's tests), then a generic type at the boundary, a WIT type per
    instance;

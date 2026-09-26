@@ -350,6 +350,10 @@ codes! {
     // props were checked by nothing.
     VIEW_ELEMENT = "PW5020" / view_element / 1, Markup,
         "an element named with a capital letter is a view the compiler composes";
+    // ADR-0073. Until 2026-09-26 a loop's key was read by its last segment:
+    // `(item.id)` in a loop over `x` keyed on `x.id`, and `(k.r.id)` on `k.id`.
+    LOOP_KEY = "PW5021" / loop_key / 1, Markup,
+        "a loop's key is its element, or a field read from it";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

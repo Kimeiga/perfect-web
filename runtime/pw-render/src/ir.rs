@@ -139,9 +139,11 @@ pub enum Part {
         collection: String,
         /// The name each element is bound to inside `body`.
         binding: String,
-        /// The field that identifies an element, from `(item.id)`. `None` means
-        /// the list declared no key — which markup rules reject for a mutable
-        /// collection and permit for a static one.
+        /// What identifies an element, as the path from the element to it:
+        /// `id` from `(item.id)`, `r.id` from `(item.r.id)`, and empty from
+        /// `(item)` (ADR-0073). `None` means the list declared no key — which
+        /// markup rules reject for a mutable collection and permit for a
+        /// static one.
         key: Option<String>,
         body: Vec<Chunk>,
     },

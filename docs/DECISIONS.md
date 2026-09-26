@@ -481,3 +481,12 @@ of the three passed `pw check`, and the first two failed only when rendered.
 (§8.1), built as an unknown HTML element, its markup never rendered and its
 props checked by nothing. It is refused (PW5020) until views compose, and so
 is a tag that names no view. How a view composes needs a ruling.
+
+## 2026-09-26: a template reads each value by path (E10)
+
+[ADR-0073](DECISIONS/ADR-0073-a-template-reads-each-value-by-path.md): a
+computed hole checks and does not build, where it built with an empty path
+and failed every render; `pw build` refuses a part the renderer refuses; a
+`style:` directive no longer builds as an attribute a browser ignores; and a
+loop's key is read from its element (PW5021) along its whole path, where
+`(k.r.id)` keyed on `k.id`.

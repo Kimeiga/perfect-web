@@ -359,13 +359,7 @@ pub fn render_instance(
         });
     };
 
-    let raw = match item {
-        Value::Record(fields) => fields
-            .get(field)
-            .and_then(|v| v.as_str())
-            .unwrap_or_default(),
-        other => other.as_str().unwrap_or_default(),
-    };
+    let raw = key_of(item, field);
     if raw.is_empty() {
         return Err(Blocked::MissingLoopKey {
             each: *id,
@@ -386,14 +380,24 @@ pub fn render_instance(
 /// The server needs it to say WHICH instance a patch removes or moves, and
 /// deriving it here rather than in the patch generator keeps one derivation.
 pub fn instance_token_of(each: PartId, item: &Value, key_field: &str, env: &Env) -> InstanceToken {
-    let raw = match item {
-        Value::Record(fields) => fields
-            .get(key_field)
-            .and_then(|v| v.as_str())
-            .unwrap_or_default(),
-        other => other.as_str().unwrap_or_default(),
-    };
-    env.domain.instance_token(&env.path, each, &raw)
+    env.domain
+        .instance_token(&env.path, each, &key_of(item, key_field))
+}
+
+/// **An element's key**: the text at `path` from it, empty where there is
+/// none. `id` reads the element's `id`, `r.id` its `r`'s `id`, and the empty
+/// path the element itself. One derivation for the render, an inserted
+/// instance and a patch's token. Until 2026-09-26 each read one field, so a
+/// nested key could not be followed (ADR-0073).
+fn key_of(item: &Value, path: &str) -> String {
+    path.split('.')
+        .filter(|s| !s.is_empty())
+        .try_fold(item, |v, segment| match v {
+            Value::Record(fields) => fields.get(segment),
+            _ => None,
+        })
+        .and_then(Value::as_str)
+        .unwrap_or_default()
 }
 
 /// A JavaScript number holds every integer up to 2^53 exactly. The compiled
@@ -658,13 +662,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                     // an opaque token, so one instance can be addressed,
                     // reordered or removed without touching its neighbours.
                     Some(field) => {
-                        let raw = match item {
-                            Value::Record(fields) => fields
-                                .get(field)
-                                .and_then(|v| v.as_str())
-                                .unwrap_or_default(),
-                            other => other.as_str().unwrap_or_default(),
-                        };
+                        let raw = key_of(item, field);
                         // A declared key that does not identify is not a key.
                         // Both defects are in the DATA rather than in the
                         // derivation, and they are separate because their

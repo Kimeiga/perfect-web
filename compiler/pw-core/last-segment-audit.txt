@@ -39,7 +39,5 @@ lower.rs:constructor_arm    syntax    takes the case out of a template arm's mar
 
 koka.rs:lower_pattern      encoding   emits a constructor name into generated Koka source. Koka is the differential oracle, not a product surface, and its namespace is flat by construction. Nothing reads this back as a pw identity.
 
-
 layout.rs:compositor_properties    encoding   collects `set_*` names from signatures carrying `animation.composite`, to learn which CSS properties are compositor-only. The names ARE the data — `opacity`, `transform` — rather than references to declarations. It does flatten modules, so two modules declaring `set_opacity` contribute one property, which is the correct answer for a property vocabulary.
 
-template_ir.rs:parse_each  syntax  `{#each menu as item (item.id)}` — takes `id` out of the written key expression. Pure text handling of source syntax; nothing is resolved.

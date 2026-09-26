@@ -152,7 +152,10 @@ refused by name:
   is not read: the runtime has no decision tree. `{:else}` in `{#each}` is refused;
   `{#if xs}` around the list says the same.
 - **An interpolated attribute is refused in a `style`**, and a URL with holes
-  must begin with text (ADR-0042). A hole must be a value path.
+  must begin with text (ADR-0042).
+- **A hole is a value path** (ADR-0073): a name, or fields read from one. A
+  computed hole, `{n + 1}` or `disabled={!b}`, checks and does not build,
+  and neither does a directive other than `on:` (`style:width={w}`).
 - **A view is not used in another view** (ADR-0072). `<Money value={p} />`,
   as the charter writes it (§8.1), is refused (PW5020): views do not compose
   yet. Until 2026-09-26 it built as an unknown HTML element. How a view

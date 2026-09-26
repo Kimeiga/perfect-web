@@ -1086,6 +1086,7 @@ fn check_unit_with(
         );
         crate::capability::capability_arguments(&unit.hir, decl, types, &mut out);
         markup_rules(&unit.hir, decl, &mut out);
+        loop_keys(&unit.hir, id, decl, &mut out);
         template_blocks(&unit.hir, sigs, id, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = unit.hir.body(body_id);
@@ -2951,6 +2952,60 @@ fn permitted_children(tag: &str) -> Option<&'static [&'static str]> {
 /// Until 2026-09-25 nothing read them. `{:else}` was dropped, so both of an
 /// `if`'s branches rendered together; `{#if a} .. {/each}` closed the `if`;
 /// and an unknown directive passed `pw check`, refused only when rendered.
+/// **A loop's key is its element, or a field read from it** (ADR-0073).
+///
+/// `{#each rs as x (x.id)}` keys each instance on its element's `id`. Until
+/// 2026-09-26 the key's head was not read: the template IR kept the key's last
+/// segment and keyed on that field of the element. So `(item.id)` in a loop
+/// over `x` keyed on `x.id`, and `(k.r.id)` on `k.id`, silently.
+fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagnostic>) {
+    let Some(body_id) = decl.body else { return };
+    let body = hir.body(body_id);
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    for n in body.walk_markup(&roots) {
+        let Node::Block { directive, .. } = body.node(n) else {
+            continue;
+        };
+        let Some((binding, _, Some(key))) = crate::template_ir::each_parts(directive) else {
+            continue;
+        };
+        let head = key.split('.').next().unwrap_or_default().trim();
+        if head == binding {
+            continue;
+        }
+        out.push(Diagnostic {
+            code: crate::codes::LOOP_KEY.id,
+            invariant: crate::codes::LOOP_KEY.invariant,
+            reason: "loop_key",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!(
+                "a loop's key is `{binding}` or a field read from it, and this is `{key}`"
+            ),
+            primary_span: body.node_span(n),
+            related: vec![Related {
+                span: hir.decl_span(id),
+                label: format!("`{}` renders this", decl.name),
+            }],
+            explanation: Some(
+                "A key identifies each element of the list, so it is read from the element. \
+                 Until 2026-09-26 a key whose head was another name keyed on a field of the \
+                 element, silently."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: format!("key the loop on `{binding}`, or on a field read from it"),
+                replacement: None,
+            }],
+        });
+    }
+}
+
 fn template_blocks(
     hir: &Hir,
     sigs: &Signatures,

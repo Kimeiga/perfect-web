@@ -252,9 +252,11 @@ pub enum Part {
         collection: String,
         /// The name each element is bound to inside `body`.
         binding: String,
-        /// The field that identifies an element, from `(item.id)`. `None` means
-        /// the list declared no key — which markup rules reject for a mutable
-        /// collection and permit for a static one.
+        /// What identifies an element, as the path from the element to it:
+        /// `id` from `(item.id)`, `r.id` from `(item.r.id)`, and empty from
+        /// `(item)` (ADR-0073). `None` means the list declared no key — which
+        /// markup rules reject for a mutable collection and permit for a
+        /// static one.
         key: Option<String>,
         body: Vec<Chunk>,
     },
@@ -717,13 +719,48 @@ fn coalesce(chunks: Vec<Chunk>) -> Vec<Chunk> {
     out
 }
 
+/// **The path a template reads a value by**: a name, or fields read from one.
+///
+/// `None` for anything computed. The renderer looks each value up by its path
+/// among the values it is given, and a computation has none. Until 2026-09-26
+/// a text hole or an attribute that was not a path lowered with an empty path,
+/// and `f(x).name` with the path `.name`, so every render failed; a program
+/// that wrote one now fails to build instead (ADR-0073).
+fn value_path(body: &Body, e: ExprId) -> Option<String> {
+    match body.expr(e) {
+        Expr::Name(n) => Some(n.clone()),
+        Expr::Field { base, name } => value_path(body, *base).map(|b| format!("{b}.{name}")),
+        _ => None,
+    }
+}
+
+/// What a hole holds when it is not a path, for the reason it is refused.
+fn computed(body: &Body, e: ExprId) -> &'static str {
+    match body.expr(e) {
+        Expr::Call { .. } => "a call",
+        Expr::Binary { .. } | Expr::Unary { .. } => "an operation",
+        Expr::Literal(_) | Expr::Interpolated { .. } => "a literal",
+        Expr::Field { .. } => "a field of a computed value",
+        _ => "a computed value",
+    }
+}
+
 fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out: &mut Vec<Chunk>) {
     match body.node(id) {
         Node::Text(t) => out.push(Chunk::Static(escape_static_text(t))),
-        Node::Interpolation(e) => out.push(Chunk::Dynamic(Part::Text {
-            id: ix.part(),
-            value: crate::infer::path_of(body, *e),
-            context: Context::Text,
+        Node::Interpolation(e) => out.push(Chunk::Dynamic(match value_path(body, *e) {
+            Some(value) => Part::Text {
+                id: ix.part(),
+                value,
+                context: Context::Text,
+            },
+            None => Part::Blocked {
+                reason: format!(
+                    "a template hole is read by path, and this is {}",
+                    computed(body, *e)
+                ),
+                at: "{..}".to_string(),
+            },
         })),
         Node::Element {
             tag,
@@ -840,6 +877,22 @@ fn lower_element(
             }));
             continue;
         }
+        // `style:width={w}` is a directive, and `on:` is the only one compiled.
+        // Written out, it is an attribute named `style:width`, which a browser
+        // ignores: until 2026-09-26 the style was silently not applied
+        // (ADR-0073). An XML namespace (`xlink:href`) is an attribute's name.
+        if let Some((prefix, _)) = a.name.split_once(':')
+            && !matches!(prefix, "xml" | "xlink" | "xmlns")
+        {
+            out.push(Chunk::Dynamic(Part::Blocked {
+                reason: format!(
+                    "`{}` is a directive, and only `on:` directives are compiled",
+                    a.name
+                ),
+                at: a.name.clone(),
+            }));
+            continue;
+        }
         match &a.value {
             AttrValue::None => {
                 out.push(Chunk::Static(format!(" {}", a.name)));
@@ -879,7 +932,17 @@ fn lower_element(
                 }
             }
             AttrValue::Expr(e) => {
-                let value = crate::infer::path_of(body, *e);
+                let Some(value) = value_path(body, *e) else {
+                    out.push(Chunk::Dynamic(Part::Blocked {
+                        reason: format!(
+                            "`{}` is read by path, and this is {}",
+                            a.name,
+                            computed(body, *e)
+                        ),
+                        at: format!("{}={{..}}", a.name),
+                    }));
+                    continue;
+                };
                 out.push(Chunk::Static(" ".to_string()));
                 let owner = owner.expect("an element with a dynamic attribute owns an identity");
                 if BOOLEAN_ATTRIBUTES.contains(&a.name.as_str()) {
@@ -945,11 +1008,36 @@ fn lower_block(
         })
     };
     // `c` in `{#if c}`: a value path, as every template value is.
-    let subject_path = subject
-        .map(|e| crate::infer::path_of(body, e))
-        .filter(|p| !p.is_empty());
+    let subject_path = subject.and_then(|e| value_path(body, e));
 
     if let Some((binding, collection, key)) = parse_each(d) {
+        let written = collection.split('.').map(str::trim).all(|s| {
+            s.starts_with(|c: char| c.is_alphabetic() || c == '_')
+                && s.chars().all(|c| c.is_alphanumeric() || c == '_')
+        });
+        if !written {
+            out.push(blocked(format!(
+                "`{{#each}}` reads its list by path, and `{collection}` is computed"
+            )));
+            return;
+        }
+        // The key as the path from the element to it: `id` from `(item.id)`,
+        // `r.id` from `(item.r.id)`, and empty from `(item)`. Until 2026-09-26
+        // it was the key's last segment, so `(item.r.id)` keyed on `item.id`
+        // (ADR-0073). A key whose head is another name is PW5021.
+        let key = match key {
+            None => None,
+            Some(k) => {
+                let mut segments = k.split('.').map(str::trim);
+                if segments.next() != Some(binding.as_str()) {
+                    out.push(blocked(format!(
+                        "a loop's key is `{binding}` or a field read from it, and this is `{k}`"
+                    )));
+                    return;
+                }
+                Some(segments.collect::<Vec<_>>().join("."))
+            }
+        };
         if !branches.is_empty() {
             out.push(blocked(
                 "`{#each}` takes no branch marker; `{#if xs}` around the list says \
@@ -1033,19 +1121,19 @@ fn lower_block(
     }));
 }
 
-/// `{#each items as item (item.id)}` -> `("item", "items", Some("id"))`.
+/// `{#each items as item (item.id)}` -> `("item", "items", Some("item.id"))`.
 fn parse_each(d: &str) -> Option<(String, String, Option<String>)> {
-    let inner = d.strip_prefix("{#each")?.strip_suffix('}')?.trim();
+    each_parts(d)
+}
+
+/// `{#each items as item (item.id)}` -> `("item", "items", Some("item.id"))`:
+/// the directive's parts as written.
+pub(crate) fn each_parts(d: &str) -> Option<(String, String, Option<String>)> {
+    let inner = d.trim().strip_prefix("{#each")?.strip_suffix('}')?.trim();
     let (collection, rest) = inner.split_once(" as ")?;
     let rest = rest.trim();
     let (binding, key) = match rest.split_once('(') {
-        Some((b, k)) => {
-            let k = k.trim_end_matches(')').trim();
-            // `(item.id)` names a FIELD of the binding. The field is what the
-            // runtime keys on, so it is stored alone rather than as an
-            // expression the renderer would have to interpret.
-            (b.trim(), k.rsplit('.').next().map(str::to_string))
-        }
+        Some((b, k)) => (b.trim(), Some(k.trim_end_matches(')').trim().to_string())),
         None => (rest, None),
     };
     Some((binding.to_string(), collection.trim().to_string(), key))
@@ -1087,12 +1175,11 @@ fn interpolated_attribute(
         let Some(hole) = holes.next() else {
             return blocked("a hole in the attribute did not parse");
         };
-        let path = crate::infer::path_of(body, *hole);
-        if path.is_empty() {
+        let Some(path) = value_path(body, *hole) else {
             return blocked(
                 "a hole in an attribute must be a value path, as `{..}` between tags is",
             );
-        }
+        };
         segments.push(Segment::Value(path));
         rest = &after[close + 1..];
     }
@@ -1194,7 +1281,7 @@ fn conditional(
         Some(((marker, run), more)) => match marker.condition {
             Some(c) => {
                 let nested = ix.part();
-                match Some(crate::infer::path_of(body, c)).filter(|p| !p.is_empty()) {
+                match value_path(body, c) {
                     Some(v) => vec![conditional(body, nested, v, run, more, ctx, ix)],
                     None => blocked(
                         "an `{:else if}` condition must be a value path",

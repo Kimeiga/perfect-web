@@ -865,6 +865,22 @@ e10-view-elements:
      } > docs/evidence/E10/view-elements.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/view-elements.txt
 
+# ADR-0073: a template reads each value by path. The checker's and the build's
+# tests, the renderer's key tests, and the mutation controls.
+e10-template-values:
+    @{ echo "ADR-0073 - a template reads each value by path"; echo; \
+       echo "produced by: just e10-template-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker, the template IR and the build (compiler/pw-core/tests/template_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test template_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer's keys (runtime/pw-render/tests/keys.rs)"; echo; \
+       cargo test --locked -p pw-render --test keys 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/template_value_mutations.py)"; echo; \
+       python3 scripts/template_value_mutations.py; \
+     } > docs/evidence/E10/template-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/template-values.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation
