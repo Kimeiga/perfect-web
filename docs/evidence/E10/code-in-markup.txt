@@ -1,0 +1,29 @@
+ADR-0094 - a template writes no code
+
+produced by: just e10-code-in-markup
+commit: 59ee24533df5eee9fe31782ca8efb0aaf75a9e54
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== code in markup (compiler/pw-core/tests/code_in_markup.rs)
+
+test a_template_writes_no_document_inline ... ok
+test a_stylesheet_holds_no_value_a_program_writes ... ok
+test a_template_writes_no_script ... ok
+test a_template_writes_no_inline_handler ... ok
+test a_template_writes_no_script_url ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/code_in_markup_mutations.py)
+
+baseline: 5 passed, 0 failed
+the rule does not run: KILLED (5 of 5 tests fail)
+a script element is written: KILLED (1 of 5 tests fail)
+a stylesheet holds a value: KILLED (1 of 5 tests fail)
+an inline handler is written: KILLED (1 of 5 tests fail)
+an on: directive is an inline handler: KILLED (1 of 5 tests fail)
+a script URL is written: KILLED (1 of 5 tests fail)
+a value may write a URL's scheme: KILLED (1 of 5 tests fail)
+whitespace hides a scheme: KILLED (1 of 5 tests fail)
+a URL with holes is not read: KILLED (1 of 5 tests fail)
+a document is written inline: KILLED (1 of 5 tests fail)
+10 of 10 mutants killed
