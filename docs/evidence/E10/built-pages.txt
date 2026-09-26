@@ -1,0 +1,18 @@
+ADR-0114 - what is built before any request reads no request's value
+
+produced by: just e10-built-pages
+commit: 56081d4fb1b4f19bf039755d86fedf408571255f
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== built pages (compiler/pw-core/tests/built_pages.rs)
+
+test a_built_page_reads_no_parameter ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+== mutation controls (scripts/built_page_mutations.py)
+
+baseline: 1 passed, 0 failed
+the rule does not run: KILLED (1 of 1 tests fail)
+every declaration is built: KILLED (1 of 1 tests fail)
+each read is reported: KILLED (1 of 1 tests fail)
+3 of 3 mutants killed
