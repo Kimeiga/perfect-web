@@ -121,7 +121,8 @@ These are corrected, and each is still caught, or still clean, as before:
 ## Not done
 
 - **`derived`'s purity is not checked.** It parses as one expression. The
-  charter calls it pure, and no rule says so yet.
+  charter calls it pure, and no rule says so yet. (Checked since ADR-0082,
+  PW0334.)
 - **A clause's words are not checked here.** A word outside its clause's
   closed set is left to the analysis that reads the clause, and most nested
   clauses have none.

@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a `derived` value performs no effect**
+([ADR-0082](DECISIONS/ADR-0082-a-derived-value-performs-no-effect.md)). The
+charter's `derived` is "a pure value computed from other values", and
+ADR-0047 recorded that nothing checked it: `let t = derived clock.now()`
+passed in a declaration whose row allows the clock. PW0334 refuses an effect
+inside a derived value, whether it is called, read through a member, or
+named as a value.
+
+Evidence: [derived.txt](evidence/E10/derived.txt) (`just e10-derived`).
+
 **Correction, 2026-09-26: a call with named arguments compiled them in
 written order** ([ADR-0081](DECISIONS/ADR-0081-a-named-argument-is-its-parameters.md)).
 - **A silent miscompile.** `g(b = 1, a = n)`, with `fn g(a: Int, b: Int)`,

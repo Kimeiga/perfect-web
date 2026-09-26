@@ -556,3 +556,10 @@ backend passed arguments in written order, so `g(b = 1, a = 10)` computed
 that named one; and a generic result's label was carried from the argument
 in the wrong place. Signatures carry parameter names now, and one
 arrangement serves the checker, the labels and the backend (PW0617).
+
+## 2026-09-26: a `derived` value performs no effect (E10)
+
+[ADR-0082](DECISIONS/ADR-0082-a-derived-value-performs-no-effect.md): the
+charter's `derived` is a pure value computed from other values, and nothing
+held it to that: `let t = derived clock.now()` checked. PW0334 refuses an
+effect inside one, whether called, read through a member or named.

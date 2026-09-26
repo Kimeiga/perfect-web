@@ -167,6 +167,10 @@ codes! {
         "an optimistic transition's reversal is derived, not written";
     OPTIMISTIC_NOT_PURE = "PW0330" / optimistic_not_pure / 1, DeclarationRules,
         "an optimistic transition must be a pure function of the resource's value";
+    // ADR-0082: the charter's `derived` is a pure value computed from other
+    // values, and until 2026-09-26 nothing held it to that.
+    DERIVED_NOT_PURE = "PW0334" / derived_not_pure / 1, DeclarationRules,
+        "a `derived` value is computed from other values, and performs no effect";
     OPTIMISTIC_TARGET_MISMATCH = "PW0331" / optimistic_target_mismatch / 1, DeclarationRules,
         "an optimistic transition must produce the value type of the resource it targets";
     // **A known policy in the wrong place**, which is a different failure from

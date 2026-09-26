@@ -138,6 +138,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // E10, ADR-0025: an optimistic transition is a separate execution root
         // with its own effect row, and its context permits none.
         named_roots_respect_their_context(&inference, i, &u.hir, per_unit);
+        derived_values_are_pure(&inference, &sigs, i, &u.hir, per_unit);
         optimistic_transitions_agree_with_their_target(&sigs, &workspace, &hirs, i, per_unit);
     }
 
@@ -534,6 +535,79 @@ fn named_roots_respect_their_context(
                 repairs: vec![Repair {
                     description: "move the effect into the command's body, which runs once and \
                                   authoritatively"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+}
+
+/// **A `derived` value performs no effect** (ADR-0082).
+///
+/// The charter's `derived` is "a pure value computed from other values"
+/// (§7.5), recomputed whenever they change. Until 2026-09-26 nothing held it
+/// to that: `let t = derived clock.now()` checked, in a declaration whose row
+/// allows the clock, and ADR-0047 recorded the gap. Everything the value
+/// performs counts: its calls, the members it reads, and the functions it
+/// names (ADR-0078).
+fn derived_values_are_pure(
+    inference: &crate::effects::Inference<'_>,
+    sigs: &Signatures,
+    unit: usize,
+    hir: &Hir,
+    out: &mut Vec<Diagnostic>,
+) {
+    for (id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let derived: Vec<ExprId> = body
+            .walk()
+            .into_iter()
+            .filter_map(|e| match body.expr(e) {
+                Expr::Keyword { keyword, args, .. } if keyword == "derived" => {
+                    args.first().copied()
+                }
+                _ => None,
+            })
+            .collect();
+        if derived.is_empty() {
+            continue;
+        }
+        let types = crate::infer::Types::of_decl(sigs, hir, id, body);
+        let found = inference.infer_in_at(unit, body, &types);
+        for value in derived {
+            let region = body.expr_span(value);
+            let Some(source) = found
+                .sources
+                .iter()
+                .find(|s| s.span.start >= region.start && s.span.end <= region.end)
+            else {
+                continue;
+            };
+            out.push(Diagnostic {
+                code: crate::codes::DERIVED_NOT_PURE.id,
+                invariant: crate::codes::DERIVED_NOT_PURE.invariant,
+                reason: "derived_value_performs_effects",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}`'s `derived` value performs `{}`",
+                    decl.name, source.effect
+                ),
+                primary_span: source.span.clone(),
+                related: vec![Related {
+                    span: region,
+                    label: "this value is `derived`".to_string(),
+                }],
+                explanation: Some(format!(
+                    "A `derived` value is computed from other values, and recomputed when \
+                     they change, so it performs nothing (charter §7.5). {}.",
+                    source.via.describe()
+                )),
+                repairs: vec![Repair {
+                    description: "compute it with a plain `let`, which runs once where the \
+                                  declaration's row allows the effect"
                         .to_string(),
                     replacement: None,
                 }],
