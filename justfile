@@ -955,6 +955,20 @@ e10-effects-through-values:
      } > docs/evidence/E10/effects-through-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/effects-through-values.txt
 
+# ADR-0079: a function value carries the label of what it makes. Its tests,
+# and the mutation controls.
+e10-labels-through-values:
+    @{ echo "ADR-0079 - a function value carries the label of what it makes"; echo; \
+       echo "produced by: just e10-labels-through-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== labels through values (compiler/pw-core/tests/labels_through_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test labels_through_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/label_value_mutations.py)"; echo; \
+       python3 scripts/label_value_mutations.py; \
+     } > docs/evidence/E10/labels-through-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/labels-through-values.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

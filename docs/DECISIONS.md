@@ -530,3 +530,11 @@ local, a helper's parameter or a record field, since only a call counted;
 R-037's invariant held only for a lambda. A declaration named as a value
 performs its effects where it is named, and a helper declaring no row
 carries its members' and its values' effects too.
+
+## 2026-09-26: a function value carries the label of what it makes (E10)
+
+[ADR-0079](DECISIONS/ADR-0079-a-function-value-carries-its-label.md): a
+`Secret<Payments>` logged publicly passed through `let f =
+secrets.payments` then `f()`, or a record field holding it: a name meaning
+a declaration was public, and a call through a value left out its callee.
+Both carry the label of what the function makes now.

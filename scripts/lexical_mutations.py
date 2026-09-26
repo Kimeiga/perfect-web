@@ -160,8 +160,8 @@ MUTANTS = [
     (
         "a name's label is not read through its binding",
         LABELS,
-        "            Expr::Name(_) => self\n                .types\n                .lexical()\n                .binder(id)\n",
-        "            Expr::Name(_) => self\n                .types\n                .lexical()\n                .binder(id)\n                .filter(|_| false)\n",
+        "            Expr::Name(n) => match self.types.lexical().binder(id) {",
+        "            Expr::Name(n) => match self.types.lexical().binder(id).filter(|_| false) {",
     ),
 ]
 

@@ -407,18 +407,31 @@ impl<'a> Labels<'a> {
     /// value is private.
     pub fn label(&self, body: &Body, id: ExprId) -> Label {
         match body.expr(id) {
-            // The binding the name means here (ADR-0063).
-            Expr::Name(_) => self
-                .types
-                .lexical()
-                .binder(id)
-                .and_then(|b| self.bindings.get(&b))
-                .map(|(l, _)| l.clone())
-                .unwrap_or_else(Label::public),
+            // The binding the name means here (ADR-0063). A declaration
+            // named as a value is labelled by what calling it makes, as a
+            // lambda is by its body (ADR-0079): `let f = secrets.payments`
+            // holds a secret's source. Until 2026-09-26 it was public, and
+            // `f()` was too.
+            Expr::Name(n) => match self.types.lexical().binder(id) {
+                Some(b) => self
+                    .bindings
+                    .get(&b)
+                    .map(|(l, _)| l.clone())
+                    .unwrap_or_else(Label::public),
+                None => self
+                    .declaration_named(n)
+                    .map(|s| s.label.clone())
+                    .unwrap_or_else(Label::public),
+            },
 
             // A field of a secret record is secret. The record's own label is
             // the floor; a field with its own declared label joins on top.
             Expr::Field { base, name } => {
+                // `secrets.payments` named as a value: a declaration, as a
+                // name is (ADR-0079).
+                if let Some(sig) = self.declaration_named(&crate::infer::path_of(body, id)) {
+                    return sig.label.clone();
+                }
                 let mut l = self.label(body, *base);
                 if let Some(sig) = self
                     .types
@@ -480,7 +493,9 @@ impl<'a> Labels<'a> {
                     // arguments, a piped value, and a method call's receiver.
                     // The receiver was left out until 2026-09-26, so
                     // `tokens.get(0)`, over a list nothing typed, was public
-                    // (ADR-0064).
+                    // (ADR-0064). So was the callee: `f()`, where `f` holds
+                    // `secrets.payments`, and `b.f()` through a record field
+                    // holding it, made a public value (ADR-0079).
                     None => {
                         let receiver = match body.expr(*callee) {
                             Expr::Field { base, .. } => Some(*base),
@@ -490,6 +505,7 @@ impl<'a> Labels<'a> {
                             .map(|a| a.value)
                             .chain(receiver)
                             .chain(self.piped.get(&id).copied())
+                            .chain(std::iter::once(*callee))
                             .fold(Label::public(), |acc, v| acc.join(&self.label(body, v)))
                     }
                 }

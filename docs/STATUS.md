@@ -78,6 +78,18 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a secret travelled through a function value
+unlabelled** ([ADR-0079](DECISIONS/ADR-0079-a-function-value-carries-its-label.md)).
+A name meaning a declaration was public, and a call through a value was
+labelled by its arguments alone. So `let f = secrets.payments` then
+`log.public("{f()}")` passed, and so did a record field holding the
+function. A declaration named as a value is labelled by what calling it
+makes now, and a call through a value carries its callee's label. No
+existing program was affected.
+
+Evidence: [labels-through-values.txt](evidence/E10/labels-through-values.txt)
+(`just e10-labels-through-values`).
+
 **Correction, 2026-09-26: an effect travelled through a function value
 unseen, so a view could read the clock or the page's geometry**
 ([ADR-0078](DECISIONS/ADR-0078-an-effect-is-performed-where-its-function-is-named.md)).
