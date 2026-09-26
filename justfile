@@ -787,6 +787,26 @@ e10-record-fields:
      } > docs/evidence/E10/record-fields.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/record-fields.txt
 
+# ADR-0068: what each construct takes, checked, and `elif` chains lowered as
+# nested ifs. Its tests, the chains through the E8 host, and the mutation
+# controls.
+e10-calls:
+    @{ echo "ADR-0068 - what each construct takes, checked"; echo; \
+       echo "produced by: just e10-calls"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== calls, loops, tries and branches (compiler/pw-core/tests/calls_and_branches.rs)"; echo; \
+       cargo test --locked -p pw-core --test calls_and_branches 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== elif chains through the E8 host (compiler/pw-conformance/tests/if_chains.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test if_chains 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/call_branch_mutations.py)"; echo; \
+       python3 scripts/call_branch_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a lambda with no annotation, called directly, whose"; \
+       echo "parameter's type no use gives."; \
+     } > docs/evidence/E10/calls.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/calls.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

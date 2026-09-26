@@ -372,6 +372,11 @@ pub enum RelationKind {
     /// `Box { value: 1, label: "a" }`: the fields a record is built with,
     /// against the fields its type declares, each once (PW0612, ADR-0067).
     Fields,
+    /// The branches of an `if` or a `match` whose value is used, against each
+    /// other (PW0613, ADR-0068).
+    Branches,
+    /// `f(x)`: a called value, against a function type (PW0614, ADR-0068).
+    Callee,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -475,6 +480,8 @@ struct Typer<'a> {
     /// Lambda parameters given a closed type while their use was solved,
     /// waiting to join `locals` (see [`Typer::solve_lambdas`]).
     solved: RefCell<BTreeMap<Binder, Ty>>,
+    /// The `if`s and `match`es whose value is used (ADR-0068).
+    used: BTreeSet<ExprId>,
 }
 
 /// What a resolved call is checked against: its parameters, where each is
@@ -712,6 +719,71 @@ fn one_type(t: Ty) -> Ty {
     }
 }
 
+/// **Mark the `if`s and `match`es whose value is used** (ADR-0068), under
+/// `id`, whose own value is used where `used` says. A block's value is its
+/// last statement's; a branch's is its `if`'s or `match`'s; a condition, a
+/// scrutinee, an initialiser, an argument and an operand are used. A `for`
+/// loop's body and a lambda's are not read here: the first is a statement,
+/// and the second is its function's result, which its use relates.
+fn mark_used(body: &Body, id: ExprId, used: bool, out: &mut BTreeSet<ExprId>) {
+    match body.expr(id) {
+        Expr::Block { stmts } => {
+            let last = stmts.len().saturating_sub(1);
+            for (i, s) in stmts.iter().enumerate() {
+                mark_used(body, *s, used && i == last, out);
+            }
+        }
+        Expr::If { cond, then, els } => {
+            if used && els.is_some() {
+                out.insert(id);
+            }
+            mark_used(body, *cond, true, out);
+            mark_used(body, *then, used, out);
+            if let Some(e) = els {
+                mark_used(body, *e, used, out);
+            }
+        }
+        Expr::Match { scrutinee, arms } => {
+            if used {
+                out.insert(id);
+            }
+            mark_used(body, *scrutinee, true, out);
+            for a in arms {
+                mark_used(body, a.body, used, out);
+            }
+        }
+        Expr::For {
+            iterable, body: b, ..
+        } => {
+            mark_used(body, *iterable, true, out);
+            mark_used(body, *b, false, out);
+        }
+        Expr::Lambda {
+            descriptor,
+            body: b,
+            ..
+        } => {
+            if let Some(d) = descriptor {
+                mark_used(body, *d, true, out);
+            }
+            mark_used(body, *b, false, out);
+        }
+        Expr::Keyword { args, block, .. } => {
+            for a in args {
+                mark_used(body, *a, true, out);
+            }
+            if let Some(b) = block {
+                mark_used(body, *b, false, out);
+            }
+        }
+        _ => {
+            for c in body.children(id) {
+                mark_used(body, c, true, out);
+            }
+        }
+    }
+}
+
 /// Is this one name, as a directive writes one?
 fn is_ident(s: &str) -> bool {
     s.starts_with(|c: char| c.is_alphabetic() || c == '_')
@@ -784,6 +856,11 @@ impl<'a> Typer<'a> {
             }
         }
 
+        let mut used = BTreeSet::new();
+        mark_used(body, body.root, false, &mut used);
+        for (_, r) in decl.term_roots() {
+            mark_used(body, r.root, false, &mut used);
+        }
         let typer = Typer {
             sigs,
             ws,
@@ -795,6 +872,7 @@ impl<'a> Typer<'a> {
             locals: RefCell::new(locals),
             piped,
             solved: RefCell::new(BTreeMap::new()),
+            used,
         };
 
         // What the program implies: an unannotated `let` or `use` takes its
@@ -1291,6 +1369,14 @@ impl<'a> Typer<'a> {
             Expr::Call { callee, .. } => self.body.expr_span(*callee),
             _ => self.body.expr_span(id),
         };
+        // A call through a binding in scope: a function value, whatever
+        // declaration shares its name (ADR-0068).
+        if let Expr::Call { callee, args } = self.body.expr(id)
+            && matches!(self.body.expr(*callee), Expr::Name(_))
+            && self.lexical.binder(*callee).is_some()
+        {
+            return self.value_call(id, *callee, args);
+        }
         let (target, args): (Option<Target<'a>>, Vec<(Option<String>, ExprId)>) =
             match self.body.expr(id) {
                 Expr::Call { callee, args } => {
@@ -1533,6 +1619,118 @@ impl<'a> Typer<'a> {
             result: result.map(|r| s.close(&r)).unwrap_or(Ty::Unknown),
             relations,
         }
+    }
+
+    /// **A call through a function value** (ADR-0068): a local, a parameter,
+    /// or a binding around a nested declaration, called. It is checked
+    /// against the value's function type as a declared callee's call is: its
+    /// arity, each argument, and its result. A value of another type is not
+    /// called (PW0614). Until 2026-09-26 nothing was checked: `f("a")`, where
+    /// `f` is a `fn(Int) -> Int`, passed.
+    fn value_call(&self, id: ExprId, callee: ExprId, args: &[crate::hir::Arg]) -> Solved {
+        let name = path_of(self.body, callee);
+        let span = self.body.expr_span(id);
+        let boundary = || (span.clone(), format!("in this call to `{name}`"));
+        let relation =
+            |kind: RelationKind, at: Span, index: Option<usize>, outcome: Outcome| ValueRelation {
+                declaration: self.decl.name.clone(),
+                kind,
+                span: at,
+                target: name.clone(),
+                index,
+                outcome,
+                declared_at: None,
+                boundary: boundary(),
+            };
+        let supplied: Vec<ExprId> = self
+            .piped
+            .get(&id)
+            .copied()
+            .into_iter()
+            .chain(args.iter().map(|a| a.value))
+            .collect();
+        let (params, result) = match self.of(callee) {
+            Ty::Builtin(Builtin::Function, mut xs) if !xs.is_empty() => {
+                let r = xs.pop().unwrap_or(Ty::Unknown);
+                (xs, r)
+            }
+            // A value of any type is a function too, of anything.
+            Ty::Any => {
+                return Solved {
+                    result: Ty::Any,
+                    relations: Vec::new(),
+                };
+            }
+            Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. } => {
+                return Solved {
+                    result: Ty::Unknown,
+                    relations: Vec::new(),
+                };
+            }
+            other => {
+                return Solved {
+                    result: Ty::Unknown,
+                    relations: vec![relation(
+                        RelationKind::Callee,
+                        self.body.expr_span(callee),
+                        None,
+                        Outcome::Disagree {
+                            expected: "a function".to_string(),
+                            actual: self.display(&other),
+                        },
+                    )],
+                };
+            }
+        };
+        let mut relations = vec![relation(
+            RelationKind::Arity,
+            span.clone(),
+            None,
+            match supplied.len() == params.len() {
+                true => Outcome::Agree,
+                false => Outcome::Disagree {
+                    expected: params.len().to_string(),
+                    actual: supplied.len().to_string(),
+                },
+            },
+        )];
+        if supplied.len() == params.len() {
+            let named = args.iter().any(|a| a.name.is_some());
+            for (i, (value, expected)) in supplied.iter().zip(&params).enumerate() {
+                let outcome = if named {
+                    Outcome::Undecided(Undecided::NamedArguments)
+                } else {
+                    // A lambda is typed against the function type it is
+                    // passed as.
+                    let actual = match (self.body.expr(*value), expected) {
+                        (
+                            Expr::Lambda {
+                                descriptor: None,
+                                params,
+                                body,
+                            },
+                            Ty::Builtin(Builtin::Function, fargs),
+                        ) => self.lambda(params, *body, fargs),
+                        _ => self.of(*value),
+                    };
+                    match unify(&mut Subst::default(), expected, &actual) {
+                        Verdict::Agree => Outcome::Agree,
+                        Verdict::Undecided => Outcome::Undecided(Undecided::Unknown),
+                        Verdict::Disagree => Outcome::Disagree {
+                            expected: self.display(expected),
+                            actual: self.display(&actual),
+                        },
+                    }
+                };
+                relations.push(relation(
+                    RelationKind::Argument,
+                    self.body.expr_span(*value),
+                    Some(i),
+                    outcome,
+                ));
+            }
+        }
+        Solved { result, relations }
     }
 
     /// `Ok(x)`, `Err(e)`, `Some(x)` — the language's own constructors, where the
@@ -2068,12 +2266,52 @@ impl<'a> Typer<'a> {
                     None => self.number(id, *operand, what),
                 });
             }
-            Expr::If { cond, .. } => out.push(self.operand(
-                id,
-                *cond,
-                "the condition of `if`",
-                &Ty::Primitive(Primitive::Bool),
-            )),
+            Expr::If { cond, .. } => {
+                out.push(self.operand(
+                    id,
+                    *cond,
+                    "the condition of `if`",
+                    &Ty::Primitive(Primitive::Bool),
+                ));
+                out.extend(self.branches(id));
+            }
+            Expr::Match { .. } => out.extend(self.branches(id)),
+            // `for x in xs`: the loop runs over a list (ADR-0051, ADR-0068).
+            Expr::For { iterable, .. } => {
+                let actual = self.of(*iterable);
+                let outcome = match &actual {
+                    Ty::Builtin(Builtin::List, _) | Ty::Any => Outcome::Agree,
+                    Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. } => {
+                        Outcome::Undecided(Undecided::Unknown)
+                    }
+                    other => Outcome::Disagree {
+                        expected: "List<_>".to_string(),
+                        actual: self.display(other),
+                    },
+                };
+                out.push(self.operand_relation(
+                    id,
+                    *iterable,
+                    "the list a `for` loop runs over",
+                    outcome,
+                ));
+            }
+            // `e?`: an `Option` or a `Result`, whose failure it returns
+            // (ADR-0051, ADR-0068).
+            Expr::Try { value } => {
+                let actual = self.of(*value);
+                let outcome = match &actual {
+                    Ty::Builtin(Builtin::Option | Builtin::Result, _) | Ty::Any => Outcome::Agree,
+                    Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. } => {
+                        Outcome::Undecided(Undecided::Unknown)
+                    }
+                    other => Outcome::Disagree {
+                        expected: "Option<_> or Result<_, _>".to_string(),
+                        actual: self.display(other),
+                    },
+                };
+                out.push(self.operand_relation(id, *value, "the operand of `?`", outcome));
+            }
             Expr::Let {
                 pat: Some(pat),
                 ty: Some(ty),
@@ -2390,6 +2628,63 @@ impl<'a> Typer<'a> {
     /// `return e` lowers as two statements, `Name("return")` then `e`, so the
     /// statement after one is a returned value. A `return` inside a lambda
     /// returns from the lambda and is not collected.
+    /// **An `if`'s or a `match`'s branches, against each other** (PW0613,
+    /// ADR-0068), where its value is used: bound, passed, operated on or
+    /// read. Where it is a statement its value is discarded, and where it is
+    /// the body's result the result relation reads each branch.
+    fn branches(&self, id: ExprId) -> Option<ValueRelation> {
+        if !self.used.contains(&id) {
+            return None;
+        }
+        let branches: Vec<ExprId> = match self.body.expr(id) {
+            Expr::If {
+                then, els: Some(e), ..
+            } => vec![*then, *e],
+            Expr::Match { arms, .. } => arms.iter().map(|a| a.body).collect(),
+            _ => return None,
+        };
+        let mut first: Option<Ty> = None;
+        let mut outcome = Outcome::Agree;
+        let mut at = self.body.expr_span(id);
+        for b in branches {
+            let t = self.of(b);
+            if t.is_unknown() || !t.is_closed() {
+                outcome = Outcome::Undecided(Undecided::Unknown);
+                continue;
+            }
+            match &first {
+                None => first = Some(t),
+                Some(f) => {
+                    if unify(&mut Subst::default(), f, &t) == Verdict::Disagree {
+                        outcome = Outcome::Disagree {
+                            expected: self.display(f),
+                            actual: self.display(&t),
+                        };
+                        at = self.body.expr_span(b);
+                        break;
+                    }
+                }
+            }
+        }
+        let what = match self.body.expr(id) {
+            Expr::If { .. } => "if",
+            _ => "match",
+        };
+        Some(ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Branches,
+            span: at,
+            target: what.to_string(),
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary: (
+                self.body.expr_span(id),
+                format!("this `{what}`'s value is used"),
+            ),
+        })
+    }
+
     fn result_sites(&self) -> Vec<ExprId> {
         let mut out = Vec::new();
         self.tail_sites(self.body.root, &mut out);
@@ -2939,6 +3234,39 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  declare builds nothing, and a value of the type is not one of them",
             )
             .repair(format!("`{}`'s constructors are {expected}", r.target)),
+            RelationKind::Branches => Diagnostic::error(
+                crate::codes::BRANCH_TYPES.id,
+                crate::codes::BRANCH_TYPES.invariant,
+                Detector::Signature,
+                format!(
+                    "this branch of the `{}` produces `{actual}`, where the first produces \
+                     `{expected}`",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("branches_produce_two_types")
+            .explain(
+                "an `if` or a `match` whose value is used is one value, whichever branch \
+                 runs, so every branch produces its type",
+            )
+            .repair(format!("make this branch a `{expected}`")),
+            RelationKind::Callee => Diagnostic::error(
+                crate::codes::NOT_CALLABLE.id,
+                crate::codes::NOT_CALLABLE.invariant,
+                Detector::Signature,
+                format!(
+                    "`{}` is called, and it is `{actual}`, not a function",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("called_value_is_not_a_function")
+            .explain("a call runs a function; a value of another type has nothing to run")
+            .repair(format!(
+                "call a function, or use `{}` as the value it is",
+                r.target
+            )),
             RelationKind::Fields => Diagnostic::error(
                 crate::codes::RECORD_FIELDS.id,
                 crate::codes::RECORD_FIELDS.invariant,

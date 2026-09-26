@@ -55,13 +55,13 @@ MUTANTS = [
     (
         "an `if` condition is not related",
         VALUES,
-        "            Expr::If { cond, .. } => out.push(self.operand(\n"
-        "                id,\n"
-        "                *cond,\n"
-        '                "the condition of `if`",\n'
-        "                &Ty::Primitive(Primitive::Bool),\n"
-        "            )),",
-        "            Expr::If { .. } => {}",
+        "                out.push(self.operand(\n"
+        "                    id,\n"
+        "                    *cond,\n"
+        '                    "the condition of `if`",\n'
+        "                    &Ty::Primitive(Primitive::Bool),\n"
+        "                ));",
+        "                let _ = cond;",
     ),
     (
         "an untyped operand is refused",

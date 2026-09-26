@@ -78,6 +78,22 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: an `elif` chain compiled as its first branch and
+its next condition, and calls through function values were checked by
+nothing** ([ADR-0068](DECISIONS/ADR-0068-what-each-construct-takes.md)).
+- **A silent miscompile.** Every `if a { x } elif b { y } else { z }`, and
+  every `else if`, lowered to `if a { x } else b`. A chain of `Bool`s checked,
+  compiled and answered wrong through the E8 host. No compiled program wrote
+  a chain; A-018's derived value did, and the new branch relation found it.
+- **Calls through a function value** were related to nothing: not their
+  arguments, their number, their result, nor that the value was a function.
+  A local function value named like a declaration was checked against the
+  declaration.
+- **Unrelated operands.** `for` over a non-list and `?` on a `Bool` checked,
+  as did an `if` whose branches produce two types where its value is bound.
+  A-005 applied `?` to a `Bool`, and four generality witnesses joined a
+  `String` with a `Secret`, a `Result` or a record. Each is corrected.
+
 **Correction, 2026-09-26: a record built with the wrong fields, and an `if`
 without `else` as a value, passed `pw check`**
 ([ADR-0067](DECISIONS/ADR-0067-a-record-is-built-with-its-fields.md)). A
@@ -156,6 +172,14 @@ had no signature and the whole WIT package failed ("missing component
 signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
+
+**2026-09-26: what each construct takes, checked**
+([ADR-0068](DECISIONS/ADR-0068-what-each-construct-takes.md)): a call through
+a function value is checked against its type, and a value that is not one is
+PW0614; `for`'s list and `?`'s operand are operands; a used `if`'s or
+`match`'s branches produce one type (PW0613); an `elif` chain is nested ifs.
+
+Evidence: [calls.txt](evidence/E10/calls.txt) (`just e10-calls`).
 
 **2026-09-26: a record is built with each of its fields, once**
 ([ADR-0067](DECISIONS/ADR-0067-a-record-is-built-with-its-fields.md)): PW0612
@@ -529,6 +553,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0068: the branches of an `if` or a `match` are related to each other
+  only where its value is used, not where it is a statement.
 - ADR-0066: a nested declaration sees the enclosing bindings in scope where
   it is written, not every binding of the enclosing body.
 - ADR-0065: a declared function's result its arguments do not fix stays

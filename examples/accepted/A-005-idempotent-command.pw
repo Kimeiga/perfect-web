@@ -33,7 +33,10 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     retry         transport_only(max = 2, jitter = true)
 {
     // Revalidate availability inside the transaction, not before it.
-    let available = Menu.is_available(item)?
+    // `Menu.is_available` answers a `Bool`, which has no failure for `?` to
+    // return: this read `Menu.is_available(item)?` until 2026-09-26, when
+    // `?`'s operand was first checked (ADR-0068).
+    let available = Menu.is_available(item)
     if !available {
         return Err(CartError.ItemUnavailable(item))
     }

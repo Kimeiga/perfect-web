@@ -249,6 +249,16 @@ codes! {
     // twice each passed, and the backend was the first to refuse them.
     RECORD_FIELDS = "PW0612" / record_fields / 1, Types,
         "a record must be built with each field its type declares, once, and no other";
+    // ADR-0068: until 2026-09-26 the branches of an `if` or a `match` were
+    // related to nothing but a declared result, so `let x = if c { 1 } else
+    // { "a" }` passed.
+    BRANCH_TYPES = "PW0613" / branch_types / 1, Types,
+        "the branches of an `if` or a `match` whose value is used must produce one type";
+    // ADR-0068: a call through a function value was checked by nothing until
+    // 2026-09-26: not its arguments, not its result, not that the value was a
+    // function at all.
+    NOT_CALLABLE = "PW0614" / not_callable / 1, Types,
+        "a value called must be a function";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

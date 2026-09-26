@@ -443,3 +443,12 @@ once and no other (PW0612), where each field was related alone and a field
 left out, one its type lacks, or one given twice passed. An `if` without
 `else` is the unit value, so a body declaring another result cannot end in
 one.
+
+## 2026-09-26: what each construct takes, checked (E10)
+
+[ADR-0068](DECISIONS/ADR-0068-what-each-construct-takes.md): a call through a
+function value is checked against its type (arity, arguments, result), and a
+value called that is not a function is PW0614; `for`'s list and `?`'s operand
+are related; the branches of an `if` or a `match` whose value is used produce
+one type (PW0613). It fixes a silent miscompile: every `elif` and `else if`
+chain lowered to its first branch and, for its `else`, the next condition.

@@ -255,6 +255,10 @@ awaited in order. What remains:
   in its type parameters, which stands in for signatures stating how a
   result's label is made (ruling needed). A name bound over a labelled
   collection's elements carries its label (ADR-0063).
+- **A call through an unannotated lambda is related to nothing**
+  (ADR-0068). `let f = (x) => x + 1` then `f("a")`: the lambda's parameter
+  takes its type from no use, so the call has no function type to check. A
+  call through an annotated value or a parameter is checked.
 - **The name check keeps its own scope walk** (ADR-0066). `names.rs`
   resolves scopes for PW0021 itself, where every other analysis reads
   `crate::lexical`. They differ in one rule: the name check binds any keyword

@@ -16,6 +16,9 @@ import domain.{ StoreId }
 fn audit(id: StoreId, dry_run: Bool) -> () !{ log<Public>, database.read<Stores> } {
     let store = Stores.get(id)
     let same = store
-    let value = if dry_run { "none" } else { same }
+    // Each branch is a `String`, the second interpolating the store: a
+    // branch of another type, `{ same }`, was a second defect, and
+    // PW0613 refuses it since 2026-09-26 (ADR-0068).
+    let value = if dry_run { "none" } else { "{same}" }
     log.public("loaded {value}")
 }

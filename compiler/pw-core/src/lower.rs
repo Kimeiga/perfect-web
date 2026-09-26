@@ -870,6 +870,12 @@ impl Lowerer<'_> {
             },
 
             K::IfExpr => {
+                // `if a { x } elif b { y } else { z }` is one node holding
+                // `a`, `{ x }`, `b`, `{ y }`, `{ z }`, and `else if` the same.
+                // Until 2026-09-26 the third child was taken for the `else`,
+                // so the chain lowered to `if a { x } else b`: `b` was the
+                // value when `a` was false, and `{ y }` and `{ z }` were
+                // dropped (ADR-0068). The chain is nested ifs.
                 let kids: Vec<_> = node.children().collect();
                 let cond = match kids.first() {
                     Some(c) => self.expr(b, c),
@@ -879,7 +885,7 @@ impl Lowerer<'_> {
                     Some(c) => self.expr(b, c),
                     None => b.expr(Expr::Error, span.clone()),
                 };
-                let els = kids.get(2).map(|c| self.expr(b, c));
+                let els = self.if_chain(b, kids.get(2..).unwrap_or_default(), &span);
                 b.expr(Expr::If { cond, then, els }, span)
             }
 
@@ -1130,6 +1136,34 @@ impl Lowerer<'_> {
             },
             span,
         )
+    }
+
+    /// What follows an `if`'s first block: nothing, an `else` block, or
+    /// another condition and its block, and what follows that.
+    fn if_chain(
+        &mut self,
+        b: &mut BodyBuilder,
+        rest: &[SyntaxNode],
+        span: &Span,
+    ) -> Option<ExprId> {
+        match rest {
+            [] => None,
+            [only] => Some(self.expr(b, only)),
+            [cond, block, more @ ..] => {
+                let cond = self.expr(b, cond);
+                let then = self.expr(b, block);
+                let els = self.if_chain(b, more, span);
+                let at = match (
+                    b.exprs.span_at(cond.index()),
+                    els.and_then(|e| b.exprs.span_at(e.index())),
+                ) {
+                    (Some(c), Some(e)) => c.start..e.end,
+                    (Some(c), None) => c.start..span.end,
+                    _ => span.clone(),
+                };
+                Some(b.expr(Expr::If { cond, then, els }, at))
+            }
+        }
     }
 
     fn field_init(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> FieldInit {

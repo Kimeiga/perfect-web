@@ -19,7 +19,10 @@ page StorePage(id: StoreId, signed_in: Bool) {
 
     let store = query Store(id)
     let cart = query Cart(current_session())
-    let shown = if signed_in { cart } else { store }
+    // Each branch is a `String`, interpolating what it shows: a `Cart` on one
+    // path and a `Store` on the other was a second defect, and PW0613 refuses
+    // it since 2026-09-26 (ADR-0068).
+    let shown = if signed_in { "{cart}" } else { "{store}" }
 
     view { <main><p>{shown}</p></main> }
 }
