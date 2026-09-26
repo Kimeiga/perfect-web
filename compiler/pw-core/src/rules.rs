@@ -153,7 +153,12 @@ fn check_effects_against_placement(decl: &Decl, out: &mut Vec<Finding>) {
     ) else {
         return;
     };
-    let target = placement.value.split_whitespace().next().unwrap_or("");
+    // One world pins the declaration; a list of worlds pins none
+    // (`check::declared_world`), and no effect conflicts with a choice.
+    let target = placement.value.trim();
+    if target.contains(',') {
+        return;
+    }
     for e in row {
         // `path`, not `written`: the conflict is with the effect FAMILY, and
         // `style.mutate<LayoutAffect>` is as unavailable at `origin` as
@@ -192,7 +197,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     // --- PW0100: a non-Public value in a shared cache -----------------------
     // The charter §16.3 worked example, now on real files.
     if let Some(cache) = policy(policies, "cache")
-        && cache.value.starts_with("shared")
+        && cache.value.trim() == "shared"
         && matches!(visibility, "session" | "private")
     {
         out.push(
@@ -217,7 +222,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
 
     // --- PW0101: read_your_writes on a public read --------------------------
     if let Some(c) = policy(policies, "consistency")
-        && c.value.starts_with("read_your_writes")
+        && c.value.trim() == "read_your_writes"
         && visibility == "public"
     {
         out.push(
@@ -238,7 +243,9 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     // --- PW0102: a stale session read ---------------------------------------
     if let Some(f) = policy(policies, "freshness")
         && visibility == "session"
-        && !f.value.starts_with('0')
+        // A duration, read once (ADR-0089): `05.seconds` began with `0` and
+        // was five seconds stale.
+        && crate::policy::duration(&f.value).is_some_and(|ms| ms > 0)
     {
         out.push(
             err(
@@ -256,7 +263,9 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     if let Some(r) = policy(policies, "retry")
         && noun == "command"
         && policy(policies, "idempotent_by").is_none()
-        && !r.value.starts_with("transport_only")
+        // The operator, not the spelling's prefix (ADR-0089).
+        && !crate::policy::applied("retry", &r.value)
+            .is_some_and(|o| o.id == "policy.retry.transport_only")
     {
         out.push(
             err(
@@ -273,7 +282,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
 
     // --- PW0304: unbounded retry --------------------------------------------
     if let Some(r) = policy(policies, "retry")
-        && (r.value.contains("forever") || r.value.contains("unbounded"))
+        && r.value.trim() == "forever"
     {
         out.push(
             err("PW0313", "a retry policy must be bounded", "`retry forever` is not a permitted policy", r.span.clone())
@@ -343,7 +352,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     // --- PW0307: a subscription escaping its component ----------------------
     if let Some(s) = policy(policies, "scope")
         && matches!(noun, "subscription" | "resource")
-        && (s.value.starts_with("application") || s.value.starts_with("session"))
+        && matches!(s.value.trim(), "application" | "session")
     {
         out.push(
             // ONE code per invariant (architect ruling). `PW2004` is canonical:
@@ -370,7 +379,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
 
     // --- PW0200 (warning): a shared cache with nothing to invalidate it -----
     if let Some(cache) = policy(policies, "cache")
-        && cache.value.starts_with("shared")
+        && cache.value.trim() == "shared"
         && visibility == "public"
         && policy(policies, "freshness").is_none()
         && policy(policies, "invalidates_on").is_none()

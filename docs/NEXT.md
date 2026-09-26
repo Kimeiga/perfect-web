@@ -132,13 +132,19 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
 ~~A call to a view, a page, an event or an effect~~, refused (ADR-0087).
 Next, in order:
 1. ~~**a clause's keys**~~, done (ADR-0088), which found the store's own
-   `emits` ill-typed and five fixtures passing the wrong key;
+   `emits` ill-typed and five fixtures passing the wrong key. Then ~~**a
+   policy's value**~~, done (ADR-0089), which found `cache Shared` escaping
+   the privacy rule and three rules bypassed by spelling, and this:
+   **`pw build` does not run the declaration rules.** `Checked::of` runs
+   `check_units`, and `rules::check` runs only in the command, so `pw build`
+   compiled R-015's `retry forever` query into a component and built R-014,
+   each of which `pw check` refuses (PW0313, PW0312). Next;
 2. **a listener's key.** What each argument of `invalidates_on` binds, and
    the materializer's matching, which reads an event's arguments as a set:
    `InventoryChanged(store 47, item 3)` is deferred forever, and store 47's
    menu stays fresh (A-009, the store's `MenuFragment`);
-3. **a policy operator's arguments.** `retry transport_only(maxx = 2, ..)`
-   and `max = "two"` check.
+3. ~~**a policy operator's arguments**~~, done with the values
+   (ADR-0089).
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

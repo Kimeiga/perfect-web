@@ -288,6 +288,13 @@ awaited in order. What remains:
   values against an entry's key as a set, so `InventoryChanged(store 47,
   item 3)` is deferred forever, and store 47's menu is never invalidated
   (NEXT).
+- **A policy's value is checked by its domain where it heads a declaration**
+  (ADR-0089), not where a block writes it: `observe .. { scope application }`
+  and a `handler_policy { .. }` are body statements, read by the scope graph
+  and the handler rules. A `requires` predicate names nothing declared, and
+  is not checked; nor is a `privacy` label constructor's name, a length, or
+  a `conflict` strategy's field. `pw build` does not run the declaration
+  rules (NEXT).
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.

@@ -175,6 +175,11 @@ codes! {
     // values, and until 2026-09-26 nothing held it to that.
     DERIVED_NOT_PURE = "PW0334" / derived_not_pure / 1, DeclarationRules,
         "a `derived` value is computed from other values, and performs no effect";
+    // ADR-0089: `cache Shared`, `placement originn` and `retry nope(..)`
+    // checked until 2026-09-26, and each reader of the clause decided alone
+    // what it meant.
+    POLICY_VALUE = "PW0335" / policy_value / 1, DeclarationRules,
+        "a policy's value is one its domain has";
     OPTIMISTIC_TARGET_MISMATCH = "PW0331" / optimistic_target_mismatch / 1, DeclarationRules,
         "an optimistic transition must produce the value type of the resource it targets";
     // **A known policy in the wrong place**, which is a different failure from

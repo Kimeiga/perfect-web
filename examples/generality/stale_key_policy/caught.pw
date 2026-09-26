@@ -11,7 +11,7 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
     freshness   10.seconds
     consistency snapshot
     cache       shared
-    concurrency latest_wins
+    concurrency parallel
 {
     Stores.get(id)
 }

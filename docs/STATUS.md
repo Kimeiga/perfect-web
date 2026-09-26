@@ -78,6 +78,31 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: no policy's value was checked, and three privacy
+and retry rules could be bypassed by spelling**
+([ADR-0089](DECISIONS/ADR-0089-a-policy-value-is-one-its-domain-has.md)).
+The policy table says what each head's value is, and nothing held a value
+to it:
+- `cache Shared` on R-004's page, a session's cart in a shared cache,
+  checked. The privacy rule read it as no shared cache.
+- `placement originn` checked, and the declared world was dropped for a
+  derived one.
+- `retry nope(..)`, `retry transport_only(maxx = 2)` and `key nope`
+  checked.
+- The store's own commands named `InteractionId` without importing it.
+
+Three rules matched a value loosely:
+- `freshness 05.seconds` on a session read began with `0`;
+- a cache key's `username` contained `user`;
+- `transport_onlyish(..)` began with `transport_only`.
+
+A value is one its domain has now (PW0335), and each reader reads it
+exactly. The table gains what the corpus writes and the manifest reads:
+`parallel`, `fixed`, `supersede`, `keep` and `application`.
+
+Evidence: [policy-values.txt](evidence/E10/policy-values.txt)
+(`just e10-policy-values`).
+
 **Correction, 2026-09-26: a clause's key was never checked, and the
 store's own was ill-typed**
 ([ADR-0088](DECISIONS/ADR-0088-a-clause-names-a-declaration-and-gives-it-its-key.md)).

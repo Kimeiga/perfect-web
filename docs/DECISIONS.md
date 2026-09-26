@@ -611,3 +611,12 @@ whatever a name found, and nothing resolved, counted or typed a key, so
 `invalidates Cart(item)` and `emits Cart(..)` checked. A clause names a
 declaration of its kind (PW5103), and its key's arguments are terms related
 to what it names. The store's own `emits` gave its event the wrong type.
+
+## 2026-09-26: a policy's value is one its domain has (E10)
+
+[ADR-0089](DECISIONS/ADR-0089-a-policy-value-is-one-its-domain-has.md):
+nothing held a policy's value to the table that says what it is. `cache
+Shared` checked on R-004's page and escaped the rule that keeps a session's
+data out of a shared cache; `placement originn`, `retry nope(..)` and `key
+nope` checked; and three readers were bypassed by a prefix or a substring.
+A value is one its domain has now (PW0335), and each reader reads it exactly.

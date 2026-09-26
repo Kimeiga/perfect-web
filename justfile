@@ -1099,6 +1099,20 @@ e10-clause-keys:
      } > docs/evidence/E10/clause-keys.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/clause-keys.txt
 
+# ADR-0089: a policy's value is one its domain has. Its tests, and the
+# mutation controls.
+e10-policy-values:
+    @{ echo "ADR-0089 - a policy's value is one its domain has"; echo; \
+       echo "produced by: just e10-policy-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== policy values (compiler/pw-core/tests/policy_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test policy_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/policy_value_mutations.py)"; echo; \
+       python3 scripts/policy_value_mutations.py; \
+     } > docs/evidence/E10/policy-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/policy-values.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

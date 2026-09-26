@@ -645,7 +645,7 @@ fn varies_by(decl: &Decl) -> Vec<Dimension> {
         .into_iter()
         .filter(|d| {
             decl.policy(d.keyword())
-                .is_some_and(|p| p.value.contains("included_in_key"))
+                .is_some_and(|p| p.value.trim() == "included_in_key")
         })
         .collect();
     if decl

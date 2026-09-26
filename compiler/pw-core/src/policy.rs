@@ -58,7 +58,9 @@ pub enum Domain {
     Duration,
     /// A type the program declares: `idempotent_by InteractionId`.
     TypeRef,
-    /// A parameter of the declaration being written: `key id`.
+    /// A parameter of the declaration being written: `key id`. A cache key
+    /// may also name a partition it separates, `key store, user` (PW5004):
+    /// one of `privacy::PARTITIONS`.
     ///
     /// **Not** a term. `id` here selects a cache-key dimension; it is not
     /// evaluated, and resolving it as a term would make a cache key a function
@@ -93,7 +95,13 @@ pub enum Domain {
     /// platform will not use.
     Derived,
     /// A named operator with a signature: `retry bounded_exponential(max = 3)`.
-    Operator(&'static [Op]),
+    /// The words beside it are the values it may be instead: `retry forever`
+    /// (refused, PW0313) and `retry none`.
+    Operator(&'static [Op], &'static [&'static str]),
+    /// A word from a closed set that may carry a condition: `impact
+    /// layout_write when LayoutAffect`. The condition names a type, and is
+    /// the effect ontology's (PW5204).
+    ConditionedWord(&'static [&'static str]),
     /// An effect as written, type argument included: `capability
     /// database.read<T>`.
     EffectRef,
@@ -142,8 +150,13 @@ pub struct Op {
 /// What one argument of a policy operator is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arg {
-    /// `max = 3` — a named literal. The name is part of the signature.
-    Named(&'static str),
+    /// `max = 3` — a named literal of one kind. The name is part of the
+    /// signature, and an argument that is not `required` may be left out.
+    Named {
+        name: &'static str,
+        kind: Literal,
+        required: bool,
+    },
     /// A field of the declaration's result, paired with a strategy:
     /// `merge_by_field(notes = last_write_wins)`. Repeatable.
     FieldStrategy(&'static [&'static str]),
@@ -153,6 +166,48 @@ pub enum Arg {
     /// **A real executable term.** Receives ordinary resolution.
     Term,
 }
+
+/// **What a named literal argument is** (ADR-0089).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Literal {
+    /// A count from 1: `max = 3`. The manifest holds it as a `u32`.
+    Count,
+    /// `true` or `false`: `jitter = true`.
+    Truth,
+}
+
+impl Literal {
+    /// Is `written` a literal of this kind?
+    pub fn fits(self, written: &str) -> bool {
+        match self {
+            Literal::Count => written.parse::<u32>().is_ok_and(|n| n >= 1),
+            Literal::Truth => matches!(written, "true" | "false"),
+        }
+    }
+
+    /// What a literal of this kind is, for a message.
+    pub fn describe(self) -> &'static str {
+        match self {
+            Literal::Count => "a count from 1",
+            Literal::Truth => "`true` or `false`",
+        }
+    }
+}
+
+/// A retry's bound and whether its delays vary. The bound is what makes a
+/// retry bounded (PW0313), so it is required.
+const RETRY_ARGS: &[Arg] = &[
+    Arg::Named {
+        name: "max",
+        kind: Literal::Count,
+        required: true,
+    },
+    Arg::Named {
+        name: "jitter",
+        kind: Literal::Truth,
+        required: false,
+    },
+];
 
 /// The strategies `merge_by_field` accepts per field.
 const MERGE: &[&str] = &["last_write_wins", "maximum", "minimum", "union"];
@@ -164,12 +219,20 @@ const RETRY_OPS: &[Op] = &[
     Op {
         id: "policy.retry.bounded_exponential",
         name: "bounded_exponential",
-        args: &[Arg::Named("max"), Arg::Named("jitter")],
+        args: RETRY_ARGS,
     },
     Op {
         id: "policy.retry.transport_only",
         name: "transport_only",
-        args: &[Arg::Named("max"), Arg::Named("jitter")],
+        args: RETRY_ARGS,
+    },
+    // A fixed delay between attempts. The corpus writes it as a retry a
+    // valid program declares (`retry_not_idempotent`'s neighbour), and the
+    // manifest carries a strategy by name (ADR-0089, ruling needed).
+    Op {
+        id: "policy.retry.fixed",
+        name: "fixed",
+        args: RETRY_ARGS,
     },
 ];
 
@@ -207,8 +270,11 @@ pub fn domain_of(head: &str) -> Option<Domain> {
 
         // --- keys and concurrency
         "key" | "dedupe_by" => Domain::ParamRef,
-        "concurrency" => Domain::Word(&["one_per_key"]),
-        "on_key_change" => Domain::Word(&["cancel"]),
+        // `parallel` is the manifest's second mode (ADR-0089).
+        "concurrency" => Domain::Word(&["one_per_key", "parallel"]),
+        // The three PW0325's repair names and R-027 expects; the charter's
+        // "cancels or supersedes stale work" (ADR-0089).
+        "on_key_change" => Domain::Word(&["cancel", "supersede", "keep"]),
         "idempotent_by" => Domain::TypeRef,
 
         // --- the dependency graph
@@ -226,7 +292,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // ADR-0040: the operation the compiler supplies, by its name.
         "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
-        "impact" => Domain::Word(&[
+        "impact" => Domain::ConditionedWord(&[
             "layout_read",
             "layout_write",
             "dom_write",
@@ -239,9 +305,9 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "rollback" => Domain::Derived,
 
         // --- operators
-        "retry" | "reconnect" => Domain::Operator(RETRY_OPS),
-        "conflict" => Domain::Operator(CONFLICT_OPS),
-        "identity" => Domain::Operator(IDENTITY_OPS),
+        "retry" | "reconnect" => Domain::Operator(RETRY_OPS, &["none", "forever"]),
+        "conflict" => Domain::Operator(CONFLICT_OPS, &[]),
+        "identity" => Domain::Operator(IDENTITY_OPS, &[]),
 
         // --- transport, storage, lifecycle
         "transport" => Domain::Word(&["websocket", "sse", "poll"]),
@@ -250,7 +316,10 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "offline" => Domain::Word(&["writable", "readable"]),
         "sync" => Domain::Word(&["on_reconnect", "immediate"]),
         "on_conflict_unresolved" => Domain::Word(&["surface_to_user", "refuse"]),
-        "scope" => Domain::Word(&["component", "page", "session"]),
+        // `application` is the scope a subscription may not claim inside a
+        // component (R-028, PW2004): a word of the domain, refused where it
+        // outlives its owner (ADR-0089).
+        "scope" => Domain::Word(&["component", "page", "session", "application"]),
         "on_scope_exit" => Domain::Word(&["close", "detach"]),
         "transaction" => Domain::Word(&["serializable", "read_committed"]),
         "captures" => Domain::Word(&["serializable_only"]),
@@ -348,9 +417,177 @@ pub fn keyed(head: &str) -> Option<(crate::resolve::Namespace, &'static [crate::
 /// is what makes an unknown operator an error rather than a silent pass.
 pub fn operator(head: &str, spelling: &str) -> Option<&'static Op> {
     match domain_of(head)? {
-        Domain::Operator(ops) => ops.iter().find(|o| o.name == spelling),
+        Domain::Operator(ops, _) => ops.iter().find(|o| o.name == spelling),
         _ => None,
     }
+}
+
+/// **A duration as written: `30.seconds`, `500.milliseconds`, `1.hours`.**
+///
+/// The one reading, in milliseconds: the manifest reads it, and a value it
+/// cannot read is refused where it is written (ADR-0089).
+pub fn duration(v: &str) -> Option<u64> {
+    let (n, unit) = v.split_once('.')?;
+    let n: u64 = n.trim().parse().ok()?;
+    let per = match unit.trim() {
+        "milliseconds" | "millisecond" | "ms" => 1,
+        "seconds" | "second" => 1_000,
+        "minutes" | "minute" => 60_000,
+        "hours" | "hour" => 3_600_000,
+        _ => return None,
+    };
+    n.checked_mul(per)
+}
+
+/// **What is wrong with a policy's value, by its domain** (ADR-0089).
+///
+/// Architect ruling, 2026-08-07, on an unknown policy head: "Pleris may
+/// reject authored semantics; it must never silently erase them." A value its
+/// domain does not have is the same failure one level down. `cache Shared`
+/// was read as no cache by the manifest, and as no shared cache by the rule
+/// that keeps a session's data out of one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValueFault {
+    /// Not one of the words the domain lists.
+    Word(&'static [&'static str]),
+    /// Not a duration.
+    Duration,
+    /// Not a world.
+    World(String),
+    /// A flag written with a value.
+    Flag,
+    /// No operator of that name, where these are the domain's.
+    Operator(String, Vec<&'static str>),
+    /// An operator's arguments opened and never closed.
+    Unclosed(String),
+    /// An argument the operator does not take.
+    UnknownArgument(&'static str, String),
+    /// An argument given twice.
+    ArgumentTwice(&'static str, String),
+    /// A required argument left out.
+    MissingArgument(&'static str, &'static str),
+    /// An argument that is not of its kind: `max = "two"`.
+    ArgumentKind(&'static str, &'static str, Literal, String),
+    /// A value where every argument is written by name.
+    Positional(&'static str, String),
+    /// A word the operator's argument does not list: a strategy, a dimension.
+    ArgumentWord(&'static str, String, &'static [&'static str]),
+}
+
+/// **The fault in `value`, as `head`'s domain reads it**, or `None` where the
+/// domain has it or is not one this reads. A name the value mentions, a
+/// parameter or a type, is resolved where scope is known (`check.rs`).
+pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
+    let value = value.trim();
+    match domain_of(head)? {
+        Domain::Word(words) => (!words.contains(&value)).then_some(ValueFault::Word(words)),
+        Domain::ConditionedWord(words) => {
+            let word = value.split_once(" when ").map_or(value, |(w, _)| w).trim();
+            (!words.contains(&word)).then_some(ValueFault::Word(words))
+        }
+        Domain::Duration => duration(value).is_none().then_some(ValueFault::Duration),
+        Domain::Worlds => value
+            .split(',')
+            .map(str::trim)
+            .find(|w| !crate::placement::ALL_WORLDS.iter().any(|x| x.name() == *w))
+            .map(|w| ValueFault::World(w.to_string())),
+        Domain::Flag => (!value.is_empty()).then_some(ValueFault::Flag),
+        Domain::Operator(ops, words) => {
+            if words.contains(&value) {
+                return None;
+            }
+            let (name, args) = match value.split_once('(') {
+                Some((name, rest)) => match rest.trim_end().strip_suffix(')') {
+                    Some(args) => (name.trim(), args),
+                    None => return Some(ValueFault::Unclosed(name.trim().to_string())),
+                },
+                None => (value, ""),
+            };
+            let Some(op) = ops.iter().find(|o| o.name == name) else {
+                return Some(ValueFault::Operator(
+                    name.to_string(),
+                    ops.iter().map(|o| o.name).collect(),
+                ));
+            };
+            operator_fault(op, args)
+        }
+        _ => None,
+    }
+}
+
+/// What is wrong with an operator's arguments: each written once, by the
+/// name its signature gives it, and of its kind.
+fn operator_fault(op: &'static Op, args: &str) -> Option<ValueFault> {
+    let written: Vec<&str> = args
+        .split(',')
+        .map(str::trim)
+        .filter(|a| !a.is_empty())
+        .collect();
+    let mut given: Vec<&str> = Vec::new();
+    for a in &written {
+        match op.args {
+            [Arg::Dimension(words)] => {
+                if !words.contains(a) {
+                    return Some(ValueFault::ArgumentWord(op.name, a.to_string(), words));
+                }
+            }
+            [Arg::FieldStrategy(strategies)] => {
+                let Some((_, strategy)) = a.split_once('=') else {
+                    return Some(ValueFault::Positional(op.name, a.to_string()));
+                };
+                let strategy = strategy.trim();
+                if !strategies.contains(&strategy) {
+                    return Some(ValueFault::ArgumentWord(
+                        op.name,
+                        strategy.to_string(),
+                        strategies,
+                    ));
+                }
+            }
+            _ => {
+                let Some((name, v)) = a.split_once('=') else {
+                    return Some(ValueFault::Positional(op.name, a.to_string()));
+                };
+                let (name, v) = (name.trim(), v.trim());
+                let Some((kind, _)) = named(op, name) else {
+                    return Some(ValueFault::UnknownArgument(op.name, name.to_string()));
+                };
+                if given.contains(&name) {
+                    return Some(ValueFault::ArgumentTwice(op.name, name.to_string()));
+                }
+                given.push(name);
+                if !kind.fits(v) {
+                    let arg = named(op, name).map_or("", |(_, n)| n);
+                    return Some(ValueFault::ArgumentKind(op.name, arg, kind, v.to_string()));
+                }
+            }
+        }
+    }
+    op.args.iter().find_map(|a| match a {
+        Arg::Named {
+            name,
+            required: true,
+            ..
+        } if !given.contains(name) => Some(ValueFault::MissingArgument(op.name, name)),
+        _ => None,
+    })
+}
+
+/// The named argument `name` of `op`: its kind, and its name as the
+/// signature spells it.
+fn named(op: &Op, name: &str) -> Option<(Literal, &'static str)> {
+    op.args.iter().find_map(|a| match a {
+        Arg::Named { name: n, kind, .. } if *n == name => Some((*kind, *n)),
+        _ => None,
+    })
+}
+
+/// **The operator a value applies**: `transport_only` in `retry
+/// transport_only(max = 2)`. How a rule asks which operator it is, rather
+/// than reading the value's spelling.
+pub fn applied(head: &str, value: &str) -> Option<&'static Op> {
+    let name = value.split_once('(').map_or(value, |(n, _)| n).trim();
+    operator(head, name)
 }
 
 /// Every operator id the registry defines, for the stability test.

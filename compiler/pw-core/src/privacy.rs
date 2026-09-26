@@ -137,6 +137,10 @@ impl Label {
     /// The partitions a cache key must include for this value to be cacheable
     /// at all. A shared cache keyed without them serves one tenant's data to
     /// another (charter §14 M5 task 4, "cross-tenant cache key omission").
+    /// Every partition [`Label::required_cache_partitions`] can name: what a
+    /// cache key may separate besides the declaration's parameters.
+    pub const PARTITIONS: [&'static str; 4] = ["session", "user", "organization", "device"];
+
     pub fn required_cache_partitions(&self) -> Vec<String> {
         self.0
             .iter()

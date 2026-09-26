@@ -125,6 +125,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(unresolved_uses(&workspace, &sigs, &hirs, i, &u.hir));
         // ADR-0072: an element named with a capital letter is a view.
         per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
+        // ADR-0089: a policy's value is one its domain has.
+        per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0047: a name used as a value resolves too, in lexical scope.
         per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));
         // Every effect row, against the declarations. Reported beside the
@@ -488,6 +490,124 @@ fn not_a_term(
             description: format!("use `{path}` as {what} is used, or call a function"),
             replacement: None,
         }],
+    }
+}
+
+/// **A policy's value is one its domain has** (ADR-0089).
+///
+/// The table in `crate::policy` says what each head's value is. Nothing held
+/// a value to it until 2026-09-26: `cache Shared` checked, and the rule that
+/// keeps a session's data out of a shared cache read it as no shared cache;
+/// `placement originn` checked, and the declared world was dropped for a
+/// derived one; `retry nope(..)` and `key nope` checked. A word, a duration, a
+/// world, a flag and an operator's arguments are the table's to judge; a
+/// parameter, a type and a declaration a value names are resolved here.
+fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+    use crate::policy::{Domain, ValueFault};
+    use crate::resolve::{Namespace, Resolution};
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        for p in &decl.policies {
+            let value = p.value.trim();
+            let fault = match crate::policy::domain_of(&p.name) {
+                Some(domain @ (Domain::ParamRef | Domain::ParamList)) => value
+                    .split(',')
+                    .map(str::trim)
+                    .find(|n| {
+                        !decl.params.iter().any(|q| q.name == *n)
+                            && !(domain == Domain::ParamRef
+                                && crate::privacy::Label::PARTITIONS.contains(n))
+                    })
+                    .map(|n| format!("`{n}` is not a parameter of `{}`", decl.name)),
+                Some(Domain::TypeRef) => {
+                    let found = match value.contains('.') {
+                        true => workspace.resolve_path_in(unit, Namespace::Type, value),
+                        false => workspace.resolve_in(unit, Namespace::Type, value),
+                    };
+                    (found == Resolution::Unresolved)
+                        .then(|| format!("`{value}` names no type visible here"))
+                }
+                Some(Domain::DeclRef) => (workspace.resolve(unit, value) == Resolution::Unresolved)
+                    .then(|| format!("`{value}` names no declaration visible here")),
+                _ => crate::policy::value_fault(&p.name, value).map(|f| match f {
+                    ValueFault::Word(words) => format!("`{value}` is not one of {}", listed(words)),
+                    ValueFault::Duration => {
+                        format!("`{value}` is not a duration: a count and a unit, `30.seconds`")
+                    }
+                    ValueFault::World(w) => format!(
+                        "`{w}` is not a world: {}",
+                        listed(
+                            &crate::placement::ALL_WORLDS
+                                .iter()
+                                .map(|w| w.name())
+                                .collect::<Vec<_>>()
+                        )
+                    ),
+                    ValueFault::Flag => format!("`{}` takes no value", p.name),
+                    ValueFault::Operator(name, ops) => {
+                        format!(
+                            "`{name}` is none of `{}`'s operators: {}",
+                            p.name,
+                            listed(&ops)
+                        )
+                    }
+                    ValueFault::Unclosed(name) => {
+                        format!("`{name}`'s arguments are not closed with `)`")
+                    }
+                    ValueFault::UnknownArgument(op, a) => format!("`{op}` takes no argument `{a}`"),
+                    ValueFault::ArgumentTwice(op, a) => format!("`{op}` is given `{a}` twice"),
+                    ValueFault::MissingArgument(op, a) => format!("`{op}` is not given `{a}`"),
+                    ValueFault::ArgumentKind(op, a, kind, v) => {
+                        format!("`{op}`'s `{a}` is {}, and this is `{v}`", kind.describe())
+                    }
+                    ValueFault::Positional(op, v) => {
+                        format!("`{op}` takes its arguments by name, and `{v}` names none")
+                    }
+                    ValueFault::ArgumentWord(op, v, words) => {
+                        format!("`{v}` is none of what `{op}` takes: {}", listed(words))
+                    }
+                }),
+            };
+            let Some(why) = fault else { continue };
+            out.push(Diagnostic {
+                code: crate::codes::POLICY_VALUE.id,
+                invariant: crate::codes::POLICY_VALUE.invariant,
+                reason: "policy_value",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!("`{} {value}`: {why}", p.name),
+                primary_span: p.span.clone(),
+                related: vec![Related {
+                    span: hir.decl_span(id),
+                    label: format!("a policy of `{}`", decl.name),
+                }],
+                explanation: Some(
+                    "A policy's value is one its domain has: a word the policy lists, a \
+                     duration, a world, a parameter of the declaration, a type, or an \
+                     operator given its arguments by name. A value the compiler does not \
+                     understand is not a policy nobody wrote. Until 2026-09-26 such a \
+                     value checked, and each reader of the clause decided alone what it \
+                     meant: `cache Shared` was no shared cache to the privacy rule, and \
+                     no cache to the manifest."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write a value the policy has".to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// `a`, `b` and `c`, each in backticks, for a message.
+fn listed<S: AsRef<str>>(words: &[S]) -> String {
+    let words: Vec<String> = words.iter().map(|w| format!("`{}`", w.as_ref())).collect();
+    match words.split_last() {
+        None => String::new(),
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
     }
 }
 
@@ -3108,10 +3228,13 @@ fn privacy_flow(
     }
     let key_policy = decl.policy("key");
     let key_text = key_policy.map(|k| k.value.clone()).unwrap_or_default();
+    // Each of the key's items, by name. A substring matched a parameter
+    // called `username` as the user's partition until 2026-09-26 (ADR-0089).
+    let items: Vec<&str> = key_text.split(',').map(str::trim).collect();
     let missing: Vec<String> = label
         .required_cache_partitions()
         .into_iter()
-        .filter(|p| !key_text.contains(p.as_str()))
+        .filter(|p| !items.contains(&p.as_str()))
         .collect();
     if missing.is_empty() {
         return;

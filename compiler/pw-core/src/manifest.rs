@@ -292,15 +292,8 @@ fn split_result(decl: &Decl) -> (Option<String>, Option<String>) {
 
 /// `30.seconds`, `2.seconds`, `500.milliseconds`, `5.minutes`.
 fn parse_duration(v: &str) -> Option<Millis> {
-    let (n, unit) = v.split_once('.')?;
-    let n: u64 = n.trim().parse().ok()?;
-    Some(match unit.trim() {
-        "milliseconds" | "millisecond" | "ms" => n,
-        "seconds" | "second" => n * 1_000,
-        "minutes" | "minute" => n * 60_000,
-        "hours" | "hour" => n * 3_600_000,
-        _ => return None,
-    })
+    // The one reading, which the checker holds a value to (ADR-0089).
+    crate::policy::duration(v)
 }
 
 /// `forever`, `transport_only(max = 2, jitter = true)`,

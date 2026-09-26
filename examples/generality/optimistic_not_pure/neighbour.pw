@@ -12,7 +12,7 @@ import Carts
 import Resources.{ Cart }
 import context.{ current_session }
 import domain.{ MenuItemId, PositiveInt }
-import domain.{ CartError }
+import domain.{ CartError, InteractionId }
 
 command remove_from_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<domain.Cart, CartError>

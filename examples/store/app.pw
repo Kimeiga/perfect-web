@@ -38,7 +38,7 @@ import Menus
 // page renders without authority moved with it. That was the architect's
 // ruling and the reason the repair waited for a frozen matrix.
 import context.{ current_session }
-import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem,
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, InteractionId,
     MenuItemId, PositiveInt }
 import capability.{ Session, SessionId }
 import Events.{ CartChanged }

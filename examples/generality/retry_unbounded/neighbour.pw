@@ -5,7 +5,7 @@ module generality.retry_bounded_ok
 
 import Payments
 import domain.{ OrderId, PaymentError }
-import domain.{ Money, PaymentReceipt }
+import domain.{ Money, PaymentReceipt, InteractionId }
 
 command sync(order: OrderId) -> Result<PaymentReceipt, PaymentError>
     requires      SignedIn
