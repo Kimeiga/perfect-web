@@ -783,7 +783,7 @@ struct TypeCx<'a> {
     out: &'a mut BTreeMap<Type, WitType>,
     /// Declarations being defined: a record that contains itself has no
     /// canonical layout.
-    visiting: Vec<DefId>,
+    visiting: Vec<(DefId, Vec<Type>)>,
 }
 
 impl TypeCx<'_> {
@@ -841,18 +841,24 @@ impl TypeCx<'_> {
                 };
                 anonymous(resolve, TypeDefKind::Result(Result_ { ok, err }))
             }
-            Type::Nominal(def) => {
-                // The world's own, when the declaration crosses the boundary.
+            Type::Nominal(def, args) => {
+                // The world's own, when the declaration crosses the boundary:
+                // one type, whatever a phantom argument is.
                 if let (Some(iface), Some(ident)) = (self.world_types, self.idents.get(def))
                     && let Some(id) = resolve.interfaces[iface].types.get(ident)
                 {
                     WitType::Id(*id)
                 } else {
-                    let d = self.declared.iter().find(|d| d.def == *def)?;
-                    if self.visiting.contains(def) {
+                    // Otherwise this instance's own, under its arguments
+                    // (ADR-0062).
+                    let d = self
+                        .declared
+                        .iter()
+                        .find(|d| d.def == *def && d.args == *args)?;
+                    if self.visiting.contains(&(*def, args.clone())) {
                         return None;
                     }
-                    self.visiting.push(*def);
+                    self.visiting.push((*def, args.clone()));
                     let defined = match &d.shape {
                         Shape::Alias(of) => self.wit(resolve, of),
                         Shape::Record { fields } => {

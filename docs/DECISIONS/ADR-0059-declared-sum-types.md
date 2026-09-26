@@ -123,6 +123,10 @@ case of several fields holds them in an array, as a tuple is held.
 
 ### 4. Refused by name
 
+Superseded in part: a generic sum type compiles since ADR-0062, a nested or
+literal pattern since ADR-0060, and a template's `{#match}` takes a sum type
+apart since ADR-0061.
+
 - **A generic sum type in the backend.** A `Type::Nominal` carries no type
   arguments, so the layout is unknown. Generic records share this
   limitation.

@@ -257,12 +257,12 @@ command Add(id: Id) -> Result<Cart, CartError>
         });
 
     // The parameter and result kept their types, resolved to DefIds.
-    assert!(matches!(f.params[0].1, Type::Nominal(_)));
+    assert!(matches!(f.params[0].1, Type::Nominal(_, _)));
     let Type::Result(ok, err) = &f.ret else {
         panic!("{:?}", f.ret)
     };
-    assert!(matches!(**ok, Type::Nominal(_)));
-    assert!(matches!(**err, Type::Nominal(_)));
+    assert!(matches!(**ok, Type::Nominal(_, _)));
+    assert!(matches!(**err, Type::Nominal(_, _)));
 
     // **No import.** `write` is compiled here.
     let imports: Vec<String> = f.blocks[0]

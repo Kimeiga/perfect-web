@@ -37,7 +37,7 @@ MUTANTS = [
     (
         "a piped value does not build an opaque value",
         LOWER,
-        "            (Some(v), []) => v,",
+        "            (Some(v), []) => Given::Value(v),",
         "            (Some(_), []) => return Lowering::Blocked {\n"
         '                why: "piped".to_string(),\n'
         "                span,\n"

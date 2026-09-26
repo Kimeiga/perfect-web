@@ -336,7 +336,7 @@ fn a_declared_variant_is_built_by_its_case_and_never_as_a_record() {
         def,
         export: "builds".to_string(),
         params: vec![],
-        ret: Type::Nominal(def),
+        ret: Type::Nominal(def, vec![]),
         blocks: vec![Block {
             id: BlockId(0),
             instrs,
@@ -358,7 +358,7 @@ fn a_declared_variant_is_built_by_its_case_and_never_as_a_record() {
                 result: ValueId(1),
                 case: 1,
                 fields: vec![ValueId(0)],
-                ty: Type::Nominal(def),
+                ty: Type::Nominal(def, vec![]),
             },
         ],
         ValueId(1),
@@ -373,7 +373,7 @@ fn a_declared_variant_is_built_by_its_case_and_never_as_a_record() {
             result: ValueId(0),
             ctor: def,
             args: vec![],
-            ty: Type::Nominal(def),
+            ty: Type::Nominal(def, vec![]),
         }],
         ValueId(0),
     );

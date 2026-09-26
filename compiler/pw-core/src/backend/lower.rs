@@ -522,7 +522,7 @@ pub(crate) fn handler_program(cx: &Context<'_>, function: Function) -> Program {
 fn sendable(cx: &Context<'_>, t: &Type) -> bool {
     match t {
         Type::Int | Type::Float | Type::Bool | Type::Str => true,
-        Type::Nominal(def) => cx
+        Type::Nominal(def, _) => cx
             .sigs
             .type_decl(*def)
             .and_then(|d| d.representation.as_ref())
@@ -788,7 +788,7 @@ pub fn program_by_declaration(
 /// record that never crosses the boundary (ADR-0039), so a type that does not
 /// resolve leaves its declaration out rather than guessing.
 fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
-    let mut wanted: Vec<DefId> = Vec::new();
+    let mut wanted: Vec<(DefId, Vec<Type>)> = Vec::new();
     for f in &p.functions {
         for (_, t) in &f.params {
             wanted.extend(t.nominals());
@@ -801,19 +801,28 @@ fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
         }
     }
     let mut out: Vec<TypeDef> = Vec::new();
-    let mut seen: BTreeSet<DefId> = BTreeSet::new();
-    // Transitively: a record's field may be another record.
-    while let Some(def) = wanted.pop() {
-        if !seen.insert(def) {
+    let mut seen: BTreeSet<(DefId, Vec<Type>)> = BTreeSet::new();
+    // Transitively: a record's field may be another record. One definition
+    // per instance, each field under the instance's arguments (ADR-0062).
+    while let Some((def, args)) = wanted.pop() {
+        if !seen.insert((def, args.clone())) {
             continue;
         }
         let Some(decl) = crate::resolve::declaration(cx.hirs, def) else {
             continue;
         };
         let at = decl.name_span.clone();
-        let resolved = |r: &TypeResolution| match ty_resolution(cx.sigs, r, &at) {
-            Lowering::Lowered(t) => Some(t),
-            _ => None,
+        let subst: BTreeMap<(DefId, u32), Type> = args
+            .iter()
+            .enumerate()
+            .map(|(i, t)| ((def, i as u32), t.clone()))
+            .collect();
+        let resolved = |r: &TypeResolution| match r.resolved() {
+            Some(t) => match ty_resolved_with(cx.sigs, t, &at, &subst) {
+                Lowering::Lowered(t) => Some(t),
+                _ => None,
+            },
+            None => None,
         };
         let declared = cx.sigs.type_decl(def);
         let shape = if let Some(rep) = declared.and_then(|t| t.representation.as_ref()) {
@@ -877,11 +886,12 @@ fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
         }
         out.push(TypeDef {
             def,
+            args,
             name: decl.name.clone(),
             shape,
         });
     }
-    out.sort_by_key(|t| t.def);
+    out.sort_by(|a, b| (a.def, &a.args).cmp(&(b.def, &b.args)));
     out
 }
 
@@ -991,8 +1001,12 @@ fn instantiate(
     if sigs.privacy_qualifier(declared).is_some() && args.len() == 1 {
         return instantiate(sigs, &args[0], actual, subst);
     }
-    match declared.def_id() {
-        Some(def) if args.is_empty() => actual == &Type::Nominal(def),
+    // `Box<T>` against `Box<Int>` binds `T` (ADR-0062).
+    match (declared.def_id(), actual) {
+        (Some(def), Type::Nominal(d, acts)) if def == *d && acts.len() == args.len() => args
+            .iter()
+            .zip(acts)
+            .all(|(a, t)| instantiate(sigs, a, t, subst)),
         _ => false,
     }
 }
@@ -1149,9 +1163,7 @@ fn ty_resolved_with(
     if sigs.privacy_qualifier(ty).is_some() && ty.args().len() == 1 {
         return arg(0);
     }
-    if let Some(def) = ty.def_id()
-        && ty.args().is_empty()
-    {
+    if let Some(def) = ty.def_id() {
         // Refused by name here, where a type first meets the backend: until
         // 2026-09-26 it reached the world as WIT that does not parse.
         if contains_itself(sigs, def) {
@@ -1164,12 +1176,20 @@ fn ty_resolved_with(
                 ),
             };
         }
-        return Lowering::Lowered(Type::Nominal(def));
+        // An instance, by its arguments (ADR-0062): `Box<Int>` is laid out
+        // with an `Int` where `Box` declares its `T`.
+        let mut args = Vec::new();
+        for i in 0..ty.args().len() {
+            match arg(i) {
+                Lowering::Lowered(t) => args.push(t),
+                other => return other,
+            }
+        }
+        return Lowering::Lowered(Type::Nominal(def, args));
     }
-    Lowering::Unsupported {
-        construct: "an unspecialized generic type",
+    Lowering::Blocked {
+        why: format!("`{ty}` names no declaration"),
         span: span.clone(),
-        reason: format!("`{ty}` needs specialization before its layout can be encoded"),
     }
 }
 
@@ -1409,7 +1429,7 @@ impl<'a> Lower<'a> {
             Expr::Record {
                 name: Some(name),
                 fields,
-            } => self.record(body, name, fields, span),
+            } => self.record(body, name, fields, expected, span),
             Expr::List { items } => self.list(body, items, expected, span),
             other => Lowering::Unsupported {
                 construct: construct_name(other),
@@ -1827,6 +1847,7 @@ impl<'a> Lower<'a> {
         body: &Body,
         name: &str,
         fields: &[crate::hir::FieldInit],
+        expected: Option<&Type>,
         span: Span,
     ) -> Lowering<ValueId> {
         let found = match name.contains('.') {
@@ -1858,59 +1879,172 @@ impl<'a> Lower<'a> {
                 span,
             };
         }
-        // A generic record's layout depends on its arguments: `ty_resolved`'s
-        // refusal, for the same reason.
-        if crate::resolve::declaration(self.cx.hirs, def).is_some_and(|d| !d.type_params.is_empty())
-        {
-            return Lowering::Unsupported {
-                construct: "building a value of a generic record",
-                span,
-                reason: format!("`{name}` needs specialization before its layout is known"),
-            };
-        }
-        let ty = Type::Nominal(def);
-        let mut args = Vec::new();
-        for (field, resolution) in &declared {
-            let given: Vec<&crate::hir::FieldInit> =
+        let mut given = Vec::new();
+        for (field, _) in &declared {
+            let inits: Vec<&crate::hir::FieldInit> =
                 fields.iter().filter(|f| f.name == *field).collect();
-            let [init] = given.as_slice() else {
+            let [init] = inits.as_slice() else {
                 return Lowering::Blocked {
                     why: format!(
                         "`{name}` is built with its field `{field}` {} times",
-                        given.len()
+                        inits.len()
                     ),
                     span,
                 };
             };
-            let want = match self.ty(resolution, &span) {
-                Lowering::Lowered(t) => t,
-                other => return other.map(|_| unreachable!()),
-            };
-            let v = match init.value {
-                Some(e) => match self.typed(body, e, &want) {
-                    Lowering::Lowered(v) => v,
-                    other => return other,
-                },
+            given.push(match init.value {
+                Some(e) => Given::Expr(e),
                 // `Point { x, y }`: the shorthand names a binding.
                 None => match self.locals.get(field) {
-                    Some(v) if self.types.get(v) == Some(&want) => *v,
-                    _ => {
+                    Some(v) => Given::Value(*v),
+                    None => {
                         return Lowering::Blocked {
-                            why: format!("`{field}` is not a bound {want:?} here"),
+                            why: format!("`{field}` is not bound here"),
                             span,
                         };
                     }
                 },
-            };
-            args.push(v);
+            });
         }
+        let resolutions: Vec<TypeResolution> = declared.into_iter().map(|(_, r)| r).collect();
+        let (args, instance) =
+            match self.instance_fields(body, def, &resolutions, given, expected, &span) {
+                Lowering::Lowered(x) => x,
+                other => return other.map(|_| unreachable!()),
+            };
         let result = self.fresh();
         Lowering::Lowered(self.push(Instr::Construct {
             result,
             ctor: def,
             args,
-            ty,
+            ty: Type::Nominal(def, instance),
         }))
+    }
+
+    /// **Values for an instance's fields, and the instance they make**
+    /// (ADR-0062): each field lowered against its declared type under what
+    /// the context and the fields before it fixed. A field whose type
+    /// mentions a parameter nothing has fixed yet is lowered alone, and its
+    /// type fixes that parameter, as a generic callee's arguments fix its
+    /// own (ADR-0050). A parameter nothing fixes is refused by name.
+    fn instance_fields(
+        &mut self,
+        body: &Body,
+        def: DefId,
+        declared: &[TypeResolution],
+        given: Vec<Given>,
+        expected: Option<&Type>,
+        span: &Span,
+    ) -> Lowering<(Vec<ValueId>, Vec<Type>)> {
+        let mut subst = self.subst.clone();
+        if let Some(Type::Nominal(d, args)) = expected
+            && *d == def
+        {
+            for (i, a) in args.iter().enumerate() {
+                subst.insert((def, i as u32), a.clone());
+            }
+        }
+        let mut values = Vec::new();
+        for (r, g) in declared.iter().zip(given) {
+            let Some(t) = r.resolved() else {
+                return Lowering::Blocked {
+                    why: r.to_string(),
+                    span: span.clone(),
+                };
+            };
+            let v = if !mentions_unbound(t, &subst) {
+                let want = match ty_resolved_with(self.cx.sigs, t, span, &subst) {
+                    Lowering::Lowered(w) => w,
+                    other => return other.map(|_| unreachable!()),
+                };
+                match g {
+                    Given::Expr(e) => match self.typed(body, e, &want) {
+                        Lowering::Lowered(v) => v,
+                        other => return other.map(|_| unreachable!()),
+                    },
+                    Given::Value(v) if self.types.get(&v) == Some(&want) => v,
+                    Given::Value(v) => {
+                        return Lowering::Blocked {
+                            why: format!(
+                                "a {:?} where a {want:?} is the field",
+                                self.types.get(&v)
+                            ),
+                            span: span.clone(),
+                        };
+                    }
+                }
+            } else {
+                let v = match g {
+                    Given::Expr(e) => match self.expr(body, e, None) {
+                        Lowering::Lowered(v) => v,
+                        other => return other.map(|_| unreachable!()),
+                    },
+                    Given::Value(v) => v,
+                };
+                let actual = self.types.get(&v).cloned();
+                if !actual.is_some_and(|a| instantiate(self.cx.sigs, t, &a, &mut subst)) {
+                    return Lowering::Blocked {
+                        why: format!("a value of another type where the field is `{t}`"),
+                        span: span.clone(),
+                    };
+                }
+                v
+            };
+            values.push(v);
+        }
+        match self.instance_args(def, &subst) {
+            Some(args) => Lowering::Lowered((values, args)),
+            None => Lowering::Unsupported {
+                construct: "a type parameter no use instantiates",
+                span: span.clone(),
+                reason: "a generic type's arguments are fixed by its fields or where it is used, \
+                         and nothing here fixes one"
+                    .to_string(),
+            },
+        }
+    }
+
+    /// The arguments an instance of `def` is applied to, from `subst`:
+    /// `None` if a parameter is not in it.
+    fn instance_args(&self, def: DefId, subst: &BTreeMap<(DefId, u32), Type>) -> Option<Vec<Type>> {
+        let n = crate::resolve::declaration(self.cx.hirs, def).map_or(0, |d| d.type_params.len());
+        (0..n as u32)
+            .map(|i| subst.get(&(def, i)).cloned())
+            .collect()
+    }
+
+    /// **The instance a case's fields' types fix** (ADR-0062): `Maybe.Just`
+    /// given an `Int` is a `Maybe<Int>`. `None` where they fix none, or
+    /// disagree with its fields.
+    fn case_instance(&self, def: DefId, index: usize, fields: &[Type]) -> Option<Vec<Type>> {
+        let (_, declared) = self
+            .cx
+            .sigs
+            .type_decl(def)?
+            .variants
+            .as_ref()?
+            .get(index)?
+            .clone();
+        if declared.len() != fields.len() {
+            return None;
+        }
+        let mut subst = self.subst.clone();
+        for (d, f) in declared.iter().zip(fields) {
+            if !instantiate(self.cx.sigs, d.resolved()?, f, &mut subst) {
+                return None;
+            }
+        }
+        self.instance_args(def, &subst)
+    }
+
+    /// The function's substitution, with `def`'s own parameters bound to
+    /// `args`: what a field of that instance is.
+    fn instance_subst(&self, def: DefId, args: &[Type]) -> BTreeMap<(DefId, u32), Type> {
+        let mut subst = self.subst.clone();
+        for (i, a) in args.iter().enumerate() {
+            subst.insert((def, i as u32), a.clone());
+        }
+        subst
     }
 
     /// **`[a, b, c]`**: every element of one type, which the context fixes
@@ -2350,7 +2484,19 @@ impl<'a> Lower<'a> {
                     false => crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, &path),
                 };
                 if let Some((def, index)) = case {
-                    let cases = match self.declared_cases(def, &span) {
+                    // The instance the elements' types fix (ADR-0062).
+                    let instance = match self.case_instance(def, index, params) {
+                        Some(i) => i,
+                        None => {
+                            return Lowering::Blocked {
+                                why: format!(
+                                    "`{path}` is passed where a function of {params:?} is"
+                                ),
+                                span,
+                            };
+                        }
+                    };
+                    let cases = match self.declared_cases(def, &instance, &span) {
                         Lowering::Lowered(c) => c,
                         other => return other.map(|_| unreachable!()),
                     };
@@ -2360,15 +2506,16 @@ impl<'a> Lower<'a> {
                             span,
                         };
                     }
+                    let ty = Type::Nominal(def, instance);
                     let bound = self.fresh_typed(params);
                     let result = self.fresh();
                     let instrs = vec![Instr::Case {
                         result,
                         case: index as u32,
                         fields: bound.clone(),
-                        ty: Type::Nominal(def),
+                        ty: ty.clone(),
                     }];
-                    self.types.insert(result, Type::Nominal(def));
+                    self.types.insert(result, ty);
                     return Lowering::Lowered((
                         bound,
                         Region {
@@ -2602,11 +2749,11 @@ impl<'a> Lower<'a> {
         }
     }
 
-    /// **`PositiveInt(1)`** (ADR-0054): the representation, lowered as what
-    /// it is, and given the opaque type.
     /// **A sum type's case, built** (ADR-0059): `Shape.Circle(3)`, from its
     /// payload's fields positionally, each lowered against its declared
-    /// type. A piped value is the first field.
+    /// type. A piped value is the first field. A generic type's instance is
+    /// the one the context names, or the one its fields fix (ADR-0062).
+    #[allow(clippy::too_many_arguments)]
     fn case(
         &mut self,
         body: &Body,
@@ -2614,13 +2761,17 @@ impl<'a> Lower<'a> {
         index: usize,
         args: &[crate::hir::Arg],
         piped: Option<ValueId>,
+        expected: Option<&Type>,
         span: Span,
     ) -> Lowering<ValueId> {
-        let cases = match self.declared_cases(def, &span) {
-            Lowering::Lowered(c) => c,
-            other => return other.map(|_| unreachable!()),
-        };
-        let Some((_, fields)) = cases.get(index).cloned() else {
+        let Some((_, fields)) = self
+            .cx
+            .sigs
+            .type_decl(def)
+            .and_then(|t| t.variants.as_ref())
+            .and_then(|cases| cases.get(index))
+            .cloned()
+        else {
             return Lowering::Blocked {
                 why: "a case its type does not declare; the checker refuses it (PW0608)".into(),
                 span,
@@ -2633,41 +2784,39 @@ impl<'a> Lower<'a> {
                 reason: "a case's fields are positional".to_string(),
             };
         }
-        let given = usize::from(piped.is_some()) + args.len();
-        if given != fields.len() {
+        let given_count = usize::from(piped.is_some()) + args.len();
+        if given_count != fields.len() {
             return Lowering::Blocked {
                 why: format!(
-                    "the case takes {} fields and is given {given}; the checker refuses it \
+                    "the case takes {} fields and is given {given_count}; the checker refuses it \
                      (PW0604)",
                     fields.len()
                 ),
                 span,
             };
         }
-        let mut values: Vec<ValueId> = piped.into_iter().collect();
-        if let (Some(v), Some(want)) = (values.first(), fields.first())
-            && self.types.get(v) != Some(want)
-        {
-            return Lowering::Blocked {
-                why: format!(
-                    "a {:?} piped where a {want:?} is the field",
-                    self.types.get(v)
-                ),
-                span,
+        let given: Vec<Given> = piped
+            .map(Given::Value)
+            .into_iter()
+            .chain(args.iter().map(|a| Given::Expr(a.value)))
+            .collect();
+        let (values, instance) =
+            match self.instance_fields(body, def, &fields, given, expected, &span) {
+                Lowering::Lowered(x) => x,
+                other => return other.map(|_| unreachable!()),
             };
-        }
-        for (a, want) in args.iter().zip(fields.iter().skip(values.len())) {
-            match self.typed(body, a.value, want) {
-                Lowering::Lowered(v) => values.push(v),
-                other => return other,
-            }
+        // The instance's cases resolve, or it is refused here, by name.
+        if let other @ (Lowering::Unsupported { .. } | Lowering::Blocked { .. }) =
+            self.declared_cases(def, &instance, &span)
+        {
+            return other.map(|_| unreachable!());
         }
         let result = self.fresh();
         Lowering::Lowered(self.push(Instr::Case {
             result,
             case: index as u32,
             fields: values,
-            ty: Type::Nominal(def),
+            ty: Type::Nominal(def, instance),
         }))
     }
 
@@ -2681,7 +2830,18 @@ impl<'a> Lower<'a> {
         expected: Option<&Type>,
         span: Span,
     ) -> Lowering<ValueId> {
-        let cases = match self.declared_cases(def, &span) {
+        // A generic type's instance is the one its use names (ADR-0062):
+        // `Maybe.Nothing` where a `Maybe<Int>` is wanted, or the case's
+        // function where a `fn(Int) -> Maybe<Int>` is.
+        let instance = match expected {
+            Some(Type::Nominal(d, args)) if *d == def => args.clone(),
+            Some(Type::Function(_, r)) => match &**r {
+                Type::Nominal(d, args) if *d == def => args.clone(),
+                _ => Vec::new(),
+            },
+            _ => Vec::new(),
+        };
+        let cases = match self.declared_cases(def, &instance, &span) {
             Lowering::Lowered(c) => c,
             other => return other.map(|_| unreachable!()),
         };
@@ -2691,7 +2851,7 @@ impl<'a> Lower<'a> {
                 span,
             };
         };
-        let ty = Type::Nominal(def);
+        let ty = Type::Nominal(def, instance);
         if fields.is_empty() {
             let result = self.fresh();
             return Lowering::Lowered(self.push(Instr::Case {
@@ -2762,6 +2922,9 @@ impl<'a> Lower<'a> {
         }))
     }
 
+    /// **`PositiveInt(1)`** (ADR-0054): the representation, lowered as what
+    /// it is, and given the opaque type.
+    #[allow(clippy::too_many_arguments)]
     fn opaque(
         &mut self,
         body: &Body,
@@ -2769,18 +2932,12 @@ impl<'a> Lower<'a> {
         rep: &TypeResolution,
         args: &[crate::hir::Arg],
         piped: Option<ValueId>,
+        expected: Option<&Type>,
         span: Span,
     ) -> Lowering<ValueId> {
-        let want = match self.ty(rep, &span) {
-            Lowering::Lowered(t) => t,
-            other => return other.map(|_| unreachable!()),
-        };
-        let v = match (piped, args) {
-            (Some(v), []) => v,
-            (None, [a]) => match self.expr(body, a.value, Some(&want)) {
-                Lowering::Lowered(v) => v,
-                other => return other,
-            },
+        let given = match (piped, args) {
+            (Some(v), []) => Given::Value(v),
+            (None, [a]) => Given::Expr(a.value),
             _ => {
                 return Lowering::Blocked {
                     why: "an opaque type is built from one value".to_string(),
@@ -2788,20 +2945,24 @@ impl<'a> Lower<'a> {
                 };
             }
         };
-        if self.types.get(&v) != Some(&want) {
-            return Lowering::Blocked {
-                why: format!(
-                    "an opaque type over {want:?} is built from a {:?}",
-                    self.types.get(&v)
-                ),
-                span,
-            };
-        }
+        // A generic one's instance is the one the representation's type
+        // fixes, or its use names (ADR-0062).
+        let (values, instance) = match self.instance_fields(
+            body,
+            def,
+            std::slice::from_ref(rep),
+            vec![given],
+            expected,
+            &span,
+        ) {
+            Lowering::Lowered(x) => x,
+            other => return other.map(|_| unreachable!()),
+        };
         let result = self.fresh();
         Lowering::Lowered(self.push(Instr::Retype {
             result,
-            value: v,
-            ty: Type::Nominal(def),
+            value: values[0],
+            ty: Type::Nominal(def, instance),
         }))
     }
 
@@ -3512,12 +3673,21 @@ impl<'a> Lower<'a> {
             Lowering::Lowered(v) => v,
             other => return other,
         };
-        let Some(Type::Nominal(def)) = self.types.get(&of).cloned() else {
+        let Some(Type::Nominal(def, instance)) = self.types.get(&of).cloned() else {
             return Lowering::Unsupported {
                 construct: "a field of something that is not a record",
                 span,
                 reason: format!("`.{name}` is read from a value of no declared record type"),
             };
+        };
+        // A field's type under the instance's arguments (ADR-0062).
+        let subst = self.instance_subst(def, &instance);
+        let under = |r: &TypeResolution| match r.resolved() {
+            Some(t) => ty_resolved_with(self.cx.sigs, t, &span, &subst),
+            None => Lowering::Blocked {
+                why: r.to_string(),
+                span: span.clone(),
+            },
         };
         // **An opaque type's `.value`** (ADR-0048): its representation. The
         // checker allows it only in the module that declares the type.
@@ -3528,7 +3698,7 @@ impl<'a> Lower<'a> {
                 .type_decl(def)
                 .and_then(|t| t.representation.clone())
         {
-            let ty = match self.ty(&rep, &span) {
+            let ty = match under(&rep) {
                 Lowering::Lowered(t) => t,
                 other => return other.map(|_| unreachable!()),
             };
@@ -3555,7 +3725,7 @@ impl<'a> Lower<'a> {
                 span,
             };
         };
-        let ty = match self.ty(declared, &span) {
+        let ty = match under(declared) {
             Lowering::Lowered(t) => t,
             other => return other.map(|_| unreachable!()),
         };
@@ -3608,14 +3778,14 @@ impl<'a> Lower<'a> {
                     ],
                     None,
                 ),
-                Some(Type::Nominal(def))
+                Some(Type::Nominal(def, instance))
                     if self
                         .cx
                         .sigs
                         .type_decl(def)
                         .is_some_and(|t| t.variants.is_some()) =>
                 {
-                    match self.declared_cases(def, &span) {
+                    match self.declared_cases(def, &instance, &span) {
                         Lowering::Lowered(cases) => (cases, Some(def)),
                         other => return other.map(|_| unreachable!()),
                     }
@@ -3764,16 +3934,18 @@ impl<'a> Lower<'a> {
     }
 
     /// A declared sum type's cases, each with its payload's fields resolved
-    /// (ADR-0059). A generic one's layout depends on its arguments, which a
-    /// [`Type::Nominal`] does not carry.
-    fn declared_cases(&self, def: DefId, span: &Span) -> Lowering<Vec<(Case, Vec<Type>)>> {
-        if crate::resolve::declaration(self.cx.hirs, def).is_some_and(|d| !d.type_params.is_empty())
-        {
+    /// (ADR-0059), under the instance's arguments (ADR-0062): `Maybe<Int>`'s
+    /// `Just` holds an `Int`. An instance missing an argument its declaration
+    /// takes is refused by name.
+    fn declared_cases(&self, def: DefId, args: &[Type], span: &Span) -> Lowering<Cases> {
+        let params =
+            crate::resolve::declaration(self.cx.hirs, def).map_or(0, |d| d.type_params.len());
+        if args.len() != params {
             return Lowering::Unsupported {
-                construct: "a generic sum type",
+                construct: "a type parameter no use instantiates",
                 span: span.clone(),
-                reason: "its layout depends on its type arguments, which this backend does not \
-                         carry"
+                reason: "a generic sum type's arguments are fixed by its fields or where it is \
+                         used, and nothing here fixes one"
                     .to_string(),
             };
         }
@@ -3783,11 +3955,18 @@ impl<'a> Lower<'a> {
                 span: span.clone(),
             };
         };
+        let subst = self.instance_subst(def, args);
         let mut out = Vec::new();
         for (index, (_, fields)) in declared.iter().enumerate() {
             let mut types = Vec::new();
             for f in fields {
-                match self.ty(f, span) {
+                let Some(t) = f.resolved() else {
+                    return Lowering::Blocked {
+                        why: f.to_string(),
+                        span: span.clone(),
+                    };
+                };
+                match ty_resolved_with(self.cx.sigs, t, span, &subst) {
                     Lowering::Lowered(t) => types.push(t),
                     other => return other.map(|_| unreachable!()),
                 }
@@ -3902,7 +4081,7 @@ impl<'a> Lower<'a> {
     fn flat(&self, body: &Body, arms: &[crate::hir::MatchArm], ty: Option<&Type>) -> bool {
         let variant = match ty {
             Some(Type::Option(_) | Type::Result(..)) => true,
-            Some(Type::Nominal(def)) => self
+            Some(Type::Nominal(def, _)) => self
                 .cx
                 .sigs
                 .type_decl(*def)
@@ -4109,7 +4288,7 @@ impl<'a> Lower<'a> {
                 ],
                 None,
             )),
-            Type::Nominal(def) => match self.declared_cases(*def, span) {
+            Type::Nominal(def, instance) => match self.declared_cases(*def, instance, span) {
                 Lowering::Lowered(cases) if !cases.is_empty() => Some((cases, Some(*def))),
                 _ => None,
             },
@@ -4581,14 +4760,14 @@ impl<'a> Lower<'a> {
                     .type_decl(def)
                     .and_then(|t| t.representation.clone())
             {
-                return self.opaque(body, def, &rep, args, piped, span);
+                return self.opaque(body, def, &rep, args, piped, expected, span);
             }
             // **A sum type's case** (ADR-0059): `Shape.Circle(3)`, through
             // its type, by the rule the checker typed it with.
             if let Some(crate::values::CaseNamed::Case(def, index)) =
                 crate::values::case_named(self.cx.sigs, self.cx.ws, self.unit, &path)
             {
-                return self.case(body, def, index, args, piped, span);
+                return self.case(body, def, index, args, piped, expected, span);
             }
         }
         // **An operation the compiler supplies** (ADR-0040): read from the
@@ -4677,7 +4856,7 @@ impl<'a> Lower<'a> {
                 let t = self.types.get(v).cloned().unwrap_or(Type::Unit);
                 if !sendable(self.cx, &t) {
                     let named = match &t {
-                        Type::Nominal(def) => crate::resolve::declaration(self.cx.hirs, *def)
+                        Type::Nominal(def, _) => crate::resolve::declaration(self.cx.hirs, *def)
                             .map(|d| d.name.clone())
                             .unwrap_or_else(|| format!("{t:?}")),
                         other => format!("{other:?}"),
@@ -4810,7 +4989,7 @@ fn holds_collection(cx: &Context<'_>, t: &Type, seen: &mut Vec<DefId>) -> bool {
         Type::Map(..) | Type::Set(..) => true,
         Type::List(a) | Type::Option(a) => holds_collection(cx, a, seen),
         Type::Result(a, b) => holds_collection(cx, a, seen) || holds_collection(cx, b, seen),
-        Type::Nominal(def) => {
+        Type::Nominal(def, instance) => {
             if seen.contains(def) {
                 return false;
             }
@@ -4818,16 +4997,26 @@ fn holds_collection(cx: &Context<'_>, t: &Type, seen: &mut Vec<DefId>) -> bool {
             let Some(decl) = cx.sigs.type_decl(*def) else {
                 return false;
             };
+            // Each field under the instance's arguments: a `Box<Map<..>>`
+            // holds a map (ADR-0062).
+            let subst: BTreeMap<(DefId, u32), Type> = instance
+                .iter()
+                .enumerate()
+                .map(|(i, a)| ((*def, i as u32), a.clone()))
+                .collect();
             let fields = decl.record.iter().flatten().map(|(_, r)| r);
             let rep = decl.representation.iter();
             // A sum type's payloads too (ADR-0059).
             let cases = decl.variants.iter().flatten().flat_map(|(_, fs)| fs.iter());
-            fields.chain(rep).chain(cases).any(|r| {
-                matches!(
-                    ty_resolution(cx.sigs, r, &Span::default()),
-                    Lowering::Lowered(ft) if holds_collection(cx, &ft, seen)
-                )
-            })
+            instance.iter().any(|a| holds_collection(cx, a, seen))
+                || fields.chain(rep).chain(cases).any(|r| {
+                    r.resolved().is_some_and(|t| {
+                        matches!(
+                            ty_resolved_with(cx.sigs, t, &Span::default(), &subst),
+                            Lowering::Lowered(ft) if holds_collection(cx, &ft, seen)
+                        )
+                    })
+                })
         }
         Type::Int | Type::Float | Type::Bool | Type::Str | Type::Unit | Type::Function(..) => false,
     }
@@ -4875,6 +5064,14 @@ fn contains_itself(sigs: &Signatures, def: DefId) -> bool {
 
 /// A variant type's cases, each with its payload's fields' types.
 type Cases = Vec<(Case, Vec<Type>)>;
+
+/// Does `ty` mention a type parameter `subst` does not bind?
+fn mentions_unbound(ty: &ResolvedType, subst: &BTreeMap<(DefId, u32), Type>) -> bool {
+    if let Some(key) = ty.parameter_binding() {
+        return !subst.contains_key(&key);
+    }
+    ty.args().iter().any(|a| mentions_unbound(a, subst))
+}
 
 /// **A pattern as a decision tree reads it** (ADR-0060).
 #[derive(Debug, Clone, PartialEq)]
@@ -5005,7 +5202,8 @@ fn exits_early(body: &Body) -> bool {
 }
 
 /// An argument to an intrinsic, as it arrives: a piped value already lowered,
-/// or an expression written in the call.
+/// or an expression written in the call. A field of a record or a case
+/// arrives so too, a record's shorthand as the binding it names (ADR-0062).
 enum Given {
     Value(ValueId),
     Expr(ExprId),

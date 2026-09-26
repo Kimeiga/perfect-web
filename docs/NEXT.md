@@ -76,8 +76,9 @@ matched (ADR-0059, done), which found four ways a wrong program passed
 1. ~~nested and literal patterns~~, done (ADR-0060), which found a silent
    miscompile: `Some(Empty)` bound every payload;
 2. ~~a declared sum type in a template's `{#match}`~~, done (ADR-0061);
-3. generic records and generic sum types in the backend: a nominal type
-   carrying its arguments;
+3. ~~generic records and generic sum types in the backend~~, done inside a
+   component and a module (ADR-0062); next, a generic type at the boundary,
+   a WIT type per instance;
 4. the value relations' flat environment: a name bound at two sites;
 5. structural `==`, and reporting an arm no case reaches;
 6. named-argument calls, the unit value `()`, `derived` purity, calling a

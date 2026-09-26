@@ -64,3 +64,16 @@ fn a_field_named_by_a_keyword_is_named_unescaped() {
 fn a_query_named_by_a_keyword_is_exported_under_its_name() {
     assert_eq!(call("kw.Own", &[Val::S64(41)]), Val::S64(42));
 }
+
+#[test]
+fn a_type_and_a_query_of_one_name_are_two_things() {
+    // A type and a query both called `Either`, in their two namespaces.
+    // Until 2026-09-26 the type took the query's place when the worlds were
+    // generated, and the whole package failed: "missing component signature".
+    let program = "module both\n\ntype Either =\n    | Left(Int)\n    | Right(String)\n\npublic query Either(n: Int) -> Int { n + 1 }\n";
+    let out = Runnable::new(compile(&units(&[("both.pw", program)]), "both.Either"))
+        .call(&BTreeMap::new(), &[Val::S64(1)])
+        .expect("runs")
+        .remove(0);
+    assert_eq!(out, Val::S64(2));
+}

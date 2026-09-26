@@ -78,6 +78,26 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a type and a query of one name failed every
+component** ([ADR-0062](DECISIONS/ADR-0062-generic-types-in-the-backend.md)).
+A type `Either` and a query `Either` live in two namespaces, and checked.
+Where the worlds are generated, the type took the query's place, so the query
+had no signature and the whole WIT package failed ("missing component
+signature"): every component of the program was refused. A type is never a
+component now. `a_type_and_a_query_of_one_name_are_two_things` in
+`compiler/pw-conformance/tests/wit_names.rs` is the regression test.
+
+**2026-09-26: generic types in the backend**
+([ADR-0062](DECISIONS/ADR-0062-generic-types-in-the-backend.md)).
+- A nominal type carries its arguments. A generic record, sum type or opaque
+  type is laid out per instance inside a component and a module, where each
+  was refused by name.
+- An instance's arguments come from its fields, as a generic callee's
+  arguments do, or from its use. A parameter nothing fixes is refused by name.
+- A generic type still does not cross the component boundary.
+
+Evidence: [generics.txt](evidence/E10/generics.txt) (`just e10-generics`).
+
 **2026-09-26: a declared sum type in a template's match**
 ([ADR-0061](DECISIONS/ADR-0061-template-matches-over-sum-types.md)).
 - A template's `{#match}` takes a declared sum type apart, where it was

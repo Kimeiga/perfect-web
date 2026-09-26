@@ -56,10 +56,11 @@ to components and run through the E8 host, and the Rust closure path is deleted.
 The component backend is narrow, and everything outside it is refused by name
 rather than approximated:
 
-- **A generic record or sum type is not instantiated** (ADR-0050,
-  ADR-0059). `Box<Int>` and `Maybe<Int>` have no layout: `Type::Nominal`
-  names a declaration without its arguments. A generic *function* is
-  instantiated.
+- **A generic type does not cross the component boundary** (ADR-0062).
+  Inside a component and a module, a generic record, sum type or opaque type
+  is laid out per instance, its arguments fixed by its fields or its use. In
+  a query's parameter or result it has no WIT form, unless its parameter is
+  phantom. An instance only a lambda's branches name is refused by name.
 - **A type that contains itself is refused** (ADR-0059): the Canonical ABI
   has no recursive types, and the backend lays every value out by its type.
 - **`==` compares primitives only.** Two records, two sum-type values or two
@@ -75,10 +76,9 @@ rather than approximated:
   Search reaches 3.2 MB for the one-letter query `T`.
 - **Each call instantiates afresh** (ADR-0032). At 7–14 µs it costs more than
   most kiokun calls themselves (ADR-0046).
-- **A generic opaque type is refused inside a component** (ADR-0054), as a
-  generic record is. An opaque value is built and read inside a component,
-  as its representation retyped; it crosses the boundary as that
-  representation.
+- **An opaque value is built and read inside a component** (ADR-0054), as
+  its representation retyped, a generic one too since ADR-0062; it crosses
+  the boundary as that representation.
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
 

@@ -655,6 +655,30 @@ e10-handlers-compute:
      } > docs/evidence/E10/handlers-compute.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-compute.txt
 
+# ADR-0062: generic records, sum types and opaque types in the backend, and
+# a type beside a query of its name in the world. Each run through the E8
+# host, the component against the JavaScript module, and the mutation
+# controls. Needs `node`.
+e10-generics:
+    @{ echo "ADR-0062 - generic types in the backend"; echo; \
+       echo "produced by: just e10-generics"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== through the E8 host (compiler/pw-conformance/tests/generics.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test generics 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a type and a query of one name (compiler/pw-conformance/tests/wit_names.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test wit_names 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*|^test result.*"; \
+       echo; echo "== mutation controls (scripts/generic_mutations.py)"; echo; \
+       python3 scripts/generic_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a generic type at the component boundary, which has no WIT"; \
+       echo "form. NOT CLAIMED: an instance only a lambda's branches name."; \
+     } > docs/evidence/E10/generics.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/generics.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation
@@ -740,9 +764,9 @@ e10-sum-types:
        echo; echo "== mutation controls (scripts/sum_type_mutations.py)"; echo; \
        python3 scripts/sum_type_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: a generic sum type or a type that contains itself in the"; \
-       echo "backend, each refused by name. NOT CLAIMED: a nested or literal pattern,"; \
-       echo "refused by name; a sum type in a template's {#match}, refused (PW5019);"; \
+       echo "NOT CLAIMED: a type that contains itself in the backend, refused by"; \
+       echo "name (a generic sum type is ADR-0062's, a nested or literal pattern"; \
+       echo "ADR-0060's, a sum type in a template's {#match} ADR-0061's). NOT CLAIMED:"; \
        echo "a captured sum type in a handler; == between two cases."; \
      } > docs/evidence/E10/sum-types.txt
     @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/sum-types.txt

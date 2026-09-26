@@ -652,6 +652,13 @@ pub fn package(
     let mut decls: BTreeMap<String, (DefId, &Decl)> = BTreeMap::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, d) in hir.all_decls() {
+            // A type is never a component. One named as a query is, in the
+            // other namespace, took the query's place here until 2026-09-26,
+            // so a query `Either` beside a type `Either` had no signature and
+            // the whole package failed.
+            if matches!(d.kind, DeclKind::Type | DeclKind::Opaque) {
+                continue;
+            }
             decls.insert(
                 crate::contract::component_id(hir, id),
                 (DefId { unit, decl: id.0 }, d),

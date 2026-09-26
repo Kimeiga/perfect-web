@@ -505,12 +505,10 @@ fn a_type_that_contains_itself_is_refused_by_name() {
 }
 
 #[test]
-fn a_generic_sum_type_is_refused_by_name() {
-    // A `Type::Nominal` carries no type arguments, so a generic type's
-    // layout is not known to the backend (KNOWN_LIMITATIONS).
-    let err = refused(
-        "module m\n\ntype Maybe<T> =\n    | Nothing\n    | Just(T)\n\npublic query Unwrap(n: Int) -> Int {\n    match Maybe.Just(n) {\n        Just(x) => x,\n        Nothing => 0,\n    }\n}\n",
-        "m.Unwrap",
-    );
-    assert!(err.contains("a generic sum type"), "{err}");
+fn a_generic_sum_type_is_built_and_matched() {
+    // Refused by name until ADR-0062 gave a `Type::Nominal` its arguments;
+    // `tests/generics.rs` holds the rest.
+    let program = "module m\n\ntype Maybe<T> =\n    | Nothing\n    | Just(T)\n\npublic query Unwrap(n: Int) -> Int {\n    match Maybe.Just(n) {\n        Just(x) => x,\n        Nothing => 0,\n    }\n}\n";
+    let unwrap = Runnable::new(compile(&units(&[("m.pw", program)]), "m.Unwrap"));
+    assert_eq!(call(&unwrap, &[Val::S64(5)]), Val::S64(5));
 }

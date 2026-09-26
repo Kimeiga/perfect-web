@@ -90,8 +90,12 @@ pub enum Type {
     Str,
     /// Nothing crosses. A command with no declared return.
     Unit,
-    /// A record, variant or opaque type, by the declaration that defines it.
-    Nominal(DefId),
+    /// A record, variant or opaque type, by the declaration that defines it,
+    /// and the types it is applied to: none for a type that declares no
+    /// parameters, `[Int]` for `Box<Int>` (ADR-0062). An instance is laid
+    /// out by its arguments, so `Box<Int>` and `Box<String>` are two
+    /// layouts.
+    Nominal(DefId, Vec<Type>),
     Result(Box<Type>, Box<Type>),
     Option(Box<Type>),
     List(Box<Type>),
@@ -113,11 +117,11 @@ impl Type {
     /// The backend needs the transitive set to emit type definitions, and
     /// walking here rather than at each call site is the same lesson
     /// `DeclaredType` encodes: a type read one level deep is not the type.
-    pub fn nominals(&self) -> Vec<DefId> {
+    pub fn nominals(&self) -> Vec<(DefId, Vec<Type>)> {
         let mut out = Vec::new();
         self.walk(&mut |t| {
-            if let Type::Nominal(d) = t {
-                out.push(*d);
+            if let Type::Nominal(d, args) = t {
+                out.push((*d, args.clone()));
             }
         });
         out
@@ -131,6 +135,12 @@ impl Type {
                 b.walk(f);
             }
             Type::Option(a) | Type::List(a) | Type::Set(a) => a.walk(f),
+            // `Box<Cart>` uses `Cart` too.
+            Type::Nominal(_, args) => {
+                for a in args {
+                    a.walk(f);
+                }
+            }
             Type::Function(ps, r) => {
                 for p in ps {
                     p.walk(f);
@@ -885,10 +895,13 @@ pub struct BackendSignature {
     pub result: Type,
 }
 
-/// A nominal type's shape, resolved.
+/// A nominal type's shape, resolved: one per instance, its fields and cases
+/// under its arguments (ADR-0062).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeDef {
     pub def: DefId,
+    /// The arguments this instance applies the declaration to.
+    pub args: Vec<Type>,
     pub name: String,
     pub shape: Shape,
 }
@@ -994,14 +1007,27 @@ mod tests {
         // read one level deep is not the type. `Result<Cart, CartError>` uses
         // two nominals and neither is at the head.
         let t = Type::Result(
-            Box::new(Type::Nominal(def(1))),
-            Box::new(Type::Nominal(def(2))),
+            Box::new(Type::Nominal(def(1), vec![])),
+            Box::new(Type::Nominal(def(2), vec![])),
         );
-        assert_eq!(t.nominals(), vec![def(1), def(2)]);
+        assert_eq!(t.nominals(), vec![(def(1), vec![]), (def(2), vec![])]);
 
         // And through a carrier of a carrier.
-        let nested = Type::Option(Box::new(Type::List(Box::new(Type::Nominal(def(3))))));
-        assert_eq!(nested.nominals(), vec![def(3)]);
+        let nested = Type::Option(Box::new(Type::List(Box::new(Type::Nominal(
+            def(3),
+            vec![],
+        )))));
+        assert_eq!(nested.nominals(), vec![(def(3), vec![])]);
+
+        // And an instance's arguments: `Box<Cart>` uses `Cart` (ADR-0062).
+        let applied = Type::Nominal(def(4), vec![Type::Nominal(def(1), vec![])]);
+        assert_eq!(
+            applied.nominals(),
+            vec![
+                (def(4), vec![Type::Nominal(def(1), vec![])]),
+                (def(1), vec![])
+            ]
+        );
 
         // The control: a type with no nominal reports none, so "found some" is
         // not what this says about everything.

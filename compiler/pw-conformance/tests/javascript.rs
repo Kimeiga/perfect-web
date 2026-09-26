@@ -361,6 +361,30 @@ public query Mixing(m: Mixed) -> Mixed {
     }
 }
 
+// ADR-0062: generic records and sum types, a layout per instance in both.
+type Holder<T> = Holder { item: T, note: String }
+
+type Either<A, B> =
+    | Left(A)
+    | Right(B)
+
+public query GenHeld(n: Int, s: String) -> String {
+    let a = Holder { item: n, note: s }
+    let b = Holder { item: s, note: \"x\" }
+    \"{a.item}{a.note}{b.item}{b.note}\"
+}
+
+fn parity(x: Int) -> Either<Int, String> {
+    if x % 2 == 0 { Either.Left(x) } else { Either.Right(\"{x}\") }
+}
+
+public query GenEither(xs: List<Int>) -> Int {
+    List.fold(List.map(xs, parity), 0, (t, e) => match e {
+        Left(n) => t + n,
+        Right(s) => t + String.length(s),
+    })
+}
+
 // ADR-0060: nested and literal patterns, compiled to a decision tree in
 // both.
 public query PatNested(o: Option<Option<Int>>) -> Int {

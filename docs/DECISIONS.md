@@ -385,3 +385,13 @@ is. An arm binds each field of its case, `{:Rect(w, h)}`, and may name its
 type. The template IR names a declared case by its WIT name, as the value a
 component gives does, and a case of several fields is a list the renderer
 binds field by field.
+
+## 2026-09-26: generic types in the backend (E10)
+
+[ADR-0062](DECISIONS/ADR-0062-generic-types-in-the-backend.md): a nominal
+type carries its arguments, so a generic record, sum type or opaque type is
+laid out per instance inside a component and a module. An instance's
+arguments come from its fields, as a generic callee's do, or from its use; a
+parameter nothing fixes is refused by name. A generic type still does not
+cross the boundary. Writing it found a type and a query of one name failing
+the whole WIT package.

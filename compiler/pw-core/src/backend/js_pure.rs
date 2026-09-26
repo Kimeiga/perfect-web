@@ -463,11 +463,13 @@ impl<'p> Emitter<'p> {
         Ok(())
     }
 
-    fn shape(&self, def: crate::resolve::DefId) -> Option<&Shape> {
+    /// An instance's shape: its declaration's, under its arguments
+    /// (ADR-0062).
+    fn shape(&self, def: crate::resolve::DefId, args: &[Type]) -> Option<&Shape> {
         self.program
             .types
             .iter()
-            .find(|t| t.def == def)
+            .find(|t| t.def == def && t.args == args)
             .map(|t| &t.shape)
     }
 
@@ -481,7 +483,7 @@ impl<'p> Emitter<'p> {
             Type::Int => format!("BigInt({expr})"),
             Type::Float | Type::Str | Type::Bool => expr.to_string(),
             Type::List(t) => format!("{expr}.map((x) => {})", self.decode("x", t)?),
-            Type::Nominal(def) => match self.shape(*def) {
+            Type::Nominal(def, args) => match self.shape(*def, args) {
                 Some(Shape::Alias(of)) => self.decode(expr, of)?,
                 Some(Shape::Record { fields }) => {
                     let fields: Vec<String> = fields
@@ -509,7 +511,7 @@ impl<'p> Emitter<'p> {
         match ty {
             Type::Int => Ok(format!("{}({v})", self.uses("exact"))),
             Type::Float | Type::Str | Type::Bool => Ok(v.to_string()),
-            Type::Nominal(def) => match self.shape(*def).cloned() {
+            Type::Nominal(def, args) => match self.shape(*def, args).cloned() {
                 Some(Shape::Alias(of)) => self.wire(v, &of),
                 _ => Err(format!(
                     "a command argument of type {ty:?}, which a browser cannot send"
@@ -592,14 +594,12 @@ impl<'p> Emitter<'p> {
         Ok(format!("({}) => {{\n{inner}{pad}}}", names.join(", ")))
     }
 
-    fn fields(&self, def: crate::resolve::DefId) -> Result<&[(String, Type)], String> {
-        match self
-            .program
-            .types
-            .iter()
-            .find(|t| t.def == def)
-            .map(|t| &t.shape)
-        {
+    fn fields(
+        &self,
+        def: crate::resolve::DefId,
+        args: &[Type],
+    ) -> Result<&[(String, Type)], String> {
+        match self.shape(def, args) {
             Some(Shape::Record { fields }) => Ok(fields),
             Some(Shape::Alias(_)) => Ok(&[]),
             Some(Shape::Variant { .. }) => Err("a sum type, which has cases, not fields".into()),
@@ -608,8 +608,12 @@ impl<'p> Emitter<'p> {
     }
 
     /// A sum type's cases, each with its payload's fields (ADR-0059).
-    fn cases(&self, def: crate::resolve::DefId) -> Result<&[(String, Vec<Type>)], String> {
-        match self.shape(def) {
+    fn cases(
+        &self,
+        def: crate::resolve::DefId,
+        args: &[Type],
+    ) -> Result<&[(String, Vec<Type>)], String> {
+        match self.shape(def, args) {
             Some(Shape::Variant { cases }) => Ok(cases),
             _ => Err("a case of a type that is not a sum type".into()),
         }
@@ -629,9 +633,9 @@ impl<'p> Emitter<'p> {
                 };
                 (case_name(c).to_string(), payload)
             }
-            (Type::Nominal(def), VariantCase::Declared(i)) => {
+            (Type::Nominal(def, args), VariantCase::Declared(i)) => {
                 let (name, fields) = self
-                    .cases(*def)?
+                    .cases(*def, args)?
                     .get(i as usize)
                     .ok_or("a case past the type's cases")?;
                 (crate::wit::ident(name), fields.clone())
@@ -741,8 +745,12 @@ impl<'p> Emitter<'p> {
             Instr::ImportCall { import, .. } => {
                 return Err(format!("a host call, `{}`", import.qualified()));
             }
-            Instr::Construct { ctor, args, .. } => {
-                let fields = self.fields(*ctor)?;
+            Instr::Construct { ctor, args, ty, .. } => {
+                let instance: &[Type] = match ty {
+                    Type::Nominal(_, a) => a,
+                    _ => &[],
+                };
+                let fields = self.fields(*ctor, instance)?;
                 let expr = if fields.is_empty() {
                     // An opaque type is its representation.
                     match args.as_slice() {
@@ -766,11 +774,11 @@ impl<'p> Emitter<'p> {
                 self.line(&format!("const {r} = {expr};"));
             }
             Instr::Project { of, field, .. } => {
-                let Type::Nominal(def) = self.type_of(*of)?.clone() else {
+                let Type::Nominal(def, instance) = self.type_of(*of)?.clone() else {
                     return Err("a field read from a value that is not a record".into());
                 };
                 let name = self
-                    .fields(def)?
+                    .fields(def, &instance)?
                     .get(*field as usize)
                     .map(|(n, _)| n.clone())
                     .ok_or("a field index past the record's fields")?;
