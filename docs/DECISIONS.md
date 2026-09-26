@@ -538,3 +538,12 @@ carries its members' and its values' effects too.
 secrets.payments` then `f()`, or a record field holding it: a name meaning
 a declaration was public, and a call through a value left out its callee.
 Both carry the label of what the function makes now.
+
+## 2026-09-26: the affine rule follows bindings, not names (E10)
+
+[ADR-0080](DECISIONS/ADR-0080-the-affine-rule-follows-bindings.md): PW2005
+found a transaction's uses by its name, so an outer `tx` never ended passed
+where each branch ended an inner `tx`, correct programs were refused, and
+an end through `let end = Database.rollback` counted nothing. It follows the
+binding a name means now; a local bound to a declaration is that
+declaration, and a value given to any other function value is refused.

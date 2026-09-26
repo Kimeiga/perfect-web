@@ -969,6 +969,20 @@ e10-labels-through-values:
      } > docs/evidence/E10/labels-through-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/labels-through-values.txt
 
+# ADR-0080: the affine rule follows bindings, not names. Its tests, and the
+# mutation controls.
+e10-affine-bindings:
+    @{ echo "ADR-0080 - the affine rule follows bindings, not names"; echo; \
+       echo "produced by: just e10-affine-bindings"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== affine bindings (compiler/pw-core/tests/affine_bindings.rs)"; echo; \
+       cargo test --locked -p pw-core --test affine_bindings 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/affine_binding_mutations.py)"; echo; \
+       python3 scripts/affine_binding_mutations.py; \
+     } > docs/evidence/E10/affine-bindings.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/affine-bindings.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -108,8 +108,10 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    `<stream>` and a mounted resource~~, refused by name (ADR-0075). ~~A
    call through a field holding a function~~, checked (ADR-0077), which
    found ~~an effect travelling through a function value unseen~~, done
-   (ADR-0078), and ~~a secret through one~~, done (ADR-0079). Next, the
-   name check's own scope walk onto `crate::lexical`;
+   (ADR-0078), and ~~a secret through one~~, done (ADR-0079), and ~~the
+   affine rule by names~~, done (ADR-0080), which found a transaction never
+   ended passing. Next, the name check's own scope walk onto
+   `crate::lexical`, the last analysis that keeps its own;
 4. a function passed to a generic declaration in the backend (found writing
    ADR-0062's tests), then a generic type at the boundary, a WIT type per
    instance;

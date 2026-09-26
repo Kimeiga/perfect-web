@@ -29,16 +29,31 @@
 //! that can carry a resource out. Until 2026-09-25 it asked only whether a
 //! release came before each `return`, so a value never released, one live
 //! across a `?`, and one released twice all passed.
+//!
+//! # Bindings, not names
+//!
+//! A use of the value is a name whose binding is the acquisition's
+//! (`crate::lexical`, ADR-0080). Until 2026-09-26 it was any name spelled
+//! like it, so an inner `tx` ended in each branch ended an outer `tx` never
+//! ended, and a program ending each once was refused as ending the outer
+//! twice. A local bound to a declaration, `let end = Database.rollback`, is
+//! that declaration where it is called; a value given to any other function
+//! value may be released there, which nothing can count, and is refused.
 
 use std::collections::BTreeSet;
 
 use crate::codes;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{BinOp, Body, Decl, Expr, ExprId, Hir, Span};
+use crate::infer::Types;
+use crate::lexical::Binder;
 use crate::signatures::Signatures;
 
 /// A value bound in this body whose producer declared it affine.
 struct Acquired {
+    /// The binding every use of it means (ADR-0080).
+    binder: Binder,
+    /// Its name, for the diagnostic.
     name: String,
     /// The resource type, from `resource.acquire<T>`.
     ty: String,
@@ -72,13 +87,15 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let mut owned = acquisitions(body, sigs, &types);
         owned.extend(released_parameters(hir, sigs, id, decl, body));
         for a in owned {
-            let releases = releases_of(body, sigs, &types, &a);
-            if let Some(escape) = escape_of(body, &a, &module_state) {
+            let (releases, given) = releases_of(body, sigs, &types, &a);
+            if let Some(escape) = escape_of(body, &types, &a, &module_state) {
                 report_escape(hir, decl, &a, escape, &at, out);
+            } else if let Some((span, to)) = given.into_iter().next() {
+                report_unconsumed(hir, sigs, decl, &a, Fault::Given(span, to), &at, out);
             } else if a.scoped {
                 // A `use` block releases its value when it ends.
                 continue;
-            } else if let Some(fault) = fault_of(body, &a, &releases) {
+            } else if let Some(fault) = fault_of(body, &types, &a, &releases) {
                 report_unconsumed(hir, sigs, decl, &a, fault, &at, out);
             }
         }
@@ -113,9 +130,11 @@ fn released_parameters(
         .collect();
     decl.params
         .iter()
-        .filter_map(|p| {
+        .enumerate()
+        .filter_map(|(i, p)| {
             let ty = p.ty.as_ref()?.written();
             released.contains(&ty).then(|| Acquired {
+                binder: Binder::Param(i),
                 name: p.name.clone(),
                 ty,
                 span: body.expr_span(body.root),
@@ -134,13 +153,15 @@ fn acquisitions<'a>(
 ) -> Vec<Acquired> {
     let mut out = Vec::new();
     for id in body.walk() {
-        let (name, init, scoped) = match body.expr(id) {
+        let (binder, name, init, scoped) = match body.expr(id) {
             Expr::Let {
                 pat: Some(pat),
                 init: Some(init),
                 ..
             } => match body.pat(*pat) {
-                crate::hir::Pattern::Bind { name, .. } => (name.clone(), *init, false),
+                crate::hir::Pattern::Bind { name, .. } => {
+                    (Binder::Pattern(*pat), name.clone(), *init, false)
+                }
                 _ => continue,
             },
             // `use handle = Maps.create(..)` — the scoped form.
@@ -150,7 +171,7 @@ fn acquisitions<'a>(
                 args,
                 ..
             } if keyword == "use" => match (modifiers.first(), args.first()) {
-                (Some(name), Some(init)) => (name.clone(), *init, true),
+                (Some(name), Some(init)) => (Binder::Use(id), name.clone(), *init, true),
                 _ => continue,
             },
             _ => continue,
@@ -166,6 +187,7 @@ fn acquisitions<'a>(
             continue;
         };
         out.push(Acquired {
+            binder,
             name,
             ty,
             span: body.expr_span(id),
@@ -176,40 +198,61 @@ fn acquisitions<'a>(
     out
 }
 
-/// Calls in this body that release the value, by span.
+/// Does `e` mean the value `a` holds: a name whose binding is `a`'s
+/// (ADR-0080)?
+fn means(body: &Body, types: &Types<'_>, e: ExprId, a: &Acquired) -> bool {
+    matches!(body.expr(e), Expr::Name(_)) && types.lexical().binder(e) == Some(a.binder)
+}
+
+/// Calls in this body that release the value, by span; and the calls that
+/// give it to a function value, which may release it where nothing counts
+/// (ADR-0080), by span and callee.
 fn releases_of<'a>(
     body: &Body,
     sigs: &'a Signatures,
-    types: &crate::infer::Types<'a>,
+    types: &Types<'a>,
     a: &Acquired,
-) -> Vec<Span> {
-    let mut out = Vec::new();
+) -> (Vec<Span>, Vec<(Span, String)>) {
+    let (mut out, mut given) = (Vec::new(), Vec::new());
     for id in body.walk() {
         let Expr::Call { callee, args } = body.expr(id) else {
             continue;
         };
+        // Either `tx.commit()` — the value is the receiver — or
+        // `Database.commit(tx)`, where it is an argument.
+        let receiver = matches!(body.expr(*callee), Expr::Field { base, .. }
+            if means(body, types, *base, a));
+        let passed = args.iter().any(|arg| means(body, types, arg.value, a));
+        if !(receiver || passed) {
+            continue;
+        }
         let Some(sig) = signature_of(sigs, types, body, *callee) else {
+            // A function value a binding holds: `f(tx)`, where `f` is a
+            // parameter, a lambda, or a declaration chosen at run time.
+            if function_value(body, types, *callee) {
+                given.push((body.expr_span(id), path_of(body, *callee)));
+            }
             continue;
         };
-        if !sig
+        if sig
             .effects
             .iter()
             .any(|e| type_argument(e, "resource.release").as_deref() == Some(a.ty.as_str()))
         {
-            continue;
-        }
-        // Either `tx.commit()` — the value is the receiver — or
-        // `Database.commit(tx)`, where it is an argument.
-        let receiver = matches!(body.expr(*callee), Expr::Field { base, .. }
-            if matches!(body.expr(*base), Expr::Name(n) if *n == a.name));
-        let passed = args
-            .iter()
-            .any(|arg| matches!(body.expr(arg.value), Expr::Name(n) if *n == a.name));
-        if receiver || passed {
             out.push(body.expr_span(id));
         }
     }
-    out
+    (out, given)
+}
+
+/// Is `callee` a value a binding in scope holds, `f` or `box.f`, rather than
+/// a declaration, a constructor or a language form?
+fn function_value(body: &Body, types: &Types<'_>, callee: ExprId) -> bool {
+    match body.expr(callee) {
+        Expr::Name(_) => types.lexical().binder(callee).is_some(),
+        Expr::Field { base, .. } => function_value(body, types, *base),
+        _ => false,
+    }
 }
 
 /// How many times a path has released the value: 0, 1, or 2 for "more than
@@ -295,7 +338,8 @@ impl Flow {
 /// carry a resource out, so the tree is enough.
 struct Paths<'a> {
     body: &'a Body,
-    name: &'a str,
+    types: &'a Types<'a>,
+    acquired: &'a Acquired,
     releases: &'a [Span],
     /// Where the body's value is produced. The value named there moves to the
     /// caller, which is its one consumption.
@@ -312,7 +356,7 @@ impl Paths<'_> {
             // after it on this path runs.
             if matches!(self.body.expr(s), Expr::Name(n) if n == "return") {
                 let value = match stmts.get(i + 1) {
-                    Some(e) if matches!(self.body.expr(*e), Expr::Name(n) if n == self.name) => {
+                    Some(e) if means(self.body, self.types, *e, self.acquired) => {
                         Flow::releasing(1)
                     }
                     Some(e) => self.expr(*e),
@@ -361,7 +405,11 @@ impl Paths<'_> {
                     .map(|e| self.body.expr_span(e))
                     .find(|s| self.releases.contains(s)),
             },
-            Expr::Name(n) if n == self.name && self.tails.contains(&id) => Flow::releasing(1),
+            Expr::Name(_)
+                if self.tails.contains(&id) && means(self.body, self.types, id, self.acquired) =>
+            {
+                Flow::releasing(1)
+            }
             _ => self.children(id),
         }
     }
@@ -408,16 +456,20 @@ enum Fault {
     Twice(Span),
     /// A release inside a loop or a function value.
     Repeated(Span),
+    /// Given to a function value, `f(tx)`, which may release it where
+    /// nothing counts (ADR-0080): the call, and what it calls.
+    Given(Span, String),
 }
 
 /// The scope `a` is acquired in: the statements after its binding, in the
 /// block that holds it, or the whole body for a parameter.
-fn fault_of(body: &Body, a: &Acquired, releases: &[Span]) -> Option<Fault> {
+fn fault_of(body: &Body, types: &Types<'_>, a: &Acquired, releases: &[Span]) -> Option<Fault> {
     let mut tail = BTreeSet::new();
     tails(body, body.root, &mut tail);
     let paths = Paths {
         body,
-        name: &a.name,
+        types,
+        acquired: a,
         releases,
         tails: tail,
     };
@@ -450,7 +502,7 @@ fn fault_of(body: &Body, a: &Acquired, releases: &[Span]) -> Option<Fault> {
 }
 
 /// An assignment that puts the value somewhere the acquiring scope cannot see.
-fn escape_of(body: &Body, a: &Acquired, module_state: &[&str]) -> Option<Span> {
+fn escape_of(body: &Body, types: &Types<'_>, a: &Acquired, module_state: &[&str]) -> Option<Span> {
     body.walk().into_iter().find_map(|id| {
         let Expr::Binary {
             op: BinOp::Assign,
@@ -463,13 +515,14 @@ fn escape_of(body: &Body, a: &Acquired, module_state: &[&str]) -> Option<Span> {
         let Expr::Name(target) = body.expr(*lhs) else {
             return None;
         };
-        if !module_state.contains(&target.as_str()) {
+        // Module state, and not a local that shares its name.
+        if !module_state.contains(&target.as_str()) || types.lexical().binder(*lhs).is_some() {
             return None;
         }
         // The value need not be assigned bare: `Some(handle)` still stores it.
         body.walk_from(*rhs)
             .into_iter()
-            .any(|e| matches!(body.expr(e), Expr::Name(n) if *n == a.name))
+            .any(|e| means(body, types, e, a))
             .then(|| body.expr_span(id))
     })
 }
@@ -565,6 +618,19 @@ fn report_unconsumed(
             span,
             format!("end `{}` once on each path", a.name),
         ),
+        Fault::Given(span, to) => (
+            "affine_value_given_to_a_function_value",
+            format!(
+                "affine resource `{}: {}` is given to `{to}`, a function value, which may \
+                 release it",
+                a.name, a.ty
+            ),
+            span,
+            format!(
+                "end `{}` with {ways} here, or bind one of them to a name nothing reassigns",
+                a.name
+            ),
+        ),
         Fault::Repeated(span) => (
             "affine_value_released_repeatedly",
             format!(
@@ -641,15 +707,44 @@ fn type_argument(effect: &str, prefix: &str) -> Option<String> {
 }
 
 /// The signature a call resolves to: a module path, or a member of a receiver
-/// whose type is known. Nothing else.
+/// whose type is known. A local bound to a declaration, `let end =
+/// Database.rollback`, is that declaration (ADR-0080). Nothing else.
 fn signature_of<'a>(
     sigs: &'a Signatures,
-    types: &crate::infer::Types<'a>,
+    types: &Types<'a>,
     body: &Body,
     callee: ExprId,
 ) -> Option<&'a crate::signatures::Signature> {
+    if matches!(body.expr(callee), Expr::Name(_)) && types.lexical().binder(callee).is_some() {
+        let init = alias_of(body, types, callee)?;
+        return sigs
+            .by_path(&path_of(body, init))
+            .or_else(|| types.callee(body, init));
+    }
     sigs.by_path(&path_of(body, callee))
         .or_else(|| types.callee(body, callee))
+}
+
+/// What a `let` binding the name holds, where nothing reassigns it: its
+/// initialiser.
+fn alias_of(body: &Body, types: &Types<'_>, name: ExprId) -> Option<ExprId> {
+    let Binder::Pattern(p) = types.lexical().binder(name)? else {
+        return None;
+    };
+    if !matches!(
+        body.pat(p),
+        crate::hir::Pattern::Bind { mutable: false, .. }
+    ) {
+        return None;
+    }
+    body.walk().into_iter().find_map(|id| match body.expr(id) {
+        Expr::Let {
+            pat: Some(q),
+            init: Some(init),
+            ..
+        } if *q == p => Some(*init),
+        _ => None,
+    })
 }
 
 use crate::infer::path_of;

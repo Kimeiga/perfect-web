@@ -78,6 +78,26 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: PW2005 found a transaction by its name, so a
+transaction never ended passed**
+([ADR-0080](DECISIONS/ADR-0080-the-affine-rule-follows-bindings.md)). ADR-0045
+counts every path, and the affine checker was the analysis ADR-0063 did not
+move onto bindings. So:
+- an outer `tx` never ended passed, where each branch began and ended an
+  inner `tx`;
+- an outer and an inner `tx`, each ended once, were refused as the outer
+  ended twice, and so was a lambda whose own parameter is named `tx`;
+- with `let end = Database.rollback`, `end(tx)` counted nothing: ending it
+  that way once was refused, and twice passed.
+
+The checker follows the binding a name means now. A local bound to a
+declaration is that declaration, and a transaction given to any other
+function value is refused, since it may be ended there where nothing
+counts. No fixture or example changed.
+
+Evidence: [affine-bindings.txt](evidence/E10/affine-bindings.txt)
+(`just e10-affine-bindings`).
+
 **Correction, 2026-09-26: a secret travelled through a function value
 unlabelled** ([ADR-0079](DECISIONS/ADR-0079-a-function-value-carries-its-label.md)).
 A name meaning a declaration was public, and a call through a value was

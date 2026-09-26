@@ -55,8 +55,12 @@ MUTANTS = [
     (
         "the body's value does not move the resource to the caller",
         AFFINE,
-        "            Expr::Name(n) if n == self.name && self.tails.contains(&id) => Flow::releasing(1),",
-        "            Expr::Name(n) if n == self.name && self.tails.contains(&id) => Flow::identity(),",
+        "                if self.tails.contains(&id) && means(self.body, self.types, id, self.acquired) =>\n"
+        "            {\n"
+        "                Flow::releasing(1)",
+        "                if self.tails.contains(&id) && means(self.body, self.types, id, self.acquired) =>\n"
+        "            {\n"
+        "                Flow::identity()",
     ),
     (
         "a use binding is held to explicit releases",
