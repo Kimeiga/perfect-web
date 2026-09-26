@@ -1,0 +1,71 @@
+ADR-0059 - declared sum types
+
+produced by: just e10-sum-types
+commit: 220325fa31efeaaf86e30504101d1d99d60d3e1d
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== the checker (compiler/pw-core/tests/sum_types.rs)
+
+test a_bare_case_with_a_payload_names_its_qualified_form ... ok
+test an_options_payload_is_typed_in_its_arm ... ok
+test a_patterns_qualifier_must_name_the_type_matched ... ok
+test an_arms_fields_are_typed_in_its_body ... ok
+test a_pattern_through_its_type_is_a_case_not_a_binding ... ok
+test a_cases_fields_are_its_arguments ... ok
+test a_generic_sum_type_is_instantiated_where_it_is_used ... ok
+test a_case_is_its_types_value ... ok
+test a_bare_case_is_the_one_type_that_has_it ... ok
+test a_case_its_type_does_not_declare_is_refused ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+== through the E8 host, against a model (compiler/pw-conformance/tests/sum_types.rs)
+
+test a_generic_sum_type_is_refused_by_name ... ok
+test a_type_that_contains_itself_is_refused_by_name ... ok
+test a_hosts_answer_is_matched_by_its_case ... ok
+test a_case_inside_an_option ... ok
+test every_joined_slot_is_read_and_written ... ok
+test a_parameter_is_returned_as_itself ... ok
+test each_case_is_built ... ok
+test a_union_of_one_case_is_a_variant ... ok
+test a_case_is_a_function_value_and_a_bare_case_a_value ... ok
+test a_case_inside_a_record_and_a_list ... ok
+test a_parameter_is_matched_case_by_case ... ok
+test a_type_of_three_hundred_cases_has_a_wider_discriminant ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
+== the component and the JavaScript module
+
+javascript: 79 queries, 15800 calls, component and module agree (934 trapped in both)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.83s
+
+== mutation controls (scripts/sum_type_mutations.py)
+
+baseline: 26 passed, 0 failed
+a case its type lacks is not named: KILLED (1 of 26 tests fail)
+a case's fields are not its arguments: KILLED (2 of 26 tests fail)
+an arm's fields are not bound: KILLED (2 of 26 tests fail)
+an arm's body is walked without its bindings: KILLED (3 of 26 tests fail)
+a bare case is not typed: KILLED (3 of 26 tests fail)
+a pattern through its type is a binding: KILLED (2 of 26 tests fail)
+a pattern's qualifier is not checked: KILLED (1 of 26 tests fail)
+a bare case two types declare is not reported: KILLED (1 of 26 tests fail)
+a bare case with a payload is not told its qualified form: KILLED (1 of 26 tests fail)
+`_` takes every case, those taken before it too: KILLED (2 of 26 tests fail)
+an or-pattern's alternatives take no case: KILLED (2 of 26 tests fail)
+a type that contains itself reaches the world: KILLED (1 of 26 tests fail)
+a 16-bit discriminant is stored in 8 bits: KILLED (1 of 26 tests fail)
+a joined slot is read without its coercion: KILLED (7 of 26 tests fail)
+a case's fields are written at its payload's start: KILLED (6 of 26 tests fail)
+an arm's cases are tested for inequality: KILLED (6 of 26 tests fail)
+a flat scrutinee is matched unwritten: KILLED (6 of 26 tests fail)
+a module names a case as Pleris writes it: KILLED (1 of 26 tests fail)
+a module binds a case's several fields as one: KILLED (1 of 26 tests fail)
+a union of one case is written as a record: KILLED (1 of 26 tests fail)
+20 of 20 mutants killed
+
+NOT CLAIMED: a generic sum type or a type that contains itself in the
+backend, each refused by name. NOT CLAIMED: a nested or literal pattern,
+refused by name; a sum type in a template's {#match}, refused (PW5019);
+a captured sum type in a handler; == between two cases.
