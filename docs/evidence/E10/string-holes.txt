@@ -1,0 +1,20 @@
+ADR-0084 - what a string interpolates has a text form
+
+produced by: just e10-string-holes
+commit: 4e9f9dc283f3eae503b003b39e83492d82092652
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== string holes (compiler/pw-core/tests/string_holes.rs)
+
+test an_attributes_string_is_the_templates ... ok
+test a_value_that_may_be_absent_is_taken_apart_first ... ok
+test a_strings_hole_has_a_text_form ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/string_hole_mutations.py)
+
+baseline: 3 passed, 0 failed
+a string's holes are not related: KILLED (2 of 3 tests fail)
+an attribute's string is related as code: KILLED (3 of 3 tests fail)
+an absent value in a string is taken apart as a template's: KILLED (1 of 3 tests fail)
+3 of 3 mutants killed
