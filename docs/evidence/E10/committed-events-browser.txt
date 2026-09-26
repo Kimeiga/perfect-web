@@ -1,0 +1,12 @@
+E10 - the store page, compiled commands and handlers, in browser engines: chromium
+
+produced by: just e10-browser "chromium" docs/evidence/E10/committed-events-browser.txt
+commit: e92229283c4ab13e34af0bab86507c5865448be1
+playwright: Version 1.58.0
+
+== full run 1
+  101 passed (13.0s)
+== full run 2
+  101 passed (10.5s)
+== full run 3
+  101 passed (10.5s)

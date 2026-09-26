@@ -1,0 +1,34 @@
+ADR-0104 - the dev server commits the events a command declares
+
+produced by: just e10-committed-events
+commit: e92229283c4ab13e34af0bab86507c5865448be1
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the dev server (spikes/own-renderer/server)
+
+test tests::a_subscriber_that_falls_behind_is_told_to_reload ... ok
+test tests::the_commands_and_handlers_are_the_compilers ... ok
+test tests::an_unknown_component_is_refused_rather_than_defaulted ... ok
+test tests::a_failing_command_commits_neither_state_nor_event ... ok
+test tests::every_command_commits_its_state_and_its_event_together ... ok
+test tests::a_browsers_arguments_are_typed_by_the_components_own_parameters ... ok
+test tests::a_command_is_refused_on_a_node_that_does_not_grant_its_capability ... ok
+test tests::the_compiled_command_carries_its_arguments_to_the_data_layer ... ok
+test tests::an_event_value_the_server_cannot_compute_is_refused ... ok
+test tests::the_same_command_runs_where_the_capability_exists ... ok
+test tests::a_document_whose_handlers_were_not_compiled_is_refused ... ok
+test tests::clear_cart_is_authorised_separately ... ok
+test tests::a_command_commits_the_events_it_declares ... ok
+test tests::sustained_load_leaves_the_server_bounded ... ok
+test tests::a_forgotten_page_that_polls_is_told_to_reload ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+
+== mutation controls (scripts/committed_events_mutations.py)
+
+baseline: 15 passed, 0 failed
+`CartChanged` is committed whatever is declared: KILLED (1 of 15 tests fail)
+any command's events are this one's: KILLED (1 of 15 tests fail)
+any edge is an event: KILLED (1 of 15 tests fail)
+the session is not the value: KILLED (1 of 15 tests fail)
+a value is guessed: KILLED (1 of 15 tests fail)
+5 of 5 mutants killed
