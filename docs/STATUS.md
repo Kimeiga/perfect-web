@@ -78,6 +78,15 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a record built with the wrong fields, and an `if`
+without `else` as a value, passed `pw check`**
+([ADR-0067](DECISIONS/ADR-0067-a-record-is-built-with-its-fields.md)). A
+record built by its fields' names was related only field by field, so a
+field left out, a field its type lacks, and a field given twice each checked;
+the backend was the first to refuse them. An `if` without `else` had no
+stated type, so a body declaring an `Int` could end in one. The fields are a
+relation now (PW0612), and an `if` without `else` is the unit value.
+
 **Correction, 2026-09-26: a secret read by a nested function was public, and
 a nested function's annotations checked nothing**
 ([ADR-0066](DECISIONS/ADR-0066-a-nested-declaration-sees-around-it.md)).
@@ -147,6 +156,14 @@ had no signature and the whole WIT package failed ("missing component
 signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
+
+**2026-09-26: a record is built with each of its fields, once**
+([ADR-0067](DECISIONS/ADR-0067-a-record-is-built-with-its-fields.md)): PW0612
+refuses a field left out, one its type lacks, and one given twice; an `if`
+without `else` is the unit value.
+
+Evidence: [record-fields.txt](evidence/E10/record-fields.txt)
+(`just e10-record-fields`).
 
 **2026-09-26: a nested declaration sees the bindings around it**
 ([ADR-0066](DECISIONS/ADR-0066-a-nested-declaration-sees-around-it.md)).

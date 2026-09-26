@@ -369,7 +369,17 @@ pub enum RelationKind {
     /// `Shape.Circle`: the case a path names, against the cases its type
     /// declares (PW0608, ADR-0059).
     Case,
+    /// `Box { value: 1, label: "a" }`: the fields a record is built with,
+    /// against the fields its type declares, each once (PW0612, ADR-0067).
+    Fields,
 }
+
+/// A fields relation's expectation for a field its type does not declare.
+const FIELD_UNDECLARED: &str = "a field its type declares";
+/// A fields relation's expectation for a field given more than once.
+const FIELD_ONCE: &str = "each field once";
+/// A fields relation's expectation for a field left out.
+const FIELD_GIVEN: &str = "every field its type declares";
 
 /// A member relation's expectation when the member is an opaque type's
 /// representation, read outside the module that declares the type.
@@ -885,6 +895,11 @@ impl<'a> Typer<'a> {
             Expr::If {
                 then, els: Some(e), ..
             } => join(self.of(*then), self.of(*e)),
+            // Without `else` it is a statement, whose value is the unit value
+            // whichever way it goes, as the backend has it (ADR-0051). It was
+            // of no stated type until 2026-09-26, so one ending a body that
+            // declares an `Int` passed (ADR-0067).
+            Expr::If { els: None, .. } => Ty::Primitive(Primitive::Unit),
             // Each arm's body. Its pattern's names are bound to the payload
             // types the scrutinee's type gives them when the typer is built:
             // `entry` in `Some(entry) => ..` is the option's `T`.
@@ -1582,14 +1597,48 @@ impl<'a> Typer<'a> {
         };
         let mut s = Subst::default();
         let mut relations = Vec::new();
+        // The fields it is built with, against the fields its type declares,
+        // each once (ADR-0067).
+        let record = self.display_def(def);
+        let fields_relation = |span: Span, expected: &str, field: &str| ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Fields,
+            span,
+            target: record.clone(),
+            index: None,
+            outcome: match expected.is_empty() {
+                true => Outcome::Agree,
+                false => Outcome::Disagree {
+                    expected: expected.to_string(),
+                    actual: field.to_string(),
+                },
+            },
+            declared_at: None,
+            boundary: (
+                self.body.expr_span(id),
+                format!("in this construction of `{record}`"),
+            ),
+        };
+        let mut given: BTreeSet<&str> = BTreeSet::new();
+        let mut whole = true;
         for (i, init) in fields.iter().enumerate() {
             let Some((index, (_, expected))) = declared
                 .iter()
                 .enumerate()
                 .find(|(_, (n, _))| *n == init.name)
             else {
+                relations.push(fields_relation(
+                    init.span.clone(),
+                    FIELD_UNDECLARED,
+                    &init.name,
+                ));
+                whole = false;
                 continue;
             };
+            if !given.insert(init.name.as_str()) {
+                relations.push(fields_relation(init.span.clone(), FIELD_ONCE, &init.name));
+                whole = false;
+            }
             let actual = match init.value {
                 Some(v) => self.of(v),
                 // `Point { x, y }` — the shorthand names a binding.
@@ -1628,6 +1677,15 @@ impl<'a> Typer<'a> {
                     format!("in this construction of `{}`", self.display_def(def)),
                 ),
             });
+        }
+        for (name, _) in declared {
+            if !given.contains(name.as_str()) {
+                relations.push(fields_relation(self.body.expr_span(id), FIELD_GIVEN, name));
+                whole = false;
+            }
+        }
+        if whole {
+            relations.push(fields_relation(self.body.expr_span(id), "", ""));
         }
         s.any.extend(unmentioned(
             self.ws,
@@ -2881,6 +2939,27 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  declare builds nothing, and a value of the type is not one of them",
             )
             .repair(format!("`{}`'s constructors are {expected}", r.target)),
+            RelationKind::Fields => Diagnostic::error(
+                crate::codes::RECORD_FIELDS.id,
+                crate::codes::RECORD_FIELDS.invariant,
+                Detector::Signature,
+                match expected.as_str() {
+                    FIELD_UNDECLARED => format!("`{}` has no field `{actual}`", r.target),
+                    FIELD_ONCE => format!("`{}` is given its field `{actual}` twice", r.target),
+                    _ => format!("`{}` is built without its field `{actual}`", r.target),
+                },
+                r.span.clone(),
+            )
+            .reason("record_built_with_other_fields")
+            .explain(
+                "a record's value holds each field its type declares, so it is built with each \
+                 of them, once, and with nothing else",
+            )
+            .repair(match expected.as_str() {
+                FIELD_UNDECLARED => format!("remove `{actual}`, or declare it on `{}`", r.target),
+                FIELD_ONCE => format!("give `{actual}` once"),
+                _ => format!("give `{actual}` a value"),
+            }),
             RelationKind::Annotation => Diagnostic::error(
                 crate::codes::UNRESOLVED_TYPE.id,
                 crate::codes::UNRESOLVED_TYPE.invariant,

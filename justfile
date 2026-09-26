@@ -773,6 +773,20 @@ e10-nested:
      } > docs/evidence/E10/nested.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/nested.txt
 
+# ADR-0067: a record is built with each of its fields, once, and an `if`
+# without `else` is no value. Its tests, and the mutation controls.
+e10-record-fields:
+    @{ echo "ADR-0067 - a record is built with each of its fields, once"; echo; \
+       echo "produced by: just e10-record-fields"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== a record's fields, and an if without else (compiler/pw-core/tests/record_fields.rs)"; echo; \
+       cargo test --locked -p pw-core --test record_fields 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/record_field_mutations.py)"; echo; \
+       python3 scripts/record_field_mutations.py; \
+     } > docs/evidence/E10/record-fields.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/record-fields.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

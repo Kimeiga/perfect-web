@@ -434,3 +434,12 @@ has them, and is in its module. A stream's parts and a release clause's name
 are resolved; a call's callee is the binding in scope or a declaration;
 `(x) =>` binds. It fixes a secret logged publicly through a nested function,
 and a nested declaration's annotations, which never resolved.
+
+## 2026-09-26: a record is built with each of its fields, once (E10)
+
+[ADR-0067](DECISIONS/ADR-0067-a-record-is-built-with-its-fields.md): a record
+built by its fields' names is related to the fields its type declares, each
+once and no other (PW0612), where each field was related alone and a field
+left out, one its type lacks, or one given twice passed. An `if` without
+`else` is the unit value, so a body declaring another result cannot end in
+one.

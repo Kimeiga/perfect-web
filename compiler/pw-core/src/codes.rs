@@ -243,6 +243,12 @@ codes! {
     // bindings may be assigned: a parameter, or a `let` without `mut`, was.
     ASSIGN_IMMUTABLE = "PW0611" / assign_immutable / 1, Types,
         "an assignment's target must be a binding declared `let mut`";
+    // ADR-0067: until 2026-09-26 a record built by its fields' names was
+    // checked field by field against the fields it gave, and nothing else. A
+    // field left out, a field the type does not declare, and a field given
+    // twice each passed, and the backend was the first to refuse them.
+    RECORD_FIELDS = "PW0612" / record_fields / 1, Types,
+        "a record must be built with each field its type declares, once, and no other";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,
