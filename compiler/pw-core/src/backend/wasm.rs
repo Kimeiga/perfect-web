@@ -226,9 +226,9 @@ pub fn core_module_with(
     }
 
     // --- the imports this function actually calls, in first-use order --------
-    let Some(entry) = function.entry() else {
+    if function.entry().is_none() {
         blocked!("`{}` has no entry block", function.export);
-    };
+    }
     if function.blocks.len() > 1 {
         refuse!(
             "a function with more than one block",
@@ -246,7 +246,6 @@ pub fn core_module_with(
         .flat_map(|f| f.blocks.iter())
         .flat_map(|b| all_instrs(&b.instrs))
         .collect();
-    let _ = entry;
     for i in calls {
         let Instr::ImportCall { import, .. } = i else {
             continue;
@@ -1681,6 +1680,40 @@ impl Enc<'_> {
     /// Push a value the way a function compiled beside the export takes it
     /// (ADR-0050): its flat values, or a pointer to its layout, stored first
     /// when the value is held flat.
+    /// A call's arguments, each passed the way its parameter takes it.
+    fn pass_args(&mut self, args: &[ValueId], params: &[(WitType, Passed)]) -> Encoding<()> {
+        for (a, (ty, passing)) in args.iter().zip(params) {
+            let Some(h) = self.held.get(a).cloned() else {
+                blocked!("`{}` passes {a:?} and nothing defines it", self.export);
+            };
+            match self.pass(&h, ty, passing) {
+                Encoding::Encoded(()) => {}
+                other => return other,
+            }
+        }
+        Encoding::Encoded(())
+    }
+
+    /// A call's result, taken off the stack the way the callee passes it.
+    fn returned(&mut self, ret: Option<(WitType, Passed)>) -> Held {
+        use wasm_encoder::Instruction as I;
+        match ret {
+            None => Held::Nothing,
+            Some((ty, Passed::Flat(vs))) => {
+                let ls: Vec<u32> = vs.iter().map(|v| self.locals.fresh(*v)).collect();
+                for l in ls.iter().rev() {
+                    self.ops.push(I::LocalSet(*l));
+                }
+                Held::Flat { ty, locals: ls }
+            }
+            Some((ty, Passed::Pointer)) => {
+                let p = self.locals.fresh(ValType::I32);
+                self.ops.push(I::LocalSet(p));
+                Held::Memory { ty, ptr: p }
+            }
+        }
+    }
+
     fn pass(&mut self, h: &Held, ty: &WitType, passing: &Passed) -> Encoding<()> {
         use wasm_encoder::Instruction as I;
         let (resolve, sizes) = (self.resolve, self.sizes);
@@ -1885,31 +1918,12 @@ impl Enc<'_> {
                     );
                 };
                 let (index, params, ret) = (c.index, c.params.clone(), c.result.clone());
-                for (a, (ty, passing)) in args.iter().zip(&params) {
-                    let Some(h) = self.held.get(a).cloned() else {
-                        blocked!("`{}` passes {a:?} and nothing defines it", self.export);
-                    };
-                    match self.pass(&h, ty, passing) {
-                        Encoding::Encoded(()) => {}
-                        other => return other,
-                    }
+                match self.pass_args(args, &params) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
                 }
                 self.ops.push(I::Call(index));
-                let held = match ret {
-                    None => Held::Nothing,
-                    Some((ty, Passed::Flat(vs))) => {
-                        let ls: Vec<u32> = vs.iter().map(|v| self.locals.fresh(*v)).collect();
-                        for l in ls.iter().rev() {
-                            self.ops.push(I::LocalSet(*l));
-                        }
-                        Held::Flat { ty, locals: ls }
-                    }
-                    Some((ty, Passed::Pointer)) => {
-                        let p = self.locals.fresh(ValType::I32);
-                        self.ops.push(I::LocalSet(p));
-                        Held::Memory { ty, ptr: p }
-                    }
-                };
+                let held = self.returned(ret);
                 self.held.insert(*result, held);
             }
             Instr::Construct {
@@ -2036,14 +2050,9 @@ impl Enc<'_> {
                     other => return other.map(|_| unreachable!()),
                 };
                 self.ops.push(I::LocalGet(env));
-                for (a, (ty, passing)) in args.iter().zip(&params) {
-                    let Some(h) = self.held.get(a).cloned() else {
-                        blocked!("`{}` passes {a:?} and nothing defines it", self.export);
-                    };
-                    match self.pass(&h, ty, passing) {
-                        Encoding::Encoded(()) => {}
-                        other => return other,
-                    }
+                match self.pass_args(args, &params) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
                 }
                 self.ops.extend([
                     I::LocalGet(env),
@@ -2057,21 +2066,7 @@ impl Enc<'_> {
                         table_index: 0,
                     },
                 ]);
-                let held = match ret {
-                    None => Held::Nothing,
-                    Some((ty, Passed::Flat(vs))) => {
-                        let ls: Vec<u32> = vs.iter().map(|v| self.locals.fresh(*v)).collect();
-                        for l in ls.iter().rev() {
-                            self.ops.push(I::LocalSet(*l));
-                        }
-                        Held::Flat { ty, locals: ls }
-                    }
-                    Some((ty, Passed::Pointer)) => {
-                        let p = self.locals.fresh(ValType::I32);
-                        self.ops.push(I::LocalSet(p));
-                        Held::Memory { ty, ptr: p }
-                    }
-                };
+                let held = self.returned(ret);
                 self.held.insert(*result, held);
             }
             // A mutable binding (ADR-0051): a holder of its own, which each

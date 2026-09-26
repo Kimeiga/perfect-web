@@ -54,6 +54,12 @@ lint:
 case-check:
     @bash scripts/case-check.sh
 
+# Every mutation control's anchor matches its file exactly once. Reads the
+# anchors and builds nothing, so a refactor that moves an anchored line fails
+# here rather than when the control is next run (scripts/mutation_anchors.py).
+mutation-anchors:
+    @python3 scripts/mutation_anchors.py
+
 # Charter §3.6 supply-chain scanning. `deny.toml` and
 # `tools/node-audit-allow.txt` both require a written reason per exception.
 audit:
@@ -1147,6 +1153,6 @@ rq-row-polymorphism:
 # ---------------------------------------------------------------------------
 
 # The one command that must pass for the current milestone's gate.
-ci: evidence-gates fmt-check lint case-check test-unit test-compile
+ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile
     @echo ""
     @echo "ci: OK"

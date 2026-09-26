@@ -45,15 +45,13 @@ MUTANTS = [
         LOWER,
         """        inlining: vec![def],
         subst,
-        internal,
-    };""",
+        internal,""",
         """        inlining: vec![def],
         subst: {
             let _ = subst;
             BTreeMap::new()
         },
-        internal,
-    };""",
+        internal,""",
     ),
     (
         "a list's element type binds nothing",
@@ -72,11 +70,11 @@ MUTANTS = [
     (
         "a callee's result is left on the stack",
         WASM,
-        """                        for l in ls.iter().rev() {
-                            self.ops.push(I::LocalSet(*l));
-                        }
-                        Held::Flat { ty, locals: ls }""",
-        """                        Held::Flat { ty, locals: ls }""",
+        """                for l in ls.iter().rev() {
+                    self.ops.push(I::LocalSet(*l));
+                }
+                Held::Flat { ty, locals: ls }""",
+        """                Held::Flat { ty, locals: ls }""",
     ),
     (
         "the module omits its callees",

@@ -98,8 +98,10 @@ MUTANTS = [
     (
         "imports are read from the top of the body only",
         WASM,
-        "    for i in all_instrs(&entry.instrs) {",
-        "    for i in entry.instrs.iter() {",
+        """        .flat_map(|b| all_instrs(&b.instrs))
+        .collect();""",
+        """        .flat_map(|b| b.instrs.iter())
+        .collect();""",
     ),
     (
         "a program that does not parse is compiled",

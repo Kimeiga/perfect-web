@@ -35,9 +35,7 @@ MUTANTS = [
                 }
                 if let Some(p) = *pat {
                     let mut names = BTreeSet::new();
-                    self.pattern_names(p, &mut names);
-                    self.bind(names);
-                }""",
+                    self.pattern_names(p, &mut names);""",
         """                if let Some(p) = *pat {
                     let mut names = BTreeSet::new();
                     self.pattern_names(p, &mut names);
@@ -45,7 +43,10 @@ MUTANTS = [
                 }
                 if let Some(init) = *init {
                     self.expr(init);
-                }""",
+                }
+                if let Some(p) = *pat {
+                    let mut names = BTreeSet::new();
+                    self.pattern_names(p, &mut names);""",
     ),
     (
         "a block's bindings outlive it",

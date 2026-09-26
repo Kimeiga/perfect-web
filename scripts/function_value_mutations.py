@@ -66,8 +66,8 @@ MUTANTS = [
     (
         "a capture is laid over the table slot",
         WASM,
-        "captures: captures.into_iter().zip(offsets.into_iter().skip(1)).collect(),",
-        "captures: captures.into_iter().zip(offsets.into_iter()).collect(),",
+        ".zip(offsets.into_iter().skip(1))",
+        ".zip(offsets.into_iter())",
     ),
     (
         "a module's closure forgets what it captured",
