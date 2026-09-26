@@ -1,0 +1,19 @@
+ADR-0079 - a function value carries the label of what it makes
+
+produced by: just e10-labels-through-values
+commit: d569e18f6379bd9be400ded19e1f4aca1ef26350
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== labels through values (compiler/pw-core/tests/labels_through_values.rs)
+
+test a_binding_named_like_a_secrets_source_is_its_value ... ok
+test a_secret_made_through_a_function_value_is_labelled ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+== mutation controls (scripts/label_value_mutations.py)
+
+baseline: 2 passed, 0 failed
+a declaration named as a value is public: KILLED (1 of 2 tests fail)
+a module's function named as a value is public: KILLED (1 of 2 tests fail)
+a call through a value leaves out its callee: KILLED (1 of 2 tests fail)
+3 of 3 mutants killed
