@@ -78,6 +78,21 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: what a string interpolates has a text form**
+([ADR-0084](DECISIONS/ADR-0084-what-a-string-interpolates-has-a-text-form.md)).
+`"{xs}"` over a list, a record or an `Option` checked, and the backend was
+the first to refuse it. A string's holes are related as a template's are
+(ADR-0074) now, PW0609 and PW0600. Three fixtures interpolated a value with
+none, and are corrected:
+- two clean ones logged a `Result`, the rule fixture
+  `privacy-sink/public-value-to-public-log.pw` and the generality neighbour
+  `value_exceeds_sink_level/valid-public-neighbour.pw`;
+- the witness `private_in_shared_cache/branch-join.pw` showed a whole
+  `Cart` and `Store`.
+
+Evidence: [string-holes.txt](evidence/E10/string-holes.txt)
+(`just e10-string-holes`).
+
 **2026-09-26: a call's arguments open on the callee's line**
 ([ADR-0083](DECISIONS/ADR-0083-a-call-opens-on-its-callees-line.md)). A `(`
 at the start of a line continued the expression before it: `g(n)` then `()`
@@ -753,6 +768,7 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0084: a record or a list has no text form, in a template or a string.
 - ADR-0078: a function type states no effect row, so an effect is counted
   where its function is named rather than where it is called; the
   alternative is effect rows on function types, as Koka's are.

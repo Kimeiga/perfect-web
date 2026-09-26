@@ -14,7 +14,13 @@ import capability.{ Public }
 import domain.{ StoreId }
 
 fn audit(id: StoreId, dry_run: Bool) -> () !{ log<Public>, database.read<Stores> } {
-    let store = Stores.get(id)
+    // The store's name, taken out of the `Result` `get` answers: until
+    // 2026-09-26 this interpolated the `Result` itself, which has no text
+    // form (ADR-0084).
+    let store = match Stores.get(id) {
+        Ok(found) => found.name,
+        Err(_) => "unavailable",
+    }
     let same = store
     // Each branch is a `String`, the second interpolating the store: a
     // branch of another type, `{ same }`, was a second defect, and

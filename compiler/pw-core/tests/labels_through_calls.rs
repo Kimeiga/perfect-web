@@ -66,12 +66,24 @@ fn none(src: &str) {
 const SECRETS: &str = "[secrets.payments()]";
 const WORDS: &str = "[\"a\", \"b\"]";
 
+// What these log is text: an `Option` is taken apart first, and a list is
+// joined into one string, since a string's holes have a text form
+// (ADR-0084). They logged the `Option` and the list themselves until
+// 2026-09-26.
+
+/// `lines`, joined, by a fold, which carries what it folds (ADR-0064).
+const JOINED: &str = "List.fold(lines, \"\", (acc, l) => \"{acc}{l}\")";
+
+/// Log `t`, taken out of `option`.
+fn log_some(option: &str) -> String {
+    format!(
+        "    match {option} {{\n        Some(t) => log.public(\"with {{t}}\"),\n        None => (),\n    }}"
+    )
+}
+
 #[test]
 fn an_element_taken_out_of_a_list_keeps_its_label() {
-    let wrong = logs(
-        "",
-        "    let t = List.get([secrets.payments()], 0)\n    log.public(\"with {t}\")",
-    );
+    let wrong = logs("", &log_some("List.get([secrets.payments()], 0)"));
     refused(&wrong, "PW5006");
     none(&wrong.replace(SECRETS, WORDS));
 }
@@ -80,14 +92,18 @@ fn an_element_taken_out_of_a_list_keeps_its_label() {
 fn a_list_mapped_keeps_what_its_function_computes() {
     let wrong = logs(
         "",
-        "    let lines = List.map([secrets.payments()], t => \"with {t}\")\n    log.public(\"{lines}\")",
+        &format!(
+            "    let lines = List.map([secrets.payments()], t => \"with {{t}}\")\n    log.public({JOINED})"
+        ),
     );
     refused(&wrong, "PW5006");
     none(&wrong.replace(SECRETS, WORDS));
     // Through the function too: a public list mapped to a secret.
     let captured = logs(
         "",
-        "    let key = secrets.payments()\n    let lines = List.map([\"a\"], w => \"{w}{key}\")\n    log.public(\"{lines}\")",
+        &format!(
+            "    let key = secrets.payments()\n    let lines = List.map([\"a\"], w => \"{{w}}{{key}}\")\n    log.public({JOINED})"
+        ),
     );
     refused(&captured, "PW5006");
 }
@@ -105,10 +121,7 @@ fn a_fold_keeps_what_it_accumulates() {
 #[test]
 fn a_programs_own_generic_function_keeps_its_arguments_labels() {
     let first = "fn first<T>(xs: List<T>) -> Option<T> { List.get(xs, 0) }";
-    let wrong = logs(
-        first,
-        "    let t = first([secrets.payments()])\n    log.public(\"with {t}\")",
-    );
+    let wrong = logs(first, &log_some("first([secrets.payments()])"));
     refused(&wrong, "PW5006");
     none(&wrong.replace(SECRETS, WORDS));
 }
@@ -125,14 +138,23 @@ fn a_result_that_mentions_no_parameter_keeps_its_contract() {
 #[test]
 fn a_method_calls_receiver_is_its_first_argument() {
     // Typed, `tokens.get(0)` is `List.get` with `tokens` as its `items`.
-    let typed = logs("", "    let tokens: List<Secret<Payments>> = [secrets.payments()]\n    let t = tokens.get(0)\n    log.public(\"with {t}\")")
-        .replace("{ Payments, Public }", "{ Secret, Payments, Public }");
+    let typed = logs(
+        "",
+        &format!(
+            "    let tokens: List<Secret<Payments>> = [secrets.payments()]\n{}",
+            log_some("tokens.get(0)")
+        ),
+    )
+    .replace("{ Payments, Public }", "{ Secret, Payments, Public }");
     refused(&typed, "PW5006");
     // Untyped, the call resolves to nothing, and carries what went into it:
     // its receiver too.
     let untyped = logs(
         "",
-        "    let tokens = [secrets.payments()]\n    let t = tokens.get(0)\n    log.public(\"with {t}\")",
+        &format!(
+            "    let tokens = [secrets.payments()]\n{}",
+            log_some("tokens.get(0)")
+        ),
     );
     refused(&untyped, "PW5006");
     none(&untyped.replace(SECRETS, WORDS));
@@ -144,7 +166,9 @@ fn a_piped_argument_is_matched_to_its_parameter() {
     // mentions the result's `U`.
     let wrong = logs(
         "",
-        "    let key = secrets.payments()\n    let lines = [\"a\"] |> List.map(w => \"{w}{key}\")\n    log.public(\"{lines}\")",
+        &format!(
+            "    let key = secrets.payments()\n    let lines = [\"a\"] |> List.map(w => \"{{w}}{{key}}\")\n    log.public({JOINED})"
+        ),
     );
     refused(&wrong, "PW5006");
     none(&wrong.replace("{w}{key}", "{w}"));

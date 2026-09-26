@@ -1030,6 +1030,20 @@ e10-call-lines:
      } > docs/evidence/E10/call-lines.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/call-lines.txt
 
+# ADR-0084: what a string interpolates has a text form. Its tests, and the
+# mutation controls.
+e10-string-holes:
+    @{ echo "ADR-0084 - what a string interpolates has a text form"; echo; \
+       echo "produced by: just e10-string-holes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== string holes (compiler/pw-core/tests/string_holes.rs)"; echo; \
+       cargo test --locked -p pw-core --test string_holes 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/string_hole_mutations.py)"; echo; \
+       python3 scripts/string_hole_mutations.py; \
+     } > docs/evidence/E10/string-holes.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/string-holes.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

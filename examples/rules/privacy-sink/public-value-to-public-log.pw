@@ -12,6 +12,12 @@ import capability.{ Public }
 import domain.{ StoreId }
 
 fn trace(id: StoreId) -> () !{ log<Public>, database.read<Stores> } {
-    let store = Stores.get(id)
-    log.public("loaded {store}")
+    // The store's name, taken out of the `Result` `get` answers: a string
+    // holds text, and until 2026-09-26 this logged the `Result` itself, which
+    // has none and which the backend refuses (ADR-0084).
+    let name = match Stores.get(id) {
+        Ok(store) => store.name,
+        Err(_) => "unavailable",
+    }
+    log.public("loaded {name}")
 }

@@ -570,3 +570,11 @@ effect inside one, whether called, read through a member or named.
 at the start of a line continued the expression before it, so `g(n)` then
 `()` parsed as `g(n)()` and a correct program was refused for "`` does not
 resolve". It begins a new statement now, as `<`, `-` and `!` do.
+
+## 2026-09-26: what a string interpolates has a text form (E10)
+
+[ADR-0084](DECISIONS/ADR-0084-what-a-string-interpolates-has-a-text-form.md):
+`"{xs}"` over a list, a record or an `Option` checked, and the backend was
+the first to refuse it. A string's holes are related to a text form now, as
+a template's are (ADR-0074); three fixtures interpolated a value with none
+and are corrected.

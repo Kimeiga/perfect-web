@@ -501,6 +501,9 @@ struct Typer<'a> {
     solved: RefCell<BTreeMap<Binder, Ty>>,
     /// The `if`s and `match`es whose value is used (ADR-0068).
     used: BTreeSet<ExprId>,
+    /// Each template attribute written as a string with holes: its holes are
+    /// `template_relations`', which names the attribute (ADR-0084).
+    attribute_strings: BTreeSet<ExprId>,
 }
 
 /// What a resolved call is checked against: its parameters, where each is
@@ -880,6 +883,25 @@ impl<'a> Typer<'a> {
         for (_, r) in decl.term_roots() {
             mark_used(body, r.root, false, &mut used);
         }
+        let mut roots = Vec::new();
+        for id in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(id) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        let attribute_strings: BTreeSet<ExprId> = body
+            .walk_markup(&roots)
+            .into_iter()
+            .filter_map(|n| match body.node(n) {
+                crate::hir::Node::Element { attrs, .. } => Some(attrs.clone()),
+                _ => None,
+            })
+            .flatten()
+            .filter_map(|a| match a.value {
+                crate::hir::AttrValue::Expr(e) => Some(e),
+                _ => None,
+            })
+            .collect();
         let typer = Typer {
             sigs,
             ws,
@@ -892,6 +914,7 @@ impl<'a> Typer<'a> {
             piped,
             solved: RefCell::new(BTreeMap::new()),
             used,
+            attribute_strings,
         };
 
         // What the program implies: an unannotated `let` or `use` takes its
@@ -2656,6 +2679,19 @@ impl<'a> Typer<'a> {
     /// The relations one expression is the site of.
     fn relations_at(&self, id: ExprId, out: &mut Vec<ValueRelation>) {
         match self.body.expr(id) {
+            // A string's holes are written as text, as a template's are
+            // (ADR-0084): until 2026-09-26 `"{xs}"` over a list checked, and
+            // the backend was the first to refuse it. An attribute's are
+            // `template_relations`', which names the attribute.
+            Expr::Interpolated { parts, .. } if !self.attribute_strings.contains(&id) => {
+                for p in parts {
+                    out.extend(self.text(
+                        self.of(*p),
+                        "\"{..}\"".to_string(),
+                        self.body.expr_span(*p),
+                    ));
+                }
+            }
             Expr::Call { .. } => out.extend(self.call(id).relations),
             Expr::Keyword {
                 keyword, modifiers, ..
@@ -3774,6 +3810,24 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  anything else when it renders",
             )
             .repair("write a field of it, or a `String` made from it"),
+            // A string's hole, `"{..}"`, in code (ADR-0084), where `match` takes
+            // the value apart; anything else is a template's.
+            RelationKind::Absent if r.target.starts_with('"') => Diagnostic::error(
+                crate::codes::OPTION_USED_AS_VALUE.id,
+                crate::codes::OPTION_USED_AS_VALUE.invariant,
+                Detector::Signature,
+                format!(
+                    "`{}` is `{actual}`, a value that may be absent; `match` takes it apart",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("string_reads_optional_as_present")
+            .explain(
+                "an `Option` or a `Result` is a value that may be absent or failed; a \
+                 string holds text, and `match` says what it holds when there is none",
+            )
+            .repair("take it apart with `match`, and write the value in its `Some` or `Ok` arm"),
             RelationKind::Absent => Diagnostic::error(
                 crate::codes::OPTION_USED_AS_VALUE.id,
                 crate::codes::OPTION_USED_AS_VALUE.invariant,
