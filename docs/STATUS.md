@@ -78,6 +78,20 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: handlers that compute**
+([ADR-0058](DECISIONS/ADR-0058-handlers-that-compute.md)).
+- A resumable handler's body is lowered through the backend IR and written
+  by the pure-computation emitter. It computes, branches, loops, and calls
+  several commands, each awaited in order.
+- Until now it was one command call with simple arguments. Each module is
+  tested under Node against a context that records what it sends.
+- The store's handlers send what they sent; their text changed.
+- The event as a parameter is not done: no syntax binds one, and the runtime
+  listens for a click only.
+
+Evidence: [handlers-compute.txt](evidence/E10/handlers-compute.txt)
+(`just e10-handlers-compute`).
+
 **2026-09-25: maps and sets**
 ([ADR-0057](DECISIONS/ADR-0057-maps-and-sets.md)).
 - `Map<K, V>` and `Set<T>` are language types with standard-library
@@ -272,6 +286,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0058: a command's answer is not read by a handler; the syntax that
+  would bind an event to a resumable handler is not chosen.
 - ADR-0057: a map's key is an `Int` or a `String`; entries are in
   ascending key order, not insertion order; a map or set from outside out
   of order is refused, not sorted.

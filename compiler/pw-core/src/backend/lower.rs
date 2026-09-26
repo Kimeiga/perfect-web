@@ -275,6 +275,8 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         vars: BTreeSet::new(),
         in_lambda: 0,
         ret: Type::Unit,
+        captured: BTreeMap::new(),
+        handler: false,
     };
 
     // Parameters first, so a body naming one finds it.
@@ -374,6 +376,166 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
     })
 }
 
+/// **A resumable handler's body, lowered** (ADR-0058): a function of the
+/// values it captured, one for each path the document carries for it, in the
+/// order `resume::capture_paths` gives them. A command it calls is
+/// `Instr::Command`, awaited by its module in the browser; everything else is
+/// what a query's body lowers to.
+pub fn handler(
+    cx: &Context<'_>,
+    unit: usize,
+    decl_id: crate::hir::DeclId,
+    lambda: ExprId,
+    span: Span,
+) -> Lowering<(Function, Vec<String>)> {
+    let hir = cx.hirs[unit];
+    let decl = hir.decl(decl_id);
+    let Some(def) = decl_def(cx, unit, decl) else {
+        return Lowering::Blocked {
+            why: format!("`{}` has no resolved identity", decl.name),
+            span,
+        };
+    };
+    let Some(body_id) = decl.body else {
+        return Lowering::Blocked {
+            why: format!("`{}` holds a handler and has no body", decl.name),
+            span,
+        };
+    };
+    let body = hir.body(body_id);
+    let Expr::Lambda {
+        params,
+        body: inner,
+        ..
+    } = body.expr(lambda)
+    else {
+        return Lowering::Blocked {
+            why: "a handler identity that is not a lambda".to_string(),
+            span,
+        };
+    };
+    if !params.is_empty() {
+        return Lowering::Unsupported {
+            construct: "a handler with parameters",
+            span,
+            reason: "the event is not passed to a compiled handler (ADR-0058)".to_string(),
+        };
+    }
+    // What each captured path is: its root's type, then each field's.
+    let types = crate::infer::Types::of_body(cx.sigs, decl, body, hir.module_of(decl_id));
+    let internal = RefCell::new(Internal {
+        in_handler: true,
+        ..Internal::default()
+    });
+    let mut f = Lower {
+        cx,
+        unit,
+        next_value: 0,
+        instrs: Vec::new(),
+        locals: BTreeMap::new(),
+        types: BTreeMap::new(),
+        inlining: vec![def],
+        subst: BTreeMap::new(),
+        internal: &internal,
+        vars: BTreeSet::new(),
+        in_lambda: 0,
+        ret: Type::Unit,
+        captured: BTreeMap::new(),
+        handler: true,
+    };
+    let (mut captured, mut paths) = (Vec::new(), Vec::new());
+    for path in crate::resume::capture_paths(body, lambda) {
+        let mut parts = path.split('.');
+        let root = parts.next().unwrap_or_default();
+        let mut ty = types.bindings().get(root).cloned();
+        for field in parts {
+            ty = ty.and_then(|t| {
+                cx.sigs
+                    .member_of(&t, field)
+                    .and_then(|s| s.result().cloned())
+            });
+        }
+        let Some(ty) = ty else {
+            return Lowering::Unsupported {
+                construct: "a captured value whose type nothing states",
+                span,
+                reason: format!("`{path}` has no type the handler can decode it by"),
+            };
+        };
+        let ty = match ty_resolved(cx.sigs, &ty, &span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        };
+        let v = f.fresh();
+        f.types.insert(v, ty.clone());
+        f.captured.insert(path.clone(), v);
+        internal
+            .borrow_mut()
+            .captured_roots
+            .insert(path.split('.').next().unwrap_or_default().to_string());
+        captured.push((v, ty));
+        paths.push(path);
+    }
+    let result = match f.expr(body, *inner, None) {
+        Lowering::Lowered(v) => v,
+        other => return other.map(|_| unreachable!()),
+    };
+    let ret = f.types.get(&result).cloned().unwrap_or(Type::Unit);
+    let instrs = std::mem::take(&mut f.instrs);
+    drop(f);
+    let internal = internal.into_inner();
+    let function = Function {
+        def,
+        export: crate::contract::component_id(hir, decl_id),
+        params: captured,
+        ret,
+        blocks: vec![Block {
+            id: BlockId(0),
+            instrs,
+            terminator: Terminator::Return(result),
+        }],
+        capabilities: Vec::new(),
+        instance: Vec::new(),
+        callees: internal.done,
+        closures: internal
+            .closures
+            .into_iter()
+            .map(|c| c.expect("every closure slot is filled when its code lowers"))
+            .collect(),
+    };
+    Lowering::Lowered((function, paths))
+}
+
+/// **A handler's program** (ADR-0058): its function, and the nominal types
+/// it reaches, which its module decodes captures and encodes arguments by.
+pub(crate) fn handler_program(cx: &Context<'_>, function: Function) -> Program {
+    let mut p = Program {
+        functions: vec![function],
+        ..Program::default()
+    };
+    p.types = type_defs(cx, &p);
+    p
+}
+
+/// Can a browser send a value of this type to a command? A primitive, or an
+/// opaque type over one, which crosses as its representation (ADR-0033 §4).
+fn sendable(cx: &Context<'_>, t: &Type) -> bool {
+    match t {
+        Type::Int | Type::Float | Type::Bool | Type::Str => true,
+        Type::Nominal(def) => cx
+            .sigs
+            .type_decl(*def)
+            .and_then(|d| d.representation.as_ref())
+            .is_some_and(|r| {
+                matches!(
+                    ty_resolution(cx.sigs, r, &Span::default()),
+                    Lowering::Lowered(Type::Int | Type::Float | Type::Bool | Type::Str)
+                )
+            }),
+        _ => false,
+    }
+}
+
 /// **The functions compiled beside one export** (ADR-0050), shared by every
 /// `Lower` working on it: each instance begun, so a recursive call finds its
 /// own, and each one finished.
@@ -385,6 +547,13 @@ struct Internal {
     /// before its code is lowered, so a closure made inside another's code
     /// has its own index.
     closures: Vec<Option<Closure>>,
+    /// The export is a resumable handler (ADR-0058). A function lowered
+    /// beside it, or a function value's code, is not its body, and a command
+    /// called in one is refused.
+    in_handler: bool,
+    /// The names at the roots of the handler's captured paths: read in a
+    /// function value, one is refused, since its code does not receive them.
+    captured_roots: BTreeSet<String>,
 }
 
 /// **One declaration, compiled beside the export that reaches it**, at the
@@ -431,6 +600,8 @@ fn lower_internal(
         vars: BTreeSet::new(),
         in_lambda: 0,
         ret: Type::Unit,
+        captured: BTreeMap::new(),
+        handler: false,
     };
     let mut params = Vec::new();
     for (index, p) in decl.params.iter().enumerate() {
@@ -523,6 +694,8 @@ fn lower_closure(
         vars: BTreeSet::new(),
         in_lambda: 0,
         ret: ret.clone(),
+        captured: BTreeMap::new(),
+        handler: false,
     };
     let mut values = Vec::new();
     for (name, ty) in captures.into_iter().chain(params) {
@@ -732,6 +905,12 @@ struct Lower<'a> {
     in_lambda: usize,
     /// What the function being lowered returns: what `return` and `?` give.
     ret: Type,
+    /// A resumable handler's captures (ADR-0058): each path it reads, by the
+    /// value the document carries for it. A read of the path is that value.
+    captured: BTreeMap<String, ValueId>,
+    /// A handler's body is being lowered: a command it calls is
+    /// `Instr::Command`, which its module awaits.
+    handler: bool,
 }
 
 /// **Instantiate a declared type against the type a value has** (ADR-0050):
@@ -966,6 +1145,17 @@ impl<'a> Lower<'a> {
     /// It is how `None` knows what it is `None` of.
     fn expr(&mut self, body: &Body, e: ExprId, expected: Option<&Type>) -> Lowering<ValueId> {
         let span = body.expr_span(e);
+        // **A path a handler captured** (ADR-0058) is the value the document
+        // carries for it, unless a binding in the body shadows its root.
+        if !self.captured.is_empty()
+            && let Some(path) = crate::resume::field_chain(body, e)
+            && let Some(v) = self.captured.get(&path).copied()
+            && !self
+                .locals
+                .contains_key(path.split('.').next().unwrap_or_default())
+        {
+            return Lowering::Lowered(v);
+        }
         match body.expr(e) {
             Expr::Literal(l) => {
                 // The HIR keeps a literal as its SOURCE TEXT, so a number that
@@ -1048,6 +1238,16 @@ impl<'a> Lower<'a> {
                 // as a value (ADR-0052).
                 None if matches!(expected, Some(Type::Function(..))) => {
                     self.declaration_value(body, e, expected.cloned(), span)
+                }
+                None if self.internal.borrow().captured_roots.contains(n) => {
+                    Lowering::Unsupported {
+                        construct: "a captured value read inside a function value",
+                        span,
+                        reason: format!(
+                            "`{n}` is what the handler captured; a function value's code does \
+                             not receive it (ADR-0058)"
+                        ),
+                    }
                 }
                 None => Lowering::Blocked {
                     why: format!("`{n}` is not bound here"),
@@ -3414,6 +3614,72 @@ impl<'a> Lower<'a> {
                 Lowering::Lowered(v) => lowered.push(v),
                 other => return other,
             }
+        }
+
+        // **A command a handler calls** (ADR-0058): through its context, in
+        // the browser, by the contract's component id. Its arguments are sent
+        // as JSON, so each is one a browser can send (ADR-0033 §4).
+        // A query answers on the server, and a handler runs in the browser.
+        let in_handler = self.handler || self.internal.borrow().in_handler;
+        if in_handler
+            && let Some(d) = resolved
+            && let Some(decl) = crate::resolve::declaration(self.cx.hirs, d)
+            && decl.kind == DeclKind::Query
+        {
+            return Lowering::Unsupported {
+                construct: "a query called from a handler",
+                span,
+                reason: format!(
+                    "`{path}` answers on the server; a handler reaches the server through a \
+                     command"
+                ),
+            };
+        }
+        if in_handler
+            && let Some(d) = resolved
+            && let Some(decl) = crate::resolve::declaration(self.cx.hirs, d)
+            && decl.kind == DeclKind::Command
+        {
+            if self.in_lambda > 0 || !self.handler {
+                return Lowering::Unsupported {
+                    construct: "a command called inside a function",
+                    span,
+                    reason: format!(
+                        "`{path}` would be awaited inside a function value or a function \
+                         compiled beside the handler; call it in the handler's own body, a \
+                         `for` loop's included"
+                    ),
+                };
+            }
+            for (i, v) in lowered.iter().enumerate() {
+                let t = self.types.get(v).cloned().unwrap_or(Type::Unit);
+                if !sendable(self.cx, &t) {
+                    let named = match &t {
+                        Type::Nominal(def) => crate::resolve::declaration(self.cx.hirs, *def)
+                            .map(|d| d.name.clone())
+                            .unwrap_or_else(|| format!("{t:?}")),
+                        other => format!("{other:?}"),
+                    };
+                    return Lowering::Unsupported {
+                        construct: "a command parameter a browser cannot send",
+                        span,
+                        reason: format!(
+                            "argument {} of `{path}` is `{named}`; a handler sends primitives \
+                             and opaque types over them",
+                            i + 1
+                        ),
+                    };
+                }
+            }
+            let command =
+                crate::contract::component_id(self.cx.hirs[d.unit], crate::hir::DeclId(d.decl));
+            let result = self.fresh();
+            return Lowering::Lowered(self.push(Instr::Command {
+                result,
+                command,
+                args: lowered,
+                ty: Type::Unit,
+            }));
         }
 
         let def = resolved;

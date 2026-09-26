@@ -635,6 +635,26 @@ e10-function-values:
      } > docs/evidence/E10/function-values.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/function-values.txt
 
+# ADR-0058: handlers that compute. Each handler's module run under Node against
+# a context that records what it sends, and the mutation controls. Needs
+# `node`.
+e10-handlers-compute:
+    @{ echo "ADR-0058 - handlers that compute"; echo; \
+       echo "produced by: just e10-handlers-compute"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== what each handler sends, run under Node (compiler/pw-core/tests/handlers.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/handler_mutations.py)"; echo; \
+       python3 scripts/handler_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: the event as a parameter, which no syntax binds. NOT"; \
+       echo "CLAIMED: a command's answer read by the handler; its value is the unit"; \
+       echo "value. NOT CLAIMED: a command in a function value, or a function value"; \
+       echo "that reads what the handler captured; each is refused by name."; \
+     } > docs/evidence/E10/handlers-compute.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-compute.txt
+
 # ADR-0057: maps and sets. Each operation against BTreeMap and BTreeSet, the
 # checks on what arrives from outside, the component against the JavaScript
 # module, and the mutation controls. Needs `node`.
@@ -1079,8 +1099,10 @@ e10-handlers:
        echo "handler reads as rendered; the store reads only item.id, the loop key."; \
        echo "NOT CLAIMED: an opaque type's invariant is checked at the boundary."; \
        echo "PositiveInt arrives as an s64; the language states no invariant for it."; \
-       echo "NOT CLAIMED: handler parameters, local computation, branches, or"; \
-       echo "multi-statement bodies compile. Each is refused by name."; \
+       echo "NOT CLAIMED: the event as a handler parameter. No syntax binds one, the"; \
+       echo "runtime listens for a click only, and a handler with parameters is refused."; \
+       echo "Computation, branches, loops and several commands compile since"; \
+       echo "2026-09-25 (ADR-0058): just e10-handlers-compute."; \
      } > docs/evidence/E10/handlers.txt
     @grep -E "^test result|written to|refused \`" docs/evidence/E10/handlers.txt | head -20
 

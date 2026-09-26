@@ -63,7 +63,11 @@ parameters take the types its use declares (ADR-0053, done: a correction
 found on the way). An opaque value is built and read inside a component
 (ADR-0054, done). Slicing, and `sum` and `maximum` computed (ADR-0055, done).
 Unicode case mapping (ADR-0056, done). Maps and sets (ADR-0057, done).
-Next: handlers that compute.
+Handlers that compute (ADR-0058, done). The six gaps are closed. Next, each
+needing a ruling first: the event as a handler parameter (a syntax, and a
+runtime that listens for the part's own event), and the limitations
+KNOWN_LIMITATIONS still lists for the backend, among them declared sum
+types built and matched, generic records, and `Float` formatting.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

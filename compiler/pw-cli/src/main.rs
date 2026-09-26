@@ -1084,7 +1084,7 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
                     "  handler    {}  `{}` calls `{}`  {} bytes",
                     m.identity,
                     m.name,
-                    m.command,
+                    m.commands.join("`, `"),
                     m.source.len()
                 ));
             }
@@ -1207,7 +1207,7 @@ fn emit_handlers_command(paths: &[&String], out: &str) -> ExitCode {
             m.identity,
             m.name,
             c.declaration,
-            m.command,
+            m.commands.join("`, `"),
             m.source.len()
         );
     }

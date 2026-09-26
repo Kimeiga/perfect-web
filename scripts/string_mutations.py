@@ -21,7 +21,6 @@ LOWER = ROOT / "compiler/pw-core/src/lower.rs"
 BACKEND = ROOT / "compiler/pw-core/src/backend/lower.rs"
 KOKA = ROOT / "compiler/pw-core/src/koka.rs"
 MARKO = ROOT / "compiler/pw-core/src/marko.rs"
-HANDLERS = ROOT / "compiler/pw-core/src/backend/js.rs"
 
 B = "\\"  # one backslash, so the anchors below read as the Rust does
 
@@ -113,10 +112,14 @@ MUTANTS = [
             text.clone()""",
     ),
     (
-        "a handler sends the token",
-        HANDLERS,
-        "            Some(v) => Encoding::Encoded(json(&v)),",
-        "            Some(_) => Encoding::Encoded(s.clone()),",
+        # A handler's strings are the lowering's since ADR-0058, as a
+        # component's are.
+        "a handler is given the token",
+        BACKEND,
+        "                    Literal::Str(s) => match l.string_value() {\n"
+        "                        Some(v) => (Const::Str(v), Type::Str),",
+        "                    Literal::Str(s) => match l.string_value() {\n"
+        "                        Some(_) => (Const::Str(s.clone()), Type::Str),",
     ),
 ]
 

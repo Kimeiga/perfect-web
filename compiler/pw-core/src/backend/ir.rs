@@ -336,6 +336,16 @@ pub enum Instr {
         captures: Vec<ValueId>,
         ty: Type,
     },
+    /// **A command a resumable handler calls** (ADR-0058), by its
+    /// component id, through the handler's context: in the browser, awaited,
+    /// its arguments sent as JSON. Only a handler's body holds one, and its
+    /// answer is not read: its value is the unit value.
+    Command {
+        result: ValueId,
+        command: String,
+        args: Vec<ValueId>,
+        ty: Type,
+    },
     /// **The same value, as another type with its representation**
     /// (ADR-0054): an opaque type built from its representation,
     /// `PositiveInt(1)`, and its representation read back, `n.value`. The
@@ -605,6 +615,7 @@ impl Instr {
             | Instr::Get { result, .. }
             | Instr::Closure { result, .. }
             | Instr::Retype { result, .. }
+            | Instr::Command { result, .. }
             | Instr::Apply { result, .. } => *result,
         }
     }
@@ -632,6 +643,7 @@ impl Instr {
             | Instr::Get { ty, .. }
             | Instr::Closure { ty, .. }
             | Instr::Retype { ty, .. }
+            | Instr::Command { ty, .. }
             | Instr::Apply { ty, .. } => ty,
         }
     }

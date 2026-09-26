@@ -107,6 +107,58 @@ fn encode(component_id: &str, function: &Function, program: &Program) -> Result<
     Ok(e.finish(component_id, function, &sources))
 }
 
+/// **A resumable handler, as its ES module** (ADR-0058). `paths` are the
+/// captured paths its parameters are, in order.
+pub(crate) fn handler_source(
+    function: &Function,
+    program: &Program,
+    identity: &str,
+    name: &str,
+    paths: &[String],
+) -> Result<String, String> {
+    let callees: BTreeMap<(DefId, Vec<Type>), usize> = function
+        .callees
+        .iter()
+        .enumerate()
+        .map(|(n, c)| ((c.def, c.instance.clone()), n))
+        .collect();
+    let mut helpers = BTreeSet::new();
+    let mut sources = Vec::new();
+    for (n, c) in function.closures.iter().enumerate() {
+        let mut e = Emitter::new(program, &callees, &function.closures);
+        e.function(&c.function)?;
+        helpers.extend(e.helpers.iter().copied());
+        let params: Vec<String> = c.function.params.iter().map(|(v, _)| val(*v)).collect();
+        sources.push(format!(
+            "function {}({}) {{\n{}}}",
+            closure_name(n),
+            params.join(", "),
+            e.body
+        ));
+    }
+    for (n, c) in function.callees.iter().enumerate() {
+        let mut e = Emitter::new(program, &callees, &function.closures);
+        e.function(c)?;
+        helpers.extend(e.helpers.iter().copied());
+        let params: Vec<String> = c.params.iter().map(|(v, _)| val(*v)).collect();
+        sources.push(format!(
+            "function {}({}) {{\n{}}}",
+            callee_name(n),
+            params.join(", "),
+            e.body
+        ));
+    }
+    let mut e = Emitter::new(program, &callees, &function.closures);
+    e.handler = true;
+    e.handler_function(function, paths)?;
+    e.helpers.extend(helpers);
+    Ok(e.finish_handler(identity, name, &sources))
+}
+
+fn json(s: &str) -> String {
+    serde_json::Value::String(s.to_string()).to_string()
+}
+
 /// A function compiled beside the query, in the module (ADR-0050).
 fn callee_name(n: usize) -> String {
     format!("callee{n}")
@@ -127,6 +179,9 @@ struct Emitter<'p> {
     types: BTreeMap<ValueId, Type>,
     /// The prelude functions the body calls.
     helpers: BTreeSet<&'static str>,
+    /// A resumable handler's body (ADR-0058): a command it calls is awaited.
+    /// Off in a function value's body, which is not async.
+    handler: bool,
     body: String,
     depth: usize,
 }
@@ -217,6 +272,15 @@ const HELPERS: &[(&str, &[&str], &str)] = &[
          return b > a ? xs.slice(Number(a), Number(b)) : [];\n}",
     ),
     (
+        "exact",
+        &["trap"],
+        "// An Int sent to a command as a JSON number (ADR-0058): exact within\n\
+         // ±2^53, and a trap past it rather than a different number.\n\
+         function exact(v) {\n  \
+         if (v < -(2n ** 53n) || v > 2n ** 53n) trap(\"an Int a JavaScript number cannot carry exactly\");\n  \
+         return Number(v);\n}",
+    ),
+    (
         "key_order",
         &["compare"],
         "// The order of two keys (ADR-0057): an Int by value, a String by code\n\
@@ -305,13 +369,15 @@ impl<'p> Emitter<'p> {
             closures,
             types: BTreeMap::new(),
             helpers: BTreeSet::new(),
+            handler: false,
             body: String::new(),
             depth: 1,
         }
     }
 
-    fn finish(self, component_id: &str, function: &Function, callees: &[String]) -> String {
-        // Every helper a used helper calls, in the table's order.
+    /// The prelude this module's functions call: every helper a used helper
+    /// calls, in the table's order, then the case tables used (ADR-0056).
+    fn prelude(&self) -> Vec<String> {
         let mut used = self.helpers.clone();
         loop {
             let before = used.len();
@@ -324,18 +390,23 @@ impl<'p> Emitter<'p> {
                 break;
             }
         }
-        // The case tables, generated rather than written (ADR-0056).
-        let tables: Vec<String> = [("case_lower", Case::Lower), ("case_upper", Case::Upper)]
-            .into_iter()
-            .filter(|(name, _)| used.contains(name))
-            .map(|(name, c)| case_table(name, c))
-            .collect();
-        let mut prelude: Vec<&str> = HELPERS
+        let mut out: Vec<String> = HELPERS
             .iter()
             .filter(|(name, _, _)| used.contains(name))
-            .map(|(_, _, source)| *source)
+            .map(|(_, _, source)| source.to_string())
             .collect();
-        prelude.extend(tables.iter().map(String::as_str));
+        out.extend(
+            [("case_lower", Case::Lower), ("case_upper", Case::Upper)]
+                .into_iter()
+                .filter(|(name, _)| used.contains(name))
+                .map(|(name, c)| case_table(name, c)),
+        );
+        out
+    }
+
+    fn finish(self, component_id: &str, function: &Function, callees: &[String]) -> String {
+        let prelude = self.prelude();
+        let prelude: Vec<&str> = prelude.iter().map(String::as_str).collect();
         let params: Vec<String> = function.params.iter().map(|(v, _)| val(*v)).collect();
         let mut before: Vec<&str> = prelude;
         before.extend(callees.iter().map(String::as_str));
@@ -347,6 +418,104 @@ impl<'p> Emitter<'p> {
             params.join(", "),
             self.body
         )
+    }
+
+    /// **A handler's module** (ADR-0058): its prelude and functions, the names
+    /// the runtime reads, and `run(context)`.
+    fn finish_handler(self, identity: &str, name: &str, sources: &[String]) -> String {
+        let prelude = self.prelude();
+        let mut before: Vec<&str> = prelude.iter().map(String::as_str).collect();
+        before.extend(sources.iter().map(String::as_str));
+        format!(
+            "// Generated by pw: resumable handler {identity}. Do not edit.\n\n\
+             {}{}export const name = {};\nexport const handler = {};\n\
+             export async function run(context) {{\n{}}}\n",
+            before.join("\n\n"),
+            if before.is_empty() { "" } else { "\n\n" },
+            json(name),
+            json(identity),
+            self.body
+        )
+    }
+
+    /// **A handler's body** (ADR-0058): each captured path read from the
+    /// document and decoded by its type, then the body, its commands awaited.
+    fn handler_function(&mut self, f: &Function, paths: &[String]) -> Result<(), String> {
+        let [entry] = f.blocks.as_slice() else {
+            return Err(format!("{} blocks; a handler is one", f.blocks.len()));
+        };
+        let Terminator::Return(result) = &entry.terminator else {
+            return Err("its body does not return a value".into());
+        };
+        for ((v, t), path) in f.params.iter().zip(paths) {
+            let at: String = path.split('.').map(|s| format!("[{}]", json(s))).collect();
+            let decoded = self.decode(&format!("context.captures{at}"), t)?;
+            self.line(&format!("const {} = {decoded};", val(*v)));
+            self.types.insert(*v, t.clone());
+        }
+        for i in &entry.instrs {
+            self.instr(i)?;
+        }
+        self.line(&format!("return {};", val(*result)));
+        Ok(())
+    }
+
+    fn shape(&self, def: crate::resolve::DefId) -> Option<&Shape> {
+        self.program
+            .types
+            .iter()
+            .find(|t| t.def == def)
+            .map(|t| &t.shape)
+    }
+
+    /// **A captured value, from the JSON the renderer wrote** (ADR-0058). An
+    /// `Int` is a JavaScript number there, exact within ±2^53 (ADR-0033 §7),
+    /// and a `BigInt` here (ADR-0044); a record is an object by field name in
+    /// both.
+    fn decode(&self, expr: &str, ty: &Type) -> Result<String, String> {
+        let refused = || format!("a captured {ty:?}, which the document does not carry");
+        Ok(match ty {
+            Type::Int => format!("BigInt({expr})"),
+            Type::Float | Type::Str | Type::Bool => expr.to_string(),
+            Type::List(t) => format!("{expr}.map((x) => {})", self.decode("x", t)?),
+            Type::Nominal(def) => match self.shape(*def) {
+                Some(Shape::Alias(of)) => self.decode(expr, of)?,
+                Some(Shape::Record { fields }) => {
+                    let fields: Vec<String> = fields
+                        .iter()
+                        .map(|(n, t)| {
+                            Ok(format!(
+                                "{}: {}",
+                                json(n),
+                                self.decode(&format!("o[{}]", json(n)), t)?
+                            ))
+                        })
+                        .collect::<Result<_, String>>()?;
+                    format!("((o) => ({{ {} }}))({expr})", fields.join(", "))
+                }
+                _ => return Err(refused()),
+            },
+            _ => return Err(refused()),
+        })
+    }
+
+    /// **A value sent to a command, as JSON carries it** (ADR-0058): an `Int`
+    /// as a number, exact within ±2^53 or a trap; an opaque type as its
+    /// representation (ADR-0033 §4).
+    fn wire(&mut self, v: &str, ty: &Type) -> Result<String, String> {
+        match ty {
+            Type::Int => Ok(format!("{}({v})", self.uses("exact"))),
+            Type::Float | Type::Str | Type::Bool => Ok(v.to_string()),
+            Type::Nominal(def) => match self.shape(*def).cloned() {
+                Some(Shape::Alias(of)) => self.wire(v, &of),
+                _ => Err(format!(
+                    "a command argument of type {ty:?}, which a browser cannot send"
+                )),
+            },
+            other => Err(format!(
+                "a command argument of type {other:?}, which a browser cannot send"
+            )),
+        }
     }
 
     fn function(&mut self, f: &Function) -> Result<(), String> {
@@ -402,9 +571,15 @@ impl<'p> Emitter<'p> {
         let outer = std::mem::take(&mut self.body);
         let depth = self.depth;
         self.depth = 1;
+        // A function value is not async: no command is awaited in it.
+        let handler = std::mem::replace(&mut self.handler, false);
         for i in &r.instrs {
-            self.instr(i)?;
+            if let Err(e) = self.instr(i) {
+                self.handler = handler;
+                return Err(e);
+            }
         }
+        self.handler = handler;
         self.line(&format!("return {};", val(r.value)));
         let inner = std::mem::replace(&mut self.body, outer);
         self.depth = depth;
@@ -462,6 +637,25 @@ impl<'p> Emitter<'p> {
                     params.join(", "),
                     closure_name(*index as usize),
                     given.join(", ")
+                ));
+            }
+            // A command a handler calls (ADR-0058): awaited through its
+            // context, each argument as JSON can carry it.
+            Instr::Command { command, args, .. } => {
+                if !self.handler {
+                    return Err(format!(
+                        "a call to `{command}`, which only a handler's own body makes"
+                    ));
+                }
+                let mut sent = Vec::new();
+                for a in args {
+                    let t = self.type_of(*a)?.clone();
+                    sent.push(self.wire(&val(*a), &t)?);
+                }
+                self.line(&format!(
+                    "const {r} = await context.command({}, [{}]);",
+                    json(command),
+                    sent.join(", ")
                 ));
             }
             // An opaque type is its representation (ADR-0054).

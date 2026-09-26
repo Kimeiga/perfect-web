@@ -190,14 +190,20 @@ its logic in Pleris and its data layer in the host:
   times slower.
 
 **Resumable handler bodies are compiled** (2026-09-25, ADR-0033), to one ES
-module each, and the page's elements carry what the handlers read. The set is
-narrow:
+module each, and the page's elements carry what the handlers read. A body
+computes (ADR-0058): it is lowered as a query's is, and its commands are
+awaited in order. What remains:
 
-- **One command call per handler.** Its arguments may be captured values and
-  their fields, literals, and opaque constructors over a primitive. Local
-  computation, branches, multi-statement bodies and handler parameters (the
-  event) are refused, and so is a command parameter that is not a primitive or
-  an opaque type over one.
+- **The event is not a handler's parameter** (ADR-0058). No syntax binds one
+  to a resumable handler, and the runtime listens for a click only. A named
+  `fn` bound to `on:input` is checked against its event type (PW0602) and not
+  compiled.
+- **A command's answer is not read by a handler**; its value is the unit
+  value. A command called inside a function value, or a function value that
+  reads what the handler captured, is refused, and so is a command parameter
+  that is not a primitive or an opaque type over one.
+- **The development server hosts the store's two commands only.** A handler
+  that calls another command compiles, and is tested under Node.
 - **Captures are not a patched part.** An element carries the capture paths
   its handler reads, as rendered. A patch that changes a captured field without
   re-rendering the element leaves the old value there: for example, E7-P's

@@ -2036,6 +2036,12 @@ impl Enc<'_> {
             // The same value as another type (ADR-0054): the same locals, or
             // the same address. An opaque type's component type is an alias
             // of its representation's.
+            // A handler's (ADR-0058): a component calls no command.
+            Instr::Command { command, .. } => refuse!(
+                "a command called from inside a component",
+                "`{}` calls `{command}`; only a handler's module calls a command",
+                self.export
+            ),
             Instr::Retype { result, value, ty } => {
                 let Some(h) = self.held.get(value).cloned() else {
                     blocked!("`{}` retypes {value:?} and nothing defines it", self.export);

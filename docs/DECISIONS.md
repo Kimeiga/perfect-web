@@ -347,3 +347,9 @@ keyed by an `Int` or a `String`, in ascending key order: in the component
 `list<tuple<K, V>>` and `list<T>`, searched in binary and changed by
 copying; in the module sorted arrays. A map or set from outside is checked
 on arrival. `List.sort_by`'s merge sort takes a comparison now.
+
+[ADR-0058](DECISIONS/ADR-0058-handlers-that-compute.md): a resumable
+handler's body is lowered as a query's is and written by the
+pure-computation emitter, its commands awaited in order: bindings,
+arithmetic, branches, loops and several commands. A captured `Int` is read
+into a `BigInt`, and one sent past ±2^53 traps before it is sent.
