@@ -105,8 +105,10 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    path~~, done (ADR-0073): `pw build` wrote templates that fail every
    render, and keyed loops on the wrong field. ~~What a template writes~~,
    done (ADR-0074), which found ADR-0071's `{:else if}` gap, and ~~a
-   `<stream>` and a mounted resource~~, refused by name (ADR-0075). Next,
-   the name check's own scope walk onto `crate::lexical`;
+   `<stream>` and a mounted resource~~, refused by name (ADR-0075). ~~A
+   call through a field holding a function~~, checked (ADR-0077), which
+   found an effect travelling through a function value unseen: next,
+   ADR-0078. Then the name check's own scope walk onto `crate::lexical`;
 4. a function passed to a generic declaration in the backend (found writing
    ADR-0062's tests), then a generic type at the boundary, a WIT type per
    instance;

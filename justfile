@@ -925,6 +925,20 @@ e10-unreachable-arms:
      } > docs/evidence/E10/unreachable-arms.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/unreachable-arms.txt
 
+# ADR-0077: a call through a field holding a function is checked. Its tests,
+# and the mutation controls.
+e10-field-calls:
+    @{ echo "ADR-0077 - a call through a field holding a function is checked"; echo; \
+       echo "produced by: just e10-field-calls"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== field calls (compiler/pw-core/tests/field_calls.rs)"; echo; \
+       cargo test --locked -p pw-core --test field_calls 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/field_call_mutations.py)"; echo; \
+       python3 scripts/field_call_mutations.py; \
+     } > docs/evidence/E10/field-calls.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/field-calls.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -514,3 +514,10 @@ when rendered.
 exhaustiveness analysis always found unreachable arms, and nothing reported
 one. `_ => 0` before `Circle(r) => r` checked, and a literal matched twice
 built with a dead arm. PW0333 refuses each.
+
+## 2026-09-26: a call through a field holding a function is checked (E10)
+
+[ADR-0077](DECISIONS/ADR-0077-a-call-through-a-field.md): `r.f(x)`, where
+`f` is a field holding a function, resolved to nothing, so its arguments,
+its arity and its result passed unchecked. ADR-0068's relations check it
+now.

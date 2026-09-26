@@ -1377,6 +1377,18 @@ impl<'a> Typer<'a> {
         Some(Target::Member(sig, *base))
     }
 
+    /// `r.f`, where `f` is a field of `r`'s type rather than a declaration
+    /// that takes it (ADR-0077).
+    fn calls_a_field(&self, callee: ExprId) -> bool {
+        let Expr::Field { base, name } = self.body.expr(callee) else {
+            return false;
+        };
+        self.of(*base)
+            .receiver()
+            .and_then(|r| self.sigs.member_by(r, name))
+            .is_some_and(|sig| self.sigs.by_def(sig.definition).is_none())
+    }
+
     /// **Resolve, instantiate and solve one call.**
     fn call(&self, id: ExprId) -> Solved {
         let unknown = Solved {
@@ -1404,8 +1416,17 @@ impl<'a> Typer<'a> {
                             relations: Vec::new(),
                         };
                     }
+                    let target = self.target(id, *callee);
+                    // `r.f(x)`, where `f` is a field of `r`'s type: the call
+                    // is through the value the field holds, as a call through
+                    // a binding is (ADR-0068). Until 2026-09-26 it resolved to
+                    // nothing, and neither its arguments nor its result were
+                    // related (ADR-0077).
+                    if target.is_none() && self.calls_a_field(*callee) {
+                        return self.value_call(id, *callee, args);
+                    }
                     (
-                        self.target(id, *callee),
+                        target,
                         args.iter().map(|a| (a.name.clone(), a.value)).collect(),
                     )
                 }

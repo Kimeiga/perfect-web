@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a call through a field holding a function is checked**
+([ADR-0077](DECISIONS/ADR-0077-a-call-through-a-field.md)). `r.f(x)`, with
+`f` a field of type `fn(Int) -> Int`, resolved to nothing: a wrong argument,
+a wrong count and a wrong use of the result each passed `pw check`, and the
+backend refused the call by name. Building it found that an effect travels
+through a function value unseen, which ADR-0078 takes up.
+
+Evidence: [field-calls.txt](evidence/E10/field-calls.txt)
+(`just e10-field-calls`).
+
 **2026-09-26: an arm no value reaches is refused**
 ([ADR-0076](DECISIONS/ADR-0076-an-arm-no-value-reaches.md)). The
 exhaustiveness analysis computed unreachable arms from the start, and
