@@ -1,7 +1,7 @@
 ADR-0043 - operands are typed, and Float.from_int
 
 produced by: just e10-operands
-commit: 220325fa31efeaaf86e30504101d1d99d60d3e1d
+commit: e30d7555d0cd5af55908ef641e7a74cb69aa7b35
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the value relations (compiler/pw-core/tests/value_relations.rs)
@@ -9,12 +9,12 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test an_operator_takes_operands_of_the_types_it_takes ... ok
 test an_untyped_operand_is_undecided_not_refused ... ok
 test the_accepted_corpus_disagrees_nowhere_and_decides_a_floor ... ok
-test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
 
 == Float.from_int (compiler/pw-conformance/tests/stdlib.rs)
 
 test an_int_becomes_the_nearest_float ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.13s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.12s
 
 == mutation controls (scripts/operand_mutations.py)
 
@@ -25,7 +25,7 @@ arithmetic's right side need not match its left: KILLED (1 of 63 tests fail)
 a logical operator's left side need not be a Bool: KILLED (1 of 63 tests fail)
 `!` takes any type: KILLED (1 of 63 tests fail)
 an `if` condition is not related: KILLED (1 of 63 tests fail)
-an untyped operand is refused: KILLED (2 of 63 tests fail)
+an untyped operand is refused: KILLED (1 of 63 tests fail)
 `Float.from_int` reads its Int as unsigned: KILLED (1 of 63 tests fail)
 8 of 8 mutants killed
 

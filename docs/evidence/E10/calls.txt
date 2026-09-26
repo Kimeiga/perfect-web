@@ -1,0 +1,41 @@
+ADR-0068 - what each construct takes, checked
+
+produced by: just e10-calls
+commit: e30d7555d0cd5af55908ef641e7a74cb69aa7b35
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== calls, loops, tries and branches (compiler/pw-core/tests/calls_and_branches.rs)
+
+test a_local_function_value_is_not_the_declaration_it_shadows ... ok
+test a_try_takes_an_option_or_a_result ... ok
+test a_for_loop_runs_over_a_list ... ok
+test a_value_called_must_be_a_function ... ok
+test an_elif_chain_is_one_if_nested_in_another ... ok
+test branches_whose_value_is_used_produce_one_type ... ok
+test a_call_through_a_function_value_is_checked ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+== elif chains through the E8 host (compiler/pw-conformance/tests/if_chains.rs)
+
+test a_chain_without_else_is_a_statement ... ok
+test a_chain_of_four_branches_reaches_the_last ... ok
+test an_elif_chain_of_bools_answers_each_branch ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+
+== mutation controls (scripts/call_branch_mutations.py)
+
+baseline: 10 passed, 0 failed
+a call through a binding is resolved as a declaration: KILLED (3 of 10 tests fail)
+a function value's arguments are not related: KILLED (1 of 10 tests fail)
+a function value's arity is not related: KILLED (1 of 10 tests fail)
+a function value's call answers nothing known: KILLED (1 of 10 tests fail)
+a value that is not a function may be called: KILLED (1 of 10 tests fail)
+a `for` loop's list is not related: KILLED (1 of 10 tests fail)
+`?`'s operand is not related: KILLED (1 of 10 tests fail)
+branches are not related: KILLED (2 of 10 tests fail)
+a statement's branches are related as a used value's: KILLED (1 of 10 tests fail)
+an `elif` chain's next condition is its `else`: KILLED (4 of 10 tests fail)
+10 of 10 mutants killed
+
+NOT CLAIMED: a lambda with no annotation, called directly, whose
+parameter's type no use gives.
