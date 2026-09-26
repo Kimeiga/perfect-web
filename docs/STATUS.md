@@ -90,7 +90,11 @@ transaction parameter was never held to it. Every path is counted now.
   listens for a click only.
 
 Evidence: [handlers-compute.txt](evidence/E10/handlers-compute.txt)
-(`just e10-handlers-compute`).
+(`just e10-handlers-compute`), and the three-engine browser suite
+([handlers-browser-suite.txt](evidence/E10/handlers-browser-suite.txt)).
+Its runs 2 and 3 pass all 303 tests. Run 1 failed once in WebKit, in a
+keyed-list test the change does not touch ("changing one item's field
+replaces no sibling"). Five isolated reruns passed, and the cause is open.
 
 **2026-09-25: maps and sets**
 ([ADR-0057](DECISIONS/ADR-0057-maps-and-sets.md)).
