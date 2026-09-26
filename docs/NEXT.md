@@ -162,7 +162,8 @@ no write reaches~~ (ADR-0103); ~~an event no command declared~~ (ADR-0104);
 ~~a speculation nothing reconciles~~ (ADR-0105); ~~a file whose name
 another has~~ (ADR-0106), which `pw check` passed with an error; ~~a key
 that omits a parameter~~ (ADR-0107); ~~a query naming nothing~~ (ADR-0108);
-~~a timeout of zero~~ (ADR-0109). Next, in order:
+~~a timeout of zero~~ (ADR-0109); ~~a handler reading what it does not
+capture~~ (ADR-0110). Next, in order:
 1. ~~**a materialization is not reached through what it reads**~~, done
    (ADR-0102): A-009's fragment kept a changed store's old name. Then
    ~~**a command's write held to the fragments built on it**~~, done
@@ -181,9 +182,15 @@ that omits a parameter~~ (ADR-0107); ~~a query naming nothing~~ (ADR-0108);
 5. ~~**a key that omits what its entry depends on**~~, done (ADR-0107):
    two calls differing in an unkeyed parameter shared one entry;
 6. ~~**a timeout of zero**~~, done (ADR-0109);
-7. **a resumable handler reading what it does not capture**:
-   `resumable() => add_to_cart(item.id, ..)` inside `{#each menu as item}`
-   checks, and `pw emit-handlers` refuses it ("`item` is not bound here").
+7. ~~**a resumable handler reading what it does not capture**~~, done
+   (ADR-0110). It found:
+   - **a capture read through a shorthand field**: `Pick { n: 1, item }`
+     with `item` captured is refused by PW5017, as the capture paths and the
+     artifact count only names and field paths, and the backend reads a
+     shorthand field from bindings alone;
+   - **a handler performing what only the origin may**: one calling
+     `Carts.add` itself checks, and `pw emit-handlers` refuses it. The
+     page's contract leaves its handlers out, and a handler has none.
 
 Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates

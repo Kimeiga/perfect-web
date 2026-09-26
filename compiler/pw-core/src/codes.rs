@@ -359,6 +359,10 @@ codes! {
     // value, and the reverse, in silence.
     RESUME_DESTINATION_UNKNOWN = "PW5018" / resume_destination_unknown / 1, Privacy,
         "a private resumable region must say which principal it is private to";
+    // ADR-0110: `resumable() => add_to_cart(item.id, ..)` inside an
+    // `{#each}` checked until 2026-09-26, and the handler build refused it.
+    HANDLER_READS_UNCAPTURED = "PW5025" / handler_reads_uncaptured / 1, Privacy,
+        "a resumable handler reads what it captures, and what it binds itself";
     DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,

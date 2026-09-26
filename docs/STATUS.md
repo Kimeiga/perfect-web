@@ -78,6 +78,17 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: `pw check` passed a handler its build refuses**
+([ADR-0110](DECISIONS/ADR-0110-a-resumable-handler-reads-what-it-captures.md)).
+A resumable handler runs later, in the browser, with what it captured.
+`resumable() => add_to_cart(item.id, ..)` inside an `{#each}` read `item` and
+captured nothing, and checked; `pw emit-handlers` refused it, "`item` is not
+bound here". A handler reads what it captures and what it binds itself now
+(PW5025), a shorthand field `Pick { n: 1, item }` included.
+
+Evidence: [handler-captures.txt](evidence/E10/handler-captures.txt)
+(`just e10-handler-captures`).
+
 **2026-09-26: a timeout is a budget above zero**
 ([ADR-0109](DECISIONS/ADR-0109-a-timeout-is-a-budget-above-zero.md)).
 `timeout 0.seconds` checked, and the resource runtime expires a flight once

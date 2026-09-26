@@ -1402,6 +1402,20 @@ e10-timeouts:
      } > docs/evidence/E10/timeouts.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/timeouts.txt
 
+# ADR-0110: a resumable handler reads what it captures. Its tests, and the
+# mutation controls.
+e10-handler-captures:
+    @{ echo "ADR-0110 - a resumable handler reads what it captures"; echo; \
+       echo "produced by: just e10-handler-captures"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== handler captures (compiler/pw-core/tests/handler_captures.rs)"; echo; \
+       cargo test --locked -p pw-core --test handler_captures 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/handler_capture_mutations.py)"; echo; \
+       python3 scripts/handler_capture_mutations.py; \
+     } > docs/evidence/E10/handler-captures.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/handler-captures.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -134,6 +134,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0107: a cache key names each parameter its entry depends on.
         per_unit.extend(keys_name_what_is_read(&sigs, i, &u.hir));
+        // ADR-0110: a resumable handler reads what it captures.
+        per_unit.extend(handlers_read_their_captures(&sigs, i, &u.hir));
         // ADR-0098: a name is written once where it is declared.
         per_unit.extend(declared_once(&u.hir));
         // ADR-0091: a listener binds its declaration's key.
@@ -1282,6 +1284,101 @@ fn keys_name_what_is_read(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diag
                         replacement: None,
                     }],
                 });
+            }
+        }
+    }
+    out
+}
+
+/// **A resumable handler reads what it captures** (ADR-0110).
+///
+/// A resumable handler runs later, in the browser, with what it captured and
+/// nothing else: its captures are written into the document when the page
+/// renders, and read back when it runs. A name bound where the page renders,
+/// a parameter or an `{#each}` item, is not bound where the handler runs,
+/// unless it is captured. A declaration's name is not a binding, and neither
+/// is what the handler binds itself. Until 2026-09-26 such a handler checked
+/// and `pw emit-handlers` refused it: "`item` is not bound here".
+fn handlers_read_their_captures(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+            continue;
+        };
+        let Some(lexical) = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, id) else {
+            continue;
+        };
+        for lambda in body.walk() {
+            let Expr::Lambda {
+                descriptor: Some(d),
+                body: inner,
+                ..
+            } = body.expr(lambda)
+            else {
+                continue;
+            };
+            if !crate::resume::is_resumable(body, *d) {
+                continue;
+            }
+            let captured: BTreeSet<String> =
+                crate::resume::capture_roots(body, *d).into_keys().collect();
+            let own = crate::resolve::local_bindings_from(body, lambda);
+            let mut reported: BTreeSet<&str> = BTreeSet::new();
+            for e in body.walk_from(*inner) {
+                // A name, and a record's shorthand field, `Pick { n: 1, item }`,
+                // which reads one: each with whether a scope binds it.
+                let reads: Vec<(&str, crate::diagnostics::Span, bool)> = match body.expr(e) {
+                    Expr::Name(n) => {
+                        vec![(n.as_str(), body.expr_span(e), lexical.binder(e).is_some())]
+                    }
+                    Expr::Record { fields, .. } => fields
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, f)| f.value.is_none())
+                        .map(|(i, f)| {
+                            (
+                                f.name.as_str(),
+                                f.span.clone(),
+                                lexical.shorthand(e, i).is_some(),
+                            )
+                        })
+                        .collect(),
+                    _ => continue,
+                };
+                for (n, at, bound) in reads {
+                    if !bound || captured.contains(n) || own.contains(n) || !reported.insert(n) {
+                        continue;
+                    }
+                    out.push(Diagnostic {
+                        code: crate::codes::HANDLER_READS_UNCAPTURED.id,
+                        invariant: crate::codes::HANDLER_READS_UNCAPTURED.invariant,
+                        reason: "handler_reads_uncaptured",
+                        detector: Detector::PatternMatrix,
+                        severity: Severity::Error,
+                        message: format!(
+                            "`{}`'s handler reads `{n}`, which it does not capture",
+                            decl.name
+                        ),
+                        primary_span: at,
+                        related: vec![Related {
+                            span: body.expr_span(*d),
+                            label: "what the handler captures".to_string(),
+                        }],
+                        explanation: Some(format!(
+                            "A resumable handler runs later, in the browser, with what it \
+                         captured and nothing else: its captures are written into the \
+                         document when the page renders, and read back when it runs. `{n}` \
+                         is bound where `{}` renders, so where the handler runs it has no \
+                         value. `pw emit-handlers` refuses the handler; this says so where \
+                         the program is checked.",
+                            decl.name
+                        )),
+                        repairs: vec![Repair {
+                            description: format!("capture it: `resumable(captures = {{ {n} }})`"),
+                            replacement: None,
+                        }],
+                    });
+                }
             }
         }
     }

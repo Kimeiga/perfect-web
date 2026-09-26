@@ -27,12 +27,14 @@ fn refused(view: &str) {
 
 #[test]
 fn a_handler_that_captures_a_function_is_refused() {
-    // A parameter of function type, and a local declared one.
+    // A parameter of function type, and a local declared one. Each handler
+    // captures the `n` it reads too (ADR-0110), so the function is the one
+    // defect.
     refused(
-        "view V(n: Int, f: fn(Int) -> ()) !{} {\n    <button type=\"button\" on:press={resumable(captures = { f }) => f(n)}>Go</button>\n}",
+        "view V(n: Int, f: fn(Int) -> ()) !{} {\n    <button type=\"button\" on:press={resumable(captures = { f, n }) => f(n)}>Go</button>\n}",
     );
     refused(
-        "view V(n: Int) !{} {\n    let f: fn(Int) -> () = go\n    <button type=\"button\" on:press={resumable(captures = { f }) => f(n)}>Go</button>\n}",
+        "view V(n: Int) !{} {\n    let f: fn(Int) -> () = go\n    <button type=\"button\" on:press={resumable(captures = { f, n }) => f(n)}>Go</button>\n}",
     );
     // The data it would have been given, captured, and the function called by name.
     let found = reported(

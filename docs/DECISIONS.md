@@ -784,3 +784,11 @@ statement names is resolved now (PW0021).
 flight once its budget is spent, so the query could never answer. A
 timeout's domain is a duration above zero now (PW0335); a freshness of zero
 is still a promise.
+
+## 2026-09-26: a resumable handler reads what it captures (E10)
+
+[ADR-0110](DECISIONS/ADR-0110-a-resumable-handler-reads-what-it-captures.md):
+`resumable() => add_to_cart(item.id, ..)` inside an `{#each}` checked, and
+`pw emit-handlers` refused it, "`item` is not bound here": `pw check` passed
+a program its build refuses. A handler reads what it captures and what it
+binds itself now (PW5025).
