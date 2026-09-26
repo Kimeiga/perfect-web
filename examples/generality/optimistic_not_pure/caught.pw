@@ -15,7 +15,7 @@ import context.{ current_session }
 
 // Keep the result type correct while deliberately performing external work.
 fn impure_read(cart: domain.Cart) -> domain.Cart {
-    Carts.current(current_session())
+    let _current = Carts.current(current_session())
     cart
 }
 

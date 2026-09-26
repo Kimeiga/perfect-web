@@ -41,6 +41,134 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         optional_used_as_present(hir, &types, body, decl, &at, out);
         unchecked_cast(hir, sigs, &types, body, decl, &at, out);
         handler_matches_event(hir, body, sigs, decl, module, &at, out);
+        results_are_handled(&types, body, decl, &at, out);
+    }
+}
+
+// --- ADR-0099: a failure is handled ------------------------------------------
+
+/// **A `Result` whose value nothing uses** is a failure dropped: the first
+/// `Carts.add(..)` of two, as a statement, failed and the command went on.
+/// The charter's "unhandled ADT variant", one step earlier: neither case of
+/// the value is handled. `?` passes the failure on, `match` handles it, and
+/// a binding that says so, `let _cleared = ..`, discards it by name.
+///
+/// Which values are used: a statement's is not, nor a `for` body's, nor a
+/// body declared `-> ()`'s last. A lambda's body is its result, used by
+/// whoever calls it: a handler's command answer is the runtime's to drop
+/// (KNOWN_LIMITATIONS).
+fn results_are_handled(
+    types: &crate::infer::Types<'_>,
+    body: &Body,
+    decl: &Decl,
+    at: &Span,
+    out: &mut Vec<Diagnostic>,
+) {
+    let returns_unit = decl
+        .ret
+        .as_ref()
+        .is_none_or(|t| matches!(t.written().as_str(), "()" | ""));
+    let mut dropped = Vec::new();
+    unused(body, body.root, !returns_unit, &mut dropped);
+    for e in dropped {
+        let Some(ty) = types.of(body, e) else {
+            continue;
+        };
+        if ty.as_builtin() != Some(crate::resolved::Builtin::Result) {
+            continue;
+        }
+        out.push(Diagnostic {
+            code: codes::RESULT_DROPPED.id,
+            invariant: codes::RESULT_DROPPED.invariant,
+            reason: "result_dropped",
+            detector: Detector::PatternMatrix,
+            severity: Severity::Error,
+            message: format!(
+                "this `{}` is dropped, and its failure with it",
+                ty.display_name()
+            ),
+            primary_span: body.expr_span(e),
+            related: vec![Related {
+                span: at.clone(),
+                label: format!("inside `{}`", decl.name),
+            }],
+            explanation: Some(
+                "A `Result` carries a failure, and a value nothing uses handles neither \
+                 of its cases: the program goes on as though it had succeeded. Until \
+                 2026-09-26 a statement's `Result` was dropped without a word."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: "pass the failure on with `?`, handle it with `match`, or \
+                              discard it by name, `let _ignored = ..`"
+                    .to_string(),
+                replacement: None,
+            }],
+        });
+    }
+}
+
+/// Is `id` the head of a clause whose value is executable code, written as a
+/// statement: `acquire`, or `release(handle)`?
+fn executable_head(body: &Body, id: crate::hir::ExprId) -> bool {
+    let name = match body.expr(id) {
+        Expr::Name(n) => n,
+        Expr::Call { callee, .. } => match body.expr(*callee) {
+            Expr::Name(n) => n,
+            _ => return false,
+        },
+        _ => return false,
+    };
+    crate::policy::domain_of(name) == Some(crate::policy::Domain::Body)
+}
+
+/// The expressions under `id` whose value nothing uses, where `used` says
+/// whether `id`'s own is. A block, an `if` and a `match` pass their value
+/// on; everything else uses what it contains.
+fn unused(body: &Body, id: crate::hir::ExprId, used: bool, out: &mut Vec<crate::hir::ExprId>) {
+    match body.expr(id) {
+        Expr::Block { stmts } => {
+            let last = stmts.len().saturating_sub(1);
+            for (i, s) in stmts.iter().enumerate() {
+                // `acquire { .. }`, `release(h) { .. }`: a block after a clause
+                // whose value is code is that clause's value, which the
+                // platform takes (the handle `acquire` produces).
+                let clause = i > 0 && executable_head(body, stmts[i - 1]);
+                // `return x` is two statements, and `x` is the value returned.
+                let returned =
+                    i > 0 && matches!(body.expr(stmts[i - 1]), Expr::Name(n) if n == "return");
+                unused(body, *s, clause || returned || (used && i == last), out);
+            }
+        }
+        Expr::If { cond, then, els } => {
+            unused(body, *cond, true, out);
+            unused(body, *then, used, out);
+            if let Some(e) = els {
+                unused(body, *e, used, out);
+            }
+        }
+        Expr::Match { scrutinee, arms } => {
+            unused(body, *scrutinee, true, out);
+            for a in arms {
+                unused(body, a.body, used, out);
+            }
+        }
+        Expr::For {
+            iterable, body: b, ..
+        } => {
+            unused(body, *iterable, true, out);
+            unused(body, *b, false, out);
+        }
+        Expr::Lambda { body: b, .. } => unused(body, *b, true, out),
+        other => {
+            let _ = other;
+            if !used {
+                out.push(id);
+            }
+            for c in body.children(id) {
+                unused(body, c, true, out);
+            }
+        }
     }
 }
 

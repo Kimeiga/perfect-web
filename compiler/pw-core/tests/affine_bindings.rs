@@ -74,7 +74,10 @@ fn clean(body: &str) {
     assert!(found.is_empty(), "{body}: {found:#?}");
 }
 
-const INNER: &str = "        let tx = Database.begin()\n        Database.rollback(tx)";
+// The rollback's `Result` is discarded by name: a branch that is a statement
+// uses nothing its last value holds (ADR-0099).
+const INNER: &str =
+    "        let tx = Database.begin()\n        let _rolled_back = Database.rollback(tx)";
 
 #[test]
 fn an_inner_transaction_does_not_end_an_outer_one() {

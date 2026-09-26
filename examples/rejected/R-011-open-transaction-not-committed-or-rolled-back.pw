@@ -37,6 +37,6 @@ command clear_cart() -> Result<(), CartError>
         // ERROR: `tx` is still live on this path.
         return Ok(())
     }
-    Carts.clear(current_session())
+    let _cleared = Carts.clear(current_session())
     tx.commit()
 }

@@ -18,7 +18,7 @@ command settle() -> Result<(), CartError>
 {
     let tx = Database.begin()
     if Carts.is_empty(current_session()) {
-        Database.rollback(tx)
+        let _rolled_back = Database.rollback(tx)
     }
     tx.commit()
 }

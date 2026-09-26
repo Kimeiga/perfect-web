@@ -41,7 +41,7 @@ import context.{ current_session }
 
 // This helper returns the resource value but still performs the forbidden write.
 fn impure_add(cart: domain.Cart, item: MenuItemId, quantity: PositiveInt) -> domain.Cart {
-    Carts.add(current_session(), item, quantity)
+    let _added = Carts.add(current_session(), item, quantity)
     cart
 }
 

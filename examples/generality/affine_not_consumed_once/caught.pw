@@ -29,7 +29,7 @@ command drain_cart() -> Result<(), CartError>
 {
     let tx = Database.begin()
     if Carts.is_empty(current_session()) {
-        Database.rollback(tx)
+        let _rolled_back = Database.rollback(tx)
     } else {
         // No release on this path, and no `return` before the one above.
         return Ok(())

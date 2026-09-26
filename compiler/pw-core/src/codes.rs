@@ -296,6 +296,10 @@ codes! {
     // `g(b = 1, a = 10)` computed `g(1, 10)`.
     NAMED_ARGUMENT = "PW0617" / named_argument / 1, Types,
         "a named argument is given to the parameter of its name, once, after the positional ones";
+    // ADR-0099: a statement's `Result` was discarded, and its failure with
+    // it, until 2026-09-26.
+    RESULT_DROPPED = "PW0618" / result_dropped / 1, Types,
+        "a failure is handled: a `Result` is taken apart, returned with `?`, or discarded by name";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

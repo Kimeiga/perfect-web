@@ -78,6 +78,18 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: failures were dropped, in a fixture that claimed
+to be clean**
+([ADR-0099](DECISIONS/ADR-0099-a-failure-is-handled.md)). A statement's
+`Result` was dropped without a word. Nine fixtures dropped one, and
+`rules/affine/transaction-ended-on-every-path.pw` is `@expect: clean` while
+losing a failed rollback before `return Ok(())` and committing after a
+failed clear. A `Result` nothing uses is refused now (PW0618), and the
+fixtures discard theirs by a name that says so.
+
+Evidence: [results-handled.txt](evidence/E10/results-handled.txt)
+(`just e10-results-handled`).
+
 **Recorded 2026-09-26: authorization is written and not held.** `requires
 SignedIn` on a command is read by no manifest, contract, host or server,
 and its predicates are declared nowhere. The store's `add_to_cart` runs for

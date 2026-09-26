@@ -693,3 +693,11 @@ twice and an attribute given twice each checked, and one of the two was
 dropped: `cache private` then `cache shared` decided by its order whether
 a session's data was refused a shared cache. Each is written once now
 (PW0028), an effect's `impact` excepted.
+
+## 2026-09-26: a failure is handled (E10)
+
+[ADR-0099](DECISIONS/ADR-0099-a-failure-is-handled.md): a statement's
+`Result` was dropped without a word, and nine corpus fixtures dropped one, a
+rollback's or a clear's, one of them `@expect: clean`. A `Result` whose value
+nothing uses is refused (PW0618): `?` returns it, `match` handles it, and a
+binding that says so discards it by name.

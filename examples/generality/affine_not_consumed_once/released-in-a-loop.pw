@@ -18,7 +18,7 @@ command settle_all(sessions: List<String>) -> Result<(), CartError>
 {
     let tx = Database.begin()
     for s in sessions {
-        Database.rollback(tx)
+        let _rolled_back = Database.rollback(tx)
     }
     tx.commit()
 }
