@@ -8,13 +8,17 @@ module generality.cache_branch
 
 import store.queries
 import cart.queries
+// 2026-09-25 (ADR-0047): the session is read with `current_session()`, as
+// the store reads it. This file wrote a bare `session` that nothing
+// declared, and it checked until a name used as a value had to resolve.
+import context.{ current_session }
 import domain.{ StoreId }
 
 page StorePage(id: StoreId, signed_in: Bool) {
     cache shared
 
     let store = query Store(id)
-    let cart = query Cart(session)
+    let cart = query Cart(current_session())
     let shown = if signed_in { cart } else { store }
 
     view { <main><p>{shown}</p></main> }

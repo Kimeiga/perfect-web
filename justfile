@@ -606,6 +606,28 @@ e10-affine:
      } > docs/evidence/E10/affine.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
 
+# ADR-0047: every name resolves, in lexical scope (PW0021). The name tests, the
+# corpus that must stay clean, and the mutation controls.
+e10-names:
+    @cargo build --quiet --locked -p pw-cli
+    @{ echo "ADR-0047 - every name resolves, in lexical scope"; echo; \
+       echo "produced by: just e10-names"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the name tests (compiler/pw-core/tests/every_name_resolves.rs)"; echo; \
+       cargo test --locked -p pw-core --test every_name_resolves 2>&1 | grep -E '^test result'; \
+       echo; echo "== what must stay clean: errors reported"; echo; \
+       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       echo; echo "== mutation controls (scripts/names_mutations.py)"; echo; \
+       python3 scripts/names_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: that derived is pure, or that a clause's words are in its"; \
+       echo "domain. Both are left to the analyses that read them."; \
+     } > docs/evidence/E10/names.txt
+    @grep -E "^(accepted corpus|store|kiokun):|mutants killed" docs/evidence/E10/names.txt
+
 # ADR-0044: pure computation compiled to JavaScript modules, held to its Wasm
 # component under Node, with the mutation controls. Needs `node`.
 #

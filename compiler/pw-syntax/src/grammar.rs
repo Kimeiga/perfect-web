@@ -171,7 +171,7 @@ const EXPR_KEYWORDS: &[&str] = &[
     "if", "elif", "else", "match", "let", "for", "fn", "return", "true", "false",
 ];
 
-const STMT_CLAUSE_KEYWORDS: &[&str] =
+pub const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
 pub const POLICY_KEYWORDS: &[&str] = &[
@@ -885,6 +885,15 @@ impl<'a> P<'a> {
                 if self.at_kw("let") {
                     return self.let_stmt();
                 }
+                // **`derived e`: a pure value computed from other values**
+                // (charter §7.5). A bare name until 2026-09-25, so `let total =
+                // derived widths |> List.sum()` parsed as `let total = derived`
+                // and then a statement whose value was discarded: `total` named
+                // nothing, and the sum was computed and thrown away. The name
+                // check found it (ADR-0047).
+                if self.at_kw("derived") {
+                    return self.derived_expr();
+                }
                 if STMT_KEYWORDS.contains(&self.cur_text()) && !self.at_ordinary_call() {
                     return self.keyword_stmt();
                 }
@@ -1416,6 +1425,14 @@ impl<'a> P<'a> {
                 if self.at(Kind::RParen) || self.at_eof() {
                     break;
                 }
+                // A named argument, as in a call: `observe intersection(self,
+                // threshold = 0.1)`. Until 2026-09-25 this list read `threshold
+                // = 0.1` as an assignment to a name nothing declares (ADR-0047).
+                if self.at(Kind::Ident) && (self.nth_is(1, Kind::Eq) || self.nth_is(1, Kind::Colon))
+                {
+                    self.bump();
+                    self.bump();
+                }
                 self.expr(0);
                 if !self.eat(Kind::Comma) {
                     break;
@@ -1445,13 +1462,24 @@ impl<'a> P<'a> {
         self.finish();
     }
 
+    /// `derived e`: the keyword and the expression it computes, one
+    /// statement whose initialiser is the value (ADR-0047).
+    fn derived_expr(&mut self) {
+        self.start(K::LetStmt);
+        self.bump(); // derived
+        self.expr(0);
+        self.finish();
+    }
+
     /// **A statement keyword cannot name a value.** `let query = ..` parsed,
     /// and then every use of `query` in an expression parsed as a `query ..`
     /// statement: the program checked, because the checker reads such a
     /// statement as a value of no known type, and meant something else. Found
     /// 2026-09-25, writing kiokun's ranking in Pleris.
     fn not_a_statement_keyword(&mut self, what: &str) {
-        if self.at(Kind::Ident) && STMT_KEYWORDS.contains(&self.cur_text()) {
+        if self.at(Kind::Ident)
+            && (STMT_KEYWORDS.contains(&self.cur_text()) || self.cur_text() == "derived")
+        {
             let word = self.cur_text().to_string();
             self.error(
                 "PW0013",

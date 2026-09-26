@@ -255,9 +255,17 @@ pub fn domain_of(head: &str) -> Option<Domain> {
 
         // --- resource lifecycle and painting: executable blocks
         "acquire" | "release" | "draw" => Domain::Body,
+        // The hooks of an `unsafe.lifecycle { .. }` escape hatch (charter §7.5):
+        // executable blocks, written inside the statement's block.
+        "on_mount" | "on_unmount" => Domain::Body,
         "affine" => Domain::Flag,
         "intrinsic_height" => Domain::Length,
         "revision" => Domain::Word(&["content_hash"]),
+        // Inside an `animate` block: the user preference the animation yields
+        // to (charter §7.5A). A statement clause the grammar reads after the
+        // keyframes, given its vocabulary here so its value is a word of this
+        // domain and not a name to resolve (ADR-0047).
+        "respects" => Domain::Word(&["prefers_reduced_motion"]),
 
         // --- the audit record on an escape hatch
         "because" => Domain::Str,
@@ -377,6 +385,9 @@ mod tests {
             "inputs",
             "isolated",
             "tenant",
+            "respects",
+            "on_mount",
+            "on_unmount",
         ];
         let heads = [
             "cache",
@@ -431,9 +442,12 @@ mod tests {
             "acquire",
             "release",
             "draw",
+            "on_mount",
+            "on_unmount",
             "affine",
             "intrinsic_height",
             "revision",
+            "respects",
             "because",
             "attributes_forced_layout_to",
         ];

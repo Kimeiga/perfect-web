@@ -54,8 +54,10 @@ done:
      re-carried (KNOWN_LIMITATIONS);
    - the event as a handler parameter, for inputs and forms.
 
-The first follow-up in the checker is unchanged: member existence, the next
-value relation after E9-V.
+**2026-09-25, "ok fix all the known gaps":** the six gaps named that day, in
+order. Every name resolves (ADR-0047, done). Next: member existence, the next
+value relation after E9-V; then string escapes, the standard library, the
+backend's control flow and function values, and handlers that compute.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

@@ -255,6 +255,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     for (i, u) in units.iter().enumerate() {
         let per_unit = resolution.entry(i).or_default();
         per_unit.extend(unresolved_uses(&workspace, i, &u.hir));
+        // ADR-0047: a name used as a value resolves too, in lexical scope.
+        per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));
         // Every effect row, against the declarations. Reported beside the
         // resolution failures because that is what it is: a name in a row that
         // resolves to nothing is the same class of mistake as a name in an

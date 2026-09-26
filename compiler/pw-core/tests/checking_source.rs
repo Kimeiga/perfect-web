@@ -255,14 +255,18 @@ fn a_nullary_constructor_is_not_read_as_a_binding() {
 fn a_match_whose_scrutinee_type_is_unknown_is_not_reported() {
     // The rule that keeps this honest: no guessing. `x` has no declared type,
     // so nothing is claimed about it — silence, not a wildcard-shaped error.
+    //
+    // `x` was a name nothing declared until 2026-09-25. It is refused now
+    // (PW0021, ADR-0047), so the unknown type comes from a parameter written
+    // without one, which is what the rule is about.
     let src = "module m\n\
                type State = | Draft | Sent\n\
-               fn f() -> Int !{} {\n    match x {\n        Draft => 1,\n    }\n}\n";
+               fn f(x) -> Int !{} {\n    match x {\n        Draft => 1,\n    }\n}\n";
     let diags = &check_sources(&[("t.pw".to_string(), src.to_string())])[0].1;
     assert!(diags.is_empty(), "must not guess a type: {diags:?}");
 
     // Control: give it a type and the same match is reported.
-    let typed = src.replace("fn f()", "fn f(x: State)");
+    let typed = src.replace("fn f(x)", "fn f(x: State)");
     let now = &check_sources(&[("t.pw".to_string(), typed)])[0].1;
     assert_eq!(now.len(), 1, "with a declared type it must be caught");
 }

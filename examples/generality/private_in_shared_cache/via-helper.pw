@@ -9,6 +9,10 @@ module generality.cache_helper
 
 import store.queries
 import cart.queries
+// 2026-09-25 (ADR-0047): the session is read with `current_session()`, as
+// the store reads it. This file wrote a bare `session` that nothing
+// declared, and it checked until a name used as a value had to resolve.
+import context.{ current_session }
 import capability.{ Session, SessionId }
 import domain.{ Cart, StoreId }
 
@@ -17,7 +21,7 @@ fn summarize(c: Cart) -> Session<SessionId> !{} { todo }
 page StorePage(id: StoreId) {
     cache shared
 
-    let cart = query Cart(session)
+    let cart = query Cart(current_session())
     let line = summarize(cart)
 
     view { <main><p>Items: {line}</p></main> }

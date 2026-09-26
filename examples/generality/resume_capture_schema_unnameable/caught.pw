@@ -16,6 +16,9 @@
 // `helper` with a return type made the witness go silent, which is what
 // surfaced it. An anonymous record is the shape the invariant is actually
 // about, and it depends on no resolution failure.
+//
+// The binding was named `derived` until 2026-09-25, when `derived` became the
+// keyword of a computed value (ADR-0047) and could no longer name one.
 
 module generality.schema_unnameable
 
@@ -24,8 +27,8 @@ import domain.{ StoreId }
 fn refresh(id: StoreId) -> () !{} { todo }
 
 view Panel(store_id: StoreId) !{} {
-    let derived = { id: store_id }
-    <button on:press={resumable(captures = { derived }) => refresh(derived)}>
+    let summary = { id: store_id }
+    <button on:press={resumable(captures = { summary }) => refresh(summary)}>
         Refresh
     </button>
 }

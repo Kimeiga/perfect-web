@@ -114,10 +114,13 @@ inlined. Still refused by name:
   or an interpolated attribute renders on the server; the dev server's patch
   generator is written per operation, and the store uses neither. kiokun's
   pages are static.
-- **A name that resolves to nothing is refused only in a call.**
-  `{nothing.here}` in a template, or `let x = nothing`, passes `pw check`. The
-  resolver checks calls and policy terms (`check.rs`), and a value relation
-  reads such a name as unknown rather than refusing it.
+- **A clause's words are the clause's** (ADR-0047). Every name resolves in
+  lexical scope, but `scope application`'s `application`, or `load`'s
+  `on_first_interaction`, is a word of its clause and not a name. A word
+  outside its clause's closed set is left to the analysis that reads the
+  clause, and most clauses written inside a block have none.
+- **`derived e` is parsed, not checked** (ADR-0047). It is one expression,
+  and the charter calls it pure; no rule refuses an effect inside it.
 - **The standard library is small** (ADR-0040). `List` has `length`, `get`,
   `take`, `concat`, `map`, `filter`, `fold`, `any`, `all`, `find`, `sort_by`
   and `group_by` (by a `String` key, adjacent runs); `String` has `length`, `codepoints`, `from_codepoints`,

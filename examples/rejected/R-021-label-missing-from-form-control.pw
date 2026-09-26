@@ -13,6 +13,11 @@
 
 module checkout.address_form
 
+// 2026-09-25 (ADR-0047): the form submitted to `save_address`, which nothing
+// declared. A name used as a value must resolve now, and a fixture about a
+// missing label must not also be about a missing declaration.
+fn save_address() -> () !{} { todo }
+
 view AddressForm() !{} {
     <form on:submit={save_address}>
         // ERROR: no label associated with this control.

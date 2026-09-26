@@ -281,3 +281,10 @@ Every compiled kiokun query was measured per call on the whole shard:
 instructions, peak linear memory, and instantiation beside the call.
 Invocation regions stay the strategy; the other six the charter names are
 judged against the numbers. Per-call instantiation, not memory, dominates.
+
+[ADR-0047](DECISIONS/ADR-0047-every-name-resolves.md): every name resolves,
+in lexical scope, not only a call's. A `let` binds after itself, a pattern
+for its own body, and a template's blocks for their children. Clauses
+written as statements are read by position from the policy table. The walk
+found `derived` parsed as a bare name, so A-016 and A-018 computed nothing,
+and a statement's named argument read as an assignment.

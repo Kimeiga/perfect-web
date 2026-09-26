@@ -70,8 +70,8 @@ fn a_session_label_crosses_two_module_boundaries() {
         ),
         (
             "page.pw",
-            "module store.page\n\nimport domain.{ Cart }\nimport cart.queries\n\n\
-             page P() {\n    cache shared\n    let cart = query Cart(s)\n    \
+            "module store.page\n\nimport domain.{ Cart, SessionId }\nimport cart.queries\n\n\
+             page P(s: SessionId) {\n    cache shared\n    let cart = query Cart(s)\n    \
              view { <main><p>{cart.line_count}</p></main> }\n}\n",
         ),
     ]);
@@ -194,8 +194,8 @@ fn the_same_shapes_across_files_are_clean_when_they_are_correct() {
         // The private value, in a PRIVATE cache.
         (
             "page.pw",
-            "module store.page\n\nimport domain.{ Cart }\nimport cart.queries\n\n\
-             page P() {\n    cache private\n    let cart = query Cart(s)\n    \
+            "module store.page\n\nimport domain.{ Cart, SessionId }\nimport cart.queries\n\n\
+             page P(s: SessionId) {\n    cache private\n    let cart = query Cart(s)\n    \
              view { <main><p>{cart.line_count}</p></main> }\n}\n",
         ),
         (

@@ -78,6 +78,22 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-25: a name used as a value was never resolved**
+([ADR-0047](DECISIONS/ADR-0047-every-name-resolves.md)). `PW0021` examined
+calls and qualified paths only, so `let x = nothing` and `{nothing.here}` in a
+template passed `pw check`. Every name is now resolved in lexical scope. The
+walk found two parse defects in accepted code:
+- `derived`, the charter's computed value (§7.5), was a bare name. So
+  `let total = derived widths |> List.sum()` parsed as `let total = derived`
+  and a discarded statement: A-016 and A-018 computed nothing into `total`,
+  `max` and `columns`. It is one expression now.
+- `observe intersection(self, threshold = 0.1)` read its named argument as an
+  assignment to an undeclared name.
+
+It also found six fixtures reading a session that nothing declared, and one
+form submitting to an undeclared handler. Each is corrected, and each is
+caught or clean exactly as before.
+
 **Correction, 2026-09-25: `pw check` did not type an operator's operands**
 ([ADR-0043](DECISIONS/ADR-0043-operands-are-typed.md)). `1 == "a"` checked,
 and so did two accepted fixtures that divide a `Float` by an `Int`: A-017 and
@@ -118,6 +134,10 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0047: clauses written as statements (`scope component`,
+  `release(h) { .. }`, `view { .. }`) are recognised by position, from the
+  policy table, rather than re-parsed as policies; `derived` is reserved and
+  cannot name a binding (PW0013).
 - ADR-0046: whether the next performance work is instance reuse, which the
   measurements favour, rather than a memory strategy.
 - ADR-0045: a release in a loop is refused even when the loop runs once; the
