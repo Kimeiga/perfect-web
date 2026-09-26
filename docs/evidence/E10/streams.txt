@@ -1,0 +1,20 @@
+ADR-0075 - a stream and a mounted resource do not build
+
+produced by: just e10-streams
+commit: 15d261ca7a5ede7cb0401a47b819f4bdd3bf09b7
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== streams and resources (compiler/pw-core/tests/streams_and_resources.rs)
+
+test a_mounted_resource_does_not_build ... ok
+test a_stream_does_not_build ... ok
+test a_static_resource_attribute_is_an_attribute ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+== mutation controls (scripts/stream_mutations.py)
+
+baseline: 3 passed, 0 failed
+a stream lowers as an element: KILLED (1 of 3 tests fail)
+a mounted resource lowers as an element: KILLED (1 of 3 tests fail)
+a static `resource` attribute mounts a resource: KILLED (1 of 3 tests fail)
+3 of 3 mutants killed
