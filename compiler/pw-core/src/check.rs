@@ -2543,6 +2543,7 @@ fn privacy_and_placement(
                 name: "cache".to_string(),
                 value: cache_value,
                 roots: Vec::new(),
+                keys: Vec::new(),
                 span: cache_span,
             };
             let needed = label.required_cache_partitions();

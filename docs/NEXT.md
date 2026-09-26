@@ -131,11 +131,8 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
 **Found 2026-09-26 probing policy clauses, taken up before the list above.**
 ~~A call to a view, a page, an event or an effect~~, refused (ADR-0087).
 Next, in order:
-1. **a clause's keys.** `depends_on`, `invalidates` and `emits` name a
-   declaration and pass it terms, and nothing resolves, counts or types
-   them: `invalidates Cart(nosuch)` and `invalidates Cart(item)` check. The
-   store's own `emits CartChanged(current_session())` gives a
-   `Session<SessionId>` to an event declared with a `SessionId`;
+1. ~~**a clause's keys**~~, done (ADR-0088), which found the store's own
+   `emits` ill-typed and five fixtures passing the wrong key;
 2. **a listener's key.** What each argument of `invalidates_on` binds, and
    the materializer's matching, which reads an event's arguments as a set:
    `InventoryChanged(store 47, item 3)` is deferred forever, and store 47's

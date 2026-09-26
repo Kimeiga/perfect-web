@@ -19,7 +19,7 @@
 module Events
 
 import domain.{ StoreId, MenuItemId }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
 event StoreChanged(store: StoreId)
 
@@ -30,7 +30,12 @@ event InventoryChanged(store: StoreId, item: MenuItemId)
 event PromotionChanged(store: StoreId)
 
 // Private by construction: a cart belongs to one session, so an event about it
-// carries a `SessionId` and can never be a reason to regenerate anything in a
+// carries the session and can never be a reason to regenerate anything in a
 // shared partition. Charter §14 M6 gate item 4 is about the storage; this is
 // the same rule one step earlier, at the event.
-event CartChanged(session: SessionId)
+//
+// It carries the session the cart is keyed by, `Session<SessionId>`. It
+// declared a `SessionId`, a different type, until 2026-09-26, and the store's
+// `emits CartChanged(current_session())` gave it the session: nothing related
+// a clause's key to what it names until ADR-0088.
+event CartChanged(session: Session<SessionId>)

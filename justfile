@@ -1085,6 +1085,20 @@ e10-call-names:
      } > docs/evidence/E10/call-names.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/call-names.txt
 
+# ADR-0088: a clause names a declaration of its kind, and gives it its key.
+# Its tests, and the mutation controls.
+e10-clause-keys:
+    @{ echo "ADR-0088 - a clause names a declaration of its kind, and gives it its key"; echo; \
+       echo "produced by: just e10-clause-keys"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== clause keys (compiler/pw-core/tests/clause_keys.rs)"; echo; \
+       cargo test --locked -p pw-core --test clause_keys 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/clause_key_mutations.py)"; echo; \
+       python3 scripts/clause_key_mutations.py; \
+     } > docs/evidence/E10/clause-keys.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/clause-keys.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

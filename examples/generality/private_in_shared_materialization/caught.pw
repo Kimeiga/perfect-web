@@ -7,10 +7,10 @@ module generality.materialize_indirect_private
 
 import Resources.{ Cart }
 import Events.{ CartChanged }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
 // Honest about itself: private data, private entry. Nothing wrong here.
-materialize CartSummary(session: SessionId) {
+materialize CartSummary(session: Session<SessionId>) {
     placement      origin
     partition      private
     depends_on     Cart(session)
@@ -23,7 +23,7 @@ materialize CartSummary(session: SessionId) {
 // And this one pulls the same session-scoped resource into a SHARED entry.
 // The corpus shape is a fragment beside a page; this is a fragment beside a
 // fragment, in the same file, where the private one looks like precedent.
-materialize PublicSummary(session: SessionId) {
+materialize PublicSummary(session: Session<SessionId>) {
     placement      edge
     partition      public
     depends_on     Cart(session)

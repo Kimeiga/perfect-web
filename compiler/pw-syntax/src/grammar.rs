@@ -2442,6 +2442,41 @@ pub fn parse_expr(src: &str) -> Parse {
     }
 }
 
+/// **Parse expressions separated by commas, standalone.**
+///
+/// A clause that names declarations and passes each its key:
+/// `depends_on Store(id), Menu(id)`. The same expression grammar as
+/// [`parse_expr`]; each expression is a child of the root, in order. What
+/// each one must be — a name, or a name applied to its key — is the policy's
+/// question, not the grammar's.
+pub fn parse_expr_list(src: &str) -> Parse {
+    let mut p = P::new(src);
+    p.b.start(K::SourceFile);
+    while !p.at_eof() {
+        let before = p.pos;
+        p.expr(0);
+        if !p.eat(Kind::Comma) || p.pos == before {
+            break;
+        }
+    }
+    while !p.at_eof() {
+        p.fuel += 1;
+        if p.fuel > 200_000 {
+            p.error("PW0099", "parser made no progress");
+            break;
+        }
+        p.start(K::ErrorExpr);
+        p.error("PW0103", "a clause's values are separated by commas");
+        p.bump();
+        p.finish();
+    }
+    p.b.finish_node();
+    Parse {
+        green: SyntaxNode::new_root(p.b.finish()),
+        errors: p.errors,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

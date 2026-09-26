@@ -13,7 +13,7 @@ single-declaration rule can see and `PW5001` does not.
 | dimension | file | why it is relevant |
 |---|---|---|
 | direct | `caught.pw` | two fragments in one file, one honest and one not — the private neighbour makes the shared one look like precedent |
-| cross-module | `cross-module.pw` | the session label is declared in another module, so the fragment's own text contains nothing marked private |
+| cross-module | `cross-module.pw` | the session label is declared in another module, so nothing in the fragment's own file is declared `session` or `private` |
 | `private` not `session` | `user-scoped.pw` | the other restricted visibility; a rule matching the word `session` would miss it |
 | partition, not visibility | `private-cache.pw` | the dependency declares no visibility and asks for `cache private`; the restriction is in the caching policy rather than the label |
 | valid neighbour | `neighbour.pw` | the same two fragments, both `partition private` — a rule reacting to the DEPENDENCY alone would catch this |

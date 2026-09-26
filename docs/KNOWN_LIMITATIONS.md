@@ -24,8 +24,6 @@ agreement:
   `Empty`, is typed where one visible type has it. A case with a payload
   written alone, `Circle(3)`, is PW0021, naming `Shape.Circle(..)` (ruling
   needed). Until 2026-09-26 no case had a type, and `Shape.Bogus(1)` passed.
-- **Named-argument calls** are Undecided: a signature does not carry parameter
-  names. None occurs in the corpus.
 - **What the value relations still leave undecided** since ADR-0065, which
   typed a value that holds at every type (`None`, `[]`, `todo`, ..): 1 of the
   store's relations, 1 of kiokun's, 18 of the accepted corpus's. Each is its
@@ -55,8 +53,6 @@ agreement:
 - **The unit value `()` lowers to `Expr::Error`.** Its type is therefore
   unknown. This is harmless to the relations, which never guess, but it is a
   lowering gap.
-- **`g(a)` followed by `()` on the next line parses as `g(a)()`.** The language
-  has no statement terminator; nothing in the corpus depends on the difference.
 
 A scope/resource policy is now attached to the resolved type rather than its
 spelling, preserving the existing type-level policy. This is not a per-value
@@ -283,6 +279,15 @@ awaited in order. What remains:
   `crate::lexical`. They differ in one rule: the name check binds any keyword
   statement's first word (`query Store(..)`'s `Store` too), to keep a
   modifier quiet.
+- **A clause's key is checked for names, count and types, not labels**
+  (ADR-0088). A secret passed in `emits` or `invalidates` reaches the graph
+  unlabelled, and what a key performs (`current_session()`'s
+  `session.read`) is not the declaration's (ruling needed).
+- **`invalidates_on` keeps its text** (ADR-0088). What each of its
+  arguments binds is not settled. The materializer matches an event's
+  values against an entry's key as a set, so `InventoryChanged(store 47,
+  item 3)` is deferred forever, and store 47's menu is never invalidated
+  (NEXT).
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.

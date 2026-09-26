@@ -78,6 +78,31 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a clause's key was never checked, and the
+store's own was ill-typed**
+([ADR-0088](DECISIONS/ADR-0088-a-clause-names-a-declaration-and-gives-it-its-key.md)).
+`depends_on`, `invalidates` and `emits` name a declaration and pass it
+values, and the values were text. The graph drew an edge to whatever a name
+found, and nothing resolved, counted or typed a key. `invalidates
+Cart(nosuch)`, `invalidates Cart(item)` (a menu item where `Cart` is keyed by
+a session), `invalidates CartChanged(..)` (an event) and `emits Cart(..)` (a
+resource) all checked. Nine keys in six files had the wrong type:
+- the store's `emits CartChanged(current_session())` gave a
+  `Session<SessionId>` to an event declared with a `SessionId`;
+- R-045 and its rule twin passed a store id to `Cart`;
+- three witnesses keyed a fragment by a `SessionId` and passed it to `Cart`.
+
+Each is corrected, and the event carries the session now. A clause names a
+declaration of its kind (PW5103), and its key's arguments are terms,
+resolved and related to what it names (PW0021, PW0604, PW0605, PW0617).
+Found on the way: an optimistic clause written with extra spaces put every
+diagnostic inside it on the wrong columns. `invalidates_on` is next: what
+its arguments bind, and the materializer's matching, which never
+invalidates store 47's menu when its inventory changes (NEXT).
+
+Evidence: [clause-keys.txt](evidence/E10/clause-keys.txt)
+(`just e10-clause-keys`).
+
 **2026-09-26: a call names a term**
 ([ADR-0087](DECISIONS/ADR-0087-a-call-names-a-term.md)). A call to a view,
 a page, an event or an effect checked: `let e = CartChanged(s, 3)`,

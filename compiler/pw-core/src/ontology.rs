@@ -1125,6 +1125,7 @@ mod tests {
                 name: "capability".into(),
                 value: "database.read<T>".into(),
                 roots: Vec::new(),
+                keys: Vec::new(),
                 span: 0..0,
             }],
             ..bare()
@@ -1139,6 +1140,7 @@ mod tests {
                 name: "capability".into(),
                 value: "none".into(),
                 roots: Vec::new(),
+                keys: Vec::new(),
                 span: 0..0,
             }],
             ..bare()

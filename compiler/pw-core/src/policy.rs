@@ -66,9 +66,15 @@ pub enum Domain {
     ParamRef,
     /// A declared resource, with its key arguments: `depends_on Menu(id)`.
     ResourceRef,
-    /// A declared event, with key arguments and optionally typed binders:
-    /// `invalidates_on InventoryChanged(id, _item: MenuItemId)`.
+    /// A declared event and the values it carries: `emits
+    /// CartChanged(current_session())`. Each value is a term, evaluated where
+    /// the declaration runs (ADR-0088).
     EventRef,
+    /// A declared event a declaration listens for, and what each of its
+    /// values must be: `invalidates_on InventoryChanged(id, _item:
+    /// MenuItemId)`. Not an `EventRef`: nothing is evaluated, and what each
+    /// argument binds is not settled (docs/NEXT.md).
+    Listener,
     /// A predicate over the caller: `requires SignedIn, OwnsOrder(order)`.
     PredicateRef,
     /// **An optimistic transition.** `optimistic Cart(current_session()) as
@@ -208,7 +214,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // --- the dependency graph
         "depends_on" => Domain::ResourceRef,
         "invalidates" => Domain::ResourceRef,
-        "invalidates_on" => Domain::EventRef,
+        "invalidates_on" => Domain::Listener,
         "emits" => Domain::EventRef,
 
         // --- authority and placement
@@ -315,9 +321,24 @@ pub fn carries_terms(head: &str) -> bool {
             | Some(Domain::Body)
             | Some(Domain::ResourceRef)
             | Some(Domain::EventRef)
+            | Some(Domain::Listener)
             | Some(Domain::PredicateRef)
             | Some(Domain::LabelCtor)
     )
+}
+
+/// **A clause that names a declaration and passes it its key** (ADR-0088):
+/// the namespace its names are looked up in, and the kinds of declaration
+/// it may name. `invalidates Cart(current_session())` names a resource, and
+/// `emits CartChanged(current_session())` an event. Each key is a term.
+pub fn keyed(head: &str) -> Option<(crate::resolve::Namespace, &'static [crate::hir::DeclKind])> {
+    use crate::hir::DeclKind as K;
+    use crate::resolve::Namespace;
+    match domain_of(head)? {
+        Domain::ResourceRef => Some((Namespace::Term, &[K::Query, K::Subscription, K::Resource])),
+        Domain::EventRef => Some((Namespace::Event, &[K::Event])),
+        _ => None,
+    }
 }
 
 /// The operator a spelling names, within a head's domain.

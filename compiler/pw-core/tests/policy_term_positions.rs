@@ -114,7 +114,8 @@ fn term_positions() -> BTreeSet<(String, String)> {
 ///
 /// ```text
 /// ResourceRef   depends_on, invalidates   names a DECLARATION, keys are terms
-/// EventRef      emits, invalidates_on     names a DECLARATION, keys are terms
+/// EventRef      emits                     names a DECLARATION, keys are terms
+/// Listener      invalidates_on            names a DECLARATION, keys unsettled
 /// PredicateRef  requires                  names a predicate, args are terms
 /// Term          optimistic, rollback      IS a term, all the way down
 /// ```
@@ -122,15 +123,12 @@ fn term_positions() -> BTreeSet<(String, String)> {
 fn the_corpus_writes_exactly_these_terms_in_policy_position() {
     let found = term_positions();
     let expected: BTreeSet<(String, String)> = [
-        ("depends_on", "Cart(session)"),
-        ("depends_on", "Draft(session)"),
-        ("depends_on", "Menu(id)"),
-        ("depends_on", "Menu(id), Cart(id)"),
-        ("depends_on", "Orders(consumer)"),
-        ("depends_on", "Personalised(session)"),
-        ("depends_on", "Store(id), Menu(id)"),
-        ("depends_on", "Summary(session)"),
-        ("emits", "CartChanged(current_session())"),
+        // `depends_on`, `invalidates` and `emits` left this list on
+        // 2026-09-26: each names a declaration of its kind and passes it a key
+        // whose arguments are terms, resolved, counted and typed (ADR-0088).
+        // One of them, `Menu(id), Cart(id)`, passed a store where `Cart` is
+        // keyed by a session, and the store's own `emits` gave its event a
+        // session where the event declared a session id.
         // `privacy User(consumer)` on `A-011`, and `privacy Public` on
         // `A-013`'s page. Both were bare names in the executable body until UI
         // and data-operation declarations began parsing their policies inside
@@ -142,8 +140,6 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         // which is the list doing its job, not a new defect. `privacy` is a
         // `LabelCtor` and `Public` is a nullary one.
         ("privacy", "Public"),
-        ("invalidates", "Cart(current_session())"),
-        ("invalidates", "Order(order)"),
         ("invalidates_on", "CartChanged(session)"),
         ("invalidates_on", "MenuChanged(id)"),
         (

@@ -856,6 +856,73 @@ pub fn check(hir: &Hir, g: &Graph, out: &mut Vec<Diagnostic>) {
             }
         }
 
+        // 1b. A clause that names a declaration of another kind (ADR-0088).
+        //
+        // `invalidates CartChanged(..)` resolved to the event, and `emits
+        // Cart(..)` to the resource, and each was an edge like any other.
+        for (policy, kind, what, wants_resource) in [
+            ("depends_on", EdgeKind::Reads, "depends on", true),
+            (
+                "invalidates_on",
+                EdgeKind::InvalidatedBy,
+                "is invalidated by",
+                false,
+            ),
+            ("emits", EdgeKind::Emits, "emits", false),
+            ("invalidates", EdgeKind::Invalidates, "invalidates", true),
+        ] {
+            let Some(p) = decl.policy(policy) else {
+                continue;
+            };
+            let wanted = if wants_resource {
+                "a resource"
+            } else {
+                "an event"
+            };
+            for e in g.edges.iter().filter(|e| e.from == path && e.kind == kind) {
+                let Some(node) = g.node(&e.to) else {
+                    continue;
+                };
+                let is = match &node.kind {
+                    NodeKind::Resource { .. } if wants_resource => continue,
+                    NodeKind::Event if !wants_resource => continue,
+                    NodeKind::Resource { .. } => "a resource",
+                    NodeKind::Event => "an event",
+                    NodeKind::Materialization { .. } => "a materialization",
+                    NodeKind::Command => "a command",
+                    NodeKind::Page => "a page",
+                };
+                out.push(Diagnostic {
+                    code: codes::CLAUSE_NAMES_ANOTHER_KIND.id,
+                    invariant: codes::CLAUSE_NAMES_ANOTHER_KIND.invariant,
+                    reason: "clause_names_another_kind",
+                    detector: Detector::ResourceGraph,
+                    severity: Severity::Error,
+                    message: format!(
+                        "`{}` {what} `{}`, which is {is}, not {wanted}",
+                        decl.name, node.name
+                    ),
+                    primary_span: p.span.clone(),
+                    related: vec![Related {
+                        span: at.clone(),
+                        label: format!("`{}` is the node with the edge", decl.name),
+                    }],
+                    explanation: Some(format!(
+                        "`{policy}` names {wanted}. A command invalidates a resource's \
+                         entries and emits events; a resource or a materialization \
+                         depends on resources and listens for events. The graph looked \
+                         `{}` up wherever a name might be until 2026-09-26, and drew \
+                         the edge to whatever it found.",
+                        node.name
+                    )),
+                    repairs: vec![Repair {
+                        description: format!("name {wanted} here"),
+                        replacement: None,
+                    }],
+                });
+            }
+        }
+
         // 2 and 3 are about materializations whose entry is SHARED.
         let Some(Node {
             kind:

@@ -6,9 +6,9 @@ module generality.materialize_private_ok
 
 import Resources.{ Cart }
 import Events.{ CartChanged }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
-materialize CartSummary(session: SessionId) {
+materialize CartSummary(session: Session<SessionId>) {
     placement      origin
     partition      private
     depends_on     Cart(session)
@@ -18,7 +18,7 @@ materialize CartSummary(session: SessionId) {
     fallback       last_known_good
 }
 
-materialize CartBadge(session: SessionId) {
+materialize CartBadge(session: Session<SessionId>) {
     placement      origin
     partition      private
     depends_on     Cart(session)

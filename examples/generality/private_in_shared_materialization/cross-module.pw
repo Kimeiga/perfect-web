@@ -10,9 +10,9 @@ module generality.materialize_cross_module
 
 import Resources.{ Cart }
 import Events.{ CartChanged }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
-materialize AccountPanel(session: SessionId) {
+materialize AccountPanel(session: Session<SessionId>) {
     placement      edge
     partition      public
     depends_on     Cart(session)

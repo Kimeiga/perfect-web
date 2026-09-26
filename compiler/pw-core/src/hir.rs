@@ -334,7 +334,25 @@ pub struct Policy {
     /// declaration's effect row must not absorb them. Reachable-from-root would
     /// have given the second for free along with the first.
     pub roots: Vec<TermRoot>,
+    /// **The declarations this clause names, each with its key** (ADR-0088):
+    /// `depends_on Store(id), Menu(id)` names two. Only a clause
+    /// `crate::policy::keyed` describes has any. Each key's arguments are
+    /// also roots, in the `Key` context: they are terms, and the name is not.
+    pub keys: Vec<ClauseKey>,
     pub span: Span,
+}
+
+/// **A declaration a clause names, and its key** (ADR-0088):
+/// `Cart(current_session())` in `invalidates Cart(current_session())`. The
+/// name is looked up by the clause's kind, never as a term; the arguments are
+/// terms. A name written alone has no arguments.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClauseKey {
+    pub name: String,
+    pub name_span: Span,
+    /// The name and its arguments, as written.
+    pub span: Span,
+    pub args: Vec<Arg>,
 }
 
 /// **Where an expression tree runs.**
@@ -366,6 +384,12 @@ pub enum ExecutionContext {
     Acquire,
     /// `release(h) { .. }` — a resource's release.
     Release,
+    /// **A clause's key** (ADR-0088): an argument of `Cart(current_session())`
+    /// in `invalidates Cart(current_session())`. It names an entry or an
+    /// event where the declaration runs. Like an optimistic clause's target,
+    /// it may read invocation context, and its effects are not the
+    /// declaration's work.
+    Key,
 }
 
 impl ExecutionContext {
@@ -419,6 +443,7 @@ impl ExecutionContext {
             ExecutionContext::Draw => "a painter's draw block",
             ExecutionContext::Acquire => "a resource's acquire block",
             ExecutionContext::Release => "a resource's release block",
+            ExecutionContext::Key => "a clause's key",
         }
     }
 }
@@ -782,7 +807,7 @@ pub enum UnOp {
     Not,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Arg {
     /// `max = 3` and `jitter: true` carry a name; positional arguments do not.
     pub name: Option<String>,

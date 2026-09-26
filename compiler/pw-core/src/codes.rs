@@ -382,6 +382,11 @@ codes! {
         "a dependency, event or invalidation target must name something the program declares";
     PRIVATE_IN_SHARED_MATERIALIZATION = "PW5101" / private_in_shared_materialization / 1, ResourceGraph,
         "a shared materialization may only depend on data every reader of its cache entry may see";
+    // ADR-0088: `invalidates CartChanged(..)` invalidated an event and `emits
+    // Cart(..)` emitted a resource, and both checked. The graph looked a name
+    // up wherever it might be, and did not ask what it found.
+    CLAUSE_NAMES_ANOTHER_KIND = "PW5103" / clause_names_another_kind / 1, ResourceGraph,
+        "a clause names a declaration of its kind: a resource to read or invalidate, an event to emit or listen for";
 
     // --- what a capability names (PW52xx, E8) -----------------------------
     //

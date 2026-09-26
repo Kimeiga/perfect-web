@@ -149,6 +149,9 @@ pub struct Signatures {
     workspace: Workspace,
     /// Stable declaration paths are a projection of DefId, not a name lookup.
     paths: BTreeMap<DefId, String>,
+    /// What each declaration is: a clause names a declaration of its kind
+    /// (ADR-0088).
+    kinds: BTreeMap<DefId, DeclKind>,
 }
 
 impl Signatures {
@@ -172,6 +175,7 @@ impl Signatures {
                     format!("{}.{}", m.name, decl.name)
                 };
                 out.paths.insert(def, path);
+                out.kinds.insert(def, decl.kind);
             }
         }
         for m in &workspace.modules {
@@ -304,6 +308,10 @@ impl Signatures {
                         | DeclKind::Component
                         | DeclKind::Page
                         | DeclKind::Materialize
+                        // An event's values are declared like parameters, and
+                        // `emits` gives them (ADR-0088). It is in no term's
+                        // namespace, so nothing calls it.
+                        | DeclKind::Event
                 ) {
                     continue;
                 }
@@ -437,6 +445,11 @@ impl Signatures {
     }
     pub fn by_def(&self, def: DefId) -> Option<&Signature> {
         self.by_def.get(&def)
+    }
+
+    /// What kind of declaration `def` is.
+    pub fn kind_of(&self, def: DefId) -> Option<DeclKind> {
+        self.kinds.get(&def).copied()
     }
 
     pub fn in_module(&self, module: Option<&str>, path: &str) -> Option<&Signature> {

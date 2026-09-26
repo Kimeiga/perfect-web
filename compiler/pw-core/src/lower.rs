@@ -81,6 +81,15 @@ fn text(src: &str, n: &SyntaxNode) -> String {
     src[s].to_string()
 }
 
+/// Is `n` a name, or a path of names: `Cart`, `store.page.Menu`?
+fn names_a_path(n: &SyntaxNode) -> bool {
+    match n.kind() {
+        K::NameExpr => true,
+        K::FieldExpr => n.children().next().is_some_and(|base| names_a_path(&base)),
+        _ => false,
+    }
+}
+
 /// The first `Name` node's text, which is how the grammar records identifiers.
 fn first_name(n: &SyntaxNode) -> Option<String> {
     n.children()
@@ -425,6 +434,7 @@ impl Lowerer<'_> {
                             name,
                             value,
                             roots: Vec::new(),
+                            keys: Vec::new(),
                             span: span_of(&p),
                         }
                     })
@@ -621,21 +631,20 @@ impl Lowerer<'_> {
     /// line happened to be there.
     fn policy_terms(&mut self, b: &mut BodyBuilder, policies: &mut [Policy]) {
         for p in policies.iter_mut() {
+            if crate::policy::keyed(&p.name).is_some() {
+                self.clause_keys(b, p);
+                continue;
+            }
             if crate::policy::domain_of(&p.name) != Some(crate::policy::Domain::Transition) {
                 continue;
             }
-            if p.value.trim().is_empty() {
+            // The value as the source writes it: `Policy::value` collapses
+            // runs of whitespace, and a span must point into the file.
+            let (value, offset) = self.written_value(p);
+            if value.is_empty() {
                 continue;
             }
-            // Where the value starts in the file: the policy's span covers
-            // `<head> <value>`, and the head plus the whitespace after it is
-            // what precedes the value.
-            let whole = &self.src[p.span.clone()];
-            let offset = p.span.start
-                + whole
-                    .find(&p.value)
-                    .unwrap_or_else(|| p.name.len().min(whole.len()));
-            let parsed = pw_syntax::parse_transition_clause(&p.value);
+            let parsed = pw_syntax::parse_transition_clause(&value);
             let Some(clause) = parsed
                 .green
                 .children()
@@ -659,7 +668,7 @@ impl Lowerer<'_> {
             let before = (b.exprs.len(), b.pats.len(), b.types.len(), b.nodes.len());
             let mut sub = Lowerer {
                 hir: std::mem::take(&mut self.hir),
-                src: &p.value,
+                src: &value,
             };
             let target = sub.expr(b, target_node);
             let body = sub.expr(b, body_node);
@@ -676,7 +685,7 @@ impl Lowerer<'_> {
             // contexts. The target may read invocation state to name the entry;
             // the transformation may not perform anything at all.
             let bs = span_of(&name_node);
-            let binder = text(&p.value, &name_node).trim().to_string();
+            let binder = text(&value, &name_node).trim().to_string();
             p.roots = vec![
                 crate::hir::TermRoot {
                     context: crate::hir::ExecutionContext::TargetSelection,
@@ -690,6 +699,87 @@ impl Lowerer<'_> {
                 },
             ];
         }
+    }
+
+    /// **A policy's value as the source writes it, and where it starts in
+    /// the file.** `Policy::value` collapses runs of whitespace, so it is not
+    /// text a span can point into: until 2026-09-26 an optimistic clause
+    /// written with extra spaces had every diagnostic inside it underline
+    /// the wrong columns (ADR-0088).
+    fn written_value(&self, p: &Policy) -> (String, usize) {
+        let whole = self.src[p.span.clone()].trim_end();
+        let head = whole.find(char::is_whitespace).unwrap_or(whole.len());
+        let rest = &whole[head..];
+        let value = rest.trim_start();
+        (
+            value.to_string(),
+            p.span.start + head + (rest.len() - value.len()),
+        )
+    }
+
+    /// **The declarations a clause names, each with its key** (ADR-0088).
+    ///
+    /// `depends_on Store(id), Menu(id)` names two resources and passes each
+    /// the key `id`. The names are the clause's, looked up by its kind; the
+    /// arguments are terms, lowered into the declaration's arena like an
+    /// optimistic clause's, and each is a root in the `Key` context. Until
+    /// 2026-09-26 the value was text, and nothing resolved, counted or typed
+    /// a key: `invalidates Cart(nosuch)` checked.
+    ///
+    /// An item that is neither a name nor a name applied to arguments names
+    /// no declaration. The graph reports what it names (PW5100).
+    fn clause_keys(&mut self, b: &mut BodyBuilder, p: &mut Policy) {
+        let (value, offset) = self.written_value(p);
+        if value.is_empty() {
+            return;
+        }
+        let parsed = pw_syntax::parse_expr_list(&value);
+        let items: Vec<SyntaxNode> = parsed
+            .green
+            .children()
+            .filter(|c| is_expr(c.kind()))
+            .collect();
+        let before = (b.exprs.len(), b.pats.len(), b.types.len(), b.nodes.len());
+        let mut sub = Lowerer {
+            hir: std::mem::take(&mut self.hir),
+            src: &value,
+        };
+        let shift = |s: Span| (s.start + offset)..(s.end + offset);
+        let mut keys = Vec::new();
+        for item in &items {
+            let (name_node, list) = match item.kind() {
+                K::CallExpr => (
+                    item.children().next(),
+                    item.children().find(|c| c.kind() == K::ArgList),
+                ),
+                _ => (Some(item.clone()), None),
+            };
+            let Some(name_node) = name_node.filter(names_a_path) else {
+                continue;
+            };
+            let args = list.map(|l| sub.args(b, &l)).unwrap_or_default();
+            keys.push(crate::hir::ClauseKey {
+                name: text(&value, &name_node).trim().to_string(),
+                name_span: shift(span_of(&name_node)),
+                span: shift(span_of(item)),
+                args,
+            });
+        }
+        self.hir = std::mem::take(&mut sub.hir);
+        b.exprs.shift_spans_from(before.0, offset);
+        b.pats.shift_spans_from(before.1, offset);
+        b.types.shift_spans_from(before.2, offset);
+        b.nodes.shift_spans_from(before.3, offset);
+        p.roots = keys
+            .iter()
+            .flat_map(|k| &k.args)
+            .map(|a| crate::hir::TermRoot {
+                context: crate::hir::ExecutionContext::Key,
+                binders: Vec::new(),
+                root: a.value,
+            })
+            .collect();
+        p.keys = keys;
     }
 
     fn block(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> ExprId {

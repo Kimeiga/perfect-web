@@ -397,6 +397,7 @@ mod tests {
                     name: "consistency".into(),
                     value: v.into(),
                     roots: Vec::new(),
+                    keys: Vec::new(),
                     span: 0..0,
                 }],
                 imports: vec![],

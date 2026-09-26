@@ -602,3 +602,12 @@ another placement.
 page, an event or an effect checked, answered for as a call to nothing, and
 `fn f() -> Int { Badge(1) }` returned a view where an `Int` is declared. A
 call names a function, a data operation, or a type it builds (PW0027).
+
+## 2026-09-26: a clause names a declaration of its kind, and gives it its key (E10)
+
+[ADR-0088](DECISIONS/ADR-0088-a-clause-names-a-declaration-and-gives-it-its-key.md):
+`depends_on`, `invalidates` and `emits` were text. The graph drew an edge to
+whatever a name found, and nothing resolved, counted or typed a key, so
+`invalidates Cart(item)` and `emits Cart(..)` checked. A clause names a
+declaration of its kind (PW5103), and its key's arguments are terms related
+to what it names. The store's own `emits` gave its event the wrong type.

@@ -1231,6 +1231,40 @@ impl<'a> Typer<'a> {
         for (_, root) in self.decl.term_roots() {
             self.relations_from(root.root, out);
         }
+        for policy in &self.decl.policies {
+            for key in &policy.keys {
+                if let Some(sig) = self.keyed(&policy.name, key) {
+                    let args = key.args.iter().map(|a| (a.name.clone(), a.value));
+                    let solved = self.apply(
+                        key.span.clone(),
+                        key.name_span.clone(),
+                        None,
+                        Target::Callable(sig),
+                        args.collect(),
+                    );
+                    out.extend(solved.relations);
+                }
+            }
+        }
+    }
+
+    /// **The declaration a clause's key names**, where it is one of the kind
+    /// the clause names (ADR-0088): a resource for `invalidates`, an event
+    /// for `emits`. Looked up in the clause's namespace, never as a term. A
+    /// name of another kind, or of nothing, is the graph's (PW5100, PW5103).
+    fn keyed(&self, head: &str, key: &crate::hir::ClauseKey) -> Option<&'a Signature> {
+        let (ns, kinds) = crate::policy::keyed(head)?;
+        let found = match key.name.contains('.') {
+            true => self.ws.resolve_path_in(self.at, ns, &key.name),
+            false => self.ws.resolve_in(self.at, ns, &key.name),
+        };
+        let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
+            return None;
+        };
+        if !self.sigs.kind_of(def).is_some_and(|k| kinds.contains(&k)) {
+            return None;
+        }
+        self.sigs.by_def(def)
     }
 
     /// The type a policy term's binders take from its header, where it gives
@@ -1471,15 +1505,29 @@ impl<'a> Typer<'a> {
         let Some(target) = target else {
             return unknown;
         };
+        let piped = self.piped.get(&id).copied();
+        self.apply(self.body.expr_span(id), callee_span, piped, target, args)
+    }
 
+    /// **Relate what a call supplies to what its target declares:** how many
+    /// arguments, each one's name and type, and the result that follows. A
+    /// clause's key is related the same way (ADR-0088).
+    fn apply(
+        &self,
+        span: Span,
+        callee_span: Span,
+        piped: Option<ExprId>,
+        target: Target<'a>,
+        args: Vec<(Option<String>, ExprId)>,
+    ) -> Solved {
         // What is supplied, in parameter order: the receiver of a member call,
         // then a piped value, then the written arguments.
         let mut supplied: Vec<(Option<String>, ExprId)> = Vec::new();
         if let Target::Member(_, base) = &target {
             supplied.push((None, *base));
         }
-        if let Some(p) = self.piped.get(&id) {
-            supplied.push((None, *p));
+        if let Some(p) = piped {
+            supplied.push((None, p));
         }
         let leading = supplied.len();
         supplied.extend(args);
@@ -1587,7 +1635,6 @@ impl<'a> Typer<'a> {
             s.any.extend(unmentioned(self.ws, binder, &params));
         }
         let result = result.map(|r| r.instantiate(binder));
-        let span = self.body.expr_span(id);
 
         // A declaration with no parameters and a call with no arguments has
         // nothing to relate — a type, an event.
