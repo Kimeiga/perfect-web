@@ -259,6 +259,16 @@ codes! {
     // function at all.
     NOT_CALLABLE = "PW0614" / not_callable / 1, Types,
         "a value called must be a function";
+    // ADR-0069: until 2026-09-26 a list's items were joined, and where two
+    // disagreed the list's element was a hole: `[1, "a"]` was a list of
+    // something unstated, and passed where a `List<Int>` is declared.
+    LIST_ITEMS = "PW0615" / list_items / 1, Types,
+        "a list's items must share one type";
+    // ADR-0069: an `Int` is 64 bits (ADR-0039). A literal past its range was
+    // an `Int` to the checker until 2026-09-26; the backend was the first to
+    // refuse it.
+    INT_LITERAL_RANGE = "PW0616" / int_literal_range / 1, Types,
+        "an `Int` literal must fit in 64 bits";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

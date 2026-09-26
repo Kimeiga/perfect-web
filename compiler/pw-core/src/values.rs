@@ -377,6 +377,11 @@ pub enum RelationKind {
     Branches,
     /// `f(x)`: a called value, against a function type (PW0614, ADR-0068).
     Callee,
+    /// `[a, b]`: a list's items, against each other (PW0615, ADR-0069).
+    Items,
+    /// `9223372036854775808`: an `Int` literal, against the range an `Int`
+    /// holds (PW0616, ADR-0069).
+    Literal,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -2276,6 +2281,59 @@ impl<'a> Typer<'a> {
                 out.extend(self.branches(id));
             }
             Expr::Match { .. } => out.extend(self.branches(id)),
+            // `[1, "a"]`: one list, of one element type (ADR-0069).
+            Expr::List { items } if !items.is_empty() => {
+                let mut first: Option<Ty> = None;
+                let mut outcome = Outcome::Agree;
+                let mut at = self.body.expr_span(id);
+                for i in items {
+                    let t = self.of(*i);
+                    if t.is_unknown() || !t.is_closed() {
+                        outcome = Outcome::Undecided(Undecided::Unknown);
+                        continue;
+                    }
+                    match &first {
+                        None => first = Some(t),
+                        Some(f) => {
+                            if unify(&mut Subst::default(), f, &t) == Verdict::Disagree {
+                                outcome = Outcome::Disagree {
+                                    expected: self.display(f),
+                                    actual: self.display(&t),
+                                };
+                                at = self.body.expr_span(*i);
+                                break;
+                            }
+                        }
+                    }
+                }
+                out.push(ValueRelation {
+                    declaration: self.decl.name.clone(),
+                    kind: RelationKind::Items,
+                    span: at,
+                    target: "list".to_string(),
+                    index: None,
+                    outcome,
+                    declared_at: None,
+                    boundary: (self.body.expr_span(id), "in this list".to_string()),
+                });
+            }
+            // An `Int` is 64 bits (ADR-0039, ADR-0069).
+            Expr::Literal(Literal::Int(n)) => out.push(ValueRelation {
+                declaration: self.decl.name.clone(),
+                kind: RelationKind::Literal,
+                span: self.body.expr_span(id),
+                target: n.clone(),
+                index: None,
+                outcome: match n.parse::<i64>() {
+                    Ok(_) => Outcome::Agree,
+                    Err(_) => Outcome::Disagree {
+                        expected: "an Int".to_string(),
+                        actual: n.clone(),
+                    },
+                },
+                declared_at: None,
+                boundary: (self.body.expr_span(id), "this literal".to_string()),
+            }),
             // `for x in xs`: the loop runs over a list (ADR-0051, ADR-0068).
             Expr::For { iterable, .. } => {
                 let actual = self.of(*iterable);
@@ -3251,6 +3309,29 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  runs, so every branch produces its type",
             )
             .repair(format!("make this branch a `{expected}`")),
+            RelationKind::Items => Diagnostic::error(
+                crate::codes::LIST_ITEMS.id,
+                crate::codes::LIST_ITEMS.invariant,
+                Detector::Signature,
+                format!("this item of the list is `{actual}`, where the first is `{expected}`"),
+                r.span.clone(),
+            )
+            .reason("list_items_of_two_types")
+            .explain("a list holds values of one type, whichever item is read")
+            .repair(format!("make this item a `{expected}`")),
+            RelationKind::Literal => Diagnostic::error(
+                crate::codes::INT_LITERAL_RANGE.id,
+                crate::codes::INT_LITERAL_RANGE.invariant,
+                Detector::Signature,
+                format!("`{}` does not fit in an `Int`, which is 64 bits", r.target),
+                r.span.clone(),
+            )
+            .reason("int_literal_out_of_range")
+            .explain(
+                "an `Int` holds -9223372036854775808 to 9223372036854775807; a literal \
+                 is its magnitude, so the least is written as an operation on it",
+            )
+            .repair("write a value in the range, or use a `Float`"),
             RelationKind::Callee => Diagnostic::error(
                 crate::codes::NOT_CALLABLE.id,
                 crate::codes::NOT_CALLABLE.invariant,

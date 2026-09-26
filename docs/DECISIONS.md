@@ -452,3 +452,11 @@ value called that is not a function is PW0614; `for`'s list and `?`'s operand
 are related; the branches of an `if` or a `match` whose value is used produce
 one type (PW0613). It fixes a silent miscompile: every `elif` and `else if`
 chain lowered to its first branch and, for its `else`, the next condition.
+
+## 2026-09-26: a list's items share one type, and an Int literal fits an Int (E10)
+
+[ADR-0069](DECISIONS/ADR-0069-list-items-and-int-literals.md): a list's items
+are related to each other (PW0615), where two of different types made the
+element a hole and `[1, "a"]` passed as a `List<Int>`; an `Int` literal is
+related to the 64-bit range (PW0616), which the backend was the first to
+enforce.

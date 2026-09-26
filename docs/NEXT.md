@@ -95,8 +95,9 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    declaration's annotations never resolved. Then ~~a record's fields, and an
    `if` without `else` as a value~~, done (ADR-0067), and ~~calls through
    function values, `for`'s list, `?`'s operand and used branches~~, done
-   (ADR-0068), which found `elif` chains miscompiled; both found probing for
-   wrong programs that check. Next, the name check's own scope walk onto
+   (ADR-0068), which found `elif` chains miscompiled, and ~~a list's items and
+   an `Int` literal's range~~, done (ADR-0069); all found probing for wrong
+   programs that check. Next, the name check's own scope walk onto
    `crate::lexical`;
 4. a function passed to a generic declaration in the backend (found writing
    ADR-0062's tests), then a generic type at the boundary, a WIT type per

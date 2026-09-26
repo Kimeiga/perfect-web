@@ -173,6 +173,13 @@ signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
 
+**2026-09-26: a list's items share one type, and an `Int` literal fits an
+`Int`** ([ADR-0069](DECISIONS/ADR-0069-list-items-and-int-literals.md)): both
+passed `pw check` until then, `[1, "a"]` as a `List<Int>` and a literal past
+64 bits. PW0615 and PW0616 refuse them.
+
+Evidence: [lists.txt](evidence/E10/lists.txt) (`just e10-lists`).
+
 **2026-09-26: what each construct takes, checked**
 ([ADR-0068](DECISIONS/ADR-0068-what-each-construct-takes.md)): a call through
 a function value is checked against its type, and a value that is not one is
