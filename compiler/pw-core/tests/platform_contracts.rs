@@ -395,7 +395,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // A member no type has is refused now: A-001 read `.value` from an opaque
     // `PositiveInt` outside its module, and the store's page rendered a
     // `cart.line_count` that `Cart` did not have.
-    const EXPECTED: u64 = 0x9c7ffd50875f9fbd;
+    // 2026-09-25: `List` declares `drop`, `slice` and `reverse`, and `String`
+    // `slice` (ADR-0055). `List.sum` and `List.maximum` are written in Pleris,
+    // where their placeholder bodies answered 0.0, and `maximum` returns an
+    // `Option<Float>`. `List.enumerate`, which answered `[]` with no result
+    // type, is removed: the language has no tuple type.
+    const EXPECTED: u64 = 0x4efd52c07ab56544;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

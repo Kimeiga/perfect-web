@@ -60,8 +60,8 @@ MUTANTS = [
     (
         "take does not clamp a negative count",
         WASM,
-        "                    I::LocalGet(n),\n                    I::I64Const(0),\n                    I::I64LtS,",
-        "                    I::I32Const(0),",
+        "            I::LocalGet(n),\n            I::I64Const(0),\n            I::I64LtS,",
+        "            I::I32Const(0),",
     ),
     (
         "concat writes the second list over the first",

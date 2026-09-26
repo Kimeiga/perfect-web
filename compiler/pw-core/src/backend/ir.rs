@@ -382,6 +382,12 @@ pub enum Intrinsic {
     ListLength,
     ListGet,
     ListTake,
+    /// All but the first `count`, clamped: a view (ADR-0055).
+    ListDrop,
+    /// `start` up to `end`, each clamped: a view (ADR-0055).
+    ListSlice,
+    /// A copy, last element first (ADR-0055).
+    ListReverse,
     ListConcat,
     /// In code points.
     StrLength,
@@ -394,6 +400,8 @@ pub enum Intrinsic {
     StrJoin,
     /// Unicode `White_Space` from both ends.
     StrTrim,
+    /// Code points `start` up to `end`, each clamped: a view (ADR-0055).
+    StrSlice,
     /// `A`-`Z` only.
     StrToLowerAscii,
     /// The nearest `Float`, ties to even: exact up to 2^53 (ADR-0043).
@@ -426,6 +434,9 @@ impl Operation {
             "list.length" => Operation::Intrinsic(I::ListLength),
             "list.get" => Operation::Intrinsic(I::ListGet),
             "list.take" => Operation::Intrinsic(I::ListTake),
+            "list.drop" => Operation::Intrinsic(I::ListDrop),
+            "list.slice" => Operation::Intrinsic(I::ListSlice),
+            "list.reverse" => Operation::Intrinsic(I::ListReverse),
             "list.concat" => Operation::Intrinsic(I::ListConcat),
             "string.length" => Operation::Intrinsic(I::StrLength),
             "string.codepoints" => Operation::Intrinsic(I::StrCodepoints),
@@ -435,6 +446,7 @@ impl Operation {
             "string.contains" => Operation::Intrinsic(I::StrContains),
             "string.join" => Operation::Intrinsic(I::StrJoin),
             "string.trim" => Operation::Intrinsic(I::StrTrim),
+            "string.slice" => Operation::Intrinsic(I::StrSlice),
             "string.to_lower_ascii" => Operation::Intrinsic(I::StrToLowerAscii),
             "float.from_int" => Operation::Intrinsic(I::FloatFromInt),
             _ => return None,

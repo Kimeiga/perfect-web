@@ -44,6 +44,19 @@ fn get<T>(items: List<T>, index: Int) -> Option<T> !{}
 fn take<T>(items: List<T>, count: Int) -> List<T> !{}
     intrinsic "list.take"
 
+// All but the first `count` elements: all of them when `count` is not
+// positive, none when there are fewer (ADR-0055).
+fn drop<T>(items: List<T>, count: Int) -> List<T> !{}
+    intrinsic "list.drop"
+
+// The elements from `start` up to, not including, `end`. Each bound is
+// clamped to the list, and an `end` before `start` gives none (ADR-0055).
+fn slice<T>(items: List<T>, start: Int, end: Int) -> List<T> !{}
+    intrinsic "list.slice"
+
+fn reverse<T>(items: List<T>) -> List<T> !{}
+    intrinsic "list.reverse"
+
 fn concat<T>(first: List<T>, second: List<T>) -> List<T> !{}
     intrinsic "list.concat"
 
@@ -66,14 +79,26 @@ fn sort_by<T>(items: List<T>, compare: fn(T, T) -> Int) -> List<T> !{}
 fn group_by<T>(items: List<T>, key: fn(T) -> String) -> List<List<T>> !{}
     intrinsic "list.group_by"
 
-// The language has no tuple type, so a position and an element cannot be one
-// value's type yet. The result is therefore not annotated — a hole, not a
-// claim — and `for (i, v) in List.enumerate(xs)` binds by pattern.
-fn enumerate<T>(items: List<T>) !{} { [] }
-
 // Floats, because every caller sums measured lengths. The language has no
 // numeric abstraction, so an `Int` sum is a separate declaration when one is
-// needed rather than a claim this one could make.
-fn sum(items: List<Float>) -> Float !{} { 0.0 }
+// needed rather than a claim this one could make. Left to right.
+//
+// Until 2026-09-25 this and `maximum` had placeholder bodies that answered
+// 0.0, and `enumerate` answered `[]` (ADR-0055).
+fn sum(items: List<Float>) -> Float !{} {
+    fold(items, 0.0, (total, x) => total + x)
+}
 
-fn maximum(items: List<Float>) -> Float !{} { 0.0 }
+// The largest element, or `None` for an empty list (ADR-0055, ruling
+// needed). A NaN is the maximum of any list that has one, as IEEE 754's
+// `maximum` and JavaScript's `Math.max` give.
+fn maximum(items: List<Float>) -> Option<Float> !{} {
+    let mut best: Option<Float> = None
+    for x in items {
+        best = match best {
+            None => Some(x),
+            Some(b) => if x > b | x != x { Some(x) } else { Some(b) },
+        }
+    }
+    best
+}

@@ -134,13 +134,19 @@ refused by name:
   clause, and most clauses written inside a block have none.
 - **`derived e` is parsed, not checked** (ADR-0047). It is one expression,
   and the charter calls it pure; no rule refuses an effect inside it.
-- **The standard library is small** (ADR-0040). `List` has `length`, `get`,
-  `take`, `concat`, `map`, `filter`, `fold`, `any`, `all`, `find`, `sort_by`
-  and `group_by` (by a `String` key, adjacent runs); `String` has `length`, `codepoints`, `from_codepoints`,
-  `starts_with`, `ends_with`, `contains`, `join`, `trim` and
-  `to_lower_ascii`; `Float` has `from_int` (ADR-0043). There is no slicing, no Unicode case mapping, and no map
-  or set type. `sum`, `maximum` and `enumerate` still have placeholder
-  bodies.
+- **The standard library is small** (ADR-0040, ADR-0055).
+  - `List` has `length`, `get`, `take`, `drop`, `slice`, `reverse`,
+    `concat`, `map`, `filter`, `fold`, `any`, `all`, `find`, `sort_by`,
+    `group_by` (by a `String` key, adjacent runs), `sum` and `maximum` (of
+    `Float`s).
+  - `String` has `length`, `slice`, `codepoints`, `from_codepoints`,
+    `starts_with`, `ends_with`, `contains`, `join`, `trim` and
+    `to_lower_ascii`.
+  - `Float` has `from_int` (ADR-0043).
+
+  There is no `split`, no `range`, no Unicode case mapping, and no map or
+  set type. `enumerate` is removed, since the language has no tuple type
+  (ADR-0055).
 - **An affine value has no borrow** (ADR-0045). A function whose row does not
   release a transaction may use it, and one whose row does must end it once
   on every path. There is no way to say "this function reads the value and

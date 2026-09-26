@@ -233,6 +233,19 @@ public query CountTotal(cs: List<Count>) -> Int { List.fold(cs, 0, (t, c) => t +
 public query Tagged(s: String) -> Tag { Tag(\"#{s}\") }
 
 public query Untagged(t: Tag) -> String { t.value }
+
+// ADR-0055: slicing, and `sum` and `maximum` computed.
+public query Rest(xs: List<Int>, n: Int) -> List<Int> { List.drop(xs, n) }
+
+public query Part(xs: List<Int>, a: Int, b: Int) -> List<Int> { List.slice(xs, a, b) }
+
+public query Backwards(words: List<Word>) -> List<Word> { List.reverse(words) }
+
+public query TextPart(text: String, a: Int, b: Int) -> String { String.slice(text, a, b) }
+
+public query FloatTotal(xs: List<Float>) -> Float { List.sum(xs) }
+
+public query FloatMax(xs: List<Float>) -> Option<Float> { List.maximum(xs) }
 ";
 
 const CASES: usize = 200;

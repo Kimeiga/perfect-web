@@ -634,6 +634,27 @@ e10-function-values:
      } > docs/evidence/E10/function-values.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/function-values.txt
 
+# ADR-0055: slicing, and the standard library's placeholders computed. The
+# operations against Vec and str, the component against the JavaScript
+# module, and the mutation controls.
+e10-slices:
+    @{ echo "ADR-0055 - slicing, and the standard library's placeholders computed"; echo; \
+       echo "produced by: just e10-slices"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== against Vec and str (compiler/pw-conformance/tests/stdlib.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test stdlib 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module, on the same arguments"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*"; \
+       echo; echo "== mutation controls (scripts/slice_mutations.py)"; echo; \
+       python3 scripts/slice_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: String.split, List.range, or an Int sum. Unicode case"; \
+       echo "mapping, maps and sets are not claimed here."; \
+     } > docs/evidence/E10/slices.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/slices.txt
+
 # ADR-0054: an opaque value is built and read inside a component. The opaque
 # values through the host, the component against the JavaScript module, the
 # member rule over a generic representation, and the mutation controls.

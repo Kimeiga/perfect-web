@@ -22,9 +22,15 @@ paint RatingSpark(values: List<Float>, width: Float, height: Float) !{ paint.cus
         // values of one type (ADR-0039 §2), which PW0609 checks since
         // 2026-09-25 (ADR-0043). This read `width / values.length()` and
         // `i * step`.
+        //
+        // A position is counted: `List.enumerate` answered `[]`, and the
+        // language has no tuple type to pair a position with an element
+        // (ADR-0055).
         let step = width / Float.from_int(values.length())
-        for (i, v) in values.enumerate() {
+        let mut i = 0
+        for v in values {
             ctx.rect(Float.from_int(i) * step, height * (1.0 - v), step - 1.0, height * v)
+            i = i + 1
         }
     }
 }

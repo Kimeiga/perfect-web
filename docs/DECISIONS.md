@@ -329,3 +329,9 @@ as the element and refused.
 read inside a component, as its representation retyped (`Instr::Retype`),
 in the component and the module. An opaque type's representation is a type
 tree, where it was a spelling that never resolved with type arguments.
+
+[ADR-0055](DECISIONS/ADR-0055-slices-and-placeholders.md): `List.drop`,
+`List.slice`, `List.reverse` and `String.slice`, each bound clamped, a
+slice a view. `sum` and `maximum` are Pleris in `list.pw`, where their
+placeholders answered 0.0; `maximum` is an `Option`. `enumerate`, which
+answered `[]`, is removed: the language has no tuple type.

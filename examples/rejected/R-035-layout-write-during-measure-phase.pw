@@ -27,6 +27,6 @@ component MenuAligner(items: List<ElementRef>) {
                 it.offsetWidth()
             })
         }
-        mutate { self.style.set_width(widths |> List.maximum()) }
+        mutate { self.style.set_width(widths |> List.sum()) }
     }
 }

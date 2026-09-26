@@ -1840,7 +1840,12 @@ impl<'a> Lower<'a> {
         let ty = match (op, types.as_slice()) {
             (I::ListLength, [Some(Type::List(_))]) => Type::Int,
             (I::ListGet, [Some(Type::List(t)), Some(Type::Int)]) => Type::Option(t.clone()),
-            (I::ListTake, [Some(t @ Type::List(_)), Some(Type::Int)]) => t.clone(),
+            (I::ListTake | I::ListDrop, [Some(t @ Type::List(_)), Some(Type::Int)]) => t.clone(),
+            (I::ListSlice, [Some(t @ Type::List(_)), Some(Type::Int), Some(Type::Int)]) => {
+                t.clone()
+            }
+            (I::ListReverse, [Some(t @ Type::List(_))]) => t.clone(),
+            (I::StrSlice, [Some(Type::Str), Some(Type::Int), Some(Type::Int)]) => Type::Str,
             (I::ListConcat, [Some(a @ Type::List(_)), Some(b)]) if a == b => a.clone(),
             (I::StrLength, [Some(Type::Str)]) => Type::Int,
             (I::StrCodepoints, [Some(Type::Str)]) => Type::List(Box::new(Type::Int)),
@@ -3402,7 +3407,9 @@ enum Given {
 fn intrinsic_argument(op: Intrinsic, k: usize, prior: &[Type]) -> Option<Type> {
     use Intrinsic as I;
     match (op, k) {
-        (I::ListGet | I::ListTake, 1) => Some(Type::Int),
+        (I::ListGet | I::ListTake | I::ListDrop, 1) => Some(Type::Int),
+        (I::ListSlice | I::StrSlice, 1 | 2) => Some(Type::Int),
+        (I::StrSlice, 0) => Some(Type::Str),
         (I::ListConcat, 1) => prior.first().cloned(),
         (I::StrFromCodepoints, 0) => Some(Type::List(Box::new(Type::Int))),
         (I::StrJoin, 0) => Some(Type::List(Box::new(Type::Str))),

@@ -786,9 +786,18 @@ fn an_analysis_that_stops_running_cannot_look_like_success() {
         .collect();
     let reports = match_analysis(&units);
 
+    // A-002's own: the library's matches are not its (`List.maximum` has had
+    // one since ADR-0055).
+    let own: std::collections::BTreeSet<&str> = p
+        .hirs
+        .last()
+        .expect("the fixture")
+        .all_decls()
+        .map(|(_, d)| d.name.as_str())
+        .collect();
     let proven: Vec<&pw_core::check::MatchAnalysis> = reports
         .iter()
-        .filter(|m| m.outcome == MatchOutcome::Proven)
+        .filter(|m| m.outcome == MatchOutcome::Proven && own.contains(m.declaration.as_str()))
         .collect();
     assert_eq!(
         proven.len(),

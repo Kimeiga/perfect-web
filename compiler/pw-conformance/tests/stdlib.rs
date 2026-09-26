@@ -135,6 +135,20 @@ public query Totals(rows: List<List<Int>>) -> List<Int> {
 }
 
 public query AsFloat(n: Int) -> Float { Float.from_int(n) }
+
+public query Rest(xs: List<Int>, n: Int) -> List<Int> { List.drop(xs, n) }
+
+public query Part(xs: List<Int>, a: Int, b: Int) -> List<Int> { List.slice(xs, a, b) }
+
+public query Backwards(xs: List<Int>) -> List<Int> { List.reverse(xs) }
+
+public query WordsBackwards(words: List<Word>) -> List<Word> { List.reverse(words) }
+
+public query TextPart(text: String, a: Int, b: Int) -> String { String.slice(text, a, b) }
+
+public query Total(xs: List<Float>) -> Float { List.sum(xs) }
+
+public query Largest(xs: List<Float>) -> Option<Float> { List.maximum(xs) }
 ";
 
 fn compiled(id: &str) -> Runnable {
@@ -510,4 +524,124 @@ fn an_int_becomes_the_nearest_float() {
     for n in cases {
         assert_eq!(call(&r, &[Val::S64(n)]), Ok(Val::Float64(n as f64)), "{n}");
     }
+}
+
+/// A bound as `List.slice` and `String.slice` clamp it: to `0..=len`.
+fn clamp(i: i64, len: usize) -> usize {
+    usize::try_from(i.max(0)).unwrap_or(usize::MAX).min(len)
+}
+
+/// **Slicing, dropping and reversing** (ADR-0055), against `Vec` and `str`:
+/// each bound clamped, an end before the start empty.
+#[test]
+fn slices_drops_and_reversals_agree_with_vec_and_str() {
+    let (rest, part, backwards, words_backwards, text_part) = (
+        compiled("s.Rest"),
+        compiled("s.Part"),
+        compiled("s.Backwards"),
+        compiled("s.WordsBackwards"),
+        compiled("s.TextPart"),
+    );
+    let mut rng = Rng(0x51);
+    let bound = |rng: &mut Rng, len: usize| match rng.below(6) {
+        0 => [i64::MIN, i64::MAX, -1][rng.below(3) as usize],
+        _ => rng.below(len as u64 + 4) as i64 - 2,
+    };
+    for _ in 0..CASES {
+        let xs = rng.ints();
+        let (n, a, b) = (
+            bound(&mut rng, xs.len()),
+            bound(&mut rng, xs.len()),
+            bound(&mut rng, xs.len()),
+        );
+        let case = format!("{xs:?}, {n}, {a}, {b}");
+        assert_eq!(
+            call(&rest, &[ints(&xs), Val::S64(n)]),
+            Ok(ints(&xs[clamp(n, xs.len())..])),
+            "drop({case})"
+        );
+        let (from, to) = (clamp(a, xs.len()), clamp(b, xs.len()));
+        let want: &[i64] = if to > from { &xs[from..to] } else { &[] };
+        assert_eq!(
+            call(&part, &[ints(&xs), Val::S64(a), Val::S64(b)]),
+            Ok(ints(want)),
+            "slice({case})"
+        );
+        let mut reversed = xs.clone();
+        reversed.reverse();
+        assert_eq!(call(&backwards, &[ints(&xs)]), Ok(ints(&reversed)));
+
+        let words: Vec<(String, i64)> = (0..rng.below(8))
+            .map(|_| (rng.string(), rng.int()))
+            .collect();
+        let vals = Val::List(words.iter().map(|(t, s)| word(t, *s)).collect());
+        let want = Val::List(words.iter().rev().map(|(t, s)| word(t, *s)).collect());
+        assert_eq!(call(&words_backwards, &[vals]), Ok(want));
+
+        let text = rng.string();
+        let cs: Vec<char> = text.chars().collect();
+        let (a, b) = (bound(&mut rng, cs.len()), bound(&mut rng, cs.len()));
+        let (from, to) = (clamp(a, cs.len()), clamp(b, cs.len()));
+        let want: String = if to > from {
+            cs[from..to].iter().collect()
+        } else {
+            String::new()
+        };
+        assert_eq!(
+            call(
+                &text_part,
+                &[Val::String(text.clone()), Val::S64(a), Val::S64(b)]
+            ),
+            Ok(Val::String(want)),
+            "String.slice({text:?}, {a}, {b})"
+        );
+    }
+}
+
+/// **`sum` and `maximum` compute** (ADR-0055). Until 2026-09-25 both had
+/// placeholder bodies that answered 0.0.
+#[test]
+fn sum_and_maximum_compute() {
+    let (total, largest) = (compiled("s.Total"), compiled("s.Largest"));
+    let floats = |xs: &[f64]| Val::List(xs.iter().map(|x| Val::Float64(*x)).collect());
+    let mut rng = Rng(0x3a);
+    for _ in 0..CASES {
+        let xs: Vec<f64> = (0..rng.below(12))
+            .map(|_| match rng.below(8) {
+                0 => -0.0,
+                1 => f64::INFINITY,
+                2 => -1e308,
+                _ => (rng.int() as f64) / 7.0,
+            })
+            .collect();
+        let sum = xs.iter().fold(0.0, |t, x| t + x);
+        match call(&total, &[floats(&xs)]) {
+            Ok(Val::Float64(got)) => assert!(
+                got.to_bits() == sum.to_bits() || (got.is_nan() && sum.is_nan()),
+                "sum({xs:?}) = {got}, not {sum}"
+            ),
+            other => panic!("sum({xs:?}) = {other:?}"),
+        }
+        let max = xs.iter().copied().reduce(|m, x| if x > m { x } else { m });
+        assert_eq!(
+            call(&largest, &[floats(&xs)]),
+            Ok(Val::Option(max.map(|m| Box::new(Val::Float64(m))))),
+            "maximum({xs:?})"
+        );
+    }
+    // A NaN is the maximum of any list with one, wherever it is.
+    for xs in [
+        [f64::NAN, 1.0, 2.0],
+        [1.0, f64::NAN, 2.0],
+        [1.0, 2.0, f64::NAN],
+    ] {
+        match call(&largest, &[floats(&xs)]) {
+            Ok(Val::Option(Some(v))) => {
+                assert!(matches!(*v, Val::Float64(m) if m.is_nan()), "{xs:?}: {v:?}")
+            }
+            other => panic!("maximum({xs:?}) = {other:?}"),
+        }
+    }
+    assert_eq!(call(&largest, &[floats(&[])]), Ok(Val::Option(None)));
+    assert_eq!(call(&total, &[floats(&[])]), Ok(Val::Float64(0.0)));
 }

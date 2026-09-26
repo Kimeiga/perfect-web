@@ -78,6 +78,17 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: slicing, and the placeholders computed**
+([ADR-0055](DECISIONS/ADR-0055-slices-and-placeholders.md)).
+- `List.drop`, `List.slice`, `List.reverse` and `String.slice` compile, in
+  the component and the module. Each bound is clamped.
+- `List.sum` and `List.maximum` had placeholder bodies that answered 0.0,
+  and `List.enumerate` answered `[]`. `sum` and `maximum` are written in
+  Pleris now; `maximum` returns an `Option`. `enumerate` is removed.
+- A-016, A-021 and R-035 changed with the library.
+
+Evidence: [slices.txt](evidence/E10/slices.txt) (`just e10-slices`).
+
 **2026-09-25: an opaque value is built and read inside a component**
 ([ADR-0054](DECISIONS/ADR-0054-opaque-values.md)). `Count(n)` and `c.value`
 are the same value under another type, `Instr::Retype`. In the component
@@ -239,6 +250,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0055: `List.maximum` returns an `Option`, `None` for an empty list,
+  rather than negative infinity; `List.enumerate` is removed, since the
+  language has no tuple type.
 - ADR-0054: building an opaque value checks nothing, since the language
   states no invariant for it.
 - ADR-0053: a callee with no signature types no parameter of a lambda passed

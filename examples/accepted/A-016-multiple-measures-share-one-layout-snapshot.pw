@@ -27,8 +27,12 @@ component MenuAligner(items: List<ElementRef>) {
         let total = derived widths |> List.map(fn(w) w.value) |> List.sum()
         let max = derived widths |> List.map(fn(w) w.value) |> List.maximum()
 
+        // `maximum` is `None` for an empty list (ADR-0055). It answered 0.0.
         mutate {
-            self.style.set_width(max)
+            match max {
+                Some(m) => self.style.set_width(m),
+                None => self.style.set_width(0.0),
+            }
             self.style.set_custom("--total", total)
         }
     }

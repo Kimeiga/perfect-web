@@ -207,6 +207,15 @@ const HELPERS: &[(&str, &[&str], &str)] = &[
          while (b > a && WHITE.has(cs[b - 1].codePointAt(0))) b--;\n  return cs.slice(a, b).join(\"\");\n}",
     ),
     (
+        "slice",
+        &[],
+        "// `start` up to `end`, each clamped to the array, as `List.slice` and\n\
+         // `String.slice` (ADR-0055).\n\
+         function slice(xs, start, end) {\n  const n = BigInt(xs.length);\n  \
+         const clamp = (i) => (i < 0n ? 0n : i > n ? n : i);\n  const a = clamp(start), b = clamp(end);\n  \
+         return b > a ? xs.slice(Number(a), Number(b)) : [];\n}",
+    ),
+    (
         "lower_ascii",
         &[],
         "// `A`-`Z` only (ADR-0040).\n\
@@ -644,6 +653,23 @@ impl<'p> Emitter<'p> {
                         "{xs}.slice(0, {n} < 0n ? 0 : {n} > BigInt({xs}.length) ? {xs}.length : Number({n}))",
                         xs = arg(0),
                         n = arg(1)
+                    ),
+                    Intrinsic::ListDrop => format!(
+                        "{}({xs}, {n}, BigInt({xs}.length))",
+                        self.uses("slice"),
+                        xs = arg(0),
+                        n = arg(1)
+                    ),
+                    Intrinsic::ListSlice => {
+                        format!("{}({}, {}, {})", self.uses("slice"), arg(0), arg(1), arg(2))
+                    }
+                    Intrinsic::ListReverse => format!("[...{}].reverse()", arg(0)),
+                    Intrinsic::StrSlice => format!(
+                        "{}(Array.from({}), {}, {}).join(\"\")",
+                        self.uses("slice"),
+                        arg(0),
+                        arg(1),
+                        arg(2)
                     ),
                     Intrinsic::ListConcat => format!("[...{}, ...{}]", arg(0), arg(1)),
                     Intrinsic::StrLength => format!("BigInt(Array.from({}).length)", arg(0)),
