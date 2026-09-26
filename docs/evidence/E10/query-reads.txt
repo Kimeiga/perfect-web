@@ -1,0 +1,20 @@
+ADR-0100 - a query reads
+
+produced by: just e10-query-reads
+commit: 2cbe6e943dbe7fbab7d59516a5ae0a7c5bc3992f
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== query reads (compiler/pw-core/tests/query_reads.rs, effects.rs)
+
+test a_query_writes_nothing ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test effects::tests::a_query_may_read_and_not_write ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 179 filtered out; finished in 0.00s
+
+== mutation controls (scripts/query_read_mutations.py)
+
+baseline: 2 passed, 0 failed
+a query may write: KILLED (2 of 2 tests fail)
+a subscription may write: KILLED (1 of 2 tests fail)
+a transaction is not a write: KILLED (1 of 2 tests fail)
+3 of 3 mutants killed
