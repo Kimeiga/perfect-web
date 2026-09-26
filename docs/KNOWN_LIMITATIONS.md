@@ -182,6 +182,12 @@ refused by name:
   A function is a value: a lambda or a declaration's name is stored,
   returned, passed and called. But `r.check(5)` reads as a method call. A
   lambda whose use fixes no parameter types is refused by name.
+- **A function passed to a generic declaration is refused by name**
+  (ADR-0062, found 2026-09-26). `apply(n, x => x + 1)`, where `fn apply<A,
+  B>(a: A, f: fn(A) -> B) -> B`, is "a lambda whose type nothing fixes":
+  the backend types an argument by its parameter's declared type, and does
+  not carry into it what the earlier arguments fixed. A list operation's
+  function, and a non-generic declaration's, are typed.
 - **A statement keyword cannot name a value** (PW0013, ADR-0041, ruling
   needed). `let query = ..` is refused rather than read as a `query ..`
   statement at every use.

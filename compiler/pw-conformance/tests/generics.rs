@@ -58,6 +58,22 @@ public query Nested(n: Int) -> Int {
     b.value.value
 }
 
+fn no_box() -> Maybe<Box<Box<Int>>> { Maybe.Nothing }
+
+public query NestedList(n: Int) -> Int {
+    // `Maybe<Box<Box<Int>>>` is laid out before any `Box<Int>` is: the outer
+    // instance is defined with the inner inside it.
+    let first = match no_box() {
+        Just(b) => b.value.value,
+        Nothing => 0,
+    }
+    let bs = [
+        Box { value: Box { value: n, label: "in" }, label: "out" },
+        Box { value: Box { value: n + 1, label: "in" }, label: "out" },
+    ]
+    List.fold(bs, first, (t, b) => t + b.value.value)
+}
+
 public query Tags(xs: List<Int>) -> Int {
     let t = Tagged(xs)
     List.length(t.value)
@@ -66,6 +82,15 @@ public query Tags(xs: List<Int>) -> Int {
 public query Justs(xs: List<Int>) -> Int {
     let ms = List.map(xs, Maybe.Just)
     List.fold(ms, 0, (t, m) => match m {
+        Just(x) => t + x,
+        Nothing => t,
+    })
+}
+
+fn justs<T>(xs: List<T>) -> List<Maybe<T>> { List.map(xs, Maybe.Just) }
+
+public query JustsIn(xs: List<Int>) -> Int {
+    List.fold(justs(xs), 0, (t, m) => match m {
         Just(x) => t + x,
         Nothing => t,
     })
@@ -117,6 +142,9 @@ fn a_generic_sum_type_is_built_and_matched() {
 fn an_instance_inside_an_instance() {
     // `Box<Box<Int>>`: the outer layout holds the inner's.
     assert_eq!(call("g.Nested", &[Val::S64(-3)]), Val::S64(-3));
+    // And laid out in memory, the outer instance defined first: the inner
+    // instance inside it is not taken for the outer one recurring.
+    assert_eq!(call("g.NestedList", &[Val::S64(4)]), Val::S64(9));
 }
 
 #[test]
@@ -127,6 +155,9 @@ fn a_generic_opaque_type_is_built_and_read() {
 #[test]
 fn a_generic_case_as_a_function_and_a_record_in_a_lambda() {
     assert_eq!(call("g.Justs", &[ints(&[1, 2, 3])]), Val::S64(6));
+    // Inside a generic function's instance, whose own `T` is already fixed:
+    // the case's instance is fixed by the elements all the same.
+    assert_eq!(call("g.JustsIn", &[ints(&[4, 5])]), Val::S64(9));
     assert_eq!(
         call("g.Labels", &[Val::List(vec![text("a"), text("b")])]),
         text("a!b!")

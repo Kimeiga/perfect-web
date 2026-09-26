@@ -80,9 +80,11 @@ is never a component.
   - a generic record built and read;
   - two instances of one record in one body;
   - a generic sum type built and matched;
-  - `Box<Box<Int>>`;
+  - `Box<Box<Int>>`, held flat, and laid out with the outer instance defined
+    before the inner;
   - a generic opaque type;
-  - a generic case as a function, and records built in a lambda;
+  - a generic case as a function, inside a generic function's instance too,
+    and records built in a lambda;
   - the refusal of a parameter nothing fixes.
 - **`compiler/pw-conformance/tests/wit_names.rs`:** a type and a query of
   one name.
@@ -94,6 +96,13 @@ is never a component.
   e10-generics`, 9 mutants.
   - ADR-0054's control "a piped value does not build an opaque value" is
     re-anchored where this moved its code.
+  - **The first recorded run killed 7 of 9.** No test laid out an outer
+    instance before its inner one, so a recursion guard keyed by declaration
+    alone survived: the inner was defined first and remembered. No test
+    passed a case as a function where the substitution already held
+    something, so fixing the instance from its first field alone survived.
+    The two assertions above were added for them, and each fails under its
+    mutant.
 
 ## Not done
 
@@ -103,3 +112,11 @@ is never a component.
   instance. `x => if c { Either.Left(x) } else { Either.Right("") }` is
   refused. The backend infers an instance locally, and the checker's
   unification across the branches is not carried to it.
+- **A function passed to a generic declaration.** Found writing the
+  controls' tests: `fn apply<A, B>(a: A, f: fn(A) -> B) -> B`, called
+  `apply(n, x => x + 1)`, is refused by name: "a lambda whose type nothing
+  fixes". So are `apply(n, inc)` and a case passed so. An argument's
+  expected type is its parameter's declared type, and the backend does not
+  carry what the earlier arguments fixed into it. A list operation's
+  function is typed by its elements (ADR-0040), and a non-generic
+  declaration's by its parameter, so neither is affected.
