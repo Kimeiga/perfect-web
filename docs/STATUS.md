@@ -78,6 +78,18 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a correct handler was refused**
+([ADR-0111](DECISIONS/ADR-0111-a-shorthand-field-reads-its-capture.md)). A
+handler capturing `item` and building `Pick { n: 1, item }` was refused by
+PW5017. The capture paths, the handler artifact and the backend each saw a
+capture only through a name or a field path, and a shorthand field has
+neither, so the artifact read nothing of `item` and the backend could not
+build the record. It reads its capture whole in all three now, and the
+handler compiles.
+
+Evidence: [capture-shorthand.txt](evidence/E10/capture-shorthand.txt)
+(`just e10-capture-shorthand`).
+
 **Correction, 2026-09-26: `pw check` passed a handler its build refuses**
 ([ADR-0110](DECISIONS/ADR-0110-a-resumable-handler-reads-what-it-captures.md)).
 A resumable handler runs later, in the browser, with what it captured.

@@ -1899,8 +1899,10 @@ impl<'a> Lower<'a> {
             };
             given.push(match init.value {
                 Some(e) => Given::Expr(e),
-                // `Point { x, y }`: the shorthand names a binding.
-                None => match self.locals.get(field) {
+                // `Point { x, y }`: the shorthand names a binding, or, in a
+                // handler, what it captured (ADR-0111), unless a binding
+                // shadows it, as for a path.
+                None => match self.locals.get(field).or_else(|| self.captured.get(field)) {
                     Some(v) => Given::Value(*v),
                     None => {
                         return Lowering::Blocked {

@@ -792,3 +792,11 @@ is still a promise.
 `pw emit-handlers` refused it, "`item` is not bound here": `pw check` passed
 a program its build refuses. A handler reads what it captures and what it
 binds itself now (PW5025).
+
+## 2026-09-26: a shorthand field reads its capture (E10)
+
+[ADR-0111](DECISIONS/ADR-0111-a-shorthand-field-reads-its-capture.md): a
+handler capturing `item` and building `Pick { n: 1, item }` was refused by
+PW5017, a program with nothing wrong in it. The capture paths, the handler
+artifact and the backend each read a capture through a name or a field path
+only. A shorthand field reads its capture whole in all three now.

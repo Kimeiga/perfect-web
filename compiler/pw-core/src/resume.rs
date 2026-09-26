@@ -372,6 +372,20 @@ pub(crate) fn capture_paths(body: &crate::hir::Body, lambda: ExprId) -> Vec<Stri
         if inner_links.contains(&e) {
             continue;
         }
+        // `Pick { n: 1, item }` reads `item` whole: a shorthand field is a
+        // name with no expression of its own (ADR-0111).
+        if let Expr::Record { fields, .. } = body.expr(e) {
+            for f in fields.iter().filter(|f| f.value.is_none()) {
+                if let Some(capture) = captured.iter().find(|c| covers(c, &f.name)) {
+                    let root = capture.split('.').next().unwrap_or(capture);
+                    read.insert(if rebound.contains(root) {
+                        capture.clone()
+                    } else {
+                        f.name.clone()
+                    });
+                }
+            }
+        }
         // `item.describe()` calls a method; it does not read a field named
         // `describe`. The receiver below it is still visited.
         if let Expr::Call { callee, .. } = body.expr(e)

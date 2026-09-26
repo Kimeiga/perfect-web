@@ -135,10 +135,16 @@ fn artifact_of(
     let mentioned: Vec<String> = body
         .walk_from(*inner)
         .into_iter()
-        .filter_map(|e| match body.expr(e) {
-            Expr::Name(n) => Some(n.clone()),
-            Expr::Field { .. } => Some(crate::infer::path_of(body, e)),
-            _ => None,
+        .flat_map(|e| match body.expr(e) {
+            Expr::Name(n) => vec![n.clone()],
+            Expr::Field { .. } => vec![crate::infer::path_of(body, e)],
+            // `Pick { n: 1, item }` mentions `item` (ADR-0111).
+            Expr::Record { fields, .. } => fields
+                .iter()
+                .filter(|f| f.value.is_none())
+                .map(|f| f.name.clone())
+                .collect(),
+            _ => Vec::new(),
         })
         .collect();
     let accepted: Vec<(String, Option<crate::resolved::ResolvedType>)> = declared

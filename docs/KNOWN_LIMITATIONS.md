@@ -318,6 +318,12 @@ awaited in order. What remains:
   first value on a Marko page, and a speculation on it stays. PW5106 and
   PW5107 accept both kinds of reach, and the dev server honours both
   (ADR-0105).
+- **Only a resumable handler runs in the browser.** The runtime attaches
+  what `decide` authorises from a resume manifest, and a plain lambda,
+  `on:press={() => clear_cart()}`, or a named function has none, so its
+  element is left inert and the press is logged, not run. `pw check`
+  accepts such a handler, as the corpus writes them (ruling needed: what a
+  handler that is not resumable compiles to).
 - **The dev server computes one event key: `current_session()`**
   (ADR-0104). It commits the events a command declares, and refuses a
   command whose event carries anything else, such as its own argument, until

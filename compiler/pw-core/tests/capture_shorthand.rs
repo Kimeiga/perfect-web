@@ -1,13 +1,19 @@
-//! **A resumable handler reads what it captures** (ADR-0110).
+//! **A shorthand field reads its capture** (ADR-0111).
 //!
-//! A resumable handler runs later, in the browser, with what it captured and
-//! nothing else: its captures are written into the document when the page
-//! renders and read back when it runs. Until 2026-09-26 `resumable() =>
-//! add_to_cart(item.id, ..)` inside `{#each menu as item}` checked, and
-//! `pw emit-handlers` refused it: "`item` is not bound here". Each test
-//! states one case, with a control.
+//! A resumable handler's capture paths say what the document must carry for
+//! it: `item.id` when it reads `item.id`, the whole `item` when it reads
+//! `item`. A record's shorthand field, `Pick { n: 1, item }`, reads `item`
+//! with no expression of its own, and until 2026-09-26 the paths did not
+//! count it. The handler read nothing of `item` by its artifact, the manifest
+//! captured `item`, and PW5017 refused a program with nothing wrong in it.
+//! The handler backend read a shorthand field from bindings alone, so once
+//! checked, the handler was still refused: "`item` is not bound here".
 
-use pw_core::check::check_sources;
+use pw_core::backend::js;
+use pw_core::backend::wasm::Encoding;
+use pw_core::check::{Unit, check_sources};
+use pw_core::lower::lower_file;
+use pw_syntax::parse_tree;
 
 fn program(src: &str) -> Vec<(String, String)> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -71,57 +77,50 @@ fn page_with(extra: &str, handler: &str) -> String {
 }
 
 #[test]
-fn a_handler_reads_what_it_captures() {
-    assert_eq!(
-        reported(&page("resumable() => add_to_cart(item.id, PositiveInt(1))")),
-        ["PW5025 `ShopPage`'s handler reads `item`, which it does not capture"],
-    );
-    // The controls: the store's own handler, and one binding its own value
-    // beside the program's declarations, which are not captures.
-    let found = reported(&page(
-        "resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))",
-    ));
-    assert!(found.is_empty(), "{found:#?}");
-    let found = reported(&page(
-        "resumable(captures = { item }) => {\n                        \
-         let quantity = PositiveInt(1)\n                        \
-         add_to_cart(item.id, quantity)\n                    }",
-    ));
-    assert!(found.is_empty(), "{found:#?}");
-}
-
-#[test]
-fn a_page_parameter_is_captured_too() {
-    // `id` is the page's, bound where it renders. Read twice, reported once.
-    assert_eq!(
-        reported(&page(
-            "resumable(captures = { item }) => {\n                        \
-             let _store = id\n                        \
-             let _again = id\n                        \
-             add_to_cart(item.id, PositiveInt(1))\n                    }",
-        )),
-        ["PW5025 `ShopPage`'s handler reads `id`, which it does not capture"],
-    );
-}
-
-#[test]
-fn a_shorthand_field_reads_its_name() {
-    // `Pick { n: 1, item }` reads `item`, and nothing else in the handler
-    // does. A first field written short is a block (KNOWN_LIMITATIONS).
+fn a_capture_read_through_a_shorthand_field_is_read() {
     let pick = "type Pick = Pick { n: Int, item: MenuItem }\n\n\
                 fn chosen(p: Pick) -> MenuItemId !{} {\n    p.item.id\n}\n\n";
-    assert_eq!(
-        reported(&page_with(
-            pick,
-            "resumable() => add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1))",
-        )),
-        ["PW5025 `ShopPage`'s handler reads `item`, which it does not capture"],
-    );
-    // The control: captured, and a shorthand read of a capture is a read of
-    // it (ADR-0111).
     let found = reported(&page_with(
         pick,
         "resumable(captures = { item }) => add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1))",
     ));
     assert!(found.is_empty(), "{found:#?}");
+    // The control: a capture read through a field, as the store reads it.
+    let found = reported(&page(
+        "resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))",
+    ));
+    assert!(found.is_empty(), "{found:#?}");
+}
+
+/// The handler of `page_with(extra, handler)`, compiled, or why not.
+fn compiled(extra: &str, handler: &str) -> Result<String, String> {
+    let units: Vec<Unit> = program(&page_with(extra, handler))
+        .into_iter()
+        .map(|(path, src)| Unit {
+            path,
+            hir: lower_file(&src, &parse_tree(&src).green),
+            src,
+        })
+        .collect();
+    let compiled = js::compile(&units).map_err(|e| format!("{e:?}"))?;
+    let [one] = compiled.as_slice() else {
+        return Err(format!("{} handlers", compiled.len()));
+    };
+    match &one.module {
+        Encoding::Encoded(m) => Ok(m.source.clone()),
+        other => Err(format!("{other}")),
+    }
+}
+
+#[test]
+fn a_handler_builds_a_record_from_a_capture() {
+    let pick = "type Pick = Pick { n: Int, item: MenuItem }\n\n\
+                fn chosen(p: Pick) -> MenuItemId !{} {\n    p.item.id\n}\n\n";
+    let source = compiled(
+        pick,
+        "resumable(captures = { item }) => add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1))",
+    )
+    .unwrap_or_else(|e| panic!("the handler compiles: {e}"));
+    // It reads the whole item from what the document carries.
+    assert!(source.contains("context.captures[\"item\"]"), "{source}");
 }
