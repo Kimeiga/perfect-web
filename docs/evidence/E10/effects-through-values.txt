@@ -1,0 +1,33 @@
+ADR-0078 - an effect is performed where its function is named
+
+produced by: just e10-effects-through-values
+commit: 58dfe1f2ac6b119a1cdd613673dd19f56f296ea6
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== effects through values (compiler/pw-core/tests/effects_through_values.rs)
+
+test a_binding_named_like_a_function_is_its_value ... ok
+test the_diagnostic_says_it_was_named_as_a_value ... ok
+test a_function_named_in_a_handler_is_the_handlers ... ok
+test a_helper_without_a_row_carries_what_it_performs ... ok
+test a_function_named_as_a_value_performs_its_effects_where_it_is_named ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+== the generality witnesses (compiler/pw-core/tests/generality.rs)
+
+test every_witness_names_a_registered_invariant ... ok
+test every_headline_invariant_has_a_challenge_matrix ... ok
+test generality_is_reported_separately_from_conformance ... ok
+test every_witness_is_valid_evidence ... ok
+test a_general_witness_is_caught_and_a_narrow_one_is_not ... ok
+test a_witness_is_valid_except_for_the_invariant_it_is_about ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.63s
+
+== mutation controls (scripts/effect_value_mutations.py)
+
+baseline: 11 passed, 0 failed
+a function named as a value is not counted: KILLED (4 of 11 tests fail)
+a binding in scope is read as the declaration it shadows: KILLED (1 of 11 tests fail)
+a helper declaring no row carries only what it calls: KILLED (1 of 11 tests fail)
+a function named as a value is said to be called: KILLED (1 of 11 tests fail)
+4 of 4 mutants killed
