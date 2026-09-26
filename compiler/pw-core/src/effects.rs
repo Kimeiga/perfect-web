@@ -1034,6 +1034,19 @@ pub fn nondeterministic(effect: &str) -> bool {
     matches!(family_of(effect), "random") || effect.starts_with("clock.wall")
 }
 
+/// What a database effect reaches: `Carts` in `database.write<Carts>`, when
+/// its operation is `operation` (ADR-0101).
+///
+/// The domain is the argument as written, as a capability's is, so
+/// `database.read<Carts>` and `database.write<Carts>` reach one domain. An
+/// effect with no argument reaches none this can name.
+pub fn database_domain<'e>(effect: &'e str, operation: &str) -> Option<&'e str> {
+    let (head, rest) = effect.split_once('<')?;
+    let domain = rest.strip_suffix('>')?.trim();
+    (head.trim().strip_prefix("database.") == Some(operation) && !domain.is_empty())
+        .then_some(domain)
+}
+
 /// Does `effect` change the state a query reads? A write, or a transaction,
 /// which exists to hold writes (ADR-0100).
 fn writes(effect: &str) -> bool {
@@ -1369,6 +1382,25 @@ mod tests {
                 "a command writes: {effect}"
             );
         }
+    }
+
+    /// ADR-0101: a read and a write of one domain reach it, and an operation
+    /// reaches only its own.
+    #[test]
+    fn a_database_effect_names_its_domain() {
+        assert_eq!(
+            database_domain("database.write<Carts>", "write"),
+            Some("Carts")
+        );
+        assert_eq!(
+            database_domain("database.read< Carts >", "read"),
+            Some("Carts")
+        );
+        assert_eq!(database_domain("database.read<Carts>", "write"), None);
+        assert_eq!(database_domain("database.write<Carts>", "read"), None);
+        assert_eq!(database_domain("secret.write<Carts>", "write"), None);
+        assert_eq!(database_domain("database.transaction", "write"), None);
+        assert_eq!(database_domain("database.write<>", "write"), None);
     }
 
     #[test]

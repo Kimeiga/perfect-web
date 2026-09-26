@@ -113,6 +113,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // in one module depends on a query in another, so a per-file graph would
     // report a dangling edge for exactly the case the milestone is about.
     let graph = crate::graph::Graph::build(&hirs, &workspace);
+    // ADR-0101: what a command's write has to reach, over every unit, since
+    // a command in one module writes what a query in another reads.
+    let readers = cached_readers(&inference, &hirs);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -135,6 +138,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(listener_keys(&u.hir, &u.src));
         // ADR-0092: a graph clause belongs to a declaration that can mean it.
         per_unit.extend(clauses_in_place(&u.hir));
+        // ADR-0101: a command invalidates what it writes.
+        per_unit.extend(writes_invalidated(&inference, &graph, &readers, i, &u.hir));
         // ADR-0090: the declaration rules. Only `pw check` ran them, beside
         // this function; `pw build` checks through here, and compiled what
         // they refuse: R-015's `retry forever` became a component.
@@ -674,6 +679,195 @@ fn clauses_in_place(hir: &Hir) -> Vec<Diagnostic> {
                     description: format!("move `{}` to {whom}, or remove it", p.name),
                     replacement: None,
                 }],
+            });
+        }
+    }
+    out
+}
+
+/// A cached reader of the database, whose entries a write has to reach
+/// (ADR-0101).
+struct Reader {
+    /// Its graph node, `Module.Name`.
+    path: String,
+    name: String,
+    unit: usize,
+    id: hir::DeclId,
+    /// The domains it reads: `Carts` for `database.read<Carts>`.
+    reads: BTreeSet<String>,
+}
+
+/// Every query, subscription and resource that reads the database and
+/// declares no staleness window.
+///
+/// A positive `freshness` is left out: its entries may be that stale by its
+/// own declaration, and expire. **(ruling needed)**
+fn cached_readers(inference: &crate::effects::Inference, hirs: &[&Hir]) -> Vec<Reader> {
+    let mut out = Vec::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if !matches!(
+                decl.kind,
+                DeclKind::Query | DeclKind::Subscription | DeclKind::Resource
+            ) {
+                continue;
+            }
+            if decl
+                .policy("freshness")
+                .is_some_and(|f| crate::policy::duration(&f.value).is_some_and(|ms| ms > 0))
+            {
+                continue;
+            }
+            let reads: BTreeSet<String> = inference
+                .effective_effects(unit, hir, id)
+                .iter()
+                .filter_map(|e| crate::effects::database_domain(e, "read"))
+                .map(str::to_string)
+                .collect();
+            if reads.is_empty() {
+                continue;
+            }
+            out.push(Reader {
+                path: crate::graph::path_of(hir, id),
+                name: decl.name.clone(),
+                unit,
+                id,
+                reads,
+            });
+        }
+    }
+    out
+}
+
+/// **A command invalidates what it writes** (ADR-0101).
+///
+/// Invalidation is explicit (ADR-0007): the platform learns that an entry
+/// changed only from a command's `invalidates` and `emits`. A command that
+/// performs `database.write<T>` reaches each cached reader of `T`, by name or
+/// through an event the reader listens for. Until 2026-09-26 one that
+/// declared neither checked, and every page kept the cart from before.
+fn writes_invalidated(
+    inference: &crate::effects::Inference,
+    graph: &crate::graph::Graph,
+    readers: &[Reader],
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    use crate::graph::{EdgeKind, NodeKind};
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if decl.kind != DeclKind::Command {
+            continue;
+        }
+        let path = crate::graph::path_of(hir, id);
+        // A clause naming nothing, or a declaration of another kind, is
+        // PW5100's or PW5103's to report, and what it meant is not known.
+        let refused =
+            graph.dangling.iter().any(|d| {
+                d.from == path && matches!(d.kind, EdgeKind::Invalidates | EdgeKind::Emits)
+            }) || graph.edges.iter().any(|e| {
+                e.from == path
+                    && match (e.kind, graph.node(&e.to).map(|n| &n.kind)) {
+                        (EdgeKind::Invalidates, Some(NodeKind::Resource { .. }))
+                        | (EdgeKind::Emits, Some(NodeKind::Event)) => false,
+                        (kind, _) => matches!(kind, EdgeKind::Invalidates | EdgeKind::Emits),
+                    }
+            });
+        if refused {
+            continue;
+        }
+        let writes: BTreeSet<String> = inference
+            .effective_effects(unit, hir, id)
+            .iter()
+            .filter_map(|e| crate::effects::database_domain(e, "write"))
+            .map(str::to_string)
+            .collect();
+        if writes.is_empty() {
+            continue;
+        }
+        let sources = decl
+            .body
+            .map(|b| inference.infer_at(unit, hir.body(b)).sources)
+            .unwrap_or_default();
+        for r in readers {
+            let shared: Vec<&str> = writes.intersection(&r.reads).map(String::as_str).collect();
+            if shared.is_empty() || graph.invalidates(&path, &r.path) {
+                continue;
+            }
+            let reader = if r.unit == unit {
+                r.name.clone()
+            } else {
+                r.path.clone()
+            };
+            // The call that writes, when the body makes one.
+            let at = sources
+                .iter()
+                .find(|s| crate::effects::database_domain(&s.effect, "write") == Some(shared[0]))
+                .map(|s| s.span.clone())
+                .unwrap_or_else(|| decl.name_span.clone());
+            let mut related = vec![Related {
+                span: hir.decl_span(id),
+                label: format!("`{}` is the command", decl.name),
+            }];
+            if r.unit == unit {
+                related.push(Related {
+                    span: hir.decl_span(r.id),
+                    label: format!("`{}` reads `{}`", r.name, shared.join("`, `")),
+                });
+            }
+            let events: Vec<String> = graph
+                .edges
+                .iter()
+                .filter(|e| e.kind == EdgeKind::InvalidatedBy && e.from == r.path)
+                .filter_map(|e| graph.node(&e.to).map(|n| format!("`{}`", n.name)))
+                .collect();
+            out.push(Diagnostic {
+                code: crate::codes::WRITE_NOT_INVALIDATED.id,
+                invariant: crate::codes::WRITE_NOT_INVALIDATED.invariant,
+                reason: "write_not_invalidated",
+                detector: Detector::ResourceGraph,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` writes `{}` and does not invalidate `{reader}`, which reads it",
+                    decl.name,
+                    shared.join("`, `")
+                ),
+                primary_span: at,
+                related,
+                explanation: Some(format!(
+                    "Invalidation is explicit (ADR-0007): the platform learns that an entry \
+                     changed only from what a command declares. `invalidates` names a \
+                     resource whose entries it drops, and `emits` a typed event, which drops \
+                     the entries of each resource listening for it with `invalidates_on`. \
+                     `{reader}` reads what `{}` writes and declares no staleness window, so \
+                     after the write its entries, the page bindings they fill and the \
+                     fragments built from them keep the value from before, and nothing \
+                     refreshes them.",
+                    decl.name
+                )),
+                repairs: vec![
+                    Repair {
+                        description: format!(
+                            "declare `invalidates {}(..)` on `{}`",
+                            r.name, decl.name
+                        ),
+                        replacement: None,
+                    },
+                    Repair {
+                        description: if events.is_empty() {
+                            format!(
+                                "or emit an event, and have `{reader}` listen for it \
+                                 with `invalidates_on`"
+                            )
+                        } else {
+                            format!(
+                                "or emit {}, which `{reader}` listens for",
+                                events.join(" or ")
+                            )
+                        },
+                        replacement: None,
+                    },
+                ],
             });
         }
     }

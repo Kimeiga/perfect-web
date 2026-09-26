@@ -422,6 +422,10 @@ codes! {
         "a listener's argument is one of its declaration's parameters, or `_`";
     CLAUSE_NAMES_ANOTHER_KIND = "PW5103" / clause_names_another_kind / 1, ResourceGraph,
         "a clause names a declaration of its kind: a resource to read or invalidate, an event to emit or listen for";
+    // ADR-0101: `add_to_cart` without `invalidates` or `emits` checked until
+    // 2026-09-26, and the cart it wrote stayed as it was on every page.
+    WRITE_NOT_INVALIDATED = "PW5106" / write_not_invalidated / 1, ResourceGraph,
+        "a command invalidates what it writes: each cached reader of the data it changes, by name or through an event the reader listens for";
 
     // --- what a capability names (PW52xx, E8) -----------------------------
     //

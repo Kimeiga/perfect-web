@@ -433,6 +433,24 @@ impl Graph {
         self.nodes.iter().find(|n| n.path == path)
     }
 
+    /// Does `command` invalidate `resource`'s entries (ADR-0101)?
+    ///
+    /// It names the resource in `invalidates`, or emits an event the resource
+    /// listens for with `invalidates_on`. Nothing else reaches an entry: the
+    /// materializer drops what listens for a committed event, and no more.
+    pub fn invalidates(&self, command: &str, resource: &str) -> bool {
+        self.edges.iter().any(|e| {
+            e.from == command
+                && match e.kind {
+                    EdgeKind::Invalidates => e.to == resource,
+                    EdgeKind::Emits => self.edges.iter().any(|l| {
+                        l.kind == EdgeKind::InvalidatedBy && l.from == resource && l.to == e.to
+                    }),
+                    _ => false,
+                }
+        })
+    }
+
     /// Everything an event's arrival regenerates, transitively.
     ///
     /// The gate question in one call: `affected_by("Events.MenuChanged")` must
@@ -596,6 +614,11 @@ fn qualified(module: &str, name: &str) -> String {
     } else {
         format!("{module}.{name}")
     }
+}
+
+/// The node a declaration is: `Module.Name`, as [`Graph::build`] names it.
+pub(crate) fn path_of(hir: &Hir, id: crate::hir::DeclId) -> String {
+    qualified(hir.module_of(id).unwrap_or_default(), &hir.decl(id).name)
 }
 
 fn node_kind(decl: &Decl) -> Option<NodeKind> {

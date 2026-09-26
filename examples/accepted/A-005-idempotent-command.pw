@@ -22,6 +22,11 @@ import Resources.{ Cart }
 // and this command's own `invalidates Cart(current_session())` — so the repair
 // is the name, not a new platform operation.
 import context.{ current_session }
+// The command writes `Carts`, which A-004's `Cart` reads as well as the
+// library's. `invalidates` drops the entry this module imports; the event
+// reaches every cart query that listens for it. Until 2026-09-26 nothing
+// told A-004's cart that it had changed (ADR-0101).
+import Events.{ CartChanged }
 
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<domain.Cart, CartError>
@@ -30,6 +35,7 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     transaction   serializable
     optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
     invalidates   Cart(current_session())
+    emits         CartChanged(current_session())
     retry         transport_only(max = 2, jitter = true)
 {
     // Revalidate availability inside the transaction, not before it.

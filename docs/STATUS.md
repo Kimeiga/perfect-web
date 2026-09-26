@@ -78,6 +78,25 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a command's write reached no reader, in the
+accepted corpus too**
+([ADR-0101](DECISIONS/ADR-0101-a-command-invalidates-what-it-writes.md)). A
+command that writes the cart and declares neither `invalidates` nor `emits`
+checked, and nothing told the queries reading the cart that it had changed.
+- The accepted corpus is one program. In it, A-005's `add_to_cart`
+  invalidated the library's stub `Cart`. A-004's `Cart` has zero staleness
+  and read-your-writes, and was told nothing.
+- Five generality witnesses cleared the cart the same way.
+- The dev server hid it: it emits `CartChanged` after any cart write,
+  whatever the command declares (KNOWN_LIMITATIONS).
+
+A command now reaches each reader of what it writes that has no staleness
+window, by name or by an event the reader listens for (PW5106). A-004 listens
+for `CartChanged`; A-005 and the witnesses emit it.
+
+Evidence: [writes-invalidated.txt](evidence/E10/writes-invalidated.txt)
+(`just e10-writes-invalidated`).
+
 **2026-09-26: a query reads**
 ([ADR-0100](DECISIONS/ADR-0100-a-query-reads.md)). A `session query` whose
 body was `Carts.clear(current_session())` checked. The platform caches,

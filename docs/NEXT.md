@@ -154,7 +154,19 @@ declared event~~ (ADR-0093); ~~code a template writes~~ (ADR-0094: a script
 element, an inline handler, a script URL, `srcdoc`, a stylesheet's value);
 ~~an attribute's context read by its written case~~ (ADR-0095); ~~a `<base>`
 and an animated link~~ (ADR-0096); ~~a page's embedded JSON~~ (ADR-0097);
-~~a name written twice~~ (ADR-0098). Next, each needing a ruling first:
+~~a name written twice~~ (ADR-0098); ~~a failure nothing handles~~
+(ADR-0099); ~~a write inside a query~~ (ADR-0100); ~~a command's write that
+invalidates nothing~~ (ADR-0101), which found A-005 leaving A-004's cart
+stale. Next, in order:
+1. **a materialization is not reached through what it reads.** The
+   materializer invalidates a committed event's direct listeners and nothing
+   that depends on them, and `Graph::affected_by` follows reads. A-009's
+   `MenuFragment` depends on `Store(id)` and does not listen for
+   `StoreChanged`, so a renamed store keeps its old fragment (ADR-0101);
+2. **the dev server emits `CartChanged` after any cart write**, whatever
+   the command declares; it reads no command's `emits` (ADR-0101).
+
+Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates
   are declared nowhere (KNOWN_LIMITATIONS). The first, being security;
 - head elements in a body, `<meta>` and `<link>` (ADR-0096);

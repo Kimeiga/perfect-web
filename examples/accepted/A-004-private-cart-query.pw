@@ -14,14 +14,18 @@ import domain.{ Cart, CartError }
 import capability.{ Session, SessionId }
 
 import Carts
+import Events.{ CartChanged }
 
 session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
-    freshness     0.seconds
-    consistency   read_your_writes
-    cache         private
-    concurrency   one_per_key
-    on_key_change cancel
-    timeout       2.seconds
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    // Zero staleness holds only if the cart hears of each write: A-005's
+    // `add_to_cart` emits this. Until 2026-09-26 nothing did (ADR-0101).
+    invalidates_on CartChanged(session)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
 {
     Carts.current(session)
 }

@@ -708,3 +708,12 @@ binding that says so discards it by name.
 a cart checked, and the platform caches, deduplicates and retries a query as
 a read. A query or a subscription that writes or opens a transaction is
 refused (PW0401); a mutation is a command's.
+
+## 2026-09-26: a command invalidates what it writes (E10)
+
+[ADR-0101](DECISIONS/ADR-0101-a-command-invalidates-what-it-writes.md): a
+command that wrote the cart and declared neither `invalidates` nor `emits`
+checked, and nothing told the queries reading the cart that it had changed.
+A-005 told the library's stub and not A-004's cart. A command reaches each
+reader of what it writes that has no staleness window: by name, or by an event
+the reader listens for (PW5106).

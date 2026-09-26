@@ -448,3 +448,32 @@ folds, and so is every element of a list that holds one secret.
 elements (charter §7.8). **If false** (if labels were tracked per element):
 each such binding's label would be its element's, and a lambda's parameters
 would take theirs from the callee's declared function type.
+
+## A-025 — a database effect's argument names the data it reaches
+
+**Status:** `open`, ruling needed (2026-09-26, ADR-0101).
+
+`database.write<Carts>` changes what `database.read<Carts>` reads, and
+nothing else: a write reaches the readers of its argument as written, as a
+capability's identity is its argument (`contract.rs`). A row with no argument
+or the family alone (`!{ database }`) names no domain, and PW5106 matches
+nothing to it.
+
+**Validated by** the ontology stating what a database effect's argument
+denotes: a table, a module's data, or a type. **If false** (if two spellings
+could name one domain, or a family row were a write of everything): readers
+would be matched by resolved identity, and a family row by every domain.
+
+## A-026 — a declared staleness window excuses a command from invalidating
+
+**Status:** `open`, ruling needed (2026-09-26, ADR-0101).
+
+A query that declares `freshness 5.minutes` has said its entries may be five
+minutes old. A command writing what it reads need not invalidate it, since the
+entries expire. Charter §9.4 admits time-based freshness "as a fallback or
+explicit policy". A reader with no window, or a zero one, must be invalidated.
+
+**Validated by** the owner confirming a window is an invalidation source (as
+PW0200 already treats one for a shared cache). **If false** (if a command
+must reach every reader of what it writes): PW5106 would hold every reader,
+and a public aggregate read by many would be invalidated by every write.

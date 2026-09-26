@@ -1268,6 +1268,21 @@ e10-query-reads:
      } > docs/evidence/E10/query-reads.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/query-reads.txt
 
+# ADR-0101: a command invalidates what it writes. Its tests, and the
+# mutation controls.
+e10-writes-invalidated:
+    @{ echo "ADR-0101 - a command invalidates what it writes"; echo; \
+       echo "produced by: just e10-writes-invalidated"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== writes invalidated (compiler/pw-core/tests/writes_invalidated.rs, effects.rs)"; echo; \
+       cargo test --locked -p pw-core --test writes_invalidated 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-core --lib a_database_effect_names_its_domain 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/write_invalidation_mutations.py)"; echo; \
+       python3 scripts/write_invalidation_mutations.py; \
+     } > docs/evidence/E10/writes-invalidated.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/writes-invalidated.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

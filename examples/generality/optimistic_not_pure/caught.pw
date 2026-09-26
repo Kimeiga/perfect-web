@@ -12,6 +12,9 @@ import domain
 import domain.{ MenuItemId, CartError }
 import Resources.{ Cart }
 import context.{ current_session }
+// The accepted corpus's `Cart` reads what this command writes, and listens
+// for this event (ADR-0101).
+import Events.{ CartChanged }
 
 // Keep the result type correct while deliberately performing external work.
 fn impure_read(cart: domain.Cart) -> domain.Cart {
@@ -27,6 +30,7 @@ command remove_from_cart(item: MenuItemId)
     // invariant is about any effect, not about one family.
     optimistic    Cart(current_session()) as cart => impure_read(cart)
     invalidates   Cart(current_session())
+    emits         CartChanged(current_session())
 {
     Carts.clear(current_session())
 }

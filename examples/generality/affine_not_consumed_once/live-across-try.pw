@@ -11,10 +11,14 @@ module generality.affine_try
 import Carts
 import Database
 import context.{ current_session }
+// The accepted corpus's `Cart` reads what this command writes, and listens
+// for this event (ADR-0101).
+import Events.{ CartChanged }
 import domain.{ CartError }
 
 command clear_cart() -> Result<(), CartError>
     requires SignedIn
+    emits CartChanged(current_session())
 {
     let tx = Database.begin()
     Carts.clear(current_session())?

@@ -302,6 +302,20 @@ awaited in order. What remains:
   every analysis. Its values are checked by their domains (ADR-0089).
 - **Which declarations a policy belongs to is checked for the four graph
   clauses only** (ADR-0092).
+- **A command's write is matched to its readers by domain, not by key**
+  (ADR-0101). PW5106 requires a command writing `Carts` to reach each
+  cart reader with no staleness window. It does not check that the event
+  it emits carries the key of the entry it wrote. A reader with a positive
+  `freshness` is exempt (A-026), and a row naming only the family,
+  `!{ database }`, matches nothing (A-025).
+- **A materialization is not reached through what it reads** (ADR-0101).
+  The materializer invalidates the direct listeners of a committed event
+  and nothing that depends on them. A-009's `MenuFragment` depends on
+  `Store(id)`, and a `StoreChanged` drops the store and leaves the fragment
+  built from it (NEXT).
+- **The dev server emits `CartChanged` after any cart write**, whatever the
+  command declares; it reads no command's `emits` (ADR-0101). A command that
+  emits nothing works there and nowhere else (NEXT).
 - **A `style` attribute's value is escaped by refusing what executes**
   (`expression(`, a script scheme in `url(`), then as an attribute. A style
   can still load a URL the value names. A `<style>` element holds text only
