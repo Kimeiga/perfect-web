@@ -1667,11 +1667,20 @@ impl<'a> P<'a> {
                 self.finish();
             }
             Kind::Ident => {
-                // A constructor pattern if it takes arguments; a binding otherwise.
-                let is_ctor = self.nth_is(1, Kind::LParen);
+                // A constructor pattern if it takes arguments, or if it is
+                // qualified by its type (`Shape.Empty`); a binding otherwise,
+                // which is one name. Until 2026-09-26 `Shape.Empty` was a
+                // binding of that dotted name, so it matched everything, and
+                // `Shape.Circle(r)` did not parse (ADR-0059).
+                let mut after = 1;
+                while self.nth_is(after, Kind::Dot) && self.nth_is(after + 1, Kind::Ident) {
+                    after += 2;
+                }
+                let takes_args = self.nth_is(after, Kind::LParen);
+                let is_ctor = takes_args || after > 1;
                 self.start(if is_ctor { K::CtorPat } else { K::BindingPat });
                 self.dotted_name("a pattern");
-                if is_ctor {
+                if takes_args {
                     self.bump(); // (
                     loop {
                         if self.at(Kind::RParen) || self.at_eof() {

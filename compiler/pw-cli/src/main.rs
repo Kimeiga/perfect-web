@@ -165,7 +165,9 @@ fn explain_with(
                         if v.fields.is_empty() {
                             String::new()
                         } else {
-                            format!("({})", v.fields.join(", "))
+                            let fields: Vec<String> =
+                                v.fields.iter().map(|f| f.written()).collect();
+                            format!("({})", fields.join(", "))
                         }
                     );
                 }

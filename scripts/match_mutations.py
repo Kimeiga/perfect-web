@@ -49,8 +49,8 @@ MUTANTS = [
     (
         "a nested pattern is read against the scrutinee's type",
         CHECK,
-        ".map(|(a, t)| to_exhaust_pattern(env, body, *a, t, &program.type_name(t)))",
-        ".map(|(a, _)| to_exhaust_pattern(env, body, *a, ty, ty_name))",
+        "to_exhaust_pattern(env, body, qualifier, *a, t, &program.type_name(t))",
+        "to_exhaust_pattern(env, body, qualifier, *a, ty, ty_name)",
     ),
     (
         "a constructor its type lacks reads as a wildcard",

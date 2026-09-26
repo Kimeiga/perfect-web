@@ -269,8 +269,11 @@ impl Types {
     }
 
     fn push_type(&mut self, path: &str, unit: usize, d: &Decl, ws: &Workspace, def: DefId) {
+        // A union of any number of cases is a variant: one of one case was
+        // written as an empty record until 2026-09-26, and its payload was
+        // lost (ADR-0059).
         if let Some(variants) = &d.variants
-            && variants.len() > 1
+            && !variants.is_empty()
         {
             self.known.insert(path.to_string(), ident(path));
             self.defs.push(TypeDef::Variant {
@@ -282,7 +285,16 @@ impl Types {
                             v.name.clone(),
                             v.fields
                                 .iter()
-                                .map(|t| resolve_fragment(ws, unit, d, def, t))
+                                .map(|t| {
+                                    resolved::resolve(
+                                        ws,
+                                        unit,
+                                        Some(def),
+                                        &d.type_params,
+                                        t,
+                                        d.name_span.clone(),
+                                    )
+                                })
                                 .collect(),
                         )
                     })
@@ -290,9 +302,8 @@ impl Types {
             });
             return;
         }
-        // One variant, or none: a record. `type Store = Store { id: Int }` is
-        // the corpus's shape and the fields live on the single variant or on
-        // the declaration.
+        // Otherwise a record: `type Store = Store { id: Int }` is the corpus's
+        // shape, and its fields live on the declaration.
         // `f.ty` is the HEAD and `f.ty_args` its arguments, so a field written
         // `List<MenuItem>` is `("List", ["MenuItem"])` and reading only the
         // head produces `list` with nothing in it. `wit-parser` caught that on
@@ -356,28 +367,6 @@ fn mentions_parameter_of(ty: &ResolvedType, binder: DefId) -> bool {
 impl Types {
     fn is_phantom(&self, def: DefId) -> bool {
         self.phantom.contains(&def)
-    }
-}
-
-fn resolve_fragment(
-    ws: &Workspace,
-    unit: usize,
-    decl: &Decl,
-    def: DefId,
-    text: &str,
-) -> TypeResolution {
-    match crate::lower::type_fragment(text) {
-        Some(ty) => resolved::resolve(
-            ws,
-            unit,
-            Some(def),
-            &decl.type_params,
-            &ty,
-            decl.name_span.clone(),
-        ),
-        None => TypeResolution::Blocked {
-            why: format!("invalid type syntax `{text}`"),
-        },
     }
 }
 

@@ -207,7 +207,7 @@ fn a_match_over_a_list_is_refused_by_name() {
         "m.Q",
     );
     assert!(
-        err.contains("a match over something other than `Option` or `Result`"),
+        err.contains("a match over something other than a variant"),
         "{err}"
     );
 }

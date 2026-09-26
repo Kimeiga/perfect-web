@@ -441,8 +441,10 @@ pub struct TermRoot {
 #[derive(Debug, Clone)]
 pub struct VariantDef {
     pub name: String,
-    /// Field type names as written.
-    pub fields: Vec<String>,
+    /// Each payload's type, as written: a tree, so `Found(List<Entry>)`
+    /// keeps its argument (ADR-0059). They were spellings, re-parsed by each
+    /// reader, as an opaque type's representation was (ADR-0054).
+    pub fields: Vec<DeclaredType>,
     pub span: Span,
 }
 

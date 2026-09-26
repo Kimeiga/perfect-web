@@ -319,41 +319,67 @@ fn an_unimplemented_instruction_is_refused_rather_than_faked() {
     }
 }
 
-/// **A declared variant is not built** (ADR-0039 §6): a record is, and a
-/// variant's construction is refused rather than laid out as a record.
+/// **A declared variant is built by its case** (ADR-0059): `Instr::Case`
+/// writes the discriminant and the payload where `SizeAlign` puts them, and
+/// the module validates. A record's construction over a variant's type is
+/// an IR error, refused rather than laid out as a record, as it was refused
+/// by name before ADR-0059 built variants at all.
 #[test]
-fn building_a_declared_variant_is_refused() {
-    use pw_core::backend::ir::{Block, BlockId, Function, Instr, Terminator, Type, ValueId};
+fn a_declared_variant_is_built_by_its_case_and_never_as_a_record() {
+    use pw_core::backend::ir::{Block, BlockId, Const, Function, Instr, Terminator, Type, ValueId};
     use pw_core::resolve::DefId;
 
     let wit = "package t:t;\ninterface api {\n    variant v { a, b(s64) }\n    builds: func() -> v;\n}\nworld w {\n    export api;\n}\n";
     let (resolve, world) = component::world_of(wit, "w").expect("the control's WIT");
     let def = DefId { unit: 0, decl: 0 };
-    let f = Function {
+    let function = |instrs: Vec<Instr>, result: ValueId| Function {
         def,
         export: "builds".to_string(),
         params: vec![],
         ret: Type::Nominal(def),
         blocks: vec![Block {
             id: BlockId(0),
-            instrs: vec![Instr::Construct {
-                result: ValueId(0),
-                ctor: def,
-                args: vec![],
-                ty: Type::Nominal(def),
-            }],
-            terminator: Terminator::Return(ValueId(0)),
+            instrs,
+            terminator: Terminator::Return(result),
         }],
         capabilities: vec![],
         instance: vec![],
         callees: vec![],
         closures: vec![],
     };
-    match wasm::core_module(&resolve, world, &f, "builds", &[]) {
-        Encoding::Unsupported { construct, .. } => {
-            assert!(construct.contains("declared variant"), "{construct}")
-        }
-        other => panic!("a variant's construction must be refused by name: {other}"),
+    let case = function(
+        vec![
+            Instr::Const {
+                result: ValueId(0),
+                value: Const::Int(5),
+                ty: Type::Int,
+            },
+            Instr::Case {
+                result: ValueId(1),
+                case: 1,
+                fields: vec![ValueId(0)],
+                ty: Type::Nominal(def),
+            },
+        ],
+        ValueId(1),
+    );
+    match wasm::core_module(&resolve, world, &case, "builds", &[]) {
+        Encoding::Encoded(bytes) => validate(&bytes).expect("the module validates"),
+        other => panic!("`b(5)` must be built: {other}"),
+    }
+
+    let record = function(
+        vec![Instr::Construct {
+            result: ValueId(0),
+            ctor: def,
+            args: vec![],
+            ty: Type::Nominal(def),
+        }],
+        ValueId(0),
+    );
+    match wasm::core_module(&resolve, world, &record, "builds", &[]) {
+        Encoding::Blocked { why } => assert!(why.contains("not one"), "{why}"),
+        other => panic!("a record built over a variant must be refused: {other}"),
     }
 }
 

@@ -107,6 +107,9 @@ impl Env {
                         .fields
                         .iter()
                         .map(|f| {
+                            // By spelling, as before ADR-0059 kept the tree;
+                            // the analysis reads its table by name.
+                            let f = &f.written();
                             if let Some(t) = primitive(f) {
                                 return t;
                             }
@@ -254,7 +257,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     }
     for (i, u) in units.iter().enumerate() {
         let per_unit = resolution.entry(i).or_default();
-        per_unit.extend(unresolved_uses(&workspace, i, &u.hir));
+        per_unit.extend(unresolved_uses(&workspace, &hirs, i, &u.hir));
         // ADR-0047: a name used as a value resolves too, in lexical scope.
         per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));
         // Every effect row, against the declarations. Reported beside the
@@ -329,6 +332,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
 /// is left alone until types exist.
 fn unresolved_uses(
     workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
     unit: usize,
     hir: &Hir,
 ) -> Vec<Diagnostic> {
@@ -425,7 +429,20 @@ fn unresolved_uses(
                 // that made the class small enough to report — it names every
                 // owner, and the residue it leaves is what this reports.
                 if bare_call_is_unowned(workspace, unit, &path, &in_scope) {
-                    out.push(unresolved_bare_call(hir, decl, body, id, &path));
+                    // `Circle(3)`: a case, which is built through its type
+                    // (ADR-0059). The types it sees that declare one.
+                    let owners: Vec<String> = workspace
+                        .visible_types(unit)
+                        .into_iter()
+                        .filter_map(|def| crate::resolve::declaration(hirs, def))
+                        .filter(|d| {
+                            d.variants
+                                .as_ref()
+                                .is_some_and(|vs| vs.iter().any(|v| v.name == path))
+                        })
+                        .map(|d| d.name.clone())
+                        .collect();
+                    out.push(unresolved_bare_call(hir, decl, body, id, &path, &owners));
                 }
                 continue;
             };
@@ -835,7 +852,43 @@ fn bare_call_is_unowned(
     matches!(workspace.resolve(unit, path), Resolution::Unresolved)
 }
 
-fn unresolved_bare_call(hir: &Hir, decl: &Decl, body: &Body, id: ExprId, path: &str) -> Diagnostic {
+fn unresolved_bare_call(
+    hir: &Hir,
+    decl: &Decl,
+    body: &Body,
+    id: ExprId,
+    path: &str,
+    case_of: &[String],
+) -> Diagnostic {
+    // A case with a payload, written alone: what it is, and how it is built.
+    if !case_of.is_empty() {
+        let qualified: Vec<String> = case_of
+            .iter()
+            .map(|t| format!("`{t}.{path}(..)`"))
+            .collect();
+        return Diagnostic {
+            code: crate::codes::UNRESOLVED_NAME.id,
+            invariant: crate::codes::UNRESOLVED_NAME.invariant,
+            reason: "unqualified_case",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!("`{path}` does not resolve"),
+            primary_span: body.expr_span(id),
+            related: vec![Related {
+                span: hir.decl_span(decl_id_of(hir, decl)),
+                label: format!("called inside `{}`", decl.name),
+            }],
+            explanation: Some(format!(
+                "`{path}` is a case, not a function: a case with a payload is \
+                 built through its type, as the case's own declaration is \
+                 reached through it (ADR-0059). No term is called `{path}`."
+            )),
+            repairs: vec![Repair {
+                description: format!("write {}", qualified.join(" or ")),
+                replacement: None,
+            }],
+        };
+    }
     Diagnostic {
         code: crate::codes::UNRESOLVED_NAME.id,
         invariant: crate::codes::UNRESOLVED_NAME.invariant,
@@ -1357,15 +1410,34 @@ fn analyse_match(
         Ok(s) => s,
         Err((reason, ty)) => return (blocked(&reason, ty), Found::Nothing),
     };
+    // `Shape.Circle(r)`: the type a qualified pattern names, as the
+    // analysis's ADT, resolved where the match is written (ADR-0059).
+    let qualifier = |q: &str| {
+        use crate::resolve::{Namespace, Resolution};
+        let found = match q.contains('.') {
+            true => site.ws.resolve_path_in(site.at, Namespace::Type, q),
+            false => site.ws.resolve_in(site.at, Namespace::Type, q),
+        };
+        match found {
+            Resolution::Local(d) | Resolution::Imported { def: d, .. } => env.adt_of(d),
+            _ => None,
+        }
+    };
     let read: Vec<Result<Arm, PatternFault>> = arms
         .iter()
         .map(|a| {
-            to_exhaust_pattern(env, body, a.pat, &Type::Adt(subject.adt), &subject.name).map(
-                |pattern| Arm {
-                    pattern,
-                    span: body.pat_span(a.pat),
-                },
+            to_exhaust_pattern(
+                env,
+                body,
+                &qualifier,
+                a.pat,
+                &Type::Adt(subject.adt),
+                &subject.name,
             )
+            .map(|pattern| Arm {
+                pattern,
+                span: body.pat_span(a.pat),
+            })
         })
         .collect();
     // The audit's reason is the first fault, in the order an author would
@@ -1613,6 +1685,7 @@ enum PatternFault {
 fn to_exhaust_pattern(
     env: &Env,
     body: &Body,
+    qualifier: &dyn Fn(&str) -> Option<usize>,
     id: hir::PatternId,
     ty: &Type,
     ty_name: &str,
@@ -1672,11 +1745,18 @@ fn to_exhaust_pattern(
             Ok(EPat::Wildcard)
         }
         HPat::Ctor { path, args } => {
-            // `DecodeError.Invalid` and `Invalid` name the same constructor.
+            // `DecodeError.Invalid` and `Invalid` name the same constructor,
+            // where the qualifier names the type matched (ADR-0059). Read by
+            // its last segment alone, `Other.Invalid` matched a `DecodeError`.
             let short = path.rsplit('.').next().unwrap_or(path);
             let Some(cs) = ctors else {
                 return Err(unread());
             };
+            if let Some((q, _)) = path.rsplit_once('.')
+                && !matches!(ty, Type::Adt(t) if qualifier(q) == Some(*t))
+            {
+                return Err(foreign(path, &cs));
+            }
             let Some(i) = cs.iter().position(|c| c.name == short) else {
                 return Err(foreign(short, &cs));
             };
@@ -1692,13 +1772,15 @@ fn to_exhaust_pattern(
             let args = args
                 .iter()
                 .zip(fields)
-                .map(|(a, t)| to_exhaust_pattern(env, body, *a, t, &program.type_name(t)))
+                .map(|(a, t)| {
+                    to_exhaust_pattern(env, body, qualifier, *a, t, &program.type_name(t))
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(EPat::ctor(i, args))
         }
         HPat::Or(ps) => ps
             .iter()
-            .map(|p| to_exhaust_pattern(env, body, *p, ty, ty_name))
+            .map(|p| to_exhaust_pattern(env, body, qualifier, *p, ty, ty_name))
             .collect::<Result<Vec<_>, _>>()
             .map(EPat::Or),
     }

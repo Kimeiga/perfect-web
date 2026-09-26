@@ -192,11 +192,21 @@ pub enum Instr {
         args: Vec<ValueId>,
         ty: Type,
     },
-    /// Build a record or a variant case.
+    /// Build a record.
     Construct {
         result: ValueId,
         ctor: DefId,
         args: Vec<ValueId>,
+        ty: Type,
+    },
+    /// **Build a case of a declared sum type** (ADR-0059): its `case`th
+    /// case, counted from zero in the order the declaration writes them,
+    /// which is its discriminant, with its payload's fields in order. `ty`
+    /// is the type, a [`Type::Nominal`].
+    Case {
+        result: ValueId,
+        case: u32,
+        fields: Vec<ValueId>,
         ty: Type,
     },
     /// Read a field, by index. The name was resolved upstream.
@@ -575,12 +585,27 @@ impl BuiltinCase {
     }
 }
 
+/// A case of a variant type: the language's own, or a declared sum type's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Case {
+    Builtin(BuiltinCase),
+    /// A declared sum type's case, by its position in the declaration
+    /// (ADR-0059).
+    Declared(u32),
+}
+
 /// One arm of a [`Instr::Match`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchArm {
-    pub case: BuiltinCase,
-    /// The payload, bound for the arm's body: `y` in `Some(y)`.
-    pub binding: Option<ValueId>,
+    /// The cases this arm takes: one for `Some(y)` or `Circle(r)`; several
+    /// for `A | B`, and for `_` or a name, which take every case no other arm
+    /// names (ADR-0059). Every case of the scrutinee's type is taken by
+    /// exactly one arm, so an encoder needs no fallthrough.
+    pub cases: Vec<Case>,
+    /// The payload's fields, bound for the arm's body, in order: `y` in
+    /// `Some(y)`, `w` and `h` in `Rect(w, h)`, and `None` for a field no name
+    /// binds. Empty for an arm of several cases, which binds none.
+    pub bindings: Vec<Option<ValueId>>,
     pub body: Region,
 }
 
@@ -598,6 +623,7 @@ impl Instr {
             | Instr::Call { result, .. }
             | Instr::ImportCall { result, .. }
             | Instr::Construct { result, .. }
+            | Instr::Case { result, .. }
             | Instr::Project { result, .. }
             | Instr::Variant { result, .. }
             | Instr::Match { result, .. }
@@ -626,6 +652,7 @@ impl Instr {
             | Instr::Call { ty, .. }
             | Instr::ImportCall { ty, .. }
             | Instr::Construct { ty, .. }
+            | Instr::Case { ty, .. }
             | Instr::Project { ty, .. }
             | Instr::Variant { ty, .. }
             | Instr::Match { ty, .. }
@@ -871,8 +898,11 @@ pub enum Shape {
     Record {
         fields: Vec<(String, Type)>,
     },
+    /// A declared sum type (ADR-0059): each case, in declaration order,
+    /// with its payload's fields. A case of several fields crosses a
+    /// boundary as one `tuple<..>`, as `wit.rs` writes it.
     Variant {
-        cases: Vec<(String, Option<Type>)>,
+        cases: Vec<(String, Vec<Type>)>,
     },
     /// An opaque type, as its representation. A wire has no opacity to offer —
     /// the same decision `wit.rs` records and for the same reason.

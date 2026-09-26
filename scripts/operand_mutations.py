@@ -49,19 +49,19 @@ MUTANTS = [
     (
         "`!` takes any type",
         VALUES,
-        '                        UnOp::Not => ("the operand of `!`", Some(Ty::Primitive(Primitive::Bool))),',
-        '                        UnOp::Not => ("the operand of `!`", Some(Ty::Unknown)),',
+        '                    UnOp::Not => ("the operand of `!`", Some(Ty::Primitive(Primitive::Bool))),',
+        '                    UnOp::Not => ("the operand of `!`", Some(Ty::Unknown)),',
     ),
     (
         "an `if` condition is not related",
         VALUES,
-        "                Expr::If { cond, .. } => out.push(self.operand(\n"
-        "                    id,\n"
-        "                    *cond,\n"
-        '                    "the condition of `if`",\n'
-        "                    &Ty::Primitive(Primitive::Bool),\n"
-        "                )),",
-        "                Expr::If { .. } => {}",
+        "            Expr::If { cond, .. } => out.push(self.operand(\n"
+        "                id,\n"
+        "                *cond,\n"
+        '                "the condition of `if`",\n'
+        "                &Ty::Primitive(Primitive::Bool),\n"
+        "            )),",
+        "            Expr::If { .. } => {}",
     ),
     (
         "an untyped operand is refused",

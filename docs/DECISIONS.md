@@ -353,3 +353,16 @@ handler's body is lowered as a query's is and written by the
 pure-computation emitter, its commands awaited in order: bindings,
 arithmetic, branches, loops and several commands. A captured `Int` is read
 into a `BigInt`, and one sent past ±2^53 traps before it is sent.
+
+## 2026-09-26: declared sum types, typed, built and matched (E10)
+
+[ADR-0059](DECISIONS/ADR-0059-declared-sum-types.md): a sum type's case is
+typed where it is written through its type, `Shape.Circle(3)`: its fields,
+its arity, and a case the type lacks (PW0608). A pattern may name its type
+too, and an arm's fields are typed in its body. The backend builds and
+matches declared cases, in the component as WIT variants and in the module
+as `{ $case, value }`, with `_`, name and `A | B` arms. Writing it found
+four ways a wrong program passed `pw check`: a case's fields were
+unchecked, an undeclared case passed, `Shape.Empty` in a pattern bound a
+name and matched everything, and an arm's bindings were unknown in its
+body.

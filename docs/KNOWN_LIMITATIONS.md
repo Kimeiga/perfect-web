@@ -18,9 +18,12 @@ agreement:
 - **A member of a value of unknown type is not judged** (ADR-0048). Member
   existence is a relation now (PW0610), and a read whose value's type nothing
   states is undecided, as every relation's is.
-- **Sum-type variant constructors** (`Circle(3)`) have no type, because the
-  workspace does not resolve variant names as terms. Record and opaque
-  constructions are checked.
+- **A sum type's case is typed where it is written through its type**
+  (2026-09-26, ADR-0059): `Shape.Circle(3)`, its fields, its arity, and a
+  case the type lacks (PW0608). A case without a payload written alone,
+  `Empty`, is typed where one visible type has it. A case with a payload
+  written alone, `Circle(3)`, is PW0021, naming `Shape.Circle(..)` (ruling
+  needed). Until 2026-09-26 no case had a type, and `Shape.Bogus(1)` passed.
 - **Named-argument calls** are Undecided: a signature does not carry parameter
   names. None occurs in the corpus.
 - **A name bound at two sites in one body is unknown** to the value
@@ -53,9 +56,15 @@ to components and run through the E8 host, and the Rust closure path is deleted.
 The component backend is narrow, and everything outside it is refused by name
 rather than approximated:
 
-- **A generic record is not instantiated** (ADR-0050). `Box<Int>` has no
-  layout: `Type::Nominal` names a declaration without its arguments. A
-  generic *function* is instantiated.
+- **A generic record or sum type is not instantiated** (ADR-0050,
+  ADR-0059). `Box<Int>` and `Maybe<Int>` have no layout: `Type::Nominal`
+  names a declaration without its arguments. A generic *function* is
+  instantiated.
+- **A type that contains itself is refused** (ADR-0059): the Canonical ABI
+  has no recursive types, and the backend lays every value out by its type.
+- **`==` compares primitives only.** Two records, two sum-type values or two
+  lists are not compared by either backend, and the refusal is by name
+  (`Eq` on a nominal type).
 - **Straight-line bodies, at E10-I.** Import calls and scalar constants were
   supported, and values moved flat or in their canonical layout. Matches over
   `Option` and `Result`, field reads and their cases came after (ADR-0036),
@@ -82,7 +91,10 @@ the types a generic callee's arguments give it (ADR-0050). An early
 `return`, `?`, `for` loops and `let mut` bindings compile (ADR-0051). Still
 refused by name:
 
-- nested patterns, and a declared variant built or matched;
+- nested and literal patterns (a declared sum type's cases are built and
+  matched since ADR-0059, with `_`, a name, and `A | B` arms);
+- an arm no case reaches: the checker computes it and does not report it,
+  so such a match checks and does not compile (ADR-0059, ruling needed);
 - a `return`, a `?` or an assignment inside a lambda a list operation runs,
   and an assignment to a field (ADR-0051);
 - `%` on a `Float`, and a `Float` interpolated: their semantics are not
@@ -118,8 +130,9 @@ refused by name:
 - **`return` is a statement, not an expression.** Its value is the statement
   after it, in a block or on its line in a match arm (ADR-0038).
 - **Template matches take apart `Option` and `Result` only** (ADR-0042). A
-  declared sum type's constructors in `{#match}` are refused (PW5019), as the
-  component backend refuses them. `{:else}` in `{#each}` is refused;
+  declared sum type's constructors in `{#match}` are refused (PW5019). The
+  component backend builds and matches them since ADR-0059; the renderers do
+  not. `{:else}` in `{#each}` is refused;
   `{#if xs}` around the list says the same.
 - **An interpolated attribute is refused in a `style`**, and a URL with holes
   must begin with text (ADR-0042). A hole must be a value path.

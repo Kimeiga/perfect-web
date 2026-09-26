@@ -69,6 +69,22 @@ runtime that listens for the part's own event), and the limitations
 KNOWN_LIMITATIONS still lists for the backend, among them declared sum
 types built and matched, generic records, and `Float` formatting.
 
+**2026-09-26, "keep working until its perfect":** the limitations
+KNOWN_LIMITATIONS lists, in order. Declared sum types are typed, built and
+matched (ADR-0059, done), which found four ways a wrong program passed
+`pw check`. Next, in order:
+1. nested and literal patterns, in the checker's analysis and the backend;
+2. a declared sum type in a template's `{#match}`;
+3. generic records and generic sum types in the backend: a nominal type
+   carrying its arguments;
+4. the value relations' flat environment: a name bound at two sites;
+5. structural `==`, and reporting an arm no case reaches;
+6. named-argument calls, the unit value `()`, `derived` purity, calling a
+   function held in a record field, and a hole holding a string;
+7. `Float` `%` and `Float` formatting, then `split` and `range`;
+8. each needing a ruling first: the event as a handler parameter, instance
+   reuse, and captures and patches for templates.
+
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe
 the state at those dates and are superseded by this section where applicable.

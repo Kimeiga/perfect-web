@@ -443,7 +443,7 @@ impl Lowerer<'_> {
                     fields: v
                         .children()
                         .filter(|c| c.kind() == K::TypeRef)
-                        .map(|t| declared_type(&t).written())
+                        .map(|t| declared_type(&t))
                         .collect(),
                     span: span_of(&v),
                 })
@@ -1470,7 +1470,8 @@ fn visibility_of(node: &SyntaxNode) -> Option<String> {
 }
 
 /// Convert a remaining source-text type slot through the authoritative parser.
-/// Effects and variant payloads still expose written fragments in HIR. All
+/// Effects still expose written fragments in HIR; variant payloads (ADR-0059)
+/// and opaque representations (ADR-0054) are trees since 2026-09-26. All
 /// semantic consumers receive the resulting recursive tree, never a splitter.
 pub(crate) fn type_fragment(src: &str) -> Option<crate::hir::DeclaredType> {
     let parsed = pw_syntax::parse_type(src);

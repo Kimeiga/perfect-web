@@ -655,6 +655,32 @@ e10-handlers-compute:
      } > docs/evidence/E10/handlers-compute.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-compute.txt
 
+# ADR-0059: declared sum types. The checker's typing of a case where it is
+# written, each case built and matched through the E8 host against a Rust
+# model, the component against the JavaScript module, and the mutation
+# controls. Needs `node`.
+e10-sum-types:
+    @{ echo "ADR-0059 - declared sum types"; echo; \
+       echo "produced by: just e10-sum-types"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/sum_types.rs)"; echo; \
+       cargo test --locked -p pw-core --test sum_types 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== through the E8 host, against a model (compiler/pw-conformance/tests/sum_types.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test sum_types 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*|^test result.*"; \
+       echo; echo "== mutation controls (scripts/sum_type_mutations.py)"; echo; \
+       python3 scripts/sum_type_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a generic sum type or a type that contains itself in the"; \
+       echo "backend, each refused by name. NOT CLAIMED: a nested or literal pattern,"; \
+       echo "refused by name; a sum type in a template's {#match}, refused (PW5019);"; \
+       echo "a captured sum type in a handler; == between two cases."; \
+     } > docs/evidence/E10/sum-types.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/sum-types.txt
+
 # ADR-0057: maps and sets. Each operation against BTreeMap and BTreeSet, the
 # checks on what arrives from outside, the component against the JavaScript
 # module, and the mutation controls. Needs `node`.

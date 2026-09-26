@@ -32,7 +32,10 @@
 //! a string, a list an array, and a record an object keyed by its Pleris field
 //! names. `Some(v)` is `{ $case: "some", value: v }`, `None` is
 //! `{ $case: "none" }`, and `Ok` and `Err` the same; `$` begins no Pleris
-//! name, so a case can never be read as a record. An opaque type is its
+//! name, so a case can never be read as a record. A declared sum type's case
+//! is named as its WIT case is, `Shape.Circle(r)` being
+//! `{ $case: "circle", value: r }`, and a case of several fields holds them
+//! in an array, as a tuple is held (ADR-0059). An opaque type is its
 //! representation, as it is on a wire.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -41,8 +44,8 @@ use crate::resolve::DefId;
 
 use super::case::{self, Case};
 use super::ir::{
-    BinaryOp, BuiltinCase, Const, EachKind, Function, Instr, Intrinsic, Program, Region, Shape,
-    Terminator, Type, UnaryOp, ValueId,
+    BinaryOp, BuiltinCase, Case as VariantCase, Const, EachKind, Function, Instr, Intrinsic,
+    Program, Region, Shape, Terminator, Type, UnaryOp, ValueId,
 };
 
 /// **A query's pure computation, as an ES module.** `Err` names what the
@@ -599,11 +602,42 @@ impl<'p> Emitter<'p> {
         {
             Some(Shape::Record { fields }) => Ok(fields),
             Some(Shape::Alias(_)) => Ok(&[]),
-            Some(Shape::Variant { .. }) => {
-                Err("a declared variant, which the component backend refuses too".into())
-            }
+            Some(Shape::Variant { .. }) => Err("a sum type, which has cases, not fields".into()),
             None => Err("a nominal type with no definition".into()),
         }
+    }
+
+    /// A sum type's cases, each with its payload's fields (ADR-0059).
+    fn cases(&self, def: crate::resolve::DefId) -> Result<&[(String, Vec<Type>)], String> {
+        match self.shape(def) {
+            Some(Shape::Variant { cases }) => Ok(cases),
+            _ => Err("a case of a type that is not a sum type".into()),
+        }
+    }
+
+    /// A case's name as a module value holds it, and its payload's fields'
+    /// types, in the scrutinee's type.
+    fn case_of(&self, scrutinee: &Type, case: VariantCase) -> Result<(String, Vec<Type>), String> {
+        Ok(match (scrutinee, case) {
+            (_, VariantCase::Builtin(c)) => {
+                let payload = match (scrutinee, c) {
+                    (Type::Option(t), BuiltinCase::Some) => vec![(**t).clone()],
+                    (Type::Result(t, _), BuiltinCase::Ok) => vec![(**t).clone()],
+                    (Type::Result(_, e), BuiltinCase::Err) => vec![(**e).clone()],
+                    (Type::Option(_), BuiltinCase::None) => Vec::new(),
+                    _ => return Err(format!("`{c:?}` is not a case of a {scrutinee:?}")),
+                };
+                (case_name(c).to_string(), payload)
+            }
+            (Type::Nominal(def), VariantCase::Declared(i)) => {
+                let (name, fields) = self
+                    .cases(*def)?
+                    .get(i as usize)
+                    .ok_or("a case past the type's cases")?;
+                (crate::wit::ident(name), fields.clone())
+            }
+            _ => return Err(format!("a declared case of a {scrutinee:?}")),
+        })
     }
 
     fn instr(&mut self, i: &Instr) -> Result<(), String> {
@@ -754,19 +788,56 @@ impl<'p> Emitter<'p> {
                 };
                 self.line(&format!("const {r} = {expr};"));
             }
+            // `Shape.Circle(r)` (ADR-0059): its WIT case's name, and its
+            // fields, one as the value, several as an array of them.
+            Instr::Case {
+                case, fields, ty, ..
+            } => {
+                let (name, _) = self.case_of(ty, VariantCase::Declared(*case))?;
+                let name = json(&name);
+                let expr = match fields.as_slice() {
+                    [] => format!("{{ $case: {name} }}"),
+                    [one] => format!("{{ $case: {name}, value: {} }}", val(*one)),
+                    many => format!(
+                        "{{ $case: {name}, value: [{}] }}",
+                        many.iter().map(|f| val(*f)).collect::<Vec<_>>().join(", ")
+                    ),
+                };
+                self.line(&format!("const {r} = {expr};"));
+            }
             Instr::Match {
                 scrutinee, arms, ..
             } => {
                 self.line(&format!("let {r};"));
                 self.line(&format!("switch ({}.$case) {{", val(*scrutinee)));
                 self.depth += 1;
+                let st = self.type_of(*scrutinee)?.clone();
                 for arm in arms {
-                    self.line(&format!("case \"{}\": {{", case_name(arm.case)));
+                    let labels: Vec<String> = arm
+                        .cases
+                        .iter()
+                        .map(|c| self.case_of(&st, *c).map(|(n, _)| n))
+                        .collect::<Result<_, _>>()?;
+                    let Some((last, rest)) = labels.split_last() else {
+                        return Err("a match arm that takes no case".into());
+                    };
+                    for l in rest {
+                        self.line(&format!("case {}:", json(l)));
+                    }
+                    self.line(&format!("case {}: {{", json(last)));
                     self.depth += 1;
-                    if let Some(b) = arm.binding {
-                        self.types
-                            .insert(b, payload_type(self.type_of(*scrutinee)?, arm.case));
-                        self.line(&format!("const {} = {}.value;", val(b), val(*scrutinee)));
+                    if let [case] = arm.cases.as_slice() {
+                        let (_, types) = self.case_of(&st, *case)?;
+                        let many = types.len() > 1;
+                        for (k, (b, t)) in arm.bindings.iter().zip(types).enumerate() {
+                            let Some(b) = b else { continue };
+                            self.types.insert(*b, t);
+                            let read = match many {
+                                true => format!("{}.value[{k}]", val(*scrutinee)),
+                                false => format!("{}.value", val(*scrutinee)),
+                            };
+                            self.line(&format!("const {} = {read};", val(*b)));
+                        }
                     }
                     self.region(&arm.body, i.result())?;
                     self.line("break;");
@@ -1139,15 +1210,5 @@ fn case_name(c: BuiltinCase) -> &'static str {
         BuiltinCase::None => "none",
         BuiltinCase::Ok => "ok",
         BuiltinCase::Err => "err",
-    }
-}
-
-/// The type an arm's binding has: the payload of the scrutinee's case.
-fn payload_type(scrutinee: &Type, case: BuiltinCase) -> Type {
-    match (scrutinee, case) {
-        (Type::Option(t), BuiltinCase::Some) => (**t).clone(),
-        (Type::Result(t, _), BuiltinCase::Ok) => (**t).clone(),
-        (Type::Result(_, e), BuiltinCase::Err) => (**e).clone(),
-        _ => Type::Unit,
     }
 }

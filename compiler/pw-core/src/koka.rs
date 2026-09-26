@@ -130,7 +130,7 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
                         .fields
                         .iter()
                         .enumerate()
-                        .map(|(i, f)| format!("field{i} : {}", type_name(f)))
+                        .map(|(i, f)| format!("field{i} : {}", type_name(&f.written())))
                         .collect();
                     s.push_str(&format!("  {}( {} )\n", v.name, fields.join(", ")));
                 }

@@ -68,15 +68,15 @@ use wasm_encoder::{
 };
 use wit_parser::abi::{AbiVariant, FlatTypes, WasmSignature, WasmType};
 use wit_parser::{
-    Field, Function as WitFunction, LiftLowerAbi, ManglingAndAbi, Record, Resolve, Result_,
-    SizeAlign, Tuple, Type as WitType, TypeDef as WitTypeDef, TypeDefKind, TypeOwner, WasmExport,
-    WasmExportKind, WasmImport, WorldId, WorldItem, WorldKey,
+    Case as WitCase, Field, Function as WitFunction, Int, LiftLowerAbi, ManglingAndAbi, Record,
+    Resolve, Result_, SizeAlign, Tuple, Type as WitType, TypeDef as WitTypeDef, TypeDefKind,
+    TypeOwner, Variant, WasmExport, WasmExportKind, WasmImport, WorldId, WorldItem, WorldKey,
 };
 
 use super::case::{self, Case};
 use super::ir::{
-    BinaryOp, BuiltinCase, CallableImport, Const, Instr, Shape, Terminator, Type, TypeDef, UnaryOp,
-    ValueId, all_instrs,
+    BinaryOp, BuiltinCase, CallableImport, Case as VariantCase, Const, Instr, Shape, Terminator,
+    Type, TypeDef, UnaryOp, ValueId, all_instrs,
 };
 use crate::resolve::DefId;
 
@@ -888,9 +888,54 @@ impl TypeCx<'_> {
                                 )
                             })
                         }
-                        // A declared variant is built and matched by nothing
-                        // here (ADR-0039 §6).
-                        Shape::Variant { .. } => None,
+                        // A declared sum type (ADR-0059): a case of one
+                        // field carries it; of several, a tuple of them, as
+                        // `wit.rs` writes the world's.
+                        Shape::Variant { cases } => {
+                            let mut wit_cases = Vec::new();
+                            let mut whole = true;
+                            for (name, fields) in cases {
+                                let mut types = Vec::new();
+                                for f in fields {
+                                    match self.wit(resolve, f) {
+                                        Some(t) => types.push(t),
+                                        None => whole = false,
+                                    }
+                                }
+                                let ty = match types.as_slice() {
+                                    [] => None,
+                                    [one] => Some(*one),
+                                    _ => Some(anonymous(
+                                        resolve,
+                                        TypeDefKind::Tuple(Tuple { types }),
+                                    )),
+                                };
+                                wit_cases.push(WitCase {
+                                    name: crate::wit::ident(name),
+                                    ty,
+                                    docs: Default::default(),
+                                    span: Default::default(),
+                                });
+                            }
+                            whole.then(|| {
+                                WitType::Id(
+                                    resolve.types.alloc(WitTypeDef {
+                                        name: Some(
+                                            self.idents
+                                                .get(def)
+                                                .cloned()
+                                                .unwrap_or_else(|| crate::wit::ident(&d.name)),
+                                        ),
+                                        kind: TypeDefKind::Variant(Variant { cases: wit_cases }),
+                                        owner: TypeOwner::None,
+                                        docs: Default::default(),
+                                        stability: Default::default(),
+                                        span: Default::default(),
+                                        external_id: None,
+                                    }),
+                                )
+                            })
+                        }
                     };
                     self.visiting.pop();
                     defined?
@@ -1583,6 +1628,26 @@ fn expect_region(cx: &Expecting<'_>, instrs: &[Instr], out: &mut BTreeMap<ValueI
                     out.entry(*p).or_insert(pt);
                 }
             }
+            // A case's fields take its payload's types (ADR-0059).
+            Instr::Case {
+                result,
+                case,
+                fields,
+                ty,
+            } => {
+                let t = out.get(result).copied().or_else(|| wit.get(ty).copied());
+                let payload = t.and_then(|t| {
+                    let (cases, _) = variant_cases(resolve, t)?;
+                    cases.get(*case as usize).copied()
+                });
+                if let Some(types) =
+                    payload.and_then(|p| case_field_types(resolve, p, fields.len()))
+                {
+                    for (f, ft) in fields.iter().zip(types) {
+                        out.entry(*f).or_insert(ft);
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -1601,6 +1666,22 @@ fn payload_type(resolve: &Resolve, t: WitType, case: BuiltinCase) -> Option<WitT
     }
 }
 
+/// **A variant type's cases**, each its payload's type, and its
+/// discriminant's width: an `option` (`none`, `some`), a `result` (`ok`,
+/// `err`), or a declared `variant` (ADR-0059), as the Canonical ABI numbers
+/// and lays out each. `None` when `t` is not a variant.
+fn variant_cases(resolve: &Resolve, t: WitType) -> Option<(Vec<Option<WitType>>, Int)> {
+    let WitType::Id(id) = dealias(resolve, t) else {
+        return None;
+    };
+    match &resolve.types[id].kind {
+        TypeDefKind::Option(p) => Some((vec![None, Some(*p)], Int::U8)),
+        TypeDefKind::Result(r) => Some((vec![r.ok, r.err], Int::U8)),
+        TypeDefKind::Variant(v) => Some((v.cases.iter().map(|c| c.ty).collect(), v.tag())),
+        _ => None,
+    }
+}
+
 /// A variant type's discriminant for `case`, its payload type, and where the
 /// payload sits: every number from `SizeAlign`. `None` when `t` is not a
 /// variant that has this case.
@@ -1608,25 +1689,137 @@ fn case_layout(
     resolve: &Resolve,
     sizes: &SizeAlign,
     t: WitType,
-    case: BuiltinCase,
+    case: VariantCase,
 ) -> Option<(u32, Option<WitType>, u64)> {
     let WitType::Id(id) = dealias(resolve, t) else {
         return None;
     };
-    let (disc, payload, cases): (u32, Option<WitType>, Vec<Option<WitType>>) =
-        match (&resolve.types[id].kind, case) {
-            (TypeDefKind::Option(p), BuiltinCase::None) => (0, None, vec![None, Some(*p)]),
-            (TypeDefKind::Option(p), BuiltinCase::Some) => (1, Some(*p), vec![None, Some(*p)]),
-            (TypeDefKind::Result(r), BuiltinCase::Ok) => (0, r.ok, vec![r.ok, r.err]),
-            (TypeDefKind::Result(r), BuiltinCase::Err) => (1, r.err, vec![r.ok, r.err]),
-            _ => return None,
-        };
-    // Two cases: an 8-bit discriminant, as the Canonical ABI gives any
-    // variant of up to 256 cases.
+    let disc: u32 = match (&resolve.types[id].kind, case) {
+        (TypeDefKind::Option(_), VariantCase::Builtin(BuiltinCase::None)) => 0,
+        (TypeDefKind::Option(_), VariantCase::Builtin(BuiltinCase::Some)) => 1,
+        (TypeDefKind::Result(_), VariantCase::Builtin(BuiltinCase::Ok)) => 0,
+        (TypeDefKind::Result(_), VariantCase::Builtin(BuiltinCase::Err)) => 1,
+        (TypeDefKind::Variant(v), VariantCase::Declared(i)) if (i as usize) < v.cases.len() => i,
+        _ => return None,
+    };
+    let (cases, tag) = variant_cases(resolve, t)?;
     let offset = sizes
-        .payload_offset(wit_parser::Int::U8, cases.iter().map(Option::as_ref))
+        .payload_offset(tag, cases.iter().map(Option::as_ref))
         .size_wasm32() as u64;
-    Some((disc, payload, offset))
+    Some((disc, cases[disc as usize], offset))
+}
+
+/// The types of a case's `count` fields, from its payload (ADR-0059): none
+/// without one, the payload itself for one field, a tuple's types for
+/// several, as `wit.rs` writes a case of several fields.
+fn case_field_types(
+    resolve: &Resolve,
+    payload: Option<WitType>,
+    count: usize,
+) -> Option<Vec<WitType>> {
+    match (payload, count) {
+        (None, _) => Some(Vec::new()),
+        (Some(p), 1) => Some(vec![p]),
+        (Some(p), n) => {
+            let WitType::Id(id) = dealias(resolve, p) else {
+                return None;
+            };
+            match &resolve.types[id].kind {
+                TypeDefKind::Tuple(t) if t.types.len() == n => Some(t.types.clone()),
+                _ => None,
+            }
+        }
+    }
+}
+
+/// Where each of a case's `count` fields sits within its payload, and its
+/// type: [`case_field_types`], at the offsets `SizeAlign` gives a tuple.
+fn case_fields(
+    resolve: &Resolve,
+    sizes: &SizeAlign,
+    payload: Option<WitType>,
+    count: usize,
+) -> Option<Vec<(u64, WitType)>> {
+    let types = case_field_types(resolve, payload, count)?;
+    if types.len() < 2 {
+        return Some(types.into_iter().map(|t| (0, t)).collect());
+    }
+    Some(
+        sizes
+            .field_offsets(types.iter())
+            .into_iter()
+            .map(|(o, t)| (o.size_wasm32() as u64, *t))
+            .collect(),
+    )
+}
+
+/// Store the discriminant on the stack, of `tag`'s width, at `offset` past
+/// the address below it.
+fn store_tag(tag: Int, offset: u64) -> wasm_encoder::Instruction<'static> {
+    use wasm_encoder::Instruction as I;
+    let at = |align| MemArg {
+        offset,
+        align,
+        memory_index: 0,
+    };
+    match tag {
+        Int::U8 => I::I32Store8(at(0)),
+        Int::U16 => I::I32Store16(at(1)),
+        Int::U32 | Int::U64 => I::I32Store(at(2)),
+    }
+}
+
+/// Load a discriminant of `tag`'s width from `offset` past the address on
+/// the stack.
+fn load_tag(tag: Int, offset: u64) -> wasm_encoder::Instruction<'static> {
+    use wasm_encoder::Instruction as I;
+    let at = |align| MemArg {
+        offset,
+        align,
+        memory_index: 0,
+    };
+    match tag {
+        Int::U8 => I::I32Load8U(at(0)),
+        Int::U16 => I::I32Load16U(at(1)),
+        Int::U32 | Int::U64 => I::I32Load(at(2)),
+    }
+}
+
+/// A case's flat value `have`, widened into the variant's joined slot
+/// `want`: the Canonical ABI's `lower_flat_variant`.
+fn to_joined(have: ValType, want: ValType) -> Vec<wasm_encoder::Instruction<'static>> {
+    use wasm_encoder::Instruction as I;
+    match (have, want) {
+        (ValType::F32, ValType::I32) => vec![I::I32ReinterpretF32],
+        (ValType::I32, ValType::I64) => vec![I::I64ExtendI32U],
+        (ValType::F32, ValType::I64) => vec![I::I32ReinterpretF32, I::I64ExtendI32U],
+        (ValType::F64, ValType::I64) => vec![I::I64ReinterpretF64],
+        _ => Vec::new(),
+    }
+}
+
+/// A joined slot `have`, read back as the case's flat value `want`: the
+/// Canonical ABI's `lift_flat_variant`.
+fn from_joined(have: ValType, want: ValType) -> Vec<wasm_encoder::Instruction<'static>> {
+    use wasm_encoder::Instruction as I;
+    match (have, want) {
+        (ValType::I32, ValType::F32) => vec![I::F32ReinterpretI32],
+        (ValType::I64, ValType::I32) => vec![I::I32WrapI64],
+        (ValType::I64, ValType::F32) => vec![I::I32WrapI64, I::F32ReinterpretI32],
+        (ValType::I64, ValType::F64) => vec![I::F64ReinterpretI64],
+        _ => Vec::new(),
+    }
+}
+
+/// The zero of a core type, for a joined slot the named case leaves empty.
+fn zero(t: ValType) -> wasm_encoder::Instruction<'static> {
+    use wasm_encoder::Instruction as I;
+    match t {
+        ValType::I64 => I::I64Const(0),
+        ValType::F32 => I::F32Const(0.0f32.into()),
+        ValType::F64 => I::F64Const(0.0f64.into()),
+        _ => I::I32Const(0),
+    }
 }
 
 /// The encoder's state while one export's body is emitted.
@@ -1709,16 +1902,27 @@ impl Enc<'_> {
                     (true, Held::Flat { ty, locals: flats }) => {
                         let area = self.locals.fresh(ValType::I32);
                         allocate(sizes, ty, self.realloc_index, area, &mut self.ops);
-                        match store(resolve, sizes, ty, area, 0, flats, &mut self.ops) {
+                        match store(
+                            resolve,
+                            sizes,
+                            &mut self.locals,
+                            ty,
+                            area,
+                            0,
+                            flats,
+                            &mut self.ops,
+                        ) {
                             Encoding::Encoded(_) => {}
                             other => return other.map(|_| unreachable!()),
                         }
                         self.ops.push(I::LocalGet(area));
                     }
-                    (false, h) => match push_flat_values(resolve, sizes, h, &mut self.ops) {
-                        Encoding::Encoded(()) => {}
-                        other => return other,
-                    },
+                    (false, h) => {
+                        match push_flat_values(resolve, sizes, &mut self.locals, h, &mut self.ops) {
+                            Encoding::Encoded(()) => {}
+                            other => return other,
+                        }
+                    }
                 }
                 Encoding::Encoded(())
             }
@@ -1766,7 +1970,9 @@ impl Enc<'_> {
         use wasm_encoder::Instruction as I;
         let (resolve, sizes) = (self.resolve, self.sizes);
         match (passing, h) {
-            (Passed::Flat(_), h) => push_flat_values(resolve, sizes, h, &mut self.ops),
+            (Passed::Flat(_), h) => {
+                push_flat_values(resolve, sizes, &mut self.locals, h, &mut self.ops)
+            }
             (Passed::Pointer, Held::Memory { ptr, .. }) => {
                 self.ops.push(I::LocalGet(*ptr));
                 Encoding::Encoded(())
@@ -1774,7 +1980,16 @@ impl Enc<'_> {
             (Passed::Pointer, Held::Flat { locals, .. }) => {
                 let area = self.locals.fresh(ValType::I32);
                 allocate(sizes, ty, self.realloc_index, area, &mut self.ops);
-                match store(resolve, sizes, ty, area, 0, locals, &mut self.ops) {
+                match store(
+                    resolve,
+                    sizes,
+                    &mut self.locals,
+                    ty,
+                    area,
+                    0,
+                    locals,
+                    &mut self.ops,
+                ) {
                     Encoding::Encoded(_) => {}
                     other => return other.map(|_| unreachable!()),
                 }
@@ -1854,7 +2069,7 @@ impl Enc<'_> {
                             import.qualified()
                         );
                     }
-                    match push_flat_values(resolve, sizes, &h, &mut self.ops) {
+                    match push_flat_values(resolve, sizes, &mut self.locals, &h, &mut self.ops) {
                         Encoding::Encoded(()) => {}
                         other => return other,
                     }
@@ -1986,6 +2201,12 @@ impl Enc<'_> {
                 payload,
                 ty,
             } => return self.variant(*result, *case, *payload, ty),
+            Instr::Case {
+                result,
+                case,
+                fields,
+                ty,
+            } => return self.case(*result, *case, fields, ty),
             Instr::Match {
                 result,
                 scrutinee,
@@ -2237,7 +2458,7 @@ impl Enc<'_> {
                         self.export
                     );
                 };
-                match load(resolve, sizes, &ty, ptr, 0, &mut self.ops) {
+                match load(resolve, sizes, &mut self.locals, &ty, ptr, 0, &mut self.ops) {
                     Encoding::Encoded(()) => {}
                     other => return other.map(|_| unreachable!()),
                 }
@@ -2306,13 +2527,22 @@ impl Enc<'_> {
             }
             (Held::Memory { ptr: out, .. }, Held::Flat { locals: flats, .. }) => {
                 allocate(sizes, &rt, self.realloc_index, *out, &mut self.ops);
-                match store(resolve, sizes, &rt, *out, 0, flats, &mut self.ops) {
+                match store(
+                    resolve,
+                    sizes,
+                    &mut self.locals,
+                    &rt,
+                    *out,
+                    0,
+                    flats,
+                    &mut self.ops,
+                ) {
                     Encoding::Encoded(_) => {}
                     other => return other.map(|_| unreachable!()),
                 }
             }
             (Held::Flat { locals: outs, .. }, v) => {
-                match push_flat_values(resolve, sizes, v, &mut self.ops) {
+                match push_flat_values(resolve, sizes, &mut self.locals, v, &mut self.ops) {
                     Encoding::Encoded(()) => {}
                     other => return other,
                 }
@@ -2741,10 +2971,11 @@ impl Enc<'_> {
                 self.export
             );
         };
+        // A sum type's case is `Instr::Case` (ADR-0059); a record built
+        // over another kind of type is an IR error, never laid out as one.
         let TypeDefKind::Record(r) = &resolve.types[id].kind else {
-            refuse!(
-                "building a declared variant",
-                "`{}` builds a value of a declared variant, which is not encoded yet",
+            blocked!(
+                "`{}` builds a record of a type that is not one",
                 self.export
             );
         };
@@ -2792,6 +3023,7 @@ impl Enc<'_> {
                     match store(
                         resolve,
                         sizes,
+                        &mut self.locals,
                         field_ty,
                         area,
                         offset,
@@ -2840,7 +3072,15 @@ impl Enc<'_> {
                 self.export
             );
         };
-        match load(resolve, sizes, &ty, addr, offset, &mut self.ops) {
+        match load(
+            resolve,
+            sizes,
+            &mut self.locals,
+            &ty,
+            addr,
+            offset,
+            &mut self.ops,
+        ) {
             Encoding::Encoded(()) => {}
             other => return other.map(|_| unreachable!()),
         }
@@ -3314,7 +3554,16 @@ impl Enc<'_> {
                 Encoding::Encoded(())
             }
             Held::Flat { locals, .. } => {
-                match store(resolve, sizes, &ty, addr, offset, &locals, &mut self.ops) {
+                match store(
+                    resolve,
+                    sizes,
+                    &mut self.locals,
+                    &ty,
+                    addr,
+                    offset,
+                    &locals,
+                    &mut self.ops,
+                ) {
                     Encoding::Encoded(_) => Encoding::Encoded(()),
                     other => other.map(|_| ()),
                 }
@@ -3623,9 +3872,12 @@ impl Enc<'_> {
                 if kind == K::Find {
                     // `out` is the found element's address, or 0, which no
                     // allocation has.
-                    let Some((_, _, offset)) =
-                        case_layout(self.resolve, self.sizes, rt, BuiltinCase::Some)
-                    else {
+                    let Some((_, _, offset)) = case_layout(
+                        self.resolve,
+                        self.sizes,
+                        rt,
+                        VariantCase::Builtin(BuiltinCase::Some),
+                    ) else {
                         blocked!("`{}` finds into a type that is not an option", self.export);
                     };
                     let area = self.locals.fresh(ValType::I32);
@@ -4220,9 +4472,12 @@ impl Enc<'_> {
                     blocked!("`{}` indexes a value that is not a list", self.export);
                 };
                 let (esize, _) = self.layout(&et);
-                let Some((_, _, offset)) =
-                    case_layout(self.resolve, self.sizes, rt, BuiltinCase::Some)
-                else {
+                let Some((_, _, offset)) = case_layout(
+                    self.resolve,
+                    self.sizes,
+                    rt,
+                    VariantCase::Builtin(BuiltinCase::Some),
+                ) else {
                     blocked!(
                         "`{}` indexes into a type that is not an option",
                         self.export
@@ -4364,9 +4619,12 @@ impl Enc<'_> {
                     Encoding::Encoded(x) => x,
                     other => return other.map(|_| unreachable!()),
                 };
-                let Some((_, _, offset)) =
-                    case_layout(self.resolve, self.sizes, rt, BuiltinCase::Some)
-                else {
+                let Some((_, _, offset)) = case_layout(
+                    self.resolve,
+                    self.sizes,
+                    rt,
+                    VariantCase::Builtin(BuiltinCase::Some),
+                ) else {
                     blocked!("`{}` answers a map's value in a non-option", self.export);
                 };
                 let area = self.locals.fresh(ValType::I32);
@@ -4815,7 +5073,9 @@ impl Enc<'_> {
                 self.export
             );
         };
-        let Some((disc, payload_ty, offset)) = case_layout(resolve, sizes, t, case) else {
+        let Some((disc, payload_ty, offset)) =
+            case_layout(resolve, sizes, t, VariantCase::Builtin(case))
+        else {
             blocked!(
                 "`{}` builds `{case:?}` where its use needs another type",
                 self.export
@@ -4862,7 +5122,16 @@ impl Enc<'_> {
                         });
                     }
                     Held::Flat { locals, .. } => {
-                        match store(resolve, sizes, &pt, area, offset, &locals, &mut self.ops) {
+                        match store(
+                            resolve,
+                            sizes,
+                            &mut self.locals,
+                            &pt,
+                            area,
+                            offset,
+                            &locals,
+                            &mut self.ops,
+                        ) {
                             Encoding::Encoded(_) => {}
                             other => return other.map(|_| unreachable!()),
                         }
@@ -4882,9 +5151,61 @@ impl Enc<'_> {
         Encoding::Encoded(())
     }
 
+    /// **A declared sum type's case, built** (ADR-0059), into the invocation
+    /// region as the Canonical ABI lays a variant out: the discriminant, of
+    /// the width its number of cases gives, then each field at the offset
+    /// `SizeAlign` gives it within the payload.
+    fn case(&mut self, result: ValueId, case: u32, fields: &[ValueId], ty: &Type) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let Some(t) = self.type_of(result, ty) else {
+            refuse!(
+                "a sum type with no component type",
+                "`{}` builds a {ty:?}, which has no component type here: a type that \
+                 contains itself has no canonical layout",
+                self.export
+            );
+        };
+        let (Some((disc, payload, offset)), Some((_, tag))) = (
+            case_layout(resolve, sizes, t, VariantCase::Declared(case)),
+            variant_cases(resolve, t),
+        ) else {
+            blocked!("`{}` builds a case its type does not have", self.export);
+        };
+        let Some(places) = case_fields(resolve, sizes, payload, fields.len()) else {
+            blocked!(
+                "`{}` builds a case of {} fields its payload does not hold",
+                self.export,
+                fields.len()
+            );
+        };
+        if places.len() != fields.len() {
+            blocked!(
+                "`{}` builds a case of {} fields its payload does not hold",
+                self.export,
+                fields.len()
+            );
+        }
+        let area = self.locals.fresh(ValType::I32);
+        allocate(sizes, &t, self.realloc_index, area, &mut self.ops);
+        self.ops.push(I::LocalGet(area));
+        self.ops.push(I::I32Const(disc as i32));
+        self.ops.push(store_tag(tag, 0));
+        for ((at, field_ty), v) in places.into_iter().zip(fields) {
+            match self.store_at(*v, field_ty, area, offset + at) {
+                Encoding::Encoded(()) => {}
+                other => return other,
+            }
+        }
+        self.held.insert(result, Held::Memory { ty: t, ptr: area });
+        Encoding::Encoded(())
+    }
+
     /// **Choose by a variant's case**: the discriminant, read from the
-    /// scrutinee's layout, selects an arm; each arm binds its payload and moves
-    /// its value into one holder, checked against the match's component type.
+    /// scrutinee's layout, selects an arm; each arm binds its payload's fields
+    /// and moves its value into one holder, checked against the match's
+    /// component type. A scrutinee held flat, a parameter, is written to the
+    /// region first (ADR-0059).
     fn matched(
         &mut self,
         result: ValueId,
@@ -4894,67 +5215,140 @@ impl Enc<'_> {
     ) -> Encoding<()> {
         use wasm_encoder::Instruction as I;
         let (resolve, sizes) = (self.resolve, self.sizes);
-        let Some(Held::Memory { ty: st, ptr }) = self.held.get(&scrutinee).cloned() else {
-            refuse!(
-                "a match over a value not held in memory",
-                "`{}` matches a value held flat; a variant's flat form joins its \
-                 cases' slots, which this encoder does not read",
-                self.export
-            );
-        };
-        let [first, second] = arms else {
-            blocked!("`{}` matches with {} arms, not 2", self.export, arms.len());
-        };
         // The result's holder: locals for a value that flattens without
         // variant slots, an address for anything else. A match whose arms
         // are statements has none (ADR-0051).
-        let holder = match ty {
-            Type::Unit => Held::Nothing,
+        let (st, ptr, holder) = match self.held.get(&scrutinee).cloned() {
+            Some(Held::Memory { ty: st, ptr }) => (st, ptr, self.match_holder(result, ty)),
+            Some(Held::Flat { ty: st, locals }) => {
+                let holder = self.match_holder(result, ty);
+                // Written here, for this match: the value stays held flat
+                // for every other use.
+                let area = self.locals.fresh(ValType::I32);
+                allocate(sizes, &st, self.realloc_index, area, &mut self.ops);
+                match store(
+                    resolve,
+                    sizes,
+                    &mut self.locals,
+                    &st,
+                    area,
+                    0,
+                    &locals,
+                    &mut self.ops,
+                ) {
+                    Encoding::Encoded(_) => {}
+                    other => return other.map(|_| unreachable!()),
+                }
+                (st, area, holder)
+            }
+            _ => blocked!("`{}` matches a value nothing defines", self.export),
+        };
+        let holder = match holder {
+            Encoding::Encoded(h) => h,
+            other => return other.map(|_| unreachable!()),
+        };
+        let Some((cases, tag)) = variant_cases(resolve, st) else {
+            blocked!("`{}` matches a value that is not a variant", self.export);
+        };
+        // Each case taken by exactly one arm, so no case falls through.
+        let mut owner: Vec<Option<usize>> = vec![None; cases.len()];
+        for (k, arm) in arms.iter().enumerate() {
+            for c in &arm.cases {
+                let Some((d, ..)) = case_layout(resolve, sizes, st, *c) else {
+                    blocked!(
+                        "`{}` matches cases the scrutinee's type does not have",
+                        self.export
+                    );
+                };
+                if owner[d as usize].replace(k).is_some() {
+                    blocked!("`{}` matches one case in two arms", self.export);
+                }
+            }
+        }
+        if owner.iter().any(Option::is_none) {
+            blocked!("`{}` leaves a case with no arm", self.export);
+        }
+        match arms {
+            // Two cases, an arm each: the discriminant is the condition, and
+            // 1 selects the second-numbered case (`Some`, `Err`).
+            [first, second] if cases.len() == 2 => {
+                let (one, zero) = match owner[1] {
+                    Some(0) => (first, second),
+                    _ => (second, first),
+                };
+                self.ops.push(I::LocalGet(ptr));
+                self.ops.push(load_tag(tag, 0));
+                self.ops.push(I::If(wasm_encoder::BlockType::Empty));
+                match self.arm(ptr, st, one, &holder) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.ops.push(I::Else);
+                match self.arm(ptr, st, zero, &holder) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.ops.push(I::End);
+            }
+            // Otherwise the discriminant once, then each arm but the last
+            // under a test of its cases; the last takes what is left.
+            _ => {
+                let Some((last, rest)) = arms.split_last() else {
+                    blocked!("`{}` matches with no arms", self.export);
+                };
+                let d = self.locals.fresh(ValType::I32);
+                if !rest.is_empty() {
+                    self.ops.push(I::LocalGet(ptr));
+                    self.ops.push(load_tag(tag, 0));
+                    self.ops.push(I::LocalSet(d));
+                }
+                for arm in rest {
+                    for (j, c) in arm.cases.iter().enumerate() {
+                        let (disc, ..) = case_layout(resolve, sizes, st, *c).expect("checked");
+                        self.ops.push(I::LocalGet(d));
+                        self.ops.push(I::I32Const(disc as i32));
+                        self.ops.push(I::I32Eq);
+                        if j > 0 {
+                            self.ops.push(I::I32Or);
+                        }
+                    }
+                    self.ops.push(I::If(wasm_encoder::BlockType::Empty));
+                    match self.arm(ptr, st, arm, &holder) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    }
+                    self.ops.push(I::Else);
+                }
+                match self.arm(ptr, st, last, &holder) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                for _ in rest {
+                    self.ops.push(I::End);
+                }
+            }
+        }
+        self.held.insert(result, holder);
+        Encoding::Encoded(())
+    }
+
+    /// Where a match's value is put: [`Enc::holder`] for its component type,
+    /// or nothing for a match whose arms are statements (ADR-0051).
+    fn match_holder(&mut self, result: ValueId, ty: &Type) -> Encoding<Held> {
+        match ty {
+            Type::Unit => Encoding::Encoded(Held::Nothing),
             _ => match self.type_of(result, ty) {
-                Some(rt) => self.holder(rt),
+                Some(rt) => Encoding::Encoded(self.holder(rt)),
                 None => refuse!(
                     "a match whose component type nothing fixes",
                     "`{}`'s match is used where the world names no type",
                     self.export
                 ),
             },
-        };
-
-        // Discriminant 1 selects the second-numbered case: `Some` for an
-        // option, `Err` for a result.
-        let (one, zero) = {
-            let d = |a: &super::ir::MatchArm| case_layout(resolve, sizes, st, a.case);
-            match (d(first), d(second)) {
-                (Some((1, ..)), Some((0, ..))) => (first, second),
-                (Some((0, ..)), Some((1, ..))) => (second, first),
-                _ => blocked!(
-                    "`{}` matches cases the scrutinee's type does not have",
-                    self.export
-                ),
-            }
-        };
-        self.ops.push(I::LocalGet(ptr));
-        self.ops.push(I::I32Load8U(MemArg {
-            offset: 0,
-            align: 0,
-            memory_index: 0,
-        }));
-        self.ops.push(I::If(wasm_encoder::BlockType::Empty));
-        match self.arm(ptr, st, one, &holder) {
-            Encoding::Encoded(()) => {}
-            other => return other,
         }
-        self.ops.push(I::Else);
-        match self.arm(ptr, st, zero, &holder) {
-            Encoding::Encoded(()) => {}
-            other => return other,
-        }
-        self.ops.push(I::End);
-        self.held.insert(result, holder);
-        Encoding::Encoded(())
     }
 
-    /// One arm: bind the payload, emit the region, move its value.
+    /// One arm: bind its payload's fields, emit the region, move its value.
     fn arm(
         &mut self,
         ptr: u32,
@@ -4963,15 +5357,35 @@ impl Enc<'_> {
         holder: &Held,
     ) -> Encoding<()> {
         let (resolve, sizes) = (self.resolve, self.sizes);
-        let Some((_, payload_ty, offset)) = case_layout(resolve, sizes, st, arm.case) else {
-            blocked!(
-                "`{}` matches a case its scrutinee does not have",
-                self.export
-            );
-        };
-        if let (Some(b), Some(pt)) = (arm.binding, payload_ty) {
-            let at = self.address(ptr, offset);
-            self.held.insert(b, Held::Memory { ty: pt, ptr: at });
+        // An arm of one case binds its payload's fields; an arm of several
+        // binds none.
+        if let [case] = arm.cases.as_slice()
+            && arm.bindings.iter().any(Option::is_some)
+        {
+            let Some((_, payload, offset)) = case_layout(resolve, sizes, st, *case) else {
+                blocked!(
+                    "`{}` matches a case its scrutinee does not have",
+                    self.export
+                );
+            };
+            let Some(places) = case_fields(resolve, sizes, payload, arm.bindings.len()) else {
+                blocked!(
+                    "`{}` binds fields its case's payload does not hold",
+                    self.export
+                );
+            };
+            for ((at, field_ty), b) in places.into_iter().zip(&arm.bindings) {
+                if let Some(b) = b {
+                    let addr = self.address(ptr, offset + at);
+                    self.held.insert(
+                        *b,
+                        Held::Memory {
+                            ty: field_ty,
+                            ptr: addr,
+                        },
+                    );
+                }
+            }
         }
         if matches!(holder, Held::Nothing) {
             return self.region(&arm.body.instrs);
@@ -6130,9 +6544,11 @@ fn trap_on_negation_overflow(ops: &mut Ops, a: u32) {
 /// **Write flat values into a value's canonical layout**: the inverse of
 /// [`load`], with the same offsets from `SizeAlign`. Returns how many flat
 /// values it consumed.
+#[allow(clippy::too_many_arguments)]
 fn store(
     resolve: &Resolve,
     sizes: &SizeAlign,
+    locals: &mut Locals,
     ty: &WitType,
     base: u32,
     offset: u64,
@@ -6172,6 +6588,7 @@ fn store(
                     match store(
                         resolve,
                         sizes,
+                        locals,
                         field_ty,
                         base,
                         offset + o,
@@ -6192,6 +6609,7 @@ fn store(
                     match store(
                         resolve,
                         sizes,
+                        locals,
                         field_ty,
                         base,
                         offset + o,
@@ -6204,10 +6622,12 @@ fn store(
                 }
                 Encoding::Encoded(used)
             }
+            TypeDefKind::Option(_) | TypeDefKind::Result(_) | TypeDefKind::Variant(_) => {
+                store_variant(resolve, sizes, locals, *ty, base, offset, flats, ops)
+            }
             other => refuse!(
                 "writing a value of this kind into memory",
-                "{other:?} flattens with joined variant slots, which this encoder does \
-                 not write yet"
+                "{other:?} has no store here yet"
             ),
         },
         other => refuse!(
@@ -6244,6 +6664,7 @@ fn pointer_and_length(
 fn push_flat_values(
     resolve: &Resolve,
     sizes: &SizeAlign,
+    locals: &mut Locals,
     h: &Held,
     ops: &mut Vec<wasm_encoder::Instruction<'static>>,
 ) -> Encoding<()> {
@@ -6255,7 +6676,7 @@ fn push_flat_values(
             }
             Encoding::Encoded(())
         }
-        Held::Memory { ty, ptr } => load(resolve, sizes, ty, *ptr, 0, ops),
+        Held::Memory { ty, ptr } => load(resolve, sizes, locals, ty, *ptr, 0, ops),
         Held::Nothing => blocked!("a call with no result was used as a value"),
     }
 }
@@ -6265,6 +6686,7 @@ fn push_flat_values(
 fn load(
     resolve: &Resolve,
     sizes: &SizeAlign,
+    locals: &mut Locals,
     ty: &WitType,
     ptr: u32,
     offset: u64,
@@ -6326,7 +6748,7 @@ fn load(
                 let offsets = sizes.field_offsets(r.fields.iter().map(|f| &f.ty));
                 for (field_offset, field_ty) in offsets {
                     let o = field_offset.size_wasm32() as u64;
-                    match load(resolve, sizes, field_ty, ptr, offset + o, ops) {
+                    match load(resolve, sizes, locals, field_ty, ptr, offset + o, ops) {
                         Encoding::Encoded(()) => {}
                         other => return other,
                     }
@@ -6336,7 +6758,7 @@ fn load(
             TypeDefKind::Tuple(t) => {
                 for (field_offset, field_ty) in sizes.field_offsets(t.types.iter()) {
                     let o = field_offset.size_wasm32() as u64;
-                    match load(resolve, sizes, field_ty, ptr, offset + o, ops) {
+                    match load(resolve, sizes, locals, field_ty, ptr, offset + o, ops) {
                         Encoding::Encoded(()) => {}
                         other => return other,
                     }
@@ -6352,16 +6774,163 @@ fn load(
                     memory_index: 0,
                 }));
             }
+            TypeDefKind::Option(_) | TypeDefKind::Result(_) | TypeDefKind::Variant(_) => {
+                return load_variant(resolve, sizes, locals, *ty, ptr, offset, ops);
+            }
             other => refuse!(
                 "reading a value of this kind from memory",
-                "{other:?} flattens with joined variant slots, which this encoder does \
-                 not read yet"
+                "{other:?} has no load here yet"
             ),
         },
         other => refuse!(
             "reading a value of this kind from memory",
             "{other:?} has no load here yet"
         ),
+    }
+    Encoding::Encoded(())
+}
+
+/// **A variant's flat values, written to memory** (ADR-0059): the
+/// discriminant, then the payload of the case it names. Each of that case's
+/// flat values is read back from the slot the variant's flattening joined it
+/// into, as the Canonical ABI's `lift_flat_variant` reads it; a slot another
+/// case shares may hold a wider type.
+#[allow(clippy::too_many_arguments)]
+fn store_variant(
+    resolve: &Resolve,
+    sizes: &SizeAlign,
+    locals: &mut Locals,
+    t: WitType,
+    base: u32,
+    offset: u64,
+    flats: &[u32],
+    ops: &mut Vec<wasm_encoder::Instruction<'static>>,
+) -> Encoding<usize> {
+    use wasm_encoder::Instruction as I;
+    let (Some((cases, tag)), Some(all)) = (variant_cases(resolve, t), flat(resolve, &t)) else {
+        refuse!(
+            "writing a value of this kind into memory",
+            "a variant too large to hold in locals"
+        );
+    };
+    let joined = core_types(&all[1..]);
+    let used = 1 + joined.len();
+    let Some((disc, slots)) = flats.get(..used).and_then(<[u32]>::split_first) else {
+        blocked!("a store ran out of flat values");
+    };
+    ops.push(I::LocalGet(base));
+    ops.push(I::LocalGet(*disc));
+    ops.push(store_tag(tag, offset));
+    let payload_at = offset
+        + sizes
+            .payload_offset(tag, cases.iter().map(Option::as_ref))
+            .size_wasm32() as u64;
+    for (i, case) in cases.iter().enumerate() {
+        let Some(pt) = case else { continue };
+        let Some(own) = flat(resolve, pt) else {
+            refuse!(
+                "writing a value of this kind into memory",
+                "a case too large to hold in locals"
+            );
+        };
+        let mut body = Vec::new();
+        let mut values = Vec::new();
+        for (k, want) in core_types(&own).into_iter().enumerate() {
+            let have = joined[k];
+            if have == want {
+                values.push(slots[k]);
+                continue;
+            }
+            let l = locals.fresh(want);
+            body.push(I::LocalGet(slots[k]));
+            body.extend(from_joined(have, want));
+            body.push(I::LocalSet(l));
+            values.push(l);
+        }
+        match store(
+            resolve, sizes, locals, pt, base, payload_at, &values, &mut body,
+        ) {
+            Encoding::Encoded(_) => {}
+            other => return other,
+        }
+        ops.extend([
+            I::LocalGet(*disc),
+            I::I32Const(i as i32),
+            I::I32Eq,
+            I::If(wasm_encoder::BlockType::Empty),
+        ]);
+        ops.extend(body);
+        ops.push(I::End);
+    }
+    Encoding::Encoded(used)
+}
+
+/// **A variant's layout, read into its flat values** (ADR-0059): the
+/// discriminant, then each joined slot, holding the named case's flat values
+/// widened into it and zero where that case has none, as the Canonical ABI's
+/// `lower_flat_variant` writes them.
+fn load_variant(
+    resolve: &Resolve,
+    sizes: &SizeAlign,
+    locals: &mut Locals,
+    t: WitType,
+    ptr: u32,
+    offset: u64,
+    ops: &mut Vec<wasm_encoder::Instruction<'static>>,
+) -> Encoding<()> {
+    use wasm_encoder::Instruction as I;
+    let (Some((cases, tag)), Some(all)) = (variant_cases(resolve, t), flat(resolve, &t)) else {
+        refuse!(
+            "reading a value of this kind from memory",
+            "a variant too large to hold in locals"
+        );
+    };
+    let joined = core_types(&all[1..]);
+    let disc = locals.fresh(ValType::I32);
+    ops.push(I::LocalGet(ptr));
+    ops.push(load_tag(tag, offset));
+    ops.push(I::LocalSet(disc));
+    let slots: Vec<u32> = joined
+        .iter()
+        .map(|t| {
+            let l = locals.fresh(*t);
+            ops.push(zero(*t));
+            ops.push(I::LocalSet(l));
+            l
+        })
+        .collect();
+    let payload_at = offset
+        + sizes
+            .payload_offset(tag, cases.iter().map(Option::as_ref))
+            .size_wasm32() as u64;
+    for (i, case) in cases.iter().enumerate() {
+        let Some(pt) = case else { continue };
+        let Some(own) = flat(resolve, pt) else {
+            refuse!(
+                "reading a value of this kind from memory",
+                "a case too large to hold in locals"
+            );
+        };
+        let own = core_types(&own);
+        ops.extend([
+            I::LocalGet(disc),
+            I::I32Const(i as i32),
+            I::I32Eq,
+            I::If(wasm_encoder::BlockType::Empty),
+        ]);
+        match load(resolve, sizes, locals, pt, ptr, payload_at, ops) {
+            Encoding::Encoded(()) => {}
+            other => return other,
+        }
+        for k in (0..own.len()).rev() {
+            ops.extend(to_joined(own[k], joined[k]));
+            ops.push(I::LocalSet(slots[k]));
+        }
+        ops.push(I::End);
+    }
+    ops.push(I::LocalGet(disc));
+    for s in &slots {
+        ops.push(I::LocalGet(*s));
     }
     Encoding::Encoded(())
 }

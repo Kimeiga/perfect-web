@@ -78,6 +78,36 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: four kinds of wrong program passed `pw check`
+with a declared sum type** ([ADR-0059](DECISIONS/ADR-0059-declared-sum-types.md)):
+- `Shape.Circle("x")`, a field of the wrong type: a case had no type at all.
+- `Shape.Bogus(1)`, a case the type does not declare.
+- `match s { Shape.Empty => 0 }` over a type of four cases. A pattern through
+  its type parsed as a binding of that dotted name, so it matched everything
+  and the match was proven exhaustive.
+- `Some(x) => x + "a"` over an `Option<Int>`. The value relations did not
+  bind an arm's names in its body, so nothing inside an arm but its result
+  was checked.
+
+Each is refused now, with a test and a control in
+`compiler/pw-core/tests/sum_types.rs`.
+
+**2026-09-26: declared sum types, typed, built and matched**
+([ADR-0059](DECISIONS/ADR-0059-declared-sum-types.md)).
+- A case is typed where it is written through its type, `Shape.Circle(3)`;
+  a pattern may name its type too; an arm's fields are typed in its body.
+- The backend builds and matches declared cases. In the component a sum type
+  is a WIT variant, and a parameter's joined flat slots are read back as the
+  Canonical ABI reads them, which also lets an `Option` parameter be matched.
+  In the module a case is `{ $case, value }`.
+- `_`, name and `A | B` arms compile, over any variant.
+- A union of one case is a WIT variant; it was `tuple<>`. A type that
+  contains itself is refused by name; it was WIT that does not parse.
+- Not done: nested and literal patterns, generic sum types in the backend, a
+  sum type in a template's `{#match}`, and `==` on anything but a primitive.
+
+Evidence: [sum-types.txt](evidence/E10/sum-types.txt) (`just e10-sum-types`).
+
 **2026-09-25: handlers that compute**
 ([ADR-0058](DECISIONS/ADR-0058-handlers-that-compute.md)).
 - A resumable handler's body is lowered through the backend IR and written
@@ -293,6 +323,10 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0059: a case is written through its type in an expression; a case
+  without a payload may be written alone where one visible type has it, and
+  one with a payload may not (PW0021, naming the qualified form); an arm no
+  case reaches is refused by the backend and not reported by the checker.
 - ADR-0058: a command's answer is not read by a handler; the syntax that
   would bind an event to a resumable handler is not chosen.
 - ADR-0057: a map's key is an `Int` or a `String`; entries are in

@@ -48,11 +48,11 @@
 //!
 //! # What it deliberately does not decide
 //!
-//! Recorded in `docs/KNOWN_LIMITATIONS.md` rather than approximated here:
-//! function types do not exist, so a lambda's type is unknown and a callback
-//! parameter is Undecided; a sum type's variant constructors are not resolved
-//! by the workspace, so `Circle(3)` has no type; a call with named arguments is
-//! Undecided because a signature does not carry parameter names.
+//! Recorded in `docs/KNOWN_LIMITATIONS.md` rather than approximated here: a
+//! call with named arguments is Undecided because a signature does not carry
+//! parameter names. A sum type's case is typed where it is written through its
+//! type, `Shape.Circle(3)`, since ADR-0059; the workspace still resolves no
+//! case as a term.
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -347,6 +347,9 @@ pub enum RelationKind {
     /// `value.name`: the member a read or a call names, against the members
     /// the value's type has (PW0610, ADR-0048).
     Member,
+    /// `Shape.Circle`: the case a path names, against the cases its type
+    /// declares (PW0608, ADR-0059).
+    Case,
 }
 
 /// A member relation's expectation when the member is an opaque type's
@@ -418,6 +421,9 @@ pub(crate) enum Target<'s> {
     Record(DefId),
     /// `PositiveInt(1)`: an opaque type built from its representation.
     Opaque(DefId),
+    /// `Shape.Circle(3)`: a sum type's case, by its position in the
+    /// declaration, built from its payload's fields positionally (ADR-0059).
+    Case(DefId, usize),
 }
 
 struct Typer<'a> {
@@ -525,7 +531,15 @@ pub(crate) fn named<'s>(
                 _ => return Named::Nothing,
             }
         }
-        Resolution::Unresolved => return Named::Nothing,
+        // `Shape.Circle(3)`, a case through its type (ADR-0059). A case its
+        // type lacks is refused here and reported by the case relation.
+        Resolution::Unresolved => {
+            return match case_named(sigs, ws, at, &path) {
+                Some(CaseNamed::Case(def, index)) => Named::Target(Target::Case(def, index)),
+                Some(CaseNamed::Unknown(..)) => Named::Refused,
+                None => Named::Nothing,
+            };
+        }
     };
     if let Some(sig) = sigs.by_def(def) {
         return Named::Target(Target::Callable(sig));
@@ -540,6 +554,81 @@ pub(crate) fn named<'s>(
         return Named::Target(Target::Opaque(def));
     }
     Named::Refused
+}
+
+/// What a qualified path names when it names a sum type's case (ADR-0059).
+pub(crate) enum CaseNamed {
+    /// `Shape.Circle`: the type, and the case's position in its declaration.
+    Case(DefId, usize),
+    /// `Shape.Bogus`: a sum type, and a name none of its cases has.
+    Unknown(DefId, String),
+}
+
+/// **Which case a qualified path names** (ADR-0059): `Shape.Circle`, or
+/// `geometry.Shape.Circle` through a module. The type is resolved in the Type
+/// namespace where the path is written, and the case is found among the cases
+/// it declares. `None` where the path is not a sum type's: a path that
+/// resolves as a term is that term.
+///
+/// The one rule, with three readers: the typer, the check that a case exists,
+/// and the backend (`backend::lower`), so the case the checker typed is the
+/// case that is built.
+pub(crate) fn case_named(
+    sigs: &Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    path: &str,
+) -> Option<CaseNamed> {
+    let (ty, case) = path.rsplit_once('.')?;
+    if !matches!(ws.resolve_path(at, path), Resolution::Unresolved) {
+        return None;
+    }
+    let found = match ty.contains('.') {
+        true => ws.resolve_path_in(at, Namespace::Type, ty),
+        false => ws.resolve_in(at, Namespace::Type, ty),
+    };
+    let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
+        return None;
+    };
+    let cases = sigs.type_decl(def)?.variants.as_ref()?;
+    Some(match cases.iter().position(|(name, _)| name == case) {
+        Some(index) => CaseNamed::Case(def, index),
+        None => CaseNamed::Unknown(def, case.to_string()),
+    })
+}
+
+/// **The case a bare name is** (ADR-0059): `Empty`, where no term has the
+/// name, is the case of that name of the one sum type `at` sees with one,
+/// in the set ADR-0047 resolves a bare constructor against. `None` where no
+/// type has it, or several do, which the name alone cannot choose between.
+/// The language's own cases keep their names: a program's `None` is written
+/// through its type.
+pub(crate) fn bare_case(
+    sigs: &Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    name: &str,
+) -> Option<(DefId, usize)> {
+    if matches!(name, "Some" | "None" | "Ok" | "Err")
+        || !matches!(
+            ws.resolve_in(at, Namespace::Term, name),
+            Resolution::Unresolved
+        )
+    {
+        return None;
+    }
+    let found: BTreeSet<(DefId, usize)> = ws
+        .visible_types(at)
+        .into_iter()
+        .filter_map(|def| {
+            let cases = sigs.type_decl(def)?.variants.as_ref()?;
+            Some((def, cases.iter().position(|(n, _)| n == name)?))
+        })
+        .collect();
+    match found.len() {
+        1 => found.into_iter().next(),
+        _ => None,
+    }
 }
 
 impl<'a> Typer<'a> {
@@ -760,25 +849,65 @@ impl<'a> Typer<'a> {
             return function_type(sig);
         }
         // The language's own values, only where the program has not declared
-        // something of that name.
+        // something of that name; then a sum type's case (ADR-0059).
         let own = matches!(term, Resolution::Unresolved);
         match n {
             "true" | "false" if own => Ty::Primitive(Primitive::Bool),
             "None" if own => Ty::Builtin(Builtin::Option, vec![Ty::Unknown]),
+            _ if own => match bare_case(self.sigs, self.ws, self.at, n) {
+                Some((def, index)) => self.case_value(def, index),
+                None => Ty::Unknown,
+            },
             _ => Ty::Unknown,
         }
     }
 
+    /// **A case named as a value** (ADR-0059): one without a payload is a
+    /// value of its type, `Shape.Empty`; one with a payload is the function
+    /// that builds it, `Shape.Circle`, which a list operation can be passed.
+    fn case_value(&self, def: DefId, index: usize) -> Ty {
+        let Some((_, fields)) = self
+            .sigs
+            .type_decl(def)
+            .and_then(|t| t.variants.as_ref())
+            .and_then(|cases| cases.get(index))
+        else {
+            return Ty::Unknown;
+        };
+        let s = Subst::default();
+        let result = s.close(&self.applied(def).instantiate(def));
+        if fields.is_empty() {
+            return result;
+        }
+        let mut shape: Vec<Ty> = fields
+            .iter()
+            .map(|f| match f {
+                TypeResolution::Resolved(t) => s.close(&Ty::of(t).instantiate(def)),
+                _ => Ty::Unknown,
+            })
+            .collect();
+        shape.push(result);
+        Ty::Builtin(Builtin::Function, shape)
+    }
+
     /// The names an arm's pattern binds, typed from the scrutinee's type:
     /// `Some(x)` binds the option's `T`; `Ok(x)` and `Err(e)` the result's two
-    /// sides. Only a name bound directly under one of the language's own
-    /// cases, where the program declares nothing of that name; a declared
-    /// variant's payload, and any nested pattern, bind nothing here and stay
+    /// sides, where the program declares nothing of that name; `Rect(w, h)`
+    /// each field of a declared case's payload (ADR-0059). Only a name bound
+    /// directly under the case: a nested pattern binds nothing here and stays
     /// unknown, which every relation reads as undecided.
     fn arm_bindings(&self, scrutinee: &Ty, pat: crate::hir::PatternId) -> Vec<(String, Ty)> {
         let Pattern::Ctor { path, args } = self.body.pat(pat) else {
             return Vec::new();
         };
+        if let Ty::Nominal(def, _) = scrutinee
+            && self
+                .sigs
+                .type_decl(*def)
+                .is_some_and(|t| t.variants.is_some())
+        {
+            return self.case_bindings(scrutinee, *def, path, args);
+        }
         let [inner] = args.as_slice() else {
             return Vec::new();
         };
@@ -799,6 +928,61 @@ impl<'a> Typer<'a> {
             Some(t) if !self.shadowed.contains(name) => vec![(name.clone(), t.clone())],
             _ => Vec::new(),
         }
+    }
+
+    /// `Rect(w, h)` against a `Shape`: each name bound directly under the
+    /// case, typed as its field under the scrutinee's type arguments. A case
+    /// the type lacks, a qualifier naming another type, or a field count the
+    /// case does not declare binds nothing; the exhaustiveness check reports
+    /// each (PW0608, PW0603).
+    fn case_bindings(
+        &self,
+        scrutinee: &Ty,
+        def: DefId,
+        path: &str,
+        args: &[crate::hir::PatternId],
+    ) -> Vec<(String, Ty)> {
+        let case = match path.rsplit_once('.') {
+            Some(_) => match case_named(self.sigs, self.ws, self.at, path) {
+                Some(CaseNamed::Case(d, index)) if d == def => index,
+                _ => return Vec::new(),
+            },
+            None => {
+                let cases = self.sigs.type_decl(def).and_then(|t| t.variants.as_ref());
+                match cases.and_then(|cs| cs.iter().position(|(n, _)| n == path)) {
+                    Some(index) => index,
+                    None => return Vec::new(),
+                }
+            }
+        };
+        let Some((_, fields)) = self
+            .sigs
+            .type_decl(def)
+            .and_then(|t| t.variants.as_ref())
+            .and_then(|cs| cs.get(case))
+        else {
+            return Vec::new();
+        };
+        if fields.len() != args.len() {
+            return Vec::new();
+        }
+        // The declared fields under the scrutinee's arguments: `Tree<Int>`'s
+        // `Node(Tree<T>, T)` binds a `Tree<Int>` and an `Int`.
+        let mut s = Subst::default();
+        unify(&mut s, &self.applied(def).instantiate(def), scrutinee);
+        let mut out = Vec::new();
+        for (arg, field) in args.iter().zip(fields) {
+            let Pattern::Bind { name, .. } = self.body.pat(*arg) else {
+                continue;
+            };
+            let TypeResolution::Resolved(t) = field else {
+                continue;
+            };
+            if !self.shadowed.contains(name) {
+                out.push((name.clone(), s.close(&Ty::of(t).instantiate(def))));
+            }
+        }
+        out
     }
 
     /// Every name bound by a match arm that encloses `target`, outermost
@@ -925,6 +1109,14 @@ impl<'a> Typer<'a> {
 
     /// `base.name`: a record field, read through the receiver's type.
     fn field(&self, id: ExprId, base: ExprId, name: &str) -> Ty {
+        // `Shape.Empty` and `Shape.Circle`, a case through its type
+        // (ADR-0059).
+        if let Some(c) = case_named(self.sigs, self.ws, self.at, &path_of(self.body, id)) {
+            return match c {
+                CaseNamed::Case(def, index) => self.case_value(def, index),
+                CaseNamed::Unknown(..) => Ty::Unknown,
+            };
+        }
         // A module path: `decode.string` named as a value is that function.
         if self.resolves_as_path(id) {
             let path = path_of(self.body, id);
@@ -1099,6 +1291,25 @@ impl<'a> Typer<'a> {
                     declared: fields
                         .iter()
                         .map(|(_, r)| r.resolved().map(|t| (def.unit, t.span())))
+                        .collect(),
+                    result: Some(self.applied(*def)),
+                }
+            }
+            Target::Case(def, index) => {
+                let (case, fields) = self
+                    .sigs
+                    .type_decl(*def)
+                    .and_then(|t| t.variants.as_ref())
+                    .and_then(|cases| cases.get(*index))
+                    .cloned()
+                    .unwrap_or_default();
+                Callee {
+                    name: format!("{}.{case}", self.display_def(*def)),
+                    binder: *def,
+                    params: fields.iter().map(|r| Some(r.clone())).collect(),
+                    declared: fields
+                        .iter()
+                        .map(|r| r.resolved().map(|t| (def.unit, t.span())))
                         .collect(),
                     result: Some(self.applied(*def)),
                 }
@@ -1504,71 +1715,89 @@ impl<'a> Typer<'a> {
         self.relations_from(self.body.root, out);
     }
 
-    /// The same relations, over one tree: the body, or a policy's term root.
+    /// The same relations, over one tree: the body, or a policy's term root,
+    /// in the order `Body::walk_from` visits it. An arm's body is walked with
+    /// its pattern's names bound, so `x` in `Some(x) => x + 1` is the option's
+    /// `T` and `r` in `Circle(r) => ..` the case's field (ADR-0059). Until
+    /// 2026-09-26 every relation inside an arm read them as unknown, and
+    /// `Some(x) => x + "a"` over an `Option<Int>` passed `pw check`.
     fn relations_from(&self, root: ExprId, out: &mut Vec<ValueRelation>) {
-        for id in self.body.walk_from(root) {
-            match self.body.expr(id) {
-                Expr::Call { .. } => out.extend(self.call(id).relations),
-                Expr::Keyword {
-                    keyword, modifiers, ..
-                } if matches!(keyword.as_str(), "query" | "subscription")
-                    && !modifiers.is_empty() =>
-                {
-                    out.extend(self.call(id).relations)
-                }
-                Expr::Record { name: Some(_), .. } => out.extend(self.construct(id).relations),
-                Expr::Field { base, name } => out.extend(self.member(id, *base, name)),
-                // An operator's operands, and a condition. Until 2026-09-25 a
-                // comparison was typed `Bool` whatever it compared, so
-                // `1 == "a"` checked, and the backend was the first to refuse.
-                Expr::Binary { op, lhs, rhs } => out.extend(self.operands(id, op, *lhs, *rhs)),
-                Expr::Unary { op, operand } => {
-                    let (what, expected) = match op {
-                        UnOp::Not => ("the operand of `!`", Some(Ty::Primitive(Primitive::Bool))),
-                        UnOp::Neg => ("the operand of `-`", None),
-                    };
-                    out.push(match expected {
-                        Some(t) => self.operand(id, *operand, what, &t),
-                        None => self.number(id, *operand, what),
-                    });
-                }
-                Expr::If { cond, .. } => out.push(self.operand(
-                    id,
-                    *cond,
-                    "the condition of `if`",
-                    &Ty::Primitive(Primitive::Bool),
-                )),
-                Expr::Let {
-                    pat: Some(pat),
-                    ty: Some(ty),
-                    init: Some(init),
-                } => {
-                    let Some(written) = crate::resolved::written_in_body(self.body, *ty) else {
-                        continue;
-                    };
-                    let span = self.body.expr_span(*init);
-                    let declared =
-                        self.sigs
-                            .resolve_type(self.module, self.decl, &written, span.clone());
-                    let name = match self.body.pat(*pat) {
-                        Pattern::Bind { name, .. } => name.clone(),
-                        _ => "_".to_string(),
-                    };
-                    let boundary = (
-                        self.body.expr_span(id),
-                        format!("`{name}` is annotated in this binding"),
-                    );
-                    out.push(self.relate(
-                        RelationKind::Binding,
-                        &declared,
-                        self.of(*init),
-                        name,
-                        span,
-                        boundary,
-                    ));
-                }
-                _ => {}
+        self.relations_at(root, out);
+        if let Expr::Match { scrutinee, arms } = self.body.expr(root) {
+            self.relations_from(*scrutinee, out);
+            let st = self.of(*scrutinee);
+            for arm in arms {
+                let binds = self.arm_bindings(&st, arm.pat);
+                self.with_bindings(&binds, || self.relations_from(arm.body, out));
             }
+            return;
+        }
+        for c in self.body.children(root) {
+            self.relations_from(c, out);
+        }
+    }
+
+    /// The relations one expression is the site of.
+    fn relations_at(&self, id: ExprId, out: &mut Vec<ValueRelation>) {
+        match self.body.expr(id) {
+            Expr::Call { .. } => out.extend(self.call(id).relations),
+            Expr::Keyword {
+                keyword, modifiers, ..
+            } if matches!(keyword.as_str(), "query" | "subscription") && !modifiers.is_empty() => {
+                out.extend(self.call(id).relations)
+            }
+            Expr::Record { name: Some(_), .. } => out.extend(self.construct(id).relations),
+            Expr::Field { base, name } => out.extend(self.member(id, *base, name)),
+            // An operator's operands, and a condition. Until 2026-09-25 a
+            // comparison was typed `Bool` whatever it compared, so
+            // `1 == "a"` checked, and the backend was the first to refuse.
+            Expr::Binary { op, lhs, rhs } => out.extend(self.operands(id, op, *lhs, *rhs)),
+            Expr::Unary { op, operand } => {
+                let (what, expected) = match op {
+                    UnOp::Not => ("the operand of `!`", Some(Ty::Primitive(Primitive::Bool))),
+                    UnOp::Neg => ("the operand of `-`", None),
+                };
+                out.push(match expected {
+                    Some(t) => self.operand(id, *operand, what, &t),
+                    None => self.number(id, *operand, what),
+                });
+            }
+            Expr::If { cond, .. } => out.push(self.operand(
+                id,
+                *cond,
+                "the condition of `if`",
+                &Ty::Primitive(Primitive::Bool),
+            )),
+            Expr::Let {
+                pat: Some(pat),
+                ty: Some(ty),
+                init: Some(init),
+            } => {
+                let Some(written) = crate::resolved::written_in_body(self.body, *ty) else {
+                    return;
+                };
+                let span = self.body.expr_span(*init);
+                let declared =
+                    self.sigs
+                        .resolve_type(self.module, self.decl, &written, span.clone());
+                let name = match self.body.pat(*pat) {
+                    Pattern::Bind { name, .. } => name.clone(),
+                    _ => "_".to_string(),
+                };
+                let boundary = (
+                    self.body.expr_span(id),
+                    format!("`{name}` is annotated in this binding"),
+                );
+                out.push(self.relate(
+                    RelationKind::Binding,
+                    &declared,
+                    self.of(*init),
+                    name,
+                    span,
+                    boundary,
+                ));
+            }
+            _ => {}
         }
     }
 
@@ -1583,6 +1812,42 @@ impl<'a> Typer<'a> {
     /// and a unit on a numeric literal (`900.px`, `30.seconds`), which is a
     /// dimensioned literal. A value whose type is not known is undecided.
     fn member(&self, id: ExprId, base: ExprId, name: &str) -> Option<ValueRelation> {
+        // `Shape.Circle`: not a member of a value, a case of a type, which the
+        // type must declare (PW0608, ADR-0059). Until 2026-09-26 it was
+        // undecided, and `Shape.Bogus(1)` passed `pw check`.
+        if let Some(c) = case_named(self.sigs, self.ws, self.at, &path_of(self.body, id)) {
+            let (def, outcome) = match c {
+                CaseNamed::Case(def, _) => (def, Outcome::Agree),
+                CaseNamed::Unknown(def, written) => (
+                    def,
+                    Outcome::Disagree {
+                        expected: self
+                            .sigs
+                            .type_decl(def)
+                            .and_then(|t| t.variants.as_ref())
+                            .map(|cases| {
+                                cases
+                                    .iter()
+                                    .map(|(n, _)| format!("`{n}`"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            })
+                            .unwrap_or_default(),
+                        actual: written,
+                    },
+                ),
+            };
+            return Some(ValueRelation {
+                declaration: self.decl.name.clone(),
+                kind: RelationKind::Case,
+                span: self.body.expr_span(id),
+                target: self.display_def(def),
+                index: None,
+                outcome,
+                declared_at: None,
+                boundary: (self.body.expr_span(base), "the type named".to_string()),
+            });
+        }
         if self.resolves_as_path(id)
             || matches!(
                 self.body.expr(base),
@@ -2332,6 +2597,19 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                 "read a member `{actual}` declares, or declare `{}` for it",
                 r.target
             )),
+            RelationKind::Case => Diagnostic::error(
+                crate::codes::PATTERN_CONSTRUCTOR.id,
+                crate::codes::PATTERN_CONSTRUCTOR.invariant,
+                Detector::Signature,
+                format!("`{actual}` is not a constructor of `{}`", r.target),
+                r.span.clone(),
+            )
+            .reason("path_names_a_case_its_type_lacks")
+            .explain(
+                "a sum type's values are built by the cases it declares; a case it does not \
+                 declare builds nothing, and a value of the type is not one of them",
+            )
+            .repair(format!("`{}`'s constructors are {expected}", r.target)),
             RelationKind::Annotation => Diagnostic::error(
                 crate::codes::UNRESOLVED_TYPE.id,
                 crate::codes::UNRESOLVED_TYPE.invariant,

@@ -587,6 +587,34 @@ impl Workspace {
             .is_some_and(|m| m.name == name || m.imports.iter().any(|i| i.module == name))
             && self.by_name.contains_key(name)
     }
+
+    /// **Every type `unit` sees by its bare name**: its own module's, and
+    /// those of the modules it imports, whole or by name. The set a bare
+    /// constructor is looked for in (ADR-0047, ADR-0059).
+    pub fn visible_types(&self, unit: UnitId) -> Vec<DefId> {
+        let Some(module) = self.module_of(unit) else {
+            return Vec::new();
+        };
+        let mut out: Vec<DefId> = module
+            .defines
+            .iter()
+            .filter(|((ns, _), _)| *ns == Namespace::Type)
+            .map(|(_, def)| *def)
+            .collect();
+        for import in &module.imports {
+            let Some(from) = self.modules.iter().find(|m| m.name == import.module) else {
+                continue;
+            };
+            for ((ns, name), def) in &from.defines {
+                if *ns == Namespace::Type
+                    && (import.names.is_empty() || import.names.contains(name))
+                {
+                    out.push(*def);
+                }
+            }
+        }
+        out
+    }
 }
 
 impl Module {

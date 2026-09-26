@@ -73,6 +73,11 @@ pub struct TypeDecl {
     pub record: Option<Vec<(String, TypeResolution)>>,
     /// `opaque type PositiveInt = Int`: what `PositiveInt(1)` is built from.
     pub representation: Option<TypeResolution>,
+    /// `type Shape = | Circle(Int) | Empty`: each case, in declaration order,
+    /// with its payload's fields, each resolved from where the declaration is
+    /// written (ADR-0059). A case is found by its position here, which is its
+    /// discriminant.
+    pub variants: Option<Vec<(String, Vec<TypeResolution>)>>,
 }
 
 #[derive(Debug, Default)]
@@ -134,6 +139,31 @@ impl Signatures {
                         decl.name_span.clone(),
                     );
                     out.types.entry(def).or_default().representation = Some(representation);
+                }
+                if decl.kind == DeclKind::Type
+                    && let Some(cases) = &decl.variants
+                {
+                    let variants = cases
+                        .iter()
+                        .map(|case| {
+                            let fields = case
+                                .fields
+                                .iter()
+                                .map(|written| {
+                                    resolved::resolve(
+                                        workspace,
+                                        m.unit,
+                                        Some(def),
+                                        &decl.type_params,
+                                        written,
+                                        case.span.clone(),
+                                    )
+                                })
+                                .collect();
+                            (case.name.clone(), fields)
+                        })
+                        .collect();
+                    out.types.entry(def).or_default().variants = Some(variants);
                 }
                 if decl.kind == DeclKind::Type
                     && let Some(fields) = &decl.fields

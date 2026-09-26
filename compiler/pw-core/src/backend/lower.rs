@@ -39,9 +39,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
-    BinaryOp, Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Closure, Const, EachKind,
-    Function, ImportId, Instr, Intrinsic, Lowering, MatchArm, Operation, Program, Region, Shape,
-    Terminator, Type, TypeDef, UnaryOp, ValueId, all_instrs,
+    BinaryOp, Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Case, Closure, Const,
+    EachKind, Function, ImportId, Instr, Intrinsic, Lowering, MatchArm, Operation, Program, Region,
+    Shape, Terminator, Type, TypeDef, UnaryOp, ValueId, all_instrs,
 };
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Pattern, Span};
@@ -821,14 +821,29 @@ fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
                 Some(t) => Shape::Alias(Box::new(t)),
                 None => continue,
             }
-        } else if let Some(variants) = &decl.variants
-            && variants.len() > 1
+        } else if let Some(cases) = declared
+            .and_then(|t| t.variants.as_ref())
+            .filter(|cases| !cases.is_empty())
         {
-            // A declared variant's payloads are not resolved here: the
-            // backend builds and matches none (ADR-0039 §6).
-            Shape::Variant {
-                cases: variants.iter().map(|v| (v.name.clone(), None)).collect(),
+            // A sum type's cases, each payload's fields resolved (ADR-0059),
+            // whatever their number: a union of one case is a variant too.
+            // One that does not resolve leaves the declaration out.
+            let mut out_cases = Vec::new();
+            let mut whole = true;
+            for (name, fields) in cases {
+                let mut types = Vec::new();
+                for r in fields {
+                    match resolved(r) {
+                        Some(t) => types.push(t),
+                        None => whole = false,
+                    }
+                }
+                out_cases.push((name.clone(), types));
             }
+            if !whole {
+                continue;
+            }
+            Shape::Variant { cases: out_cases }
         } else if let Some(fields) = declared.and_then(|t| t.record.as_ref()) {
             let mut out_fields = Vec::new();
             let mut whole = true;
@@ -852,6 +867,13 @@ fn type_defs(cx: &Context<'_>, p: &Program) -> Vec<TypeDef> {
         }
         if let Shape::Alias(t) = &shape {
             wanted.extend(t.nominals());
+        }
+        if let Shape::Variant { cases } = &shape {
+            for (_, fields) in cases {
+                for t in fields {
+                    wanted.extend(t.nominals());
+                }
+            }
         }
         out.push(TypeDef {
             def,
@@ -1130,6 +1152,18 @@ fn ty_resolved_with(
     if let Some(def) = ty.def_id()
         && ty.args().is_empty()
     {
+        // Refused by name here, where a type first meets the backend: until
+        // 2026-09-26 it reached the world as WIT that does not parse.
+        if contains_itself(sigs, def) {
+            return Lowering::Unsupported {
+                construct: "a type that contains itself",
+                span: span.clone(),
+                reason: format!(
+                    "`{ty}` holds a value of its own type; the Canonical ABI has no recursive \
+                     types, and this backend lays every value out by its type"
+                ),
+            };
+        }
         return Lowering::Lowered(Type::Nominal(def));
     }
     Lowering::Unsupported {
@@ -1234,6 +1268,16 @@ impl<'a> Lower<'a> {
                 // A mutable binding is read as what it holds here (ADR-0051).
                 Some(v) if self.vars.contains(&v) => Lowering::Lowered(self.read(v)),
                 Some(v) => Lowering::Lowered(v),
+                // `Empty` alone: the case of that name of the one sum type
+                // this unit sees with one, by the typer's rule (ADR-0059).
+                None if crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, n)
+                    .is_some() =>
+                {
+                    let (def, index) =
+                        crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, n)
+                            .expect("checked");
+                    self.case_value(def, index, expected, span)
+                }
                 // A declaration's name where a function is wanted: its code,
                 // as a value (ADR-0052).
                 None if matches!(expected, Some(Type::Function(..))) => {
@@ -1321,7 +1365,18 @@ impl<'a> Lower<'a> {
                 _ => self.call(body, *callee, args, None, expected, span),
             },
             Expr::Match { scrutinee, arms } => self.matched(body, *scrutinee, arms, expected, span),
-            Expr::Field { base, name } => self.field(body, *base, name, span),
+            Expr::Field { base, name } => {
+                // `Shape.Empty`, a case through its type (ADR-0059).
+                if let Some(crate::values::CaseNamed::Case(def, index)) = crate::values::case_named(
+                    self.cx.sigs,
+                    self.cx.ws,
+                    self.unit,
+                    &crate::infer::path_of(body, e),
+                ) {
+                    return self.case_value(def, index, expected, span);
+                }
+                self.field(body, *base, name, span)
+            }
             Expr::Binary { op, lhs, rhs } => self.binary(body, op, *lhs, *rhs, expected, span),
             Expr::Unary { op, operand } => self.unary(body, op, *operand, expected, span),
             Expr::If {
@@ -2282,6 +2337,46 @@ impl<'a> Lower<'a> {
             }
             Expr::Name(_) | Expr::Field { .. } => {
                 let path = crate::infer::path_of(body, f);
+                // A sum type's case (ADR-0059): `List.map(radii,
+                // Shape.Circle)` builds one per element.
+                let case = match path.contains('.') {
+                    true => {
+                        match crate::values::case_named(self.cx.sigs, self.cx.ws, self.unit, &path)
+                        {
+                            Some(crate::values::CaseNamed::Case(def, index)) => Some((def, index)),
+                            _ => None,
+                        }
+                    }
+                    false => crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, &path),
+                };
+                if let Some((def, index)) = case {
+                    let cases = match self.declared_cases(def, &span) {
+                        Lowering::Lowered(c) => c,
+                        other => return other.map(|_| unreachable!()),
+                    };
+                    if cases.get(index).map(|(_, fields)| fields.as_slice()) != Some(params) {
+                        return Lowering::Blocked {
+                            why: format!("`{path}` is passed where a function of {params:?} is"),
+                            span,
+                        };
+                    }
+                    let bound = self.fresh_typed(params);
+                    let result = self.fresh();
+                    let instrs = vec![Instr::Case {
+                        result,
+                        case: index as u32,
+                        fields: bound.clone(),
+                        ty: Type::Nominal(def),
+                    }];
+                    self.types.insert(result, Type::Nominal(def));
+                    return Lowering::Lowered((
+                        bound,
+                        Region {
+                            instrs,
+                            value: result,
+                        },
+                    ));
+                }
                 let resolution = match path.contains('.') {
                     true => self.cx.ws.resolve_path(self.unit, &path),
                     false => self.cx.ws.resolve_in(self.unit, Namespace::Term, &path),
@@ -2509,6 +2604,164 @@ impl<'a> Lower<'a> {
 
     /// **`PositiveInt(1)`** (ADR-0054): the representation, lowered as what
     /// it is, and given the opaque type.
+    /// **A sum type's case, built** (ADR-0059): `Shape.Circle(3)`, from its
+    /// payload's fields positionally, each lowered against its declared
+    /// type. A piped value is the first field.
+    fn case(
+        &mut self,
+        body: &Body,
+        def: DefId,
+        index: usize,
+        args: &[crate::hir::Arg],
+        piped: Option<ValueId>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let cases = match self.declared_cases(def, &span) {
+            Lowering::Lowered(c) => c,
+            other => return other.map(|_| unreachable!()),
+        };
+        let Some((_, fields)) = cases.get(index).cloned() else {
+            return Lowering::Blocked {
+                why: "a case its type does not declare; the checker refuses it (PW0608)".into(),
+                span,
+            };
+        };
+        if args.iter().any(|a| a.name.is_some()) {
+            return Lowering::Unsupported {
+                construct: "a case built with named fields",
+                span,
+                reason: "a case's fields are positional".to_string(),
+            };
+        }
+        let given = usize::from(piped.is_some()) + args.len();
+        if given != fields.len() {
+            return Lowering::Blocked {
+                why: format!(
+                    "the case takes {} fields and is given {given}; the checker refuses it \
+                     (PW0604)",
+                    fields.len()
+                ),
+                span,
+            };
+        }
+        let mut values: Vec<ValueId> = piped.into_iter().collect();
+        if let (Some(v), Some(want)) = (values.first(), fields.first())
+            && self.types.get(v) != Some(want)
+        {
+            return Lowering::Blocked {
+                why: format!(
+                    "a {:?} piped where a {want:?} is the field",
+                    self.types.get(v)
+                ),
+                span,
+            };
+        }
+        for (a, want) in args.iter().zip(fields.iter().skip(values.len())) {
+            match self.typed(body, a.value, want) {
+                Lowering::Lowered(v) => values.push(v),
+                other => return other,
+            }
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Case {
+            result,
+            case: index as u32,
+            fields: values,
+            ty: Type::Nominal(def),
+        }))
+    }
+
+    /// **A case named as a value** (ADR-0059): one without a payload is its
+    /// value, `Shape.Empty`; one with a payload, where a function is wanted,
+    /// is a function building it: `List.map(radii, Shape.Circle)`.
+    fn case_value(
+        &mut self,
+        def: DefId,
+        index: usize,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let cases = match self.declared_cases(def, &span) {
+            Lowering::Lowered(c) => c,
+            other => return other.map(|_| unreachable!()),
+        };
+        let Some((_, fields)) = cases.get(index).cloned() else {
+            return Lowering::Blocked {
+                why: "a case its type does not declare; the checker refuses it (PW0608)".into(),
+                span,
+            };
+        };
+        let ty = Type::Nominal(def);
+        if fields.is_empty() {
+            let result = self.fresh();
+            return Lowering::Lowered(self.push(Instr::Case {
+                result,
+                case: index as u32,
+                fields: Vec::new(),
+                ty,
+            }));
+        }
+        let Some(Type::Function(ps, r)) = expected.cloned() else {
+            return Lowering::Unsupported {
+                construct: "a case with a payload named without its fields",
+                span,
+                reason: "it is the function that builds the case, and nothing here wants a \
+                         function; call it with its fields"
+                    .to_string(),
+            };
+        };
+        if ps != fields || *r != ty {
+            return Lowering::Blocked {
+                why: format!("the case is not a {:?}", Type::Function(ps, r)),
+                span,
+            };
+        }
+        // Its code: its parameters, built into the case. It captures nothing.
+        let slot = self.reserve_closure();
+        let params: Vec<(ValueId, Type)> = fields
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (ValueId(i as u32), t.clone()))
+            .collect();
+        let built = ValueId(params.len() as u32);
+        let owner = self
+            .inlining
+            .last()
+            .copied()
+            .unwrap_or(DefId { unit: 0, decl: 0 });
+        let code = Function {
+            def: owner,
+            export: "case".to_string(),
+            params: params.clone(),
+            ret: ty.clone(),
+            blocks: vec![Block {
+                id: BlockId(0),
+                instrs: vec![Instr::Case {
+                    result: built,
+                    case: index as u32,
+                    fields: params.iter().map(|(v, _)| *v).collect(),
+                    ty: ty.clone(),
+                }],
+                terminator: Terminator::Return(built),
+            }],
+            capabilities: Vec::new(),
+            instance: Vec::new(),
+            callees: Vec::new(),
+            closures: Vec::new(),
+        };
+        self.internal.borrow_mut().closures[slot] = Some(Closure {
+            captures: 0,
+            function: code,
+        });
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Closure {
+            result,
+            index: slot as u32,
+            captures: Vec::new(),
+            ty: Type::Function(ps, r),
+        }))
+    }
+
     fn opaque(
         &mut self,
         body: &Body,
@@ -3107,8 +3360,8 @@ impl<'a> Lower<'a> {
         let x = self.fresh();
         self.types.insert(x, inner.clone());
         let succeeded = MatchArm {
-            case: ok,
-            binding: Some(x),
+            cases: vec![Case::Builtin(ok)],
+            bindings: vec![Some(x)],
             body: Region {
                 instrs: Vec::new(),
                 value: x,
@@ -3134,8 +3387,8 @@ impl<'a> Lower<'a> {
             ty: inner.clone(),
         });
         let failed = MatchArm {
-            case: fail,
-            binding: e,
+            cases: vec![Case::Builtin(fail)],
+            bindings: e.into_iter().map(Some).collect(),
             body: Region {
                 instrs: std::mem::replace(&mut self.instrs, outer),
                 value: left,
@@ -3315,9 +3568,12 @@ impl<'a> Lower<'a> {
         }))
     }
 
-    /// **A match over `Option` or `Result`**, as a structured [`Instr::Match`].
-    /// Every case must have exactly one arm: the encoder emits no fallthrough,
-    /// so a missing case is refused here rather than compiled to a trap.
+    /// **A match over a variant**, as a structured [`Instr::Match`]: over
+    /// `Option`, `Result`, or a declared sum type (ADR-0059). Each case is
+    /// taken by exactly one arm: a case pattern takes its case, `A | B` each
+    /// of its alternatives, and `_` or a name every case no arm before it
+    /// takes. The encoder emits no fallthrough, so a case no arm takes is
+    /// refused here rather than compiled to a trap.
     fn matched(
         &mut self,
         body: &Body,
@@ -3330,19 +3586,38 @@ impl<'a> Lower<'a> {
             Lowering::Lowered(v) => v,
             other => return other,
         };
-        let (cases, payloads): (Vec<BuiltinCase>, Vec<Option<Type>>) =
+        // The scrutinee's cases, each with its payload's fields.
+        let (cases, declared): (Vec<(Case, Vec<Type>)>, Option<DefId>) =
             match self.types.get(&scrutinee).cloned() {
                 Some(Type::Option(t)) => (
-                    vec![BuiltinCase::Some, BuiltinCase::None],
-                    vec![Some(*t), None],
+                    vec![
+                        (Case::Builtin(BuiltinCase::Some), vec![*t]),
+                        (Case::Builtin(BuiltinCase::None), Vec::new()),
+                    ],
+                    None,
                 ),
                 Some(Type::Result(t, e)) => (
-                    vec![BuiltinCase::Ok, BuiltinCase::Err],
-                    vec![Some(*t), Some(*e)],
+                    vec![
+                        (Case::Builtin(BuiltinCase::Ok), vec![*t]),
+                        (Case::Builtin(BuiltinCase::Err), vec![*e]),
+                    ],
+                    None,
                 ),
+                Some(Type::Nominal(def))
+                    if self
+                        .cx
+                        .sigs
+                        .type_decl(def)
+                        .is_some_and(|t| t.variants.is_some()) =>
+                {
+                    match self.declared_cases(def, &span) {
+                        Lowering::Lowered(cases) => (cases, Some(def)),
+                        other => return other.map(|_| unreachable!()),
+                    }
+                }
                 other => {
                     return Lowering::Unsupported {
-                        construct: "a match over something other than `Option` or `Result`",
+                        construct: "a match over something other than a variant",
                         span,
                         reason: match other {
                             Some(t) => format!("the scrutinee's type is {t:?}"),
@@ -3353,77 +3628,72 @@ impl<'a> Lower<'a> {
             };
 
         let mut lowered: Vec<MatchArm> = Vec::new();
+        let mut taken: BTreeSet<usize> = BTreeSet::new();
         let mut ty: Option<Type> = expected.cloned();
         for arm in arms {
-            let (case, bind) = match body.pat(arm.pat) {
-                Pattern::Ctor { path, args } => match (self.builtin(path), args.as_slice()) {
-                    (Some(case), [inner]) if case.has_payload() => match body.pat(*inner) {
-                        Pattern::Bind { name, .. } => (case, Some(name.clone())),
-                        Pattern::Wild => (case, None),
-                        _ => {
-                            return Lowering::Unsupported {
-                                construct: "a nested pattern",
-                                span,
-                                reason: format!("`{path}(..)` binds a name or `_` here"),
-                            };
-                        }
-                    },
-                    (Some(BuiltinCase::None), []) => (BuiltinCase::None, None),
-                    _ => {
-                        return Lowering::Unsupported {
-                            construct: "a pattern this backend does not lower",
-                            span,
-                            reason: format!("`{path}(..)` is not a case of the scrutinee"),
-                        };
-                    }
-                },
-                // `None` parses as a binding of that name; the language's own
-                // `None` where nothing else has the name.
-                Pattern::Bind { name, .. } if self.builtin(name) == Some(BuiltinCase::None) => {
-                    (BuiltinCase::None, None)
-                }
-                _ => {
-                    return Lowering::Unsupported {
-                        construct: "a pattern this backend does not lower",
-                        span,
-                        reason: "an arm names a case: `Some(x)`, `None`, `Ok(x)`, `Err(e)`"
-                            .to_string(),
-                    };
-                }
+            let takes = match self.arm_takes(body, arm.pat, &cases, declared, &span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
             };
-            let Some(at) = cases.iter().position(|c| *c == case) else {
+            let (indices, whole): (Vec<usize>, Option<String>) = match &takes {
+                Takes::Case(i, _) => (vec![*i], None),
+                Takes::Cases(is) => (is.clone(), None),
+                Takes::Rest(name) => (
+                    (0..cases.len()).filter(|i| !taken.contains(i)).collect(),
+                    name.clone(),
+                ),
+            };
+            if indices.is_empty() {
                 return Lowering::Unsupported {
-                    construct: "a pattern this backend does not lower",
+                    construct: "an arm no case reaches",
                     span,
-                    reason: format!("`{case:?}` is not a case of the scrutinee"),
+                    reason: "every case it could take is taken by an arm before it, so it \
+                             can never run"
+                        .to_string(),
                 };
-            };
-            if lowered.iter().any(|a| a.case == case) {
+            }
+            if let Some(i) = indices.iter().find(|i| taken.contains(i)) {
                 return Lowering::Unsupported {
                     construct: "a case matched twice",
                     span,
-                    reason: format!("`{case:?}` has two arms; the second can never run"),
+                    reason: format!("`{:?}` has two arms; the second can never run", cases[*i].0),
                 };
             }
+            taken.extend(indices.iter().copied());
 
-            // The arm's body, in a region of its own.
+            // The arm's body, in a region of its own, with what its pattern
+            // binds: each named field of its one case, or the whole value.
             let outer = std::mem::take(&mut self.instrs);
-            let binding = match (&payloads[at], &bind) {
-                (Some(t), _) => {
+            let mut bindings: Vec<Option<ValueId>> = Vec::new();
+            let mut names: Vec<(String, ValueId)> = Vec::new();
+            if let Takes::Case(i, fields) = &takes {
+                let (case, types) = &cases[*i];
+                for (k, t) in types.iter().enumerate() {
+                    let name = fields.get(k).cloned().flatten();
+                    // A builtin case's payload is bound whether or not a
+                    // name takes it: the numbering every artifact was built
+                    // with before ADR-0059.
+                    if name.is_none() && matches!(case, Case::Declared(_)) {
+                        bindings.push(None);
+                        continue;
+                    }
                     let v = self.fresh();
                     self.types.insert(v, t.clone());
-                    Some(v)
+                    bindings.push(Some(v));
+                    if let Some(n) = name {
+                        names.push((n, v));
+                    }
                 }
-                (None, _) => None,
-            };
-            let shadowed = bind
-                .as_ref()
-                .map(|name| (name.clone(), self.locals.get(name).copied()));
-            if let (Some(name), Some(v)) = (&bind, binding) {
-                self.locals.insert(name.clone(), v);
             }
+            if let Some(n) = whole {
+                names.push((n, scrutinee));
+            }
+            let shadowed: Vec<(String, Option<ValueId>)> = names
+                .iter()
+                .map(|(n, v)| (n.clone(), self.locals.insert(n.clone(), *v)))
+                .collect();
             let value = self.expr(body, arm.body, ty.as_ref());
-            if let Some((name, before)) = shadowed {
+            for (name, before) in shadowed.into_iter().rev() {
                 match before {
                     Some(v) => self.locals.insert(name, v),
                     None => self.locals.remove(&name),
@@ -3449,8 +3719,8 @@ impl<'a> Lower<'a> {
                 _ => {}
             }
             lowered.push(MatchArm {
-                case,
-                binding,
+                cases: indices.iter().map(|i| cases[*i].0).collect(),
+                bindings,
                 body: region,
             });
         }
@@ -3462,13 +3732,13 @@ impl<'a> Lower<'a> {
                 self.retype_divergent(&mut arm.body, t);
             }
         }
-        if lowered.len() != cases.len() {
+        if taken.len() != cases.len() {
             return Lowering::Unsupported {
                 construct: "a match that does not cover every case",
                 span,
                 reason: format!(
                     "{} of {} cases have arms, and a missing case would have no code",
-                    lowered.len(),
+                    taken.len(),
                     cases.len()
                 ),
             };
@@ -3486,6 +3756,163 @@ impl<'a> Lower<'a> {
             arms: lowered,
             ty,
         }))
+    }
+
+    /// A declared sum type's cases, each with its payload's fields resolved
+    /// (ADR-0059). A generic one's layout depends on its arguments, which a
+    /// [`Type::Nominal`] does not carry.
+    fn declared_cases(&self, def: DefId, span: &Span) -> Lowering<Vec<(Case, Vec<Type>)>> {
+        if crate::resolve::declaration(self.cx.hirs, def).is_some_and(|d| !d.type_params.is_empty())
+        {
+            return Lowering::Unsupported {
+                construct: "a generic sum type",
+                span: span.clone(),
+                reason: "its layout depends on its type arguments, which this backend does not \
+                         carry"
+                    .to_string(),
+            };
+        }
+        let Some(declared) = self.cx.sigs.type_decl(def).and_then(|t| t.variants.clone()) else {
+            return Lowering::Blocked {
+                why: "a sum type with no cases".to_string(),
+                span: span.clone(),
+            };
+        };
+        let mut out = Vec::new();
+        for (index, (_, fields)) in declared.iter().enumerate() {
+            let mut types = Vec::new();
+            for f in fields {
+                match self.ty(f, span) {
+                    Lowering::Lowered(t) => types.push(t),
+                    other => return other.map(|_| unreachable!()),
+                }
+            }
+            out.push((Case::Declared(index as u32), types));
+        }
+        Lowering::Lowered(out)
+    }
+
+    /// **Which of `cases` an arm's pattern takes** (ADR-0059), and what it
+    /// binds. A nested pattern is refused, and a literal one.
+    fn arm_takes(
+        &self,
+        body: &Body,
+        pat: crate::hir::PatternId,
+        cases: &[(Case, Vec<Type>)],
+        declared: Option<DefId>,
+        span: &Span,
+    ) -> Lowering<Takes> {
+        let unsupported = |construct: &'static str, reason: String| Lowering::Unsupported {
+            construct,
+            span: span.clone(),
+            reason,
+        };
+        match body.pat(pat) {
+            Pattern::Wild => Lowering::Lowered(Takes::Rest(None)),
+            Pattern::Bind { name, .. } => match self.case_index(name, cases, declared) {
+                // `None`, or `Empty`: a case without a payload, written alone.
+                Some(i) if cases[i].1.is_empty() => Lowering::Lowered(Takes::Case(i, Vec::new())),
+                Some(_) => Lowering::Blocked {
+                    why: format!("`{name}` carries a payload; the checker refuses it (PW0603)"),
+                    span: span.clone(),
+                },
+                None => Lowering::Lowered(Takes::Rest(Some(name.clone()))),
+            },
+            Pattern::Ctor { path, args } => {
+                let Some(i) = self.case_index(path, cases, declared) else {
+                    return unsupported(
+                        "a pattern this backend does not lower",
+                        format!("`{path}(..)` is not a case of the scrutinee"),
+                    );
+                };
+                if args.len() != cases[i].1.len() {
+                    return Lowering::Blocked {
+                        why: format!(
+                            "`{path}` binds {} fields of {}; the checker refuses it (PW0603)",
+                            args.len(),
+                            cases[i].1.len()
+                        ),
+                        span: span.clone(),
+                    };
+                }
+                let mut names = Vec::new();
+                for a in args {
+                    match body.pat(*a) {
+                        Pattern::Bind { name, .. } => names.push(Some(name.clone())),
+                        Pattern::Wild => names.push(None),
+                        _ => {
+                            return unsupported(
+                                "a nested pattern",
+                                format!("`{path}(..)` binds a name or `_` here"),
+                            );
+                        }
+                    }
+                }
+                Lowering::Lowered(Takes::Case(i, names))
+            }
+            // `A | B`: each alternative's cases, none of them binding.
+            Pattern::Or(alternatives) => {
+                let mut taken = Vec::new();
+                for p in alternatives {
+                    match self.arm_takes(body, *p, cases, declared, span) {
+                        Lowering::Lowered(Takes::Case(i, names))
+                            if names.iter().all(Option::is_none) =>
+                        {
+                            taken.push(i)
+                        }
+                        Lowering::Lowered(Takes::Cases(is)) => taken.extend(is),
+                        Lowering::Lowered(Takes::Rest(None)) => {
+                            return Lowering::Lowered(Takes::Rest(None));
+                        }
+                        Lowering::Lowered(_) => {
+                            return unsupported(
+                                "an or-pattern that binds a name",
+                                "each alternative would bind it from a different case".to_string(),
+                            );
+                        }
+                        other => return other,
+                    }
+                }
+                taken.sort_unstable();
+                taken.dedup();
+                Lowering::Lowered(Takes::Cases(taken))
+            }
+            Pattern::Literal(_) => unsupported(
+                "a literal pattern",
+                "an arm takes a case of the scrutinee's type".to_string(),
+            ),
+            Pattern::Error => Lowering::Blocked {
+                why: "a pattern that did not parse".to_string(),
+                span: span.clone(),
+            },
+        }
+    }
+
+    /// The position in `cases` of the case a pattern names: the language's
+    /// own by `builtin`'s rule, a declared type's through its type
+    /// (`Shape.Circle`) or alone (`Circle`), as the checker reads it.
+    fn case_index(
+        &self,
+        path: &str,
+        cases: &[(Case, Vec<Type>)],
+        declared: Option<DefId>,
+    ) -> Option<usize> {
+        let case = match declared {
+            None => Case::Builtin(self.builtin(path)?),
+            Some(def) if path.contains('.') => {
+                match crate::values::case_named(self.cx.sigs, self.cx.ws, self.unit, path)? {
+                    crate::values::CaseNamed::Case(d, index) if d == def => {
+                        Case::Declared(index as u32)
+                    }
+                    _ => return None,
+                }
+            }
+            Some(def) => {
+                let declared = self.cx.sigs.type_decl(def)?.variants.as_ref()?;
+                Case::Declared(declared.iter().position(|(n, _)| n == path)? as u32)
+            }
+        };
+        cases.iter().position(|(c, _)| *c == case)
     }
 
     /// A call — the one place the host boundary is decided.
@@ -3567,6 +3994,13 @@ impl<'a> Lower<'a> {
                     .and_then(|t| t.representation.clone())
             {
                 return self.opaque(body, def, &rep, args, piped, span);
+            }
+            // **A sum type's case** (ADR-0059): `Shape.Circle(3)`, through
+            // its type, by the rule the checker typed it with.
+            if let Some(crate::values::CaseNamed::Case(def, index)) =
+                crate::values::case_named(self.cx.sigs, self.cx.ws, self.unit, &path)
+            {
+                return self.case(body, def, index, args, piped, span);
             }
         }
         // **An operation the compiler supplies** (ADR-0040): read from the
@@ -3798,7 +4232,9 @@ fn holds_collection(cx: &Context<'_>, t: &Type, seen: &mut Vec<DefId>) -> bool {
             };
             let fields = decl.record.iter().flatten().map(|(_, r)| r);
             let rep = decl.representation.iter();
-            fields.chain(rep).any(|r| {
+            // A sum type's payloads too (ADR-0059).
+            let cases = decl.variants.iter().flatten().flat_map(|(_, fs)| fs.iter());
+            fields.chain(rep).chain(cases).any(|r| {
                 matches!(
                     ty_resolution(cx.sigs, r, &Span::default()),
                     Lowering::Lowered(ft) if holds_collection(cx, &ft, seen)
@@ -3807,6 +4243,59 @@ fn holds_collection(cx: &Context<'_>, t: &Type, seen: &mut Vec<DefId>) -> bool {
         }
         Type::Int | Type::Float | Type::Bool | Type::Str | Type::Unit | Type::Function(..) => false,
     }
+}
+
+/// **Does a declared type hold a value of its own type**, through its
+/// fields, its cases or its representation, at any depth (ADR-0059)?
+fn contains_itself(sigs: &Signatures, def: DefId) -> bool {
+    fn parts(t: &crate::signatures::TypeDecl) -> impl Iterator<Item = &TypeResolution> {
+        t.record
+            .iter()
+            .flatten()
+            .map(|(_, r)| r)
+            .chain(t.representation.iter())
+            .chain(t.variants.iter().flatten().flat_map(|(_, fs)| fs.iter()))
+    }
+    fn reaches(
+        sigs: &Signatures,
+        ty: &ResolvedType,
+        target: DefId,
+        seen: &mut BTreeSet<DefId>,
+    ) -> bool {
+        if let Some(d) = ty.def_id() {
+            if d == target {
+                return true;
+            }
+            if seen.insert(d)
+                && let Some(t) = sigs.type_decl(d)
+                && parts(t).any(|r| r.resolved().is_some_and(|x| reaches(sigs, x, target, seen)))
+            {
+                return true;
+            }
+        }
+        ty.args().iter().any(|a| reaches(sigs, a, target, seen))
+    }
+    let Some(t) = sigs.type_decl(def) else {
+        return false;
+    };
+    let mut seen = BTreeSet::new();
+    parts(t).any(|r| {
+        r.resolved()
+            .is_some_and(|x| reaches(sigs, x, def, &mut seen))
+    })
+}
+
+/// **Which cases one match arm takes** (ADR-0059), by their positions in
+/// the scrutinee's cases.
+enum Takes {
+    /// One case, and the name each field of its payload is bound to, if any:
+    /// `Some(y)`, `Rect(w, _)`, `Empty`.
+    Case(usize, Vec<Option<String>>),
+    /// Several cases, binding nothing: `A | B`.
+    Cases(Vec<usize>),
+    /// Every case no arm before it takes: `_`, or a name bound to the whole
+    /// value.
+    Rest(Option<String>),
 }
 
 fn diverges(r: &Region) -> bool {

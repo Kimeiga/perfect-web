@@ -230,9 +230,11 @@ codes! {
     OPERAND_TYPE = "PW0609" / operand_type / 1, Types,
         "an operator's operands, and a condition, must have the types they take";
     // Until 2026-09-25 such a pattern read as a wildcard, so `Ok(x)` and
-    // `Err(e)` arms proved a match over an `Option` exhaustive.
-    PATTERN_CONSTRUCTOR = "PW0608" / pattern_constructor / 1, Types,
-        "a constructor pattern must name a constructor of the type it matches";
+    // `Err(e)` arms proved a match over an `Option` exhaustive. Revision 2
+    // (ADR-0059): a case built through its type, `Shape.Bogus(1)`, is held to
+    // the same invariant; until 2026-09-26 it was undecided.
+    PATTERN_CONSTRUCTOR = "PW0608" / pattern_constructor / 2, Types,
+        "a constructor must name a case of the type it builds or matches";
     // Until 2026-09-25 a member the type does not have was unknown, and A-015
     // read `box.x` from a snapshot of a `Rect`, which has no `x` (ADR-0048).
     UNKNOWN_MEMBER = "PW0610" / unknown_member / 1, Types,

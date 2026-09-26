@@ -38,11 +38,11 @@
 //! What a name refers to past its head is not this walk's question: `box.x`
 //! on a type with no `x` is the member relation's (ADR-0048).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{AttrValue, Body, Decl, DeclId, Expr, ExprId, Hir, Node, NodeId, Pattern, Span};
-use crate::resolve::{DefId, Namespace, Resolution, UnitId, Workspace};
+use crate::resolve::{DefId, Resolution, UnitId, Workspace};
 
 /// Names the language gives a meaning to wherever the program has not
 /// declared one: its literals, its own variants, and the statement word
@@ -111,10 +111,14 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             immutable: Vec::new(),
             visited: BTreeSet::new(),
             found: Vec::new(),
+            ambiguous: Vec::new(),
         };
         walk.expr(body.root);
         for (span, name) in walk.found {
             out.push(diagnostic(hir, id, decl, span, &name));
+        }
+        for (span, name, types) in walk.ambiguous {
+            out.push(ambiguous_case(hir, id, decl, span, &name, &types));
         }
         for (span, name) in walk.immutable {
             out.push(immutable_target(hir, id, decl, span, &name));
@@ -124,32 +128,21 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
 }
 
 /// The constructors of every sum type `unit` can see: its own, and those of
-/// the types it imports.
-fn visible_constructors(workspace: &Workspace, hirs: &[&Hir], unit: UnitId) -> BTreeSet<String> {
-    let mut out = BTreeSet::new();
-    let Some(module) = workspace.module_of(unit) else {
-        return out;
-    };
-    let mut add = |def: DefId| {
-        if let Some(variants) =
-            crate::resolve::declaration(hirs, def).and_then(|d| d.variants.as_ref())
-        {
-            out.extend(variants.iter().map(|v| v.name.clone()));
-        }
-    };
-    for ((ns, _), def) in &module.defines {
-        if *ns == Namespace::Type {
-            add(*def);
-        }
-    }
-    for import in &module.imports {
-        let Some(from) = workspace.modules.iter().find(|m| m.name == import.module) else {
+/// the types it imports, each with the types that declare it, by identity.
+fn visible_constructors(
+    workspace: &Workspace,
+    hirs: &[&Hir],
+    unit: UnitId,
+) -> BTreeMap<String, BTreeMap<DefId, String>> {
+    let mut out: BTreeMap<String, BTreeMap<DefId, String>> = BTreeMap::new();
+    for def in workspace.visible_types(unit) {
+        let Some(decl) = crate::resolve::declaration(hirs, def) else {
             continue;
         };
-        for ((ns, name), def) in &from.defines {
-            if *ns == Namespace::Type && (import.names.is_empty() || import.names.contains(name)) {
-                add(*def);
-            }
+        for v in decl.variants.iter().flatten() {
+            out.entry(v.name.clone())
+                .or_default()
+                .insert(def, decl.name.clone());
         }
     }
     out
@@ -160,7 +153,7 @@ struct Walk<'a> {
     src: &'a str,
     workspace: &'a Workspace,
     unit: UnitId,
-    constructors: &'a BTreeSet<String>,
+    constructors: &'a BTreeMap<String, BTreeMap<DefId, String>>,
     /// Innermost last. A `let` adds to the innermost.
     scopes: Vec<BTreeSet<String>>,
     /// The names bound `let mut`, in the same scopes (ADR-0051).
@@ -171,6 +164,8 @@ struct Walk<'a> {
     /// region is not walked again in the outer template's scope.
     visited: BTreeSet<ExprId>,
     found: Vec<(Span, String)>,
+    /// A bare case two visible types declare, and those types (ADR-0059).
+    ambiguous: Vec<(Span, String, Vec<String>)>,
 }
 
 impl Walk<'_> {
@@ -208,7 +203,7 @@ impl Walk<'_> {
     fn resolves(&self, name: &str) -> bool {
         LANGUAGE_VALUES.contains(&name)
             || crate::resolve::INTRINSIC_CALLS.contains(&name)
-            || self.constructors.contains(name)
+            || self.constructors.contains_key(name)
             || !matches!(
                 self.workspace.resolve(self.unit, name),
                 Resolution::Unresolved
@@ -216,8 +211,26 @@ impl Walk<'_> {
     }
 
     fn name(&mut self, name: &str, span: Span) {
-        if !self.bound(name) && !self.resolves(name) {
+        if self.bound(name) {
+            return;
+        }
+        if !self.resolves(name) {
             self.found.push((span, name.to_string()));
+            return;
+        }
+        // `Empty` alone, where two types it sees each declare a case of that
+        // name and nothing else has it: it names neither (ADR-0059).
+        if let Some(types) = self.constructors.get(name)
+            && types.len() > 1
+            && !LANGUAGE_VALUES.contains(&name)
+            && !crate::resolve::INTRINSIC_CALLS.contains(&name)
+            && matches!(
+                self.workspace.resolve(self.unit, name),
+                Resolution::Unresolved
+            )
+        {
+            self.ambiguous
+                .push((span, name.to_string(), types.values().cloned().collect()));
         }
     }
 
@@ -514,7 +527,7 @@ impl Walk<'_> {
             if matches!(
                 self.workspace.resolve_path(self.unit, &path),
                 Resolution::Unresolved
-            ) && !self.constructors.contains(member)
+            ) && !self.constructors.contains_key(member)
             {
                 self.found.push((self.body.expr_span(id), path));
             }
@@ -664,6 +677,49 @@ fn immutable_target(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) 
         ),
         repairs: vec![Repair {
             description: format!("declare it `let mut {name} = ..`, or bind a new name"),
+            replacement: None,
+        }],
+    }
+}
+
+/// **PW0022**: a bare case that more than one visible type declares
+/// (ADR-0059).
+fn ambiguous_case(
+    hir: &Hir,
+    id: DeclId,
+    decl: &Decl,
+    span: Span,
+    name: &str,
+    types: &[String],
+) -> Diagnostic {
+    let qualified: Vec<String> = types.iter().map(|t| format!("`{t}.{name}`")).collect();
+    Diagnostic {
+        code: crate::codes::AMBIGUOUS_NAME.id,
+        invariant: crate::codes::AMBIGUOUS_NAME.invariant,
+        reason: "ambiguous_case",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!(
+            "`{name}` is a case of {}",
+            types
+                .iter()
+                .map(|t| format!("`{t}`"))
+                .collect::<Vec<_>>()
+                .join(" and ")
+        ),
+        primary_span: span,
+        related: vec![Related {
+            span: hir.decl_span(id),
+            label: format!("used inside `{}`", decl.name),
+        }],
+        explanation: Some(format!(
+            "A case written alone is the case of that name of the one sum type in \
+             scope that declares it. Here {} types declare `{name}`, and nothing \
+             says which is meant.",
+            types.len()
+        )),
+        repairs: vec![Repair {
+            description: format!("write it through its type: {}", qualified.join(" or ")),
             replacement: None,
         }],
     }

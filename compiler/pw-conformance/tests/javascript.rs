@@ -295,6 +295,78 @@ public query Given(m: Map<String, Int>) -> Int { Map.size(m) }
 public query LastOf(words: List<Word>) -> List<Int> {
     List.map(Map.values(Map.from_lists(List.map(words, w => String.length(w.text)), words)), w => w.score)
 }
+
+// ADR-0059: a declared sum type, built and matched, in both: a case as
+// `{ $case, value }`, its fields an array when there are several.
+type Shape =
+    | Circle(Int)
+    | Rect(Int, Int)
+    | Label(String)
+    | Empty
+
+type Mixed =
+    | I(Int)
+    | F(Float)
+    | S(String)
+    | B(Bool)
+    | Pair(Float, String)
+    | Blank
+
+fn shape_area(s: Shape) -> Int {
+    match s {
+        Circle(r) => r * r,
+        Rect(w, h) => w * h,
+        Label(t) => String.length(t),
+        Empty => -1,
+    }
+}
+
+public query ShapeArea(s: Shape) -> Int { shape_area(s) }
+
+public query ShapeKind(s: Shape) -> String {
+    match s {
+        Shape.Circle(_) | Shape.Rect(_, _) => \"figure\",
+        Label(t) => \"text {t}\",
+        other => \"nothing\",
+    }
+}
+
+public query ShapeMade(kind: Int, n: Int, text: String) -> Shape {
+    if kind % 4 == 0 {
+        Shape.Circle(n)
+    } else {
+        if kind % 4 == 1 { Shape.Rect(n, kind) } else { if kind % 4 == 2 { Shape.Label(text) } else { Empty } }
+    }
+}
+
+public query ShapeSame(s: Shape) -> Shape { s }
+
+public query ShapeCircles(radii: List<Int>) -> List<Shape> { List.map(radii, Shape.Circle) }
+
+public query ShapeBuilt(n: Int) -> Shape {
+    let make: fn(Int) -> Shape = Shape.Circle
+    make(n)
+}
+
+public query ShapeTotal(shapes: List<Shape>) -> Int { List.fold(shapes, 0, (t, s) => t + shape_area(s)) }
+
+public query Mixing(m: Mixed) -> Mixed {
+    match m {
+        I(n) => Mixed.S(\"{n}\"),
+        F(x) => Mixed.F(x * 2.0),
+        S(t) => Mixed.Pair(1.5, t),
+        B(b) => Mixed.B(!b),
+        Pair(x, t) => Mixed.I(String.length(t)),
+        Blank => Mixed.Blank,
+    }
+}
+
+public query MaybeShape(s: Option<Shape>) -> Int {
+    match s {
+        Some(x) => shape_area(x),
+        None => -2,
+    }
+}
 ";
 
 const CASES: usize = 200;
@@ -388,6 +460,20 @@ fn val(rng: &mut Rng, ty: &Type, depth: u32) -> Val {
         // A map's entry (ADR-0057). A generated map is rarely in order, so
         // the entry check is what the two are held to on most of them.
         Type::Tuple(t) => Val::Tuple(t.types().map(|ty| val(rng, &ty, depth + 1)).collect()),
+        // A sum type's case (ADR-0059), and an option's.
+        Type::Variant(v) => {
+            let case = v
+                .cases()
+                .nth(rng.below(v.cases().len() as u64) as usize)
+                .expect("a variant has a case");
+            Val::Variant(
+                case.name.to_string(),
+                case.ty.map(|ty| Box::new(val(rng, &ty, depth + 1))),
+            )
+        }
+        Type::Option(o) => {
+            Val::Option((rng.below(3) > 0).then(|| Box::new(val(rng, &o.ty(), depth + 1))))
+        }
         other => panic!("not generated: {other:?}"),
     }
 }
@@ -450,6 +536,17 @@ fn js(v: &Val) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        // `{ $case, value }` (ADR-0044, ADR-0059).
+        Val::Variant(case, payload) => match payload {
+            Some(p) => format!(
+                "{{ $case: {}, value: {} }}",
+                serde_json::to_string(case).unwrap(),
+                js(p)
+            ),
+            None => format!("{{ $case: {} }}", serde_json::to_string(case).unwrap()),
+        },
+        Val::Option(Some(x)) => format!("{{ $case: \"some\", value: {} }}", js(x)),
+        Val::Option(None) => "{ $case: \"none\" }".to_string(),
         other => panic!("not written as JavaScript: {other:?}"),
     }
 }
@@ -476,6 +573,9 @@ fn canonical(v: &Val) -> serde_json::Value {
         // `{ $case: "ok", value }` and `{ $case: "err", value }` (ADR-0044).
         Val::Result(Ok(Some(x))) => json!({ "ok": canonical(x) }),
         Val::Result(Err(Some(e))) => json!({ "err": canonical(e) }),
+        // A declared case, by its WIT name (ADR-0059).
+        Val::Variant(case, Some(p)) => json!({ case: canonical(p) }),
+        Val::Variant(case, None) => json!({ case: null }),
         other => panic!("not compared: {other:?}"),
     }
 }
@@ -495,7 +595,7 @@ function enc(v) {
   if (typeof v === "string") return { s: v };
   if (Array.isArray(v)) return { l: v.map(enc) };
   if (v !== null && typeof v === "object" && "$case" in v)
-    return v.$case === "none" ? { none: null } : { [v.$case]: enc(v.value) };
+    return "value" in v ? { [v.$case]: enc(v.value) } : { [v.$case]: null };
   if (v !== null && typeof v === "object")
     return { r: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, enc(x)])) };
   return { unknown: String(v) };
