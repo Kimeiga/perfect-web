@@ -173,6 +173,17 @@ signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
 
+**2026-09-26: what a template's blocks and events take**
+([ADR-0071](DECISIONS/ADR-0071-what-a-template-takes.md)): `{#each n}` over
+an `Int`, `{#if s}` over a declared sum type, and `on:press={n}` over an
+`Int` each passed `pw check` until then, and the first two failed only when
+rendered. PW0609 and PW0614 refuse them. The rule fixture
+`loop-capture-untyped.pw`, which runs `{#each}` over an `Int` on purpose,
+now reports PW0609 beside its PW5016.
+
+Evidence: [template-operands.txt](evidence/E10/template-operands.txt)
+(`just e10-template-operands`).
+
 **2026-09-26: an assignment to a field has the field's type**
 ([ADR-0070](DECISIONS/ADR-0070-an-assignment-to-a-field.md)): `b.value =
 "wrong"` passed `pw check` until then, since only a named target was related.

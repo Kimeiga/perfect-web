@@ -109,8 +109,8 @@ MUTANTS = [
     (
         "an `{#each}` collection's fields are not read",
         VALUES,
-        "                t = self.member_type(&t, segment);",
-        "                t = Ty::Unknown;",
+        "            t = self.member_type(&t, segment);",
+        "            t = Ty::Unknown;",
     ),
     (
         "a `{#match}` arm's names are not typed",

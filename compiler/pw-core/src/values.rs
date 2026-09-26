@@ -382,6 +382,12 @@ pub enum RelationKind {
     /// `9223372036854775808`: an `Int` literal, against the range an `Int`
     /// holds (PW0616, ADR-0069).
     Literal,
+    /// `on:press={h}`: an event attribute's value, against a function to call
+    /// (PW0614, ADR-0071).
+    Handler,
+    /// `{#if c}`: a template's condition, against a value that has a truth
+    /// (PW0609, ADR-0071).
+    Truth,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -2042,23 +2048,7 @@ impl<'a> Typer<'a> {
         // `{#each xs as x}`: each `x` is an element of `xs`, read from the
         // directive as written: a name, and the fields read from it.
         for (node, collection, head) in self.lexical.each_blocks() {
-            let mut segments = collection.split('.').map(str::trim);
-            let first = segments.next().unwrap_or_default();
-            if !is_ident(first) {
-                continue;
-            }
-            let mut t = match head {
-                Some(b) => self.local(b),
-                None => self.global(first),
-            };
-            for segment in segments {
-                if !is_ident(segment) {
-                    t = Ty::Unknown;
-                    break;
-                }
-                t = self.member_type(&t, segment);
-            }
-            if let Ty::Builtin(Builtin::List, args) = t
+            if let Ty::Builtin(Builtin::List, args) = self.each_collection(collection, head)
                 && let [element] = args.as_slice()
             {
                 added |= self.bind(Binder::Each(node), element.clone());
@@ -2103,6 +2093,28 @@ impl<'a> Typer<'a> {
             }
         }
         added
+    }
+
+    /// **The collection an `{#each}` directive names, typed**: a name, and
+    /// the fields read from it. `Unknown` where the directive writes anything
+    /// else.
+    fn each_collection(&self, collection: &str, head: Option<Binder>) -> Ty {
+        let mut segments = collection.split('.').map(str::trim);
+        let first = segments.next().unwrap_or_default();
+        if !is_ident(first) {
+            return Ty::Unknown;
+        }
+        let mut t = match head {
+            Some(b) => self.local(b),
+            None => self.global(first),
+        };
+        for segment in segments {
+            if !is_ident(segment) {
+                return Ty::Unknown;
+            }
+            t = self.member_type(&t, segment);
+        }
+        t
     }
 
     /// **Record the type a binding holds.** A binding keeps the first type
@@ -2230,6 +2242,128 @@ impl<'a> Typer<'a> {
     /// Every place in this body a value meets a declared type.
     fn relations(&self, out: &mut Vec<ValueRelation>) {
         self.relations_from(self.body.root, out);
+        self.template_relations(out);
+    }
+
+    /// **What a template's blocks and events take** (ADR-0071), as the
+    /// renderer runs them:
+    /// - `{#each xs}` runs over a list;
+    /// - `{#if c}` and `{:else if c}` test a value that has a truth, which an
+    ///   `Option`, a `Result` or a sum type has not: each is taken apart with
+    ///   `{#match}`, and the renderer refuses it;
+    /// - an event attribute is given a function to call.
+    ///
+    /// Until 2026-09-26 none was related, so each passed `pw check`, and the
+    /// first two failed only when rendered.
+    fn template_relations(&self, out: &mut Vec<ValueRelation>) {
+        let unknown = |t: &Ty| matches!(t, Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. });
+        for (node, collection, head) in self.lexical.each_blocks() {
+            let t = self.each_collection(collection, head);
+            let outcome = match &t {
+                Ty::Builtin(Builtin::List, _) | Ty::Any => Outcome::Agree,
+                t if unknown(t) => Outcome::Undecided(Undecided::Unknown),
+                other => Outcome::Disagree {
+                    expected: "List<_>".to_string(),
+                    actual: self.display(other),
+                },
+            };
+            let span = self.body.node_span(node);
+            out.push(ValueRelation {
+                declaration: self.decl.name.clone(),
+                kind: RelationKind::Operand,
+                span: span.clone(),
+                target: "the list an `{#each}` runs over".to_string(),
+                index: None,
+                outcome,
+                declared_at: None,
+                boundary: (span, "this block".to_string()),
+            });
+        }
+        let mut roots = Vec::new();
+        for id in self.body.walk() {
+            if let Expr::Template { roots: r, .. } = self.body.expr(id) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        for n in self.body.walk_markup(&roots) {
+            match self.body.node(n) {
+                crate::hir::Node::Block {
+                    directive,
+                    subject: Some(c),
+                    ..
+                } if directive.trim_start().starts_with("{#if") => {
+                    out.extend(self.truth(*c, "{#if}"));
+                }
+                crate::hir::Node::Branch {
+                    condition: Some(c), ..
+                } => out.extend(self.truth(*c, "{:else if}")),
+                crate::hir::Node::Element { attrs, .. } => {
+                    for a in attrs {
+                        let (Some(event), crate::hir::AttrValue::Expr(e)) =
+                            (a.name.strip_prefix("on:"), &a.value)
+                        else {
+                            continue;
+                        };
+                        let outcome = match self.body.expr(*e) {
+                            Expr::Lambda { .. } => Outcome::Agree,
+                            _ => match self.of(*e) {
+                                Ty::Builtin(Builtin::Function, _) | Ty::Any => Outcome::Agree,
+                                t if unknown(&t) => Outcome::Undecided(Undecided::Unknown),
+                                other => Outcome::Disagree {
+                                    expected: "a function".to_string(),
+                                    actual: self.display(&other),
+                                },
+                            },
+                        };
+                        out.push(ValueRelation {
+                            declaration: self.decl.name.clone(),
+                            kind: RelationKind::Handler,
+                            span: self.body.expr_span(*e),
+                            target: format!("on:{event}"),
+                            index: None,
+                            outcome,
+                            declared_at: None,
+                            boundary: (a.span.clone(), "this attribute".to_string()),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// A template condition: a value that has a truth (ADR-0071). An
+    /// `Option` and a `Result` are PW0600's, which says the same of each.
+    fn truth(&self, c: ExprId, block: &str) -> Option<ValueRelation> {
+        let t = self.of(c);
+        let outcome = match &t {
+            Ty::Builtin(Builtin::Option | Builtin::Result, _) => return None,
+            Ty::Nominal(d, _)
+                if self
+                    .sigs
+                    .type_decl(*d)
+                    .is_some_and(|t| t.variants.is_some()) =>
+            {
+                Outcome::Disagree {
+                    expected: String::new(),
+                    actual: self.display(&t),
+                }
+            }
+            Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. } => {
+                Outcome::Undecided(Undecided::Unknown)
+            }
+            _ => Outcome::Agree,
+        };
+        Some(ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Truth,
+            span: self.body.expr_span(c),
+            target: block.to_string(),
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary: (self.body.expr_span(c), "this condition".to_string()),
+        })
     }
 
     /// The same relations, over one tree: the body, or a policy's term root,
@@ -3312,6 +3446,35 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  runs, so every branch produces its type",
             )
             .repair(format!("make this branch a `{expected}`")),
+            RelationKind::Truth => Diagnostic::error(
+                crate::codes::OPERAND_TYPE.id,
+                crate::codes::OPERAND_TYPE.invariant,
+                Detector::Signature,
+                format!(
+                    "`{}` tests a `{actual}`, which is taken apart with `{{#match}}`",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("template_condition_is_a_case")
+            .explain(
+                "a template's condition is a `Bool`, a number, a string, a list or a record; \
+                 a `Result` or a sum type has no truth, and the renderer refuses it",
+            )
+            .repair("take it apart with `{#match}`"),
+            RelationKind::Handler => Diagnostic::error(
+                crate::codes::NOT_CALLABLE.id,
+                crate::codes::NOT_CALLABLE.invariant,
+                Detector::Signature,
+                format!(
+                    "`{}` is given `{actual}`, which is not a function to call",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("event_attribute_is_not_a_function")
+            .explain("an event attribute's value is called when the event arrives")
+            .repair("give it a lambda, or a function the program declares"),
             RelationKind::Items => Diagnostic::error(
                 crate::codes::LIST_ITEMS.id,
                 crate::codes::LIST_ITEMS.invariant,

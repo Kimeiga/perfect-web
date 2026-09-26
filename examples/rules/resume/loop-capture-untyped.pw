@@ -12,6 +12,10 @@
 // The alternative — quietly emitting an ordinary handler instead — would make
 // which handlers are resumable depend on where the compiler happens to be
 // blind, so performance and compatibility would move when inference improved.
+//
+// Since ADR-0071 the `{#each}` over an `Int` is refused too (PW0609). PW5016
+// is pinned all the same: the capture schema refuses a type it does not know,
+// whether or not another rule refuses the program.
 
 module rules.resume_loop_untyped
 

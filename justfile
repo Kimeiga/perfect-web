@@ -835,6 +835,22 @@ e10-field-assignment:
      } > docs/evidence/E10/field-assignment.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/field-assignment.txt
 
+# ADR-0071: what a template's blocks and events take. Its tests, the store's
+# test that every relation is decided, and the mutation controls.
+e10-template-operands:
+    @{ echo "ADR-0071 - what a template's blocks and events take"; echo; \
+       echo "produced by: just e10-template-operands"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== a template's operands (compiler/pw-core/tests/template_operands.rs)"; echo; \
+       cargo test --locked -p pw-core --test template_operands 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store's relations, each decided (compiler/pw-core/tests/value_relations.rs)"; echo; \
+       cargo test --locked -p pw-core --test value_relations the_store_program_is_decided_not_merely_silent 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/template_operand_mutations.py)"; echo; \
+       python3 scripts/template_operand_mutations.py; \
+     } > docs/evidence/E10/template-operands.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/template-operands.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

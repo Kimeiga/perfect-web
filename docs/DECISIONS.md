@@ -466,3 +466,10 @@ enforce.
 [ADR-0070](DECISIONS/ADR-0070-an-assignment-to-a-field.md): `b.value = e`
 relates `e` to the field's type (PW0607), where an assignment to a field
 related nothing.
+
+## 2026-09-26: what a template's blocks and events take (E10)
+
+[ADR-0071](DECISIONS/ADR-0071-what-a-template-takes.md): an `{#each}`'s
+collection is a list, an `{#if}` or `{:else if}` condition is not a declared
+sum type (PW0609), and an event attribute is given a function (PW0614). Each
+of the three passed `pw check`, and the first two failed only when rendered.
