@@ -1,12 +1,16 @@
 E10 - the store page, compiled commands and handlers, in browser engines: chromium firefox webkit
 
 produced by: just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt
-commit: f8adc037665ac52aa372be2914c7bb4776d11072
+commit: 12b3cb68f20c4fcc0abc6cb48727e1d09a4b269e
 playwright: Version 1.58.0
 
 == full run 1
-  273 passed (35.7s)
+  1) [webkit] › e2e/keyed-list.spec.mjs:231:1 › changing one item's field replaces no sibling ──────
+    Error: expect(received).toEqual(expected) // deep equality
+  1 failed
+  5 did not run
+  297 passed (50.4s)
 == full run 2
-  273 passed (35.8s)
+  303 passed (32.1s)
 == full run 3
-  273 passed (35.5s)
+  303 passed (32.0s)
