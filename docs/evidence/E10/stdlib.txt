@@ -1,7 +1,7 @@
 ADR-0040 - the standard library's lists and strings, compiled
 
 produced by: just e10-stdlib
-commit: b8f95478aea36271739bbcca12354d3cecdf0775
+commit: fcf35e9c48250e96e141c52bd6be56e400872c5d
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == against Vec and str (compiler/pw-conformance/tests/stdlib.rs)
@@ -12,31 +12,33 @@ test indexing_taking_and_joining_lists ... ok
 test joining_strings_and_functions_by_name ... ok
 test list_operations_agree_with_vec ... ok
 test records_are_sorted_stably_and_built_in_lists ... ok
+test slices_drops_and_reversals_agree_with_vec_and_str ... ok
 test string_operations_agree_with_str ... ok
+test sum_and_maximum_compute ... ok
 test text_is_rebuilt_from_code_points_and_bad_ones_trap ... ok
 test what_stays_outside_is_refused_by_name ... r.Q: `r.Q` did not lower: the backend does not lower an empty list whose element type nothing fixes yet: `[]` needs the type its context expects
 r.Q: `r.Q` did not lower: the backend does not lower an intrinsic this backend does not know yet: `shuffle` is declared `intrinsic "list.shuffle"`
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.69s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.36s
 
 == mutation controls (scripts/stdlib_mutations.py)
 
-baseline: 80 passed, 0 failed
-map writes every element to the first slot: KILLED (5 of 80 tests fail)
-filter keeps every element: KILLED (1 of 80 tests fail)
-fold keeps its seed: KILLED (2 of 80 tests fail)
-find does not stop at the first match: KILLED (1 of 80 tests fail)
-sort_by takes the right element on a tie: KILLED (1 of 80 tests fail)
-get refuses index 0: KILLED (1 of 80 tests fail)
-take does not clamp a negative count: KILLED (1 of 80 tests fail)
-concat writes the second list over the first: KILLED (1 of 80 tests fail)
-length counts some bytes twice: KILLED (3 of 80 tests fail)
-from_codepoints accepts surrogates: KILLED (1 of 80 tests fail)
-trim keeps U+3000: KILLED (1 of 80 tests fail)
-to_lower_ascii leaves `Z`: KILLED (1 of 80 tests fail)
-contains looks only at the start: KILLED (1 of 80 tests fail)
-join writes no separators: KILLED (1 of 80 tests fail)
-an intrinsic is not read from its declaration: KILLED (9 of 80 tests fail)
-a parenthesised list is not a lambda's parameters: KILLED (9 of 80 tests fail)
+baseline: 82 passed, 0 failed
+map writes every element to the first slot: KILLED (5 of 82 tests fail)
+filter keeps every element: KILLED (1 of 82 tests fail)
+fold keeps its seed: KILLED (3 of 82 tests fail)
+find does not stop at the first match: KILLED (1 of 82 tests fail)
+sort_by takes the right element on a tie: KILLED (1 of 82 tests fail)
+get refuses index 0: KILLED (1 of 82 tests fail)
+take does not clamp a negative count: KILLED (2 of 82 tests fail)
+concat writes the second list over the first: KILLED (1 of 82 tests fail)
+length counts some bytes twice: KILLED (3 of 82 tests fail)
+from_codepoints accepts surrogates: KILLED (1 of 82 tests fail)
+trim keeps U+3000: KILLED (1 of 82 tests fail)
+to_lower_ascii leaves `Z`: KILLED (1 of 82 tests fail)
+contains looks only at the start: KILLED (1 of 82 tests fail)
+join writes no separators: KILLED (1 of 82 tests fail)
+an intrinsic is not read from its declaration: KILLED (11 of 82 tests fail)
+a parenthesised list is not a lambda's parameters: KILLED (12 of 82 tests fail)
 16 of 16 mutants killed
 
 NOT CLAIMED: Unicode case mapping. to_lower_ascii maps A-Z only.
