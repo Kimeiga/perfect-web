@@ -85,8 +85,14 @@ MUTANTS = [
     (
         "a type a policy names is not resolved",
         CHECK,
-        "                    (found == Resolution::Unresolved)\n                        .then(|| format!(\"`{value}` names no type visible here\"))",
-        "                    (false && found == Resolution::Unresolved)\n                        .then(|| format!(\"`{value}` names no type visible here\"))",
+        "                    (!resolved).then(|| format!(\"`{value}` names no type visible here\"))",
+        "                    (false && !resolved).then(|| format!(\"`{value}` names no type visible here\"))",
+    ),
+    (
+        "a policy's type must be a declaration's",
+        CHECK,
+        "                    let resolved = crate::lower::type_fragment(value).is_some_and(|t| {",
+        "                    let resolved = workspace.resolve_in(unit, crate::resolve::Namespace::Type, value)\n                        != Resolution::Unresolved\n                        && crate::lower::type_fragment(value).is_some_and(|t| {",
     ),
     (
         "a session read's staleness is read by its first character",

@@ -236,4 +236,6 @@ fn a_type_a_policy_names_is_visible() {
         &["PW0335 `idempotent_by Nope`: `Nope` names no type visible here"],
     );
     clean(&command("idempotent_by Tag"));
+    // The language's own types are types too.
+    clean(&command("idempotent_by Int"));
 }

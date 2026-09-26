@@ -517,7 +517,7 @@ fn not_a_term(
 /// parameter, a type and a declaration a value names are resolved here.
 fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
     use crate::policy::{Domain, ValueFault};
-    use crate::resolve::{Namespace, Resolution};
+    use crate::resolve::Resolution;
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         for p in &decl.policies {
@@ -532,13 +532,23 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
                                 && crate::privacy::Label::PARTITIONS.contains(n))
                     })
                     .map(|n| format!("`{n}` is not a parameter of `{}`", decl.name)),
+                // Resolved as a written type is, so the language's own types
+                // are types too: `idempotent_by Int` was "no type visible
+                // here" when only declarations were asked (ADR-0089).
                 Some(Domain::TypeRef) => {
-                    let found = match value.contains('.') {
-                        true => workspace.resolve_path_in(unit, Namespace::Type, value),
-                        false => workspace.resolve_in(unit, Namespace::Type, value),
-                    };
-                    (found == Resolution::Unresolved)
-                        .then(|| format!("`{value}` names no type visible here"))
+                    let resolved = crate::lower::type_fragment(value).is_some_and(|t| {
+                        crate::resolved::resolve(
+                            workspace,
+                            unit,
+                            None,
+                            &decl.type_params,
+                            &t,
+                            p.span.clone(),
+                        )
+                        .resolved()
+                        .is_some()
+                    });
+                    (!resolved).then(|| format!("`{value}` names no type visible here"))
                 }
                 Some(Domain::DeclRef) => (workspace.resolve(unit, value) == Resolution::Unresolved)
                     .then(|| format!("`{value}` names no declaration visible here")),

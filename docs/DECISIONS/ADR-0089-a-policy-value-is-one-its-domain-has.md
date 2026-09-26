@@ -96,3 +96,12 @@ which the table lacked.
   apart from ADR-0058's two handlers.
 - **Mutation controls:** `scripts/policy_value_mutations.py`,
   `just e10-policy-values`, 14 mutants.
+
+## Correction, 2026-09-26
+
+A type a policy names was looked up among the program's declarations alone.
+So `idempotent_by Int` was refused as "no type visible here", although
+`Int` is a type. It is resolved as a written type is now, so the language's
+own types count too. `tests/policy_values.rs` states it (`idempotent_by
+Int` checks clean), and the mutation controls gain a fifteenth mutant: a
+type that must be a declaration's.

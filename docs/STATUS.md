@@ -78,6 +78,12 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: ADR-0089 refused `idempotent_by Int`.** A type a
+policy names was looked up among declarations alone, and `Int` is not one.
+It is resolved as a written type is now (ADR-0089's correction).
+
+Evidence: [policy-values.txt](evidence/E10/policy-values.txt), re-recorded.
+
 **2026-09-26: a dependency-graph clause belongs to a declaration that can
 mean it**
 ([ADR-0092](DECISIONS/ADR-0092-a-graph-clause-belongs-to-a-declaration-that-can-mean-it.md)).
