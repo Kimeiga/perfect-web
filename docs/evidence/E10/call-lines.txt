@@ -1,0 +1,25 @@
+ADR-0083 - a call's arguments open on the callee's line
+
+produced by: just e10-call-lines
+commit: b95bfe63b1f4863792294a1e770bdf22faf2c2fb
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== call lines (compiler/pw-core/tests/call_lines.rs)
+
+test a_call_still_breaks_inside_its_arguments ... ok
+test a_parenthesis_on_the_next_line_begins_a_statement ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== the grammar (compiler/pw-syntax)
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== mutation control (scripts/call_line_mutations.py)
+
+baseline: 2 passed, 0 failed
+a parenthesis on the next line continues a call: KILLED (1 of 2 tests fail)
+1 of 1 mutants killed
