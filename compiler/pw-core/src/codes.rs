@@ -332,6 +332,10 @@ codes! {
     // browser, pinned to the origin, is wrong without being unplaceable.
     DECLARED_PLACEMENT_CANNOT_GRANT = "PW5005" / declared_placement_cannot_grant / 1, Placement,
         "a declared placement must be able to grant every effect it requires";
+    // ADR-0114: a `placement build` page rendering its `id` checked until
+    // 2026-09-26, and the file it is built into exists before any request.
+    BUILT_BEFORE_ITS_PARAMETERS = "PW5026" / built_before_its_parameters / 1, Placement,
+        "what is built before any request reads no request's value";
     VALUE_EXCEEDS_SINK_LEVEL = "PW5006" / value_exceeds_sink_level / 1, Privacy,
         "a sink accepts only values its declared privacy level admits";
     PRIVATE_IN_RESUME_MANIFEST = "PW5007" / private_in_resume_manifest / 1, Privacy,

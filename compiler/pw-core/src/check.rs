@@ -134,6 +134,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0107: a cache key names each parameter its entry depends on.
         per_unit.extend(keys_name_what_is_read(&sigs, i, &u.hir));
+        // ADR-0114: what is built before any request reads none of its values.
+        per_unit.extend(built_pages_read_no_parameter(&sigs, i, &u.hir));
         // ADR-0110: a resumable handler reads what it captures.
         per_unit.extend(handlers_read_their_captures(&sigs, i, &u.hir));
         // ADR-0113: and performs only what the browser may.
@@ -1485,6 +1487,70 @@ fn handlers_run_in_the_browser(
                     }],
                 });
             }
+        }
+    }
+    out
+}
+
+/// **What is built before any request reads no request's value** (ADR-0114).
+///
+/// `placement build` makes a declaration's output a file produced before any
+/// request exists (charter §9.3: "public, deterministic, build-known"), so a
+/// parameter, which a request supplies, has no value when it is built. Until
+/// 2026-09-26 a build-placed page rendering its `id` checked.
+fn built_pages_read_no_parameter(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if declared_world(hir, decl) != Some(World::Build) || decl.params.is_empty() {
+            continue;
+        }
+        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+            continue;
+        };
+        let Some(lexical) = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, id) else {
+            continue;
+        };
+        let mut reported = BTreeSet::new();
+        for e in body.walk() {
+            let Some(crate::lexical::Binder::Param(i)) = lexical.binder(e) else {
+                continue;
+            };
+            let Some(param) = decl.params.get(i) else {
+                continue;
+            };
+            if !reported.insert(i) {
+                continue;
+            }
+            out.push(Diagnostic {
+                code: crate::codes::BUILT_BEFORE_ITS_PARAMETERS.id,
+                invariant: crate::codes::BUILT_BEFORE_ITS_PARAMETERS.invariant,
+                reason: "built_before_its_parameters",
+                detector: Detector::PatternMatrix,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` is built before any request, and reads `{}`, which a request supplies",
+                    decl.name, param.name
+                ),
+                primary_span: body.expr_span(e),
+                related: vec![Related {
+                    span: hir.decl_span(id),
+                    label: format!("`{}` is placed at build", decl.name),
+                }],
+                explanation: Some(format!(
+                    "`placement build` makes `{}`'s output a file produced before any \
+                     request exists, and served as it is to every one. `{}` is supplied by \
+                     a request, so when the file is built it has no value, and no one \
+                     value could be right for every reader.",
+                    decl.name, param.name
+                )),
+                repairs: vec![Repair {
+                    description: format!(
+                        "place `{}` where requests are, or build it from what the build knows",
+                        decl.name
+                    ),
+                    replacement: None,
+                }],
+            });
         }
     }
     out

@@ -1458,6 +1458,20 @@ e10-handlers-in-the-browser:
      } > docs/evidence/E10/handlers-in-the-browser.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-in-the-browser.txt
 
+# ADR-0114: what is built before any request reads no request's value. The
+# test, and the mutation controls.
+e10-built-pages:
+    @{ echo "ADR-0114 - what is built before any request reads no request's value"; echo; \
+       echo "produced by: just e10-built-pages"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== built pages (compiler/pw-core/tests/built_pages.rs)"; echo; \
+       cargo test --locked -p pw-core --test built_pages 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/built_page_mutations.py)"; echo; \
+       python3 scripts/built_page_mutations.py; \
+     } > docs/evidence/E10/built-pages.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/built-pages.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

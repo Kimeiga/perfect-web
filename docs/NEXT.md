@@ -165,7 +165,8 @@ that omits a parameter~~ (ADR-0107); ~~a query naming nothing~~ (ADR-0108);
 ~~a timeout of zero~~ (ADR-0109); ~~a handler reading what it does not
 capture~~ (ADR-0110); ~~a capture read through a shorthand field~~
 (ADR-0111); ~~a secret passed by an import's spelling~~ (ADR-0112); ~~a
-handler performing what only the origin may~~ (ADR-0113). Next, in order:
+handler performing what only the origin may~~ (ADR-0113); ~~a build-placed
+page reading its parameter~~ (ADR-0114). Next, in order:
 1. ~~**a materialization is not reached through what it reads**~~, done
    (ADR-0102): A-009's fragment kept a changed store's old name. Then
    ~~**a command's write held to the fragments built on it**~~, done
@@ -191,9 +192,9 @@ handler performing what only the origin may~~ (ADR-0113). Next, in order:
    - ~~**a handler performing what only the origin may**~~, done
      (ADR-0113): one calling `Carts.add` itself checked, and `pw
      emit-handlers` refused it;
-8. **a build-placed page reading its parameter**: `placement build` with
-   `<h1>{id}</h1>` checks, and the file it is built into exists before any
-   request supplies `id`.
+8. ~~**a build-placed page reading its parameter**~~, done (ADR-0114):
+   `placement build` with `<h1>{id}</h1>` checked, and the file it is built
+   into exists before any request supplies `id`.
 
 Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates
@@ -205,7 +206,9 @@ Then, each needing a ruling first:
   library's `Order` declares `freshness 2.seconds` with it, and PW5106
   exempts such a reader (A-026);
 - the host's `wasi:` exemption from contract membership, which rests on
-  the WASI context the host links (`pw_host::is_runtime`).
+  the WASI context the host links (`pw_host::is_runtime`);
+- whether a build-placed page may take a parameter at all, and whether a
+  build may enumerate a parameter's values (ADR-0114).
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

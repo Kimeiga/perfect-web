@@ -819,3 +819,11 @@ none, so nothing asked where its effects run. What a handler performs itself,
 beside the commands it calls, is the browser's to grant now (PW5005). R-010
 and a witness flushed a connection from the browser, a second defect, and
 are corrected.
+
+## 2026-09-26: what is built before any request reads no request's value (E10)
+
+[ADR-0114](DECISIONS/ADR-0114-what-is-built-before-any-request-reads-no-requests-value.md):
+a `placement build` page rendering its `id` passed `pw check`, and the file
+it is built into exists before any request supplies one. A build-placed
+declaration reads none of its parameters now (PW5026). Whether a build may
+enumerate a parameter's values needs a ruling.

@@ -78,6 +78,15 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a built page read a request's value**
+([ADR-0114](DECISIONS/ADR-0114-what-is-built-before-any-request-reads-no-requests-value.md)).
+A `placement build` page rendering its `id` passed `pw check`. Its file is
+built before any request supplies `id`, and served to every reader. A
+build-placed declaration reads none of its parameters now (PW5026).
+
+Evidence: [built-pages.txt](evidence/E10/built-pages.txt)
+(`just e10-built-pages`).
+
 **Correction, 2026-09-26: a handler wrote the database from the browser**
 ([ADR-0113](DECISIONS/ADR-0113-a-resumable-handler-runs-in-the-browser.md)).
 The store's Add handler written `Carts.add(current_session(), item.id,
