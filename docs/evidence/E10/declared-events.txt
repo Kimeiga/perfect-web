@@ -1,0 +1,18 @@
+ADR-0093 - an element handles an event the platform declares
+
+produced by: just e10-declared-events
+commit: 743c7eab62fd32484b3b2af1b65ec451b7bf9eee
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== declared events (compiler/pw-core/tests/declared_events.rs)
+
+test a_program_without_a_platform_declares_no_events ... ok
+test an_element_handles_an_event_the_platform_declares ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+== mutation controls (scripts/declared_event_mutations.py)
+
+baseline: 2 passed, 0 failed
+an undeclared event is skipped: KILLED (1 of 2 tests fail)
+a program without a platform refuses every event: KILLED (1 of 2 tests fail)
+2 of 2 mutants killed
