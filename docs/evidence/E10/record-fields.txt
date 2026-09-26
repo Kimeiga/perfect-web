@@ -1,0 +1,24 @@
+ADR-0067 - a record is built with each of its fields, once
+
+produced by: just e10-record-fields
+commit: 36af280ef439200d184136056f0c41fe78f209ef
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== a record's fields, and an if without else (compiler/pw-core/tests/record_fields.rs)
+
+test a_field_given_twice_is_refused ... ok
+test a_shorthand_field_is_given ... ok
+test a_field_the_type_does_not_declare_is_refused ... ok
+test a_field_left_out_is_refused ... ok
+test an_if_without_else_is_no_value ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+== mutation controls (scripts/record_field_mutations.py)
+
+baseline: 5 passed, 0 failed
+a field its type does not declare is skipped: KILLED (1 of 5 tests fail)
+a field given twice is not noticed: KILLED (1 of 5 tests fail)
+a field left out is not noticed: KILLED (1 of 5 tests fail)
+a shorthand field is not counted as given: KILLED (1 of 5 tests fail)
+an `if` without `else` has no stated type: KILLED (1 of 5 tests fail)
+5 of 5 mutants killed
