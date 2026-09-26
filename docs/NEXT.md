@@ -58,9 +58,10 @@ done:
 order. Every name resolves (ADR-0047, done). Every member exists (ADR-0048,
 done). String escapes are defined (ADR-0049, done). Recursion and generic
 callees compile (ADR-0050, done). An early `return`, `?` and `for` loops
-compile (ADR-0051, done). A function is a value (ADR-0052, done). Next:
-opaque values inside a component; then the standard library (maps and sets
-want generic records), and handlers that compute.
+compile (ADR-0051, done). A function is a value (ADR-0052, done). A lambda's
+parameters take the types its use declares (ADR-0053, done: a correction
+found on the way). Next: opaque values inside a component; then the standard
+library (maps and sets want generic records), and handlers that compute.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

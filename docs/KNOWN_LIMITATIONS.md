@@ -23,6 +23,10 @@ agreement:
   constructions are checked.
 - **Named-argument calls** are Undecided: a signature does not carry parameter
   names. None occurs in the corpus.
+- **A name bound at two sites in one body is unknown** to the value
+  relations, whatever each binding holds (ADR-0053). Their environment is
+  flat and cannot say which binding a use means. A lambda's parameters take
+  the types its use declares, except under such a name.
 - **A `()` body discards its last value** (A-018). A branch mismatch in
   statement position is not refused; as a result, it is.
 - **Generic layouts at the boundary.** Phantom parameters map to one WIT

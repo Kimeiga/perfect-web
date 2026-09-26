@@ -341,8 +341,8 @@ e9-values:
        echo; echo "== mutation controls (scripts/e9_value_mutations.py)"; echo; \
        python3 scripts/e9_value_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: member existence. \`box.x\` on a Rect with no \`x\` is"; \
-       echo "unknown, not refused; it is the next relation, not one of V1-V6."; \
+       echo "NOT CLAIMED here: member existence, which is not one of V1-V6. It is a"; \
+       echo "relation since 2026-09-25 (PW0610, ADR-0048): just e10-members."; \
        echo "NOT CLAIMED: branch agreement in statement position, named-argument"; \
        echo "calls, sum-type variant constructors, or policy-term expressions."; \
        echo "Each is Undecided and counted above, never reported as agreement."; \
@@ -502,10 +502,12 @@ e10-pure:
        echo; echo "== mutation controls (scripts/pure_mutations.py)"; echo; \
        python3 scripts/pure_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: internal functions. A call is inlined, so recursion and"; \
-       echo "generic declarations are refused; code size grows with each call site."; \
+       echo "NOT CLAIMED here: recursion and generic callees, compiled beside the"; \
+       echo "export since 2026-09-25 (ADR-0050): just e10-recursion. A call that"; \
+       echo "does not recurse is still inlined, so code size grows with each call site."; \
        echo "NOT CLAIMED: declared variants built or matched, Float remainder and"; \
-       echo "formatting, and early return. Each is refused by name."; \
+       echo "formatting. Each is refused by name. An early return compiles since"; \
+       echo "2026-09-25 (ADR-0051): just e10-control-flow."; \
      } > docs/evidence/E10/pure.txt
     @grep -E "^test result|mutants killed|^oracle:" docs/evidence/E10/pure.txt
 
@@ -525,9 +527,9 @@ e10-stdlib:
        python3 scripts/stdlib_mutations.py; \
        echo; \
        echo "NOT CLAIMED: Unicode case mapping. to_lower_ascii maps A-Z only."; \
-       echo "NOT CLAIMED: a function as a value. A lambda or a declaration's name is"; \
-       echo "compiled where a list operation runs it; stored, returned or passed to"; \
-       echo "any other declaration, it is refused."; \
+       echo "NOT CLAIMED here: a function stored, returned or passed to a program's"; \
+       echo "own declaration. It is a value since 2026-09-25 (ADR-0052):"; \
+       echo "just e10-function-values."; \
      } > docs/evidence/E10/stdlib.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/stdlib.txt
 
@@ -632,6 +634,34 @@ e10-function-values:
      } > docs/evidence/E10/function-values.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/function-values.txt
 
+# ADR-0053: a lambda's parameters take the types its use declares. The
+# callback tests, the effect chain through a callback, what must stay clean,
+# and the mutation controls.
+e10-callbacks:
+    @cargo build --quiet --locked -p pw-cli
+    @{ echo "ADR-0053 - a lambda's parameters take the types its use declares"; echo; \
+       echo "produced by: just e10-callbacks"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the callback tests (compiler/pw-core/tests/callback_parameters.rs)"; echo; \
+       cargo test --locked -p pw-core --test callback_parameters 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== an effect through a callback (compiler/pw-core/tests/causal_evidence.rs)"; echo; \
+       cargo test --locked -p pw-core --test causal_evidence 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what must stay clean: errors reported"; echo; \
+       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       echo; echo "== mutation controls (scripts/callback_mutations.py)"; echo; \
+       python3 scripts/callback_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a parameter whose name is bound at two sites in one body."; \
+       echo "The value relations' environment is flat, and such a name is unknown."; \
+       echo "NOT CLAIMED: a lambda in a branch of an annotated binding's initialiser,"; \
+       echo "typed by the annotation. A returned value is seen through its branches;"; \
+       echo "an initialiser is typed only when it is the lambda itself."; \
+     } > docs/evidence/E10/callbacks.txt
+    @grep -E "^test result|^(accepted corpus|store|kiokun):|mutants killed" docs/evidence/E10/callbacks.txt
+
 # ADR-0051: an early `return`, `?`, and `for` loops compile, and the checker
 # says what may be assigned. The compiled bodies through the host, the
 # component against the JavaScript module, and the mutation controls.
@@ -650,8 +680,9 @@ e10-control-flow:
        echo; echo "== mutation controls (scripts/control_flow_mutations.py)"; echo; \
        python3 scripts/control_flow_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: a function value, a return or assignment inside a lambda,"; \
-       echo "or an assignment to a field."; \
+       echo "NOT CLAIMED: a return or assignment inside a lambda a list operation"; \
+       echo "runs, or an assignment to a field. A function value is ADR-0052's:"; \
+       echo "just e10-function-values."; \
      } > docs/evidence/E10/control-flow.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/control-flow.txt
 
@@ -671,7 +702,8 @@ e10-recursion:
        echo; echo "== mutation controls (scripts/recursion_mutations.py)"; echo; \
        python3 scripts/recursion_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: an early return, a loop, a function value, or a generic record."; \
+       echo "NOT CLAIMED: a generic record. An early return and a loop are ADR-0051's"; \
+       echo "(just e10-control-flow), a function value ADR-0052's (just e10-function-values)."; \
      } > docs/evidence/E10/recursion.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/recursion.txt
 

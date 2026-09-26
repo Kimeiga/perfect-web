@@ -128,6 +128,15 @@ impl Ty {
         matches!(self, Ty::Unknown)
     }
 
+    /// Fully known: no hole and no inference variable anywhere in it.
+    fn is_closed(&self) -> bool {
+        match self {
+            Ty::Unknown | Ty::Var(_) => false,
+            Ty::Builtin(_, args) | Ty::Nominal(_, args) => args.iter().all(Ty::is_closed),
+            _ => true,
+        }
+    }
+
     /// The constructor a member lookup keys on. A hole in an argument does not
     /// change which members a `List<?>` has.
     fn receiver(&self) -> Option<Receiver> {
@@ -427,6 +436,9 @@ struct Typer<'a> {
     shadowed: BTreeSet<String>,
     /// The expression each `|>` feeds, keyed by the call on its right.
     piped: BTreeMap<ExprId, ExprId>,
+    /// Lambda parameters given a closed type while their use was solved,
+    /// waiting to join `locals` (see [`Typer::solve_lambdas`]).
+    solved: RefCell<BTreeMap<String, Ty>>,
 }
 
 /// What a resolved call is checked against: its parameters, where each is
@@ -584,6 +596,7 @@ impl<'a> Typer<'a> {
             ),
             shadowed,
             piped,
+            solved: RefCell::new(BTreeMap::new()),
         };
 
         // **A binding typed with a callee's own `T` is no type.** `infer.rs`
@@ -600,11 +613,13 @@ impl<'a> Typer<'a> {
             .borrow_mut()
             .retain(|_, t| !t.mentions_foreign_parameter(own));
 
-        // An unannotated `let` takes its initialiser's type. Iterated, because
-        // `let a = f()` then `let b = g(a)` needs `a` first; bounded, because
-        // each round can only add bindings.
+        // An unannotated `let` takes its initialiser's type, and a lambda's
+        // parameters the types its use gives them. Iterated, because
+        // `let a = f()` then `let b = g(a)` needs `a` first, and a lambda's
+        // call may need a binding typed; bounded, because each round can only
+        // add bindings.
         for _ in 0..4 {
-            let mut added = false;
+            let mut added = typer.solve_lambdas();
             for id in body.walk() {
                 let Expr::Let {
                     pat: Some(pat),
@@ -887,8 +902,12 @@ impl<'a> Typer<'a> {
             shape.push(Ty::Unknown);
             return Ty::Builtin(Builtin::Function, shape);
         }
+        let own = self.own_def();
         let mut saved = Vec::new();
         for (name, ty) in names.iter().zip(expected_params) {
+            if ty.is_closed() && !ty.mentions_foreign_parameter(own) {
+                self.solved.borrow_mut().insert(name.clone(), ty.clone());
+            }
             let old = self.locals.borrow_mut().insert(name.clone(), ty.clone());
             saved.push((name.clone(), old));
         }
@@ -1399,6 +1418,82 @@ impl<'a> Typer<'a> {
         match self.ws.resolve_in(self.at, ns, &self.decl.name) {
             Resolution::Local(d) => Some(d),
             _ => None,
+        }
+    }
+
+    /// **A lambda's parameters, as its use gives them**: the function type of
+    /// the parameter it is passed as, of a `let`'s written type, or of the
+    /// declared result it is returned as. Returns whether any parameter was
+    /// newly typed.
+    ///
+    /// The relations walk reads a lambda's body on its own, with the body's
+    /// bindings. A parameter was typed only while its call was solved, so in
+    /// that walk it was untyped, or typed by `infer.rs`'s narrower rule
+    /// (ADR-0053). A parameter keeps the closed type its use gives it. One
+    /// whose name is bound at several sites stays unknown, as any such name:
+    /// [`Typer::name`] answers for it before `locals` is read.
+    fn solve_lambdas(&self) -> bool {
+        let is_lambda = |id: ExprId| matches!(self.body.expr(id), Expr::Lambda { .. });
+        for id in self.body.walk() {
+            match self.body.expr(id) {
+                Expr::Call { args, .. } if args.iter().any(|a| is_lambda(a.value)) => {
+                    let _ = self.call(id);
+                }
+                Expr::Let {
+                    ty: Some(ty),
+                    init: Some(init),
+                    ..
+                } if is_lambda(*init) => {
+                    let Some(written) = crate::resolved::written_in_body(self.body, *ty) else {
+                        continue;
+                    };
+                    let span = self.body.expr_span(*init);
+                    if let Some(t) = self
+                        .sigs
+                        .resolve_type(self.module, self.decl, &written, span)
+                        .resolved()
+                    {
+                        self.lambda_as(*init, &Ty::of(t));
+                    }
+                }
+                _ => {}
+            }
+        }
+        let result = self
+            .own_def()
+            .and_then(|d| self.sigs.by_def(d))
+            .and_then(Signature::result)
+            .map(Ty::of);
+        if let Some(result) = result {
+            for site in self.result_sites() {
+                self.lambda_as(site, &result);
+            }
+        }
+        let solved = std::mem::take(&mut *self.solved.borrow_mut());
+        let mut locals = self.locals.borrow_mut();
+        let mut added = false;
+        for (name, t) in solved {
+            if let std::collections::btree_map::Entry::Vacant(e) = locals.entry(name) {
+                e.insert(t);
+                added = true;
+            }
+        }
+        added
+    }
+
+    /// Type a lambda against a function type it is used as, for the
+    /// parameters that records.
+    fn lambda_as(&self, id: ExprId, expected: &Ty) {
+        if let (
+            Expr::Lambda {
+                descriptor: None,
+                params,
+                body,
+            },
+            Ty::Builtin(Builtin::Function, fargs),
+        ) = (self.body.expr(id), expected)
+        {
+            let _ = self.lambda(params, *body, fargs);
         }
     }
 

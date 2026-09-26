@@ -78,6 +78,34 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-25: a callback's parameters had the wrong types**
+([ADR-0053](DECISIONS/ADR-0053-callback-parameters.md)). The checker gave a
+lambda's first parameter the element type of any list beside it, whatever
+the callee declared.
+- `List.fold(ws, 0, (t, w) => t + w.score)` was refused (PW0609), with the
+  accumulator `t` typed as a `Word`.
+- A program's own callback taker was refused (PW0605) the same way.
+- Every other parameter was untyped, so nothing in a lambda's body that read
+  one was checked: not `fold`'s element, a lambda bound with a written type,
+  or a returned lambda.
+
+Each parameter now takes the type its use declares. Found compiling an
+opaque type's fold. Every fixture reports what it did before. Evidence:
+[callbacks.txt](evidence/E10/callbacks.txt) (`just e10-callbacks`).
+
+**Correction, 2026-09-25: five mutation anchors had drifted.** A mutation
+control replaces an exact anchor, and later commits had moved five:
+- one in `function_value_mutations.py`, reformatted before its evidence was
+  recorded;
+- one in `names_mutations.py` (ADR-0051);
+- one in `pure_mutations.py` (ADR-0050);
+- two in `recursion_mutations.py`.
+
+Each evidence file was true at its own commit, and none reproduced at HEAD.
+The anchors are repaired, and `just ci` now checks every anchor
+(`just mutation-anchors`). Five recipes' NOT CLAIMED texts, which later ADRs
+had made false, are corrected, and their evidence is re-recorded.
+
 **2026-09-25: a function is a value**
 ([ADR-0052](DECISIONS/ADR-0052-function-values.md)). A lambda used as a value,
 or a declaration's name where a function is wanted, compiles to a closure.
@@ -198,6 +226,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0053: a callee with no signature types no parameter of a lambda passed
+  to it.
 - ADR-0052: a closure captures by value; a `let mut` binding assigned after
   the closure is made is not seen by it.
 - ADR-0051: `for` over a list is the only loop; there is no `while`.

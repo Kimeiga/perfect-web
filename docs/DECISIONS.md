@@ -317,3 +317,10 @@ lambda or a declaration's name compiles to a closure of its captures, is
 stored, returned, passed and called through: in the component an
 environment in the region naming its code's slot in a `funcref` table,
 called with `call_indirect`; in the module a JavaScript function.
+
+[ADR-0053](DECISIONS/ADR-0053-callback-parameters.md): a lambda's parameters
+take the types its use declares. `infer.rs` reads them from the callee's
+declared function type, where it gave the first parameter the element type
+of any list beside it; `values.rs` keeps the types a solved call, an
+annotation or a declared result gives them. `fold`'s accumulator was typed
+as the element and refused.

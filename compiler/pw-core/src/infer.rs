@@ -31,13 +31,17 @@
 //! `Style`, and `.set_padding` is a member of `Style`. No step asks whether a
 //! name is unique.
 //!
+//! A lambda parameter is typed where its callee's declared function type
+//! says, without solving the call: `el` in `List.map(items, el => ..)` is an
+//! element of `items`, because `map` takes a `List<T>` and a `fn(T) -> U`.
+//!
 //! # What it does not infer
 //!
-//! Unannotated lambda parameters. `List.map(items, el => el.offsetWidth())`
-//! gives `el` no type, because that needs the generic's instantiation. Callers
-//! are told so — [`Types::of`] returns `None` — and it is each caller's
-//! decision whether to fall back or to stop. `docs/evidence/P0/readiness.txt`
-//! records which ones still fall back.
+//! A lambda parameter whose type needs the call solved, such as `fold`'s
+//! accumulator `A`, which the seed argument instantiates. `values.rs` solves
+//! calls. Where this module cannot say, [`Types::of`] returns `None`, and it is
+//! each caller's decision whether to fall back or to stop.
+//! `docs/evidence/P0/readiness.txt` records which ones still fall back.
 
 use std::collections::BTreeMap;
 
@@ -202,12 +206,13 @@ impl<'a> Types<'a> {
             }
         }
 
-        // A CALLBACK's parameter takes the element type of the collection the
-        // callback is applied to.
+        // A CALLBACK's parameter takes the type its callee declares for it.
         //
         // `items |> List.map(fn(el) el.getBoundingClientRect().width)` gives
-        // `el` the type `ElementRef`, so `getBoundingClientRect` resolves
-        // through the RECEIVER rather than through a spelling.
+        // `el` the type `ElementRef`: `map` takes a `List<T>` and a
+        // `fn(T) -> U`, and `items` is a `List<ElementRef>`. So
+        // `getBoundingClientRect` resolves through the RECEIVER rather than
+        // through a spelling.
         //
         // Architect ruling, 2026-08-07:
         //
@@ -216,15 +221,21 @@ impl<'a> Types<'a> {
         // > `getBoundingClientRect` — not because some globally unique
         // > declaration has that spelling.
         //
-        // The same shape `{#each}` already relies on, one level down. It is
-        // deliberately narrow: the callback's FIRST parameter, and only when a
-        // sibling argument is a collection whose element type is known. A
-        // callback over something that is not a collection binds nothing,
-        // because there is nothing to be right about.
+        // A parameter is typed where the callee's function type gives it a
+        // type that mentions no type parameter, or exactly the type parameter
+        // a list argument's element instantiates. Anything else needs the
+        // call solved, which `values.rs` does.
+        //
+        // Until 2026-09-25 the rule was "the FIRST parameter takes the element
+        // type of any list beside it", whatever the callee declared. `fold`'s
+        // callback is `fn(A, T) -> A`, whose first parameter is the
+        // accumulator, so `List.fold(ws, 0, (t, w) => t + w.score)` typed `t`
+        // as a `Word` and was refused (ADR-0053).
+        //
         // `xs |> f(cb)` keeps its pipe: the HIR is `Binary { Pipe, xs, f(cb) }`
         // rather than a call with `xs` prepended. So the piped value is
-        // collected here and offered to the call on its right, which is what
-        // `|>` means.
+        // collected here and offered to the call on its right as its first
+        // argument, which is what `|>` means.
         let mut piped: BTreeMap<ExprId, ExprId> = BTreeMap::new();
         for id in body.walk() {
             if let Expr::Binary {
@@ -238,36 +249,74 @@ impl<'a> Types<'a> {
         }
 
         for id in body.walk() {
-            let Expr::Call { args, .. } = body.expr(id) else {
+            let Expr::Call { callee, args } = body.expr(id) else {
                 continue;
             };
-            // The element type any sibling argument offers — including the
-            // piped receiver.
-            let element = args
-                .iter()
-                .map(|a| a.value)
-                .chain(piped.get(&id).copied())
-                .find_map(|value| {
-                    let name = path_of(body, value);
-                    element_of
-                        .get(&name)
-                        .cloned()
-                        .or_else(|| types.element_type(body, &name))
-                });
-            let Some(element) = element else { continue };
-
-            for a in args {
-                let Expr::Lambda { params, .. } = body.expr(a.value) else {
+            // A named argument's position is not its parameter's.
+            if args.iter().any(|a| a.name.is_some()) {
+                continue;
+            }
+            let Some(sig) = types.callee(body, *callee) else {
+                continue;
+            };
+            let values: Vec<(usize, ExprId)> = piped
+                .get(&id)
+                .copied()
+                .into_iter()
+                .chain(args.iter().map(|a| a.value))
+                .enumerate()
+                .collect();
+            let declared = |i: usize| {
+                sig.params
+                    .get(i)
+                    .and_then(Option::as_ref)
+                    .and_then(resolved::TypeResolution::resolved)
+            };
+            // The element each list argument gives its type parameter:
+            // `items: List<T>` passed a `List<Word>` makes `T` a `Word`.
+            let mut elements = BTreeMap::new();
+            for (i, value) in &values {
+                let Some(param) = declared(*i)
+                    .and_then(element_of_type)
+                    .and_then(ResolvedType::parameter_binding)
+                else {
                     continue;
                 };
-                let Some(first) = params.first() else {
+                let name = path_of(body, *value);
+                if let Some(e) = element_of
+                    .get(&name)
+                    .cloned()
+                    .or_else(|| types.element_type(body, &name))
+                {
+                    elements.entry(param).or_insert(e);
+                }
+            }
+            for (i, value) in &values {
+                let Expr::Lambda { params, .. } = body.expr(*value) else {
                     continue;
                 };
-                // `fn(el)` arrives as a constructor-shaped wrapper around the
-                // binding — the parameter LIST is call-shaped — so the name is
-                // found by walking rather than matched at the top.
-                if let Some(name) = first_bound_name(body, *first) {
-                    types.bindings.entry(name).or_insert(element.clone());
+                let Some(f) = declared(*i).filter(|t| t.as_builtin() == Some(Builtin::Function))
+                else {
+                    continue;
+                };
+                let Some((_, wanted)) = f.args().split_last() else {
+                    continue;
+                };
+                let Some(names) = crate::values::lambda_names(body, params) else {
+                    continue;
+                };
+                if names.len() != wanted.len() {
+                    continue;
+                }
+                for (name, w) in names.into_iter().zip(wanted) {
+                    let ty = match w.parameter_binding() {
+                        Some(p) => elements.get(&p).cloned(),
+                        None if !mentions_parameter(w) => Some(w.clone()),
+                        None => None,
+                    };
+                    if let Some(t) = ty {
+                        types.bindings.entry(name).or_insert(t);
+                    }
                 }
             }
         }
@@ -421,19 +470,9 @@ impl<'a> Types<'a> {
 /// loop iterates what is inside. That is not the same as ignoring them: a
 /// `Result` still has to be handled, and `option_used_as_value` is the rule
 /// that says so. This answers a different question — what one element IS.
-/// The first name a pattern binds, however it is wrapped.
-///
-/// A lambda parameter list is call-shaped, so `fn(el)` lowers to a constructor
-/// pattern with an empty path around the binding. Matching `Bind` at the top
-/// finds nothing, and finding nothing here is indistinguishable from a callback
-/// over something untyped.
-fn first_bound_name(body: &Body, pat: crate::hir::PatternId) -> Option<String> {
-    use crate::hir::Pattern;
-    match body.pat(pat) {
-        Pattern::Bind { name, .. } => Some(name.clone()),
-        Pattern::Ctor { args, .. } => args.iter().find_map(|a| first_bound_name(body, *a)),
-        _ => None,
-    }
+/// Does this type mention a type parameter anywhere?
+fn mentions_parameter(ty: &ResolvedType) -> bool {
+    ty.parameter_binding().is_some() || ty.args().iter().any(mentions_parameter)
 }
 
 pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {

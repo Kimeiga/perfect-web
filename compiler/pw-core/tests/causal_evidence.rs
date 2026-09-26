@@ -33,10 +33,19 @@ type Rect = Rect { width: Int }
 fn getBoundingClientRect(el: ElementRef) -> Rect !{ layout.measure } { Rect { width: 0 } }
 ";
 
+/// `List.map` as `packages/pw-std/list.pw` declares it. Until 2026-09-25 this
+/// was the pre-ADR-0031 stand-in, `map(items: List<Unknown>, f: Decoder)`,
+/// which says nothing about `el`: the checker gave any callback's first
+/// parameter the element type of a list beside it, whatever the callee
+/// declared (ADR-0053).
 const LIST: &str = "\
 module List
 
-fn map(items: List<Unknown>, f: Decoder) -> List<Unknown> !{} { items }
+fn map<T, U>(items: List<T>, f: fn(T) -> U) -> List<U> !{}
+    intrinsic \"list.map\"
+
+fn fold<T, A>(items: List<T>, seed: A, f: fn(A, T) -> A) -> A !{}
+    intrinsic \"list.fold\"
 ";
 
 /// R-037's shape: the effect is reached only through the callback's parameter.
@@ -52,8 +61,41 @@ fn widths(items: List<ElementRef>) -> Int !{} {
 }
 ";
 
+/// The same member, reached through a callback whose parameter is not the
+/// first (ADR-0053). The first rule gave `total` the element type and `el`
+/// none, so the member was not resolved through `el`'s type.
+const FOLDED: &str = "\
+module app
+
+import List
+import browser
+
+fn widths(items: List<ElementRef>) -> Int !{} {
+    List.fold(items, 0, fn(total, el) total + el.getBoundingClientRect().width)
+}
+";
+
+/// The same member, through a program's own declaration whose callback type
+/// is written out. Its parameter is typed by that declaration alone.
+const OWN: &str = "\
+module app
+
+import List
+import browser
+
+fn each_width(items: List<ElementRef>, f: fn(ElementRef) -> Int) -> Int !{} { 0 }
+
+fn widths(items: List<ElementRef>) -> Int !{} {
+    each_width(items, fn(el) el.getBoundingClientRect().width)
+}
+";
+
 fn evidence_of(decl: &str) -> Evidence {
-    let sources = [PLATFORM, LIST, SMUGGLED];
+    evidence_in(SMUGGLED, decl)
+}
+
+fn evidence_in(app: &str, decl: &str) -> Evidence {
+    let sources = [PLATFORM, LIST, app];
     let hirs: Vec<Hir> = sources
         .iter()
         .map(|s| lower_file(s, &parse_tree(s).green))
@@ -185,4 +227,19 @@ fn widths(items: List<Rect>) -> Int !{} {
         "and the effect must not reach the body: {:?}",
         e.facts()
     );
+}
+
+#[test]
+fn a_callbacks_later_parameter_is_typed_by_the_callees_declaration() {
+    for (what, app) in [
+        ("fold's element", FOLDED),
+        ("a program's own callback", OWN),
+    ] {
+        let e = evidence_in(app, "widths");
+        assert!(
+            e.resolved_member_on("ElementRef", "getBoundingClientRect"),
+            "{what}: no receiver-type resolution: {:?}",
+            e.facts()
+        );
+    }
 }
