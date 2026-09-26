@@ -1,45 +1,45 @@
 ADR-0063 - every name means one binding
 
 produced by: just e10-lexical
-commit: 39878663877afcdb29adc6b339250f9c3c3d59a8
+commit: 3ae67d93ff80153c55a4b89017d73c45f0efa334
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the scopes, and what each reader makes of them (compiler/pw-core/tests/lexical_scope.rs)
 
 test a_capture_is_typed_by_the_binding_its_name_means ... ok
-test an_each_blocks_name_is_an_element_of_its_collection ... ok
-test two_arms_binding_one_name_are_typed_apart ... ok
-test two_arms_binding_one_name_in_a_template_are_typed_apart ... ok
-test a_name_bound_twice_carries_each_bindings_label ... ok
-test two_branches_binding_one_name_are_typed_apart ... ok
-test a_lambda_parameter_is_not_the_let_it_shadows ... ok
 test a_record_shorthand_names_the_binding_in_scope ... ok
+test two_branches_binding_one_name_are_typed_apart ... ok
+test a_secret_logged_through_a_lambdas_parameter_is_refused ... ok
 test a_secret_rendered_through_an_each_blocks_name_is_refused ... ok
+test an_each_blocks_name_is_an_element_of_its_collection ... ok
 test a_secret_logged_through_a_for_loops_name_is_refused ... ok
 test a_for_loops_name_is_an_element_of_its_list ... ok
+test two_arms_binding_one_name_are_typed_apart ... ok
+test two_arms_binding_one_name_in_a_template_are_typed_apart ... ok
+test a_lambda_parameter_is_not_the_let_it_shadows ... ok
+test a_name_bound_twice_carries_each_bindings_label ... ok
 test a_let_binds_from_the_next_statement ... ok
-test a_secret_logged_through_a_lambdas_parameter_is_refused ... ok
 test two_lambdas_binding_one_name_are_typed_apart ... ok
-test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
 
 == a match over a name an arm binds again (compiler/pw-core/tests/match_exhaustiveness.rs)
 
-test a_call_returning_a_declared_sum_type_is_checked ... ok
 test an_option_match_without_none_is_refused ... ok
-test a_result_match_without_err_is_refused ... ok
 test a_declared_option_parameter_is_checked_too ... ok
+test a_result_match_without_err_is_refused ... ok
+test a_call_returning_a_declared_sum_type_is_checked ... ok
 test the_kiokun_slices_matches_are_proven_now ... ok
-test a_type_no_pattern_takes_apart_is_matched_by_a_name_only ... ok
 test a_return_in_an_arm_is_not_a_phantom_arm ... ok
-test a_field_count_is_checked_at_any_depth_and_in_every_arm ... ok
 test a_name_an_arm_binds_again_is_not_read_as_the_parameter ... ok
+test a_type_no_pattern_takes_apart_is_matched_by_a_name_only ... ok
+test a_field_count_is_checked_at_any_depth_and_in_every_arm ... ok
 test what_the_analysis_cannot_read_is_blocked_not_proven ... ok
 test a_pattern_nested_under_some_is_analysed ... ok
 test a_literal_is_one_value_of_its_type ... ok
 test a_nested_pattern_is_read_against_its_fields_type ... ok
 test exhaustive_matches_pass ... ok
 test a_constructor_its_type_lacks_is_refused_not_read_as_a_wildcard ... ok
-test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
 
 == what the value relations decide: the store program
 
@@ -47,9 +47,9 @@ test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
   Arity       agree                            24
   Argument    agree                            28
   Field       agree                            11
-  Return      agree                            24
-  Return      undecided: Unknown               40
-  Binding     undecided: Unknown               1
+  Return      agree                            63
+  Return      undecided: Unknown               1
+  Binding     agree                            1
   Annotation  agree                            422
   Operand     agree                            9
   Assignment  agree                            1
@@ -61,11 +61,10 @@ test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 26 file(s)
   Arity       agree                            76
   Argument    agree                            131
-  Field       agree                            31
-  Field       undecided: Unknown               1
-  Return      agree                            64
-  Return      undecided: Unknown               18
-  Binding     undecided: Unknown               1
+  Field       agree                            32
+  Return      agree                            81
+  Return      undecided: Unknown               1
+  Binding     agree                            1
   Annotation  agree                            396
   Operand     agree                            156
   Assignment  agree                            1
@@ -76,18 +75,19 @@ test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 64 file(s)
   Arity       agree                            62
-  Argument    agree                            86
-  Argument    undecided: Unknown               6
+  Argument    agree                            87
+  Argument    undecided: Unknown               5
   Field       agree                            18
-  Return      agree                            24
-  Return      undecided: Unknown               53
-  Binding     undecided: Unknown               4
+  Return      agree                            75
+  Return      undecided: Unknown               2
+  Binding     agree                            1
+  Binding     undecided: Unknown               3
   Annotation  agree                            462
   Operand     agree                            35
   Operand     undecided: Unknown               4
   Assignment  agree                            2
-  Member      agree                            46
-  Member      undecided: Unknown               3
+  Member      agree                            47
+  Member      undecided: Unknown               2
   Case        agree                            7
 
 == mutation controls (scripts/lexical_mutations.py)
