@@ -761,3 +761,10 @@ named `app.pw` the second's replaced the first's, and `pw check a/app.pw
 b/app.pw` passed with an error in `a/app.pw`. Every `just ci` check named two
 files `effects.pw`. Diagnostics are paired with their files by position now,
 and a file whose name is shared is named by its path.
+
+## 2026-09-26: a cache key names each parameter its entry depends on (E10)
+
+[ADR-0107](DECISIONS/ADR-0107-a-cache-key-names-what-its-entry-depends-on.md):
+`query Other(id, other)` with `key id` and a body reading `other` checked, and
+two calls differing in `other` shared one cache entry. A `key` or `dedupe_by`
+names each parameter the body reads now (PW0336).

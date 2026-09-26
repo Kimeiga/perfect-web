@@ -78,6 +78,17 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a cache key names each parameter its entry depends on**
+([ADR-0107](DECISIONS/ADR-0107-a-cache-key-names-what-its-entry-depends-on.md)).
+`query Other(id, other)` with `key id` and a body reading `other` checked, so
+`Other(1, 2)` and `Other(1, 3)` shared one cache entry and the second call was
+given the first's store. PW5004 held a key to the privacy partitions a value
+depends on, and nothing held it to the parameters. A `key` or `dedupe_by`
+names each parameter the body reads now (PW0336).
+
+Evidence: [keys-cover-reads.txt](evidence/E10/keys-cover-reads.txt)
+(`just e10-keys-cover-reads`).
+
 **Correction, 2026-09-26: `pw check` passed a file whose name another
 file had**
 ([ADR-0106](DECISIONS/ADR-0106-each-file-is-reported-by-its-place.md)).

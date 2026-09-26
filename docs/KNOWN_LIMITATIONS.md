@@ -302,6 +302,10 @@ awaited in order. What remains:
   every analysis. Its values are checked by their domains (ADR-0089).
 - **Which declarations a policy belongs to is checked for the four graph
   clauses only** (ADR-0092).
+- **A cache key is held to every parameter its body reads** (ADR-0107),
+  including one read only for an effect such as a trace, whose value the
+  entry does not depend on. Telling the two apart needs the flow of values
+  to the result (ruling needed).
 - **A command's write is matched to its readers by domain, not by key**
   (ADR-0101). PW5106 requires a command writing `Carts` to reach each
   cart reader with no staleness window. It does not check that the event

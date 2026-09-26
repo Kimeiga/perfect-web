@@ -187,6 +187,10 @@ codes! {
         "a policy's value is one its domain has";
     OPTIMISTIC_TARGET_MISMATCH = "PW0331" / optimistic_target_mismatch / 1, DeclarationRules,
         "an optimistic transition must produce the value type of the resource it targets";
+    // ADR-0107: `query Other(id, other)` with `key id` and a body reading
+    // `other` checked until 2026-09-26, and two calls shared one entry.
+    KEY_OMITS_A_READ = "PW0336" / key_omits_a_read / 1, DeclarationRules,
+        "a cache key names each parameter its entry depends on";
     // **A known policy in the wrong place**, which is a different failure from
     // an unknown one. `effect a.b { host ".." }` parsed, was recorded, and was
     // read by nothing — and while it existed a reader walking declarations could

@@ -160,8 +160,8 @@ invalidates nothing~~ (ADR-0101), which found A-005 leaving A-004's cart
 stale; ~~an event that stops at its listeners~~ (ADR-0102); ~~a fragment
 no write reaches~~ (ADR-0103); ~~an event no command declared~~ (ADR-0104);
 ~~a speculation nothing reconciles~~ (ADR-0105); ~~a file whose name
-another has~~ (ADR-0106), which `pw check` passed with an error. Next, in
-order:
+another has~~ (ADR-0106), which `pw check` passed with an error; ~~a key
+that omits a parameter~~ (ADR-0107). Next, in order:
 1. ~~**a materialization is not reached through what it reads**~~, done
    (ADR-0102): A-009's fragment kept a changed store's old name. Then
    ~~**a command's write held to the fragments built on it**~~, done
@@ -177,10 +177,8 @@ order:
    command in the page's own module names in `invalidates`, where the
    checker and the dev server accept an event, and a command anywhere
    (KNOWN_LIMITATIONS).
-5. **a key that omits what its entry depends on**: `query Other(id, other)`
-   with `key id` and a body reading `other` checks, and `Other(1, 2)` and
-   `Other(1, 3)` share one entry. PW5004 holds a key to the privacy
-   partitions a value depends on, and nothing to its parameters.
+5. ~~**a key that omits what its entry depends on**~~, done (ADR-0107):
+   two calls differing in an unkeyed parameter shared one entry.
 
 Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates

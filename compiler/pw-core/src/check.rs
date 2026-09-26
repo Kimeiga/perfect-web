@@ -132,6 +132,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(code_in_markup(&u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
+        // ADR-0107: a cache key names each parameter its entry depends on.
+        per_unit.extend(keys_name_what_is_read(&sigs, i, &u.hir));
         // ADR-0098: a name is written once where it is declared.
         per_unit.extend(declared_once(&u.hir));
         // ADR-0091: a listener binds its declaration's key.
@@ -1191,6 +1193,94 @@ fn speculation_reconciled(
                 },
             ],
         });
+    }
+    out
+}
+
+/// **A cache key names each parameter its entry depends on** (ADR-0107).
+///
+/// A query's entry is shared by every call whose `key` is equal, and a
+/// subscription's stream by every call whose `dedupe_by` is. A parameter the
+/// body reads and the key leaves out gives one call another's answer:
+/// `Other(1, 2)` and `Other(1, 3)`, keyed by `id`, share an entry. PW5004
+/// holds a key to the privacy partitions a value depends on; this holds it
+/// to the parameters. A read is any use of the parameter in the body, which
+/// errs toward keying: a parameter read only for a trace is keyed too.
+fn keys_name_what_is_read(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if !matches!(
+            decl.kind,
+            DeclKind::Query | DeclKind::Subscription | DeclKind::Resource
+        ) {
+            continue;
+        }
+        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+            continue;
+        };
+        let Some(lexical) = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, id) else {
+            continue;
+        };
+        // Each parameter the body reads, with its first read.
+        let mut read: BTreeMap<usize, ExprId> = BTreeMap::new();
+        for e in body.walk() {
+            if let Some(crate::lexical::Binder::Param(i)) = lexical.binder(e) {
+                read.entry(i).or_insert(e);
+            }
+        }
+        for head in ["key", "dedupe_by"] {
+            let Some(p) = decl.policy(head) else {
+                continue;
+            };
+            let named: Vec<&str> = p.value.split(',').map(str::trim).collect();
+            // A component naming neither a parameter nor a partition is
+            // PW0335's, and what the key meant is not known.
+            if named.iter().any(|n| {
+                !decl.params.iter().any(|q| q.name == *n)
+                    && !crate::privacy::Label::PARTITIONS.contains(n)
+            }) {
+                continue;
+            }
+            for (&i, &at) in &read {
+                let Some(param) = decl.params.get(i) else {
+                    continue;
+                };
+                if named.contains(&param.name.as_str()) {
+                    continue;
+                }
+                out.push(Diagnostic {
+                    code: crate::codes::KEY_OMITS_A_READ.id,
+                    invariant: crate::codes::KEY_OMITS_A_READ.invariant,
+                    reason: "key_omits_a_read",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message: format!(
+                        "`{}`'s `{head}` omits `{}`, which its body reads",
+                        decl.name, param.name
+                    ),
+                    primary_span: p.span.clone(),
+                    related: vec![Related {
+                        span: body.expr_span(at),
+                        label: format!("`{}` is read here", param.name),
+                    }],
+                    explanation: Some(format!(
+                        "Every call whose `{head}` is equal shares one entry: a cached \
+                         answer, or one stream. `{}` reads `{}`, so two calls that differ \
+                         only in `{}` are given one answer, the first's.",
+                        decl.name, param.name, param.name
+                    )),
+                    repairs: vec![Repair {
+                        description: format!(
+                            "key the entry by `{}` too: `{head} {}, {}`",
+                            param.name,
+                            p.value.trim(),
+                            param.name
+                        ),
+                        replacement: None,
+                    }],
+                });
+            }
+        }
     }
     out
 }

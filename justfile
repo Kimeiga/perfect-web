@@ -1360,6 +1360,20 @@ e10-same-name:
      } > docs/evidence/E10/same-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/same-name.txt
 
+# ADR-0107: a cache key names each parameter its entry depends on. Its
+# tests, and the mutation controls.
+e10-keys-cover-reads:
+    @{ echo "ADR-0107 - a cache key names each parameter its entry depends on"; echo; \
+       echo "produced by: just e10-keys-cover-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== keys cover reads (compiler/pw-core/tests/keys_cover_reads.rs)"; echo; \
+       cargo test --locked -p pw-core --test keys_cover_reads 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/key_read_mutations.py)"; echo; \
+       python3 scripts/key_read_mutations.py; \
+     } > docs/evidence/E10/keys-cover-reads.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/keys-cover-reads.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation
