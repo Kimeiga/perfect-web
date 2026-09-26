@@ -717,3 +717,13 @@ checked, and nothing told the queries reading the cart that it had changed.
 A-005 told the library's stub and not A-004's cart. A command reaches each
 reader of what it writes that has no staleness window: by name, or by an event
 the reader listens for (PW5106).
+
+## 2026-09-26: an event reaches what reads what it invalidates (E10)
+
+[ADR-0102](DECISIONS/ADR-0102-an-event-reaches-what-reads-what-it-invalidates.md):
+the materializer invalidated an event's direct listeners and nothing built
+from them, although the compiler's graph follows reads. A-009's fragment
+depends on a store that listens for `StoreChanged`, and kept the old store
+after one. An event now reaches each entry that reads what it reaches, at
+the key the read supplies, and a key the read does not supply matches any
+value.

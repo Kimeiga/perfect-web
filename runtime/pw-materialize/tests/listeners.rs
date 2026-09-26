@@ -1,4 +1,4 @@
-//! **A listener binds its entry's key, position by position** (ADR-0089).
+//! **A listener binds its entry's key, position by position** (ADR-0091).
 //!
 //! `invalidates_on InventoryChanged(id, _)` says which of an event's values
 //! must equal which part of the entry's key: the first must equal the

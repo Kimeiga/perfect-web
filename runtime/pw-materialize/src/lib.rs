@@ -690,9 +690,6 @@ impl Materializer {
             }
             let mut matched = false;
             for key in instances {
-                if !fragments.contains(&key.fragment) {
-                    continue;
-                }
                 // The narrowing the whole milestone is about. An event's
                 // arguments are matched against the entry's key, position by
                 // position as its listener binds them (ADR-0091), so
@@ -701,7 +698,11 @@ impl Materializer {
                 // too. An event with NO arguments matches every instance,
                 // which is the honest reading of "the menu changed" with
                 // nothing said about which.
-                if !g.listens(&key.fragment, &c.event.name, &c.event.args, &key.key) {
+                //
+                // And an entry that reads what the event reaches, at the key
+                // its read supplies (ADR-0102): a fragment built from a store
+                // is stale when the store is.
+                if !g.reaches(&key.fragment, &c.event.name, &c.event.args, &key.key) {
                     continue;
                 }
                 matched = true;

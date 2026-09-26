@@ -1283,6 +1283,23 @@ e10-writes-invalidated:
      } > docs/evidence/E10/writes-invalidated.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/writes-invalidated.txt
 
+# ADR-0102: an event reaches what reads what it invalidates. The
+# materializer's tests, ADR-0091's listener tests it must keep passing, and
+# the mutation controls.
+e10-read-through:
+    @{ echo "ADR-0102 - an event reaches what reads what it invalidates"; echo; \
+       echo "produced by: just e10-read-through"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== reads followed (runtime/pw-materialize/tests/reads.rs)"; echo; \
+       cargo test --locked -p pw-materialize --test reads 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the M6 gate and the listeners, unchanged"; echo; \
+       cargo test --locked -p pw-materialize --test gate --test listeners 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/read_through_mutations.py)"; echo; \
+       python3 scripts/read_through_mutations.py; \
+     } > docs/evidence/E10/read-through.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/read-through.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

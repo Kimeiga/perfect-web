@@ -157,12 +157,13 @@ and an animated link~~ (ADR-0096); ~~a page's embedded JSON~~ (ADR-0097);
 ~~a name written twice~~ (ADR-0098); ~~a failure nothing handles~~
 (ADR-0099); ~~a write inside a query~~ (ADR-0100); ~~a command's write that
 invalidates nothing~~ (ADR-0101), which found A-005 leaving A-004's cart
-stale. Next, in order:
-1. **a materialization is not reached through what it reads.** The
-   materializer invalidates a committed event's direct listeners and nothing
-   that depends on them, and `Graph::affected_by` follows reads. A-009's
-   `MenuFragment` depends on `Store(id)` and does not listen for
-   `StoreChanged`, so a renamed store keeps its old fragment (ADR-0101);
+stale; ~~an event that stops at its listeners~~ (ADR-0102). Next, in order:
+1. ~~**a materialization is not reached through what it reads**~~, done
+   (ADR-0102): A-009's fragment kept a changed store's old name. Next,
+   **a command's write held to the fragments built on it.** A materialization
+   has no staleness window (`regenerate` is `on_invalidation` alone), so one
+   built from a query with a window keeps what it rendered after a write
+   until an event reaches it (ADR-0102);
 2. **the dev server emits `CartChanged` after any cart write**, whatever
    the command declares; it reads no command's `emits` (ADR-0101).
 

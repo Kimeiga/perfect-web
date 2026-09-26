@@ -110,6 +110,13 @@ impl Graph {
     /// was deferred forever, since no menu is keyed by an item, and a value at
     /// one position matched a key at another.
     pub fn listens(&self, listener: &str, event: &str, values: &[String], key: &[String]) -> bool {
+        let key: Vec<Option<&str>> = key.iter().map(|k| Some(k.as_str())).collect();
+        self.binds(listener, event, values, &key)
+    }
+
+    /// [`Graph::listens`], for an entry whose key may be known only in part:
+    /// a position that is `None` matches any value.
+    fn binds(&self, listener: &str, event: &str, values: &[String], key: &[Option<&str>]) -> bool {
         let params = self
             .node(listener)
             .map(|n| n.params.as_slice())
@@ -124,11 +131,74 @@ impl Graph {
                         .get(i)
                         .and_then(|arg| params.iter().position(|p| p == arg))
                     {
-                        Some(j) => key.get(j) == Some(value),
+                        Some(j) => key.get(j).is_some_and(|k| k.is_none_or(|k| k == value)),
                         None => true,
                     }
                 })
             })
+    }
+
+    /// **Does `event` carrying `values` reach `node`'s entry keyed `key`?**
+    /// (ADR-0102)
+    ///
+    /// It does when the node listens for the event and binds the entry, and
+    /// when the node reads a node the event reaches, at the key its read
+    /// supplies. Charter §9.4 makes a materialization a view over what it
+    /// reads, and the compiler's `Graph::affected_by` follows reads the same
+    /// way. Until 2026-09-26 an event reached its direct listeners only: a
+    /// store's change dropped the store and left the fragment built from it.
+    ///
+    /// A read's key is the reader's arguments as written: `Store(id)` passes
+    /// the reader's `id` as the store's first parameter. A position the read
+    /// does not fill from a parameter is not known, and matches any value: an
+    /// entry invalidated needlessly costs a regeneration, and one missed is a
+    /// stale page.
+    pub fn reaches(&self, node: &str, event: &str, values: &[String], key: &[String]) -> bool {
+        let key: Vec<Option<&str>> = key.iter().map(|k| Some(k.as_str())).collect();
+        self.reaches_from(node, event, values, &key, &mut Vec::new())
+    }
+
+    /// [`Graph::reaches`], along one path of reads. A node already on the
+    /// path is not read again, so a cycle of reads ends.
+    fn reaches_from(
+        &self,
+        node: &str,
+        event: &str,
+        values: &[String],
+        key: &[Option<&str>],
+        path: &mut Vec<String>,
+    ) -> bool {
+        if self.binds(node, event, values, key) {
+            return true;
+        }
+        if path.iter().any(|p| p == node) {
+            return false;
+        }
+        path.push(node.to_string());
+        let params = self
+            .node(node)
+            .map(|n| n.params.as_slice())
+            .unwrap_or_default();
+        let found = self
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::Reads && e.from == node)
+            .any(|e| {
+                let width = self
+                    .node(&e.to)
+                    .map_or(e.key.len(), |n| n.params.len().max(e.key.len()));
+                let supplied: Vec<Option<&str>> = (0..width)
+                    .map(|i| {
+                        e.key
+                            .get(i)
+                            .and_then(|arg| params.iter().position(|p| p == arg))
+                            .and_then(|j| key.get(j).copied().flatten())
+                    })
+                    .collect();
+                self.reaches_from(&e.to, event, values, &supplied, path)
+            });
+        path.pop();
+        found
     }
 
     /// Everything that declared `invalidates_on <event>`.

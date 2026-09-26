@@ -308,11 +308,12 @@ awaited in order. What remains:
   it emits carries the key of the entry it wrote. A reader with a positive
   `freshness` is exempt (A-026), and a row naming only the family,
   `!{ database }`, matches nothing (A-025).
-- **A materialization is not reached through what it reads** (ADR-0101).
-  The materializer invalidates the direct listeners of a committed event
-  and nothing that depends on them. A-009's `MenuFragment` depends on
-  `Store(id)`, and a `StoreChanged` drops the store and leaves the fragment
-  built from it (NEXT).
+- **A command's write is held to its readers, not to the fragments built
+  from them** (ADR-0102). A materialization regenerates only
+  `on_invalidation`, so it has no staleness window of its own. One built
+  from a query that PW5106 exempts for its window keeps what it rendered
+  after a write until an event reaches it, and nothing requires the command
+  to emit one (NEXT).
 - **The dev server emits `CartChanged` after any cart write**, whatever the
   command declares; it reads no command's `emits` (ADR-0101). A command that
   emits nothing works there and nowhere else (NEXT).

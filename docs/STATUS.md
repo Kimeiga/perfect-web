@@ -78,6 +78,20 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: the materializer stopped at an event's
+listeners**
+([ADR-0102](DECISIONS/ADR-0102-an-event-reaches-what-reads-what-it-invalidates.md)).
+The compiler's graph says an event reaches its listeners and whatever reads
+them, and charter §9.4 makes a fragment a view over what it reads. The
+materializer invalidated the direct listeners only. A-009's `MenuFragment`
+depends on a `Store` that listens for `StoreChanged`, and kept the old store
+after one. The store demo never showed this, because its fragment listens for
+every event itself. An event now reaches each entry that reads what it
+reaches, at the key the read supplies.
+
+Evidence: [read-through.txt](evidence/E10/read-through.txt)
+(`just e10-read-through`).
+
 **Correction, 2026-09-26: a command's write reached no reader, in the
 accepted corpus too**
 ([ADR-0101](DECISIONS/ADR-0101-a-command-invalidates-what-it-writes.md)). A

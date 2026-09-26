@@ -64,8 +64,8 @@ MUTANTS = [
     (
         "an event's values are read as a set",
         MATERIALIZE,
-        "                if !g.listens(&key.fragment, &c.event.name, &c.event.args, &key.key) {",
-        "                if !c.event.args.is_empty() && !c.event.args.iter().all(|a| key.key.contains(a)) {",
+        "                if !g.reaches(&key.fragment, &c.event.name, &c.event.args, &key.key) {",
+        "                if !(g.listeners_for(&c.event.name).contains(&key.fragment) && (c.event.args.is_empty() || c.event.args.iter().all(|a| key.key.contains(a)))) {",
     ),
     (
         "a position `_` binds must match",
@@ -76,8 +76,8 @@ MUTANTS = [
     (
         "a value matches any part of the key",
         GRAPH,
-        "                        Some(j) => key.get(j) == Some(value),",
-        "                        Some(_) => key.contains(value),",
+        "                        Some(j) => key.get(j).is_some_and(|k| k.is_none_or(|k| k == value)),",
+        "                        Some(_) => key.contains(&Some(value.as_str())),",
     ),
 ]
 
