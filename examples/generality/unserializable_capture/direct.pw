@@ -4,10 +4,14 @@
 module generality.resume_direct
 
 import domain.{ DatabaseConnection }
-import Database
+
+// Performs nothing. The handler called `connection.flush()`, which is
+// `Database.flush`'s `database.connect`: the origin's to perform, which a
+// handler, run in the browser, may not (ADR-0113). One defect per witness.
+fn flush(c: DatabaseConnection) -> () !{} { todo }
 
 view AdminPanel(connection: DatabaseConnection) !{} {
-    <button on:press={resumable(captures = { connection }) => connection.flush()}>
+    <button on:press={resumable(captures = { connection }) => flush(connection)}>
         Flush
     </button>
 }

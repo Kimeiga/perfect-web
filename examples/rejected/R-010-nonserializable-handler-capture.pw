@@ -15,12 +15,17 @@
 module admin.panel
 
 import domain.{ DatabaseConnection }
-import Database
+
+// Performs nothing. The handler called `connection.flush()`, which is
+// `Database.flush`'s `database.connect`: the origin's to perform, which a
+// handler, run in the browser, may not. A second defect, reported since
+// 2026-09-26 (ADR-0113).
+fn flush(c: DatabaseConnection) -> () !{} { todo }
 
 view AdminPanel(connection: DatabaseConnection) !{} {
     <button
         // ERROR: capturing a live database connection in a resumable handler.
-        on:press={resumable(captures = { connection }) => connection.flush()}
+        on:press={resumable(captures = { connection }) => flush(connection)}
     >
         Flush
     </button>

@@ -809,3 +809,13 @@ imported name carried no label: R-003's secret in markup and R-006's secret in
 a public log passed `pw check` written with `import secrets.{ payments }` and
 `import log.{ public }`. A callee is resolved as the unit sees it now, and a
 value PW5001 refuses a shared cache is not reported again by PW5004.
+
+## 2026-09-26: a resumable handler runs in the browser (E10)
+
+[ADR-0113](DECISIONS/ADR-0113-a-resumable-handler-runs-in-the-browser.md): a
+handler calling `Carts.add` itself passed `pw check`, and `pw emit-handlers`
+refused it. The page's contract leaves its handlers out, and a handler has
+none, so nothing asked where its effects run. What a handler performs itself,
+beside the commands it calls, is the browser's to grant now (PW5005). R-010
+and a witness flushed a connection from the browser, a second defect, and
+are corrected.

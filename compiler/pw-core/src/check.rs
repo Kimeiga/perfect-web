@@ -136,6 +136,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(keys_name_what_is_read(&sigs, i, &u.hir));
         // ADR-0110: a resumable handler reads what it captures.
         per_unit.extend(handlers_read_their_captures(&sigs, i, &u.hir));
+        // ADR-0113: and performs only what the browser may.
+        per_unit.extend(handlers_run_in_the_browser(
+            &inference, &ontology, &workspace, &hirs, i, &u.hir,
+        ));
         // ADR-0098: a name is written once where it is declared.
         per_unit.extend(declared_once(&u.hir));
         // ADR-0091: a listener binds its declaration's key.
@@ -1379,6 +1383,107 @@ fn handlers_read_their_captures(sigs: &Signatures, unit: usize, hir: &Hir) -> Ve
                         }],
                     });
                 }
+            }
+        }
+    }
+    out
+}
+
+/// **A resumable handler runs in the browser** (ADR-0113).
+///
+/// It is loaded and run there when its element is pressed, and it reaches
+/// the origin through a command: the command is its own component, with its
+/// own contract (`contract.rs`), so a call to one performs nothing here. What
+/// the handler performs itself is the browser's to grant. Until 2026-09-26 a
+/// handler calling `Carts.add` itself checked, and nothing asked where it
+/// ran: the page's contract leaves its handlers out, and the handler has none.
+fn handlers_run_in_the_browser(
+    inference: &crate::effects::Inference,
+    platform: &dyn Placements,
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    use crate::resolve::Resolution;
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+            continue;
+        };
+        for lambda in body.walk() {
+            let Expr::Lambda {
+                descriptor: Some(d),
+                body: inner,
+                ..
+            } = body.expr(lambda)
+            else {
+                continue;
+            };
+            if !crate::resume::is_resumable(body, *d) {
+                continue;
+            }
+            // The calls to a command: a request, which the command performs.
+            let commands: Vec<crate::diagnostics::Span> = body
+                .walk_from(*inner)
+                .into_iter()
+                .filter(|e| {
+                    let Expr::Call { callee, .. } = body.expr(*e) else {
+                        return false;
+                    };
+                    let path = path_of(body, *callee);
+                    let resolution = match path.contains('.') {
+                        true => workspace.resolve_path(unit, &path),
+                        false => workspace.resolve(unit, &path),
+                    };
+                    matches!(
+                        resolution,
+                        Resolution::Local(def) | Resolution::Imported { def, .. }
+                            if crate::resolve::declaration(hirs, def)
+                                .is_some_and(|c| c.kind == DeclKind::Command)
+                    )
+                })
+                .map(|e| body.expr_span(e))
+                .collect();
+            let mut reported = BTreeSet::new();
+            for s in inference.infer_rooted(unit, body, *inner).sources {
+                let requested = commands
+                    .iter()
+                    .any(|c| s.span.start >= c.start && s.span.end <= c.end);
+                if requested
+                    || World::Browser.grants(&s.effect, platform) != crate::placement::Grant::No
+                    || !reported.insert(s.effect.clone())
+                {
+                    continue;
+                }
+                out.push(Diagnostic {
+                    code: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.id,
+                    invariant: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.invariant,
+                    reason: "handler_performs_outside_the_browser",
+                    detector: Detector::PatternMatrix,
+                    severity: Severity::Error,
+                    message: format!(
+                        "`{}`'s handler performs `{}`, which the browser cannot grant",
+                        decl.name, s.effect
+                    ),
+                    primary_span: s.span.clone(),
+                    related: vec![Related {
+                        span: body.expr_span(*d),
+                        label: "a resumable handler runs in the browser".to_string(),
+                    }],
+                    explanation: Some(format!(
+                        "A resumable handler is loaded and run in the browser when its \
+                         element is pressed. It reaches the origin through a command, \
+                         which is its own component with its own contract, so what the \
+                         command performs is not the handler's. `{}` is performed by the \
+                         handler itself, and the browser cannot grant it.",
+                        s.effect
+                    )),
+                    repairs: vec![Repair {
+                        description: "move it into a command, and call the command".to_string(),
+                        replacement: None,
+                    }],
+                });
             }
         }
     }

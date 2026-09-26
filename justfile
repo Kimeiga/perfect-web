@@ -1444,6 +1444,20 @@ e10-privacy-by-resolution:
      } > docs/evidence/E10/privacy-by-resolution.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/privacy-by-resolution.txt
 
+# ADR-0113: a resumable handler runs in the browser. The test, and the
+# mutation controls.
+e10-handlers-in-the-browser:
+    @{ echo "ADR-0113 - a resumable handler runs in the browser"; echo; \
+       echo "produced by: just e10-handlers-in-the-browser"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== handlers in the browser (compiler/pw-core/tests/handlers_in_the_browser.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers_in_the_browser 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/handler_placement_mutations.py)"; echo; \
+       python3 scripts/handler_placement_mutations.py; \
+     } > docs/evidence/E10/handlers-in-the-browser.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-in-the-browser.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

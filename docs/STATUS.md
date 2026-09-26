@@ -78,6 +78,18 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a handler wrote the database from the browser**
+([ADR-0113](DECISIONS/ADR-0113-a-resumable-handler-runs-in-the-browser.md)).
+The store's Add handler written `Carts.add(current_session(), item.id,
+PositiveInt(1))`, rather than as a call to `add_to_cart`, passed `pw check`,
+and `pw emit-handlers` refused it. The page's contract leaves its handlers
+out, since a command has its own, and nothing asked where a handler's own
+effects run. They are the browser's to grant now (PW5005). R-010 and a
+generality witness each had this second defect, and each is corrected.
+
+Evidence: [handlers-in-the-browser.txt](evidence/E10/handlers-in-the-browser.txt)
+(`just e10-handlers-in-the-browser`).
+
 **Correction, 2026-09-26: a secret reached the browser and a public log,
 by the spelling of an import**
 ([ADR-0112](DECISIONS/ADR-0112-a-calls-privacy-is-the-declaration-it-resolves-to.md)).
