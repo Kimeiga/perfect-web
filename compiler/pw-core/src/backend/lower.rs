@@ -424,7 +424,7 @@ pub fn handler(
     // What each captured path is: its root's type, then each field's. The
     // root is typed by the binding its name means where the descriptor
     // writes it (ADR-0063).
-    let types = crate::infer::Types::of_body(cx.sigs, decl, body, hir.module_of(decl_id));
+    let types = crate::infer::Types::of_decl(cx.sigs, hir, decl_id, body);
     let roots = descriptor
         .map(|d| crate::resume::capture_roots(body, d))
         .unwrap_or_default();

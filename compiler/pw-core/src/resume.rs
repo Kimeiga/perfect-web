@@ -183,9 +183,9 @@ pub fn check(
         // nothing else. `Types` follows a chain and `Labels` follows a value,
         // so a capture that is a field, a rebinding or a branch is answered
         // the same way as a bare parameter.
-        let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
+        let types = crate::infer::Types::of_decl(sigs, hir, id, body);
         let imports = crate::labels::imported_modules(hir);
-        let labels = crate::labels::Labels::of_body(sigs, decl, body, hir.module_of(id), &imports);
+        let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports);
         // **Where the manifest lands.** A resume manifest ships with its
         // document, so what it may hold is what that document may hold.
         let destination = manifest_scope(hir, decl);

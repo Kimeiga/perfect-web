@@ -44,7 +44,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         // Resolved by receiver TYPE. `self.style.set_padding(..)` is
         // `ElementRef` -> `Style` -> a member of `Style`; no step asks whether
         // `set_padding` happens to be unique in the program.
-        let types = Types::of_body(sigs, decl, body, hir.module_of(id));
+        let types = Types::of_decl(sigs, hir, id, body);
         frame_transaction_order(body, &types, decl, &at, out);
         observation_feedback(body, &types, decl, &at, out);
         compositor_animation(body, sigs, decl, &at, out);

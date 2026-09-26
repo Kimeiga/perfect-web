@@ -68,7 +68,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
             continue;
         }
         let at = hir.decl_span(id);
-        let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
+        let types = crate::infer::Types::of_decl(sigs, hir, id, body);
         let mut owned = acquisitions(body, sigs, &types);
         owned.extend(released_parameters(hir, sigs, id, decl, body));
         for a in owned {

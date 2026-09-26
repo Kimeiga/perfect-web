@@ -15,12 +15,16 @@
 module store.browser_widget
 
 import Stores
-import domain.{ StoreId }
+// `Store` and `StoreError` are imported, and `load` declares the `Result`
+// `Stores.get` answers with, since 2026-09-26. A nested declaration's
+// annotations were never resolved until then, so the missing import and the
+// wrong result were two more defects nothing reported (ADR-0066).
+import domain.{ StoreId, Store, StoreError }
 
 component StoreBadge(store_id: StoreId) {
     placement browser
 
-    fn load() -> Store !{ database.read<Stores> } {
+    fn load() -> Result<Store, StoreError> !{ database.read<Stores> } {
         // ERROR: no database capability exists in the browser world.
         Stores.get(store_id)
     }

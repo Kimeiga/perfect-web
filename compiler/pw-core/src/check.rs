@@ -122,7 +122,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     }
     for (i, u) in units.iter().enumerate() {
         let per_unit = resolution.entry(i).or_default();
-        per_unit.extend(unresolved_uses(&workspace, &hirs, i, &u.hir));
+        per_unit.extend(unresolved_uses(&workspace, &sigs, &hirs, i, &u.hir));
         // ADR-0047: a name used as a value resolves too, in lexical scope.
         per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));
         // Every effect row, against the declarations. Reported beside the
@@ -197,6 +197,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
 /// is left alone until types exist.
 fn unresolved_uses(
     workspace: &crate::resolve::Workspace,
+    sigs: &Signatures,
     hirs: &[&Hir],
     unit: usize,
     hir: &Hir,
@@ -204,14 +205,21 @@ fn unresolved_uses(
     use crate::resolve::Resolution;
 
     let mut out = Vec::new();
-    for (_, decl) in hir.all_decls() {
+    // A declaration can call itself and its siblings.
+    let declared: std::collections::BTreeSet<String> =
+        hir.all_decls().map(|(_, d)| d.name.clone()).collect();
+    for (decl_id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
+        // Which binding a callee's name means where the call is written: a
+        // call to a function value out of its binding's scope names nothing
+        // (ADR-0066). The set below held every name the body bound anywhere,
+        // so such a call passed.
+        let lexical = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, decl_id);
 
         let mut in_scope = crate::resolve::local_bindings(body);
         in_scope.extend(decl.params.iter().map(|p| p.name.clone()));
-        // A declaration can call itself and its siblings.
-        in_scope.extend(hir.all_decls().map(|(_, d)| d.name.clone()));
+        in_scope.extend(declared.iter().cloned());
 
         // **The body, PLUS every embedded transition.**
         //
@@ -293,7 +301,16 @@ fn unresolved_uses(
                 // CSS value function. `tests/semantic_ownership.rs` is the gate
                 // that made the class small enough to report — it names every
                 // owner, and the residue it leaves is what this reports.
-                if bare_call_is_unowned(workspace, unit, &path, &in_scope) {
+                let unowned = match &lexical {
+                    // A local in scope where the call is written is the value
+                    // it holds; any other name must be a declaration's.
+                    Some(lx) if matches!(body.expr(*callee), Expr::Name(_)) => {
+                        lx.binder(*callee).is_none()
+                            && bare_call_is_unowned(workspace, unit, &path, &declared)
+                    }
+                    _ => bare_call_is_unowned(workspace, unit, &path, &in_scope),
+                };
+                if unowned {
                     // `Circle(3)`: a case, which is built through its type
                     // (ADR-0059). The types it sees that declare one.
                     let owners: Vec<String> = workspace
@@ -473,7 +490,6 @@ fn optimistic_transitions_agree_with_their_target(
     for (_, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        let module = hir.module_of(decl_id_of(hir, decl)).map(str::to_string);
         for (policy, target, transition) in decl.optimistic_clauses() {
             // The target names a resource. `Cart(current_session())` — the
             // callee, not the argument.
@@ -502,7 +518,7 @@ fn optimistic_transitions_agree_with_their_target(
             // The binder IS the target's value type; the transition must
             // produce it. Seeded rather than inferred — nothing in the body
             // says what `cart` is, because the clause's header does.
-            let mut types = crate::infer::Types::of_body(sigs, decl, body, module.as_deref());
+            let mut types = crate::infer::Types::of_decl(sigs, hir, decl_id_of(hir, decl), body);
             // Each binder by where it is bound: its term's place among the
             // declaration's (ADR-0063).
             let term = decl
@@ -2591,7 +2607,7 @@ fn privacy_sinks(
     let imports = crate::labels::imported_modules(hir);
     // Labels belong to VALUES. `labels.rs` explains why this is not a map from
     // binding name to restriction any more.
-    let labels = crate::labels::Labels::of_body(sigs, decl, body, hir.module_of(id), &imports);
+    let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports);
 
     for id in body.walk() {
         let Expr::Call { callee, args } = body.expr(id) else {
@@ -2718,7 +2734,7 @@ fn privacy_flow(
     // name to restriction, so `let shown = if dry_run { "none" } else { key }`
     // rendered a secret that the rule could not see — the same narrowness the
     // sink rule had, in the one place that had not been migrated with it.
-    let labels = crate::labels::Labels::of_body(sigs, decl, body, hir.module_of(id), &imports);
+    let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports);
     for id in body.walk() {
         let Expr::Template { parts, .. } = body.expr(id) else {
             continue;
@@ -2867,7 +2883,7 @@ fn template_blocks(
     if roots.is_empty() {
         return;
     }
-    let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
+    let types = crate::infer::Types::of_decl(sigs, hir, id, body);
     let at = hir.decl_span(id);
     let related = || {
         vec![Related {
@@ -3610,7 +3626,7 @@ fn effect_rows(
     //
     // Two constructions of one environment is how the narrower one silently
     // wins, which is exactly what happened.
-    let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
+    let types = crate::infer::Types::of_decl(sigs, hir, id, body);
     let mut found = inference.infer_in_at(at, body, &types);
 
     // **Plus the named roots that ARE this declaration's work.**

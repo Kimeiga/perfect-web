@@ -90,9 +90,10 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    (ADR-0064), with an undeclared call's receiver;
 2. ~~a value with a hole that means any type~~, done (ADR-0065): 41 of the
    store's undecided relations to 1, 20 of kiokun's to 1;
-3. the name check and the call check read scopes as `crate::lexical` does:
-   a call to a function value outside its scope is not reported, and
-   `(x) => x + 1` does not bind its `x` (both found 2026-09-26);
+3. ~~the call check reads scopes~~, done (ADR-0066), with what it found: a
+   nested function read its enclosing body's secret unlabelled, and a nested
+   declaration's annotations never resolved. Next, the name check's own scope
+   walk onto `crate::lexical`;
 4. a function passed to a generic declaration in the backend (found writing
    ADR-0062's tests), then a generic type at the boundary, a WIT type per
    instance;

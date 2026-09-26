@@ -1208,6 +1208,14 @@ impl Lowerer<'_> {
                     None => b.pat(Pattern::Error, span),
                 }
             }
+            // `(x) => ..`: one parameter in parentheses. It was read as a
+            // descriptor, like `resumable(..)`, so `x` was bound to nothing
+            // and its use did not resolve (PW0021) until 2026-09-26
+            // (ADR-0066).
+            K::ParenExpr => match node.children().next() {
+                Some(c) => self.param_pattern(b, &c),
+                None => b.pat(Pattern::Error, span),
+            },
             K::ParamList | K::TupleExpr | K::ListExpr => {
                 let args = node.children().map(|c| self.param_pattern(b, &c)).collect();
                 b.pat(
@@ -1609,7 +1617,10 @@ fn is_markup(k: K) -> bool {
 /// Can this node stand in a lambda's parameter position as a binding?
 /// Anything else there is an annotation, kept as an expression.
 fn is_param_shaped(k: K) -> bool {
-    matches!(k, K::NameExpr | K::ParamList | K::TupleExpr | K::ListExpr)
+    matches!(
+        k,
+        K::NameExpr | K::ParamList | K::TupleExpr | K::ListExpr | K::ParenExpr
+    )
 }
 
 fn is_pattern(k: K) -> bool {

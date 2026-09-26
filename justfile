@@ -756,6 +756,23 @@ e10-any:
      } > docs/evidence/E10/any.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/any.txt
 
+# ADR-0066: a nested declaration sees the bindings around it. Its tests, and
+# the mutation controls.
+e10-nested:
+    @{ echo "ADR-0066 - a nested declaration sees the bindings around it"; echo; \
+       echo "produced by: just e10-nested"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== nested declarations, streams, clauses, calls (compiler/pw-core/tests/nested_scope.rs)"; echo; \
+       cargo test --locked -p pw-core --test nested_scope 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/nested_scope_mutations.py)"; echo; \
+       python3 scripts/nested_scope_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: one scope walk for the name check. names.rs keeps its own,"; \
+       echo "which binds a keyword statement's first word where the resolver does not."; \
+     } > docs/evidence/E10/nested.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/nested.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

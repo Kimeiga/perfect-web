@@ -424,3 +424,13 @@ mentions hold at every type their hole could be, and the value relations
 decide them. A variable such a value meets is not fixed by it, a function's
 link between its parameter and its result is kept, and a `let mut` holds one
 type, completed by an assignment.
+
+## 2026-09-26: a nested declaration sees the bindings around it (E10)
+
+[ADR-0066](DECISIONS/ADR-0066-a-nested-declaration-sees-around-it.md): a
+declaration nested in another sees the enclosing parameters and the bindings
+in scope where it is written, typed and labelled as the enclosing declaration
+has them, and is in its module. A stream's parts and a release clause's name
+are resolved; a call's callee is the binding in scope or a declaration;
+`(x) =>` binds. It fixes a secret logged publicly through a nested function,
+and a nested declaration's annotations, which never resolved.

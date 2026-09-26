@@ -499,7 +499,8 @@ pub(crate) fn type_of(
     body: &Body,
     e: ExprId,
 ) -> (Ty, String) {
-    let typer = Typer::new(sigs, ws, at, module, decl, body);
+    let lexical = Lexical::build(sigs, Some(at), decl, body);
+    let typer = Typer::new(sigs, ws, at, module, decl, body, lexical, Vec::new());
     let t = typer.of(e);
     let name = typer.display(&t);
     (t, name)
@@ -713,6 +714,10 @@ fn is_ident(s: &str) -> bool {
 const ROUNDS: usize = 8;
 
 impl<'a> Typer<'a> {
+    /// A typer for `decl`'s body, reading names by `lexical`. `outer` types
+    /// the bindings around a nested declaration, in the order the resolution
+    /// numbers them (ADR-0066).
+    #[allow(clippy::too_many_arguments)]
     fn new(
         sigs: &'a Signatures,
         ws: &'a Workspace,
@@ -720,9 +725,9 @@ impl<'a> Typer<'a> {
         module: Option<&'a str>,
         decl: &'a Decl,
         body: &'a Body,
+        lexical: Lexical,
+        outer: Vec<Ty>,
     ) -> Typer<'a> {
-        let lexical = Lexical::build(sigs, Some(at), decl, body);
-
         let mut piped = BTreeMap::new();
         for id in body.walk() {
             if let Expr::Binary {
@@ -736,8 +741,14 @@ impl<'a> Typer<'a> {
         }
 
         // What the program writes: each parameter's declared type, and each
-        // annotated `let`'s.
+        // annotated `let`'s. Around a nested declaration, what its enclosing
+        // declaration's bindings were typed as there (ADR-0066).
         let mut locals = BTreeMap::new();
+        for (i, t) in outer.into_iter().enumerate() {
+            if !t.is_unknown() {
+                locals.insert(Binder::Outer(i as u32), t);
+            }
+        }
         for (i, p) in decl.params.iter().enumerate() {
             if let Some(t) = &p.ty
                 && let Some(ty) = sigs
@@ -1792,6 +1803,30 @@ impl<'a> Typer<'a> {
                 added |= self.bind(Binder::Each(node), element.clone());
             }
         }
+        // `release(h) { .. }`: what the resource's `acquire { .. }` produced,
+        // its success where it can fail.
+        for (clause, acquired) in self.lexical.released() {
+            let t = match self.of(acquired) {
+                Ty::Builtin(Builtin::Result, mut args) if args.len() == 2 => args.swap_remove(0),
+                t => t,
+            };
+            added |= self.bind(Binder::Clause(clause, 0), t);
+        }
+        // `<ready as={x}>`: the stream's answer when it succeeds, and
+        // `<failed as={e}>` its failure.
+        for (node, query, ok) in self.lexical.stream_parts() {
+            let t = match (self.of(query), ok) {
+                (Ty::Builtin(Builtin::Result, mut args), true) if args.len() == 2 => {
+                    args.swap_remove(0)
+                }
+                (Ty::Builtin(Builtin::Result, mut args), false) if args.len() == 2 => {
+                    args.swap_remove(1)
+                }
+                (t, true) => t,
+                (_, false) => Ty::Unknown,
+            };
+            added |= self.bind(Binder::Stream(node), t);
+        }
         // `{:Some(x)}`, `{:Rect(w, h)}`: each name is its field of the case
         // the block's subject holds, as a match arm's is.
         for (node, subject) in self.lexical.template_arms() {
@@ -2428,14 +2463,30 @@ pub(crate) fn lambda_binders(
 /// [`analysis`] use, so the two cannot disagree about which relations exist.
 pub fn relations(hir: &Hir, sigs: &Signatures, ws: &Workspace, at: UnitId) -> Vec<ValueRelation> {
     let mut out = Vec::new();
+    // Each declaration's bindings as typed, for the declarations nested in
+    // it, which come after it (ADR-0066).
+    let mut typed: BTreeMap<DeclId, BTreeMap<Binder, Ty>> = BTreeMap::new();
     for (id, decl) in hir.all_decls() {
         annotations(hir, sigs, ws, at, id, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        let typer = Typer::new(sigs, ws, at, hir.module_of(id), decl, body);
+        let lexical = Lexical::build_in(sigs, Some(at), hir, id)
+            .unwrap_or_else(|| Lexical::build(sigs, Some(at), decl, body));
+        let outer: Vec<Ty> = lexical
+            .outer_bindings()
+            .map(|(d, b)| {
+                typed
+                    .get(&d)
+                    .and_then(|l| l.get(&b))
+                    .cloned()
+                    .unwrap_or(Ty::Unknown)
+            })
+            .collect();
+        let typer = Typer::new(sigs, ws, at, hir.module_of(id), decl, body, lexical, outer);
         typer.relations(&mut out);
         typer.term_relations(&mut out);
         returns(&typer, sigs, at, id, decl, &mut out);
+        typed.insert(id, typer.locals.borrow().clone());
     }
     out
 }

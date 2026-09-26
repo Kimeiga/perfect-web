@@ -45,7 +45,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Node};
+use crate::hir::{Body, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Node};
 use crate::lexical::{Binder, Lexical};
 use crate::resolved::{self, Builtin, ResolvedType};
 use crate::signatures::Signatures;
@@ -88,7 +88,44 @@ impl<'a> Types<'a> {
         module: Option<&str>,
     ) -> Types<'a> {
         let lexical = Lexical::build(sigs, sigs.unit_of(module), decl, body);
+        Types::with(sigs, decl, body, module, lexical, Vec::new())
+    }
+
+    /// **The same, for the declaration `id` of `hir`, where it may be nested
+    /// in another** (ADR-0066): the bindings around it are typed as its
+    /// enclosing declaration types them.
+    pub fn of_decl(sigs: &'a Signatures, hir: &Hir, id: DeclId, body: &Body) -> Types<'a> {
+        let decl = hir.decl(id);
+        let module = hir.module_of(id);
+        let at = sigs.unit_of(module);
+        let Some(lexical) = Lexical::build_in(sigs, at, hir, id) else {
+            return Types::of_body(sigs, decl, body, module);
+        };
+        let parent = crate::lexical::enclosing(hir, id).and_then(|p| {
+            let b = hir.decl(p).body?;
+            Some(Types::of_decl(sigs, hir, p, hir.body(b)))
+        });
+        let outer = lexical
+            .outer_bindings()
+            .map(|(_, b)| parent.as_ref().and_then(|t| t.bindings.get(&b).cloned()))
+            .collect();
+        Types::with(sigs, decl, body, module, lexical, outer)
+    }
+
+    fn with(
+        sigs: &'a Signatures,
+        decl: &Decl,
+        body: &Body,
+        module: Option<&str>,
+        lexical: Lexical,
+        outer: Vec<Option<ResolvedType>>,
+    ) -> Types<'a> {
         let mut bindings: BTreeMap<Binder, ResolvedType> = BTreeMap::new();
+        for (i, t) in outer.into_iter().enumerate() {
+            if let Some(t) = t {
+                bindings.insert(Binder::Outer(i as u32), t);
+            }
+        }
 
         for (i, p) in decl.params.iter().enumerate() {
             if let Some(t) = &p.ty
@@ -153,8 +190,46 @@ impl<'a> Types<'a> {
         // An E9 slice, pulled forward because E7 genuinely requires it:
         // milestone numbering must not force knowingly unsound semantics.
         //
-        // A collection named by a binding: a parameter's, a `let`'s. The
-        // binding is the one the name means where the block is written.
+        // A collection named by a binding: a parameter's, a `let`'s, a
+        // stream part's. The binding is the one the name means where the
+        // block is written.
+        //
+        // A stream's `<ready as={x}>` is its query's success, and
+        // `<failed as={e}>` its failure (ADR-0066).
+        // A `release(h) { .. }` clause's `h` is what its resource's
+        // `acquire { .. }` produced, its success where it can fail.
+        let released: Vec<_> = types.lexical.released().collect();
+        for (clause, acquired) in released {
+            let last = match body.expr(acquired) {
+                Expr::Block { stmts } => stmts.last().copied(),
+                _ => Some(acquired),
+            };
+            let Some(t) = last.and_then(|e| types.of(body, e)) else {
+                continue;
+            };
+            let value = match t.as_builtin() {
+                Some(Builtin::Result) => t.args().first().cloned(),
+                _ => Some(t),
+            };
+            if let Some(v) = value {
+                types.bindings.insert(Binder::Clause(clause, 0), v);
+            }
+        }
+        let parts: Vec<_> = types.lexical.stream_parts().collect();
+        for (n, query, ok) in parts {
+            let Some(t) = types.of(body, query) else {
+                continue;
+            };
+            let part = match (t.as_builtin(), ok) {
+                (Some(Builtin::Result), true) => t.args().first().cloned(),
+                (Some(Builtin::Result), false) => t.args().get(1).cloned(),
+                (_, true) => Some(t),
+                (_, false) => None,
+            };
+            if let Some(p) = part {
+                types.bindings.insert(Binder::Stream(n), p);
+            }
+        }
         let eaches: Vec<(crate::hir::NodeId, Option<Binder>)> = types
             .lexical
             .each_blocks()

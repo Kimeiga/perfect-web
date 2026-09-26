@@ -1075,10 +1075,22 @@ impl Hir {
     /// Inference needs this, so it is an input to inference rather than
     /// something bolted on afterwards — see `Types::of_body`.
     pub fn module_of(&self, decl: DeclId) -> Option<&str> {
-        self.modules
+        if let Some((_, m, _)) = self
+            .modules
             .iter()
             .find(|(_, m, _)| m.decls.contains(&decl))
-            .map(|(_, m, _)| m.name.as_str())
+        {
+            return Some(m.name.as_str());
+        }
+        // A declaration nested in another is in that one's module. A module
+        // lists only its top-level declarations, so until 2026-09-26 a nested
+        // one had none, and every annotation it wrote was left unresolved
+        // ("the annotation's declaring module is unavailable", ADR-0066).
+        let parent = self
+            .all_decls()
+            .find(|(_, d)| d.children.contains(&decl))
+            .map(|(p, _)| p)?;
+        self.module_of(parent)
     }
 
     /// Every declaration, nested ones included.

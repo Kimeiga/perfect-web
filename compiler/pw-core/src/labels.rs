@@ -101,13 +101,55 @@ impl<'a> Labels<'a> {
         decl: &Decl,
         body: &Body,
         module: Option<&'a str>,
+        imports: &'a [String],
+    ) -> Labels<'a> {
+        let types = crate::infer::Types::of_body(sigs, decl, body, module);
+        Labels::with(sigs, decl, body, module, imports, types, BTreeMap::new())
+    }
+
+    /// **The same, for the declaration `id` of `hir`, where it may be nested
+    /// in another** (ADR-0066). A binding around a nested declaration carries
+    /// the label it has in the enclosing declaration: a secret the enclosing
+    /// body holds is a secret where the nested function reads it. Until
+    /// 2026-09-26 it was unlabelled there, and a nested function logged it
+    /// publicly with nothing reported.
+    pub fn of_decl(
+        sigs: &'a Signatures,
+        hir: &'a crate::hir::Hir,
+        id: crate::hir::DeclId,
+        body: &Body,
+        imports: &'a [String],
+    ) -> Labels<'a> {
+        let decl = hir.decl(id);
+        let module = hir.module_of(id);
+        let types = crate::infer::Types::of_decl(sigs, hir, id, body);
+        let parent = crate::lexical::enclosing(hir, id).and_then(|p| {
+            let b = hir.decl(p).body?;
+            Some(Labels::of_decl(sigs, hir, p, hir.body(b), imports))
+        });
+        let mut outer = BTreeMap::new();
+        for (i, (_, b)) in types.lexical().outer_bindings().enumerate() {
+            if let Some(found) = parent.as_ref().and_then(|l| l.bindings.get(&b)) {
+                outer.insert(Binder::Outer(i as u32), found.clone());
+            }
+        }
+        Labels::with(sigs, decl, body, module, imports, types, outer)
+    }
+
+    fn with(
+        sigs: &'a Signatures,
+        decl: &Decl,
+        body: &Body,
+        module: Option<&'a str>,
         _imports: &'a [String],
+        types: crate::infer::Types<'a>,
+        outer: BTreeMap<Binder, (Label, Span)>,
     ) -> Labels<'a> {
         let mut me = Labels {
             sigs,
             module,
-            types: crate::infer::Types::of_body(sigs, decl, body, module),
-            bindings: BTreeMap::new(),
+            types,
+            bindings: outer,
             piped: BTreeMap::new(),
         };
 
@@ -243,6 +285,29 @@ impl<'a> Labels<'a> {
                             .entry(Binder::Pattern(q))
                             .or_insert((from.clone(), span));
                     }
+                }
+            }
+
+            // A `release(h) { .. }` clause's `h` carries what its resource
+            // acquired.
+            let released: Vec<_> = me.types.lexical().released().collect();
+            for (clause, acquired) in released {
+                let l = me.label(body, acquired);
+                if !l.is_public() {
+                    me.bindings
+                        .entry(Binder::Clause(clause, 0))
+                        .or_insert((l, body.expr_span(clause)));
+                }
+            }
+
+            // A stream's parts carry its query's label (ADR-0066).
+            let parts: Vec<_> = me.types.lexical().stream_parts().collect();
+            for (n, query, _) in parts {
+                let l = me.label(body, query);
+                if !l.is_public() {
+                    me.bindings
+                        .entry(Binder::Stream(n))
+                        .or_insert((l, body.node_span(n)));
                 }
             }
 

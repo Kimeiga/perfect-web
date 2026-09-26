@@ -28,8 +28,15 @@ MUTANTS = [
     (
         "a block's names outlive it",
         LEXICAL,
-        "                    self.statement(*s, scope);\n                }\n                scope.truncate(depth);",
-        "                    self.statement(*s, scope);\n                }",
+        "                            self.out.nested.insert(*child, scope.clone());\n"
+        "                        }\n"
+        "                    }\n"
+        "                }\n"
+        "                scope.truncate(depth);",
+        "                            self.out.nested.insert(*child, scope.clone());\n"
+        "                        }\n"
+        "                    }\n"
+        "                }",
     ),
     (
         "a lambda's parameters outlive it",

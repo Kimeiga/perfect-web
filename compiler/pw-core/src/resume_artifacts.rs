@@ -328,7 +328,7 @@ pub fn located(
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        let types = Types::of_body(sigs, decl, body, hir.module_of(id));
+        let types = Types::of_decl(sigs, hir, id, body);
         let document_schema = document_schema_of(body);
         for lambda in body.walk() {
             let Expr::Lambda {
@@ -360,7 +360,7 @@ pub fn check(src: &str, hir: &Hir, sigs: &Signatures, build: &str, out: &mut Vec
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        let types = Types::of_body(sigs, decl, body, hir.module_of(id));
+        let types = Types::of_decl(sigs, hir, id, body);
         let at = hir.decl_span(id);
         let document_schema = document_schema_of(body);
 

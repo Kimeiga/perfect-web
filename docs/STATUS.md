@@ -78,6 +78,23 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a secret read by a nested function was public, and
+a nested function's annotations checked nothing**
+([ADR-0066](DECISIONS/ADR-0066-a-nested-declaration-sees-around-it.md)).
+- **A secret through a nested function.** A `fn` nested in a `fn`, a
+  `command` or a `component` was analysed alone. A name it read from around
+  it had no type and no label, so a secret the enclosing body held, logged
+  publicly by the nested function, passed `pw check`. So did a secret field
+  of an enclosing parameter.
+- **Unresolved annotations.** A nested declaration had no module, so every
+  annotation its body was read by was unresolved. The rejected fixture R-002
+  hid two defects behind that: an unimported `Store`, and a `Store` declared
+  where a `Result` is answered. Both are corrected.
+- **Bindings only the name check knew.** A stream's `<ready as={x}>` and a
+  `release(h) { .. }` clause were resolved by the name check alone. A call to
+  a function value outside its scope passed, and `(x) => x + 1` did not bind
+  its `x`.
+
 **Correction, 2026-09-26: a secret passed through a generic function came
 out public** ([ADR-0064](DECISIONS/ADR-0064-a-label-through-a-call.md)). A
 call to a declared function was labelled by the declaration alone, and none
@@ -130,6 +147,19 @@ had no signature and the whole WIT package failed ("missing component
 signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
+
+**2026-09-26: a nested declaration sees the bindings around it**
+([ADR-0066](DECISIONS/ADR-0066-a-nested-declaration-sees-around-it.md)).
+- A nested declaration sees the enclosing declaration's parameters and the
+  bindings in scope where it is written. Each is typed and labelled as the
+  enclosing declaration has it.
+- A nested declaration is in its enclosing declaration's module.
+- A stream's parts, and a release clause's name, are resolved, typed and
+  labelled. A call's callee is the binding in scope, or a declaration.
+  `(x) =>` binds its `x`.
+- Not done: the name check keeps its own scope walk.
+
+Evidence: [nested.txt](evidence/E10/nested.txt) (`just e10-nested`).
 
 **2026-09-26: a value that holds at every type**
 ([ADR-0065](DECISIONS/ADR-0065-a-value-of-any-type.md)).
@@ -482,6 +512,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0066: a nested declaration sees the enclosing bindings in scope where
+  it is written, not every binding of the enclosing body.
 - ADR-0065: a declared function's result its arguments do not fix stays
   unknown rather than any type, since a host function may answer at no type
   its arguments fix.
