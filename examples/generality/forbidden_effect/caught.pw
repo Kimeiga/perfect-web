@@ -16,8 +16,14 @@ fn nearby(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fe
     Estimates.for_location(at)
 }
 
-fn label(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fetch } {
-    nearby(at)
+// A `String`, which a template writes as text. Until 2026-09-26 this answered
+// the `Result`, which a template takes apart with `{#match}`, and nothing
+// checked the hole (ADR-0074).
+fn label(at: Location) -> String !{ network.fetch } {
+    match nearby(at) {
+        Ok(_) => "soon",
+        Err(_) => "unavailable",
+    }
 }
 
 view Nearby(at: Location) !{ network.fetch } {

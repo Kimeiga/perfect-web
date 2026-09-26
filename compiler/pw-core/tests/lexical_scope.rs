@@ -150,7 +150,8 @@ fn a_record_shorthand_names_the_binding_in_scope() {
 
 // --- a template's names ----------------------------------------------------
 
-const TABLE: &str = "type Row = Row { name: String }\n\ntype Table = Table { rows: List<Row> }\n\n";
+const TABLE: &str =
+    "type Row = Row { name: String }\n\ntype Table = Table { title: String, rows: List<Row> }\n\n";
 
 #[test]
 fn an_each_blocks_name_is_an_element_of_its_collection() {
@@ -165,14 +166,16 @@ fn an_each_blocks_name_is_an_element_of_its_collection() {
 
 #[test]
 fn two_arms_binding_one_name_in_a_template_are_typed_apart() {
+    // `e.title`, a field with a text form. This wrote `e.rows` until ADR-0074,
+    // a list, which a template does not write as text.
     let wrong = program(&format!(
-        "{TABLE}page P(t: Option<Table>, w: Option<Row>) {{\n    view {{\n        {{#match t}}\n            {{:Some(e)}}\n                <p>{{e.rows}}</p>\n            {{:None}}\n        {{/match}}\n        {{#match w}}\n            {{:Some(e)}}\n                <p>{{e.rows}}</p>\n            {{:None}}\n        {{/match}}\n    }}\n}}"
+        "{TABLE}page P(t: Option<Table>, w: Option<Row>) {{\n    view {{\n        {{#match t}}\n            {{:Some(e)}}\n                <p>{{e.title}}</p>\n            {{:None}}\n        {{/match}}\n        {{#match w}}\n            {{:Some(e)}}\n                <p>{{e.title}}</p>\n            {{:None}}\n        {{/match}}\n    }}\n}}"
     ));
     let d = one(&wrong, "PW0610");
-    assert!(d.contains("rows"), "{d}");
+    assert!(d.contains("title"), "{d}");
     let right = wrong
-        .replacen("<p>{e.rows}</p>", "<p>{e.name}</p>", 2)
-        .replacen("<p>{e.name}</p>", "<p>{e.rows}</p>", 1);
+        .replacen("<p>{e.title}</p>", "<p>{e.name}</p>", 2)
+        .replacen("<p>{e.name}</p>", "<p>{e.title}</p>", 1);
     none(&right);
 }
 

@@ -881,6 +881,22 @@ e10-template-values:
      } > docs/evidence/E10/template-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/template-values.txt
 
+# ADR-0074: what a template writes has a text form. Its tests, ADR-0073's
+# (a computed list now checks, and does not build), and the mutation controls.
+e10-template-text:
+    @{ echo "ADR-0074 - what a template writes has a text form"; echo; \
+       echo "produced by: just e10-template-text"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== what a template writes (compiler/pw-core/tests/template_text.rs)"; echo; \
+       cargo test --locked -p pw-core --test template_text 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what a template reads by path (compiler/pw-core/tests/template_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test template_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/template_text_mutations.py)"; echo; \
+       python3 scripts/template_text_mutations.py; \
+     } > docs/evidence/E10/template-text.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/template-text.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

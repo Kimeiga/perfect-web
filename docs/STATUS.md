@@ -78,6 +78,28 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: ADR-0071 left `{:else if o}` over an `Option`
+related to nothing, and nothing related what a template writes**
+([ADR-0074](DECISIONS/ADR-0074-what-a-template-writes-has-a-text-form.md)).
+- **ADR-0071's gap.** Its truth relation left an `Option` or a `Result` to
+  PW0600, which reads only an `{#if}`'s subject. So `{:else if o}` over an
+  `Option` passed, and the renderer refuses it.
+- **What a template writes.** A list, a record, a function, a `Float` or an
+  `Option` in a text hole, an attribute or a URL's hole passed, and failed
+  when rendered. So did a boolean attribute given a case, a loop keyed on a
+  record, and a loop or a key read through a field the value does not have
+  (`{#each s.itemz}`, `(x.missing)`).
+- **Three fixtures were ill-typed.** Two generality witnesses read a field
+  a `StoreId` does not have and rendered a `Result`; the rejected R-037
+  keyed a loop on a `Float`. Each is corrected, and each still emits its
+  invariant alone.
+
+PW0609, PW0600 and PW0610 refuse each now. The store, kiokun and the
+accepted corpus check clean.
+
+Evidence: [template-text.txt](evidence/E10/template-text.txt)
+(`just e10-template-text`).
+
 **Correction, 2026-09-26: `pw build` wrote templates that fail every
 render, and keyed loops on the wrong field**
 ([ADR-0073](DECISIONS/ADR-0073-a-template-reads-each-value-by-path.md)).

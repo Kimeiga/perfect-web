@@ -602,8 +602,17 @@ impl Walk<'_> {
                 }
                 let mut scope = BTreeSet::new();
                 if let Some((collection, binding)) = each(&directive) {
-                    let head = collection.split('.').next().unwrap_or("").trim();
-                    if !head.is_empty() && !self.bound(head) && !self.resolves(head) {
+                    // A list written as a path starts with a name. A computed
+                    // one, `same(xs)`, is not a name: until 2026-09-26 it was
+                    // reported as one that does not resolve, and the build now
+                    // refuses it for what it is (ADR-0074).
+                    let segments: Vec<&str> = collection.split('.').map(str::trim).collect();
+                    let written = segments.iter().all(|s| {
+                        s.starts_with(|c: char| c.is_alphabetic() || c == '_')
+                            && s.chars().all(|c| c.is_alphanumeric() || c == '_')
+                    });
+                    let head = segments[0];
+                    if written && !self.bound(head) && !self.resolves(head) {
                         self.found.push((self.body.node_span(id), head.to_string()));
                     }
                     scope.insert(binding);

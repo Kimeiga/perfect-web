@@ -101,6 +101,12 @@ fn a_computed_hole_checks_and_does_not_build() {
             "{#if b}<p>x</p>{:else if n > 0}<p>y</p>{/if}",
             "an `{:else if}` condition must be a value path",
         ),
+        // Until ADR-0074 the name check read this as a name, `same(xs)`, that
+        // does not resolve.
+        (
+            "<ul>{#each same(xs) as x (x)}<li>{x}</li>{/each}</ul>",
+            "`{#each}` reads its list by path",
+        ),
     ] {
         let src = view(markup);
         let found = reported(&src);
@@ -198,10 +204,9 @@ fn a_key_is_the_path_from_the_element() {
     );
 }
 
-/// A computed list is refused by the name check already, as a name that does
-/// not resolve (PW0021), and a key read from another name is PW5021. The
-/// template IR blocks both too, since it can be built from a program nothing
-/// checked.
+/// A computed list does not build, and a key read from another name is
+/// PW5021. The template IR blocks both, since it can be built from a program
+/// nothing checked.
 #[test]
 fn the_ir_blocks_a_computed_list_and_a_foreign_key() {
     let blocked = |markup: &str| {

@@ -49,7 +49,7 @@ MUTANTS = [
     (
         "an `{:else if}`'s condition is not related",
         VALUES,
-        '                } => out.extend(self.truth(*c, "{:else if}")),',
+        '                } => out.extend(self.truth(*c, "{:else if}", false)),',
         "                } => {\n                    let _ = c;\n                }",
     ),
     (
@@ -74,7 +74,7 @@ MUTANTS = [
     (
         "an `Option` condition is related as agreeing",
         VALUES,
-        "            Ty::Builtin(Builtin::Option | Builtin::Result, _) => return None,\n",
+        "            Ty::Builtin(Builtin::Option | Builtin::Result, _) if if_subject => return None,\n",
         "",
     ),
     (

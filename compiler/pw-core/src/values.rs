@@ -388,6 +388,13 @@ pub enum RelationKind {
     /// `{#if c}`: a template's condition, against a value that has a truth
     /// (PW0609, ADR-0071).
     Truth,
+    /// `{v}`, `title={v}`, a loop's key: a value a template writes as text,
+    /// against a type that has a text form (PW0609, ADR-0074).
+    Text,
+    /// `{o}` or `{:else if o}` over an `Option` or a `Result`: a value that may
+    /// be absent, which a template takes apart with `{#match}` (PW0600,
+    /// ADR-0074).
+    Absent,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -2276,8 +2283,36 @@ impl<'a> Typer<'a> {
                 index: None,
                 outcome,
                 declared_at: None,
-                boundary: (span, "this block".to_string()),
+                boundary: (span.clone(), "this block".to_string()),
             });
+            // The fields the list is read through exist (ADR-0074).
+            let mut segments = collection.split('.').map(str::trim);
+            let first = segments.next().unwrap_or_default();
+            if is_ident(first) {
+                let start = match head {
+                    Some(b) => self.local(b),
+                    None => self.global(first),
+                };
+                let rest: Vec<&str> = segments.collect();
+                self.read_through(start, &rest, &span, out);
+            }
+            // The key is read from the element, through fields it has, and is
+            // written as text (ADR-0074). A key read from another name is
+            // PW5021's.
+            let crate::hir::Node::Block { directive, .. } = self.body.node(node) else {
+                continue;
+            };
+            let Some((binding, _, Some(key))) = crate::template_ir::each_parts(directive) else {
+                continue;
+            };
+            let segments: Vec<&str> = key.split('.').map(str::trim).collect();
+            if segments.first() != Some(&binding.as_str()) {
+                continue;
+            }
+            let element = self.local(Binder::Each(node));
+            if let Some(t) = self.read_through(element, &segments[1..], &span, out) {
+                out.extend(self.text(t, format!("({key})"), span.clone()));
+            }
         }
         let mut roots = Vec::new();
         for id in self.body.walk() {
@@ -2292,13 +2327,57 @@ impl<'a> Typer<'a> {
                     subject: Some(c),
                     ..
                 } if directive.trim_start().starts_with("{#if") => {
-                    out.extend(self.truth(*c, "{#if}"));
+                    out.extend(self.truth(*c, "{#if}", true));
                 }
                 crate::hir::Node::Branch {
                     condition: Some(c), ..
-                } => out.extend(self.truth(*c, "{:else if}")),
-                crate::hir::Node::Element { attrs, .. } => {
+                } => out.extend(self.truth(*c, "{:else if}", false)),
+                crate::hir::Node::Interpolation(e) => {
+                    out.extend(self.text(self.of(*e), "{..}".to_string(), self.body.expr_span(*e)));
+                }
+                crate::hir::Node::Element { tag, attrs, .. } => {
+                    // `<map-container resource={StoreMap} center={c} />` mounts
+                    // a resource, and its attributes are the resource's
+                    // arguments (A-007), not text.
+                    let mounts = attrs.iter().any(|a| a.name == "resource");
                     for a in attrs {
+                        // A value the element writes: as text, or as a boolean
+                        // attribute's presence (ADR-0074). Not written: a
+                        // directive, which does not build unless it is `on:`
+                        // (ADR-0073); a stream's query, and the name a stream's
+                        // part binds.
+                        let directive = a.name.split_once(':').is_some_and(|(prefix, _)| {
+                            !matches!(prefix, "xml" | "xlink" | "xmlns")
+                        });
+                        let written = !directive
+                            && !mounts
+                            && !(tag == "stream" && a.name == "query")
+                            && !(matches!(tag.as_str(), "ready" | "failed") && a.name == "as");
+                        if let crate::hir::AttrValue::Expr(e) = &a.value
+                            && written
+                        {
+                            match self.body.expr(*e) {
+                                Expr::Interpolated { parts, .. } => {
+                                    for h in parts {
+                                        out.extend(self.text(
+                                            self.of(*h),
+                                            a.name.clone(),
+                                            self.body.expr_span(*h),
+                                        ));
+                                    }
+                                }
+                                _ if crate::template_ir::BOOLEAN_ATTRIBUTES
+                                    .contains(&a.name.as_str()) =>
+                                {
+                                    out.extend(self.truth(*e, &a.name, false));
+                                }
+                                _ => out.extend(self.text(
+                                    self.of(*e),
+                                    a.name.clone(),
+                                    self.body.expr_span(*e),
+                                )),
+                            }
+                        }
                         let (Some(event), crate::hir::AttrValue::Expr(e)) =
                             (a.name.strip_prefix("on:"), &a.value)
                         else {
@@ -2333,11 +2412,17 @@ impl<'a> Typer<'a> {
     }
 
     /// A template condition: a value that has a truth (ADR-0071). An
-    /// `Option` and a `Result` are PW0600's, which says the same of each.
-    fn truth(&self, c: ExprId, block: &str) -> Option<ValueRelation> {
+    /// `Option` and a `Result` may be absent (PW0600): as an `{#if}`'s
+    /// subject `template_blocks` says so, and anywhere else this relation
+    /// does (ADR-0074). Until 2026-09-26 an `{:else if}` over one was
+    /// reported by neither.
+    fn truth(&self, c: ExprId, block: &str, if_subject: bool) -> Option<ValueRelation> {
         let t = self.of(c);
         let outcome = match &t {
-            Ty::Builtin(Builtin::Option | Builtin::Result, _) => return None,
+            Ty::Builtin(Builtin::Option | Builtin::Result, _) if if_subject => return None,
+            Ty::Builtin(Builtin::Option | Builtin::Result, _) => {
+                return Some(self.absent(&t, block.to_string(), self.body.expr_span(c)));
+            }
             Ty::Nominal(d, _)
                 if self
                     .sigs
@@ -2364,6 +2449,108 @@ impl<'a> Typer<'a> {
             declared_at: None,
             boundary: (self.body.expr_span(c), "this condition".to_string()),
         })
+    }
+
+    /// **A value a template writes as text** (ADR-0074): a `String`, an `Int`
+    /// or a `Bool`, or an opaque type over one, which is written as its
+    /// representation. An `Option` or a `Result` may be absent (PW0600). A
+    /// `Float` has no format yet (KNOWN_LIMITATIONS). Until 2026-09-26 none
+    /// was related, and the renderer refused each when it rendered.
+    fn text(&self, t: Ty, target: String, span: crate::hir::Span) -> Option<ValueRelation> {
+        let outcome = match &t {
+            Ty::Primitive(Primitive::Str | Primitive::Int | Primitive::Bool) | Ty::Any => {
+                Outcome::Agree
+            }
+            Ty::Builtin(Builtin::Option | Builtin::Result, _) => {
+                return Some(self.absent(&t, target, span));
+            }
+            Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. } => {
+                Outcome::Undecided(Undecided::Unknown)
+            }
+            other => match self.representation(other, "value") {
+                Some((_, rep)) => return self.text(rep, target, span),
+                None => Outcome::Disagree {
+                    expected: "a `String`, an `Int` or a `Bool`".to_string(),
+                    actual: self.display(other),
+                },
+            },
+        };
+        Some(ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Text,
+            span: span.clone(),
+            target,
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary: (span, "written here".to_string()),
+        })
+    }
+
+    /// A value that may be absent, where a template reads it as present.
+    fn absent(&self, t: &Ty, target: String, span: crate::hir::Span) -> ValueRelation {
+        ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Absent,
+            span: span.clone(),
+            target,
+            index: None,
+            outcome: Outcome::Disagree {
+                expected: String::new(),
+                actual: self.display(t),
+            },
+            declared_at: None,
+            boundary: (span, "read here".to_string()),
+        }
+    }
+
+    /// **A path a directive reads, field by field** (ADR-0074): each field
+    /// is one its value has. The type at the end, or `None` where a field is
+    /// missing or a value's type is not known. Until 2026-09-26 a directive's
+    /// fields were typed and not checked, so `{#each s.itemz}` passed.
+    fn read_through(
+        &self,
+        start: Ty,
+        fields: &[&str],
+        span: &crate::hir::Span,
+        out: &mut Vec<ValueRelation>,
+    ) -> Option<Ty> {
+        let mut t = start;
+        for name in fields {
+            if !is_ident(name) {
+                return None;
+            }
+            let r = t.receiver()?;
+            let outcome = if self.sigs.member_by(r, name).is_some()
+                || self
+                    .representation(&t, name)
+                    .is_some_and(|(def, _)| def.unit == self.at)
+            {
+                None
+            } else if self.contents_have(&t, name) {
+                Some(OPTIONAL_CONTENTS.to_string())
+            } else {
+                Some(format!("a member `{name}`"))
+            };
+            if let Some(expected) = outcome {
+                out.push(ValueRelation {
+                    declaration: self.decl.name.clone(),
+                    kind: RelationKind::Member,
+                    span: span.clone(),
+                    target: name.to_string(),
+                    index: None,
+                    outcome: Outcome::Disagree {
+                        expected,
+                        actual: self.display(&t),
+                    },
+                    declared_at: None,
+                    boundary: (span.clone(), "the value read".to_string()),
+                });
+                return None;
+            }
+            t = self.member_type(&t, name);
+        }
+        Some(t)
     }
 
     /// The same relations, over one tree: the body, or a policy's term root,
@@ -3462,6 +3649,37 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  a `Result` or a sum type has no truth, and the renderer refuses it",
             )
             .repair("take it apart with `{#match}`"),
+            RelationKind::Text => Diagnostic::error(
+                crate::codes::OPERAND_TYPE.id,
+                crate::codes::OPERAND_TYPE.invariant,
+                Detector::Signature,
+                format!("`{}` is `{actual}`, which has no text form", r.target),
+                r.span.clone(),
+            )
+            .reason("template_value_has_no_text_form")
+            .explain(
+                "a template writes a `String`, an `Int` or a `Bool` as text, or an opaque \
+                 type over one; a `Float` has no format yet, and the renderer refuses \
+                 anything else when it renders",
+            )
+            .repair("write a field of it, or a `String` made from it"),
+            RelationKind::Absent => Diagnostic::error(
+                crate::codes::OPTION_USED_AS_VALUE.id,
+                crate::codes::OPTION_USED_AS_VALUE.invariant,
+                Detector::Signature,
+                format!(
+                    "`{}` is `{actual}`, a value that may be absent; `{{#match}}` takes it apart",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("template_reads_optional_as_present")
+            .explain(
+                "an `Option` or a `Result` is a value that may be absent or failed; a \
+                 template takes it apart with `{#match}`, which says what renders when \
+                 there is none",
+            )
+            .repair("write `{#match v}{:Some(x)} .. {:None} .. {/match}`"),
             RelationKind::Handler => Diagnostic::error(
                 crate::codes::NOT_CALLABLE.id,
                 crate::codes::NOT_CALLABLE.invariant,

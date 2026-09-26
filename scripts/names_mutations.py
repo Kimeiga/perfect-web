@@ -102,7 +102,7 @@ MUTANTS = [
     (
         "an `{#each}` source is not read",
         NAMES,
-        "if !head.is_empty() && !self.bound(head) && !self.resolves(head) {",
+        "if written && !self.bound(head) && !self.resolves(head) {",
         "if false {",
     ),
     (

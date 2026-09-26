@@ -19,12 +19,17 @@ import browser.{ ElementRef }
 
 import List
 
+// Each width with its element, which keys the loop. Until 2026-09-26 the loop
+// was keyed by the `Float` width, which has no text form: a second defect
+// nothing reported (ADR-0074).
+type Sized = Sized { el: ElementRef, width: Float }
+
 view MenuView(items: List<ElementRef>) !{} {
     // ERROR: the callback measures layout, so `List.map` is not pure here and
     // neither is this view. Effect rows are row-polymorphic: the helper
     // preserves whatever its callback requires.
-    let widths = items |> List.map(fn(el) el.getBoundingClientRect().width)
+    let sized = items |> List.map(fn(el) Sized { el: el, width: el.getBoundingClientRect().width })
     <ul aria-label="Menu">
-        {#each widths as w (w)}<li style:width={w} />{/each}
+        {#each sized as s (s.el)}<li style:width={s.width} />{/each}
     </ul>
 }

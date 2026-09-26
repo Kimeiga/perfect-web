@@ -29,6 +29,8 @@ three in a template. On 2026-09-26 each checked and built at 3555fa4:
   `Shape`, which is taken apart with `{#match}`". An `Option` and a `Result`
   stay PW0600's alone. No relation is recorded for either, so neither is
   reported twice, and neither is counted as a condition that agrees.
+  **Corrected by ADR-0074:** PW0600 read only an `{#if}`'s subject, so an
+  `{:else if}` over an `Option` was related to nothing. It is PW0600 now.
 - **The renderer's truth is kept for the rest**: a `Bool`, an `Int`, a
   string, a list and a record. ADR-0042 relies on it for a list, with
   `{#if xs}` around an `{#each}`. kiokun's search page tests a list,

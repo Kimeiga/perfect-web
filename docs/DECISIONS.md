@@ -490,3 +490,12 @@ and failed every render; `pw build` refuses a part the renderer refuses; a
 `style:` directive no longer builds as an attribute a browser ignores; and a
 loop's key is read from its element (PW5021) along its whole path, where
 `(k.r.id)` keyed on `k.id`.
+
+## 2026-09-26: what a template writes has a text form (E10)
+
+[ADR-0074](DECISIONS/ADR-0074-what-a-template-writes-has-a-text-form.md): a
+value a template writes as text has a text form (PW0609); one that may be
+absent is taken apart (PW0600), in `{:else if}` too, which ADR-0071 left to
+nothing; a boolean attribute has a truth; and a loop's list and key are read
+through fields their values have (PW0610). Each passed `pw check` and failed
+when rendered.

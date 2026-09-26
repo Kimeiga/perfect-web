@@ -7,11 +7,15 @@
 
 module generality.list_nested
 
-import domain.{ StoreId }
+import domain.{ MenuItem, StoreId }
 
-view Grid(groups: List<StoreId>) !{} {
+// Until 2026-09-26 the outer list was a `List<StoreId>`, whose elements have
+// no `items`, and nothing checked the field (ADR-0074).
+type Group = Group { id: StoreId, items: List<MenuItem> }
+
+view Grid(groups: List<Group>) !{} {
     <ul>
-        {#each groups as g (g)}
+        {#each groups as g (g.id)}
             <li>
                 <ul>
                     {#each g.items as item}
