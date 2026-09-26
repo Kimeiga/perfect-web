@@ -1,0 +1,34 @@
+ADR-0071 - what a template's blocks and events take
+
+produced by: just e10-template-operands
+commit: 6370a75a18532e214a685af4e3d7b739196c1f67
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== a template's operands (compiler/pw-core/tests/template_operands.rs)
+
+test an_option_condition_is_reported_once ... ok
+test an_each_runs_over_a_list ... ok
+test an_event_attribute_is_given_a_function ... ok
+test an_if_tests_a_value_with_a_truth ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+== the store's relations, each decided (compiler/pw-core/tests/value_relations.rs)
+
+test the_store_program_is_decided_not_merely_silent ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.06s
+
+== mutation controls (scripts/template_operand_mutations.py)
+
+baseline: 5 passed, 0 failed
+an `{#each}`'s collection is not related: KILLED (1 of 5 tests fail)
+an `{#each}` over a list is refused: KILLED (2 of 5 tests fail)
+an `{#if}`'s condition is not related: KILLED (1 of 5 tests fail)
+an `{:else if}`'s condition is not related: KILLED (1 of 5 tests fail)
+a sum type has a truth: KILLED (1 of 5 tests fail)
+no value has a truth: KILLED (1 of 5 tests fail)
+an `Option` condition is related as agreeing: KILLED (1 of 5 tests fail)
+an event attribute's value is not related: KILLED (1 of 5 tests fail)
+a function is not a function to call: KILLED (1 of 5 tests fail)
+a lambda is not decided: KILLED (1 of 5 tests fail)
+every attribute's value is related as an event's: KILLED (1 of 5 tests fail)
+11 of 11 mutants killed
