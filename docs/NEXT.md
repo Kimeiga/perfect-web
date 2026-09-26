@@ -135,10 +135,8 @@ Next, in order:
    `emits` ill-typed and five fixtures passing the wrong key. Then ~~**a
    policy's value**~~, done (ADR-0089), which found `cache Shared` escaping
    the privacy rule and three rules bypassed by spelling, and this:
-   **`pw build` does not run the declaration rules.** `Checked::of` runs
-   `check_units`, and `rules::check` runs only in the command, so `pw build`
-   compiled R-015's `retry forever` query into a component and built R-014,
-   each of which `pw check` refuses (PW0313, PW0312). Next;
+   ~~**`pw build` does not run the declaration rules**~~, done
+   (ADR-0090): it compiled R-015's `retry forever` query into a component;
 2. **a listener's key.** What each argument of `invalidates_on` binds, and
    the materializer's matching, which reads an event's arguments as a set:
    `InventoryChanged(store 47, item 3)` is deferred forever, and store 47's

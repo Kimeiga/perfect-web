@@ -34,21 +34,14 @@ fn program(src: &str) -> Vec<(String, String)> {
     out
 }
 
-/// What `pw check` reports for `t.pw`: the checker and the declaration
-/// rules, as the command runs them.
+/// What `pw check` reports for `t.pw`, the declaration rules included
+/// (ADR-0090).
 fn reported(src: &str) -> Vec<String> {
-    let mut found: Vec<String> = check_sources(&program(src))
+    check_sources(&program(src))
         .into_iter()
         .filter(|(n, _)| n == "t.pw")
         .flat_map(|(_, ds)| ds.into_iter().map(|d| format!("{} {}", d.code, d.message)))
-        .collect();
-    let hir = pw_core::lower::lower_file(src, &pw_syntax::parse_tree(src).green);
-    found.extend(
-        pw_core::rules::check(&hir)
-            .into_iter()
-            .map(|d| format!("{} {}", d.code, d.message)),
-    );
-    found
+        .collect()
 }
 
 /// Exactly these, in any order.

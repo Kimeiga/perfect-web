@@ -78,6 +78,20 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: `pw build` compiled programs `pw check` refuses**
+([ADR-0090](DECISIONS/ADR-0090-the-build-checks-what-pw-check-checks.md)).
+The declaration rules (PW0312, PW0313, PW0102, PW0325, ..) ran only in the
+`pw check` command, beside `check_sources`. `pw build` checks through
+`check_units`, which did not run them, so it compiled R-015's `retry
+forever` query into a component and built R-014, a non-idempotent command
+that retries. One checker runs them now. Their diagnostics had never met the
+checker's standard either. Two restated their invariants in words the
+registry does not use, seven lacked a boundary span or an explanation, and
+PW0312 did not name the policy R-014 expects. Each is repaired.
+
+Evidence: [one-checker.txt](evidence/E10/one-checker.txt)
+(`just e10-one-checker`).
+
 **Correction, 2026-09-26: no policy's value was checked, and three privacy
 and retry rules could be bypassed by spelling**
 ([ADR-0089](DECISIONS/ADR-0089-a-policy-value-is-one-its-domain-has.md)).

@@ -127,6 +127,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
+        // ADR-0090: the declaration rules. Only `pw check` ran them, beside
+        // this function; `pw build` checks through here, and compiled what
+        // they refuse: R-015's `retry forever` became a component.
+        per_unit.extend(crate::rules::check(&u.hir));
         // ADR-0047: a name used as a value resolves too, in lexical scope.
         per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));
         // Every effect row, against the declarations. Reported beside the

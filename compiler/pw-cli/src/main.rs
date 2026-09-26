@@ -19,7 +19,6 @@ use std::process::ExitCode;
 
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use pw_core::diagnostics::{Diagnostic, Severity};
-use pw_core::rules;
 
 fn render(source: &str, path: &str, errors: &[pw_syntax::SyntaxError], styled: bool) -> String {
     let renderer = if styled {
@@ -1537,8 +1536,9 @@ fn run() -> ExitCode {
             // `hir` is `Some` exactly when `parsed.errors` is empty, three
             // lines up. The `else` branch is unreachable and says so rather
             // than silently reporting a clean file.
-            let mut found = hir.as_ref().map(rules::check).unwrap_or_default();
-            found.extend(body_diags.get(display).cloned().unwrap_or_default());
+            // One checker (ADR-0090): the declaration rules run inside
+            // `check_sources`, as they do for `pw build`.
+            let mut found = body_diags.get(display).cloned().unwrap_or_default();
             found.sort_by_key(|d| d.primary_span.start);
             if !found.is_empty() {
                 print!("{}", render_findings(src, display, &found, !plain));

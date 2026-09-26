@@ -399,15 +399,13 @@ fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
         // plus only the accepted modules the fixture imports, since several
         // rejected fixtures reuse an accepted module's name.
         let files = c8_program(name, src);
-        let mut symbols: Vec<&'static str> = check_sources(&files)
+        let symbols: Vec<&'static str> = check_sources(&files)
             .into_iter()
             .find(|(n, _)| n == name)
             .map(|(_, d)| d.iter().map(|d| d.symbol()).collect())
             .unwrap_or_default();
-        // Declaration-header rules run beside the body checks in `pw check`,
-        // not inside `check_sources`; R-014, R-015 and R-027 are such rules.
-        let hir = pw_core::lower::lower_file(src, &pw_syntax::parse_tree(src).green);
-        symbols.extend(pw_core::rules::check(&hir).iter().map(|d| d.symbol()));
+        // Declaration-header rules run inside `check_sources` since ADR-0090;
+        // R-014, R-015 and R-027 are such rules.
         if !symbols.contains(&declared.as_str()) {
             wrong.push(format!(
                 "{name}: its pre-C8 text is no longer caught for `{declared}` \

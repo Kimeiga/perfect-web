@@ -620,3 +620,11 @@ Shared` checked on R-004's page and escaped the rule that keeps a session's
 data out of a shared cache; `placement originn`, `retry nope(..)` and `key
 nope` checked; and three readers were bypassed by a prefix or a substring.
 A value is one its domain has now (PW0335), and each reader reads it exactly.
+
+## 2026-09-26: `pw build` checks what `pw check` checks (E10)
+
+[ADR-0090](DECISIONS/ADR-0090-the-build-checks-what-pw-check-checks.md):
+the declaration rules ran only in the `pw check` command, so `pw build`
+compiled R-015's `retry forever` query into a component and built R-014.
+One checker runs them now, and their diagnostics meet the checker's
+standard: the registry's invariant, a boundary span, an explanation.

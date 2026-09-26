@@ -42,7 +42,13 @@ fn err(
     message: impl Into<String>,
     span: Span,
 ) -> Diagnostic {
-    Diagnostic::error(code, invariant, Detector::DeclarationRule, message, span)
+    Diagnostic::error(
+        code,
+        invariant_of(code, invariant),
+        Detector::DeclarationRule,
+        message,
+        span,
+    )
 }
 
 fn warn(
@@ -51,7 +57,21 @@ fn warn(
     message: impl Into<String>,
     span: Span,
 ) -> Diagnostic {
-    Diagnostic::warning(code, invariant, Detector::DeclarationRule, message, span)
+    Diagnostic::warning(
+        code,
+        invariant_of(code, invariant),
+        Detector::DeclarationRule,
+        message,
+        span,
+    )
+}
+
+/// **The registry's sentence for `code`**, where it registers one. A rule may
+/// not restate an invariant in its own words; these did, unseen, until they
+/// ran inside `check_sources` (ADR-0090). A code the registry does not hold,
+/// an alias it redirects, keeps the rule's.
+fn invariant_of(code: &'static str, written: &'static str) -> &'static str {
+    crate::codes::lookup(code).map_or(written, |c| c.invariant)
 }
 
 fn policy<'a>(policies: &'a [Policy], name: &str) -> Option<&'a Policy> {
@@ -236,6 +256,10 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
                 name_span.clone(),
                 "declared `public` here, so there is no session to read the writes of",
             )
+            .explain(
+                "read-your-writes promises a reader the writes of its own session; a public \
+                 read has no session, so the promise names no one",
+            )
             .repair("use `consistency snapshot` for public data, or declare the query `session`"),
         );
     }
@@ -255,6 +279,10 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
                 f.span.clone(),
             )
             .related(name_span.clone(), "declared `session` here")
+            .explain(
+                "a session's own state changes when the session acts, and a copy served from a \
+                 staleness window hides the change it just made",
+            )
             .repair("use `freshness 0.seconds` with `consistency read_your_writes` for session-owned state"),
         );
     }
@@ -271,7 +299,11 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
             err(
                 "PW0312",
                 "a retryable mutation must be idempotent",
-                format!("`{name}` declares a retry policy but is not idempotent"),
+                // The policy as written, as R-014 expects (ADR-0090).
+                format!(
+                    "`{name}` declares `retry {}` but is not idempotent",
+                    r.value.split('(').next().unwrap_or_default().trim()
+                ),
                 r.span.clone(),
             )
             .related(name_span.clone(), "declared here with no `idempotent_by` key")
@@ -286,6 +318,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     {
         out.push(
             err("PW0313", "a retry policy must be bounded", "`retry forever` is not a permitted policy", r.span.clone())
+                .related(name_span.clone(), format!("`{name}` would retry without end"))
                 .explain("an unbounded retry is a self-inflicted denial of service")
                 .repair("declare a finite bound with jitter, e.g. `bounded_exponential(max = 3, jitter = true)`"),
         );
@@ -317,6 +350,10 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
                 format!("`{name}` declares a `rollback`"),
                 r.span.clone(),
             )
+            .related(
+                name_span.clone(),
+                format!("the platform restores what `{name}` held before"),
+            )
             .explain(
                 "the platform restores the resource value it held before the speculative one, \
                  which it knows exactly. A written inverse describes a different operation: \
@@ -344,6 +381,11 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
             .related(
                 name_span.clone(),
                 "this query is keyed, so its key can change",
+            )
+            .explain(
+                "when a keyed read's key changes while it runs, the work for the old key is \
+                 stale; a policy says whether it is cancelled or kept, and without one the old \
+                 answer can arrive after the new key and be shown for it",
             )
             .repair("declare `on_key_change cancel | supersede | keep`"),
         );
@@ -392,6 +434,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
                 format!("shared materialization of `{name}` declares no freshness policy"),
                 cache.span.clone(),
             )
+            .related(name_span.clone(), format!("`{name}` is cached for every reader"))
             .explain("with neither a freshness window nor an invalidation source, a shared entry is unbounded")
             .repair("add `freshness <n>.seconds`, or an `invalidates_on <Event>` clause"),
         );
@@ -446,6 +489,10 @@ fn check_effect_names_no_operation(decl: &Decl, out: &mut Vec<Finding>) {
             crate::codes::EFFECT_NAMES_AN_OPERATION.invariant,
             format!("effect `{name}` declares a `host` operation"),
             h.span.clone(),
+        )
+        .related(
+            decl.name_span.clone(),
+            "an effect, which names an authority and no operation",
         )
         .explain(
             "a capability authorizes an operation and does not identify one (ADR-0026). Two \

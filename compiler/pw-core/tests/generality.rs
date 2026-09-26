@@ -114,7 +114,6 @@ fn witnesses() -> Vec<Witness> {
 
 /// The symbols a witness file reports, checked as its own program.
 fn symbols_for(w: &Witness) -> BTreeSet<&'static str> {
-    use pw_core::codes::lookup;
     let mut files = library();
     let leaf = w.name.rsplit('/').next().unwrap().to_string();
     files.push((leaf.clone(), w.src.clone()));
@@ -124,17 +123,8 @@ fn symbols_for(w: &Witness) -> BTreeSet<&'static str> {
         .map(|(_, d)| d)
         .unwrap_or_default();
 
-    let mut out: BTreeSet<&'static str> = diags.iter().map(|d| d.symbol()).collect();
-    // The declaration rules run on the syntax tree, not through `check_sources`.
-    out.extend(
-        pw_core::rules::check(&pw_core::lower::lower_file(
-            &w.src,
-            &pw_syntax::parse_tree(&w.src).green,
-        ))
-        .iter()
-        .filter(|f| f.is_error())
-        .filter_map(|f| lookup(f.code).map(|c| c.symbol)),
-    );
+    // The declaration rules run inside `check_sources` since ADR-0090.
+    let out: BTreeSet<&'static str> = diags.iter().map(|d| d.symbol()).collect();
     out
 }
 

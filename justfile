@@ -1113,6 +1113,22 @@ e10-policy-values:
      } > docs/evidence/E10/policy-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/policy-values.txt
 
+# ADR-0090: `pw build` checks what `pw check` checks. Its tests, the corpus
+# standard the declaration rules are held to, and the mutation controls.
+e10-one-checker:
+    @{ echo "ADR-0090 - pw build checks what pw check checks"; echo; \
+       echo "produced by: just e10-one-checker"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== one checker (compiler/pw-core/tests/one_checker.rs)"; echo; \
+       cargo test --locked -p pw-core --test one_checker 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus standard (compiler/pw-core/tests/checking_source.rs)"; echo; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/one_checker_mutations.py)"; echo; \
+       python3 scripts/one_checker_mutations.py; \
+     } > docs/evidence/E10/one-checker.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/one-checker.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation
