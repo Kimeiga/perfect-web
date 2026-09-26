@@ -1,0 +1,31 @@
+ADR-0102 - an event reaches what reads what it invalidates
+
+produced by: just e10-read-through
+commit: 3ae47387c04bf55e618efbe9e94135293db54768
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== reads followed (runtime/pw-materialize/tests/reads.rs)
+
+test an_event_reaches_what_reads_its_listener ... ok
+test a_key_the_reader_does_not_supply_reaches_every_entry ... ok
+test a_node_read_twice_is_followed_at_each_key ... ok
+test reads_that_form_a_cycle_end ... ok
+test a_reader_of_what_the_event_does_not_reach_is_untouched ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== the M6 gate and the listeners, unchanged
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/read_through_mutations.py)
+
+baseline: 5 passed, 0 failed
+an event reaches its listeners only: KILLED (5 of 5 tests fail)
+a read is followed one step: KILLED (4 of 5 tests fail)
+a read's key is not carried: KILLED (3 of 5 tests fail)
+a position the read leaves unfilled is not read: KILLED (1 of 5 tests fail)
+an unknown position matches no value: KILLED (1 of 5 tests fail)
+a cycle of reads does not end: KILLED (the tests overflow the stack)
+a node followed once is not followed again: KILLED (1 of 5 tests fail)
+7 of 7 mutants killed
