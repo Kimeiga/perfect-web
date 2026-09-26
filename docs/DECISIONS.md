@@ -578,3 +578,12 @@ resolve". It begins a new statement now, as `<`, `-` and `!` do.
 the first to refuse it. A string's holes are related to a text form now, as
 a template's are (ADR-0074); three fixtures interpolated a value with none
 and are corrected.
+
+## 2026-09-26: a call carries what it is given (E10)
+
+[ADR-0085](DECISIONS/ADR-0085-a-call-carries-what-it-is-given.md): a
+secret logged publicly passed once it went through `String.trim`, or any
+declared function over plain values: ADR-0064 carried a label only where the
+result mentions a type parameter. A declared call carries every argument
+given to a parameter that states no label now, and a parameter declared
+`Secret<C>` keeps its contract. Corrects ADR-0064 §1.

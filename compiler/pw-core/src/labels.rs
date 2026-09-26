@@ -445,24 +445,19 @@ impl<'a> Labels<'a> {
 
             Expr::Call { callee, args } => {
                 match self.types.callee(body, *callee) {
-                    // Declared: its return label is the contract. E2C's whole
-                    // model is that one declaration answers this, so a helper
-                    // that launders a secret is a library-contract defect and
-                    // not something to second-guess here.
-                    //
-                    // Except where the result is made of what the call is
-                    // given (ADR-0064). A result that mentions one of the
-                    // callee's type parameters carries the label of each
-                    // argument whose declared type mentions it: `List.get`'s
-                    // `Option<T>` is an element of its `List<T>`, whatever
-                    // `get` declares. `List.length`'s `Int` mentions none,
-                    // and keeps the contract.
+                    // Declared: its return label is the contract, joined with
+                    // what it is given (ADR-0085). A parameter declared with a
+                    // label of its own, `key: Secret<Payments>`, receives the
+                    // value by that contract, and the declaration says what
+                    // comes out: a receipt, not the key. Any other parameter
+                    // says nothing about labels, and what the call makes
+                    // carries what it was given, as the charter's data flow
+                    // asks (§7.8). Until 2026-09-26 only an argument that
+                    // brought in a type parameter the result mentions was
+                    // carried (ADR-0064), so `String.trim` over a secret
+                    // string made a public one.
                     Some(sig) => {
                         let mut l = sig.label.clone();
-                        let carried = carried_parameters(sig);
-                        if carried.is_empty() {
-                            return l;
-                        }
                         // What each parameter is given: a piped value, or a
                         // method call's receiver, first.
                         let first = self.piped.get(&id).copied().or(match body.expr(*callee) {
@@ -501,11 +496,11 @@ impl<'a> Labels<'a> {
                         }
                         for (param, value) in sig.params.iter().zip(given) {
                             let Some(value) = value else { continue };
-                            if param
+                            let states_a_label = param
                                 .as_ref()
                                 .and_then(crate::resolved::TypeResolution::resolved)
-                                .is_some_and(|t| mentions_any(t, sig.definition, &carried))
-                            {
+                                .is_some_and(|t| !self.sigs.label(t).is_public());
+                            if !states_a_label {
                                 l = l.join(&self.label(body, value));
                             }
                         }
@@ -515,23 +510,17 @@ impl<'a> Labels<'a> {
                     // program does not state carries whatever went into it,
                     // which is what stops `wrap(token)` from laundering: its
                     // arguments, a piped value, and a method call's receiver.
-                    // The receiver was left out until 2026-09-26, so
-                    // `tokens.get(0)`, over a list nothing typed, was public
-                    // (ADR-0064). So was the callee: `f()`, where `f` holds
-                    // `secrets.payments`, and `b.f()` through a record field
-                    // holding it, made a public value (ADR-0079).
-                    None => {
-                        let receiver = match body.expr(*callee) {
-                            Expr::Field { base, .. } => Some(*base),
-                            _ => None,
-                        };
-                        args.iter()
-                            .map(|a| a.value)
-                            .chain(receiver)
-                            .chain(self.piped.get(&id).copied())
-                            .chain(std::iter::once(*callee))
-                            .fold(Label::public(), |acc, v| acc.join(&self.label(body, v)))
-                    }
+                    // The callee was left out until 2026-09-26: `f()`, where `f`
+                    // holds `secrets.payments`, and `b.f()` through a record
+                    // field holding it, made a public value (ADR-0079). A
+                    // method call's callee, `tokens.get`, carries its
+                    // receiver's label, which ADR-0064 joined by hand.
+                    None => args
+                        .iter()
+                        .map(|a| a.value)
+                        .chain(self.piped.get(&id).copied())
+                        .chain(std::iter::once(*callee))
+                        .fold(Label::public(), |acc, v| acc.join(&self.label(body, v))),
                 }
             }
 
@@ -547,6 +536,15 @@ impl<'a> Labels<'a> {
                 acc.join(&self.label(body, a.body))
             }),
 
+            // `x |> f(..)` is the call, with `x` its first argument: labelled
+            // as the call labels what it is given (ADR-0085), so a secret
+            // piped to a parameter declared to receive it keeps the call's
+            // contract, as it does passed in place.
+            Expr::Binary {
+                op: crate::hir::BinOp::Pipe,
+                rhs,
+                ..
+            } if matches!(body.expr(*rhs), Expr::Call { .. }) => self.label(body, *rhs),
             Expr::Binary { lhs, rhs, .. } => self.label(body, *lhs).join(&self.label(body, *rhs)),
             Expr::Unary { operand, .. } => self.label(body, *operand),
 
@@ -595,40 +593,6 @@ impl<'a> Labels<'a> {
             _ => Label::public(),
         }
     }
-}
-
-/// The type parameters of `sig`'s own declaration its result mentions.
-fn carried_parameters(sig: &crate::signatures::Signature) -> std::collections::BTreeSet<u32> {
-    fn walk(
-        t: &crate::resolved::ResolvedType,
-        binder: crate::resolve::DefId,
-        out: &mut std::collections::BTreeSet<u32>,
-    ) {
-        if let Some((b, i)) = t.parameter_binding()
-            && b == binder
-        {
-            out.insert(i);
-        }
-        for a in t.args() {
-            walk(a, binder, out);
-        }
-    }
-    let mut out = std::collections::BTreeSet::new();
-    if let Some(r) = sig.result() {
-        walk(r, sig.definition, &mut out);
-    }
-    out
-}
-
-/// Does `t` mention one of `binder`'s type parameters in `these`?
-fn mentions_any(
-    t: &crate::resolved::ResolvedType,
-    binder: crate::resolve::DefId,
-    these: &std::collections::BTreeSet<u32>,
-) -> bool {
-    t.parameter_binding()
-        .is_some_and(|(b, i)| b == binder && these.contains(&i))
-        || t.args().iter().any(|a| mentions_any(a, binder, these))
 }
 
 /// Where a pattern binds each of its names, with their spans.

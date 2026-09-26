@@ -126,13 +126,18 @@ fn a_programs_own_generic_function_keeps_its_arguments_labels() {
     none(&wrong.replace(SECRETS, WORDS));
 }
 
+/// `length` returns an `Int` whatever `T` is, and ADR-0064 kept its
+/// declaration's label, public. ADR-0085 carries what a call is given
+/// through a parameter that states no label, so the count of a list of
+/// secrets carries their label: how many secrets there are is theirs.
 #[test]
-fn a_result_that_mentions_no_parameter_keeps_its_contract() {
-    // `length` returns an `Int` whatever `T` is: the declaration's label.
-    none(&logs(
+fn the_length_of_a_list_of_secrets_carries_their_label() {
+    let wrong = logs(
         "",
         "    let n = List.length([secrets.payments()])\n    log.public(\"count {n}\")",
-    ));
+    );
+    refused(&wrong, "PW5006");
+    none(&wrong.replace(SECRETS, WORDS));
 }
 
 #[test]
@@ -172,4 +177,14 @@ fn a_piped_argument_is_matched_to_its_parameter() {
     );
     refused(&wrong, "PW5006");
     none(&wrong.replace("{w}{key}", "{w}"));
+    // The piped value is given to `items`, and carried (ADR-0085): a list of
+    // secrets mapped to words carries their label, as its length does.
+    let piped = logs(
+        "",
+        &format!(
+            "    let lines = [secrets.payments()] |> List.map(t => \"x\")\n    log.public({JOINED})"
+        ),
+    );
+    refused(&piped, "PW5006");
+    none(&piped.replace(SECRETS, WORDS));
 }

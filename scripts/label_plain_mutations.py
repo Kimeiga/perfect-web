@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0064: a label carried through a call.
+"""Mutation controls for ADR-0085: a call carries what it is given.
 
-Each mutant undoes one piece of how a call's result is labelled by what it is
-given: a declared call whose result mentions one of its type parameters, the
-argument, piped value or receiver each parameter is given, a function
-labelled by what it computes, and an undeclared call's receiver. The tests of
-labels through calls must then fail.
+Each mutant undoes one piece of how a declared call's label is made: the
+join of every argument given to a parameter that states no label, and the
+contract a parameter that states one keeps. The plain-value label tests must
+then fail.
 
-Run from the repository root; `just e10-labels` records the output.
-The source is restored after every mutant, whatever happens.
+Run from the repository root; `just e10-labels-through-plain-values` records
+the output. The source is restored after every mutant, whatever happens.
 """
 
 import pathlib
@@ -20,46 +19,30 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 LABELS = ROOT / "compiler/pw-core/src/labels.rs"
 
 # (what is undone, file, anchor, replacement)
-#
-# Two were retired on 2026-09-26. "A result's type parameters are not
-# found": ADR-0085 carries every argument given to a parameter that states
-# no label, so a result's type parameters no longer decide which. "An
-# undeclared call leaves out its receiver": ADR-0079 joins the callee's
-# label, and a method call's callee, `tokens.get`, carries its receiver's,
-# so the receiver's own join was redundant and is gone. "An argument a
-# parameter brings in is not joined" is the first mutant's, which now
-# guards the one join.
 MUTANTS = [
     (
-        "a declared call's result keeps its contract alone",
+        "a declared call carries nothing it is given",
         LABELS,
         "                            if !states_a_label {",
         "                            if false && !states_a_label {",
     ),
     (
-        "a piped value is not its call's first argument",
+        "a pipe joins what it pipes beside its call",
         LABELS,
-        "                        let first = self.piped.get(&id).copied().or(match body.expr(*callee) {",
-        "                        let first = self.piped.get(&id).copied().filter(|_| false).or(match body.expr(*callee) {",
+        "            } if matches!(body.expr(*rhs), Expr::Call { .. }) => self.label(body, *rhs),",
+        "            } if false && matches!(body.expr(*rhs), Expr::Call { .. }) => self.label(body, *rhs),",
     ),
     (
-        "a method call's receiver is not its first argument",
+        "a parameter that states a label carries its argument too",
         LABELS,
-        "                            {\n                                Some(*base)\n                            }",
-        "                            {\n                                let _ = base;\n                                None\n                            }",
-    ),
-    (
-        "a function is labelled public",
-        LABELS,
-        "            Expr::Lambda { body: inner, .. } => self.label(body, *inner),\n",
-        "",
+        "                                .is_some_and(|t| !self.sigs.label(t).is_public());",
+        "                                .is_some_and(|t| false && !self.sigs.label(t).is_public());",
     ),
 ]
 
 TESTS = [
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "labels_through_calls"],
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "labels_through_plain_values"],
 ]
-
 
 def run_tests():
     """(built, passed, failed) over every test command."""

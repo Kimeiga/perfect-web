@@ -40,7 +40,7 @@ MUTANTS = [
     (
         "a call through a value leaves out its callee",
         LABELS,
-        "                            .chain(std::iter::once(*callee))\n",
+        "                        .chain(std::iter::once(*callee))\n",
         "",
     ),
 ]

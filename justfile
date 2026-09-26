@@ -1044,6 +1044,20 @@ e10-string-holes:
      } > docs/evidence/E10/string-holes.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/string-holes.txt
 
+# ADR-0085: a call carries what it is given. Its tests, and the mutation
+# controls.
+e10-labels-through-plain-values:
+    @{ echo "ADR-0085 - a call carries what it is given"; echo; \
+       echo "produced by: just e10-labels-through-plain-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== labels through plain values (compiler/pw-core/tests/labels_through_plain_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test labels_through_plain_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/label_plain_mutations.py)"; echo; \
+       python3 scripts/label_plain_mutations.py; \
+     } > docs/evidence/E10/labels-through-plain-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/labels-through-plain-values.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

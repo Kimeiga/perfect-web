@@ -38,6 +38,11 @@ result mentions:
 - `length<T>(items: List<T>) -> Int` mentions no parameter in its result, and
   keeps its contract, so the length of a list of secrets is public.
 
+**Corrected by ADR-0085:** a function over plain values mentions no type
+parameter either, so `String.trim` laundered a secret string. A declared
+call carries every argument given to a parameter that states no label now,
+and the length of a list of secrets carries their label.
+
 A join never loses a restriction, so a declared label is never weakened.
 **(ruling needed)**: the alternative is label polymorphism in the
 signatures, where a declaration states how each result's label is made.

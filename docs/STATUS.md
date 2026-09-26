@@ -78,6 +78,23 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a secret laundered through any declared
+function over plain values**
+([ADR-0085](DECISIONS/ADR-0085-a-call-carries-what-it-is-given.md)).
+ADR-0064 carried a label through a declared call only where the result
+mentions a type parameter. So `log.public(String.trim("with
+{secrets.payments()}"))` passed, and so did `String.to_upper`, `slice`,
+`join` and a program's own `fn echoed(text: String) -> String`. A declared
+call carries every argument given to a parameter that states no label now,
+as the charter's data flow asks (§7.8). A parameter declared
+`key: Secret<Payments>` keeps its contract, so `Payments.capture`'s receipt
+is not the key. This reverses ADR-0064's choice that the length of a list
+of secrets is public, and closes the recorded limitation that an element a
+secret index chose was public. No example changed.
+
+Evidence: [labels-through-plain-values.txt](evidence/E10/labels-through-plain-values.txt)
+(`just e10-labels-through-plain-values`).
+
 **2026-09-26: what a string interpolates has a text form**
 ([ADR-0084](DECISIONS/ADR-0084-what-a-string-interpolates-has-a-text-form.md)).
 `"{xs}"` over a list, a record or an `Option` checked, and the backend was
@@ -786,9 +803,11 @@ Decisions awaiting a ruling:
 - ADR-0065: a declared function's result its arguments do not fix stays
   unknown rather than any type, since a host function may answer at no type
   its arguments fix.
-- ADR-0064: a declared call's result carries the labels of the arguments
-  that bring in the type parameters it mentions, standing in for signatures
-  that state how a result's label is made.
+- ADR-0085 (correcting ADR-0064): a declared call's result carries every
+  argument given to a parameter that states no label, and a parameter
+  declared with one keeps its contract; a function that makes public data
+  from a secret takes it in such a parameter. Label polymorphism in
+  signatures, or an audited declassification, is the alternative.
 - ADR-0063: an element of a labelled collection carries the collection's
   label, as a `for` loop's names, an `{#each}` block's and a `{#match}`
   arm's do; a lambda passed to a call takes the join of the call's other

@@ -267,12 +267,13 @@ awaited in order. What remains:
   browser's arguments by the component's parameters: `PositiveInt` arrives as
   an `s64`, and any `s64` is accepted. `opaque type PositiveInt = Int` states
   no invariant that could be checked.
-- **A privacy label is a value's, not the control flow's** (ADR-0064). An
-  element chosen by a secret index is its list's label, not the index's. A
-  generic function's result carries the labels of the arguments that bring
-  in its type parameters, which stands in for signatures stating how a
-  result's label is made (ruling needed). A name bound over a labelled
-  collection's elements carries its label (ADR-0063).
+- **A privacy label is a value's, not the control flow's** (ADR-0064). A
+  branch a secret chooses is not labelled by it. A declared call's result
+  carries what it is given through a parameter that states no label
+  (ADR-0085), so an element a secret index chose carries the index's label;
+  that stands in for signatures stating how a result's label is made
+  (ruling needed). A name bound over a labelled collection's elements
+  carries its label (ADR-0063).
 - **A call through an unannotated lambda is related to nothing**
   (ADR-0068). `let f = (x) => x + 1` then `f("a")`: the lambda's parameter
   takes its type from no use, so the call has no function type to check. A
