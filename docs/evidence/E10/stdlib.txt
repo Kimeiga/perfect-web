@@ -1,7 +1,7 @@
 ADR-0040 - the standard library's lists and strings, compiled
 
 produced by: just e10-stdlib
-commit: 7d689fd8b11386f929b8530276b7c3a1c211fb35
+commit: b8f95478aea36271739bbcca12354d3cecdf0775
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == against Vec and str (compiler/pw-conformance/tests/stdlib.rs)
@@ -14,33 +14,32 @@ test list_operations_agree_with_vec ... ok
 test records_are_sorted_stably_and_built_in_lists ... ok
 test string_operations_agree_with_str ... ok
 test text_is_rebuilt_from_code_points_and_bad_ones_trap ... ok
-test what_stays_outside_is_refused_by_name ... r.Q: `r.Q` did not lower: the backend does not lower a function passed to a declaration that is not an intrinsic yet: `apply` takes a function; only the standard library's list operations compile one, where they run it (ADR-0040 §3)
-r.Q: `r.Q` did not lower: the backend does not lower an empty list whose element type nothing fixes yet: `[]` needs the type its context expects
+test what_stays_outside_is_refused_by_name ... r.Q: `r.Q` did not lower: the backend does not lower an empty list whose element type nothing fixes yet: `[]` needs the type its context expects
 r.Q: `r.Q` did not lower: the backend does not lower an intrinsic this backend does not know yet: `shuffle` is declared `intrinsic "list.shuffle"`
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.54s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.69s
 
 == mutation controls (scripts/stdlib_mutations.py)
 
-baseline: 73 passed, 0 failed
-map writes every element to the first slot: KILLED (4 of 73 tests fail)
-filter keeps every element: KILLED (1 of 73 tests fail)
-fold keeps its seed: KILLED (2 of 73 tests fail)
-find does not stop at the first match: KILLED (1 of 73 tests fail)
-sort_by takes the right element on a tie: KILLED (1 of 73 tests fail)
-get refuses index 0: KILLED (1 of 73 tests fail)
-take does not clamp a negative count: KILLED (1 of 73 tests fail)
-concat writes the second list over the first: KILLED (1 of 73 tests fail)
-length counts some bytes twice: KILLED (3 of 73 tests fail)
-from_codepoints accepts surrogates: KILLED (1 of 73 tests fail)
-trim keeps U+3000: KILLED (1 of 73 tests fail)
-to_lower_ascii leaves `Z`: KILLED (1 of 73 tests fail)
-contains looks only at the start: KILLED (1 of 73 tests fail)
-join writes no separators: KILLED (1 of 73 tests fail)
-an intrinsic is not read from its declaration: KILLED (9 of 73 tests fail)
-a parenthesised list is not a lambda's parameters: KILLED (4 of 73 tests fail)
+baseline: 80 passed, 0 failed
+map writes every element to the first slot: KILLED (5 of 80 tests fail)
+filter keeps every element: KILLED (1 of 80 tests fail)
+fold keeps its seed: KILLED (2 of 80 tests fail)
+find does not stop at the first match: KILLED (1 of 80 tests fail)
+sort_by takes the right element on a tie: KILLED (1 of 80 tests fail)
+get refuses index 0: KILLED (1 of 80 tests fail)
+take does not clamp a negative count: KILLED (1 of 80 tests fail)
+concat writes the second list over the first: KILLED (1 of 80 tests fail)
+length counts some bytes twice: KILLED (3 of 80 tests fail)
+from_codepoints accepts surrogates: KILLED (1 of 80 tests fail)
+trim keeps U+3000: KILLED (1 of 80 tests fail)
+to_lower_ascii leaves `Z`: KILLED (1 of 80 tests fail)
+contains looks only at the start: KILLED (1 of 80 tests fail)
+join writes no separators: KILLED (1 of 80 tests fail)
+an intrinsic is not read from its declaration: KILLED (9 of 80 tests fail)
+a parenthesised list is not a lambda's parameters: KILLED (9 of 80 tests fail)
 16 of 16 mutants killed
 
 NOT CLAIMED: Unicode case mapping. to_lower_ascii maps A-Z only.
-NOT CLAIMED: a function as a value. A lambda or a declaration's name is
-compiled where a list operation runs it; stored, returned or passed to
-any other declaration, it is refused.
+NOT CLAIMED here: a function stored, returned or passed to a program's
+own declaration. It is a value since 2026-09-25 (ADR-0052):
+just e10-function-values.

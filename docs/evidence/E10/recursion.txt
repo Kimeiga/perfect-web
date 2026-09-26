@@ -1,23 +1,23 @@
 ADR-0050 - recursion and generic callees compile
 
 produced by: just e10-recursion
-commit: 995daaff7fb06ca46aec171d24c354690aad2c48
+commit: b8f95478aea36271739bbcca12354d3cecdf0775
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
 == recursions through the host (pw-conformance/tests/recursion.rs)
 
 test an_overflow_inside_a_recursion_traps ... ok
-test a_recursion_builds_a_string_and_an_option ... ok
 test a_generic_recursion_is_compiled_once_per_instance ... ok
+test a_recursion_builds_a_string_and_an_option ... ok
 test an_exported_query_calls_itself ... ok
 test two_functions_call_each_other ... ok
 test a_function_calls_itself ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
 
 == the component and the JavaScript module, on the same arguments
 
-javascript: 39 queries, 7800 calls, component and module agree (418 trapped in both)
+javascript: 49 queries, 9800 calls, component and module agree (587 trapped in both)
 
 == mutation controls (scripts/recursion_mutations.py)
 
@@ -31,4 +31,5 @@ a callee's result is left on the stack: KILLED (8 of 19 tests fail)
 the module omits its callees: KILLED (1 of 19 tests fail)
 7 of 7 mutants killed
 
-NOT CLAIMED: an early return, a loop, a function value, or a generic record.
+NOT CLAIMED: a generic record. An early return and a loop are ADR-0051's
+(just e10-control-flow), a function value ADR-0052's (just e10-function-values).

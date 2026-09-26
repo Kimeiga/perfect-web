@@ -1,0 +1,35 @@
+ADR-0052 - a function is a value
+
+produced by: just e10-function-values
+commit: 01a21c76ee0884a4e9d7d212024db3b4c2eaf440
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== closures through the host (pw-conformance/tests/function_values.rs)
+
+test a_declarations_name_is_a_value ... ok
+test a_function_is_chosen_by_a_branch ... ok
+test a_recursion_carries_a_function ... ok
+test a_lambda_passed_to_a_declaration_is_called_there ... ok
+test a_function_is_returned_and_called ... ok
+test a_closure_carries_what_it_captures ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+== the component and the JavaScript module, on the same arguments
+
+javascript: 49 queries, 9800 calls, component and module agree (587 trapped in both)
+
+== mutation controls (scripts/function_value_mutations.py)
+
+baseline: 17 passed, 0 failed
+a closure captures nothing: KILLED (3 of 17 tests fail)
+a binding's written type is not what its value must be: KILLED (3 of 17 tests fail)
+a function type binds no type parameter: KILLED (6 of 17 tests fail)
+the environment keeps no capture: KILLED (3 of 17 tests fail)
+every environment names the first closure's code: KILLED (3 of 17 tests fail)
+a capture is laid over the table slot: KILLED (3 of 17 tests fail)
+a module's closure forgets what it captured: KILLED (1 of 17 tests fail)
+7 of 7 mutants killed
+
+NOT CLAIMED: a function read from a record field and called, or a
+function crossing the component boundary.

@@ -1,7 +1,7 @@
 ADR-0051 - an early return, ?, and for loops compile
 
 produced by: just e10-control-flow
-commit: b8c2357070346be06aa9bb6cc3c0738eea9eaf4a
+commit: b8f95478aea36271739bbcca12354d3cecdf0775
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
@@ -9,12 +9,12 @@ node: v22.21.1
 
 test a_read_is_a_copy_a_later_assignment_does_not_change ... ok
 test a_return_leaves_a_loop_and_the_body ... ok
-test a_branch_that_returns_takes_the_other_branchs_type ... ok
 test a_callee_that_returns_early_returns_from_itself ... ok
+test a_branch_that_returns_takes_the_other_branchs_type ... ok
 test a_return_leaves_the_body_early ... ok
 test a_loop_updates_a_mutable_binding ... ok
 test a_question_mark_returns_the_failure ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
 
 == what may be assigned (compiler/pw-core/tests/assignments.rs)
 
@@ -24,11 +24,11 @@ test the_innermost_binding_decides ... ok
 test a_module_level_let_mut_is_assigned_and_a_let_is_not ... ok
 test an_assignment_keeps_the_bindings_type ... ok
 test a_parameter_and_a_loop_variable_are_not ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 == the component and the JavaScript module, on the same arguments
 
-javascript: 45 queries, 9000 calls, component and module agree (456 trapped in both)
+javascript: 49 queries, 9800 calls, component and module agree (587 trapped in both)
 
 == mutation controls (scripts/control_flow_mutations.py)
 
@@ -48,5 +48,6 @@ a module-level `let mut` is not assignable: KILLED (1 of 26 tests fail)
 an assignment's value is not related to the binding: KILLED (1 of 26 tests fail)
 13 of 13 mutants killed
 
-NOT CLAIMED: a function value, a return or assignment inside a lambda,
-or an assignment to a field.
+NOT CLAIMED: a return or assignment inside a lambda a list operation
+runs, or an assignment to a field. A function value is ADR-0052's:
+just e10-function-values.

@@ -1,7 +1,7 @@
 ADR-0047 - every name resolves, in lexical scope
 
 produced by: just e10-names
-commit: d45fc237f4be6be29aabe4c3a3056ae5572ce61f
+commit: 01a21c76ee0884a4e9d7d212024db3b4c2eaf440
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the name tests (compiler/pw-core/tests/every_name_resolves.rs)

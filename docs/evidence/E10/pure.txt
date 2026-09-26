@@ -1,7 +1,7 @@
 ADR-0039 - pure computation in the component backend
 
 produced by: just e10-pure
-commit: dad120134fc31aab52bcf2c36117eab23d6ac36d
+commit: b8f95478aea36271739bbcca12354d3cecdf0775
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 koka: Koka 3.2.3, 01:29:29 Mar 18 2026 (ghc release version)
 
@@ -21,42 +21,43 @@ m.Rem: 300 cases, 291 values, 9 traps, all as the reference
 test logic_evaluates_its_right_side_only_when_it_decides ... ok
 test negation_and_comparison ... ok
 test strings_compare_by_their_bytes ... ok
-test what_stays_outside_is_refused_by_name ... r.Q: `r.Q` did not lower: the backend does not lower a recursive call yet: `down` calls itself, directly or through another declaration; calls are inlined (ADR-0039 §4) and an inlined recursion has no end the compiler can see
-r.Q: `r.Q` did not lower: the backend does not lower an unspecialized generic type yet: `T` needs specialization before its layout can be encoded
-r.Q: `r.Q` did not lower: blocked upstream: `Eq` on a Int and a Str: the operands differ in type
+test what_stays_outside_is_refused_by_name ... r.Q: the program does not check, so nothing is compiled: [PW0609] the right side of `==`, like its left, must be `Int`, and this is `String`
 r.Q: `r.Q` did not lower: the backend does not lower `%` on a Float yet: its semantics are not decided, and Wasm has no instruction for it
-r.Q: `r.Q` did not lower: the backend does not lower an early `return` yet: a body's value is its last expression here; a `return` part-way through would need a jump out of every enclosing region
+r.Q: `r.Q` did not lower: the backend does not lower a `return` inside a function value yet: the lambda a list operation runs is compiled into its loop; a `return` there would leave the function around it
+r.Q: `r.Q` did not lower: the backend does not lower an assignment inside a function value yet: a lambda a list operation runs does not change the bindings around it
 r.Q: `r.Q` did not lower: the backend does not lower an `if` without `else` yet: it has no value when its condition is false
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
 
 == against Koka (compiler/pw-conformance/tests/koka_oracle.rs)
 
 oracle: 9 functions x 240 inputs: 1620 values identical to Koka's, 530 traps where a 64-bit result did not fit, 10 zero divisors (Koka: 0 and the dividend; Pleris: a trap)
 oracle: a Koka answer altered by one is not matched
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.21s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.27s
 
 == mutation controls (scripts/pure_mutations.py)
 
-baseline: 80 passed, 0 failed
-addition wraps: KILLED (1 of 80 tests fail)
-subtraction wraps: KILLED (1 of 80 tests fail)
-multiplication wraps: KILLED (2 of 80 tests fail)
-negation wraps: KILLED (1 of 80 tests fail)
-division truncates: KILLED (3 of 80 tests fail)
-the remainder takes the dividend's sign: KILLED (2 of 80 tests fail)
-`&` evaluates as `|`: KILLED (1 of 80 tests fail)
-`<` on strings is `<=`: KILLED (1 of 80 tests fail)
-a negative number is written with `+`: KILLED (1 of 80 tests fail)
-a literal is placed one byte off: KILLED (2 of 80 tests fail)
-the region starts on the literals: KILLED (2 of 80 tests fail)
-every record field is stored at offset 0: KILLED (1 of 80 tests fail)
-imports are read from the top of the body only: KILLED (1 of 80 tests fail)
-a program that does not parse is compiled: KILLED (1 of 80 tests fail)
-an operator after a name starts a policy: KILLED (11 of 80 tests fail)
-Koka negates with `-`: KILLED (1 of 80 tests fail)
+baseline: 91 passed, 0 failed
+addition wraps: KILLED (1 of 91 tests fail)
+subtraction wraps: KILLED (1 of 91 tests fail)
+multiplication wraps: KILLED (2 of 91 tests fail)
+negation wraps: KILLED (1 of 91 tests fail)
+division truncates: KILLED (3 of 91 tests fail)
+the remainder takes the dividend's sign: KILLED (2 of 91 tests fail)
+`&` evaluates as `|`: KILLED (1 of 91 tests fail)
+`<` on strings is `<=`: KILLED (1 of 91 tests fail)
+a negative number is written with `+`: KILLED (1 of 91 tests fail)
+a literal is placed one byte off: KILLED (2 of 91 tests fail)
+the region starts on the literals: KILLED (2 of 91 tests fail)
+every record field is stored at offset 0: KILLED (1 of 91 tests fail)
+imports are read from the top of the body only: KILLED (1 of 91 tests fail)
+a program that does not parse is compiled: KILLED (1 of 91 tests fail)
+an operator after a name starts a policy: KILLED (11 of 91 tests fail)
+Koka negates with `-`: KILLED (1 of 91 tests fail)
 16 of 16 mutants killed
 
-NOT CLAIMED: internal functions. A call is inlined, so recursion and
-generic declarations are refused; code size grows with each call site.
+NOT CLAIMED here: recursion and generic callees, compiled beside the
+export since 2026-09-25 (ADR-0050): just e10-recursion. A call that
+does not recurse is still inlined, so code size grows with each call site.
 NOT CLAIMED: declared variants built or matched, Float remainder and
-formatting, and early return. Each is refused by name.
+formatting. Each is refused by name. An early return compiles since
+2026-09-25 (ADR-0051): just e10-control-flow.
