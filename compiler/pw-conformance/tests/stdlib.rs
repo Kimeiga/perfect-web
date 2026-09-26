@@ -423,13 +423,19 @@ fn refused(program: &str, id: &str) -> String {
 
 #[test]
 fn what_stays_outside_is_refused_by_name() {
-    let held = refused(
-        "module r\n\nimport List\n\nfn apply(xs: List<Int>, f: fn(Int) -> Int) -> List<Int> { List.map(xs, f) }\n\npublic query Q(xs: List<Int>) -> List<Int> { apply(xs, x => x) }\n",
+    // A function passed to a declaration was refused here until 2026-09-25.
+    // It is a function value now (ADR-0052), called where the list
+    // operation runs it.
+    let held = Runnable::new(compile(
+        &units(&[(
+            "r.pw",
+            "module r\n\nimport List\n\nfn apply(xs: List<Int>, f: fn(Int) -> Int) -> List<Int> { List.map(xs, f) }\n\npublic query Q(xs: List<Int>) -> List<Int> { apply(xs, x => x + 1) }\n",
+        )]),
         "r.Q",
-    );
-    assert!(
-        held.contains("a function passed to a declaration"),
-        "{held}"
+    ));
+    assert_eq!(
+        held.call(&BTreeMap::new(), &[ints(&[1, 2])]),
+        Ok(vec![ints(&[2, 3])])
     );
 
     let empty = refused(

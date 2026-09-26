@@ -62,9 +62,9 @@
 use std::collections::BTreeMap;
 
 use wasm_encoder::{
-    CodeSection, ConstExpr, DataSection, EntityType, ExportKind, ExportSection, Function,
-    FunctionSection, GlobalSection, GlobalType, ImportSection, MemArg, MemorySection, MemoryType,
-    Module, TypeSection, ValType,
+    CodeSection, ConstExpr, DataSection, ElementSection, Elements, EntityType, ExportKind,
+    ExportSection, Function, FunctionSection, GlobalSection, GlobalType, ImportSection, MemArg,
+    MemorySection, MemoryType, Module, RefType, TableSection, TableType, TypeSection, ValType,
 };
 use wit_parser::abi::{AbiVariant, FlatTypes, WasmSignature, WasmType};
 use wit_parser::{
@@ -200,6 +200,7 @@ pub fn core_module_with(
     // The export, and every function compiled beside it (ADR-0050).
     let all: Vec<&super::ir::Function> = std::iter::once(function)
         .chain(function.callees.iter())
+        .chain(function.closures.iter().map(|c| &c.function))
         .collect();
     let mut private = world_resolve.clone();
     let wit = internal_types(&mut private, &all, declared, idents);
@@ -374,9 +375,116 @@ pub fn core_module_with(
         );
     }
 
+    // --- function values (ADR-0052) -------------------------------------------
+    // Each call through a value is `call_indirect` at the core type of the
+    // value's function type: its environment, then its parameters.
+    let mut fn_sigs: BTreeMap<Type, FnSig> = BTreeMap::new();
+    let mut sig_of = |t: &Type, ty: &mut dyn FnMut(Vec<ValType>, Vec<ValType>) -> u32| {
+        if fn_sigs.contains_key(t) {
+            return Some(());
+        }
+        let Type::Function(ps, r) = t else {
+            return None;
+        };
+        let mut params = Vec::new();
+        for p in ps {
+            let w = wit.get(p).copied()?;
+            params.push((w, passed(resolve, &w)));
+        }
+        let result = match &**r {
+            Type::Unit => None,
+            r => {
+                let w = wit.get(r).copied()?;
+                Some((w, passed(resolve, &w)))
+            }
+        };
+        let mut core = vec![ValType::I32];
+        core.extend(params.iter().flat_map(|(_, p)| p.core()));
+        let results: Vec<ValType> = result.iter().flat_map(|(_, p)| p.core()).collect();
+        let type_index = ty(core, results);
+        fn_sigs.insert(
+            t.clone(),
+            FnSig {
+                type_index,
+                params,
+                result,
+            },
+        );
+        Some(())
+    };
+    for i in all
+        .iter()
+        .flat_map(|f| f.blocks.iter())
+        .flat_map(|b| all_instrs(&b.instrs))
+    {
+        if let Instr::Apply { function_ty, .. }
+        | Instr::Closure {
+            ty: function_ty, ..
+        } = i
+            && sig_of(function_ty, &mut ty).is_none()
+        {
+            refuse!(
+                "a function value with no component type",
+                "`{}` makes or calls a {function_ty:?}, which has no core signature here",
+                function.export
+            );
+        }
+    }
+    let first_closure = post_index + 1 + function.callees.len() as u32;
+    let mut closures: BTreeMap<u32, ClosureCode> = BTreeMap::new();
+    for (n, c) in function.closures.iter().enumerate() {
+        let f = &c.function;
+        let mut captures = Vec::new();
+        for (_, t) in &f.params[..c.captures] {
+            let Some(w) = wit.get(t).copied() else {
+                refuse!(
+                    "a capture with no component type",
+                    "a function value in `{}` captures a {t:?}",
+                    function.export
+                );
+            };
+            captures.push(w);
+        }
+        let mut env_types = vec![WitType::U32];
+        env_types.extend(captures.iter().copied());
+        let offsets: Vec<u64> = sizes
+            .field_offsets(env_types.iter())
+            .into_iter()
+            .map(|(o, _)| o.size_wasm32() as u64)
+            .collect();
+        let env = sizes.record(env_types.iter());
+        let signature = Type::Function(
+            f.params[c.captures..]
+                .iter()
+                .map(|(_, t)| t.clone())
+                .collect(),
+            Box::new(f.ret.clone()),
+        );
+        if sig_of(&signature, &mut ty).is_none() {
+            refuse!(
+                "a function value with no component type",
+                "a function value in `{}` is a {signature:?}",
+                function.export
+            );
+        }
+        closures.insert(
+            n as u32,
+            ClosureCode {
+                index: first_closure + n as u32,
+                captures: captures
+                    .into_iter()
+                    .zip(offsets.into_iter().skip(1))
+                    .collect(),
+                size: env.size.size_wasm32() as u32,
+                align: env.align.align_wasm32() as u32,
+                signature,
+            },
+        );
+    }
+
     // --- the export's body --------------------------------------------------------
     let mut helpers = Helpers {
-        first: post_index + 1 + function.callees.len() as u32,
+        first: first_closure + function.closures.len() as u32,
         used: Vec::new(),
     };
     let shared = Shared {
@@ -387,6 +495,8 @@ pub fn core_module_with(
         imports: &import_index,
         realloc_index,
         callees: &callees,
+        closures: &closures,
+        fn_sigs: &fn_sigs,
     };
     let body = match export_body(shared, function, &export_fn, &export_sig, &mut helpers) {
         Encoding::Encoded(b) => b,
@@ -399,6 +509,13 @@ pub fn core_module_with(
             other => return other.map(|_| unreachable!()),
         }
     }
+    let mut closure_bodies = Vec::new();
+    for (n, c) in function.closures.iter().enumerate() {
+        match closure_body(shared, n as u32, c, &mut helpers) {
+            Encoding::Encoded(b) => closure_bodies.push(b),
+            other => return other.map(|_| unreachable!()),
+        }
+    }
 
     let mut funcs = FunctionSection::new();
     funcs.function(realloc_ty);
@@ -406,6 +523,9 @@ pub fn core_module_with(
     funcs.function(post_ty);
     for t in &callee_types {
         funcs.function(*t);
+    }
+    for c in closures.values() {
+        funcs.function(fn_sigs[&c.signature].type_index);
     }
     for h in &helpers.used {
         let (params, results) = h.signature();
@@ -476,6 +596,9 @@ pub fn core_module_with(
     for b in &internal_bodies {
         code.function(b);
     }
+    for b in &closure_bodies {
+        code.function(b);
+    }
     for h in &helpers.used {
         code.function(&h.body(realloc_index));
     }
@@ -483,9 +606,33 @@ pub fn core_module_with(
     module.section(&types);
     module.section(&import_section);
     module.section(&funcs);
+    // The function values' code, in a table a value's environment indexes
+    // (ADR-0052).
+    if !closures.is_empty() {
+        let n = closures.len() as u64;
+        let mut tables = TableSection::new();
+        tables.table(TableType {
+            element_type: RefType::FUNCREF,
+            table64: false,
+            minimum: n,
+            maximum: Some(n),
+            shared: false,
+        });
+        module.section(&tables);
+    }
     module.section(&memories);
     module.section(&globals);
     module.section(&exports);
+    if !closures.is_empty() {
+        let indices: Vec<u32> = closures.values().map(|c| c.index).collect();
+        let mut elements = ElementSection::new();
+        elements.active(
+            Some(0),
+            &ConstExpr::i32_const(0),
+            Elements::Functions(std::borrow::Cow::Owned(indices)),
+        );
+        module.section(&elements);
+    }
     module.section(&code);
     if !literals.bytes.is_empty() {
         let mut data = DataSection::new();
@@ -625,6 +772,9 @@ impl TypeCx<'_> {
             Type::Bool => WitType::Bool,
             Type::Str => WitType::String,
             Type::Unit => return None,
+            // A function value is the address of its environment, which
+            // names its code (ADR-0052). It never crosses the boundary.
+            Type::Function(..) => WitType::U32,
             Type::Option(inner) => {
                 let inner = self.wit(resolve, inner)?;
                 anonymous(resolve, TypeDefKind::Option(inner))
@@ -884,6 +1034,30 @@ struct Shared<'a> {
     realloc_index: u32,
     /// The functions compiled beside the export, by instance (ADR-0050).
     callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
+    /// The function values' code, by closure index (ADR-0052).
+    closures: &'a BTreeMap<u32, ClosureCode>,
+    /// How each function type is called (ADR-0052).
+    fn_sigs: &'a BTreeMap<Type, FnSig>,
+}
+
+/// **How a function value of one type is called** (ADR-0052): the core type
+/// `call_indirect` checks, and its parameters and result as a callee passes
+/// them.
+struct FnSig {
+    type_index: u32,
+    params: Vec<(WitType, Passed)>,
+    result: Option<(WitType, Passed)>,
+}
+
+/// **A function value's code** (ADR-0052): its function index, the table
+/// slot is its closure index; where each capture sits in the environment,
+/// after the slot; the environment's size and alignment; and its type.
+struct ClosureCode {
+    index: u32,
+    captures: Vec<(WitType, u64)>,
+    size: u32,
+    align: u32,
+    signature: Type,
 }
 
 /// **How a function compiled beside the export passes one value**
@@ -967,6 +1141,8 @@ fn export_body(
         literals: shared.literals,
         helpers,
         callees: shared.callees,
+        closures: shared.closures,
+        fn_sigs: shared.fn_sigs,
         exit: Exit::Export {
             result: export_fn.result,
             retptr: export_sig.retptr,
@@ -1037,6 +1213,107 @@ fn export_body(
     Encoding::Encoded(enc.finish())
 }
 
+/// **A function value's code** (ADR-0052): its environment first, from which
+/// each capture is read where it sits; then its parameters and its result as
+/// a callee passes them.
+fn closure_body(
+    shared: Shared<'_>,
+    n: u32,
+    closure: &super::ir::Closure,
+    helpers: &mut Helpers,
+) -> Encoding<Function> {
+    use wasm_encoder::Instruction as I;
+    let function = &closure.function;
+    let (Some(code), Some(sig)) = (
+        shared.closures.get(&n),
+        shared
+            .closures
+            .get(&n)
+            .and_then(|c| shared.fn_sigs.get(&c.signature)),
+    ) else {
+        blocked!("a function value's code has no signature");
+    };
+    let first: usize = 1 + sig
+        .params
+        .iter()
+        .map(|(_, p)| p.core().len())
+        .sum::<usize>();
+    let result_ty = sig.result.as_ref().map(|(t, _)| *t);
+    let mut enc = Enc {
+        resolve: shared.resolve,
+        sizes: shared.sizes,
+        imports: shared.imports,
+        realloc_index: shared.realloc_index,
+        wit: shared.wit,
+        literals: shared.literals,
+        helpers,
+        callees: shared.callees,
+        closures: shared.closures,
+        fn_sigs: shared.fn_sigs,
+        exit: Exit::Callee {
+            result: sig.result.clone(),
+        },
+        export: &function.export,
+        ops: Vec::new(),
+        locals: Locals {
+            first: first as u32,
+            types: Vec::new(),
+        },
+        held: BTreeMap::new(),
+        expected: expected_types(
+            shared.resolve,
+            shared.wit,
+            function,
+            result_ty,
+            shared.imports,
+            shared.callees,
+        ),
+    };
+    for ((value, _), (ty, offset)) in function.params.iter().zip(&code.captures) {
+        let at = enc.address(0, *offset);
+        enc.held.insert(*value, Held::Memory { ty: *ty, ptr: at });
+    }
+    let mut next = 1u32;
+    for ((value, _), (ty, passing)) in function.params[closure.captures..].iter().zip(&sig.params) {
+        let held = match passing {
+            Passed::Flat(v) => {
+                let locals: Vec<u32> = (next..next + v.len() as u32).collect();
+                next += v.len() as u32;
+                Held::Flat { ty: *ty, locals }
+            }
+            Passed::Pointer => {
+                next += 1;
+                Held::Memory {
+                    ty: *ty,
+                    ptr: next - 1,
+                }
+            }
+        };
+        enc.held.insert(*value, held);
+    }
+    let Some(entry) = function.entry() else {
+        blocked!("a function value's code has no entry block");
+    };
+    if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+        enc.region(&entry.instrs)
+    {
+        return other.map(|_| unreachable!());
+    }
+    let Terminator::Return(v) = &entry.terminator else {
+        refuse!(
+            "a terminator other than `return`",
+            "a function value's code ends in {:?}",
+            entry.terminator
+        );
+    };
+    match enc.leave(*v) {
+        Encoding::Encoded(()) => {}
+        other => return other.map(|_| unreachable!()),
+    }
+    enc.ops.push(I::End);
+    Encoding::Encoded(enc.finish())
+}
+
 /// **A function compiled beside the export** (ADR-0050): its parameters as
 /// its [`Callee`] entry passes them, its body, and its result the same way.
 fn internal_body(
@@ -1065,6 +1342,8 @@ fn internal_body(
         literals: shared.literals,
         helpers,
         callees: shared.callees,
+        closures: shared.closures,
+        fn_sigs: shared.fn_sigs,
         exit: Exit::Callee {
             result: me.result.clone(),
         },
@@ -1313,6 +1592,8 @@ struct Enc<'a> {
     literals: &'a Literals,
     helpers: &'a mut Helpers,
     callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
+    closures: &'a BTreeMap<u32, ClosureCode>,
+    fn_sigs: &'a BTreeMap<Type, FnSig>,
     exit: Exit,
     export: &'a str,
     ops: Vec<wasm_encoder::Instruction<'static>>,
@@ -1689,6 +1970,109 @@ impl Enc<'_> {
                     },
                 };
                 self.held.insert(*result, placeholder);
+            }
+            // A function value (ADR-0052): an environment in the region, its
+            // first word the table slot of its code, then each capture.
+            Instr::Closure {
+                result,
+                index,
+                captures,
+                ..
+            } => {
+                let Some(code) = self.closures.get(index) else {
+                    blocked!("`{}` makes a function value nothing compiled", self.export);
+                };
+                let (size, align, slots) = (code.size, code.align, code.captures.clone());
+                let env = self.locals.fresh(ValType::I32);
+                self.ops.extend([
+                    I::I32Const(0),
+                    I::I32Const(0),
+                    I::I32Const(align as i32),
+                    I::I32Const(size as i32),
+                    I::Call(self.realloc_index),
+                    I::LocalSet(env),
+                    I::LocalGet(env),
+                    I::I32Const(*index as i32),
+                    I::I32Store(MemArg {
+                        offset: 0,
+                        align: 2,
+                        memory_index: 0,
+                    }),
+                ]);
+                for (v, (ty, offset)) in captures.iter().zip(slots) {
+                    match self.store_at(*v, ty, env, offset) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    }
+                }
+                self.held.insert(
+                    *result,
+                    Held::Flat {
+                        ty: WitType::U32,
+                        locals: vec![env],
+                    },
+                );
+            }
+            // A call through a function value (ADR-0052): its environment
+            // and its arguments, then `call_indirect` through the slot the
+            // environment names.
+            Instr::Apply {
+                result,
+                function,
+                function_ty,
+                args,
+                ..
+            } => {
+                let Some(sig) = self.fn_sigs.get(function_ty) else {
+                    blocked!(
+                        "`{}` calls a {function_ty:?} with no signature",
+                        self.export
+                    );
+                };
+                let (type_index, params, ret) =
+                    (sig.type_index, sig.params.clone(), sig.result.clone());
+                let env = match self.flat_locals(*function) {
+                    Encoding::Encoded((_, ls)) => ls[0],
+                    other => return other.map(|_| unreachable!()),
+                };
+                self.ops.push(I::LocalGet(env));
+                for (a, (ty, passing)) in args.iter().zip(&params) {
+                    let Some(h) = self.held.get(a).cloned() else {
+                        blocked!("`{}` passes {a:?} and nothing defines it", self.export);
+                    };
+                    match self.pass(&h, ty, passing) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    }
+                }
+                self.ops.extend([
+                    I::LocalGet(env),
+                    I::I32Load(MemArg {
+                        offset: 0,
+                        align: 2,
+                        memory_index: 0,
+                    }),
+                    I::CallIndirect {
+                        type_index,
+                        table_index: 0,
+                    },
+                ]);
+                let held = match ret {
+                    None => Held::Nothing,
+                    Some((ty, Passed::Flat(vs))) => {
+                        let ls: Vec<u32> = vs.iter().map(|v| self.locals.fresh(*v)).collect();
+                        for l in ls.iter().rev() {
+                            self.ops.push(I::LocalSet(*l));
+                        }
+                        Held::Flat { ty, locals: ls }
+                    }
+                    Some((ty, Passed::Pointer)) => {
+                        let p = self.locals.fresh(ValType::I32);
+                        self.ops.push(I::LocalSet(p));
+                        Held::Memory { ty, ptr: p }
+                    }
+                };
+                self.held.insert(*result, held);
             }
             // A mutable binding (ADR-0051): a holder of its own, which each
             // assignment moves a value into and each read copies out of.

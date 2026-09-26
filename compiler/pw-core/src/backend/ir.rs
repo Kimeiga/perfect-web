@@ -95,6 +95,9 @@ pub enum Type {
     Result(Box<Type>, Box<Type>),
     Option(Box<Type>),
     List(Box<Type>),
+    /// **A function value**, by its parameters and its result (ADR-0052).
+    /// It never crosses the component boundary.
+    Function(Vec<Type>, Box<Type>),
 }
 
 impl Type {
@@ -121,6 +124,12 @@ impl Type {
                 b.walk(f);
             }
             Type::Option(a) | Type::List(a) => a.walk(f),
+            Type::Function(ps, r) => {
+                for p in ps {
+                    p.walk(f);
+                }
+                r.walk(f);
+            }
             _ => {}
         }
     }
@@ -312,6 +321,23 @@ pub enum Instr {
         local: ValueId,
         ty: Type,
     },
+    /// **A function value** (ADR-0052): the export's closure `index`, with
+    /// the values it captures, in the order its code takes them.
+    Closure {
+        result: ValueId,
+        index: u32,
+        captures: Vec<ValueId>,
+        ty: Type,
+    },
+    /// **A call through a function value** (ADR-0052). `function_ty` is the
+    /// value's type, which fixes how it is called.
+    Apply {
+        result: ValueId,
+        function: ValueId,
+        function_ty: Type,
+        args: Vec<ValueId>,
+        ty: Type,
+    },
 }
 
 /// What a loop over a list computes (ADR-0040).
@@ -494,7 +520,9 @@ impl Instr {
             | Instr::Return { result, .. }
             | Instr::Local { result, .. }
             | Instr::Set { result, .. }
-            | Instr::Get { result, .. } => *result,
+            | Instr::Get { result, .. }
+            | Instr::Closure { result, .. }
+            | Instr::Apply { result, .. } => *result,
         }
     }
 
@@ -518,7 +546,9 @@ impl Instr {
             | Instr::Return { ty, .. }
             | Instr::Local { ty, .. }
             | Instr::Set { ty, .. }
-            | Instr::Get { ty, .. } => ty,
+            | Instr::Get { ty, .. }
+            | Instr::Closure { ty, .. }
+            | Instr::Apply { ty, .. } => ty,
         }
     }
 
@@ -601,6 +631,18 @@ pub struct Function {
     /// every instance the export reaches, transitively, each once. Only an
     /// exported function has any: a callee's own calls are in this list too.
     pub callees: Vec<Function>,
+    /// **The code of every function value the export makes** (ADR-0052),
+    /// by the index a [`Instr::Closure`] names. Only an export has any.
+    pub closures: Vec<Closure>,
+}
+
+/// **A function value's code** (ADR-0052): a function whose first
+/// `captures` parameters are what the value captured, and the rest the
+/// parameters its callers pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Closure {
+    pub captures: usize,
+    pub function: Function,
 }
 
 impl Function {

@@ -183,6 +183,31 @@ public query Quarter(n: Int) -> Result<Int, String> {
     Ok(q)
 }
 
+// ADR-0052: a function is a value. Closures capture, are passed, returned,
+// and called through, in both.
+fn apply_to(f: fn(Int) -> Int, x: Int) -> Int { f(x) }
+
+public query Tripled(x: Int) -> Int { apply_to(y => y * 3, x) }
+
+fn adder(k: Int) -> fn(Int) -> Int {
+    x => x + k
+}
+
+public query Added(k: Int, xs: List<Int>) -> List<Int> {
+    let add = adder(k)
+    List.map(xs, add)
+}
+
+public query Labelled(words: List<Word>, tag: String) -> List<String> {
+    let label: fn(Word) -> String = w => \"{tag}:{w.text}:{w.score}\"
+    List.map(words, label)
+}
+
+public query Picked(flag: Bool, x: Int) -> Int {
+    let f: fn(Int) -> Int = if flag { y => y * 10 } else { y => y - 10 }
+    f(x)
+}
+
 public query SumOf(xs: List<Int>, i: Int) -> Option<Int> {
     let a = List.get(xs, i)?
     let b = List.get(xs, i + 1)?

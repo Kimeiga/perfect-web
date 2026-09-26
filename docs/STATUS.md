@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: a function is a value**
+([ADR-0052](DECISIONS/ADR-0052-function-values.md)). A lambda used as a value,
+or a declaration's name where a function is wanted, compiles to a closure.
+It is stored, returned, passed to the program's own declarations, and
+called through. In the component it is an environment of its captures,
+whose first word is its code's slot in a `funcref` table, called with
+`call_indirect`. In the module it is a JavaScript function. The
+backend now lowers a binding's written type as what its value must be; it
+ignored it before.
+
 **2026-09-25: an early `return`, `?`, and `for` loops compile**
 ([ADR-0051](DECISIONS/ADR-0051-early-return-and-loops.md)). The IR gains
 `Return`, and `Local`, `Set` and `Get` for `let mut` bindings; a `for` loop
@@ -188,6 +198,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0052: a closure captures by value; a `let mut` binding assigned after
+  the closure is made is not seen by it.
 - ADR-0051: `for` over a list is the only loop; there is no `while`.
 - ADR-0050: a callee is inlined until it recurses, and only the recursion is
   a call, rather than every declaration being a function of its component.

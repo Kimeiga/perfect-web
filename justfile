@@ -606,6 +606,26 @@ e10-affine:
      } > docs/evidence/E10/affine.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
 
+# ADR-0052: a function is a value. The closures through the host, the
+# component against the JavaScript module, and the mutation controls.
+e10-function-values:
+    @{ echo "ADR-0052 - a function is a value"; echo; \
+       echo "produced by: just e10-function-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== closures through the host (pw-conformance/tests/function_values.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test function_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module, on the same arguments"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*"; \
+       echo; echo "== mutation controls (scripts/function_value_mutations.py)"; echo; \
+       python3 scripts/function_value_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a function read from a record field and called, or a"; \
+       echo "function crossing the component boundary."; \
+     } > docs/evidence/E10/function-values.txt
+    @grep -E "^javascript:|mutants killed" docs/evidence/E10/function-values.txt
+
 # ADR-0051: an early `return`, `?`, and `for` loops compile, and the checker
 # says what may be assigned. The compiled bodies through the host, the
 # component against the JavaScript module, and the mutation controls.

@@ -74,8 +74,22 @@ fn encode(component_id: &str, function: &Function, program: &Program) -> Result<
         .collect();
     let mut helpers = BTreeSet::new();
     let mut sources = Vec::new();
+    // The function values' code (ADR-0052): its captures, then its
+    // parameters, as a function of the module.
+    for (n, c) in function.closures.iter().enumerate() {
+        let mut e = Emitter::new(program, &callees, &function.closures);
+        e.function(&c.function).map_err(refused)?;
+        helpers.extend(e.helpers.iter().copied());
+        let params: Vec<String> = c.function.params.iter().map(|(v, _)| val(*v)).collect();
+        sources.push(format!(
+            "function {}({}) {{\n{}}}",
+            closure_name(n),
+            params.join(", "),
+            e.body
+        ));
+    }
     for (n, c) in function.callees.iter().enumerate() {
-        let mut e = Emitter::new(program, &callees);
+        let mut e = Emitter::new(program, &callees, &function.closures);
         e.function(c).map_err(refused)?;
         helpers.extend(e.helpers.iter().copied());
         let params: Vec<String> = c.params.iter().map(|(v, _)| val(*v)).collect();
@@ -86,7 +100,7 @@ fn encode(component_id: &str, function: &Function, program: &Program) -> Result<
             e.body
         ));
     }
-    let mut e = Emitter::new(program, &callees);
+    let mut e = Emitter::new(program, &callees, &function.closures);
     e.function(function).map_err(refused)?;
     e.helpers.extend(helpers);
     Ok(e.finish(component_id, function, &sources))
@@ -97,10 +111,17 @@ fn callee_name(n: usize) -> String {
     format!("callee{n}")
 }
 
+/// A function value's code, in the module (ADR-0052).
+fn closure_name(n: usize) -> String {
+    format!("closure{n}")
+}
+
 struct Emitter<'p> {
     program: &'p Program,
     /// The functions compiled beside the query, by instance (ADR-0050).
     callees: &'p BTreeMap<(DefId, Vec<Type>), usize>,
+    /// The function values' code (ADR-0052).
+    closures: &'p [super::ir::Closure],
     /// Each value's type, as the IR states it.
     types: BTreeMap<ValueId, Type>,
     /// The prelude functions the body calls.
@@ -202,10 +223,15 @@ const HELPERS: &[(&str, &[&str], &str)] = &[
 ];
 
 impl<'p> Emitter<'p> {
-    fn new(program: &'p Program, callees: &'p BTreeMap<(DefId, Vec<Type>), usize>) -> Emitter<'p> {
+    fn new(
+        program: &'p Program,
+        callees: &'p BTreeMap<(DefId, Vec<Type>), usize>,
+        closures: &'p [super::ir::Closure],
+    ) -> Emitter<'p> {
         Emitter {
             program,
             callees,
+            closures,
             types: BTreeMap::new(),
             helpers: BTreeSet::new(),
             body: String::new(),
@@ -340,6 +366,33 @@ impl<'p> Emitter<'p> {
                     Const::Unit => "undefined".into(),
                 };
                 self.line(&format!("const {r} = {lit};"));
+            }
+            // A function value (ADR-0052): a JavaScript function that calls
+            // its code with what it captured, then what it is given.
+            Instr::Closure {
+                index, captures, ..
+            } => {
+                let Some(c) = self.closures.get(*index as usize) else {
+                    return Err("a function value nothing compiled".into());
+                };
+                let arity = c.function.params.len() - c.captures;
+                let params: Vec<String> = (0..arity).map(|k| format!("a{k}")).collect();
+                let mut given: Vec<String> = captures.iter().map(|v| val(*v)).collect();
+                given.extend(params.iter().cloned());
+                self.line(&format!(
+                    "const {r} = ({}) => {}({});",
+                    params.join(", "),
+                    closure_name(*index as usize),
+                    given.join(", ")
+                ));
+            }
+            Instr::Apply { function, args, .. } => {
+                let args: Vec<String> = args.iter().map(|a| val(*a)).collect();
+                self.line(&format!(
+                    "const {r} = {}({});",
+                    val(*function),
+                    args.join(", ")
+                ));
             }
             // `return e` and `?`'s failure (ADR-0051). The placeholder is
             // declared, never read.

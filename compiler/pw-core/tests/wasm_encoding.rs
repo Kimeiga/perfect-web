@@ -309,6 +309,7 @@ fn an_unimplemented_instruction_is_refused_rather_than_faked() {
         capabilities: vec![],
         instance: vec![],
         callees: vec![],
+        closures: vec![],
     };
     match wasm::core_module(&resolve, world, &f, "builds", &[]) {
         Encoding::Blocked { why } => {
@@ -346,6 +347,7 @@ fn building_a_declared_variant_is_refused() {
         capabilities: vec![],
         instance: vec![],
         callees: vec![],
+        closures: vec![],
     };
     match wasm::core_module(&resolve, world, &f, "builds", &[]) {
         Encoding::Unsupported { construct, .. } => {

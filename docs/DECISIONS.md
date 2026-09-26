@@ -311,3 +311,9 @@ from its arguments. Existing artifacts are byte-identical.
 the module. A callee that returns early is compiled beside its export. The
 checker refuses an assignment to a binding that is not `let mut` (PW0611),
 and relates the assigned value to the binding's type (PW0607).
+
+[ADR-0052](DECISIONS/ADR-0052-function-values.md): a function is a value. A
+lambda or a declaration's name compiles to a closure of its captures, is
+stored, returned, passed and called through: in the component an
+environment in the region naming its code's slot in a `funcref` table,
+called with `call_indirect`; in the module a JavaScript function.

@@ -39,9 +39,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
-    BinaryOp, Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Const, EachKind, Function,
-    ImportId, Instr, Intrinsic, Lowering, MatchArm, Operation, Program, Region, Shape, Terminator,
-    Type, TypeDef, UnaryOp, ValueId, all_instrs,
+    BinaryOp, Block, BlockId, BuiltinCase, CallableImport, CapabilityId, Closure, Const, EachKind,
+    Function, ImportId, Instr, Intrinsic, Lowering, MatchArm, Operation, Program, Region, Shape,
+    Terminator, Type, TypeDef, UnaryOp, ValueId, all_instrs,
 };
 use crate::contract::ComponentContract;
 use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Hir, Literal, Pattern, Span};
@@ -319,6 +319,8 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
     };
 
     let instrs = std::mem::take(&mut f.instrs);
+    drop(f);
+    let internal = internal.into_inner();
     Lowering::Lowered(Function {
         def,
         export: decl.name.clone(),
@@ -331,7 +333,12 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         }],
         capabilities,
         instance: Vec::new(),
-        callees: internal.into_inner().done,
+        callees: internal.done,
+        closures: internal
+            .closures
+            .into_iter()
+            .map(|c| c.expect("every closure slot is filled when its code lowers"))
+            .collect(),
     })
 }
 
@@ -342,6 +349,10 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
 struct Internal {
     started: BTreeSet<(DefId, Vec<Type>)>,
     done: Vec<Function>,
+    /// The function values' code (ADR-0052), by index. A slot is reserved
+    /// before its code is lowered, so a closure made inside another's code
+    /// has its own index.
+    closures: Vec<Option<Closure>>,
 }
 
 /// **One declaration, compiled beside the export that reaches it**, at the
@@ -444,6 +455,78 @@ fn lower_internal(
         capabilities: Vec::new(),
         instance,
         callees: Vec::new(),
+        closures: Vec::new(),
+    })
+}
+
+/// **A lambda's code, compiled as a function** (ADR-0052): its captures,
+/// then its parameters, and its body lowered against its result. It lowers
+/// under the declarations being lowered where it is made, so a call back
+/// into one of them is a call, not an inlining without end.
+#[allow(clippy::too_many_arguments)]
+fn lower_closure(
+    cx: &Context<'_>,
+    internal: &RefCell<Internal>,
+    owner: DefId,
+    unit: usize,
+    body: &Body,
+    captures: Vec<(String, Type)>,
+    params: Vec<(String, Type)>,
+    inner: ExprId,
+    ret: Type,
+    subst: BTreeMap<(DefId, u32), Type>,
+    inlining: Vec<DefId>,
+    span: Span,
+) -> Lowering<Function> {
+    let mut f = Lower {
+        cx,
+        unit,
+        next_value: 0,
+        instrs: Vec::new(),
+        locals: BTreeMap::new(),
+        types: BTreeMap::new(),
+        inlining,
+        subst,
+        internal,
+        vars: BTreeSet::new(),
+        in_lambda: 0,
+        ret: ret.clone(),
+    };
+    let mut values = Vec::new();
+    for (name, ty) in captures.into_iter().chain(params) {
+        let v = f.fresh();
+        f.locals.insert(name, v);
+        f.types.insert(v, ty.clone());
+        values.push((v, ty));
+    }
+    let result = match f.expr(body, inner, Some(&ret)) {
+        Lowering::Lowered(v) => v,
+        other => return other.map(|_| unreachable!()),
+    };
+    if f.types.get(&result) != Some(&ret) {
+        return Lowering::Blocked {
+            why: format!(
+                "a lambda produces a {:?} where a {ret:?} is its result",
+                f.types.get(&result)
+            ),
+            span,
+        };
+    }
+    let instrs = std::mem::take(&mut f.instrs);
+    Lowering::Lowered(Function {
+        def: owner,
+        export: "lambda".to_string(),
+        params: values,
+        ret,
+        blocks: vec![Block {
+            id: BlockId(0),
+            instrs,
+            terminator: Terminator::Return(result),
+        }],
+        capabilities: Vec::new(),
+        instance: Vec::new(),
+        callees: Vec::new(),
+        closures: Vec::new(),
     })
 }
 
@@ -658,6 +741,17 @@ fn instantiate(
                     && instantiate(sigs, &args[0], o, subst)
                     && instantiate(sigs, &args[1], e, subst)
             }
+            (Builtin::Function, Type::Function(ps, r)) => match args.split_last() {
+                Some((dr, dps)) => {
+                    dps.len() == ps.len()
+                        && dps
+                            .iter()
+                            .zip(ps)
+                            .all(|(d, p)| instantiate(sigs, d, p, subst))
+                        && instantiate(sigs, dr, r, subst)
+                }
+                None => false,
+            },
             _ => false,
         };
     }
@@ -779,11 +873,23 @@ fn ty_resolved_with(
             },
             Builtin::Option => arg(0).map(|a| Type::Option(Box::new(a))),
             Builtin::List => arg(0).map(|a| Type::List(Box::new(a))),
-            Builtin::Function => Lowering::Unsupported {
-                construct: "a function type",
-                span: span.clone(),
-                reason: format!("`{ty}` is a function; a function value has no layout here"),
-            },
+            // `fn(A, B) -> R`: its parameters, then its result (ADR-0052).
+            Builtin::Function => {
+                let mut all = Vec::new();
+                for i in 0..ty.args().len() {
+                    match arg(i) {
+                        Lowering::Lowered(t) => all.push(t),
+                        other => return other,
+                    }
+                }
+                match all.pop() {
+                    Some(r) => Lowering::Lowered(Type::Function(all, Box::new(r))),
+                    None => Lowering::Blocked {
+                        why: "a function type with no result".to_string(),
+                        span: span.clone(),
+                    },
+                }
+            }
         };
     }
     if sigs.privacy_qualifier(ty).is_some() && ty.args().len() == 1 {
@@ -885,11 +991,21 @@ impl<'a> Lower<'a> {
                 // A mutable binding is read as what it holds here (ADR-0051).
                 Some(v) if self.vars.contains(&v) => Lowering::Lowered(self.read(v)),
                 Some(v) => Lowering::Lowered(v),
+                // A declaration's name where a function is wanted: its code,
+                // as a value (ADR-0052).
+                None if matches!(expected, Some(Type::Function(..))) => {
+                    self.declaration_value(body, e, expected.cloned(), span)
+                }
                 None => Lowering::Blocked {
                     why: format!("`{n}` is not bound here"),
                     span,
                 },
             },
+            Expr::Lambda {
+                descriptor: None,
+                params,
+                body: inner,
+            } => self.closure(body, params, *inner, expected, span),
             Expr::Block { stmts } => {
                 let mut last = None;
                 for (i, s) in stmts.iter().enumerate() {
@@ -900,7 +1016,7 @@ impl<'a> Lower<'a> {
                     if matches!(body.expr(*s), Expr::Name(n) if n == "return") {
                         return self.early_return(body, stmts.get(i + 1).copied(), expected, span);
                     }
-                    if let Expr::Let { pat, init, .. } = body.expr(*s) {
+                    if let Expr::Let { pat, init, ty } = body.expr(*s) {
                         if tail {
                             return Lowering::Unsupported {
                                 construct: "a block ending in a binding",
@@ -908,7 +1024,8 @@ impl<'a> Lower<'a> {
                                 reason: "the block's value would be the unit value".to_string(),
                             };
                         }
-                        match self.bind(body, *pat, *init, span.clone()) {
+                        let annotated = ty.and_then(|t| self.annotation(body, t, &span));
+                        match self.bind(body, *pat, *init, annotated, span.clone()) {
                             Lowering::Lowered(()) => continue,
                             other => return other.map(|_| unreachable!()),
                         }
@@ -1802,11 +1919,46 @@ impl<'a> Lower<'a> {
                 span,
                 reason: "its descriptor belongs to a handler".to_string(),
             },
-            Expr::Name(n) if self.locals.contains_key(&n) => Lowering::Unsupported {
-                construct: "a function held in a value",
-                span,
-                reason: format!("`{n}` is a value here; pass a lambda or a declaration's name"),
-            },
+            // A function value a binding holds (ADR-0052): called, once per
+            // element.
+            Expr::Name(n) if self.locals.contains_key(&n) => {
+                let f = self.locals[&n];
+                let Some(Type::Function(ps, r)) = self.types.get(&f).cloned() else {
+                    return Lowering::Blocked {
+                        why: format!("`{n}` is passed as a function and holds none"),
+                        span,
+                    };
+                };
+                if ps.as_slice() != params {
+                    return Lowering::Blocked {
+                        why: format!("`{n}` takes {ps:?}, and is given {params:?}"),
+                        span,
+                    };
+                }
+                let bound = self.fresh_typed(params);
+                let outer = std::mem::take(&mut self.instrs);
+                let f = if self.vars.contains(&f) {
+                    self.read(f)
+                } else {
+                    f
+                };
+                let result = self.fresh();
+                self.push(Instr::Apply {
+                    result,
+                    function: f,
+                    function_ty: Type::Function(ps, r.clone()),
+                    args: bound.clone(),
+                    ty: *r,
+                });
+                let instrs = std::mem::replace(&mut self.instrs, outer);
+                Lowering::Lowered((
+                    bound,
+                    Region {
+                        instrs,
+                        value: result,
+                    },
+                ))
+            }
             Expr::Name(_) | Expr::Field { .. } => {
                 let path = crate::infer::path_of(body, f);
                 let resolution = match path.contains('.') {
@@ -2032,6 +2184,283 @@ impl<'a> Lower<'a> {
                 span,
             },
         }
+    }
+
+    /// **A lambda as a value** (ADR-0052): its code compiled as a function of
+    /// its captures and its parameters, and a value holding the captures.
+    /// Its type is the one its use gives it: an annotation, or the parameter
+    /// it is passed as.
+    fn closure(
+        &mut self,
+        body: &Body,
+        params: &[crate::hir::PatternId],
+        inner: ExprId,
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let Some(Type::Function(param_types, ret)) = expected.cloned() else {
+            return Lowering::Unsupported {
+                construct: "a lambda whose type nothing fixes",
+                span,
+                reason: "a function value's parameter types come from where it is used: \
+                         an annotation, or the parameter it is passed as"
+                    .to_string(),
+            };
+        };
+        let Some(names) = crate::values::lambda_names(body, params) else {
+            return Lowering::Unsupported {
+                construct: "a lambda parameter that is not a name",
+                span,
+                reason: "a function's parameters are names here".to_string(),
+            };
+        };
+        if names.len() != param_types.len() {
+            return Lowering::Blocked {
+                why: format!(
+                    "a lambda of {} parameters where {} are taken",
+                    names.len(),
+                    param_types.len()
+                ),
+                span,
+            };
+        }
+        // What it captures: every name its body reads that a binding here
+        // holds, as it holds it now.
+        let mut captured: BTreeMap<String, ValueId> = BTreeMap::new();
+        for id in body.walk_from(inner) {
+            let read: Vec<&String> = match body.expr(id) {
+                Expr::Name(n) => vec![n],
+                Expr::Record { fields, .. } => fields
+                    .iter()
+                    .filter(|f| f.value.is_none())
+                    .map(|f| &f.name)
+                    .collect(),
+                _ => Vec::new(),
+            };
+            for n in read {
+                if !names.contains(n)
+                    && let Some(v) = self.locals.get(n)
+                {
+                    captured.insert(n.clone(), *v);
+                }
+            }
+        }
+        let mut values = Vec::new();
+        let mut captures = Vec::new();
+        for (n, v) in captured {
+            let v = if self.vars.contains(&v) {
+                self.read(v)
+            } else {
+                v
+            };
+            let Some(t) = self.types.get(&v).cloned() else {
+                return Lowering::Blocked {
+                    why: format!("`{n}` is captured and has no type"),
+                    span,
+                };
+            };
+            values.push(v);
+            captures.push((n, t));
+        }
+        let index = self.reserve_closure();
+        let owner = self
+            .inlining
+            .last()
+            .copied()
+            .unwrap_or(DefId { unit: 0, decl: 0 });
+        let code = match lower_closure(
+            self.cx,
+            self.internal,
+            owner,
+            self.unit,
+            body,
+            captures,
+            names.into_iter().zip(param_types.iter().cloned()).collect(),
+            inner,
+            (*ret).clone(),
+            self.subst.clone(),
+            self.inlining.clone(),
+            span,
+        ) {
+            Lowering::Lowered(f) => f,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.internal.borrow_mut().closures[index] = Some(Closure {
+            captures: values.len(),
+            function: code,
+        });
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Closure {
+            result,
+            index: index as u32,
+            captures: values,
+            ty: Type::Function(param_types, ret),
+        }))
+    }
+
+    /// **A binding's written type**, resolved where the declaration being
+    /// lowered is written, under its instance (ADR-0052). `None` where it
+    /// does not resolve, and the binding is lowered as if unwritten; the
+    /// checker reports a written type that names nothing (PW0026).
+    fn annotation(&self, body: &Body, ty: crate::hir::TypeRefId, span: &Span) -> Option<Type> {
+        let written = crate::resolved::written_in_body(body, ty)?;
+        let def = *self.inlining.last()?;
+        let decl = crate::resolve::declaration(self.cx.hirs, def)?;
+        let module = self.cx.hirs[def.unit].module_of(crate::hir::DeclId(def.decl));
+        let resolution = self
+            .cx
+            .sigs
+            .resolve_type(module, decl, &written, span.clone());
+        match self.ty(&resolution, span) {
+            Lowering::Lowered(t) => Some(t),
+            _ => None,
+        }
+    }
+
+    /// A slot for a function value's code, filled once it lowers.
+    fn reserve_closure(&mut self) -> usize {
+        let mut i = self.internal.borrow_mut();
+        i.closures.push(None);
+        i.closures.len() - 1
+    }
+
+    /// **A declaration's name, where a function value is wanted**
+    /// (ADR-0052): its body compiled as the value's code, at the instance
+    /// the wanted type gives it. It captures nothing.
+    fn declaration_value(
+        &mut self,
+        body: &Body,
+        e: ExprId,
+        expected: Option<Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let Some(Type::Function(ps, r)) = expected else {
+            unreachable!("asked for a function value")
+        };
+        let path = crate::infer::path_of(body, e);
+        let def = match self.cx.ws.resolve_in(self.unit, Namespace::Term, &path) {
+            Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
+            _ => {
+                return Lowering::Blocked {
+                    why: format!("`{path}` names no declaration here"),
+                    span,
+                };
+            }
+        };
+        let (Some(decl), Some(sig)) = (
+            crate::resolve::declaration(self.cx.hirs, def),
+            self.cx.sigs.by_def(def),
+        ) else {
+            return Lowering::Blocked {
+                why: format!("`{path}` has no resolved signature"),
+                span,
+            };
+        };
+        if crate::backend::intrinsic_binding(decl).is_some()
+            || crate::backend::host_binding(decl).is_some()
+        {
+            return Lowering::Unsupported {
+                construct: "a standard-library or host operation as a function value",
+                span,
+                reason: format!("`{path}` is supplied by the compiler or the host, not compiled"),
+            };
+        }
+        let mut subst = BTreeMap::new();
+        let declared: Vec<Option<&ResolvedType>> = sig
+            .params
+            .iter()
+            .map(|p| p.as_ref().and_then(TypeResolution::resolved))
+            .collect();
+        let fits = declared.len() == ps.len()
+            && declared
+                .iter()
+                .zip(&ps)
+                .all(|(d, p)| d.is_some_and(|d| instantiate(self.cx.sigs, d, p, &mut subst)));
+        let returns = sig.returns.as_ref().and_then(TypeResolution::resolved);
+        if !fits || !returns.is_some_and(|d| instantiate(self.cx.sigs, d, &r, &mut subst)) {
+            return Lowering::Blocked {
+                why: format!("`{path}` is not a {:?}", Type::Function(ps, r)),
+                span,
+            };
+        }
+        let mut instance = Vec::new();
+        for index in 0..decl.type_params.len() as u32 {
+            match subst.get(&(def, index)) {
+                Some(t) => instance.push(t.clone()),
+                None => {
+                    return Lowering::Unsupported {
+                        construct: "a type parameter no use instantiates",
+                        span,
+                        reason: format!("`{path}` is generic, and its use fixes no instance"),
+                    };
+                }
+            }
+        }
+        let index = self.reserve_closure();
+        let code = match lower_internal(self.cx, self.internal, def, instance, subst, span.clone())
+        {
+            Lowering::Lowered(f) => f,
+            other => return other.map(|_| unreachable!()),
+        };
+        self.internal.borrow_mut().closures[index] = Some(Closure {
+            captures: 0,
+            function: code,
+        });
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Closure {
+            result,
+            index: index as u32,
+            captures: Vec::new(),
+            ty: Type::Function(ps, r),
+        }))
+    }
+
+    /// **`f(a, b)`, where `f` holds a function value** (ADR-0052).
+    #[allow(clippy::too_many_arguments)]
+    fn call_value(
+        &mut self,
+        body: &Body,
+        f: ValueId,
+        params: &[Type],
+        ret: Type,
+        args: &[crate::hir::Arg],
+        piped: Option<ValueId>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let mut lowered: Vec<ValueId> = piped.into_iter().collect();
+        for a in args {
+            let i = lowered.len();
+            match self.expr(body, a.value, params.get(i)) {
+                Lowering::Lowered(v) => lowered.push(v),
+                other => return other,
+            }
+        }
+        if lowered.len() != params.len() {
+            return Lowering::Blocked {
+                why: format!(
+                    "a function of {} parameters is given {}",
+                    params.len(),
+                    lowered.len()
+                ),
+                span,
+            };
+        }
+        for (v, p) in lowered.iter().zip(params) {
+            if self.types.get(v) != Some(p) {
+                return Lowering::Blocked {
+                    why: format!("a function taking {p:?} is given a {:?}", self.types.get(v)),
+                    span,
+                };
+            }
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Apply {
+            result,
+            function: f,
+            function_ty: Type::Function(params.to_vec(), Box::new(ret.clone())),
+            args: lowered,
+            ty: ret,
+        }))
     }
 
     /// **`return e`** (ADR-0051): `e`, of the function's result type, and the
@@ -2361,6 +2790,7 @@ impl<'a> Lower<'a> {
         body: &Body,
         pat: Option<crate::hir::PatternId>,
         init: Option<ExprId>,
+        annotated: Option<Type>,
         span: Span,
     ) -> Lowering<()> {
         let Some(init) = init else {
@@ -2370,10 +2800,23 @@ impl<'a> Lower<'a> {
                 reason: "`let x` without `= e` has nothing to bind".to_string(),
             };
         };
-        let v = match self.expr(body, init, None) {
+        // The written type, where there is one, is what the value must be:
+        // the type a lambda takes its parameters from (ADR-0052).
+        let v = match self.expr(body, init, annotated.as_ref()) {
             Lowering::Lowered(v) => v,
             other => return other.map(|_| unreachable!()),
         };
+        if let Some(t) = &annotated
+            && self.types.get(&v) != Some(t)
+        {
+            return Lowering::Blocked {
+                why: format!(
+                    "a binding written `{t:?}` is initialised with a {:?}",
+                    self.types.get(&v)
+                ),
+                span,
+            };
+        }
         match pat.map(|p| body.pat(p)) {
             // `let mut x = e`: a variable, holding `e` until assigned
             // (ADR-0051).
@@ -2676,6 +3119,20 @@ impl<'a> Lower<'a> {
     ) -> Lowering<ValueId> {
         let path = crate::infer::path_of(body, callee);
 
+        // **A call through a function value** (ADR-0052): a binding that
+        // holds one, called.
+        if let Expr::Name(n) = body.expr(callee)
+            && let Some(f) = self.locals.get(n).copied()
+            && let Some(Type::Function(ps, r)) = self.types.get(&f).cloned()
+        {
+            let f = if self.vars.contains(&f) {
+                self.read(f)
+            } else {
+                f
+            };
+            return self.call_value(body, f, &ps, *r, args, piped, span);
+        }
+
         // **Through `Signatures`, keyed by the path a call site writes.**
         // `Carts.add` is a qualified path across a module boundary, and
         // `Workspace::resolve_in` answers about a single name — asking it for a
@@ -2744,19 +3201,8 @@ impl<'a> Lower<'a> {
                 },
                 None => None,
             };
-            // A function is compiled where the standard library runs it
-            // (ADR-0040 §3); a declaration taking one would need it as a
-            // value.
-            if matches!(body.expr(a.value), Expr::Lambda { .. }) {
-                return Lowering::Unsupported {
-                    construct: "a function passed to a declaration that is not an intrinsic",
-                    span,
-                    reason: format!(
-                        "`{path}` takes a function; only the standard library's list \
-                         operations compile one, where they run it (ADR-0040 §3)"
-                    ),
-                };
-            }
+            // A lambda passed to a declaration is a function value
+            // (ADR-0052), typed by the parameter it is passed as.
             match self.expr(body, a.value, expected.as_ref()) {
                 Lowering::Lowered(v) => lowered.push(v),
                 other => return other,

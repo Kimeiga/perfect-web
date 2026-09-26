@@ -141,9 +141,10 @@ refused by name:
   on every path. There is no way to say "this function reads the value and
   hands it back"; a `use` block releases its value and is the scoped form. A
   release inside a loop is refused even when the loop would run once.
-- **A function is not a value.** A lambda or a declaration's name is compiled
-  where a list operation runs it; stored, returned, or passed to any other
-  declaration, it is refused.
+- **A function value read from a record field is not called** (ADR-0052).
+  A function is a value: a lambda or a declaration's name is stored,
+  returned, passed and called. But `r.check(5)` reads as a method call. A
+  lambda whose use fixes no parameter types is refused by name.
 - **A statement keyword cannot name a value** (PW0013, ADR-0041, ruling
   needed). `let query = ..` is refused rather than read as a `query ..`
   statement at every use.
