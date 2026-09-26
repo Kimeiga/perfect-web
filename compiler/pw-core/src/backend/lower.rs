@@ -2110,11 +2110,14 @@ impl<'a> Lower<'a> {
         expected: Option<&Type>,
         span: Span,
     ) -> Lowering<ValueId> {
+        // The checker gives a named argument to the parameter of its name
+        // (ADR-0081); an operation takes its arguments in order, and is not
+        // given them by name yet.
         if args.iter().any(|a| a.name.is_some()) {
             return Lowering::Unsupported {
-                construct: "a named argument",
+                construct: "a named argument to a standard-library operation",
                 span,
-                reason: "a signature does not carry parameter names".to_string(),
+                reason: "an operation takes its arguments in order".to_string(),
             };
         }
         // The arguments as written, the piped value first.
@@ -4802,11 +4805,25 @@ impl<'a> Lower<'a> {
         };
 
         // The arguments, each expecting its parameter's declared type. A piped
-        // value is the first.
-        let mut lowered: Vec<ValueId> = piped.into_iter().collect();
-        let offset = lowered.len();
-        for (i, a) in args.iter().enumerate() {
-            let i = i + offset;
+        // value is the first. A named argument is given to the parameter of
+        // its name (ADR-0081): each is lowered in the order written, and
+        // passed in the order declared. Until 2026-09-26 they were passed as
+        // written, so `g(b = 1, a = 10)` computed `g(1, 10)`.
+        let offset = usize::from(piped.is_some());
+        let written: Vec<Option<&str>> = args.iter().map(|a| a.name.as_deref()).collect();
+        let Ok(order) = crate::signatures::arrange(&sig.names, offset, &written) else {
+            return Lowering::Blocked {
+                why: format!(
+                    "a named argument in this call to `{path}` names no parameter, or one twice"
+                ),
+                span,
+            };
+        };
+        let mut slots: Vec<Option<ValueId>> = vec![None; offset + args.len()];
+        if let Some(p) = piped {
+            slots[0] = Some(p);
+        }
+        for (a, i) in args.iter().zip(order) {
             let expected = match sig.params.get(i).and_then(Option::as_ref) {
                 Some(p) => match ty_resolution(self.cx.sigs, p, &span) {
                     Lowering::Lowered(t) => Some(t),
@@ -4817,10 +4834,24 @@ impl<'a> Lower<'a> {
             // A lambda passed to a declaration is a function value
             // (ADR-0052), typed by the parameter it is passed as.
             match self.expr(body, a.value, expected.as_ref()) {
-                Lowering::Lowered(v) => lowered.push(v),
+                Lowering::Lowered(v) => match slots.get_mut(i) {
+                    Some(slot) => *slot = Some(v),
+                    None => {
+                        return Lowering::Blocked {
+                            why: format!("`{path}` is given more arguments than it declares"),
+                            span,
+                        };
+                    }
+                },
                 other => return other,
             }
         }
+        let Some(lowered) = slots.into_iter().collect::<Option<Vec<ValueId>>>() else {
+            return Lowering::Blocked {
+                why: format!("a parameter of `{path}` is given no argument"),
+                span,
+            };
+        };
 
         // **A command a handler calls** (ADR-0058): through its context, in
         // the browser, by the contract's component id. Its arguments are sent

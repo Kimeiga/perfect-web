@@ -273,6 +273,11 @@ codes! {
     // refuse it.
     INT_LITERAL_RANGE = "PW0616" / int_literal_range / 1, Types,
         "an `Int` literal must fit in 64 bits";
+    // ADR-0081: until 2026-09-26 a named argument's type was related to
+    // nothing, and the backend passed arguments in written order, so
+    // `g(b = 1, a = 10)` computed `g(1, 10)`.
+    NAMED_ARGUMENT = "PW0617" / named_argument / 1, Types,
+        "a named argument is given to the parameter of its name, once, after the positional ones";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

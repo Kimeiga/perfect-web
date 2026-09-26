@@ -983,6 +983,23 @@ e10-affine-bindings:
      } > docs/evidence/E10/affine-bindings.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/affine-bindings.txt
 
+# ADR-0081: a named argument is given to the parameter of its name. The
+# checker's tests, the call run through the E8 host, and the mutation
+# controls.
+e10-named-arguments:
+    @{ echo "ADR-0081 - a named argument is given to the parameter of its name"; echo; \
+       echo "produced by: just e10-named-arguments"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker and the labels (compiler/pw-core/tests/named_arguments.rs)"; echo; \
+       cargo test --locked -p pw-core --test named_arguments 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the call, through the E8 host (compiler/pw-conformance/tests/named_arguments.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test named_arguments 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/named_argument_mutations.py)"; echo; \
+       python3 scripts/named_argument_mutations.py; \
+     } > docs/evidence/E10/named-arguments.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/named-arguments.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

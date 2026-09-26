@@ -395,6 +395,9 @@ pub enum RelationKind {
     /// be absent, which a template takes apart with `{#match}` (PW0600,
     /// ADR-0074).
     Absent,
+    /// `f(z = 1)`: a named argument, against the parameters the callee names
+    /// (PW0617, ADR-0081).
+    Named,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -419,8 +422,6 @@ pub enum Undecided {
     Unknown,
     /// The declared type did not resolve; the relation refuses to run on it.
     ExpectedUnresolved,
-    /// The call names its arguments, and a signature does not carry names.
-    NamedArguments,
     /// The call has the wrong number of arguments; `Arity` owns that.
     ArityMismatch,
 }
@@ -1457,6 +1458,7 @@ impl<'a> Typer<'a> {
         if let Some(p) = self.piped.get(&id) {
             supplied.push((None, *p));
         }
+        let leading = supplied.len();
         supplied.extend(args);
 
         let Callee {
@@ -1596,14 +1598,65 @@ impl<'a> Typer<'a> {
                 ),
             ),
         });
-        let named = supplied.iter().any(|(n, _)| n.is_some());
+        // Each named argument, to the parameter of its name (ADR-0081). Until
+        // 2026-09-26 a call that named one related none of its arguments.
+        let mut named_fault = None;
+        if supplied.iter().any(|(n, _)| n.is_some()) {
+            let names: Vec<String> = match &target {
+                Target::Callable(sig) | Target::Member(sig, _) => sig.names.clone(),
+                Target::Record(_) => field_names.clone().unwrap_or_default(),
+                // A case's fields and an opaque type's representation are
+                // not named.
+                Target::Case(..) | Target::Opaque(_) => Vec::new(),
+            };
+            let written: Vec<Option<&str>> = supplied[leading..]
+                .iter()
+                .map(|(n, _)| n.as_deref())
+                .collect();
+            match crate::signatures::arrange(&names, leading, &written) {
+                Ok(order) if arity_ok => {
+                    let mut arranged = supplied.clone();
+                    for (k, i) in order.into_iter().enumerate() {
+                        arranged[i] = supplied[leading + k].clone();
+                    }
+                    supplied = arranged;
+                }
+                Ok(_) => {}
+                Err(fault) => named_fault = Some(fault),
+            }
+        }
+        if let Some(fault) = &named_fault {
+            use crate::signatures::ArgFault;
+            relations.push(ValueRelation {
+                declaration: self.decl.name.clone(),
+                kind: RelationKind::Named,
+                span: span.clone(),
+                target: name.clone(),
+                index: None,
+                outcome: Outcome::Disagree {
+                    expected: match fault {
+                        ArgFault::Unknown(_) => "unknown",
+                        ArgFault::Twice(_) => "twice",
+                        ArgFault::AfterNamed => "after",
+                    }
+                    .to_string(),
+                    actual: match fault {
+                        ArgFault::Unknown(n) | ArgFault::Twice(n) => n.clone(),
+                        ArgFault::AfterNamed => String::new(),
+                    },
+                },
+                declared_at: None,
+                boundary: (
+                    callee_span.clone(),
+                    format!("`{name}` names its parameters"),
+                ),
+            });
+        }
 
         for (i, (_, value)) in supplied.iter().enumerate() {
             let expected = params.get(i).cloned().flatten();
-            let outcome = if !arity_ok {
+            let outcome = if !arity_ok || named_fault.is_some() {
                 Outcome::Undecided(Undecided::ArityMismatch)
-            } else if named {
-                Outcome::Undecided(Undecided::NamedArguments)
             } else {
                 match &expected {
                     Some(TypeResolution::Resolved(t)) => {
@@ -1733,11 +1786,23 @@ impl<'a> Typer<'a> {
                 },
             },
         )];
+        // A function value's parameters have no names (ADR-0081).
+        let named = args.iter().find_map(|a| a.name.clone());
+        if let Some(n) = &named {
+            relations.push(relation(
+                RelationKind::Named,
+                span.clone(),
+                None,
+                Outcome::Disagree {
+                    expected: "unnamed".to_string(),
+                    actual: n.clone(),
+                },
+            ));
+        }
         if supplied.len() == params.len() {
-            let named = args.iter().any(|a| a.name.is_some());
             for (i, (value, expected)) in supplied.iter().zip(&params).enumerate() {
-                let outcome = if named {
-                    Outcome::Undecided(Undecided::NamedArguments)
+                let outcome = if named.is_some() {
+                    Outcome::Undecided(Undecided::ArityMismatch)
                 } else {
                     // A lambda is typed against the function type it is
                     // passed as.
@@ -3670,6 +3735,31 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  a `Result` or a sum type has no truth, and the renderer refuses it",
             )
             .repair("take it apart with `{#match}`"),
+            RelationKind::Named => Diagnostic::error(
+                crate::codes::NAMED_ARGUMENT.id,
+                crate::codes::NAMED_ARGUMENT.invariant,
+                Detector::Signature,
+                match expected.as_str() {
+                    "unknown" => format!("`{}` has no parameter `{actual}`", r.target),
+                    "twice" => format!("`{}`'s parameter `{actual}` is given twice", r.target),
+                    "unnamed" => format!(
+                        "`{}` is a function value, whose parameters have no names, and this \
+                         names `{actual}`",
+                        r.target
+                    ),
+                    _ => format!(
+                        "a positional argument follows a named one in this call to `{}`",
+                        r.target
+                    ),
+                },
+                r.span.clone(),
+            )
+            .reason("named_argument_names_no_parameter")
+            .explain(
+                "an argument written with a name is given to the parameter of that name; \
+                 the positional ones come first, and fill the parameters in order",
+            )
+            .repair("name a parameter the declaration has, once, after the positional arguments"),
             RelationKind::Text => Diagnostic::error(
                 crate::codes::OPERAND_TYPE.id,
                 crate::codes::OPERAND_TYPE.invariant,

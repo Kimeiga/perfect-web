@@ -29,6 +29,65 @@ pub struct Signature {
     /// No annotation is not the same as an annotation which did not resolve.
     pub returns: Option<TypeResolution>,
     pub params: Vec<Option<TypeResolution>>,
+    /// Each parameter's name, in order, for a named argument (ADR-0081).
+    /// Empty where a parameter has none: a field read as a member takes its
+    /// receiver unnamed.
+    pub names: Vec<String>,
+}
+
+/// Why a call's named arguments do not arrange (ADR-0081).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArgFault {
+    /// `f(z = 1)`, where `f` has no parameter `z`.
+    Unknown(String),
+    /// `f(1, a = 2)`, where the first parameter is `a`: given twice.
+    Twice(String),
+    /// `f(a = 1, 2)`: a positional argument after a named one.
+    AfterNamed,
+}
+
+/// **Which parameter each written argument is given to** (ADR-0081).
+///
+/// `leading` parameters are taken first, by a method call's receiver or a
+/// piped value. Positional arguments fill the parameters after them in
+/// order, and a named one the parameter of its name. `Ok(v)`: `v[k]` is the
+/// parameter the `k`th written argument binds. Until 2026-09-26 nothing
+/// arranged them: the checker left a named argument's type undecided, and the
+/// backend passed arguments in written order, so `g(b = 1, a = 10)` computed
+/// `g(1, 10)`.
+pub fn arrange(
+    names: &[String],
+    leading: usize,
+    written: &[Option<&str>],
+) -> Result<Vec<usize>, ArgFault> {
+    let mut taken: Vec<bool> = vec![false; names.len().max(leading + written.len())];
+    for t in taken.iter_mut().take(leading) {
+        *t = true;
+    }
+    let mut next = leading;
+    let mut named = false;
+    let mut out = Vec::with_capacity(written.len());
+    for w in written {
+        let i = match w {
+            None if named => return Err(ArgFault::AfterNamed),
+            None => {
+                next += 1;
+                next - 1
+            }
+            Some(n) => {
+                named = true;
+                names
+                    .iter()
+                    .position(|p| p == n)
+                    .ok_or_else(|| ArgFault::Unknown(n.to_string()))?
+            }
+        };
+        if std::mem::replace(&mut taken[i], true) {
+            return Err(ArgFault::Twice(names.get(i).cloned().unwrap_or_default()));
+        }
+        out.push(i);
+    }
+    Ok(out)
 }
 
 impl Signature {
@@ -227,6 +286,7 @@ impl Signatures {
                                     label,
                                     returns: Some(result),
                                     params: vec![Some(recv.clone())],
+                                    names: vec![String::new()],
                                 },
                             );
                         }
@@ -320,6 +380,7 @@ impl Signatures {
                 .iter()
                 .map(|p| p.ty.as_ref().map(|t| resolve(t, p.span.clone())))
                 .collect(),
+            names: decl.params.iter().map(|p| p.name.clone()).collect(),
         }
     }
 

@@ -112,6 +112,9 @@ refused by name:
   computed and did not report: it is PW0333 now;
 - a `return`, a `?` or an assignment inside a lambda a list operation runs,
   and an assignment to a field (ADR-0051);
+- a named argument to a standard-library operation, which the checker
+  gives to the parameter of its name and the backend refuses by name: an
+  operation takes its arguments in order (ADR-0081);
 - `%` on a `Float`, and a `Float` interpolated: their semantics are not
   decided;
 - list and string operations beyond the ones the standard library declares

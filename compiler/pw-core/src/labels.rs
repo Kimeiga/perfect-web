@@ -475,8 +475,32 @@ impl<'a> Labels<'a> {
                             }
                             _ => None,
                         });
-                        let given = first.into_iter().chain(args.iter().map(|a| a.value));
+                        // Each argument, to the parameter it is given to: a
+                        // named one to the parameter of its name (ADR-0081).
+                        // A call whose names do not arrange is PW0617's, and
+                        // carries every argument's label meanwhile.
+                        let leading = usize::from(first.is_some());
+                        let written: Vec<Option<&str>> =
+                            args.iter().map(|a| a.name.as_deref()).collect();
+                        let Ok(order) = crate::signatures::arrange(&sig.names, leading, &written)
+                        else {
+                            return args
+                                .iter()
+                                .map(|a| a.value)
+                                .chain(first)
+                                .fold(l, |acc, v| acc.join(&self.label(body, v)));
+                        };
+                        let mut given: Vec<Option<ExprId>> = vec![None; sig.params.len()];
+                        if let (Some(f), Some(slot)) = (first, given.get_mut(0)) {
+                            *slot = Some(f);
+                        }
+                        for (a, i) in args.iter().zip(order) {
+                            if let Some(slot) = given.get_mut(i) {
+                                *slot = Some(a.value);
+                            }
+                        }
                         for (param, value) in sig.params.iter().zip(given) {
+                            let Some(value) = value else { continue };
                             if param
                                 .as_ref()
                                 .and_then(crate::resolved::TypeResolution::resolved)

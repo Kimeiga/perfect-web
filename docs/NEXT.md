@@ -116,8 +116,10 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    ADR-0062's tests), then a generic type at the boundary, a WIT type per
    instance;
 5. structural `==`; ~~reporting an arm no case reaches~~, done (ADR-0076);
-6. named-argument calls, the unit value `()`, `derived` purity, calling a
-   function held in a record field, and a hole holding a string;
+6. ~~named-argument calls~~, done (ADR-0081), which found them compiled
+   in written order; the unit value `()`, `derived` purity, calling a
+   function held in a record field (checked since ADR-0077; the backend
+   refuses it by name), and a hole holding a string;
 7. `Float` `%` and `Float` formatting, then `split` and `range`;
 8. each needing a ruling first:
    - the event as a handler parameter;

@@ -547,3 +547,12 @@ where each branch ended an inner `tx`, correct programs were refused, and
 an end through `let end = Database.rollback` counted nothing. It follows the
 binding a name means now; a local bound to a declaration is that
 declaration, and a value given to any other function value is refused.
+
+## 2026-09-26: a named argument is given to the parameter of its name (E10)
+
+[ADR-0081](DECISIONS/ADR-0081-a-named-argument-is-its-parameters.md): the
+backend passed arguments in written order, so `g(b = 1, a = 10)` computed
+`g(1, 10)`, a silent miscompile; the checker related no argument of a call
+that named one; and a generic result's label was carried from the argument
+in the wrong place. Signatures carry parameter names now, and one
+arrangement serves the checker, the labels and the backend (PW0617).

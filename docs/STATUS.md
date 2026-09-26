@@ -78,6 +78,25 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a call with named arguments compiled them in
+written order** ([ADR-0081](DECISIONS/ADR-0081-a-named-argument-is-its-parameters.md)).
+- **A silent miscompile.** `g(b = 1, a = n)`, with `fn g(a: Int, b: Int)`,
+  compiled as `g(1, n)`: `Named(10)` answered `-9` through the E8 host,
+  where it means `9`. A signature carried no parameter names, so nothing
+  could place a named argument.
+- **Named arguments were checked by nothing.** A wrong type, a name the
+  callee lacks, a parameter given twice and a positional argument after a
+  named one each passed.
+- **A generic result's label was carried from the wrong argument**, so a
+  secret given by name to a generic helper came out public.
+
+Signatures carry parameter names now, one arrangement serves the checker,
+the labels and the backend, and PW0617 refuses one that fails. No example
+calls a declaration with named arguments.
+
+Evidence: [named-arguments.txt](evidence/E10/named-arguments.txt)
+(`just e10-named-arguments`).
+
 **Correction, 2026-09-26: PW2005 found a transaction by its name, so a
 transaction never ended passed**
 ([ADR-0080](DECISIONS/ADR-0080-the-affine-rule-follows-bindings.md)). ADR-0045
