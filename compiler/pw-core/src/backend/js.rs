@@ -299,13 +299,13 @@ fn value(cx: &Cx<'_>, e: ExprId) -> Encoding<String> {
             _ => refuse!("a float literal", "`{f}` is not a finite number"),
         },
         // The literal's VALUE, JSON-encoded, never its token: the token keeps
-        // its quotes and escapes as written, and what an escape means is not
-        // yet decided by the language (`Literal::string_value`).
+        // its quotes and escapes as written, and `Literal::string_value` is
+        // what they mean (ADR-0049).
         Expr::Literal(l @ Literal::Str(s)) => match l.string_value() {
-            Some(v) => Encoding::Encoded(json(v)),
+            Some(v) => Encoding::Encoded(json(&v)),
             None => refuse!(
-                "a string literal whose escapes the language does not define",
-                "`{s}` means something only under an escape rule"
+                "a string literal with no value",
+                "`{s}` has none; the grammar refuses it (PW0014)"
             ),
         },
         Expr::Name(n)

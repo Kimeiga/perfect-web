@@ -715,9 +715,18 @@ impl Lowerer<'_> {
                         // A string with `{..}` holes is not a literal: the holes
                         // are expressions, and a checker that has to search the
                         // characters for them cannot see into `{token.value}`.
-                        if s.contains('{') {
-                            let start = span.start;
-                            let parts = self.interpolations(b, &s, start);
+                        // Where the holes are is the string decoder's answer
+                        // (ADR-0049): `\{` opens none, and a `"""` string has
+                        // none.
+                        if let Ok(pieces) = pw_syntax::strings::pieces(&s) {
+                            let mut parts = Vec::new();
+                            for p in &pieces {
+                                if let pw_syntax::strings::Piece::Hole { source, at } = p
+                                    && let Some(id) = self.expression_at(b, source, span.start + at)
+                                {
+                                    parts.push(id);
+                                }
+                            }
                             if !parts.is_empty() {
                                 return b.expr(Expr::Interpolated { text: s, parts }, span);
                             }

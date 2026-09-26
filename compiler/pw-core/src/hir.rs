@@ -731,27 +731,21 @@ pub enum Literal {
 }
 
 impl Literal {
-    /// **The value a string literal denotes, where the language has decided
-    /// one**: `"espresso"` is `espresso`.
+    /// **The value a string literal denotes**: `"espresso"` is `espresso`,
+    /// and `"a\nb"` is `a`, a line feed and `b` (ADR-0049).
     ///
-    /// A `Literal::Str` holds its source TOKEN, quotes and escapes as written.
-    /// What an escape means is not specified anywhere: the lexer knows only
-    /// that a backslash keeps the next character inside the string, and the
-    /// Koka and Marko backends pass the token through to targets whose escape
-    /// rules differ. So only a token whose value depends on no escape rule has
-    /// one here: `"..."` with no backslash in it. A `"""` string is `None`
-    /// too, because what happens to its first newline and its indentation is
-    /// equally undecided. A backend given `None` refuses; it does not pick a
-    /// rule (docs/KNOWN_LIMITATIONS.md, string escapes).
-    pub fn string_value(&self) -> Option<&str> {
+    /// A `Literal::Str` holds its source TOKEN, quotes and escapes as written;
+    /// `pw_syntax::strings` is the one reading of it, which every backend
+    /// shares. Until 2026-09-25 a token with a backslash, or a `"""` string,
+    /// had no value here (A-023), and backends refused it or passed it to
+    /// their targets' rules. `None` now only for a token the grammar already
+    /// refused (PW0014), or one with a hole, which lowers as
+    /// `Expr::Interpolated` instead.
+    pub fn string_value(&self) -> Option<String> {
         let Literal::Str(token) = self else {
             return None;
         };
-        if token.starts_with("\"\"\"") {
-            return None;
-        }
-        let inner = token.strip_prefix('"')?.strip_suffix('"')?;
-        (!inner.contains('\\')).then_some(inner)
+        pw_syntax::strings::value(token).ok().flatten()
     }
 }
 

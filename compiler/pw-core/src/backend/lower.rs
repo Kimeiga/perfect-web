@@ -617,12 +617,11 @@ impl<'a> Lower<'a> {
                     // held the token, quotes included, which nothing noticed
                     // because the encoder refuses constants that need memory.
                     Literal::Str(s) => match l.string_value() {
-                        Some(v) => (Const::Str(v.to_string()), Type::Str),
+                        Some(v) => (Const::Str(v), Type::Str),
                         None => {
-                            return Lowering::Unsupported {
-                                construct: "a string literal whose escapes the language does not define",
+                            return Lowering::Blocked {
+                                why: format!("`{s}` has no value; the grammar refuses it (PW0014)"),
                                 span,
-                                reason: format!("`{s}` means something only under an escape rule"),
                             };
                         }
                     },
@@ -1055,68 +1054,49 @@ impl<'a> Lower<'a> {
         parts: &[ExprId],
         span: Span,
     ) -> Lowering<ValueId> {
-        if text.starts_with("\"\"\"") || text.contains('\\') {
-            return Lowering::Unsupported {
-                construct: "an interpolated string whose escapes the language does not define",
-                span,
-                reason: "A-023: a string literal has a value only where no escape rule is \
-                         involved"
-                    .to_string(),
-            };
-        }
-        let Some(inner) = text.strip_prefix('"').and_then(|t| t.strip_suffix('"')) else {
-            return Lowering::Blocked {
-                why: "an interpolated string that is not a quoted token".to_string(),
-                span,
-            };
-        };
-        enum Piece<'t> {
-            Text(&'t str),
-            Hole(usize),
-        }
-        let mut pieces = Vec::new();
-        let mut rest = inner;
-        let mut next = 0;
-        while let Some(open) = rest.find('{') {
-            let after = &rest[open + 1..];
-            let Some(close) = after.find('}') else {
-                break;
-            };
-            pieces.push(Piece::Text(&rest[..open]));
-            if after[..close].trim().is_empty() {
-                return Lowering::Unsupported {
-                    construct: "an empty interpolation hole",
+        // The string decoder's pieces (ADR-0049): its text, escapes decoded,
+        // and its holes in order. Until 2026-09-25 a string with a backslash,
+        // or a `"""` one, was refused here (A-023), and this split the token
+        // on its own.
+        use pw_syntax::strings::Piece;
+        let pieces = match pw_syntax::strings::pieces(text) {
+            Ok(p) => p,
+            Err(e) => {
+                return Lowering::Blocked {
+                    why: format!("the string has no value ({}); PW0014 refuses it", e.message),
                     span,
-                    reason: "`{}` holds no expression".to_string(),
                 };
             }
-            pieces.push(Piece::Hole(next));
-            next += 1;
-            rest = &after[close + 1..];
-        }
-        pieces.push(Piece::Text(rest));
-        if next != parts.len() {
+        };
+        let holes = pieces
+            .iter()
+            .filter(|p| matches!(p, Piece::Hole { .. }))
+            .count();
+        if holes != parts.len() {
             return Lowering::Blocked {
                 why: format!(
-                    "the string has {next} holes and {} of them parsed",
+                    "the string has {holes} holes and {} of them parsed",
                     parts.len()
                 ),
                 span,
             };
         }
         let mut values = Vec::new();
+        let mut next = 0;
         for piece in pieces {
             match piece {
-                Piece::Text("") => {}
+                Piece::Text(t) if t.is_empty() => {}
                 Piece::Text(t) => {
                     let result = self.fresh();
                     values.push(self.push(Instr::Const {
                         result,
-                        value: Const::Str(t.to_string()),
+                        value: Const::Str(t),
                         ty: Type::Str,
                     }));
                 }
-                Piece::Hole(i) => {
+                Piece::Hole { .. } => {
+                    let i = next;
+                    next += 1;
                     let v = match self.expr(body, parts[i], None) {
                         Lowering::Lowered(v) => v,
                         other => return other,

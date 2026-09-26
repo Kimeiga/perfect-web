@@ -101,6 +101,11 @@ public query Head(xs: List<Int>) -> Int {
 }
 
 public query AsFloat(n: Int) -> Float { Float.from_int(n) }
+
+// ADR-0049: a string's escapes are the language's, the same in both.
+public query Escapes() -> String { \"tab\\there \\\"q\\\" \\\\ \\{x\\} \\u{1F600}\\n\" }
+
+public query Framed(text: String) -> String { \"[\\t{text}\\n]\" }
 ";
 
 const CASES: usize = 200;

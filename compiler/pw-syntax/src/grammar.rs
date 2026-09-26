@@ -793,6 +793,21 @@ impl<'a> P<'a> {
     fn expr_lhs(&mut self, cp: rowan::Checkpoint) {
         match self.cur() {
             Kind::Int | Kind::Float | Kind::Str | Kind::UnterminatedStr => {
+                // A string's escapes and holes are the language's (ADR-0049):
+                // one it does not define is refused here, at its token,
+                // rather than given whatever meaning a backend's target has.
+                if self.at(Kind::Str)
+                    && let Err(e) = crate::strings::pieces(self.cur_text())
+                {
+                    let span = self.cur_span();
+                    let at = span.start + e.at;
+                    self.errors.push(SyntaxError {
+                        code: "PW0014",
+                        message: e.message,
+                        span: at..(at + 1).min(span.end),
+                        help: None,
+                    });
+                }
                 self.start(K::LiteralExpr);
                 self.bump();
                 self.finish();

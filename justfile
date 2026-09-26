@@ -606,6 +606,29 @@ e10-affine:
      } > docs/evidence/E10/affine.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
 
+# ADR-0049: a string's escapes are the language's. The decoder's tests, the
+# checker's, the compiled values, and the mutation controls.
+e10-strings:
+    @{ echo "ADR-0049 - a string's escapes are the language's"; echo; \
+       echo "produced by: just e10-strings"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the decoder (compiler/pw-syntax/src/strings.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib strings 2>&1 | grep -E '^test result'; \
+       echo; echo "== the checker, Koka and Marko (compiler/pw-core/tests/string_escapes.rs)"; echo; \
+       cargo test --locked -p pw-core --test string_escapes 2>&1 | grep -E '^test result'; \
+       echo; echo "== compiled components through the host (pw-conformance/tests/strings.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test strings 2>&1 | grep -E '^test result'; \
+       echo; echo "== the component and the JavaScript module, on the same arguments"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*"; \
+       echo; echo "== mutation controls (scripts/string_mutations.py)"; echo; \
+       python3 scripts/string_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a string inside a hole, or decoded policy strings."; \
+     } > docs/evidence/E10/strings.txt
+    @grep -E "^javascript:|mutants killed" docs/evidence/E10/strings.txt
+
 # ADR-0048: a read names a member its value's type has (PW0610). The member
 # tests, the corpus that must stay clean, and the mutation controls.
 e10-members:

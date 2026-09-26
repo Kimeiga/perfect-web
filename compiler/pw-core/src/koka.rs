@@ -194,7 +194,7 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
     Ok(match b.expr(id) {
         Expr::Literal(l) => match l {
             Literal::Int(s) | Literal::Float(s) => s.clone(),
-            Literal::Str(s) => s.clone(),
+            Literal::Str(_) => koka_string(l)?,
             Literal::UnterminatedStr(_) => return Err("an unterminated string"),
         },
 
@@ -353,7 +353,8 @@ fn lower_pattern(b: &Body, id: crate::hir::PatternId) -> Result<String, &'static
                 format!("{head}( {} )", parts?.join(", "))
             }
         }
-        Pattern::Literal(Literal::Int(s) | Literal::Float(s) | Literal::Str(s)) => s.clone(),
+        Pattern::Literal(l @ Literal::Str(_)) => koka_string(l)?,
+        Pattern::Literal(Literal::Int(s) | Literal::Float(s)) => s.clone(),
         Pattern::Literal(_) => return Err("an unsupported literal pattern"),
         Pattern::Or(_) => return Err("an or-pattern"),
         Pattern::Error => return Err("a pattern that did not parse"),
@@ -361,6 +362,27 @@ fn lower_pattern(b: &Body, id: crate::hir::PatternId) -> Result<String, &'static
 }
 
 // --- names ---------------------------------------------------------------
+
+/// **A string literal, in Koka's syntax.** The value is Pleris's
+/// (`Literal::string_value`, ADR-0049), never the token: until 2026-09-25 the
+/// token was passed through, so an escape meant whatever Koka's rules said.
+/// Written with only the escapes Koka 3.2.3 was run against: `\\`, `\"`,
+/// `\uXXXX` and `\UXXXXXX`; printable ASCII stays as it is.
+fn koka_string(l: &Literal) -> Result<String, &'static str> {
+    let v = l.string_value().ok_or("a string literal with no value")?;
+    let mut out = String::from("\"");
+    for c in v.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            ' '..='~' => out.push(c),
+            c if (c as u32) <= 0xFFFF => out.push_str(&format!("\\u{:04X}", c as u32)),
+            c => out.push_str(&format!("\\U{:06X}", c as u32)),
+        }
+    }
+    out.push('"');
+    Ok(out)
+}
 
 fn starts_upper(s: &str) -> bool {
     s.chars().next().is_some_and(char::is_uppercase)

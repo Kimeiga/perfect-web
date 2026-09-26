@@ -178,10 +178,9 @@ narrow:
   browser's arguments by the component's parameters: `PositiveInt` arrives as
   an `s64`, and any `s64` is accepted. `opaque type PositiveInt = Int` states
   no invariant that could be checked.
-- **String escapes are not defined** (A-023). A string literal containing a
-  backslash, and a `"""` string, have no value in the handler backend or the
-  Wasm lowering, and both refuse them. The Koka and Marko backends pass the
-  token through to their targets' escape rules.
+- **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
+  token at the inner quote. Escapes are defined, and every backend reads one
+  decoder; policy strings (`because`, `route`, `host`) are read as written.
 
 ## Research requirements are not implemented guarantees
 

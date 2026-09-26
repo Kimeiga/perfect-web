@@ -294,3 +294,8 @@ value names a member its type has (PW0610): a field, or a declaration whose
 first parameter takes the type. An opaque type's `.value` is its
 representation in its own module only. It found eight reads of members no
 type has, among them the store page's `{cart.line_count}`.
+
+[ADR-0049](DECISIONS/ADR-0049-string-escapes.md): a string's escapes are the
+language's, settling A-023. One decoder in `pw_syntax::strings` reads every
+string token; an undefined escape is PW0014; `"""` strings are raw; each
+backend encodes the value in its own syntax.

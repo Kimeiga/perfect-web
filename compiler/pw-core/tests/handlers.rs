@@ -309,14 +309,25 @@ fn each_path_read_is_read_where_the_document_carries_it() {
 }
 
 #[test]
-fn a_string_whose_value_needs_an_escape_rule_is_refused() {
-    // The language does not say what `\"` means inside a string. The Koka and
-    // Marko backends pass the token to their targets' rules; this one refuses
-    // rather than choose JavaScript's.
-    refused(
-        "Rename(item.id, \"new \\\"name\\\"\")",
-        "a string literal whose escapes the language does not define",
-        "escape rule",
+fn a_string_with_escapes_sends_its_value() {
+    // Refused until 2026-09-25, when the language did not say what `\"` means
+    // (A-023). It says now (ADR-0049), and the module sends the decoded value,
+    // JSON-encoded: the quotes are the value's, and a line feed is one.
+    let m = compiled("Rename(item.id, \"new \\\"name\\\"\\n\")");
+    assert!(
+        m.source
+            .contains(r#"[context.captures["item"]["id"], "new \"name\"\n"]"#),
+        "{}",
+        m.source
+    );
+    // Escapes JSON writes differently, so a module that sent the token would
+    // not pass: `\{` and `\}` are braces, and `\u{41}` is `A`.
+    let m = compiled("Rename(item.id, \"\\{x\\} \\u{41}\")");
+    assert!(
+        m.source
+            .contains(r#"[context.captures["item"]["id"], "{x} A"]"#),
+        "{}",
+        m.source
     );
 }
 

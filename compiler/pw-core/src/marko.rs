@@ -725,9 +725,34 @@ fn dom_event(event: &str) -> Result<&'static str, String> {
 fn expr_text(body: &Body, id: ExprId, ctx: &Ctx<'_>) -> Result<String, String> {
     Ok(match body.expr(id) {
         Expr::Name(n) => ctx.name(n),
-        Expr::Literal(Literal::Int(s) | Literal::Float(s) | Literal::Str(s)) => s.clone(),
-        // Rendered as written; the adapter emits the template's own syntax.
-        Expr::Interpolated { text, .. } => text.clone(),
+        Expr::Literal(Literal::Int(s) | Literal::Float(s)) => s.clone(),
+        // The literal's value (ADR-0049), as a JavaScript string. Until
+        // 2026-09-25 the Pleris token was emitted, so an escape meant what
+        // JavaScript's rules said.
+        Expr::Literal(l @ Literal::Str(_)) => {
+            let v = l.string_value().ok_or("a string literal with no value")?;
+            serde_json::Value::String(v).to_string()
+        }
+        // Its pieces, joined. Until 2026-09-25 this emitted the token, and a
+        // JavaScript string with `{name}` in it renders the braces.
+        Expr::Interpolated { text, parts } => {
+            let pieces = pw_syntax::strings::pieces(text)
+                .map_err(|e| format!("a string with no value: {}", e.message))?;
+            let mut holes = parts.iter();
+            let mut out = Vec::new();
+            for p in pieces {
+                match p {
+                    pw_syntax::strings::Piece::Text(t) => {
+                        out.push(serde_json::Value::String(t).to_string())
+                    }
+                    pw_syntax::strings::Piece::Hole { .. } => {
+                        let e = holes.next().ok_or("a hole that did not parse")?;
+                        out.push(format!("String({})", expr_text(body, *e, ctx)?));
+                    }
+                }
+            }
+            format!("({})", out.join(" + "))
+        }
         Expr::Literal(Literal::UnterminatedStr(_)) => {
             return Err("an unterminated string".to_string());
         }

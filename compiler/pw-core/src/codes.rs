@@ -120,6 +120,11 @@ codes! {
     // emitted PW0009 for it, which named the wrong invariant.
     KEYWORD_AS_NAME = "PW0013" / keyword_as_name / 1, Syntax,
         "a statement keyword cannot name a binding or a parameter";
+    // ADR-0049: a string's escapes are the language's. Until 2026-09-25 a
+    // backslash had no defined meaning (A-023), and backends either refused it
+    // or passed it to their targets' rules.
+    STRING_ESCAPE = "PW0014" / string_escape / 1, Syntax,
+        "a string's escapes and holes must be ones the language defines";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------

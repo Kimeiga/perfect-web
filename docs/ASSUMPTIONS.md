@@ -413,7 +413,12 @@ cannot compute its arguments in the browser.
 
 ## A-023 — only an escape-free string literal has a value
 
-**Status:** `open`, ruling needed (2026-09-25, ADR-0033 §6).
+**Status:** `settled by ADR-0049`, ruling needed on its escape set and on
+`"""` strings being raw (2026-09-25). The text below is the assumption as it
+stood; one decoder, `pw_syntax::strings`, now gives every string its value,
+and every backend reads it.
+
+**Status until 2026-09-25:** `open`, ruling needed (ADR-0033 §6).
 
 `"espresso"` denotes `espresso`. A string with a backslash, and a `"""`
 string, denote nothing until the language states its escape rules and its

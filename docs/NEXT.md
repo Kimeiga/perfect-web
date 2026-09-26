@@ -56,9 +56,9 @@ done:
 
 **2026-09-25, "ok fix all the known gaps":** the six gaps named that day, in
 order. Every name resolves (ADR-0047, done). Every member exists (ADR-0048,
-done). Next: string escapes; then the standard library, the backend's control
-flow and function values (with opaque values inside a component), and
-handlers that compute.
+done). String escapes are defined (ADR-0049, done). Next: the standard
+library; then the backend's control flow and function values (with opaque
+values inside a component), and handlers that compute.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

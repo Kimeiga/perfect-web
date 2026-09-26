@@ -31,6 +31,7 @@ pub mod fmt;
 pub mod grammar;
 pub mod kind;
 pub mod lexer;
+pub mod strings;
 pub mod tree;
 
 pub use fmt::{format_source, format_tree};

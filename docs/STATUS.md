@@ -78,6 +78,15 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: a string's escapes are the language's**
+([ADR-0049](DECISIONS/ADR-0049-string-escapes.md), settling A-023). One
+decoder reads a string token: `\n` `\t` `\r` `\\` `\"` `\{` `\}` and
+`\u{..}`, holes, and raw `"""` strings. An escape it does not define is
+PW0014. The backends refused such strings, or passed the token to their
+targets' rules. Each now encodes the value in its own syntax, Koka's checked
+against Koka 3.2.3. The Marko adapter rendered an interpolated string as its
+token, braces and all; it joins the pieces now.
+
 **Correction, 2026-09-25: a member no type has was never refused**
 ([ADR-0048](DECISIONS/ADR-0048-members-exist.md)). A read or call through a
 value is related to its type's members now (PW0610). Eight reads in code that
@@ -188,7 +197,9 @@ Decisions awaiting a ruling:
 - ADR-0032: the contract locates each export in its component.
 - ADR-0033 / A-022: captured values carried on the element are resume
   metadata, not identity markup.
-- ADR-0033 / A-023: a string literal has a value only where no escape rule is
+- ADR-0049: the escape set (`\n` `\t` `\r` `\\` `\"` `\{` `\}` `\u{..}`), and
+  `"""` strings are raw.
+- (settled by ADR-0049) ADR-0033 / A-023: a string literal has a value only where no escape rule is
   involved, until the language defines escapes.
 - ADR-0034 §3: a placeholder is not a refusal until something depends on it.
 - ADR-0037 §3: kiokun's share-alike data (CC-CEDICT, JMdict, Tatoeba) lives in
