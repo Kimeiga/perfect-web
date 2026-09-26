@@ -1,0 +1,43 @@
+ADR-0047 - every name resolves, in lexical scope
+
+produced by: just e10-names
+commit: d45fc237f4be6be29aabe4c3a3056ae5572ce61f
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the name tests (compiler/pw-core/tests/every_name_resolves.rs)
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+== what must stay clean: errors reported
+
+accepted corpus: 0
+store: 0
+kiokun: 0
+
+== mutation controls (scripts/names_mutations.py)
+
+baseline: 20 passed, 0 failed
+the walk is not run: KILLED (16 of 20 tests fail)
+a `let` binds before its initialiser: KILLED (1 of 20 tests fail)
+a block's bindings outlive it: KILLED (1 of 20 tests fail)
+a lambda's parameters outlive its body: KILLED (1 of 20 tests fail)
+a match arm's bindings reach the arms after it: KILLED (1 of 20 tests fail)
+a loop's pattern outlives the loop: KILLED (1 of 20 tests fail)
+a record shorthand is not read: KILLED (1 of 20 tests fail)
+a nested template part is walked again in the outer scope: KILLED (5 of 20 tests fail)
+an `{#each}` source is not read: KILLED (1 of 20 tests fail)
+an `{#each}` item outlives its block: KILLED (1 of 20 tests fail)
+a `{#match}` arm's binding reaches the arms after it: KILLED (1 of 20 tests fail)
+a stream part's `as` is read as a use: KILLED (1 of 20 tests fail)
+a receiver is not read: KILLED (1 of 20 tests fail)
+a module path used as a value is not read: KILLED (1 of 20 tests fail)
+a clause needs no value or block: KILLED (1 of 20 tests fail)
+`release(h)` does not bind `h` in its block: KILLED (1 of 20 tests fail)
+a nested declaration does not see its parent's parameters: KILLED (1 of 20 tests fail)
+a spawn form's words are uses: KILLED (1 of 20 tests fail)
+`derived` is a bare name again: KILLED (1 of 20 tests fail)
+a statement's named argument is an assignment again: KILLED (1 of 20 tests fail)
+20 of 20 mutants killed
+
+NOT CLAIMED: that derived is pure, or that a clause's words are in its
+domain. Both are left to the analyses that read them.

@@ -92,7 +92,9 @@ walk found two parse defects in accepted code:
 
 It also found six fixtures reading a session that nothing declared, and one
 form submitting to an undeclared handler. Each is corrected, and each is
-caught or clean exactly as before.
+caught or clean exactly as before. Evidence:
+[names.txt](evidence/E10/names.txt) (`just e10-names`), 20 of 20 mutants
+killed.
 
 **Correction, 2026-09-25: `pw check` did not type an operator's operands**
 ([ADR-0043](DECISIONS/ADR-0043-operands-are-typed.md)). `1 == "a"` checked,
