@@ -1,0 +1,38 @@
+ADR-0048 - a read names a member its value's type has
+
+produced by: just e10-members
+commit: c30382e78907de4b22a5e84453e20867a551ef68
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the member tests (compiler/pw-core/tests/members.rs)
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+== what must stay clean: errors reported
+
+accepted corpus: 0
+store: 0
+kiokun: 0
+
+== what the audit decided (member relations, the accepted corpus)
+
+  Member      agree                            28
+  Member      undecided: Unknown               26
+
+== mutation controls (scripts/member_mutations.py)
+
+baseline: 11 passed, 0 failed
+no member relation is recorded: KILLED (6 of 11 tests fail)
+every known type has every member: KILLED (5 of 11 tests fail)
+a declaration taking the type is not a member: KILLED (3 of 11 tests fail)
+a unit on a number is read as a member: KILLED (1 of 11 tests fail)
+a module path is recorded as a member: KILLED (1 of 11 tests fail)
+an opaque type's value is readable from any module: KILLED (1 of 11 tests fail)
+an opaque type's value is refused in its own module: KILLED (1 of 11 tests fail)
+an opaque type's value has no type: KILLED (1 of 11 tests fail)
+an optional's contents are an ordinary missing member: KILLED (2 of 11 tests fail)
+one defect is reported by every rule that reaches it: KILLED (1 of 11 tests fail)
+10 of 10 mutants killed
+
+NOT CLAIMED: an opaque value built or read inside a component, which the
+Wasm encoder refuses.

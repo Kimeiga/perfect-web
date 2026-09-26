@@ -93,7 +93,10 @@ checked clean named members nothing declares:
   A-016 and A-018 read members their types lack.
 
 An opaque type's `.value` is its representation in its own module, and
-refused elsewhere.
+refused elsewhere. Evidence: [members.txt](evidence/E10/members.txt)
+(`just e10-members`), 10 of 10 mutants killed; the audit decides 28 member
+reads in the accepted corpus and leaves 26 undecided. E9's audit is
+re-recorded at the same commit ([value-relations.txt](evidence/E9/value-relations.txt)).
 
 **Correction, 2026-09-25: a name used as a value was never resolved**
 ([ADR-0047](DECISIONS/ADR-0047-every-name-resolves.md)). `PW0021` examined
