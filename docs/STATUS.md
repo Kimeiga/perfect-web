@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a function crosses no boundary**
+([ADR-0086](DECISIONS/ADR-0086-a-function-crosses-no-boundary.md)). A
+resumable handler that captured a function, a view's `fn(Int) -> ()`
+parameter or a local declared one, checked, and the build refused the
+handler for a name that "names no declaration". A value that is or holds a
+function crosses no boundary now (PW5008).
+
+Evidence: [function-captures.txt](evidence/E10/function-captures.txt)
+(`just e10-function-captures`).
+
 **Correction, 2026-09-26: a secret laundered through any declared
 function over plain values**
 ([ADR-0085](DECISIONS/ADR-0085-a-call-carries-what-it-is-given.md)).

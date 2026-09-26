@@ -267,6 +267,14 @@ pub fn remote_support(sig: &Interface, facts: &TypeFacts) -> RemoteSupport {
                     reason: format!("it carries a {restriction} restriction"),
                 })
             }
+            // A function is code, not data (ADR-0086).
+            Crossing::Violation(Violation::Function { ty }) => refused.push(Untransferable {
+                position,
+                ty: Some(ty),
+                reason: "a function is code, not data, and nothing encodes it for another \
+                         placement"
+                    .to_string(),
+            }),
             Crossing::Blocked(Blocked::UndeterminedSchema) => undetermined.push(Untransferable {
                 position,
                 ty: None,

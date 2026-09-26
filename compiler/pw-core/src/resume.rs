@@ -281,6 +281,9 @@ pub fn check(
                     Crossing::Violation(Violation::Private { restriction }) => {
                         out.push(private_value(decl, &name, &restriction, span, &at));
                     }
+                    Crossing::Violation(Violation::Function { ty }) => {
+                        out.push(captured_function(decl, &name, &ty, span, &at));
+                    }
                     // The region is private and names no principal, so there
                     // is no destination to check against. Reported rather than
                     // waved through: a manifest whose scope nobody can state is
@@ -497,6 +500,36 @@ fn unserializable(
             description: format!(
                 "capture the key that identifies what `{name}` points at, and acquire \
                  the resource again on the other side"
+            ),
+            replacement: None,
+        }],
+    }
+}
+
+/// A resumable handler that captures a function (ADR-0086).
+fn captured_function(decl: &Decl, name: &str, ty: &str, span: Span, at: &Span) -> Diagnostic {
+    Diagnostic {
+        code: codes::UNSERIALIZABLE_CAPTURE.id,
+        invariant: codes::UNSERIALIZABLE_CAPTURE.invariant,
+        reason: "resumable_handler_captures_a_function",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!("handler captures `{name}: {ty}`, which is not serializable"),
+        primary_span: span,
+        related: vec![Related {
+            span: at.clone(),
+            label: format!("`{}` declares the handler", decl.name),
+        }],
+        explanation: Some(
+            "A resumable handler's captures are written onto the element as data, and \
+             read back when the handler runs. A function is code, not data: nothing \
+             encodes it, and the handler would have nothing to call."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: format!(
+                "call the function the handler needs by its name, and capture the data \
+                 `{name}` would have been given"
             ),
             replacement: None,
         }],

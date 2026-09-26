@@ -1058,6 +1058,20 @@ e10-labels-through-plain-values:
      } > docs/evidence/E10/labels-through-plain-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/labels-through-plain-values.txt
 
+# ADR-0086: a function crosses no boundary. Its test, and the mutation
+# controls.
+e10-function-captures:
+    @{ echo "ADR-0086 - a function crosses no boundary"; echo; \
+       echo "produced by: just e10-function-captures"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== function captures (compiler/pw-core/tests/function_captures.rs)"; echo; \
+       cargo test --locked -p pw-core --test function_captures 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/function_capture_mutations.py)"; echo; \
+       python3 scripts/function_capture_mutations.py; \
+     } > docs/evidence/E10/function-captures.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/function-captures.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

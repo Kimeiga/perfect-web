@@ -146,10 +146,12 @@ impl TypeFacts {
                 schema: Schema::Undetermined,
                 resource: None,
                 produced_scope: None,
+                function: None,
             };
         };
         let mut resource = None;
         let mut produced_scope = None;
+        let mut function = None;
         let mut carrier = None;
         // The one place this module takes a type name apart, for the same
         // reason `ontology.rs` is the one place an effect name is.
@@ -166,6 +168,9 @@ impl TypeFacts {
             {
                 produced_scope = Some(s.clone());
             }
+            if function.is_none() && part.as_builtin() == Some(crate::resolved::Builtin::Function) {
+                function = Some(part.display_name());
+            }
         });
         TransferProfile {
             // The component that carries the cost, where one does, so a
@@ -175,6 +180,7 @@ impl TypeFacts {
             schema: Schema::Named(carrier.unwrap_or_else(|| ty.display_name())),
             resource,
             produced_scope,
+            function,
         }
     }
 
@@ -227,6 +233,9 @@ pub struct TransferProfile {
     /// produces it. `Cart` is an ordinary record and is session-scoped because
     /// only a `session query` makes one.
     pub produced_scope: Option<Restriction>,
+    /// The function type it is or holds, where it does (ADR-0086). A function
+    /// is code, not data: nothing encodes it for the far side.
+    pub function: Option<String>,
 }
 
 /// Which boundary, what a value carries across it, and what the far side may
@@ -310,6 +319,9 @@ pub enum Violation {
     Resource { ty: String, producer: String },
     /// Private data crossing a boundary that does not preserve the restriction.
     Private { restriction: Restriction },
+    /// A function, which is code, not data (ADR-0086): `ty` is the function
+    /// type it is or holds.
+    Function { ty: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -357,6 +369,12 @@ pub fn can_cross(profile: &TransferProfile, ctx: &BoundaryContext) -> Crossing {
             ty: ty.clone(),
             producer: producer.clone(),
         });
+    }
+    // A function crosses nothing (ADR-0086). Until 2026-09-26 one captured by
+    // a resumable handler checked, and the build refused the handler for a
+    // name that "names no declaration".
+    if let Some(ty) = &profile.function {
+        return Crossing::Violation(Violation::Function { ty: ty.clone() });
     }
 
     // **Two sources, JOINED.** The LABEL covers a value that says so in its own
@@ -410,6 +428,7 @@ mod tests {
             schema: Schema::Named(ty.to_string()),
             resource: None,
             produced_scope: None,
+            function: None,
         }
     }
 
@@ -650,6 +669,7 @@ mod tests {
             schema: Schema::Undetermined,
             resource: None,
             produced_scope: None,
+            function: None,
         };
         for boundary in [Boundary::Resume, Boundary::RemoteCall] {
             assert_eq!(

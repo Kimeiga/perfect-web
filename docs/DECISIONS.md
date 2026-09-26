@@ -587,3 +587,11 @@ declared function over plain values: ADR-0064 carried a label only where the
 result mentions a type parameter. A declared call carries every argument
 given to a parameter that states no label now, and a parameter declared
 `Secret<C>` keeps its contract. Corrects ADR-0064 §1.
+
+## 2026-09-26: a function crosses no boundary (E10)
+
+[ADR-0086](DECISIONS/ADR-0086-a-function-crosses-no-boundary.md): a
+resumable handler that captured a function checked, and the build refused it
+for a name that "names no declaration". A value that is or holds a function
+crosses no boundary now: PW5008 for a capture, untransferable for a call to
+another placement.
