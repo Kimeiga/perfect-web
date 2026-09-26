@@ -78,6 +78,19 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: `pw check` passed a file whose name another
+file had**
+([ADR-0106](DECISIONS/ADR-0106-each-file-is-reported-by-its-place.md)).
+`pw check` kept each file's diagnostics under its file name, and of two files
+of one name the second's replaced the first's: `pw check a/app.pw b/app.pw`
+printed "no diagnostics" and exited 0 with a type error in `a/app.pw`. Every
+check `just ci` runs names two files `effects.pw`, the standard library's and
+the platform's, so the standard library's was never reported on; checked
+under a name of its own, it has no diagnostics. Each file's diagnostics are
+its own now, by its place, and a shared name is shown as a path.
+
+Evidence: [same-name.txt](evidence/E10/same-name.txt) (`just e10-same-name`).
+
 **2026-09-26: a command invalidates the entry it speculates on**
 ([ADR-0105](DECISIONS/ADR-0105-a-command-invalidates-the-entry-it-speculates-on.md)).
 A command speculating on `Cart` with neither `invalidates` nor an event

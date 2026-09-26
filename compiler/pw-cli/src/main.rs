@@ -1465,6 +1465,8 @@ fn run() -> ExitCode {
     // `match` in one file can be on a type declared in another, so a per-file
     // loop cannot check it at all (assumption A-009).
     struct Input {
+        /// The path as given, and the name diagnostics call the file by.
+        path: String,
         display: String,
         src: String,
         parsed: pw_syntax::Parse,
@@ -1493,11 +1495,25 @@ fn run() -> ExitCode {
             .is_empty()
             .then(|| pw_core::lower::lower_file(&src, &parsed.green));
         inputs.push(Input {
+            path: path.to_string(),
             display,
             src,
             parsed,
             hir,
         });
+    }
+
+    // A file is named by its file name, and by the path it was given as
+    // when another file has that name too (ADR-0106): `store/app.pw` and
+    // `kiokun/app.pw` are two files.
+    let mut named: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for i in &inputs {
+        *named.entry(i.display.clone()).or_default() += 1;
+    }
+    for i in &mut inputs {
+        if named[&i.display] > 1 {
+            i.display = i.path.clone();
+        }
     }
 
     // Only files that parse cleanly enter the program. Recovery invents
@@ -1508,8 +1524,18 @@ fn run() -> ExitCode {
         .filter(|i| i.parsed.errors.is_empty())
         .map(|i| (i.display.clone(), i.src.clone()))
         .collect();
-    let body_diags: std::collections::HashMap<String, Vec<Diagnostic>> =
-        pw_core::check::check_sources(&clean).into_iter().collect();
+    // Each file's diagnostics by its place, in the order the checker was
+    // given them (ADR-0106). A map keyed by name kept the last file's for
+    // every file of that name: `pw check a/app.pw b/app.pw` passed with an
+    // error in `a/app.pw` until 2026-09-26.
+    let mut checked = pw_core::check::check_sources(&clean).into_iter();
+    let body_diags: Vec<Vec<Diagnostic>> = inputs
+        .iter()
+        .map(|i| match i.parsed.errors.is_empty() {
+            true => checked.next().map(|(_, d)| d).unwrap_or_default(),
+            false => Vec::new(),
+        })
+        .collect();
 
     // One graph for every file given, so `explain`'s key audit is a
     // whole-program answer. Built once rather than per file: a fragment's key
@@ -1520,12 +1546,13 @@ fn run() -> ExitCode {
     let program_ws = pw_core::resolve::Workspace::build(&program_hirs);
     let program_graph = pw_core::graph::Graph::build(&program_hirs, &program_ws);
 
-    for input in &inputs {
+    for (input, checked) in inputs.iter().zip(&body_diags) {
         let Input {
             display,
             src,
             parsed,
             hir,
+            ..
         } = input;
 
         if !parsed.errors.is_empty() {
@@ -1538,7 +1565,7 @@ fn run() -> ExitCode {
             // than silently reporting a clean file.
             // One checker (ADR-0090): the declaration rules run inside
             // `check_sources`, as they do for `pw build`.
-            let mut found = body_diags.get(display).cloned().unwrap_or_default();
+            let mut found = checked.clone();
             found.sort_by_key(|d| d.primary_span.start);
             if !found.is_empty() {
                 print!("{}", render_findings(src, display, &found, !plain));

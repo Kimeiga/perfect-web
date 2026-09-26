@@ -1346,6 +1346,20 @@ e10-speculation-reconciled:
      } > docs/evidence/E10/speculation-reconciled.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/speculation-reconciled.txt
 
+# ADR-0106: `pw check` reports each file by its place. Its tests, run
+# against the binary, and the mutation controls.
+e10-same-name:
+    @{ echo "ADR-0106 - pw check reports each file by its place"; echo; \
+       echo "produced by: just e10-same-name"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== two files of one name (compiler/pw-cli/tests/same_name.rs)"; echo; \
+       cargo test --locked -p pw-cli --test same_name 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/same_name_mutations.py)"; echo; \
+       python3 scripts/same_name_mutations.py; \
+     } > docs/evidence/E10/same-name.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/same-name.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

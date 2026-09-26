@@ -752,3 +752,12 @@ a command speculating on `Cart` with neither `invalidates` nor an event
 `Cart` hears checked, and nothing replaced the speculation with what the
 command committed (ADR-0025's reconciliation). A command now reaches each
 entry it speculates on (PW5107).
+
+## 2026-09-26: `pw check` reports each file by its place (E10)
+
+[ADR-0106](DECISIONS/ADR-0106-each-file-is-reported-by-its-place.md):
+`pw check` kept each file's diagnostics under its file name, so of two files
+named `app.pw` the second's replaced the first's, and `pw check a/app.pw
+b/app.pw` passed with an error in `a/app.pw`. Every `just ci` check named two
+files `effects.pw`. Diagnostics are paired with their files by position now,
+and a file whose name is shared is named by its path.
