@@ -821,6 +821,20 @@ e10-lists:
      } > docs/evidence/E10/lists.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/lists.txt
 
+# ADR-0070: an assignment to a field has the field's type. Its test, and the
+# mutation control.
+e10-field-assignment:
+    @{ echo "ADR-0070 - an assignment to a field has the field's type"; echo; \
+       echo "produced by: just e10-field-assignment"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== a field's assignment (compiler/pw-core/tests/field_assignment.rs)"; echo; \
+       cargo test --locked -p pw-core --test field_assignment 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/field_assignment_mutations.py)"; echo; \
+       python3 scripts/field_assignment_mutations.py; \
+     } > docs/evidence/E10/field-assignment.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/field-assignment.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

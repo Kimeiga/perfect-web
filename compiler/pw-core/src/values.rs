@@ -2563,10 +2563,13 @@ impl<'a> Typer<'a> {
     /// **`x = e`**: `e` has the type `x` holds (ADR-0051). An assignment to a
     /// field, or to a name whose type is not known, relates nothing here.
     fn assignment(&self, id: ExprId, lhs: ExprId, rhs: ExprId) -> Vec<ValueRelation> {
-        let Expr::Name(x) = self.body.expr(lhs) else {
-            return Vec::new();
+        // A name, or a field read from a value: `b.value = e` holds the
+        // field's type, where it related nothing until 2026-09-26 (ADR-0070).
+        let (x, declared) = match self.body.expr(lhs) {
+            Expr::Name(x) => (x.clone(), self.name(lhs, x)),
+            Expr::Field { .. } => (path_of(self.body, lhs), self.of(lhs)),
+            _ => return Vec::new(),
         };
-        let declared = self.name(lhs, x);
         let actual = self.of(rhs);
         let mut s = Subst::default();
         let outcome = match unify(&mut s, &declared, &actual) {

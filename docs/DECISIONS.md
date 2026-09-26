@@ -460,3 +460,9 @@ are related to each other (PW0615), where two of different types made the
 element a hole and `[1, "a"]` passed as a `List<Int>`; an `Int` literal is
 related to the 64-bit range (PW0616), which the backend was the first to
 enforce.
+
+## 2026-09-26: an assignment to a field has the field's type (E10)
+
+[ADR-0070](DECISIONS/ADR-0070-an-assignment-to-a-field.md): `b.value = e`
+relates `e` to the field's type (PW0607), where an assignment to a field
+related nothing.

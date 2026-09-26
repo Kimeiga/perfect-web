@@ -173,6 +173,13 @@ signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
 
+**2026-09-26: an assignment to a field has the field's type**
+([ADR-0070](DECISIONS/ADR-0070-an-assignment-to-a-field.md)): `b.value =
+"wrong"` passed `pw check` until then, since only a named target was related.
+
+Evidence: [field-assignment.txt](evidence/E10/field-assignment.txt)
+(`just e10-field-assignment`).
+
 **2026-09-26: a list's items share one type, and an `Int` literal fits an
 `Int`** ([ADR-0069](DECISIONS/ADR-0069-list-items-and-int-literals.md)): both
 passed `pw check` until then, `[1, "a"]` as a `List<Int>` and a literal past
