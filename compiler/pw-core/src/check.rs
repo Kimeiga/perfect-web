@@ -2629,8 +2629,8 @@ fn check_unit_with(
             inherited.get(&id.0).copied(),
             &mut out,
         );
-        privacy_flow(&unit.hir, sigs, id, decl, &mut out);
-        privacy_sinks(&unit.hir, sigs, id, decl, &mut out);
+        privacy_flow(&unit.hir, sigs, labels, inference, at, id, decl, &mut out);
+        privacy_sinks(&unit.hir, sigs, inference, at, id, decl, &mut out);
         effect_rows(
             &unit.hir, sigs, inference, ontology, ws, at, id, decl, &mut out,
         );
@@ -4242,17 +4242,44 @@ fn reads_label_with_source(
 /// table of accessor names here any more: a function carries a secret because
 /// it returns `Secret<C>`, not because it is spelled `secrets.something`
 /// (E2C, architect ruling 2026-08-06).
-fn body_label(body: &Body, sigs: &Signatures) -> Label {
+fn body_label(
+    body: &Body,
+    sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
+) -> Label {
     let mut label = Label::public();
     for id in body.walk() {
         let Expr::Call { callee, .. } = body.expr(id) else {
             continue;
         };
-        if let Some(sig) = sigs.by_path(&path_of(body, *callee)) {
+        if let Some(sig) = callee_signature(sigs, inference, at, body, *callee) {
             label = label.join(&sig.label);
         }
     }
     label
+}
+
+/// **The signature a call names, as the unit sees it** (ADR-0112).
+///
+/// Resolved through the unit's own declarations and imports first, then by
+/// a whole path. `secrets.payments()` and `payments()` after `import
+/// secrets.{ payments }` are one declaration. The privacy rules read a
+/// callee's label and its sink level by its fully qualified spelling alone
+/// until 2026-09-26, so the second spelling carried no label: a secret
+/// reached markup, and a public log, and `pw check` passed.
+fn callee_signature<'s>(
+    sigs: &'s Signatures,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
+    body: &Body,
+    callee: ExprId,
+) -> Option<&'s crate::signatures::Signature> {
+    let path = path_of(body, callee);
+    inference
+        .called_from(at, &path)
+        .and_then(|def| sigs.by_def(def))
+        .or_else(|| sigs.by_path(&path))
 }
 
 /// E5 rules that need the body's label, not only the declaration header.
@@ -4287,6 +4314,8 @@ pub(crate) fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::h
 fn privacy_sinks(
     hir: &Hir,
     sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
     id: crate::hir::DeclId,
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
@@ -4302,7 +4331,7 @@ fn privacy_sinks(
         let Expr::Call { callee, args } = body.expr(id) else {
             continue;
         };
-        let Some(level) = sink_level(sigs, body, *callee) else {
+        let Some(level) = sink_level(sigs, inference, at, body, *callee) else {
             continue;
         };
         // Only `Public` is checked, because only `Public` is what the corpus
@@ -4387,13 +4416,15 @@ fn blame(
 /// declares it.
 fn sink_level(
     sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
     body: &Body,
     callee: ExprId,
 ) -> Option<(String, crate::hir::Span)> {
-    // By path only. A sink is named — `log.public` — and resolving it by "the
-    // one declaration spelled `public`" would make the privacy rule depend on
-    // no other module having a `public`.
-    let sig = sigs.by_path(&path_of(body, callee))?;
+    // As the unit resolves it (ADR-0112): a bare `public` is the `log.public`
+    // it imports, or its own `public`, and never "the one declaration
+    // spelled `public`" somewhere else.
+    let sig = callee_signature(sigs, inference, at, body, callee)?;
     sig.effects.iter().find_map(|e| {
         let (_, rest) = e.split_once('<')?;
         let level = rest.strip_suffix('>')?;
@@ -4401,9 +4432,13 @@ fn sink_level(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn privacy_flow(
     hir: &Hir,
     sigs: &Signatures,
+    declared_labels: &BTreeMap<crate::resolve::DefId, Label>,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
     id: crate::hir::DeclId,
     decl: &Decl,
     out: &mut Vec<Diagnostic>,
@@ -4411,7 +4446,7 @@ fn privacy_flow(
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
     let imports = crate::labels::imported_modules(hir);
-    let label = body_label(body, sigs);
+    let label = body_label(body, sigs, inference, at);
     if label.is_public() {
         return;
     }
@@ -4476,6 +4511,13 @@ fn privacy_flow(
         .policy("cache")
         .is_some_and(|c| c.value.trim() == "shared");
     if !shared {
+        return;
+    }
+    // One defect, one diagnostic (ADR-0112). A value PW5001 already refuses
+    // a shared cache, whose repairs include partitioning it, is not asked
+    // again which partitions its key lacks.
+    let (read, _) = reads_label_with_source(hir, declared_labels, inference, at, decl);
+    if !label_of(decl).join(&read).safe_in_shared_cache() {
         return;
     }
     let key_policy = decl.policy("key");

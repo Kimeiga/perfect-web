@@ -164,7 +164,8 @@ another has~~ (ADR-0106), which `pw check` passed with an error; ~~a key
 that omits a parameter~~ (ADR-0107); ~~a query naming nothing~~ (ADR-0108);
 ~~a timeout of zero~~ (ADR-0109); ~~a handler reading what it does not
 capture~~ (ADR-0110); ~~a capture read through a shorthand field~~
-(ADR-0111). Next, in order:
+(ADR-0111); ~~a secret passed by an import's spelling~~ (ADR-0112). Next, in
+order:
 1. ~~**a materialization is not reached through what it reads**~~, done
    (ADR-0102): A-009's fragment kept a changed store's old name. Then
    ~~**a command's write held to the fragments built on it**~~, done
@@ -189,7 +190,10 @@ capture~~ (ADR-0110); ~~a capture read through a shorthand field~~
      a correct handler was refused by PW5017;
    - **a handler performing what only the origin may**: one calling
      `Carts.add` itself checks, and `pw emit-handlers` refuses it. The
-     page's contract leaves its handlers out, and a handler has none.
+     page's contract leaves its handlers out, and a handler has none;
+8. **a build-placed page reading its parameter**: `placement build` with
+   `<h1>{id}</h1>` checks, and the file it is built into exists before any
+   request supplies `id`.
 
 Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates

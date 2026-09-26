@@ -1430,6 +1430,20 @@ e10-capture-shorthand:
      } > docs/evidence/E10/capture-shorthand.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/capture-shorthand.txt
 
+# ADR-0112: a call's privacy is the declaration it resolves to. Its tests,
+# and the mutation controls.
+e10-privacy-by-resolution:
+    @{ echo "ADR-0112 - a call's privacy is the declaration it resolves to"; echo; \
+       echo "produced by: just e10-privacy-by-resolution"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== privacy by resolution (compiler/pw-core/tests/privacy_by_resolution.rs)"; echo; \
+       cargo test --locked -p pw-core --test privacy_by_resolution 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/privacy_resolution_mutations.py)"; echo; \
+       python3 scripts/privacy_resolution_mutations.py; \
+     } > docs/evidence/E10/privacy-by-resolution.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/privacy-by-resolution.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

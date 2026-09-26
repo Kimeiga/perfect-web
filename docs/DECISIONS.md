@@ -800,3 +800,12 @@ handler capturing `item` and building `Pick { n: 1, item }` was refused by
 PW5017, a program with nothing wrong in it. The capture paths, the handler
 artifact and the backend each read a capture through a name or a field path
 only. A shorthand field reads its capture whole in all three now.
+
+## 2026-09-26: a call's privacy is the declaration it resolves to (E10)
+
+[ADR-0112](DECISIONS/ADR-0112-a-calls-privacy-is-the-declaration-it-resolves-to.md):
+the privacy rules read a callee by its fully qualified spelling, so a bare
+imported name carried no label: R-003's secret in markup and R-006's secret in
+a public log passed `pw check` written with `import secrets.{ payments }` and
+`import log.{ public }`. A callee is resolved as the unit sees it now, and a
+value PW5001 refuses a shared cache is not reported again by PW5004.

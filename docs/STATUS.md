@@ -78,6 +78,24 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a secret reached the browser and a public log,
+by the spelling of an import**
+([ADR-0112](DECISIONS/ADR-0112-a-calls-privacy-is-the-declaration-it-resolves-to.md)).
+The privacy rules read a callee by its fully qualified spelling, and a bare
+imported name has none. Each of these passed `pw check`:
+- R-003 with `import secrets.{ payments }`: a payments key rendered into
+  markup;
+- R-006 with `import log.{ public }`: a payments token in a public log;
+- a public query in a shared cache reading `current_session()`, with every
+  session's cart in one entry.
+
+Written qualified, each was refused. A callee is resolved as the unit sees
+it now. A page PW5001 refuses a shared cache is not reported again by PW5004,
+which the qualified spelling had done.
+
+Evidence: [privacy-by-resolution.txt](evidence/E10/privacy-by-resolution.txt)
+(`just e10-privacy-by-resolution`).
+
 **Correction, 2026-09-26: a correct handler was refused**
 ([ADR-0111](DECISIONS/ADR-0111-a-shorthand-field-reads-its-capture.md)). A
 handler capturing `item` and building `Pick { n: 1, item }` was refused by
