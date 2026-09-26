@@ -86,7 +86,9 @@ is compiled beside its export, so its `return` leaves it and not its
 caller. The checker now says what may be assigned. A binding must be
 `let mut` (PW0611), where a parameter or a plain `let` was assignable
 before. The assigned value must have the binding's type (PW0607), where
-`x = "a"` for an `Int` `x` passed.
+`x = "a"` for an `Int` `x` passed. Evidence:
+[control-flow.txt](evidence/E10/control-flow.txt) (`just e10-control-flow`),
+13 of 13 mutants killed.
 
 **2026-09-25: recursion and generic callees compile**
 ([ADR-0050](DECISIONS/ADR-0050-recursion-and-generic-callees.md)). A call is
