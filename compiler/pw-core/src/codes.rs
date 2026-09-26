@@ -199,6 +199,10 @@ codes! {
     // --- exhaustiveness ---------------------------------------------------
     NON_EXHAUSTIVE_MATCH = "PW0305" / non_exhaustive_match / 1, Exhaustiveness,
         "a match must cover every value its scrutinee can take";
+    // ADR-0076. The analysis found unreachable arms from the start, and until
+    // 2026-09-26 nothing reported one.
+    UNREACHABLE_ARM = "PW0333" / unreachable_arm / 1, Exhaustiveness,
+        "every arm of a match must be reached by some value";
 
     // --- types (PW06xx) ---------------------------------------------------
     OPTION_USED_AS_VALUE = "PW0600" / option_used_as_value / 1, Types,

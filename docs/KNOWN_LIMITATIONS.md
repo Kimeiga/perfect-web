@@ -108,8 +108,8 @@ refused by name:
 
 - a `Float` literal pattern, and an or-pattern that binds a name (nested
   and literal patterns compile to a decision tree since ADR-0060);
-- an arm no case reaches: the checker computes it and does not report it,
-  so such a match checks and does not compile (ADR-0059, ruling needed);
+- (resolved by ADR-0076) an arm no case reaches, which the checker
+  computed and did not report: it is PW0333 now;
 - a `return`, a `?` or an assignment inside a lambda a list operation runs,
   and an assignment to a field (ADR-0051);
 - `%` on a `Float`, and a `Float` interpolated: their semantics are not

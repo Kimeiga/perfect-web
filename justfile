@@ -911,6 +911,20 @@ e10-streams:
      } > docs/evidence/E10/streams.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/streams.txt
 
+# ADR-0076: an arm no value reaches is refused. Its tests, and the mutation
+# controls.
+e10-unreachable-arms:
+    @{ echo "ADR-0076 - an arm no value reaches is refused"; echo; \
+       echo "produced by: just e10-unreachable-arms"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== unreachable arms (compiler/pw-core/tests/unreachable_arms.rs)"; echo; \
+       cargo test --locked -p pw-core --test unreachable_arms 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/unreachable_arm_mutations.py)"; echo; \
+       python3 scripts/unreachable_arm_mutations.py; \
+     } > docs/evidence/E10/unreachable-arms.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/unreachable-arms.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

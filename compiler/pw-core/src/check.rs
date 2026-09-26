@@ -1164,6 +1164,10 @@ pub struct MatchAnalysis {
     pub scrutinee_type: Option<String>,
     pub span: crate::hir::Span,
     pub outcome: MatchOutcome,
+    /// Each arm no value reaches, by its pattern: the arms before it take
+    /// every value it matches (ADR-0076). Empty where the analysis did not
+    /// run.
+    pub unreachable: Vec<crate::hir::Span>,
 }
 
 /// **Every `match` in the program, and what was concluded about it.**
@@ -1531,6 +1535,7 @@ fn analyse_match(
         outcome: MatchOutcome::Blocked {
             reason: reason.to_string(),
         },
+        unreachable: Vec::new(),
     };
     let subject = match subject(site, scrutinee) {
         Ok(s) => s,
@@ -1603,6 +1608,16 @@ fn analyse_match(
     let lowered: Vec<Arm> = read.into_iter().filter_map(Result::ok).collect();
 
     let report = exhaust::check_match(&subject.program, &subject.ty, &lowered);
+    // Which arms no value reaches, where the analysis ran. `exhaust.rs` found
+    // them all along; until 2026-09-26 nothing read them (ADR-0076).
+    let unreachable: Vec<crate::hir::Span> = match report.blocked.is_empty() {
+        true => report
+            .unreachable
+            .iter()
+            .filter_map(|&i| lowered.get(i).map(|a| a.span.clone()))
+            .collect(),
+        false => Vec::new(),
+    };
     let outcome = match report.outcome() {
         crate::outcome::Outcome::Proven(_) => MatchOutcome::Proven,
         crate::outcome::Outcome::Blocked(bs) => MatchOutcome::Blocked {
@@ -1622,6 +1637,7 @@ fn analyse_match(
             scrutinee_type: Some(subject.name.clone()),
             span,
             outcome,
+            unreachable,
         },
         Found::Arms(Box::new(subject), lowered.into_iter().map(Ok).collect()),
     )
@@ -1665,6 +1681,40 @@ fn exhaustiveness(
             PatternFault::Arity(a) => out.push(constructor_arity(body, match_id, &subject, a)),
             PatternFault::Unread(_) => {}
         }
+    }
+
+    // **An arm no value reaches** (ADR-0076): the arms before it take every
+    // value it matches, so the code in it is dead and the value it was
+    // written for goes to an earlier arm. Until 2026-09-26 the analysis found
+    // these and nothing reported them: `_ => 0` before `Circle(r) => r`
+    // checked, the backend refused a case matched twice, and a literal
+    // matched twice built with its second arm dead.
+    for arm in &analysis.unreachable {
+        out.push(Diagnostic {
+            code: crate::codes::UNREACHABLE_ARM.id,
+            invariant: crate::codes::UNREACHABLE_ARM.invariant,
+            reason: "unreachable_arm",
+            detector: Detector::PatternMatrix,
+            severity: Severity::Error,
+            message: format!(
+                "no `{ty_name}` reaches this arm: the arms before it take every value it matches"
+            ),
+            primary_span: arm.clone(),
+            related: vec![Related {
+                span: body.expr_span(scrutinee),
+                label: format!("this has type `{ty_name}`"),
+            }],
+            explanation: Some(
+                "A match tries its arms in order, so an arm whose values the arms before it \
+                 already take never runs."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: "remove the arm, or move it before the arm that takes its values"
+                    .to_string(),
+                replacement: None,
+            }],
+        });
     }
 
     // A `Blocked` analysis produced NO ANSWER. The reason is already reported

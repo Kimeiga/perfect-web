@@ -507,3 +507,10 @@ the template IR refuses a `<stream>` and an element that mounts a resource
 by name, where each lowered as a literal element: a stream was refused for
 its `query` attribute, and A-007's mounted resource built a page that fails
 when rendered.
+
+## 2026-09-26: an arm no value reaches is refused (E10)
+
+[ADR-0076](DECISIONS/ADR-0076-an-arm-no-value-reaches.md): the
+exhaustiveness analysis always found unreachable arms, and nothing reported
+one. `_ => 0` before `Circle(r) => r` checked, and a literal matched twice
+built with a dead arm. PW0333 refuses each.

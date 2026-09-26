@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: an arm no value reaches is refused**
+([ADR-0076](DECISIONS/ADR-0076-an-arm-no-value-reaches.md)). The
+exhaustiveness analysis computed unreachable arms from the start, and
+nothing read them. `_ => 0` before `Circle(r) => r` checked, as did a case
+matched twice, both refused only by the backend; a literal matched twice
+built with its second arm dead. PW0333 refuses each.
+
+Evidence: [unreachable-arms.txt](evidence/E10/unreachable-arms.txt)
+(`just e10-unreachable-arms`).
+
 **2026-09-26: a stream and a mounted resource do not build**
 ([ADR-0075](DECISIONS/ADR-0075-a-stream-and-a-mounted-resource-do-not-build.md)).
 Each lowered as a literal element: A-008's `<stream>` was refused by
@@ -677,8 +687,8 @@ Decisions awaiting a ruling:
   point, which the structured IR has no jump for.
 - ADR-0059: a case is written through its type in an expression; a case
   without a payload may be written alone where one visible type has it, and
-  one with a payload may not (PW0021, naming the qualified form); an arm no
-  case reaches is refused by the backend and not reported by the checker.
+  one with a payload may not (PW0021, naming the qualified form). (An arm no
+  case reaches is reported by the checker since ADR-0076.)
 - ADR-0058: a command's answer is not read by a handler; the syntax that
   would bind an event to a resumable handler is not chosen.
 - ADR-0057: a map's key is an `Int` or a `String`; entries are in
