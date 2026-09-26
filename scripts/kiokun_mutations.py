@@ -5,6 +5,8 @@ A test that passes with the mechanism removed is not evidence for it. Each
 mutant undoes one piece of ADR-0041, or of the defects found building it, and
 at least one test must then fail or not build.
 
+One control was retired by ADR-0063, with its reason, below.
+
 The Pleris mutants are killed by the E10 oracle, which compiles
 `examples/kiokun/` from source. `evidence_is_current` is left out of the tests
 run here: it would kill every Pleris mutant by noticing only that the
@@ -41,12 +43,12 @@ MUTANTS = [
         "                I::LocalGet(ptr),\n                I::LocalGet(start),\n                I::I32Const(esize as i32),",
         "                I::LocalGet(ptr),\n                I::I32Const(0),\n                I::I32Const(esize as i32),",
     ),
-    (
-        "an unannotated binding of a generic call keeps the callee's `T`",
-        VALUES,
-        "            .retain(|_, t| !t.mentions_foreign_parameter(own));",
-        "            .retain(|_, _| true);",
-    ),
+    # Retired by ADR-0063: "an unannotated binding of a generic call keeps
+    # the callee's `T`". The value relations took their bindings from
+    # `infer.rs`, which typed `let ys = List.filter(xs, ..)` by `filter`'s
+    # declared `List<T>`, and a guard dropped such a binding. They no longer
+    # read `infer.rs`'s environment, every type they record is closed over its
+    # callee's parameters, and the guard, which nothing could reach, is gone.
     (
         "a statement keyword can name a value",
         GRAMMAR,

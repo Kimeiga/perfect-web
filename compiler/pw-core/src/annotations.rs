@@ -91,7 +91,7 @@ fn optional_used_as_present(
             continue;
         };
         let _ = (ty, init);
-        let Some(ty) = types.bindings().get(name) else {
+        let Some(ty) = types.binding(crate::lexical::Binder::Pattern(*pat)) else {
             continue;
         };
         if ty.as_builtin() != Some(crate::resolved::Builtin::Option) {

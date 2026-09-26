@@ -155,7 +155,10 @@ compared with them.
   - kiokun's rule and ranking in Pleris;
   - the host's escape handling and batching.
 
-  Each must fail a test.
+  Each must fail a test. Eleven since ADR-0063: the first defect's control,
+  a binding keeping its callee's `T`, is retired with its cause. The value
+  relations no longer take their bindings from `infer.rs`, and the guard it
+  undid could no longer be reached.
 - The browser spec, in three engines.
 
 ## Correction, 2026-09-25: which ranking "kiokun's" is

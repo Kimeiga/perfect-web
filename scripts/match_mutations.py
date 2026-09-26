@@ -37,8 +37,8 @@ MUTANTS = [
     (
         "a match arm's names are not typed",
         VALUES,
-        "    let around = typer.arms_around(e);",
-        "    let around: Vec<(String, Ty)> = Vec::new();",
+        "        let mut out = Vec::new();\n        self.bind_pattern(scrutinee, pat, &mut out);\n        out\n",
+        "        let _ = (scrutinee, pat);\n        Vec::new()\n",
     ),
     (
         "a shadowed parameter is read as the parameter",

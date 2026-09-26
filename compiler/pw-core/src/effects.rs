@@ -260,11 +260,7 @@ impl<'a> Inference<'a> {
     }
 
     /// What one body performs, given the types its declaration makes known.
-    pub fn infer_in(
-        &self,
-        body: &Body,
-        types: &BTreeMap<String, crate::resolved::ResolvedType>,
-    ) -> Inferred {
+    pub fn infer_in(&self, body: &Body, types: &crate::infer::Types<'_>) -> Inferred {
         self.infer_in_at(usize::MAX, body, types)
     }
 
@@ -273,7 +269,7 @@ impl<'a> Inference<'a> {
         &self,
         unit: usize,
         body: &Body,
-        types: &BTreeMap<String, crate::resolved::ResolvedType>,
+        types: &crate::infer::Types<'_>,
     ) -> Inferred {
         let mut out = self.infer_at(unit, body);
         self.member_effects(body, types, &mut out);
@@ -287,12 +283,7 @@ impl<'a> Inference<'a> {
     /// lives in the accessors' declared rows (`packages/pw-platform-web/browser.pw`),
     /// not in a list of property names here — which is what E2C's deletion gate
     /// requires and what lets a new accessor be added without touching a checker.
-    fn member_effects(
-        &self,
-        body: &Body,
-        types: &BTreeMap<String, crate::resolved::ResolvedType>,
-        out: &mut Inferred,
-    ) {
+    fn member_effects(&self, body: &Body, types: &crate::infer::Types<'_>, out: &mut Inferred) {
         // Which lambdas were handed to which function, so a member call inside
         // a callback names the callback rather than only itself.
         //
@@ -314,19 +305,17 @@ impl<'a> Inference<'a> {
 
         for id in body.walk() {
             // Both shapes: a property read, and a method call on a value.
-            let (receiver, member, span) = match body.expr(id) {
-                Expr::Field { base, name } => {
-                    (receiver_name(body, *base), name.clone(), body.expr_span(id))
-                }
+            let (base, member, span) = match body.expr(id) {
+                Expr::Field { base, name } => (*base, name.clone(), body.expr_span(id)),
                 Expr::Call { callee, .. } => match body.expr(*callee) {
-                    Expr::Field { base, name } => {
-                        (receiver_name(body, *base), name.clone(), body.expr_span(id))
-                    }
+                    Expr::Field { base, name } => (*base, name.clone(), body.expr_span(id)),
                     _ => continue,
                 },
                 _ => continue,
             };
-            let Some(receiver) = receiver else { continue };
+            let Some(receiver) = receiver_name(body, base) else {
+                continue;
+            };
 
             // A module path is not a member access — `Stores.get` is already
             // handled by the call walk, and counting it twice would report the
@@ -342,9 +331,11 @@ impl<'a> Inference<'a> {
             // `Money.add` once, reporting a pure calculation as writing to the
             // database. A receiver whose type this program does not state is a
             // receiver whose members are unknown.
-            let Some(declared) = types.get(&receiver) else {
+            // The binding the receiver's name means here (ADR-0063).
+            let Some(declared) = types.of(body, base) else {
                 continue;
             };
+            let declared = &declared;
             let Some(sig) = self.sigs.member_of(declared, &member) else {
                 continue;
             };

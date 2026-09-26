@@ -402,6 +402,26 @@ pub(crate) fn capture_paths(body: &crate::hir::Body, lambda: ExprId) -> Vec<Stri
         .collect()
 }
 
+/// **Where each capture's root is written in the descriptor**: `item` in
+/// `resumable(captures = { item })`, by its name. The expression is the use
+/// the root's binding is resolved at (ADR-0063), so a capture is typed by
+/// the binding its name means there, not by another binding of the name.
+pub(crate) fn capture_roots(
+    body: &crate::hir::Body,
+    descriptor: ExprId,
+) -> std::collections::BTreeMap<String, ExprId> {
+    let mut out = std::collections::BTreeMap::new();
+    for (_, _, mut e) in captures(body, descriptor) {
+        while let Expr::Field { base, .. } = body.expr(e) {
+            e = *base;
+        }
+        if let Expr::Name(n) = body.expr(e) {
+            out.entry(n.clone()).or_insert(e);
+        }
+    }
+    out
+}
+
 /// `item.id` for `Field { Name(item), id }`; nothing for any other shape.
 pub(crate) fn field_chain(body: &crate::hir::Body, e: ExprId) -> Option<String> {
     match body.expr(e) {

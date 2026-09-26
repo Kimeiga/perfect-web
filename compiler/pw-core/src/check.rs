@@ -503,8 +503,15 @@ fn optimistic_transitions_agree_with_their_target(
             // produce it. Seeded rather than inferred — nothing in the body
             // says what `cart` is, because the clause's header does.
             let mut types = crate::infer::Types::of_body(sigs, decl, body, module.as_deref());
-            for (name, _) in &transition.binders {
-                types = types.with_binding(name, &value_ty);
+            // Each binder by where it is bound: its term's place among the
+            // declaration's (ADR-0063).
+            let term = decl
+                .term_roots()
+                .position(|(_, r)| std::ptr::eq(r, transition));
+            for j in 0..transition.binders.len() {
+                if let Some(i) = term {
+                    types = types.with_binding(crate::lexical::Binder::Term(i, j), &value_ty);
+                }
             }
             let Some(produced) = types.of(body, transition.root) else {
                 // No answer is not a violation. `docs/RISK_QUEUE.md`: an
@@ -2660,7 +2667,7 @@ fn blame(
 ) -> (String, crate::hir::Span, Option<crate::hir::Span>) {
     for id in body.walk_from(value) {
         if let Expr::Name(n) = body.expr(id)
-            && let Some((_, origin)) = labels.origin(n)
+            && let Some((_, origin)) = labels.origin(id)
         {
             return (n.clone(), body.expr_span(id), Some(origin.clone()));
         }
@@ -2722,7 +2729,7 @@ fn privacy_flow(
                 .walk_from(*part)
                 .into_iter()
                 .find_map(|e| match body.expr(e) {
-                    Expr::Name(n) => labels.origin(n).map(|(_, o)| (n.clone(), o.clone())),
+                    Expr::Name(n) => labels.origin(e).map(|(_, o)| (n.clone(), o.clone())),
                     _ => None,
                 })
                 .unwrap_or_else(|| ("this value".to_string(), body.expr_span(*part)));
@@ -3601,7 +3608,7 @@ fn effect_rows(
     // Two constructions of one environment is how the narrower one silently
     // wins, which is exactly what happened.
     let types = crate::infer::Types::of_body(sigs, decl, body, hir.module_of(id));
-    let mut found = inference.infer_in_at(at, body, types.bindings());
+    let mut found = inference.infer_in_at(at, body, &types);
 
     // **Plus the named roots that ARE this declaration's work.**
     //

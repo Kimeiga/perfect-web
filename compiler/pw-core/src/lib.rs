@@ -43,6 +43,7 @@ pub mod infer;
 pub mod koka;
 pub mod labels;
 pub mod layout;
+pub mod lexical;
 pub mod lower;
 pub mod manifest;
 pub mod marko;

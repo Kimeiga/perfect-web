@@ -430,3 +430,21 @@ to their targets' rules.
 (if escapes should follow some existing language's rules): one decoder in
 `Literal::string_value`, with every backend reading it.
 
+## A-024 — an element of a labelled collection carries the collection's label
+
+**Status:** `open`, ruling needed (2026-09-26, ADR-0063).
+
+A name bound over a value's elements has that value's label:
+- a `for` loop's names, its iterable's;
+- an `{#each}` block's name, its collection's;
+- a `{#match}` arm's names, its subject's;
+- a lambda's parameters, where the lambda is passed to a call, the join of
+  the call's other arguments' labels and a piped value's.
+
+It errs toward private. A fold's accumulator is labelled by the list it
+folds, and so is every element of a list that holds one secret.
+
+**Validated by** the privacy model stating how a label reaches a collection's
+elements (charter §7.8). **If false** (if labels were tracked per element):
+each such binding's label would be its element's, and a lambda's parameters
+would take theirs from the callee's declared function type.

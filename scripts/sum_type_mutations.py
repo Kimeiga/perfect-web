@@ -49,8 +49,8 @@ MUTANTS = [
     (
         "an arm's body is walked without its bindings",
         VALUES,
-        "                let binds = self.arm_bindings(&st, arm.pat);",
-        "                let binds: Vec<(String, Ty)> = Vec::new();",
+        "                        for (b, t) in self.arm_bindings(&st, arm.pat) {\n                            added |= self.bind(b, t);",
+        "                        for (b, t) in self.arm_bindings(&st, arm.pat) {\n                            let _ = (b, t);",
     ),
     (
         "a bare case is not typed",

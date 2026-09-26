@@ -21,9 +21,14 @@ component BadgeRow(badges: List<ElementRef>) {
         // values of one type (ADR-0039 §2), which PW0609 checks since
         // 2026-09-25 (ADR-0043). This read `/ badges.length()`.
         let unit: LayoutSnapshot<Float> = measure { self.content_width() / Float.from_int(badges.length()) }
+        // A snapshot is read through `.value`, as A-016's are (assumption
+        // A-020, ruling needed). This passed `unit` itself, a
+        // `LayoutSnapshot<Float>`, where `set_width` takes a `Float`. The
+        // loop's `badge` had no type until its list gave it one (ADR-0063), so
+        // nothing checked the call.
         mutate {
             for badge in badges {
-                badge.style.set_width(unit)
+                badge.style.set_width(unit.value)
             }
         }
     }

@@ -45,14 +45,25 @@
 
 use std::collections::BTreeMap;
 
-use crate::hir::{Body, Decl, DeclKind, Expr, ExprId};
+use crate::hir::{Body, Decl, DeclKind, Expr, ExprId, Node};
+use crate::lexical::{Binder, Lexical};
 use crate::resolved::{self, Builtin, ResolvedType};
 use crate::signatures::Signatures;
 
 /// The types known inside one declaration's body.
 pub struct Types<'a> {
     sigs: &'a Signatures,
-    bindings: BTreeMap<String, ResolvedType>,
+    /// The binding each local name means (ADR-0063): the rule the value
+    /// relations and the backend read names by.
+    lexical: Lexical,
+    /// Every binding with a type the program states, by where it is bound,
+    /// never by its name: two bindings of one name are two entries. Until
+    /// 2026-09-26 this was keyed by name, the last binding of a name won, and
+    /// a handler's capture was typed by another binding of its name
+    /// (ADR-0063).
+    bindings: BTreeMap<Binder, ResolvedType>,
+    /// `self`, in a UI declaration: its own element.
+    self_type: Option<ResolvedType>,
     /// The module this body lives in, so a bare name resolves to a sibling
     /// declaration. Without it `shrink(self)` looked up `shrink` and found
     /// nothing, because signatures are stored module-qualified — so a rule
@@ -76,35 +87,28 @@ impl<'a> Types<'a> {
         body: &Body,
         module: Option<&str>,
     ) -> Types<'a> {
-        let mut bindings: BTreeMap<String, ResolvedType> = BTreeMap::new();
+        let lexical = Lexical::build(sigs, sigs.unit_of(module), decl, body);
+        let mut bindings: BTreeMap<Binder, ResolvedType> = BTreeMap::new();
 
-        for p in &decl.params {
+        for (i, p) in decl.params.iter().enumerate() {
             if let Some(t) = &p.ty
                 && let Some(ty) = sigs
                     .resolve_type(module, decl, t, p.span.clone())
                     .resolved()
             {
-                bindings.insert(p.name.clone(), ty.clone());
+                bindings.insert(Binder::Param(i), ty.clone());
             }
         }
-
-        // `List<MenuItem>` for a parameter, so the `#each` rule below can ask
-        // what an element of it is.
-        let element_of: BTreeMap<String, ResolvedType> = bindings
-            .iter()
-            .filter_map(|(name, ty)| element_of_type(ty).map(|t| (name.clone(), t.clone())))
-            .collect();
 
         // Charter §7.5A writes `self.style.set_padding(..)` inside a component.
         // `self` is the declaration's own element, and that is a language fact
         // about UI declarations rather than something a library declares.
-        if matches!(
-            decl.kind,
-            DeclKind::View | DeclKind::Component | DeclKind::Page
-        ) && let Some(ty) = sigs.language_type("browser", "ElementRef")
-        {
-            bindings.insert("self".to_string(), ty);
-        }
+        let self_type = match decl.kind {
+            DeclKind::View | DeclKind::Component | DeclKind::Page => {
+                sigs.language_type("browser", "ElementRef")
+            }
+            _ => None,
+        };
 
         // Annotated bindings first, then inferred ones — a written annotation
         // is the most precise thing available and must not be overwritten by a
@@ -118,17 +122,19 @@ impl<'a> Types<'a> {
             else {
                 continue;
             };
-            if let (crate::hir::Pattern::Bind { name, .. }, Some(t)) =
+            if let (crate::hir::Pattern::Bind { .. }, Some(t)) =
                 (body.pat(*pat), resolved::written_in_body(body, *ty))
                 && let Some(ty) = sigs.resolve_type(module, decl, &t, 0..0).resolved()
             {
-                bindings.insert(name.clone(), ty.clone());
+                bindings.insert(Binder::Pattern(*pat), ty.clone());
             }
         }
 
         let mut types = Types {
             sigs,
+            lexical,
             bindings,
+            self_type,
             module: module.map(str::to_string),
         };
 
@@ -146,25 +152,18 @@ impl<'a> Types<'a> {
         //
         // An E9 slice, pulled forward because E7 genuinely requires it:
         // milestone numbering must not force knowingly unsound semantics.
-        let mut roots = Vec::new();
-        for e in body.walk() {
-            if let Expr::Template { roots: r, .. } = body.expr(e) {
-                roots.extend(r.iter().copied());
-            }
-        }
-        for n in body.walk_markup(&roots) {
-            let crate::hir::Node::Block { directive, .. } = body.node(n) else {
-                continue;
-            };
-            let Some((binding, collection)) = each_binding(directive) else {
-                continue;
-            };
-            if let Some(elem) = element_of
-                .get(&collection)
-                .cloned()
-                .or_else(|| types.element_type(body, &collection))
-            {
-                types.bindings.insert(binding, elem);
+        //
+        // A collection named by a binding: a parameter's, a `let`'s. The
+        // binding is the one the name means where the block is written.
+        let eaches: Vec<(crate::hir::NodeId, Option<Binder>)> = types
+            .lexical
+            .each_blocks()
+            .filter(|(_, collection, _)| !collection.contains(['.', '(']))
+            .map(|(n, _, head)| (n, head))
+            .collect();
+        for (n, head) in eaches {
+            if let Some(elem) = head.and_then(|b| types.element_of_binder(body, b)) {
+                types.bindings.insert(Binder::Each(n), elem);
             }
         }
 
@@ -173,47 +172,38 @@ impl<'a> Types<'a> {
         //     Option<Entry>          Result<T, E>
         //         | {:Some(e)}           | {:Ok(v)}  {:Err(x)}
         //     e : Entry              v : T     x : E
-        for n in body.walk_markup(&roots) {
-            let crate::hir::Node::Block {
-                subject: Some(s),
-                children,
-                ..
-            } = body.node(n)
-            else {
+        let arms: Vec<(crate::hir::NodeId, ExprId)> = types.lexical.template_arms().collect();
+        for (n, s) in arms {
+            let Node::Branch { arm: Some(arm), .. } = body.node(n) else {
                 continue;
             };
-            let Some(ty) = types.of(body, *s) else {
+            let Some(ty) = types.of(body, s) else {
                 continue;
             };
-            for c in children {
-                let crate::hir::Node::Branch { arm: Some(arm), .. } = body.node(*c) else {
-                    continue;
-                };
-                let payload = match (ty.as_builtin(), arm.short()) {
-                    (Some(Builtin::Option), "Some") | (Some(Builtin::Result), "Ok") => {
-                        ty.args().first()
-                    }
-                    (Some(Builtin::Result), "Err") => ty.args().get(1),
-                    _ => None,
-                };
-                if let (Some(p), [name]) = (payload.cloned(), arm.bindings.as_slice()) {
-                    types.bindings.insert(name.clone(), p);
-                    continue;
+            let payload = match (ty.as_builtin(), arm.short()) {
+                (Some(Builtin::Option), "Some") | (Some(Builtin::Result), "Ok") => {
+                    ty.args().first()
                 }
-                // A declared case's fields (ADR-0061), where the type has
-                // no arguments a field could mention.
-                if let Some(def) = ty.def_id()
-                    && ty.args().is_empty()
-                    && let Some((_, fields)) = sigs
-                        .type_decl(def)
-                        .and_then(|t| t.variants.as_ref())
-                        .and_then(|cases| cases.iter().find(|(n, _)| n == arm.short()))
-                    && fields.len() == arm.bindings.len()
-                {
-                    for (name, f) in arm.bindings.iter().zip(fields) {
-                        if let Some(t) = f.resolved() {
-                            types.bindings.insert(name.clone(), t.clone());
-                        }
+                (Some(Builtin::Result), "Err") => ty.args().get(1),
+                _ => None,
+            };
+            if let (Some(p), [_]) = (payload.cloned(), arm.bindings.as_slice()) {
+                types.bindings.insert(Binder::Arm(n, 0), p);
+                continue;
+            }
+            // A declared case's fields (ADR-0061), where the type has no
+            // arguments a field could mention.
+            if let Some(def) = ty.def_id()
+                && ty.args().is_empty()
+                && let Some((_, fields)) = sigs
+                    .type_decl(def)
+                    .and_then(|t| t.variants.as_ref())
+                    .and_then(|cases| cases.iter().find(|(c, _)| c == arm.short()))
+                && fields.len() == arm.bindings.len()
+            {
+                for (i, f) in fields.iter().enumerate() {
+                    if let Some(t) = f.resolved() {
+                        types.bindings.insert(Binder::Arm(n, i), t.clone());
                     }
                 }
             }
@@ -295,11 +285,11 @@ impl<'a> Types<'a> {
                 else {
                     continue;
                 };
-                let name = path_of(body, *value);
-                if let Some(e) = element_of
-                    .get(&name)
-                    .cloned()
-                    .or_else(|| types.element_type(body, &name))
+                // A list named by a binding: the one its name means here.
+                if let Some(e) = types
+                    .lexical
+                    .binder(*value)
+                    .and_then(|b| types.element_of_binder(body, b))
                 {
                     elements.entry(param).or_insert(e);
                 }
@@ -315,20 +305,20 @@ impl<'a> Types<'a> {
                 let Some((_, wanted)) = f.args().split_last() else {
                     continue;
                 };
-                let Some(names) = crate::values::lambda_names(body, params) else {
+                let Some(binders) = crate::values::lambda_binders(body, params) else {
                     continue;
                 };
-                if names.len() != wanted.len() {
+                if binders.len() != wanted.len() {
                     continue;
                 }
-                for (name, w) in names.into_iter().zip(wanted) {
+                for (p, w) in binders.into_iter().zip(wanted) {
                     let ty = match w.parameter_binding() {
                         Some(p) => elements.get(&p).cloned(),
                         None if !mentions_parameter(w) => Some(w.clone()),
                         None => None,
                     };
                     if let Some(t) = ty {
-                        types.bindings.entry(name).or_insert(t);
+                        types.bindings.entry(Binder::Pattern(p)).or_insert(t);
                     }
                 }
             }
@@ -348,14 +338,15 @@ impl<'a> Types<'a> {
                 else {
                     continue;
                 };
-                let crate::hir::Pattern::Bind { name, .. } = body.pat(*pat) else {
+                let crate::hir::Pattern::Bind { .. } = body.pat(*pat) else {
                     continue;
                 };
-                if types.bindings.contains_key(name) {
+                let b = Binder::Pattern(*pat);
+                if types.bindings.contains_key(&b) {
                     continue;
                 }
                 if let Some(t) = types.of(body, *init) {
-                    types.bindings.insert(name.clone(), t);
+                    types.bindings.insert(b, t);
                     added = true;
                 }
             }
@@ -370,7 +361,17 @@ impl<'a> Types<'a> {
     ///
     /// `menu` bound from `query Menu(..)` whose declaration returns
     /// `List<MenuItemId>` gives `MenuItemId`.
-    fn element_type(&self, body: &Body, name: &str) -> Option<ResolvedType> {
+    ///
+    /// By where it is bound: a parameter's or an annotated `let`'s written
+    /// type, or the declared result of the query or call a `let` is bound
+    /// to.
+    fn element_of_binder(&self, body: &Body, b: Binder) -> Option<ResolvedType> {
+        if let Some(t) = self.bindings.get(&b) {
+            return element_of_type(t).cloned();
+        }
+        let Binder::Pattern(p) = b else {
+            return None;
+        };
         // A binding whose initialiser is a declaration returning `List<T>`.
         for id in body.walk() {
             let bound = match body.expr(id) {
@@ -378,10 +379,7 @@ impl<'a> Types<'a> {
                     pat: Some(pat),
                     init: Some(init),
                     ..
-                } => match body.pat(*pat) {
-                    crate::hir::Pattern::Bind { name: n, .. } if n == name => Some(*init),
-                    _ => None,
-                },
+                } if *pat == p => Some(*init),
                 _ => None,
             };
             let Some(init) = bound else { continue };
@@ -425,8 +423,8 @@ impl<'a> Types<'a> {
     /// binds `cart` to the target resource's VALUE type, and nothing in the
     /// body says so. Added rather than inferred, because the type comes from
     /// the resource the clause targets — see ADR-0025.
-    pub fn with_binding(mut self, name: &str, ty: &ResolvedType) -> Types<'a> {
-        self.bindings.insert(name.to_string(), ty.clone());
+    pub fn with_binding(mut self, b: Binder, ty: &ResolvedType) -> Types<'a> {
+        self.bindings.insert(b, ty.clone());
         self
     }
 
@@ -434,13 +432,24 @@ impl<'a> Types<'a> {
         self.sigs.stable_type(ty)
     }
 
-    pub fn bindings(&self) -> &BTreeMap<String, ResolvedType> {
-        &self.bindings
+    /// The type a binding holds, where the program states it.
+    pub fn binding(&self, b: Binder) -> Option<&ResolvedType> {
+        self.bindings.get(&b)
+    }
+
+    /// The binding each local name means in this body.
+    pub fn lexical(&self) -> &Lexical {
+        &self.lexical
     }
 
     pub fn of(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {
         match body.expr(id) {
-            Expr::Name(n) => self.bindings.get(n).cloned(),
+            // The binding the name means here (ADR-0063), or `self`.
+            Expr::Name(n) => match self.lexical.binder(id) {
+                Some(b) => self.bindings.get(&b).cloned(),
+                None if n == "self" => self.self_type.clone(),
+                None => None,
+            },
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;
                 self.sigs
@@ -502,7 +511,7 @@ pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {
 /// Read from the directive's text because that is where the parser leaves it —
 /// a markup block keeps its directive verbatim. The shape is fixed by the
 /// grammar, so this is reading a known form rather than guessing at one.
-fn each_binding(directive: &str) -> Option<(String, String)> {
+pub(crate) fn each_binding(directive: &str) -> Option<(String, String)> {
     let d = directive.trim();
     let inner = d.strip_prefix("{#each")?.strip_suffix('}')?;
     let (collection, rest) = inner.trim().split_once(" as ")?;

@@ -42,16 +42,30 @@
 //! function's name. That is E2C's rule and the reason the checker has no table
 //! of accessors.
 //!
+//! # Where a binding's label comes from
+//!
+//! A binding is labelled by where it is bound, never by its name (ADR-0063):
+//! a `let` by its initialiser, a match arm's names by the scrutinee, and a
+//! name bound over the elements of a collection by the collection. A `for`
+//! loop's name, a `{#each}` block's, and a lambda's parameters where the
+//! lambda is passed to a call, whose parameters take the call's other
+//! arguments' labels: an element of a labelled list carries the list's label.
+//! Until 2026-09-26 those were unlabelled, and `for t in tokens {
+//! log.public("{t}") }` over a list of secrets passed `pw check`; and the
+//! bindings were keyed by name, so a name bound twice carried its first
+//! binding's label at both.
+//!
 //! # What it does not do
 //!
-//! Track a label *into* a collection and back out — `List.push(xs, secret)`
-//! then `List.first(xs)` loses it, because the element type is not inferred.
-//! A witness for that belongs in `examples/generality/` when someone writes
-//! one; it is not claimed here.
+//! Track a label *through* a declared function — `List.get(xs, 0)` over a
+//! list of secrets is public, because `get` declares no label for its result
+//! and a declaration's label is its contract. A witness for that belongs in
+//! `examples/generality/` when someone writes one; it is not claimed here.
 
 use std::collections::BTreeMap;
 
-use crate::hir::{Body, Decl, Expr, ExprId, Pattern as HPat, Span};
+use crate::hir::{Body, Decl, Expr, ExprId, Node, Pattern as HPat, PatternId, Span};
+use crate::lexical::Binder;
 use crate::privacy::Label;
 use crate::signatures::Signatures;
 
@@ -62,8 +76,9 @@ pub struct Labels<'a> {
     /// unqualified name may resolve to, and nothing wider.
     module: Option<&'a str>,
     types: crate::infer::Types<'a>,
-    /// Binding name → its label and where it acquired one.
-    bindings: BTreeMap<String, (Label, Span)>,
+    /// Each binding's label and where it acquired one, by where it is bound
+    /// (ADR-0063): two bindings of one name are two entries.
+    bindings: BTreeMap<Binder, (Label, Span)>,
 }
 
 impl<'a> Labels<'a> {
@@ -87,7 +102,7 @@ impl<'a> Labels<'a> {
 
         // A label comes from the resolved annotation in its real lexical
         // context. A same-spelled type in another module is not a qualifier.
-        for p in &decl.params {
+        for (i, p) in decl.params.iter().enumerate() {
             if let Some(written) = &p.ty
                 && let Some(ty) = sigs
                     .resolve_type(module, decl, written, p.span.clone())
@@ -95,8 +110,20 @@ impl<'a> Labels<'a> {
             {
                 let label = sigs.label(ty);
                 if !label.is_public() {
-                    me.bindings.insert(p.name.clone(), (label, p.span.clone()));
+                    me.bindings
+                        .insert(Binder::Param(i), (label, p.span.clone()));
                 }
+            }
+        }
+        let mut piped: BTreeMap<ExprId, ExprId> = BTreeMap::new();
+        for id in body.walk() {
+            if let Expr::Binary {
+                op: crate::hir::BinOp::Pipe,
+                lhs,
+                rhs,
+            } = body.expr(id)
+            {
+                piped.insert(*rhs, *lhs);
             }
         }
 
@@ -107,15 +134,16 @@ impl<'a> Labels<'a> {
         for _ in 0..6 {
             let before = me.bindings.len();
             for id in body.walk() {
-                let (name, init, span) = match body.expr(id) {
+                let (binder, init, span) = match body.expr(id) {
                     Expr::Let {
                         pat: Some(pat),
                         init: Some(init),
                         ty,
                     } => {
-                        let HPat::Bind { name, .. } = body.pat(*pat) else {
+                        let HPat::Bind { .. } = body.pat(*pat) else {
                             continue;
                         };
+                        let binder = Binder::Pattern(*pat);
                         if let Some(written) =
                             ty.and_then(|t| crate::resolved::written_in_body(body, t))
                             && let Some(resolved) = sigs
@@ -124,12 +152,11 @@ impl<'a> Labels<'a> {
                         {
                             let label = sigs.label(resolved);
                             if !label.is_public() {
-                                me.bindings
-                                    .insert(name.clone(), (label, body.expr_span(id)));
+                                me.bindings.insert(binder, (label, body.expr_span(id)));
                                 continue;
                             }
                         }
-                        (name.clone(), *init, body.expr_span(id))
+                        (binder, *init, body.expr_span(id))
                     }
                     Expr::Keyword {
                         keyword,
@@ -137,34 +164,106 @@ impl<'a> Labels<'a> {
                         args,
                         ..
                     } if keyword == "use" => match (modifiers.first(), args.first()) {
-                        (Some(n), Some(init)) => (n.clone(), *init, body.expr_span(id)),
+                        (Some(_), Some(init)) => (Binder::Use(id), *init, body.expr_span(id)),
                         _ => continue,
                     },
                     _ => continue,
                 };
-                if me.bindings.contains_key(&name) {
+                if me.bindings.contains_key(&binder) {
                     continue;
                 }
                 let l = me.label(body, init);
                 if !l.is_public() {
-                    me.bindings.insert(name, (l, span));
+                    me.bindings.insert(binder, (l, span));
                 }
             }
 
             // A pattern binding inherits its scrutinee's label: matching on a
             // secret and naming the payload does not make the payload public.
+            //
+            // And a name bound over a collection's elements inherits the
+            // collection's label: a `for` loop's, and a lambda's parameters
+            // where it is passed to a call, which inherit the call's other
+            // arguments' (ADR-0063).
             for id in body.walk() {
-                let Expr::Match { scrutinee, arms } = body.expr(id) else {
+                let (from, pats): (Label, Vec<PatternId>) = match body.expr(id) {
+                    Expr::Match { scrutinee, arms } => (
+                        me.label(body, *scrutinee),
+                        arms.iter().map(|a| a.pat).collect(),
+                    ),
+                    Expr::For {
+                        pat: Some(p),
+                        iterable,
+                        ..
+                    } => (me.label(body, *iterable), vec![*p]),
+                    Expr::Call { args, .. } => {
+                        for (i, a) in args.iter().enumerate() {
+                            let Expr::Lambda { params, .. } = body.expr(a.value) else {
+                                continue;
+                            };
+                            let l = args
+                                .iter()
+                                .enumerate()
+                                .filter(|(j, _)| *j != i)
+                                .map(|(_, o)| o.value)
+                                .chain(piped.get(&id).copied())
+                                .fold(Label::public(), |acc, v| acc.join(&me.label(body, v)));
+                            if l.is_public() {
+                                continue;
+                            }
+                            for p in params {
+                                for (q, span) in bound_binders(body, *p) {
+                                    me.bindings
+                                        .entry(Binder::Pattern(q))
+                                        .or_insert((l.clone(), span));
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                    _ => continue,
+                };
+                if from.is_public() {
+                    continue;
+                }
+                for p in pats {
+                    for (q, span) in bound_binders(body, p) {
+                        me.bindings
+                            .entry(Binder::Pattern(q))
+                            .or_insert((from.clone(), span));
+                    }
+                }
+            }
+
+            // A template's names: an `{#each}` block's by its collection, a
+            // `{#match}` arm's by the block's subject.
+            let eaches: Vec<_> = me
+                .types
+                .lexical()
+                .each_blocks()
+                .map(|(n, c, h)| (n, c.to_string(), h))
+                .collect();
+            for (n, collection, head) in eaches {
+                let l = me.collection_label(&collection, head);
+                if !l.is_public() {
+                    me.bindings
+                        .entry(Binder::Each(n))
+                        .or_insert((l, body.node_span(n)));
+                }
+            }
+            let arms: Vec<_> = me.types.lexical().template_arms().collect();
+            for (n, subject) in arms {
+                let l = me.label(body, subject);
+                let Node::Branch { arm: Some(arm), .. } = body.node(n) else {
                     continue;
                 };
-                let l = me.label(body, *scrutinee);
                 if l.is_public() {
                     continue;
                 }
-                for arm in arms {
-                    for (name, span) in bound_names(body, arm.pat) {
-                        me.bindings.entry(name).or_insert((l.clone(), span));
-                    }
+                for i in 0..arm.bindings.len() {
+                    me.bindings
+                        .entry(Binder::Arm(n, i))
+                        .or_insert((l.clone(), body.node_span(n)));
                 }
             }
 
@@ -193,9 +292,36 @@ impl<'a> Labels<'a> {
         self.sigs.in_module(self.module, name)
     }
 
-    /// Where a binding acquired its label, for the diagnostic's origin span.
-    pub fn origin(&self, name: &str) -> Option<&(Label, Span)> {
-        self.bindings.get(name)
+    /// Where the binding a name means where `use_` writes it acquired its
+    /// label, for the diagnostic's origin span.
+    pub fn origin(&self, use_: ExprId) -> Option<&(Label, Span)> {
+        self.bindings.get(&self.types.lexical().binder(use_)?)
+    }
+
+    /// The label of a collection a `{#each}` directive names, as written: its
+    /// first name's binding's, and each field read from it on top, as a
+    /// field read is labelled.
+    fn collection_label(&self, collection: &str, head: Option<Binder>) -> Label {
+        let Some(b) = head else {
+            return Label::public();
+        };
+        let mut l = self
+            .bindings
+            .get(&b)
+            .map(|(l, _)| l.clone())
+            .unwrap_or_else(Label::public);
+        let mut ty = self.types.binding(b).cloned();
+        for field in collection.split('.').skip(1) {
+            let Some(sig) = ty
+                .as_ref()
+                .and_then(|t| self.sigs.member_of(t, field.trim()))
+            else {
+                break;
+            };
+            l = l.join(&sig.label);
+            ty = sig.result().cloned();
+        }
+        l
     }
 
     /// The label of a value.
@@ -205,9 +331,12 @@ impl<'a> Labels<'a> {
     /// value is private.
     pub fn label(&self, body: &Body, id: ExprId) -> Label {
         match body.expr(id) {
-            Expr::Name(n) => self
-                .bindings
-                .get(n)
+            // The binding the name means here (ADR-0063).
+            Expr::Name(_) => self
+                .types
+                .lexical()
+                .binder(id)
+                .and_then(|b| self.bindings.get(&b))
                 .map(|(l, _)| l.clone())
                 .unwrap_or_else(Label::public),
 
@@ -298,6 +427,21 @@ impl<'a> Labels<'a> {
             _ => Label::public(),
         }
     }
+}
+
+/// Where a pattern binds each of its names, with their spans.
+fn bound_binders(body: &Body, pat: PatternId) -> Vec<(PatternId, Span)> {
+    let mut out = Vec::new();
+    let mut stack = vec![pat];
+    while let Some(p) = stack.pop() {
+        match body.pat(p) {
+            HPat::Bind { .. } => out.push((p, body.pat_span(p))),
+            HPat::Ctor { args, .. } => stack.extend(args.iter().copied()),
+            HPat::Or(alts) => stack.extend(alts.iter().copied()),
+            _ => {}
+        }
+    }
+    out
 }
 
 /// The names a pattern binds, with their spans.

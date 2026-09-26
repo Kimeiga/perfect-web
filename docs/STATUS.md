@@ -78,6 +78,39 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a name bound twice was checked by none of its
+bindings, and typed and labelled by the wrong one**
+([ADR-0063](DECISIONS/ADR-0063-every-name-means-one-binding.md)). Three
+analyses kept an environment per body keyed by name. Each of these passed
+`pw check`:
+- **Type errors through a reused name.** The value relations read a name
+  bound at two sites as unknown wherever it was used. So `Some(x) => x + 1`
+  over an `Option<String>` passed where another match also bound an `x`, and
+  so did a lambda's `s + 1` over a `List<String>` where another lambda bound
+  an `s`. A `for` loop's name had no type at all.
+- **Two accepted programs disagreed.** A-017 passed a
+  `LayoutSnapshot<Float>` to `set_width`, which takes a `Float`, where A-016
+  reads its snapshots' `.value`, as assumption A-020 states. Nothing checked
+  A-017's call, because its loop variable had no type. It reads `.value` now.
+  A-020 is open: under its alternative, a phase rule, A-017's original form
+  was right.
+- **A handler's capture typed by the wrong binding.** The declared-type
+  environment gave a name its last binding's type. With a second `{#each}`
+  binding `item` to a `Store`, the store page's add-to-cart handler typed its
+  capture `item.id` as a `StoreId`, and its capture schema and identity said
+  so, silently. The value relations checked the call against the first
+  binding; the backend compiled it against the second.
+- **Secrets leaked through unlabelled bindings.** The privacy labels gave no
+  label to a `for` loop's name, a lambda's parameters or an `{#each}`
+  block's name. A `Secret<Payments>` logged publicly through one (PW5006), or
+  rendered through one (PW5003), passed. A public value logged under a name a
+  secret also bound was refused.
+
+Each use of a name now means the one binding in scope where it is written,
+by the scopes the backend lowers with. All three analyses read that binding.
+`compiler/pw-core/tests/lexical_scope.rs` states each case with a control,
+and every one of its 14 tests fails at the commit before.
+
 **Correction, 2026-09-26: a type and a query of one name failed every
 component** ([ADR-0062](DECISIONS/ADR-0062-generic-types-in-the-backend.md)).
 A type `Either` and a query `Either` live in two namespaces, and checked.
@@ -86,6 +119,24 @@ had no signature and the whole WIT package failed ("missing component
 signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
+
+**2026-09-26: every name means one binding**
+([ADR-0063](DECISIONS/ADR-0063-every-name-means-one-binding.md)).
+- `crate::lexical` resolves each local name once, to a parameter, a pattern,
+  a `use`, a template block or arm, or a policy term's binder. A name no
+  binding in scope has is the program's own.
+- The value relations, the declared-type environment and the privacy labels
+  each keep their facts by binding. A `for` loop's name and an `{#each}`
+  block's are typed by their collection's element, and labelled by the
+  collection.
+- The value relations decide more. Undecided relations fall from 58 to 20 in
+  kiokun, from 43 to 41 in the store, and from 96 to 70 in the corpus. Every
+  relation decided before is decided the same.
+- Not done: a label carried through a declared function, such as `List.get`
+  over a list of secrets (next); a value with a hole that means any type,
+  which is all 20 of kiokun's remaining undecided relations.
+
+Evidence: [lexical.txt](evidence/E10/lexical.txt) (`just e10-lexical`).
 
 **2026-09-26: generic types in the backend**
 ([ADR-0062](DECISIONS/ADR-0062-generic-types-in-the-backend.md)).
@@ -392,6 +443,12 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0063: an element of a labelled collection carries the collection's
+  label, as a `for` loop's names, an `{#each}` block's and a `{#match}`
+  arm's do; a lambda passed to a call takes the join of the call's other
+  arguments' labels; a policy term's tree sees the declaration's parameters
+  and none of the body's bindings; and a record literal whose first field is
+  shorthand, `P { x }`, still parses as a name and a block.
 - ADR-0061: a declared case named like the language's own (`Some`, `None`,
   `Ok`, `Err`) is refused in a template, whose value names those cases the
   language's way.

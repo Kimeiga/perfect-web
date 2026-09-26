@@ -406,7 +406,7 @@ pub fn handler(
     let Expr::Lambda {
         params,
         body: inner,
-        ..
+        descriptor,
     } = body.expr(lambda)
     else {
         return Lowering::Blocked {
@@ -421,8 +421,13 @@ pub fn handler(
             reason: "the event is not passed to a compiled handler (ADR-0058)".to_string(),
         };
     }
-    // What each captured path is: its root's type, then each field's.
+    // What each captured path is: its root's type, then each field's. The
+    // root is typed by the binding its name means where the descriptor
+    // writes it (ADR-0063).
     let types = crate::infer::Types::of_body(cx.sigs, decl, body, hir.module_of(decl_id));
+    let roots = descriptor
+        .map(|d| crate::resume::capture_roots(body, d))
+        .unwrap_or_default();
     let internal = RefCell::new(Internal {
         in_handler: true,
         ..Internal::default()
@@ -447,7 +452,7 @@ pub fn handler(
     for path in crate::resume::capture_paths(body, lambda) {
         let mut parts = path.split('.');
         let root = parts.next().unwrap_or_default();
-        let mut ty = types.bindings().get(root).cloned();
+        let mut ty = roots.get(root).and_then(|e| types.of(body, *e));
         for field in parts {
             ty = ty.and_then(|t| {
                 cx.sigs

@@ -395,3 +395,14 @@ arguments come from its fields, as a generic callee's do, or from its use; a
 parameter nothing fixes is refused by name. A generic type still does not
 cross the boundary. Writing it found a type and a query of one name failing
 the whole WIT package.
+
+## 2026-09-26: every name means one binding (E10)
+
+[ADR-0063](DECISIONS/ADR-0063-every-name-means-one-binding.md): each local
+name is resolved once, to the binding in scope where it is written, by the
+scopes the backend lowers with. The value relations, the declared-type
+environment and the privacy labels keep their facts by binding, where each
+kept them by name. It fixes type errors that passed through any name bound
+twice, a handler capture typed by another binding of its name, and secrets
+logged or rendered through a `for` loop's, a lambda's or an `{#each}` block's
+name.

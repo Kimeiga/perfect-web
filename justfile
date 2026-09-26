@@ -679,6 +679,38 @@ e10-generics:
      } > docs/evidence/E10/generics.txt
     @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/generics.txt
 
+# ADR-0063: every name means one binding. The resolver's scopes, each read
+# by the value relations, the declared-type environment, a handler's capture
+# and the privacy labels; what the value relations now decide over the store,
+# kiokun and the accepted corpus; and the mutation controls.
+e10-lexical:
+    @cargo build --quiet --locked -p pw-cli
+    @{ echo "ADR-0063 - every name means one binding"; echo; \
+       echo "produced by: just e10-lexical"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the scopes, and what each reader makes of them (compiler/pw-core/tests/lexical_scope.rs)"; echo; \
+       cargo test --locked -p pw-core --test lexical_scope 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a match over a name an arm binds again (compiler/pw-core/tests/match_exhaustiveness.rs)"; echo; \
+       cargo test --locked -p pw-core --test match_exhaustiveness 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what the value relations decide: the store program"; echo; \
+       ./target/debug/pw audit-values packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw; \
+       echo; echo "== what the value relations decide: kiokun"; echo; \
+       ./target/debug/pw audit-values packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw; \
+       echo; echo "== what the value relations decide: the accepted corpus as one program"; echo; \
+       ./target/debug/pw audit-values packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw; \
+       echo; echo "== mutation controls (scripts/lexical_mutations.py)"; echo; \
+       python3 scripts/lexical_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a label carried through a declared function, such as"; \
+       echo "List.get over a list of secrets (next: ADR-0064). NOT CLAIMED: a record"; \
+       echo "literal whose first field is shorthand, P { x }, which parses as P and a"; \
+       echo "block. Each undecided relation above is counted, never agreement."; \
+     } > docs/evidence/E10/lexical.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/lexical.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -114,7 +114,7 @@ fn evidence_in(app: &str, decl: &str) -> Evidence {
         .unwrap_or_else(|| panic!("no `{decl}`"));
     let body = hir.body(d.body.expect("a body"));
     let types = pw_core::infer::Types::of_body(&sigs, d, body, hir.module_of(id));
-    inference.infer_in_at(unit, body, types.bindings()).evidence
+    inference.infer_in_at(unit, body, &types).evidence
 }
 
 #[test]
@@ -216,7 +216,7 @@ fn widths(items: List<Rect>) -> Int !{} {
         .expect("widths");
     let body = hir.body(d.body.expect("a body"));
     let types = pw_core::infer::Types::of_body(&sigs, d, body, hir.module_of(id));
-    let e = inference.infer_in_at(2, body, types.bindings()).evidence;
+    let e = inference.infer_in_at(2, body, &types).evidence;
 
     assert!(
         !e.resolved_member_on("ElementRef", "getBoundingClientRect"),

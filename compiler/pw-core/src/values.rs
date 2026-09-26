@@ -61,7 +61,7 @@ use crate::diagnostics::{Detector, Diagnostic};
 use crate::hir::{
     BinOp, Body, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Literal, Pattern, Span, UnOp,
 };
-use crate::infer::Types;
+use crate::lexical::{Binder, Lexical};
 use crate::resolve::{DefId, Namespace, Resolution, UnitId, Workspace};
 use crate::resolved::{Builtin, Primitive, ResolvedType, TypeKey, TypeResolution};
 use crate::signatures::{Receiver, Signature, Signatures};
@@ -433,18 +433,19 @@ struct Typer<'a> {
     module: Option<&'a str>,
     decl: &'a Decl,
     body: &'a Body,
-    /// Every name bound to a known type in this body. A cell, because typing
-    /// a lambda against the function type it is passed as binds its
-    /// parameters for the duration of that one question.
-    locals: RefCell<BTreeMap<String, Ty>>,
-    /// Names bound at more than one site. A flat environment cannot say which
-    /// binding a use refers to, so their uses are unknown rather than guessed.
-    shadowed: BTreeSet<String>,
+    /// The binding each local name means (ADR-0063).
+    lexical: Lexical,
+    /// Every binding given a known type in this body, by where it is bound,
+    /// never by its name: two bindings of one name are two entries
+    /// (ADR-0063). A cell, because typing a lambda against the function type
+    /// it is passed as binds its parameters for the duration of that one
+    /// question.
+    locals: RefCell<BTreeMap<Binder, Ty>>,
     /// The expression each `|>` feeds, keyed by the call on its right.
     piped: BTreeMap<ExprId, ExprId>,
     /// Lambda parameters given a closed type while their use was solved,
     /// waiting to join `locals` (see [`Typer::solve_lambdas`]).
-    solved: RefCell<BTreeMap<String, Ty>>,
+    solved: RefCell<BTreeMap<Binder, Ty>>,
 }
 
 /// What a resolved call is checked against: its parameters, where each is
@@ -480,8 +481,7 @@ pub(crate) fn type_of(
     e: ExprId,
 ) -> (Ty, String) {
     let typer = Typer::new(sigs, ws, at, module, decl, body);
-    let around = typer.arms_around(e);
-    let t = typer.with_bindings(&around, || typer.of(e));
+    let t = typer.of(e);
     let name = typer.display(&t);
     (t, name)
 }
@@ -651,6 +651,17 @@ pub(crate) fn bare_case(
     }
 }
 
+/// Is this one name, as a directive writes one?
+fn is_ident(s: &str) -> bool {
+    s.starts_with(|c: char| c.is_alphabetic() || c == '_')
+        && s.chars().all(|c| c.is_alphanumeric() || c == '_')
+}
+
+/// The rounds the typer's bindings are solved in, at most. Each round adds a
+/// binding or completes one's type, or ends the solving; a chain written in
+/// order is solved in one.
+const ROUNDS: usize = 8;
+
 impl<'a> Typer<'a> {
     fn new(
         sigs: &'a Signatures,
@@ -660,22 +671,7 @@ impl<'a> Typer<'a> {
         decl: &'a Decl,
         body: &'a Body,
     ) -> Typer<'a> {
-        let types = Types::of_body(sigs, decl, body, module);
-
-        let mut sites: BTreeMap<String, usize> = BTreeMap::new();
-        for p in &decl.params {
-            *sites.entry(p.name.clone()).or_default() += 1;
-        }
-        for (_, pat, _) in body.pats.iter() {
-            if let Pattern::Bind { name, .. } = pat {
-                *sites.entry(name.clone()).or_default() += 1;
-            }
-        }
-        let shadowed: BTreeSet<String> = sites
-            .into_iter()
-            .filter(|(_, n)| *n > 1)
-            .map(|(name, _)| name)
-            .collect();
+        let lexical = Lexical::build(sigs, Some(at), decl, body);
 
         let mut piped = BTreeMap::new();
         for id in body.walk() {
@@ -689,6 +685,34 @@ impl<'a> Typer<'a> {
             }
         }
 
+        // What the program writes: each parameter's declared type, and each
+        // annotated `let`'s.
+        let mut locals = BTreeMap::new();
+        for (i, p) in decl.params.iter().enumerate() {
+            if let Some(t) = &p.ty
+                && let Some(ty) = sigs
+                    .resolve_type(module, decl, t, p.span.clone())
+                    .resolved()
+            {
+                locals.insert(Binder::Param(i), Ty::of(ty));
+            }
+        }
+        for id in body.walk() {
+            if let Expr::Let {
+                pat: Some(pat),
+                ty: Some(ty),
+                ..
+            } = body.expr(id)
+                && let Pattern::Bind { .. } = body.pat(*pat)
+                && let Some(written) = crate::resolved::written_in_body(body, *ty)
+                && let Some(t) = sigs
+                    .resolve_type(module, decl, &written, body.expr_span(id))
+                    .resolved()
+            {
+                locals.insert(Binder::Pattern(*pat), Ty::of(t));
+            }
+        }
+
         let typer = Typer {
             sigs,
             ws,
@@ -696,60 +720,23 @@ impl<'a> Typer<'a> {
             module,
             decl,
             body,
-            locals: RefCell::new(
-                types
-                    .bindings()
-                    .iter()
-                    .map(|(name, t)| (name.clone(), Ty::of(t)))
-                    .collect(),
-            ),
-            shadowed,
+            lexical,
+            locals: RefCell::new(locals),
             piped,
             solved: RefCell::new(BTreeMap::new()),
         };
 
-        // **A binding typed with a callee's own `T` is no type.** `infer.rs`
-        // types `let ys = List.filter(xs, ..)` by `filter`'s declared result,
-        // `List<T>`, with nothing instantiating `T`; and the loop below skipped
-        // every name already bound. So `ys` was `List<type parameter 0>`, and
-        // a correct `List.sort_by(ys, compare)` was refused (PW0605) for a
-        // mismatch the typer had made. Found 2026-09-25, writing kiokun's
-        // ranking in Pleris. Such a binding is dropped, and the call is solved
-        // below.
-        let own = typer.own_def();
-        typer
-            .locals
-            .borrow_mut()
-            .retain(|_, t| !t.mentions_foreign_parameter(own));
-
-        // An unannotated `let` takes its initialiser's type, and a lambda's
-        // parameters the types its use gives them. Iterated, because
-        // `let a = f()` then `let b = g(a)` needs `a` first, and a lambda's
-        // call may need a binding typed; bounded, because each round can only
-        // add bindings.
-        for _ in 0..4 {
+        // What the program implies: an unannotated `let` or `use` takes its
+        // initialiser's type, a lambda's parameters the types its use gives
+        // them, a match arm's names its scrutinee's payload, a `for` loop's
+        // name its list's element, and a template's names their block's
+        // (ADR-0063). Iterated, because `let a = f()` then `let b = g(a)`
+        // needs `a` first, and a lambda's call may need a binding typed;
+        // bounded, because a round only adds a binding or makes one's type
+        // more complete, and a complete type is never changed.
+        for _ in 0..ROUNDS {
             let mut added = typer.solve_lambdas();
-            for id in body.walk() {
-                let Expr::Let {
-                    pat: Some(pat),
-                    ty: None,
-                    init: Some(init),
-                } = body.expr(id)
-                else {
-                    continue;
-                };
-                let Pattern::Bind { name, .. } = body.pat(*pat) else {
-                    continue;
-                };
-                if typer.locals.borrow().contains_key(name) {
-                    continue;
-                }
-                let t = typer.of(*init);
-                if !t.is_unknown() {
-                    typer.locals.borrow_mut().insert(name.clone(), t);
-                    added = true;
-                }
-            }
+            added |= typer.solve_bindings();
             if !added {
                 break;
             }
@@ -766,7 +753,7 @@ impl<'a> Typer<'a> {
                 Literal::Str(_) | Literal::UnterminatedStr(_) => Primitive::Str,
             }),
             Expr::Interpolated { .. } => Ty::Primitive(Primitive::Str),
-            Expr::Name(n) => self.name(n),
+            Expr::Name(n) => self.name(id, n),
             Expr::Field { base, name } => self.field(id, *base, name),
             Expr::Call { .. } => self.call(id).result,
             // `let store = query Store(id)` binds what the query produces when
@@ -829,16 +816,14 @@ impl<'a> Typer<'a> {
             Expr::If {
                 then, els: Some(e), ..
             } => join(self.of(*then), self.of(*e)),
-            // Each arm's body, with its pattern's names bound to the payload
-            // types the scrutinee's type gives them: `entry` in
-            // `Some(entry) => ..` is the option's `T`.
-            Expr::Match { scrutinee, arms } => {
-                let st = self.of(*scrutinee);
-                arms.iter()
-                    .map(|a| self.with_bindings(&self.arm_bindings(&st, a.pat), || self.of(a.body)))
-                    .reduce(join)
-                    .unwrap_or(Ty::Unknown)
-            }
+            // Each arm's body. Its pattern's names are bound to the payload
+            // types the scrutinee's type gives them when the typer is built:
+            // `entry` in `Some(entry) => ..` is the option's `T`.
+            Expr::Match { arms, .. } => arms
+                .iter()
+                .map(|a| self.of(a.body))
+                .reduce(join)
+                .unwrap_or(Ty::Unknown),
             Expr::Record { name: Some(_), .. } => self.construct(id).result,
             Expr::List { items } => Ty::Builtin(
                 Builtin::List,
@@ -854,13 +839,23 @@ impl<'a> Typer<'a> {
         }
     }
 
-    fn name(&self, n: &str) -> Ty {
-        if self.shadowed.contains(n) {
-            return Ty::Unknown;
+    /// **A name where `id` writes it**: the binding it means, or, where no
+    /// binding in scope has it, the program's own (ADR-0063).
+    fn name(&self, id: ExprId, n: &str) -> Ty {
+        match self.lexical.binder(id) {
+            Some(b) => self.local(b),
+            None => self.global(n),
         }
-        if let Some(t) = self.locals.borrow().get(n) {
-            return t.clone();
-        }
+    }
+
+    /// The type a binding holds, as far as it is known.
+    fn local(&self, b: Binder) -> Ty {
+        self.locals.borrow().get(&b).cloned().unwrap_or(Ty::Unknown)
+    }
+
+    /// A name no local binding has: a declaration, the language's own value,
+    /// or a sum type's case.
+    fn global(&self, n: &str) -> Ty {
         // A declared callable named as a value: `List.map(xs, line_total)`.
         let term = self.ws.resolve_in(self.at, Namespace::Term, n);
         if let Resolution::Local(d) | Resolution::Imported { def: d, .. } = term
@@ -874,6 +869,13 @@ impl<'a> Typer<'a> {
         match n {
             "true" | "false" if own => Ty::Primitive(Primitive::Bool),
             "None" if own => Ty::Builtin(Builtin::Option, vec![Ty::Unknown]),
+            // Charter §7.5A: `self` in a UI declaration is its own element, a
+            // language fact rather than something a library declares.
+            "self" if own && self.is_ui() => self
+                .sigs
+                .language_type("browser", "ElementRef")
+                .map(|t| Ty::of(&t))
+                .unwrap_or(Ty::Unknown),
             _ if own => match bare_case(self.sigs, self.ws, self.at, n) {
                 Some((def, index)) => self.case_value(def, index),
                 None => Ty::Unknown,
@@ -918,17 +920,19 @@ impl<'a> Typer<'a> {
     /// a case inside the option; and a name alone the whole value, unless it
     /// names a case (ADR-0060). Until 2026-09-26 only a name directly under a
     /// case was bound, and a nested one was unknown to every relation.
-    fn arm_bindings(&self, scrutinee: &Ty, pat: crate::hir::PatternId) -> Vec<(String, Ty)> {
+    /// Each name an arm's pattern binds, by where it binds it, and the type
+    /// the scrutinee's type gives it.
+    fn arm_bindings(&self, scrutinee: &Ty, pat: crate::hir::PatternId) -> Vec<(Binder, Ty)> {
         let mut out = Vec::new();
         self.bind_pattern(scrutinee, pat, &mut out);
         out
     }
 
-    fn bind_pattern(&self, ty: &Ty, pat: crate::hir::PatternId, out: &mut Vec<(String, Ty)>) {
+    fn bind_pattern(&self, ty: &Ty, pat: crate::hir::PatternId, out: &mut Vec<(Binder, Ty)>) {
         match self.body.pat(pat) {
             Pattern::Bind { name, .. } => {
-                if !self.shadowed.contains(name) && !self.names_a_case(name) {
-                    out.push((name.clone(), ty.clone()));
+                if !self.names_a_case(name) {
+                    out.push((Binder::Pattern(pat), ty.clone()));
                 }
             }
             Pattern::Ctor { path, args } => {
@@ -946,17 +950,7 @@ impl<'a> Typer<'a> {
     /// language's `true`, `false` or `None`, or a case of a type this unit
     /// sees (ADR-0038)?
     fn names_a_case(&self, name: &str) -> bool {
-        let own = matches!(
-            self.ws.resolve_in(self.at, Namespace::Term, name),
-            Resolution::Unresolved
-        );
-        (own && matches!(name, "true" | "false" | "None"))
-            || self.ws.visible_types(self.at).into_iter().any(|def| {
-                self.sigs
-                    .type_decl(def)
-                    .and_then(|t| t.variants.as_ref())
-                    .is_some_and(|cs| cs.iter().any(|(n, _)| n == name))
-            })
+        crate::lexical::names_a_case(self.sigs, Some(self.at), name)
     }
 
     /// The types of the fields a constructor pattern takes apart, read
@@ -1003,52 +997,6 @@ impl<'a> Typer<'a> {
         (arity == 1).then(|| vec![payload.clone()])
     }
 
-    /// Every name bound by a match arm that encloses `target`, outermost
-    /// first, each typed in the scope its own match sees.
-    fn arms_around(&self, target: ExprId) -> Vec<(String, Ty)> {
-        let mut parent: BTreeMap<ExprId, ExprId> = BTreeMap::new();
-        for e in self.body.walk() {
-            for c in self.body.children(e) {
-                parent.insert(c, e);
-            }
-        }
-        let mut path = vec![target];
-        while let Some(p) = parent.get(path.last().expect("non-empty")) {
-            path.push(*p);
-        }
-        path.reverse();
-        let mut bound: Vec<(String, Ty)> = Vec::new();
-        for pair in path.windows(2) {
-            let (outer, inner) = (pair[0], pair[1]);
-            let Expr::Match { scrutinee, arms } = self.body.expr(outer) else {
-                continue;
-            };
-            let Some(arm) = arms.iter().find(|a| a.body == inner) else {
-                continue;
-            };
-            let st = self.with_bindings(&bound, || self.of(*scrutinee));
-            bound.extend(self.arm_bindings(&st, arm.pat));
-        }
-        bound
-    }
-
-    /// Run `f` with these names bound, restoring what they meant before.
-    fn with_bindings<R>(&self, binds: &[(String, Ty)], f: impl FnOnce() -> R) -> R {
-        let mut saved = Vec::new();
-        for (name, ty) in binds {
-            let old = self.locals.borrow_mut().insert(name.clone(), ty.clone());
-            saved.push((name.clone(), old));
-        }
-        let result = f();
-        for (name, old) in saved.into_iter().rev() {
-            match old {
-                Some(t) => self.locals.borrow_mut().insert(name, t),
-                None => self.locals.borrow_mut().remove(&name),
-            };
-        }
-        result
-    }
-
     /// **A policy's term roots**: the target and transition of an optimistic
     /// clause, a resource's `acquire` and `release`, a painter. They are
     /// separate trees in the body's arena, reached from no statement, so the
@@ -1061,13 +1009,27 @@ impl<'a> Typer<'a> {
     /// (ADR-0025), a `release(h)`'s is what the resource declares it
     /// produces. Any other binder is bound as unknown, so it can never borrow
     /// the type of a parameter that happens to share its name.
-    fn term_relations(&self, own_result: Option<Ty>, out: &mut Vec<ValueRelation>) {
+    fn term_relations(&self, out: &mut Vec<ValueRelation>) {
+        for (_, root) in self.decl.term_roots() {
+            self.relations_from(root.root, out);
+        }
+    }
+
+    /// The type a policy term's binders take from its header, where it gives
+    /// one (see [`Typer::term_relations`]).
+    fn term_binders(&self) -> Vec<(Binder, Ty)> {
         use crate::hir::ExecutionContext as Cx;
         let success = |t: Ty| match t {
             Ty::Builtin(Builtin::Result, mut args) if args.len() == 2 => args.swap_remove(0),
             other => other,
         };
-        for (policy, root) in self.decl.term_roots() {
+        let own_result = self
+            .own_def()
+            .and_then(|d| self.sigs.by_def(d))
+            .and_then(Signature::result)
+            .map(Ty::of);
+        let mut out = Vec::new();
+        for (i, (policy, root)) in self.decl.term_roots().enumerate() {
             let bound = match root.context {
                 Cx::OptimisticTransition => policy
                     .roots
@@ -1078,13 +1040,9 @@ impl<'a> Typer<'a> {
                 Cx::Release => own_result.clone().map(success).unwrap_or(Ty::Unknown),
                 _ => Ty::Unknown,
             };
-            let binds: Vec<(String, Ty)> = root
-                .binders
-                .iter()
-                .map(|(name, _)| (name.clone(), bound.clone()))
-                .collect();
-            self.with_bindings(&binds, || self.relations_from(root.root, out));
+            out.extend((0..root.binders.len()).map(|j| (Binder::Term(i, j), bound.clone())));
         }
+        out
     }
 
     /// A lambda, typed against the function type it is passed as: its
@@ -1092,32 +1050,33 @@ impl<'a> Typer<'a> {
     /// with its body's type as the result. Without an expected function type
     /// a lambda has no type here — an unannotated parameter is not a claim.
     fn lambda(&self, params: &[crate::hir::PatternId], body: ExprId, expected: &[Ty]) -> Ty {
-        let Some(names) = lambda_names(self.body, params) else {
+        let Some(params) = lambda_binders(self.body, params) else {
             return Ty::Unknown;
         };
         let Some((_, expected_params)) = expected.split_last() else {
             return Ty::Unknown;
         };
-        if names.len() != expected_params.len() {
+        if params.len() != expected_params.len() {
             // A callback of the wrong arity is a different function type.
-            let mut shape = vec![Ty::Unknown; names.len()];
+            let mut shape = vec![Ty::Unknown; params.len()];
             shape.push(Ty::Unknown);
             return Ty::Builtin(Builtin::Function, shape);
         }
         let own = self.own_def();
         let mut saved = Vec::new();
-        for (name, ty) in names.iter().zip(expected_params) {
+        for (p, ty) in params.iter().zip(expected_params) {
+            let b = Binder::Pattern(*p);
             if ty.is_closed() && !ty.mentions_foreign_parameter(own) {
-                self.solved.borrow_mut().insert(name.clone(), ty.clone());
+                self.solved.borrow_mut().insert(b, ty.clone());
             }
-            let old = self.locals.borrow_mut().insert(name.clone(), ty.clone());
-            saved.push((name.clone(), old));
+            let old = self.locals.borrow_mut().insert(b, ty.clone());
+            saved.push((b, old));
         }
         let result = self.of(body);
-        for (name, old) in saved {
+        for (b, old) in saved {
             match old {
-                Some(t) => self.locals.borrow_mut().insert(name, t),
-                None => self.locals.borrow_mut().remove(&name),
+                Some(t) => self.locals.borrow_mut().insert(b, t),
+                None => self.locals.borrow_mut().remove(&b),
             };
         }
         let mut shape = expected_params.to_vec();
@@ -1147,7 +1106,14 @@ impl<'a> Typer<'a> {
                 _ => Ty::Unknown,
             };
         }
-        let receiver = self.of(base);
+        self.member_type(&self.of(base), name)
+    }
+
+    /// The type of `name` read from a value of type `receiver`: a record's
+    /// field under its instance, an opaque value's representation in its own
+    /// module, or a property.
+    fn member_type(&self, receiver: &Ty, name: &str) -> Ty {
+        let receiver = receiver.clone();
         let Some(sig) = receiver
             .receiver()
             .and_then(|r| self.sigs.member_by(r, name))
@@ -1533,11 +1499,13 @@ impl<'a> Typer<'a> {
             else {
                 continue;
             };
-            let _ = i;
             let actual = match init.value {
                 Some(v) => self.of(v),
                 // `Point { x, y }` — the shorthand names a binding.
-                None => self.name(&init.name),
+                None => match self.lexical.shorthand(id, i) {
+                    Some(b) => self.local(b),
+                    None => self.global(&init.name),
+                },
             };
             let outcome = match expected {
                 TypeResolution::Resolved(t) => {
@@ -1642,6 +1610,140 @@ impl<'a> Typer<'a> {
             .unwrap_or_else(|| "?".to_string())
     }
 
+    /// **Every binding the body's own shape types** (ADR-0063): an
+    /// unannotated `let` or `use` by its initialiser, a match arm's names by
+    /// the scrutinee's payload, a `for` loop's name by its list's element, a
+    /// template's `{#each}` and `{#match}` arm names by their block's, and a
+    /// policy term's binders by its header. Returns whether any binding was
+    /// newly typed, or more completely.
+    fn solve_bindings(&self) -> bool {
+        let mut added = false;
+        let mut trees = vec![self.body.root];
+        trees.extend(self.decl.term_roots().map(|(_, r)| r.root));
+        for id in trees.iter().flat_map(|t| self.body.walk_from(*t)) {
+            match self.body.expr(id) {
+                Expr::Let {
+                    pat: Some(pat),
+                    ty: None,
+                    init: Some(init),
+                } if matches!(self.body.pat(*pat), Pattern::Bind { .. }) => {
+                    added |= self.bind(Binder::Pattern(*pat), self.of(*init));
+                }
+                Expr::Keyword { keyword, args, .. } if keyword == "use" => {
+                    if let Some(init) = args.first() {
+                        added |= self.bind(Binder::Use(id), self.of(*init));
+                    }
+                }
+                Expr::Match { scrutinee, arms } => {
+                    let st = self.of(*scrutinee);
+                    for arm in arms {
+                        for (b, t) in self.arm_bindings(&st, arm.pat) {
+                            added |= self.bind(b, t);
+                        }
+                    }
+                }
+                // `for x in xs` over a `List<T>`: each `x` is a `T`. The loop
+                // takes a list and binds one name (ADR-0051).
+                Expr::For {
+                    pat: Some(pat),
+                    iterable,
+                    ..
+                } if matches!(self.body.pat(*pat), Pattern::Bind { .. }) => {
+                    if let Ty::Builtin(Builtin::List, args) = self.of(*iterable)
+                        && let [element] = args.as_slice()
+                    {
+                        added |= self.bind(Binder::Pattern(*pat), element.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+        for (b, t) in self.term_binders() {
+            added |= self.bind(b, t);
+        }
+        // `{#each xs as x}`: each `x` is an element of `xs`, read from the
+        // directive as written: a name, and the fields read from it.
+        for (node, collection, head) in self.lexical.each_blocks() {
+            let mut segments = collection.split('.').map(str::trim);
+            let first = segments.next().unwrap_or_default();
+            if !is_ident(first) {
+                continue;
+            }
+            let mut t = match head {
+                Some(b) => self.local(b),
+                None => self.global(first),
+            };
+            for segment in segments {
+                if !is_ident(segment) {
+                    t = Ty::Unknown;
+                    break;
+                }
+                t = self.member_type(&t, segment);
+            }
+            if let Ty::Builtin(Builtin::List, args) = t
+                && let [element] = args.as_slice()
+            {
+                added |= self.bind(Binder::Each(node), element.clone());
+            }
+        }
+        // `{:Some(x)}`, `{:Rect(w, h)}`: each name is its field of the case
+        // the block's subject holds, as a match arm's is.
+        for (node, subject) in self.lexical.template_arms() {
+            let crate::hir::Node::Branch { arm: Some(arm), .. } = self.body.node(node) else {
+                continue;
+            };
+            let st = self.of(subject);
+            let Some(fields) = self.pattern_fields(&st, &arm.case, arm.bindings.len()) else {
+                continue;
+            };
+            for (i, f) in fields.into_iter().enumerate() {
+                added |= self.bind(Binder::Arm(node, i), f);
+            }
+        }
+        added
+    }
+
+    /// **Record the type a binding holds.** A binding keeps the first type
+    /// it is given, unless a later round gives it a complete type its
+    /// incomplete one agrees with: `List<?>` becomes `List<Int>`, and a
+    /// complete type is never changed. So the rounds end.
+    ///
+    /// Every type recorded is the typer's own, closed over each callee's
+    /// parameters. Until ADR-0063 the bindings began as `infer.rs`'s, which
+    /// typed `let ys = List.filter(xs, ..)` by `filter`'s declared `List<T>`,
+    /// and a correct `List.sort_by(ys, compare)` was refused (PW0605) for a
+    /// mismatch the typer had made (found 2026-09-25).
+    fn bind(&self, b: Binder, t: Ty) -> bool {
+        if t.is_unknown() {
+            return false;
+        }
+        let mut locals = self.locals.borrow_mut();
+        match locals.get(&b) {
+            None => {
+                locals.insert(b, t);
+                true
+            }
+            Some(old)
+                if !old.is_closed()
+                    && t.is_closed()
+                    && unify(&mut Subst::default(), old, &t) != Verdict::Disagree =>
+            {
+                locals.insert(b, t);
+                true
+            }
+            Some(_) => false,
+        }
+    }
+
+    /// Is this declaration one whose body renders an element: a view, a
+    /// component, a page?
+    fn is_ui(&self) -> bool {
+        matches!(
+            self.decl.kind,
+            DeclKind::View | DeclKind::Component | DeclKind::Page
+        )
+    }
+
     fn own_def(&self) -> Option<DefId> {
         let ns = Namespace::of(self.decl.kind)?;
         match self.ws.resolve_in(self.at, ns, &self.decl.name) {
@@ -1658,9 +1760,8 @@ impl<'a> Typer<'a> {
     /// The relations walk reads a lambda's body on its own, with the body's
     /// bindings. A parameter was typed only while its call was solved, so in
     /// that walk it was untyped, or typed by `infer.rs`'s narrower rule
-    /// (ADR-0053). A parameter keeps the closed type its use gives it. One
-    /// whose name is bound at several sites stays unknown, as any such name:
-    /// [`Typer::name`] answers for it before `locals` is read.
+    /// (ADR-0053). A parameter keeps the closed type its use gives it, by
+    /// where it is bound, whatever else binds its name (ADR-0063).
     fn solve_lambdas(&self) -> bool {
         let is_lambda = |id: ExprId| matches!(self.body.expr(id), Expr::Lambda { .. });
         for id in self.body.walk() {
@@ -1699,13 +1800,9 @@ impl<'a> Typer<'a> {
             }
         }
         let solved = std::mem::take(&mut *self.solved.borrow_mut());
-        let mut locals = self.locals.borrow_mut();
         let mut added = false;
-        for (name, t) in solved {
-            if let std::collections::btree_map::Entry::Vacant(e) = locals.entry(name) {
-                e.insert(t);
-                added = true;
-            }
+        for (b, t) in solved {
+            added |= self.bind(b, t);
         }
         added
     }
@@ -1734,22 +1831,14 @@ impl<'a> Typer<'a> {
     }
 
     /// The same relations, over one tree: the body, or a policy's term root,
-    /// in the order `Body::walk_from` visits it. An arm's body is walked with
-    /// its pattern's names bound, so `x` in `Some(x) => x + 1` is the option's
-    /// `T` and `r` in `Circle(r) => ..` the case's field (ADR-0059). Until
-    /// 2026-09-26 every relation inside an arm read them as unknown, and
-    /// `Some(x) => x + "a"` over an `Option<Int>` passed `pw check`.
+    /// in the order `Body::walk_from` visits it. An arm's names are typed by
+    /// where they are bound, so `x` in `Some(x) => x + 1` is the option's `T`
+    /// and `r` in `Circle(r) => ..` the case's field (ADR-0059), whatever
+    /// else binds an `x` or an `r` (ADR-0063). Until 2026-09-26 every
+    /// relation inside an arm read them as unknown, and `Some(x) => x + "a"`
+    /// over an `Option<Int>` passed `pw check`.
     fn relations_from(&self, root: ExprId, out: &mut Vec<ValueRelation>) {
         self.relations_at(root, out);
-        if let Expr::Match { scrutinee, arms } = self.body.expr(root) {
-            self.relations_from(*scrutinee, out);
-            let st = self.of(*scrutinee);
-            for arm in arms {
-                let binds = self.arm_bindings(&st, arm.pat);
-                self.with_bindings(&binds, || self.relations_from(arm.body, out));
-            }
-            return;
-        }
         for c in self.body.children(root) {
             self.relations_from(c, out);
         }
@@ -1982,7 +2071,7 @@ impl<'a> Typer<'a> {
         let Expr::Name(x) = self.body.expr(lhs) else {
             return Vec::new();
         };
-        let declared = self.name(x);
+        let declared = self.name(lhs, x);
         let actual = self.of(rhs);
         let mut s = Subst::default();
         let outcome = match unify(&mut s, &declared, &actual) {
@@ -2201,17 +2290,30 @@ fn function_type(sig: &Signature) -> Ty {
 /// the last two lowered as one unnamed constructor pattern. The backend reads
 /// parameters through this too (ADR-0040), so the two cannot disagree.
 pub(crate) fn lambda_names(body: &Body, params: &[crate::hir::PatternId]) -> Option<Vec<String>> {
-    let bind = |p: crate::hir::PatternId| match body.pat(p) {
-        Pattern::Bind { name, .. } => Some(name.clone()),
-        _ => None,
-    };
+    lambda_binders(body, params)?
+        .into_iter()
+        .map(|p| match body.pat(p) {
+            Pattern::Bind { name, .. } => Some(name.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// **Where a lambda binds each of its parameters**: `(t, w) => ..` is one
+/// parenthesised pattern holding two names. `None` where a parameter is not
+/// a name.
+pub(crate) fn lambda_binders(
+    body: &Body,
+    params: &[crate::hir::PatternId],
+) -> Option<Vec<crate::hir::PatternId>> {
+    let named = |p: &crate::hir::PatternId| matches!(body.pat(*p), Pattern::Bind { .. });
     if let [only] = params
         && let Pattern::Ctor { path, args } = body.pat(*only)
         && path.is_empty()
     {
-        return args.iter().map(|a| bind(*a)).collect();
+        return args.iter().all(named).then(|| args.clone());
     }
-    params.iter().map(|p| bind(*p)).collect()
+    params.iter().all(named).then(|| params.to_vec())
 }
 
 // --- running it -----------------------------------------------------------------------
@@ -2226,14 +2328,7 @@ pub fn relations(hir: &Hir, sigs: &Signatures, ws: &Workspace, at: UnitId) -> Ve
         let body = hir.body(body_id);
         let typer = Typer::new(sigs, ws, at, hir.module_of(id), decl, body);
         typer.relations(&mut out);
-        let own_result = sigs
-            .by_def(DefId {
-                unit: at,
-                decl: id.0,
-            })
-            .and_then(Signature::result)
-            .map(Ty::of);
-        typer.term_relations(own_result, &mut out);
+        typer.term_relations(&mut out);
         returns(&typer, sigs, at, id, decl, &mut out);
     }
     out

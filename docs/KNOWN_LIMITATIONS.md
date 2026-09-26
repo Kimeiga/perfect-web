@@ -26,10 +26,17 @@ agreement:
   needed). Until 2026-09-26 no case had a type, and `Shape.Bogus(1)` passed.
 - **Named-argument calls** are Undecided: a signature does not carry parameter
   names. None occurs in the corpus.
-- **A name bound at two sites in one body is unknown** to the value
-  relations, whatever each binding holds (ADR-0053). Their environment is
-  flat and cannot say which binding a use means. A lambda's parameters take
-  the types its use declares, except under such a name.
+- **A value with a hole that means any type is undecided.** `None`, `[]`,
+  `Err(e)` against a declared result, `todo`, and a generic opaque value
+  built from its representation (`Secret("")`) each have a part nothing
+  states. Each is undecided where it is well-typed. They are all 20 of
+  kiokun's undecided relations since ADR-0063, which gave every name the
+  binding it means.
+- **A record literal whose first field is shorthand** (`P { x }`) parses as
+  the name `P` followed by a block `{ x }`. A brace is a record only as `{ }`
+  or `{ name:`, so that `if x { .. }` stays a block. `let p = P { x }`
+  checks and means something else; `P { a: 1, x }` is a record. Found
+  writing ADR-0063; its fix is a grammar decision (ruling needed).
 - **A `()` body discards its last value** (A-018). A branch mismatch in
   statement position is not refused; as a result, it is.
 - **Generic layouts at the boundary.** Phantom parameters map to one WIT
@@ -234,6 +241,13 @@ awaited in order. What remains:
   browser's arguments by the component's parameters: `PositiveInt` arrives as
   an `s64`, and any `s64` is accepted. `opaque type PositiveInt = Int` states
   no invariant that could be checked.
+- **A privacy label is not carried through a declared function**
+  (ADR-0063). `List.get(tokens, 0)`, over a list of secrets, is public, and
+  so is `List.map`'s result: a declaration's label is its contract, and
+  `get` declares none for a result holding its argument's element. A name
+  bound over a labelled collection's elements carries its label since
+  ADR-0063: a `for` loop's, an `{#each}` block's, and a lambda's parameters
+  where the lambda is passed to a call.
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.

@@ -104,8 +104,8 @@ MUTANTS = [
     (
         "an arm's binding has no type",
         INFER,
-        "                    types.bindings.insert(name.clone(), p);",
-        "                    let _ = p;",
+        "                types.bindings.insert(Binder::Arm(n, 0), p);",
+        "                let _ = p;",
     ),
     (
         "a match renders its first arm whatever the case",

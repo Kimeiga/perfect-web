@@ -337,7 +337,10 @@ fn a_type_no_pattern_takes_apart_is_matched_by_a_name_only() {
 fn a_name_an_arm_binds_again_is_not_read_as_the_parameter() {
     // `x` in the inner match is the arm's `Colour`, not the parameter's
     // `Status`. The parameter's type proved `match x { Red => 1 }`
-    // exhaustive against `Status`, where `Red` read as a binding.
+    // exhaustive against `Status`, where `Red` read as a binding. From
+    // ADR-0053 a name bound twice was unknown, and the match was blocked;
+    // since ADR-0063 each use is its own binding's, and the case the arm's
+    // `Colour` is missing is found.
     let shadowed = "public query Q(x: Status, w: String) -> Int {\n    match paint(w) {\n        Some(x) => match x {\n            Red => 1,\n        },\n        None => 0,\n    }\n}\n";
     let found = outcomes(shadowed, "Q");
     assert_eq!(found.len(), 2);
@@ -346,7 +349,14 @@ fn a_name_an_arm_binds_again_is_not_read_as_the_parameter() {
         MatchOutcome::Proven,
         "the outer match, over `Option<Colour>`"
     );
-    assert!(blocked_because(&found[1], "unknown here"), "{found:?}");
+    assert!(
+        matches!(&found[1], MatchOutcome::NonExhaustive { missing } if missing == &["Green"]),
+        "the inner match, over the arm's `Colour`: {found:?}"
+    );
+    assert_eq!(
+        refused(shadowed).repairs[0].description,
+        "add an arm for `Green`"
+    );
 
     // Bound once, it is typed, and the missing case is found.
     let d = refused(

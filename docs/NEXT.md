@@ -77,15 +77,31 @@ matched (ADR-0059, done), which found four ways a wrong program passed
    miscompile: `Some(Empty)` bound every payload;
 2. ~~a declared sum type in a template's `{#match}`~~, done (ADR-0061);
 3. ~~generic records and generic sum types in the backend~~, done inside a
-   component and a module (ADR-0062); next, a generic type at the boundary,
-   a WIT type per instance;
-4. the value relations' flat environment: a name bound at two sites;
-5. structural `==`, and reporting an arm no case reaches;
-6. named-argument calls, the unit value `()`, `derived` purity, calling a
+   component and a module (ADR-0062);
+4. ~~the value relations' flat environment: a name bound at two sites~~,
+   done (ADR-0063). It was three flat environments. Type errors through any
+   name bound twice passed. A handler's capture was typed by another binding
+   of its name. Secrets were logged or rendered through a `for` loop's, a
+   lambda's or an `{#each}` block's name. And the accepted A-017 was
+   ill-typed.
+
+Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
+1. a privacy label carried through a declared function: `List.get` over a
+   list of secrets is public (ADR-0064);
+2. a value with a hole that means any type (`None`, `[]`, `Err(e)`, `todo`,
+   `Secret("")`), which is all 20 of kiokun's undecided relations;
+3. a function passed to a generic declaration in the backend (found writing
+   ADR-0062's tests), then a generic type at the boundary, a WIT type per
+   instance;
+4. structural `==`, and reporting an arm no case reaches;
+5. named-argument calls, the unit value `()`, `derived` purity, calling a
    function held in a record field, and a hole holding a string;
-7. `Float` `%` and `Float` formatting, then `split` and `range`;
-8. each needing a ruling first: the event as a handler parameter, instance
-   reuse, and captures and patches for templates.
+6. `Float` `%` and `Float` formatting, then `split` and `range`;
+7. each needing a ruling first:
+   - the event as a handler parameter;
+   - instance reuse;
+   - captures and patches for templates;
+   - a record literal whose first field is shorthand (ADR-0063).
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe
