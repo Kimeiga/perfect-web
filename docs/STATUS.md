@@ -78,6 +78,32 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a case named under another compiled as a
+binding** ([ADR-0060](DECISIONS/ADR-0060-nested-and-literal-patterns.md)).
+`match o { Some(Empty) => 1, None => 0 }` over an `Option<Shape>` passed
+`pw check`: the analysis could not see into `Some`'s payload. The backend
+then read `Empty` as a binding of that name, so every `Some` took the first
+arm, and `Some(Circle(3))` answered 1. It was present since ADR-0036 for any
+case name written under `Some`, `Ok` or `Err`, and ADR-0059 extended it to
+declared cases. The checker now names the missing `Some(Circle(Int))`, and
+the backend compiles such a pattern to a test of the payload.
+`pats.EmptyOnly` in `compiler/pw-conformance/tests/patterns.rs` is the
+regression test.
+
+**2026-09-26: nested and literal patterns**
+([ADR-0060](DECISIONS/ADR-0060-nested-and-literal-patterns.md)).
+- The exhaustiveness analysis types each match's subject, an ADT per
+  instance. A pattern nested under `Some`, `Ok`, `Err` or a declared case is
+  read against its own type, where it was Blocked.
+- `true`, `false` and each literal are constructors. A `Bool`, an `Int` or a
+  `String` can be matched, and `-1` is a pattern.
+- Every name a pattern binds is typed in its arm, a name alone as the whole
+  value.
+- A match that is not one level deep compiles to a decision tree of nested
+  matches and tests. An arm reached on several paths is compiled on each.
+
+Evidence: [patterns.txt](evidence/E10/patterns.txt) (`just e10-patterns`).
+
 **Correction, 2026-09-26: a Pleris name WIT reserves broke the whole
 build.** A case `List`, a field `own` or a query `Own` became a WIT keyword
 (`list`, `own`), written bare. The program's WIT package then did not parse,
@@ -332,6 +358,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0060: a match that is not one level deep compiles to a decision tree
+  that copies an arm's body onto each path reaching it, rather than a join
+  point, which the structured IR has no jump for.
 - ADR-0059: a case is written through its type in an expression; a case
   without a payload may be written alone where one visible type has it, and
   one with a payload may not (PW0021, naming the qualified form); an arm no

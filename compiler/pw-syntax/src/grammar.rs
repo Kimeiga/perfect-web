@@ -1651,6 +1651,14 @@ impl<'a> P<'a> {
                 self.bump();
                 self.finish();
             }
+            // `-1`: a negative literal, one pattern (ADR-0060). It was a
+            // parse error, so a match could not name a negative number.
+            Kind::Minus if matches!(self.nth(1).kind, Kind::Int | Kind::Float) => {
+                self.start(K::LiteralPat);
+                self.bump();
+                self.bump();
+                self.finish();
+            }
             Kind::LParen => {
                 self.start(K::TuplePat);
                 self.bump();

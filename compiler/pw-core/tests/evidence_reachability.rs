@@ -742,14 +742,15 @@ fn f(s: State) -> Int {
     };
     assert_eq!(missing, &["Sent".to_string()], "and it names the witness");
 
-    // Blocked: the scrutinee's type is not one this program declares, so the
-    // analysis has no matrix to build. **Not** a proof, and not a violation.
+    // Blocked: a `Float` literal decides no case, so the analysis does not
+    // read it. **Not** a proof, and not a violation. (An `Int` literal was
+    // the example until ADR-0060, which reads it.)
     let blocked = "\
 module m
 
-fn f(s: Int) -> Int {
+fn f(s: Float) -> Int {
     match s {
-        1 => 1
+        0.5 => 1
     }
 }
 ";

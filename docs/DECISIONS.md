@@ -366,3 +366,13 @@ four ways a wrong program passed `pw check`: a case's fields were
 unchecked, an undeclared case passed, `Shape.Empty` in a pattern bound a
 name and matched everything, and an arm's bindings were unknown in its
 body.
+
+## 2026-09-26: nested and literal patterns (E10)
+
+[ADR-0060](DECISIONS/ADR-0060-nested-and-literal-patterns.md): the
+exhaustiveness analysis types each match's subject, an ADT per instance, so
+a pattern nested under `Some` or a declared case is read against its own
+type, and `true`, `false` and each literal are constructors. The backend
+compiles any match that is not one level deep to a decision tree of nested
+matches and tests. It fixes a silent miscompile: `Some(Empty)` bound every
+payload to a name `Empty`.

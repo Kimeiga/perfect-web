@@ -91,8 +91,8 @@ the types a generic callee's arguments give it (ADR-0050). An early
 `return`, `?`, `for` loops and `let mut` bindings compile (ADR-0051). Still
 refused by name:
 
-- nested and literal patterns (a declared sum type's cases are built and
-  matched since ADR-0059, with `_`, a name, and `A | B` arms);
+- a `Float` literal pattern, and an or-pattern that binds a name (nested
+  and literal patterns compile to a decision tree since ADR-0060);
 - an arm no case reaches: the checker computes it and does not report it,
   so such a match checks and does not compile (ADR-0059, ruling needed);
 - a `return`, a `?` or an assignment inside a lambda a list operation runs,
@@ -115,11 +115,13 @@ refused by name:
 
 - **Some matches are not analysed for exhaustiveness.** Each is counted
   Blocked by the match audit, with its reason: neither proven nor refused.
-  - A constructor pattern nested under `Some`, `Ok` or `Err`
-    (`Some(Some(x))`). The backend refuses nested patterns.
-  - A literal pattern (`Some("a")`).
+  - A `Float` literal pattern.
   - A scrutinee the value relations cannot type, including a name bound at
     two sites.
+
+  A pattern nested under `Some`, `Ok`, `Err` or a declared case, a literal,
+  a `Bool`, and a scrutinee no pattern takes apart (a record, a list) are
+  analysed since 2026-09-26 (ADR-0060); until then each was Blocked.
 
   Until 2026-09-25 matches over `Option`, `Result` and calls were not checked
   at all, and four other shapes were proven exhaustive when they were not

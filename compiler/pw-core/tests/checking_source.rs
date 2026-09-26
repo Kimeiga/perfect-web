@@ -376,25 +376,17 @@ fn every_diagnostic_carries_what_charter_16_3_requires() {
 }
 
 #[test]
-fn building_the_environment_reads_variants_and_opaques() {
+fn the_environment_knows_every_constructor_name() {
+    // A bare pattern name that some type has as a constructor is that
+    // constructor (ADR-0038): the program's own cases, and the language's
+    // four. Each match types its own subject's constructors (ADR-0060).
     let u = unit(
         "t.pw",
         "module m\nopaque type StoreId = String\ntype S = | A | B(Int)\n",
     );
     let env = Env::build(std::slice::from_ref(&u));
-    let p = env.program();
-    // The program's own sum type, then the language's own two (2026-09-25),
-    // which a match over a call or over `Option`/`Result` is checked against.
-    let names: Vec<&str> = p.adts.iter().map(|a| a.name.as_str()).collect();
-    assert_eq!(names, ["S", "Option", "Result"]);
-    assert_eq!(p.adts[0].ctors.len(), 2);
-    assert_eq!(p.adts[0].ctors[1].fields.len(), 1, "B carries one field");
-    let option: Vec<&str> = p.adts[1].ctors.iter().map(|c| c.name.as_str()).collect();
-    assert_eq!(option, ["Some", "None"]);
-    // `StoreId`, and the opaque payload of `Some`/`Ok`/`Err`: what a witness
-    // prints as `Some(_)`.
-    let opaques: Vec<&str> = p.opaques.iter().map(|o| o.name.as_str()).collect();
-    assert_eq!(opaques, ["StoreId", "_"]);
+    let names: Vec<&str> = env.constructors().collect();
+    assert_eq!(names, ["A", "B", "Err", "None", "Ok", "Some"]);
 }
 
 /// Everything a developer would be shown for one diagnostic, as one string.

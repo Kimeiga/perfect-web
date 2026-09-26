@@ -556,6 +556,26 @@ pub(crate) fn named<'s>(
     Named::Refused
 }
 
+/// **`t` with `binder`'s type parameters replaced by `args`**: a declared
+/// case's field under the arguments its type is applied to. A parameter no
+/// argument gives is unknown.
+pub(crate) fn substituted(t: &Ty, binder: DefId, args: &[Ty]) -> Ty {
+    match t {
+        Ty::Parameter { binder: b, index } if *b == binder => {
+            args.get(*index as usize).cloned().unwrap_or(Ty::Unknown)
+        }
+        Ty::Builtin(c, xs) => Ty::Builtin(
+            *c,
+            xs.iter().map(|x| substituted(x, binder, args)).collect(),
+        ),
+        Ty::Nominal(d, xs) => Ty::Nominal(
+            *d,
+            xs.iter().map(|x| substituted(x, binder, args)).collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
 /// What a qualified path names when it names a sum type's case (ADR-0059).
 pub(crate) enum CaseNamed {
     /// `Shape.Circle`: the type, and the case's position in its declaration.
@@ -890,99 +910,97 @@ impl<'a> Typer<'a> {
         Ty::Builtin(Builtin::Function, shape)
     }
 
-    /// The names an arm's pattern binds, typed from the scrutinee's type:
-    /// `Some(x)` binds the option's `T`; `Ok(x)` and `Err(e)` the result's two
-    /// sides, where the program declares nothing of that name; `Rect(w, h)`
-    /// each field of a declared case's payload (ADR-0059). Only a name bound
-    /// directly under the case: a nested pattern binds nothing here and stays
-    /// unknown, which every relation reads as undecided.
+    /// The names an arm's pattern binds, each typed from the type the part
+    /// of the pattern binding it is read against: `Some(x)` binds the
+    /// option's `T`; `Ok(x)` and `Err(e)` the result's two sides, where the
+    /// program declares nothing of that name; `Rect(w, h)` each field of a
+    /// declared case's payload (ADR-0059); `Some(Circle(r))` its field inside
+    /// a case inside the option; and a name alone the whole value, unless it
+    /// names a case (ADR-0060). Until 2026-09-26 only a name directly under a
+    /// case was bound, and a nested one was unknown to every relation.
     fn arm_bindings(&self, scrutinee: &Ty, pat: crate::hir::PatternId) -> Vec<(String, Ty)> {
-        let Pattern::Ctor { path, args } = self.body.pat(pat) else {
-            return Vec::new();
-        };
-        if let Ty::Nominal(def, _) = scrutinee
-            && self
-                .sigs
-                .type_decl(*def)
-                .is_some_and(|t| t.variants.is_some())
-        {
-            return self.case_bindings(scrutinee, *def, path, args);
+        let mut out = Vec::new();
+        self.bind_pattern(scrutinee, pat, &mut out);
+        out
+    }
+
+    fn bind_pattern(&self, ty: &Ty, pat: crate::hir::PatternId, out: &mut Vec<(String, Ty)>) {
+        match self.body.pat(pat) {
+            Pattern::Bind { name, .. } => {
+                if !self.shadowed.contains(name) && !self.names_a_case(name) {
+                    out.push((name.clone(), ty.clone()));
+                }
+            }
+            Pattern::Ctor { path, args } => {
+                if let Some(fields) = self.pattern_fields(ty, path, args.len()) {
+                    for (arg, field) in args.iter().zip(&fields) {
+                        self.bind_pattern(field, *arg, out);
+                    }
+                }
+            }
+            _ => {}
         }
-        let [inner] = args.as_slice() else {
-            return Vec::new();
-        };
-        let Pattern::Bind { name, .. } = self.body.pat(*inner) else {
-            return Vec::new();
-        };
+    }
+
+    /// Is a name written alone in a pattern a case rather than a binding: the
+    /// language's `true`, `false` or `None`, or a case of a type this unit
+    /// sees (ADR-0038)?
+    fn names_a_case(&self, name: &str) -> bool {
+        let own = matches!(
+            self.ws.resolve_in(self.at, Namespace::Term, name),
+            Resolution::Unresolved
+        );
+        (own && matches!(name, "true" | "false" | "None"))
+            || self.ws.visible_types(self.at).into_iter().any(|def| {
+                self.sigs
+                    .type_decl(def)
+                    .and_then(|t| t.variants.as_ref())
+                    .is_some_and(|cs| cs.iter().any(|(n, _)| n == name))
+            })
+    }
+
+    /// The types of the fields a constructor pattern takes apart, read
+    /// against `ty`: a builtin case's payload, or a declared case's fields
+    /// under the type's arguments (`Tree<Int>`'s `Node(Tree<T>, T)` has a
+    /// `Tree<Int>` and an `Int`). `None` for a case `ty` lacks, a qualifier
+    /// naming another type, or a field count the case does not declare; the
+    /// exhaustiveness check reports each (PW0608, PW0603).
+    fn pattern_fields(&self, ty: &Ty, path: &str, arity: usize) -> Option<Vec<Ty>> {
+        if let Ty::Nominal(def, args) = ty
+            && let Some(cases) = self.sigs.type_decl(*def).and_then(|t| t.variants.as_ref())
+        {
+            let index = match path.rsplit_once('.') {
+                Some(_) => match case_named(self.sigs, self.ws, self.at, path)? {
+                    CaseNamed::Case(d, index) if d == *def => index,
+                    _ => return None,
+                },
+                None => cases.iter().position(|(n, _)| n == path)?,
+            };
+            let (_, fields) = cases.get(index)?;
+            if fields.len() != arity {
+                return None;
+            }
+            return Some(
+                fields
+                    .iter()
+                    .map(|f| match f {
+                        TypeResolution::Resolved(t) => substituted(&Ty::of(t), *def, args),
+                        _ => Ty::Unknown,
+                    })
+                    .collect(),
+            );
+        }
         let own = matches!(
             self.ws.resolve_in(self.at, Namespace::Term, path),
             Resolution::Unresolved
         );
-        let payload = match (path.as_str(), scrutinee) {
+        let payload = match (path, ty) {
             ("Some", Ty::Builtin(Builtin::Option, a)) if own => a.first(),
             ("Ok", Ty::Builtin(Builtin::Result, a)) if own => a.first(),
             ("Err", Ty::Builtin(Builtin::Result, a)) if own => a.get(1),
             _ => None,
-        };
-        match payload {
-            Some(t) if !self.shadowed.contains(name) => vec![(name.clone(), t.clone())],
-            _ => Vec::new(),
-        }
-    }
-
-    /// `Rect(w, h)` against a `Shape`: each name bound directly under the
-    /// case, typed as its field under the scrutinee's type arguments. A case
-    /// the type lacks, a qualifier naming another type, or a field count the
-    /// case does not declare binds nothing; the exhaustiveness check reports
-    /// each (PW0608, PW0603).
-    fn case_bindings(
-        &self,
-        scrutinee: &Ty,
-        def: DefId,
-        path: &str,
-        args: &[crate::hir::PatternId],
-    ) -> Vec<(String, Ty)> {
-        let case = match path.rsplit_once('.') {
-            Some(_) => match case_named(self.sigs, self.ws, self.at, path) {
-                Some(CaseNamed::Case(d, index)) if d == def => index,
-                _ => return Vec::new(),
-            },
-            None => {
-                let cases = self.sigs.type_decl(def).and_then(|t| t.variants.as_ref());
-                match cases.and_then(|cs| cs.iter().position(|(n, _)| n == path)) {
-                    Some(index) => index,
-                    None => return Vec::new(),
-                }
-            }
-        };
-        let Some((_, fields)) = self
-            .sigs
-            .type_decl(def)
-            .and_then(|t| t.variants.as_ref())
-            .and_then(|cs| cs.get(case))
-        else {
-            return Vec::new();
-        };
-        if fields.len() != args.len() {
-            return Vec::new();
-        }
-        // The declared fields under the scrutinee's arguments: `Tree<Int>`'s
-        // `Node(Tree<T>, T)` binds a `Tree<Int>` and an `Int`.
-        let mut s = Subst::default();
-        unify(&mut s, &self.applied(def).instantiate(def), scrutinee);
-        let mut out = Vec::new();
-        for (arg, field) in args.iter().zip(fields) {
-            let Pattern::Bind { name, .. } = self.body.pat(*arg) else {
-                continue;
-            };
-            let TypeResolution::Resolved(t) = field else {
-                continue;
-            };
-            if !self.shadowed.contains(name) {
-                out.push((name.clone(), s.close(&Ty::of(t).instantiate(def))));
-            }
-        }
-        out
+        }?;
+        (arity == 1).then(|| vec![payload.clone()])
     }
 
     /// Every name bound by a match arm that encloses `target`, outermost

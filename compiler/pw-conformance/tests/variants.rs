@@ -192,12 +192,17 @@ fn a_match_that_misses_a_case_is_refused() {
 }
 
 #[test]
-fn a_nested_pattern_is_refused_by_name() {
+fn a_nested_pattern_that_misses_a_case_is_refused() {
+    // Refused by the backend by name until ADR-0060, which compiles a nested
+    // pattern; the checker now reads it, and names what it misses.
     let err = refused(
         "module m\n\ntype Doc = Doc {\n    s: String,\n}\n\nfn get(w: String) -> Option<Option<String>> !{ database.read<Doc> }\n    host \"m:d/e#get\"\n\npublic query Q(w: String) -> Option<String> {\n    match get(w) {\n        Some(Some(x)) => Some(x),\n        None => None,\n    }\n}\n",
         "m.Q",
     );
-    assert!(err.contains("a nested pattern"), "{err}");
+    assert!(
+        err.contains("[PW0305] match on `Option<Option<String>>` is not exhaustive"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -206,8 +211,9 @@ fn a_match_over_a_list_is_refused_by_name() {
         "module m\n\ntype Doc = Doc {\n    s: String,\n}\n\nfn get(w: String) -> List<String> !{ database.read<Doc> }\n    host \"m:d/e#get\"\n\npublic query Q(w: String) -> Option<String> {\n    match get(w) {\n        Some(x) => Some(x),\n        None => None,\n    }\n}\n",
         "m.Q",
     );
+    // The checker's, since ADR-0060: a list is taken apart by no pattern.
     assert!(
-        err.contains("a match over something other than a variant"),
+        err.contains("[PW0608] `Some` is not a constructor of `List<String>`"),
         "{err}"
     );
 }

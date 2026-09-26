@@ -122,7 +122,8 @@ fn a_result_match_without_err_is_refused() {
     let d = refused(
         "public query Q(w: String) -> Option<String> {\n    match fetch(w) {\n        Ok(x) => Some(x),\n    }\n}\n",
     );
-    assert_eq!(d.repairs[0].description, "add an arm for `Err(_)`");
+    // The payload's type, as a declared case's witness shows it (ADR-0060).
+    assert_eq!(d.repairs[0].description, "add an arm for `Err(String)`");
 }
 
 #[test]
@@ -154,31 +155,24 @@ fn exhaustive_matches_pass() {
 }
 
 #[test]
-fn a_pattern_nested_under_some_is_blocked_not_proven() {
-    // The payload is opaque to the analysis, so it cannot say whether
-    // `Some(Some(x))` covers `Some`. It says nothing, and the audit says why.
+fn a_pattern_nested_under_some_is_analysed() {
+    // Until ADR-0060 the payload was opaque to the analysis, and this match
+    // was Blocked. `Some(None)` reaches no arm.
     let body = "fn f(o: Option<Option<String>>) -> Int !{} {\n    match o {\n        Some(Some(x)) => 1,\n        None => 0,\n    }\n}\n";
-    accepted(body);
-    let mut files = library();
-    files.push(("m.pw".to_string(), format!("{PRELUDE}{body}")));
-    let units: Vec<Unit> = files
-        .iter()
-        .map(|(p, s)| Unit {
-            path: p.clone(),
-            hir: pw_core::lower::lower_file(s, &pw_syntax::parse_tree(s).green),
-            src: s.clone(),
-        })
-        .collect();
-    let f: Vec<_> = match_analysis(&units)
-        .into_iter()
-        .filter(|a| a.declaration == "f")
-        .collect();
-    assert_eq!(f.len(), 1);
-    assert!(
-        matches!(&f[0].outcome, pw_core::check::MatchOutcome::Blocked { reason } if reason.contains("nested under a built-in variant")),
-        "{:?}",
-        f[0].outcome
+    let d = refused(body);
+    assert_eq!(d.repairs[0].description, "add an arm for `Some(None)`");
+    assert_eq!(
+        outcomes(body, "f"),
+        [MatchOutcome::NonExhaustive {
+            missing: vec!["Some(None)".to_string()]
+        }]
     );
+    let whole = body.replace(
+        "        None => 0,",
+        "        Some(None) => 2,\n        None => 0,",
+    );
+    assert!(reported(&whole).is_empty(), "{:?}", reported(&whole));
+    assert_eq!(outcomes(&whole, "f"), [MatchOutcome::Proven]);
 }
 
 #[test]
@@ -286,24 +280,57 @@ fn a_nested_pattern_is_read_against_its_fields_type() {
 }
 
 #[test]
-fn what_the_analysis_cannot_read_is_blocked_not_proven() {
+fn a_literal_is_one_value_of_its_type() {
     // A literal covers one value. Read as a wildcard, `Some("a")` covered
-    // every `Some`.
+    // every `Some`; then it blocked the analysis; since ADR-0060 it is a
+    // constructor of its type's own, which no list of literals completes.
     let literal = "fn f(o: Option<String>) -> Int !{} {\n    match o {\n        Some(\"a\") => 1,\n        None => 0,\n    }\n}\n";
-    assert!(reported(literal).is_empty(), "{:?}", reported(literal));
+    let d = refused(literal);
+    assert_eq!(d.repairs[0].description, "add an arm for `Some(String)`");
+    let whole = literal.replace(
+        "        None => 0,",
+        "        Some(_) => 2,\n        None => 0,",
+    );
+    assert!(reported(&whole).is_empty(), "{:?}", reported(&whole));
+    assert_eq!(outcomes(&whole, "f"), [MatchOutcome::Proven]);
+
+    // `None` under `Some`, read against the payload's own type.
+    let nested = "fn f(o: Option<Option<String>>) -> Int !{} {\n    match o {\n        Some(None) => 1,\n        None => 0,\n    }\n}\n";
+    let d = refused(nested);
+    assert_eq!(
+        d.repairs[0].description,
+        "add an arm for `Some(Some(String))`"
+    );
+}
+
+#[test]
+fn what_the_analysis_cannot_read_is_blocked_not_proven() {
+    // A `Float` literal: equality on floats decides no case.
+    let float = "fn f(o: Option<Float>) -> Int !{} {\n    match o {\n        Some(0.5) => 1,\n        _ => 0,\n    }\n}\n";
+    assert!(reported(float).is_empty(), "{:?}", reported(float));
     assert!(blocked_because(
-        &outcomes(literal, "f")[0],
-        "a literal pattern"
+        &outcomes(float, "f")[0],
+        "a `Float` literal"
     ));
 
-    // `None` under `Some` is another type's constructor, where the analysis
-    // does not know the payload's type.
-    let nested = "fn f(o: Option<Option<String>>) -> Int !{} {\n    match o {\n        Some(None) => 1,\n        None => 0,\n    }\n}\n";
-    assert!(reported(nested).is_empty(), "{:?}", reported(nested));
-    assert!(blocked_because(
-        &outcomes(nested, "f")[0],
-        "nested under a built-in variant"
-    ));
+    // A scrutinee the program does not type.
+    let unknown =
+        "fn f(x) -> Int !{} {\n    match x {\n        1 => 1,\n        _ => 0,\n    }\n}\n";
+    assert!(blocked_because(&outcomes(unknown, "f")[0], "unknown here"));
+}
+
+#[test]
+fn a_type_no_pattern_takes_apart_is_matched_by_a_name_only() {
+    // A record is taken apart by no pattern: a name matches it, and a
+    // constructor is an error, where both were Blocked before ADR-0060.
+    let named = "fn f(d: Doc) -> Int !{} {\n    match d {\n        x => 1,\n    }\n}\n";
+    assert!(reported(named).is_empty(), "{:?}", reported(named));
+    assert_eq!(outcomes(named, "f"), [MatchOutcome::Proven]);
+    let wrong = "fn f(d: Doc) -> Int !{} {\n    match d {\n        Some(x) => 1,\n        _ => 0,\n    }\n}\n";
+    assert_eq!(
+        reported(wrong),
+        ["PW0608 `Some` is not a constructor of `Doc`"]
+    );
 }
 
 #[test]

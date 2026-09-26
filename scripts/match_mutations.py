@@ -31,8 +31,8 @@ MUTANTS = [
     (
         "`Option` and `Result` are not sum types to the analysis",
         CHECK,
-        "            builtins.insert(b, (id, cases.iter().map(|(c, _)| c.to_string()).collect()));",
-        "            let _ = (b, id);",
+        "            Ty::Builtin(Builtin::Option, a) if a.len() == 1 => {",
+        "            Ty::Builtin(Builtin::Option, a) if a.len() == 1 && a.is_empty() => {",
     ),
     (
         "a match arm's names are not typed",
@@ -49,8 +49,8 @@ MUTANTS = [
     (
         "a nested pattern is read against the scrutinee's type",
         CHECK,
-        "to_exhaust_pattern(env, body, qualifier, *a, t, &program.type_name(t))",
-        "to_exhaust_pattern(env, body, qualifier, *a, ty, ty_name)",
+        "                        *a,\n                        t,\n                        &program.type_name(t),",
+        "                        *a,\n                        ty,\n                        ty_name,",
     ),
     (
         "a constructor its type lacks reads as a wildcard",
@@ -61,18 +61,15 @@ MUTANTS = [
     (
         "another type's bare constructor reads as a binding",
         CHECK,
-        "            if env.names_a_constructor(name) {",
-        "            if env.names_a_constructor(name) && false {",
+        '            if env.names_a_constructor(name) || matches!(name.as_str(), "true" | "false") {',
+        '            if (env.names_a_constructor(name) || matches!(name.as_str(), "true" | "false")) && false {',
     ),
     (
         "a literal reads as a wildcard",
         CHECK,
-        """        HPat::Literal(_) => Err(PatternFault::Unread(
-            "a literal pattern is not analysed: it covers one value, and the \\
-             analysis does not enumerate a literal's type"
-                .to_string(),
-        )),""",
-        "        HPat::Literal(_) => Ok(EPat::Wildcard),",
+        "        HPat::Literal(l) => {\n            let key = match (ty, l) {",
+        "        HPat::Literal(l) => {\n            if literals.borrow().len() < usize::MAX {\n"
+        "                return Ok(EPat::Wildcard);\n            }\n            let key = match (ty, l) {",
     ),
     (
         "a field count is checked only at the top of an arm",

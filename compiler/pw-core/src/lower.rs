@@ -1387,10 +1387,15 @@ impl Lowerer<'_> {
             }
             K::LiteralPat => {
                 let t = own_tokens(node);
+                // `-1`: the sign, then the number (ADR-0060).
+                let (sign, t) = match t.split_first() {
+                    Some((m, rest)) if m.kind() == K::Minus => ("-", rest),
+                    _ => ("", t.as_slice()),
+                };
                 let lit = match t.first().map(|t| (t.kind(), t.text().to_string())) {
-                    Some((K::Int, s)) => Literal::Int(s),
-                    Some((K::Float, s)) => Literal::Float(s),
-                    Some((K::Str, s)) => Literal::Str(s),
+                    Some((K::Int, s)) => Literal::Int(format!("{sign}{s}")),
+                    Some((K::Float, s)) => Literal::Float(format!("{sign}{s}")),
+                    Some((K::Str, s)) if sign.is_empty() => Literal::Str(s),
                     _ => return b.pat(Pattern::Error, span),
                 };
                 b.pat(Pattern::Literal(lit), span)

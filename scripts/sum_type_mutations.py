@@ -43,8 +43,8 @@ MUTANTS = [
     (
         "an arm's fields are not bound",
         VALUES,
-        "                out.push((name.clone(), s.close(&Ty::of(t).instantiate(def))));",
-        "                let _ = (name, t);",
+        "                        TypeResolution::Resolved(t) => substituted(&Ty::of(t), *def, args),",
+        "                        TypeResolution::Resolved(_) => Ty::Unknown,",
     ),
     (
         "an arm's body is walked without its bindings",
@@ -67,8 +67,8 @@ MUTANTS = [
     (
         "a pattern's qualifier is not checked",
         CHECK,
-        "                && !matches!(ty, Type::Adt(t) if qualifier(q) == Some(*t))",
-        "                && q.is_empty()",
+        "                    if qualifier(q).is_some_and(|d| subject.defs.get(t) == Some(&d)))",
+        "                    if q.len() < usize::MAX)",
     ),
     (
         "a bare case two types declare is not reported",

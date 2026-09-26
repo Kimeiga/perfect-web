@@ -361,6 +361,51 @@ public query Mixing(m: Mixed) -> Mixed {
     }
 }
 
+// ADR-0060: nested and literal patterns, compiled to a decision tree in
+// both.
+public query PatNested(o: Option<Option<Int>>) -> Int {
+    match o {
+        Some(Some(x)) => x,
+        Some(None) => 0,
+        None => -1,
+    }
+}
+
+public query PatInner(o: Option<Shape>) -> String {
+    match o {
+        Some(Circle(0)) => \"dot\",
+        Some(Circle(r)) => \"circle {r}\",
+        Some(Rect(w, 1)) => \"thin {w}\",
+        Some(Empty) => \"empty\",
+        Some(_) => \"other\",
+        None => \"none\",
+    }
+}
+
+public query PatFlag(b: Bool, n: Int) -> Int {
+    match b {
+        true => n,
+        false => 0 - n,
+    }
+}
+
+public query PatWords(n: Int) -> String {
+    match n {
+        -1 => \"minus one\",
+        0 => \"zero\",
+        1 | 2 => \"small\",
+        _ => \"many\",
+    }
+}
+
+public query PatGreet(s: String) -> String {
+    match s {
+        \"a\" => \"letter\",
+        \"\" => \"nothing\",
+        other => \"{other}?\",
+    }
+}
+
 public query MaybeShape(s: Option<Shape>) -> Int {
     match s {
         Some(x) => shape_area(x),

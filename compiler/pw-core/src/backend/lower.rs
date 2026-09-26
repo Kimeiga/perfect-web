@@ -3586,6 +3586,11 @@ impl<'a> Lower<'a> {
             Lowering::Lowered(v) => v,
             other => return other,
         };
+        // A pattern nested in another, a literal, or a scrutinee that is not
+        // a variant: a decision tree (ADR-0060).
+        if !self.flat(body, arms, self.types.get(&scrutinee)) {
+            return self.matched_tree(body, scrutinee, arms, expected, span);
+        }
         // The scrutinee's cases, each with its payload's fields.
         let (cases, declared): (Vec<(Case, Vec<Type>)>, Option<DefId>) =
             match self.types.get(&scrutinee).cloned() {
@@ -3885,6 +3890,589 @@ impl<'a> Lower<'a> {
                 why: "a pattern that did not parse".to_string(),
                 span: span.clone(),
             },
+        }
+    }
+
+    /// **Is this match one level deep**: a variant, each arm a case whose
+    /// fields are names or `_`, `_`, a name, or `A | B` of those? Such a match
+    /// is one `Instr::Match` whose arms are the program's, each body lowered
+    /// once. A field written as a case's name, `Some(Empty)`, is a pattern
+    /// nested in another: until 2026-09-26 it was read as a binding of that
+    /// name, which took every payload (ADR-0060).
+    fn flat(&self, body: &Body, arms: &[crate::hir::MatchArm], ty: Option<&Type>) -> bool {
+        let variant = match ty {
+            Some(Type::Option(_) | Type::Result(..)) => true,
+            Some(Type::Nominal(def)) => self
+                .cx
+                .sigs
+                .type_decl(*def)
+                .is_some_and(|t| t.variants.is_some()),
+            _ => false,
+        };
+        fn one_level(me: &Lower<'_>, body: &Body, p: crate::hir::PatternId) -> bool {
+            match body.pat(p) {
+                Pattern::Wild | Pattern::Bind { .. } => true,
+                Pattern::Ctor { args, .. } => args.iter().all(|a| match body.pat(*a) {
+                    Pattern::Wild => true,
+                    Pattern::Bind { name, .. } => !me.names_a_case(name),
+                    _ => false,
+                }),
+                Pattern::Or(alternatives) => alternatives.iter().all(|a| one_level(me, body, *a)),
+                Pattern::Literal(_) | Pattern::Error => false,
+            }
+        }
+        variant && arms.iter().all(|a| one_level(self, body, a.pat))
+    }
+
+    /// Whether a name written alone in a pattern is a case: `true`, `false`,
+    /// the language's four, or a case some declared type in the program has,
+    /// as the checker reads it (ADR-0038).
+    fn names_a_case(&self, name: &str) -> bool {
+        matches!(name, "true" | "false" | "Some" | "None" | "Ok" | "Err")
+            || self.cx.hirs.iter().any(|h| {
+                h.all_decls()
+                    .any(|(_, d)| d.variants.iter().flatten().any(|v| v.name == name))
+            })
+    }
+
+    /// **A match compiled to a decision tree** (ADR-0060): nested patterns,
+    /// literals, and a `Bool`, an `Int` or a `String` taken apart. Each node
+    /// tests one value: a variant's discriminant, as a structured match; a
+    /// `Bool`, as an `if`; an `Int` or a `String`, as an `if` per literal the
+    /// arms name. A leaf is the first arm whose pattern every test so far
+    /// agrees with, its body lowered where its names are bound, so an arm
+    /// reached by several paths has several copies. A path no arm takes is
+    /// refused, never compiled to a trap.
+    fn matched_tree(
+        &mut self,
+        body: &Body,
+        scrutinee: ValueId,
+        arms: &[crate::hir::MatchArm],
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let Some(st) = self.types.get(&scrutinee).cloned() else {
+            return Lowering::Blocked {
+                why: "a match over a value with no type".to_string(),
+                span,
+            };
+        };
+        let mut rows = Vec::new();
+        for (i, arm) in arms.iter().enumerate() {
+            match self.tree_pat(body, arm.pat, &st, &span) {
+                Lowering::Lowered(p) => rows.push(TreeRow {
+                    pats: vec![p],
+                    arm: i,
+                    binds: Vec::new(),
+                }),
+                other => return other.map(|_| unreachable!()),
+            }
+        }
+        let mut leaves = 0usize;
+        let mut tree = match self.tree_build(rows, vec![(scrutinee, st)], &mut leaves, &span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        };
+        let mut ty: Option<Type> = expected.cloned();
+        match self.tree_leaves(body, arms, &mut tree, &mut ty, &span) {
+            Lowering::Lowered(()) => {}
+            other => return other.map(|_| unreachable!()),
+        }
+        let ty = ty.unwrap_or(Type::Unit);
+        let region = self.tree_emit(tree, &ty);
+        self.instrs.extend(region.instrs);
+        Lowering::Lowered(region.value)
+    }
+
+    /// A pattern as the tree reads it, against the type of the value it is
+    /// tested on.
+    fn tree_pat(
+        &self,
+        body: &Body,
+        id: crate::hir::PatternId,
+        ty: &Type,
+        span: &Span,
+    ) -> Lowering<TreePat> {
+        let refused = |construct: &'static str, reason: String| Lowering::Unsupported {
+            construct,
+            span: span.clone(),
+            reason,
+        };
+        match body.pat(id) {
+            Pattern::Wild => Lowering::Lowered(TreePat::Any(None)),
+            Pattern::Bind { name, .. } => {
+                if *ty == Type::Bool && matches!(name.as_str(), "true" | "false") {
+                    return Lowering::Lowered(TreePat::Bool(name == "true"));
+                }
+                if let Some((cases, declared)) = self.variant_cases(ty, span)
+                    && let Some(i) = self.case_index(name, &cases, declared)
+                {
+                    return match cases[i].1.is_empty() {
+                        true => Lowering::Lowered(TreePat::Case(cases[i].0, Vec::new())),
+                        false => Lowering::Blocked {
+                            why: format!("`{name}` carries a payload; the checker refuses it"),
+                            span: span.clone(),
+                        },
+                    };
+                }
+                Lowering::Lowered(TreePat::Any(Some(name.clone())))
+            }
+            Pattern::Ctor { path, args } => {
+                let Some((cases, declared)) = self.variant_cases(ty, span) else {
+                    return refused(
+                        "a pattern this backend does not lower",
+                        format!("`{path}(..)` against a {ty:?}"),
+                    );
+                };
+                let Some(i) = self.case_index(path, &cases, declared) else {
+                    return refused(
+                        "a pattern this backend does not lower",
+                        format!("`{path}(..)` is not a case of the scrutinee"),
+                    );
+                };
+                let fields = cases[i].1.clone();
+                if args.len() != fields.len() {
+                    return Lowering::Blocked {
+                        why: format!("`{path}` binds {} fields of {}", args.len(), fields.len()),
+                        span: span.clone(),
+                    };
+                }
+                let mut subs = Vec::new();
+                for (a, t) in args.iter().zip(&fields) {
+                    match self.tree_pat(body, *a, t, span) {
+                        Lowering::Lowered(p) => subs.push(p),
+                        other => return other,
+                    }
+                }
+                Lowering::Lowered(TreePat::Case(cases[i].0, subs))
+            }
+            Pattern::Literal(l) => {
+                let value = match (ty, l) {
+                    (Type::Int, Literal::Int(n)) => {
+                        n.replace('_', "").parse::<i64>().ok().map(Const::Int)
+                    }
+                    (Type::Str, Literal::Str(_)) => l.string_value().map(Const::Str),
+                    (Type::Float, Literal::Float(_)) => {
+                        return refused(
+                            "a `Float` literal pattern",
+                            "equality on floats decides no case".to_string(),
+                        );
+                    }
+                    _ => None,
+                };
+                match value {
+                    Some(v) => Lowering::Lowered(TreePat::Lit(v)),
+                    None => Lowering::Blocked {
+                        why: format!("a literal pattern against a {ty:?}; the checker refuses it"),
+                        span: span.clone(),
+                    },
+                }
+            }
+            Pattern::Or(alternatives) => {
+                let mut out = Vec::new();
+                for a in alternatives {
+                    match self.tree_pat(body, *a, ty, span) {
+                        Lowering::Lowered(p) if p.binds() => {
+                            return refused(
+                                "an or-pattern that binds a name",
+                                "each alternative would bind it from a different case".to_string(),
+                            );
+                        }
+                        Lowering::Lowered(p) => out.push(p),
+                        other => return other,
+                    }
+                }
+                Lowering::Lowered(TreePat::Or(out))
+            }
+            Pattern::Error => Lowering::Blocked {
+                why: "a pattern that did not parse".to_string(),
+                span: span.clone(),
+            },
+        }
+    }
+
+    /// A variant type's cases, each with its payload's fields, and the
+    /// declaration of a declared one. `None` for any other type.
+    fn variant_cases(&self, ty: &Type, span: &Span) -> Option<(Cases, Option<DefId>)> {
+        match ty {
+            Type::Option(t) => Some((
+                vec![
+                    (Case::Builtin(BuiltinCase::Some), vec![(**t).clone()]),
+                    (Case::Builtin(BuiltinCase::None), Vec::new()),
+                ],
+                None,
+            )),
+            Type::Result(t, e) => Some((
+                vec![
+                    (Case::Builtin(BuiltinCase::Ok), vec![(**t).clone()]),
+                    (Case::Builtin(BuiltinCase::Err), vec![(**e).clone()]),
+                ],
+                None,
+            )),
+            Type::Nominal(def) => match self.declared_cases(*def, span) {
+                Lowering::Lowered(cases) if !cases.is_empty() => Some((cases, Some(*def))),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// **The tree for `rows` over the values `occs`**, one pattern per value
+    /// in each row. The first row whose patterns are all `_` or names is a
+    /// leaf; otherwise the first value the first row tests is tested, and
+    /// the rows are divided by what it is.
+    fn tree_build(
+        &mut self,
+        rows: Vec<TreeRow>,
+        occs: Vec<(ValueId, Type)>,
+        leaves: &mut usize,
+        span: &Span,
+    ) -> Lowering<Tree> {
+        // `A | B` in any row, one row per alternative, in order.
+        let mut rows = expand_or(rows);
+        let Some(first) = rows.first() else {
+            return Lowering::Unsupported {
+                construct: "a match that does not cover every case",
+                span: span.clone(),
+                reason: "a value reaches no arm, and a missing case would have no code".to_string(),
+            };
+        };
+        let Some(col) = first
+            .pats
+            .iter()
+            .position(|p| !matches!(p, TreePat::Any(_)))
+        else {
+            *leaves += 1;
+            if *leaves > 1024 {
+                return Lowering::Unsupported {
+                    construct: "a match whose decision tree is too large",
+                    span: span.clone(),
+                    reason: "its arms' bodies would be copied more than 1,024 times".to_string(),
+                };
+            }
+            let row = rows.swap_remove(0);
+            let mut binds = row.binds;
+            for (p, (v, _)) in row.pats.iter().zip(&occs) {
+                if let TreePat::Any(Some(name)) = p {
+                    binds.push((name.clone(), *v));
+                }
+            }
+            return Lowering::Lowered(Tree::Leaf {
+                arm: row.arm,
+                binds,
+                region: None,
+            });
+        };
+        let (occ, ty) = occs[col].clone();
+        // Each row's pattern for `col`, out of the row: a name there binds
+        // the value tested.
+        let split: Vec<(TreePat, TreeRow)> = rows
+            .into_iter()
+            .map(|mut r| {
+                let p = r.pats.remove(col);
+                if let TreePat::Any(Some(name)) = &p {
+                    r.binds.push((name.clone(), occ));
+                }
+                (p, r)
+            })
+            .collect();
+        let mut rest = occs.clone();
+        rest.remove(col);
+
+        if let Some((cases, _)) = self.variant_cases(&ty, span) {
+            let mut arms = Vec::new();
+            let mut others: Vec<Case> = Vec::new();
+            for (case, fields) in &cases {
+                let named = split
+                    .iter()
+                    .any(|(p, _)| matches!(p, TreePat::Case(c, _) if c == case));
+                if !named {
+                    others.push(*case);
+                    continue;
+                }
+                // The case's fields, each a value of its own, tested next.
+                let values: Vec<ValueId> = fields
+                    .iter()
+                    .map(|t| {
+                        let v = self.fresh();
+                        self.types.insert(v, t.clone());
+                        v
+                    })
+                    .collect();
+                let sub_rows: Vec<TreeRow> = split
+                    .iter()
+                    .filter_map(|(p, r)| {
+                        let subs = match p {
+                            TreePat::Case(c, subs) if c == case => subs.clone(),
+                            TreePat::Any(_) => vec![TreePat::Any(None); fields.len()],
+                            _ => return None,
+                        };
+                        let mut pats = subs;
+                        pats.extend(r.pats.iter().cloned());
+                        Some(TreeRow {
+                            pats,
+                            arm: r.arm,
+                            binds: r.binds.clone(),
+                        })
+                    })
+                    .collect();
+                let mut sub_occs: Vec<(ValueId, Type)> =
+                    values.iter().copied().zip(fields.iter().cloned()).collect();
+                sub_occs.extend(rest.iter().cloned());
+                let sub = match self.tree_build(sub_rows, sub_occs, leaves, span) {
+                    Lowering::Lowered(t) => t,
+                    other => return other,
+                };
+                arms.push((vec![*case], values.into_iter().map(Some).collect(), sub));
+            }
+            if !others.is_empty() {
+                let sub_rows: Vec<TreeRow> = split
+                    .iter()
+                    .filter(|(p, _)| matches!(p, TreePat::Any(_)))
+                    .map(|(_, r)| r.clone())
+                    .collect();
+                let sub = match self.tree_build(sub_rows, rest.clone(), leaves, span) {
+                    Lowering::Lowered(t) => t,
+                    other => return other,
+                };
+                arms.push((others, Vec::new(), sub));
+            }
+            return Lowering::Lowered(Tree::Switch { occ, arms });
+        }
+
+        if ty == Type::Bool {
+            let mut branch = |value: bool, me: &mut Self| {
+                let sub_rows: Vec<TreeRow> = split
+                    .iter()
+                    .filter(|(p, _)| matches!(p, TreePat::Any(_)) || *p == TreePat::Bool(value))
+                    .map(|(_, r)| r.clone())
+                    .collect();
+                me.tree_build(sub_rows, rest.clone(), leaves, span)
+            };
+            let then = match branch(true, self) {
+                Lowering::Lowered(t) => t,
+                other => return other,
+            };
+            let els = match branch(false, self) {
+                Lowering::Lowered(t) => t,
+                other => return other,
+            };
+            return Lowering::Lowered(Tree::Test {
+                occ,
+                then: Box::new(then),
+                els: Box::new(els),
+            });
+        }
+
+        if matches!(ty, Type::Int | Type::Str) {
+            // Each literal the column names, in the order the arms name it,
+            // then what no literal names.
+            let mut values: Vec<Const> = Vec::new();
+            for (p, _) in &split {
+                if let TreePat::Lit(v) = p
+                    && !values.contains(v)
+                {
+                    values.push(v.clone());
+                }
+            }
+            let mut cases = Vec::new();
+            for v in values {
+                let sub_rows: Vec<TreeRow> = split
+                    .iter()
+                    .filter(|(p, _)| matches!(p, TreePat::Any(_)) || *p == TreePat::Lit(v.clone()))
+                    .map(|(_, r)| r.clone())
+                    .collect();
+                match self.tree_build(sub_rows, rest.clone(), leaves, span) {
+                    Lowering::Lowered(t) => cases.push((v, t)),
+                    other => return other,
+                }
+            }
+            let sub_rows: Vec<TreeRow> = split
+                .iter()
+                .filter(|(p, _)| matches!(p, TreePat::Any(_)))
+                .map(|(_, r)| r.clone())
+                .collect();
+            let otherwise = match self.tree_build(sub_rows, rest, leaves, span) {
+                Lowering::Lowered(t) => t,
+                other => return other,
+            };
+            return Lowering::Lowered(Tree::Literals {
+                occ,
+                ty,
+                cases,
+                otherwise: Box::new(otherwise),
+            });
+        }
+        Lowering::Unsupported {
+            construct: "a pattern this backend does not lower",
+            span: span.clone(),
+            reason: format!("a pattern that tests a {ty:?}"),
+        }
+    }
+
+    /// Lower each leaf's arm body, in the order the tree reaches them, with
+    /// the names its path binds. The first body that does not leave early
+    /// fixes the match's type.
+    fn tree_leaves(
+        &mut self,
+        body: &Body,
+        arms: &[crate::hir::MatchArm],
+        tree: &mut Tree,
+        ty: &mut Option<Type>,
+        span: &Span,
+    ) -> Lowering<()> {
+        match tree {
+            Tree::Leaf { arm, binds, region } => {
+                let outer = std::mem::take(&mut self.instrs);
+                let shadowed: Vec<(String, Option<ValueId>)> = binds
+                    .iter()
+                    .map(|(n, v)| (n.clone(), self.locals.insert(n.clone(), *v)))
+                    .collect();
+                let value = self.expr(body, arms[*arm].body, ty.as_ref());
+                for (name, before) in shadowed.into_iter().rev() {
+                    match before {
+                        Some(v) => self.locals.insert(name, v),
+                        None => self.locals.remove(&name),
+                    };
+                }
+                let instrs = std::mem::replace(&mut self.instrs, outer);
+                let value = match value {
+                    Lowering::Lowered(v) => v,
+                    other => return other.map(|_| ()),
+                };
+                let r = Region { instrs, value };
+                let value_ty = self.types.get(&value).cloned();
+                match (&*ty, value_ty) {
+                    _ if diverges(&r) => {}
+                    (None, Some(t)) => *ty = Some(t),
+                    (Some(t), Some(v)) if *t != v => {
+                        return Lowering::Blocked {
+                            why: format!("the arms produce {t:?} and {v:?}"),
+                            span: span.clone(),
+                        };
+                    }
+                    _ => {}
+                }
+                *region = Some(r);
+                Lowering::Lowered(())
+            }
+            Tree::Switch { arms: subs, .. } => {
+                for (_, _, t) in subs {
+                    match self.tree_leaves(body, arms, t, ty, span) {
+                        Lowering::Lowered(()) => {}
+                        other => return other,
+                    }
+                }
+                Lowering::Lowered(())
+            }
+            Tree::Test { then, els, .. } => {
+                match self.tree_leaves(body, arms, then, ty, span) {
+                    Lowering::Lowered(()) => {}
+                    other => return other,
+                }
+                self.tree_leaves(body, arms, els, ty, span)
+            }
+            Tree::Literals {
+                cases, otherwise, ..
+            } => {
+                for (_, t) in cases {
+                    match self.tree_leaves(body, arms, t, ty, span) {
+                        Lowering::Lowered(()) => {}
+                        other => return other,
+                    }
+                }
+                self.tree_leaves(body, arms, otherwise, ty, span)
+            }
+        }
+    }
+
+    /// The tree as instructions, of the match's type `ty`.
+    fn tree_emit(&mut self, tree: Tree, ty: &Type) -> Region {
+        match tree {
+            Tree::Leaf { region, .. } => {
+                let mut r = region.expect("every leaf is lowered first");
+                self.retype_divergent(&mut r, ty);
+                r
+            }
+            Tree::Switch { occ, arms } => {
+                let arms: Vec<MatchArm> = arms
+                    .into_iter()
+                    .map(|(cases, bindings, t)| MatchArm {
+                        cases,
+                        bindings,
+                        body: self.tree_emit(t, ty),
+                    })
+                    .collect();
+                let result = self.fresh();
+                self.types.insert(result, ty.clone());
+                Region {
+                    instrs: vec![Instr::Match {
+                        result,
+                        scrutinee: occ,
+                        arms,
+                        ty: ty.clone(),
+                    }],
+                    value: result,
+                }
+            }
+            Tree::Test { occ, then, els } => {
+                let then = self.tree_emit(*then, ty);
+                let els = self.tree_emit(*els, ty);
+                let result = self.fresh();
+                self.types.insert(result, ty.clone());
+                Region {
+                    instrs: vec![Instr::If {
+                        result,
+                        cond: occ,
+                        then,
+                        els,
+                        ty: ty.clone(),
+                    }],
+                    value: result,
+                }
+            }
+            Tree::Literals {
+                occ,
+                ty: of,
+                cases,
+                otherwise,
+            } => {
+                // `if v == a { .. } else if v == b { .. } else { .. }`, built
+                // from the last test outward.
+                let mut region = self.tree_emit(*otherwise, ty);
+                for (value, t) in cases.into_iter().rev() {
+                    let then = self.tree_emit(t, ty);
+                    let (literal, equal, result) = (self.fresh(), self.fresh(), self.fresh());
+                    self.types.insert(literal, of.clone());
+                    self.types.insert(equal, Type::Bool);
+                    self.types.insert(result, ty.clone());
+                    region = Region {
+                        instrs: vec![
+                            Instr::Const {
+                                result: literal,
+                                value,
+                                ty: of.clone(),
+                            },
+                            Instr::Binary {
+                                result: equal,
+                                op: BinaryOp::Eq,
+                                lhs: occ,
+                                rhs: literal,
+                                ty: Type::Bool,
+                            },
+                            Instr::If {
+                                result,
+                                cond: equal,
+                                then,
+                                els: region,
+                                ty: ty.clone(),
+                            },
+                        ],
+                        value: result,
+                    };
+                }
+                region
+            }
         }
     }
 
@@ -4283,6 +4871,100 @@ fn contains_itself(sigs: &Signatures, def: DefId) -> bool {
         r.resolved()
             .is_some_and(|x| reaches(sigs, x, def, &mut seen))
     })
+}
+
+/// A variant type's cases, each with its payload's fields' types.
+type Cases = Vec<(Case, Vec<Type>)>;
+
+/// **A pattern as a decision tree reads it** (ADR-0060).
+#[derive(Debug, Clone, PartialEq)]
+enum TreePat {
+    /// `_`, or a name bound to the value tested.
+    Any(Option<String>),
+    /// A variant's case, and a pattern for each field of its payload.
+    Case(Case, Vec<TreePat>),
+    /// `true` or `false`.
+    Bool(bool),
+    /// An `Int` or a `String`, equal to this.
+    Lit(Const),
+    /// `A | B`, binding nothing.
+    Or(Vec<TreePat>),
+}
+
+impl TreePat {
+    /// Does any part of this pattern bind a name?
+    fn binds(&self) -> bool {
+        match self {
+            TreePat::Any(name) => name.is_some(),
+            TreePat::Case(_, subs) | TreePat::Or(subs) => subs.iter().any(TreePat::binds),
+            TreePat::Bool(_) | TreePat::Lit(_) => false,
+        }
+    }
+}
+
+/// One arm's patterns, one per value still to test, and the names its path
+/// has bound.
+#[derive(Debug, Clone)]
+struct TreeRow {
+    pats: Vec<TreePat>,
+    arm: usize,
+    binds: Vec<(String, ValueId)>,
+}
+
+/// **A decision tree** (ADR-0060): a node per value tested, a leaf per arm
+/// reached.
+enum Tree {
+    /// The arm, and the names its path binds; its body, once lowered.
+    Leaf {
+        arm: usize,
+        binds: Vec<(String, ValueId)>,
+        region: Option<Region>,
+    },
+    /// A variant's discriminant: for each case the arms name, its fields'
+    /// values and the tree below it; then the other cases, together.
+    Switch {
+        occ: ValueId,
+        arms: Vec<(Vec<Case>, Vec<Option<ValueId>>, Tree)>,
+    },
+    /// A `Bool`.
+    Test {
+        occ: ValueId,
+        then: Box<Tree>,
+        els: Box<Tree>,
+    },
+    /// An `Int` or a `String`, compared with each literal the arms name.
+    Literals {
+        occ: ValueId,
+        ty: Type,
+        cases: Vec<(Const, Tree)>,
+        otherwise: Box<Tree>,
+    },
+}
+
+/// The rows with each `A | B` replaced by one row per alternative, in
+/// order, wherever it is in a row.
+fn expand_or(rows: Vec<TreeRow>) -> Vec<TreeRow> {
+    let mut out = Vec::new();
+    for row in rows {
+        match row.pats.iter().position(|p| matches!(p, TreePat::Or(_))) {
+            None => out.push(row),
+            Some(i) => {
+                let TreePat::Or(alternatives) = row.pats[i].clone() else {
+                    unreachable!("found above")
+                };
+                let expanded = alternatives
+                    .into_iter()
+                    .map(|a| {
+                        let mut r = row.clone();
+                        r.pats[i] = a;
+                        r
+                    })
+                    .collect();
+                out.extend(expand_or(expanded));
+            }
+        }
+    }
+    out
 }
 
 /// **Which cases one match arm takes** (ADR-0059), by their positions in

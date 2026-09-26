@@ -655,6 +655,31 @@ e10-handlers-compute:
      } > docs/evidence/E10/handlers-compute.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-compute.txt
 
+# ADR-0060: nested and literal patterns. The checker's analysis and the
+# typing of what a nested pattern binds, each match compiled to a decision
+# tree and run through the E8 host against a Rust model, the component
+# against the JavaScript module, and the mutation controls. Needs `node`.
+e10-patterns:
+    @{ echo "ADR-0060 - nested and literal patterns"; echo; \
+       echo "produced by: just e10-patterns"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/patterns.rs)"; echo; \
+       cargo test --locked -p pw-core --test patterns 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== through the E8 host, against a model (compiler/pw-conformance/tests/patterns.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test patterns 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*|^test result.*"; \
+       echo; echo "== mutation controls (scripts/pattern_mutations.py)"; echo; \
+       python3 scripts/pattern_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a Float literal pattern, refused by name. NOT CLAIMED: an"; \
+       echo "or-pattern that binds a name, refused by name. NOT CLAIMED: an arm no"; \
+       echo "value reaches reported by the checker; the backend refuses one."; \
+     } > docs/evidence/E10/patterns.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/patterns.txt
+
 # The 2026-09-26 correction: a Pleris name WIT reserves (`List`, `own`) is
 # escaped in the generated WIT text. Each query run through the E8 host, and
 # the mutation controls.

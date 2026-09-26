@@ -32,180 +32,45 @@ pub struct Unit {
     pub hir: Hir,
 }
 
-/// The declared types of every unit being checked together.
+/// **Every name some type in the program has as a constructor**: each
+/// declared sum type's cases, and the language's own `Some`, `None`, `Ok`
+/// and `Err`. A bare name in a pattern that is one of these is a constructor,
+/// never a fresh binding (ADR-0038).
+///
+/// It held an ADT per declaration, read from spellings, until 2026-09-26.
+/// Each match now types its own subject's constructors from the resolved
+/// declarations (`Instances`, ADR-0060), and this is what is left: the names.
 ///
 /// **The set of files passed to one invocation is treated as one program.**
-/// Import-based visibility is not enforced yet — that is name resolution, and
-/// it does not exist. The corpus depends on this: `R-007` matches on
-/// `OrderState`, which is declared in `A-002`. Recorded as assumption A-009.
+/// Recorded as assumption A-009.
 pub struct Env {
-    program: Program,
-    /// **The declaration → its `AdtId`.**
-    ///
-    /// Keyed by `DefId` since 2026-08-21. It was keyed by bare NAME, so two
-    /// modules declaring `Status` had one entry and a match over one saw the
-    /// other's constructors — with no diagnostic, because both spellings agreed.
-    ///
-    /// Architect ruling: *`TypeEnv` never discovers identity; it only supplies
-    /// declaration facts for an identity it is handed.* So this map cannot be
-    /// consulted without a `DefId`, and getting one is resolution's job.
-    adts: BTreeMap<crate::resolve::DefId, usize>,
-    /// The declaration → its constructor names, in declaration order.
-    ctor_names: BTreeMap<crate::resolve::DefId, Vec<String>>,
-    /// `Option` and `Result`: an ADT each, and its constructors. Keyed by the
-    /// built-in, since they have no declaration.
-    builtins: BTreeMap<crate::resolved::Builtin, (usize, Vec<String>)>,
-    /// The opaque type of their payloads, which a pattern nested under `Some`,
-    /// `Ok` or `Err` is read against.
-    payload: crate::types::OpaqueId,
+    constructors: BTreeSet<String>,
 }
 
 impl Env {
     pub fn build(units: &[Unit]) -> Env {
-        let mut program = Program::new();
-        let mut adts = BTreeMap::new();
-        let mut ctor_names = BTreeMap::new();
-
-        // Two passes: every ADT is declared before any field type is resolved,
-        // so mutually recursive types work and declaration order does not
-        // change the result.
-        let mut pending: Vec<(crate::resolve::DefId, String, Vec<hir::VariantDef>)> = Vec::new();
-        for (unit, u) in units.iter().enumerate() {
-            for (id, d) in u.hir.all_decls() {
-                if let Some(vs) = &d.variants {
-                    pending.push((
-                        crate::resolve::DefId { unit, decl: id.0 },
-                        d.name.clone(),
-                        vs.clone(),
-                    ));
-                }
-                if let Some(rep) = &d.opaque_of {
-                    program.declare_opaque(&d.name, primitive(&rep.written()).unwrap_or(Type::Str));
+        let mut constructors: BTreeSet<String> = ["Some", "None", "Ok", "Err"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        for u in units {
+            for (_, d) in u.hir.all_decls() {
+                for v in d.variants.iter().flatten() {
+                    constructors.insert(v.name.clone());
                 }
             }
         }
-        let mut by_name: BTreeMap<String, usize> = BTreeMap::new();
-        for (def, name, _) in &pending {
-            let id = program.declare_adt(name, Vec::new());
-            adts.insert(*def, id);
-            by_name.insert(name.clone(), id);
-        }
-        // A field type that is neither primitive nor declared here — usually
-        // one reached through an `import` — is nominal-but-unknown, which is
-        // exactly an opaque type. Recording it by name rather than collapsing
-        // it to a placeholder is what lets a witness read
-        // `Cancelled(CancellationReason)` instead of `Cancelled(String)`, and
-        // R-007 declares that exact string as its expected error.
-        let mut unresolved: BTreeMap<String, usize> = BTreeMap::new();
-        for (def, _name, vs) in &pending {
-            let id = adts[def];
-            let ctors: Vec<Ctor> = vs
-                .iter()
-                .map(|v| Ctor {
-                    name: v.name.clone(),
-                    fields: v
-                        .fields
-                        .iter()
-                        .map(|f| {
-                            // By spelling, as before ADR-0059 kept the tree;
-                            // the analysis reads its table by name.
-                            let f = &f.written();
-                            if let Some(t) = primitive(f) {
-                                return t;
-                            }
-                            // A FIELD's type, by name, within this build's
-                            // table. Not the semantic lookup that was re-keyed:
-                            // a field names a type in its own declaration's
-                            // scope, and resolving those is step 2 of the
-                            // migration. Recorded rather than silently kept.
-                            if let Some(i) = by_name.get(f) {
-                                return Type::Adt(*i);
-                            }
-                            let oid = *unresolved
-                                .entry(f.clone())
-                                .or_insert_with(|| program.declare_opaque(f, Type::Str));
-                            Type::Opaque(oid)
-                        })
-                        .collect(),
-                })
-                .collect();
-            program.adts[id].ctors = ctors;
-            ctor_names.insert(*def, vs.iter().map(|v| v.name.clone()).collect());
-        }
-
-        // `Option` and `Result`, the language's own variants, as the analysis
-        // sees any other. Their payloads are opaque: a pattern nested under
-        // `Some`, `Ok` or `Err` is left to `subject` to refuse, rather than
-        // checked against a type the analysis does not have. The opaque type's
-        // name is what a witness prints for it: `Some(_)`.
-        let any = program.declare_opaque("_", Type::Str);
-        let mut builtins = BTreeMap::new();
-        for (b, name, cases) in [
-            (
-                crate::resolved::Builtin::Option,
-                "Option",
-                vec![("Some", 1), ("None", 0)],
-            ),
-            (
-                crate::resolved::Builtin::Result,
-                "Result",
-                vec![("Ok", 1), ("Err", 1)],
-            ),
-        ] {
-            let ctors: Vec<Ctor> = cases
-                .iter()
-                .map(|(c, n)| Ctor {
-                    name: c.to_string(),
-                    fields: vec![Type::Opaque(any); *n],
-                })
-                .collect();
-            let id = program.declare_adt(name, ctors);
-            builtins.insert(b, (id, cases.iter().map(|(c, _)| c.to_string()).collect()));
-        }
-
-        Env {
-            program,
-            adts,
-            ctor_names,
-            builtins,
-            payload: any,
-        }
+        Env { constructors }
     }
 
-    pub fn program(&self) -> &Program {
-        &self.program
-    }
-
-    /// The `AdtId` for a declaration whose identity the caller already
-    /// established. There is no by-name entry point, deliberately.
-    fn adt_of(&self, def: crate::resolve::DefId) -> Option<usize> {
-        self.adts.get(&def).copied()
-    }
-
-    fn ctors_of(&self, def: crate::resolve::DefId) -> Option<&[String]> {
-        self.ctor_names.get(&def).map(|v| v.as_slice())
-    }
-
-    /// `Option` or `Result`, as an ADT and its constructors.
-    fn builtin(&self, b: crate::resolved::Builtin) -> Option<(usize, &[String])> {
-        self.builtins.get(&b).map(|(id, cs)| (*id, cs.as_slice()))
+    /// The names the program knows as constructors, sorted.
+    pub fn constructors(&self) -> impl Iterator<Item = &str> {
+        self.constructors.iter().map(String::as_str)
     }
 
     /// Whether any type this program knows has a constructor of this name.
     fn names_a_constructor(&self, name: &str) -> bool {
-        self.program
-            .adts
-            .iter()
-            .any(|a| a.ctors.iter().any(|c| c.name == name))
-    }
-}
-
-fn primitive(name: &str) -> Option<Type> {
-    match name {
-        "Bool" => Some(Type::Bool),
-        "Int" => Some(Type::Int),
-        "String" | "Str" => Some(Type::Str),
-        _ => None,
+        self.constructors.contains(name)
     }
 }
 
@@ -1235,11 +1100,21 @@ pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
     out
 }
 
-/// **What a match is over**: its ADT, constructors and name, found once and
+/// **What a match is over**: its type as the analysis reads it, the
+/// program that type's constructors live in, and its name, found once and
 /// read by both the analysis and its diagnostic.
 struct Subject {
-    adt: usize,
-    ctors: Vec<String>,
+    ty: Type,
+    /// The analysis's types for this match (ADR-0060): each instance a
+    /// pattern can take apart, as an ADT of its own.
+    program: Program,
+    /// Which declared sum type each of `program`'s ADTs is an instance of,
+    /// for a pattern's qualifier.
+    defs: BTreeMap<crate::types::AdtId, crate::resolve::DefId>,
+    /// The opaque types that stand for a type the program does not state: a
+    /// pattern against one is not read, where against a known type no
+    /// pattern takes apart it is an error.
+    unknown: BTreeSet<crate::types::OpaqueId>,
     /// The type as written or inferred, for messages.
     name: String,
 }
@@ -1298,35 +1173,193 @@ fn subject(site: &MatchSite<'_>, scrutinee: ExprId) -> Result<Subject, (String, 
                 Some(written),
             ));
         };
-        if let Some((adt, ctors)) = t.as_builtin().and_then(|b| env.builtin(b)) {
-            return Ok(Subject {
-                adt,
-                ctors: ctors.to_vec(),
-                name: written,
-            });
-        }
-        let Some(def) = t.def_id() else {
-            return Err((
-                "the scrutinee's type does not resolve to a declaration".into(),
-                Some(written),
-            ));
-        };
-        return declared_adt(env, def, written);
+        return typed_subject(env, sigs, &crate::values::Ty::of(t), written);
     }
     match crate::values::type_of(sigs, ws, *at, *module, decl, body, scrutinee) {
-        (crate::values::Ty::Builtin(b, _), name) => match env.builtin(b) {
-            Some((adt, ctors)) => Ok(Subject {
-                adt,
-                ctors: ctors.to_vec(),
-                name,
-            }),
-            None => Err((
-                "the scrutinee's type is not an algebraic data type".into(),
-                Some(name),
-            )),
-        },
-        (crate::values::Ty::Nominal(def, _), name) => declared_adt(env, def, name),
-        (_, _) => Err(("the scrutinee's type is unknown here".into(), None)),
+        (crate::values::Ty::Unknown | crate::values::Ty::Var(_), _) => {
+            Err(("the scrutinee's type is unknown here".into(), None))
+        }
+        (ty, name) => typed_subject(env, sigs, &ty, name),
+    }
+}
+
+/// A subject of a type a match takes apart: a sum type, the language's
+/// `Option` or `Result`, a `Bool`, or an `Int` or a `String` by its
+/// literals (ADR-0060).
+fn typed_subject(
+    _env: &Env,
+    sigs: &Signatures,
+    ty: &crate::values::Ty,
+    name: String,
+) -> Result<Subject, (String, Option<String>)> {
+    let mut instances = Instances {
+        sigs,
+        program: Program::new(),
+        memo: BTreeMap::new(),
+        defs: BTreeMap::new(),
+        unknown: BTreeSet::new(),
+    };
+    let t = instances.of(ty);
+    match &t {
+        Type::Adt(id) if instances.program.adt(*id).ctors.is_empty() => Err((
+            "the scrutinee's type declares no constructors".into(),
+            Some(name),
+        )),
+        Type::Opaque(id) if instances.unknown.contains(id) => {
+            Err(("the scrutinee's type is unknown here".into(), Some(name)))
+        }
+        // A record, a list, a `Float`: known, and taken apart by no pattern,
+        // so only `_` or a name matches one, and anything else is an error.
+        _ => Ok(Subject {
+            ty: t,
+            program: instances.program,
+            defs: instances.defs,
+            unknown: instances.unknown,
+            name,
+        }),
+    }
+}
+
+/// **The analysis's types for one match** (ADR-0060): each type a pattern
+/// can take apart, declared as an ADT of its own instance, every
+/// constructor's fields typed. `Option<Option<Int>>` and `Option<Int>` are
+/// two ADTs, and a declared case's fields are its type's, under the
+/// arguments it is applied to. Until 2026-09-26 the payloads of `Some`, `Ok`
+/// and `Err` were one opaque type and a declared case's fields were read by
+/// their spelling, so a pattern nested under either blocked the analysis.
+struct Instances<'a> {
+    sigs: &'a Signatures,
+    program: Program,
+    memo: BTreeMap<String, Type>,
+    defs: BTreeMap<crate::types::AdtId, crate::resolve::DefId>,
+    /// The opaque types standing for a type the program does not state.
+    unknown: BTreeSet<crate::types::OpaqueId>,
+}
+
+impl Instances<'_> {
+    fn of(&mut self, ty: &crate::values::Ty) -> Type {
+        use crate::resolved::{Builtin, Primitive};
+        use crate::values::Ty;
+        match ty {
+            Ty::Primitive(Primitive::Int) => Type::Int,
+            Ty::Primitive(Primitive::Str) => Type::Str,
+            Ty::Primitive(Primitive::Bool) => Type::Bool,
+            Ty::Builtin(Builtin::Option, a) if a.len() == 1 => {
+                let inner = a[0].clone();
+                self.adt(ty, None, move |me| {
+                    vec![
+                        ("Some".to_string(), vec![me.of(&inner)]),
+                        ("None".to_string(), Vec::new()),
+                    ]
+                })
+            }
+            Ty::Builtin(Builtin::Result, a) if a.len() == 2 => {
+                let (ok, err) = (a[0].clone(), a[1].clone());
+                self.adt(ty, None, move |me| {
+                    vec![
+                        ("Ok".to_string(), vec![me.of(&ok)]),
+                        ("Err".to_string(), vec![me.of(&err)]),
+                    ]
+                })
+            }
+            Ty::Nominal(def, args)
+                if self
+                    .sigs
+                    .type_decl(*def)
+                    .is_some_and(|t| t.variants.is_some()) =>
+            {
+                let cases = self
+                    .sigs
+                    .type_decl(*def)
+                    .and_then(|t| t.variants.clone())
+                    .unwrap_or_default();
+                let (def, args) = (*def, args.clone());
+                self.adt(ty, Some(def), move |me| {
+                    cases
+                        .iter()
+                        .map(|(name, fields)| {
+                            let fields = fields
+                                .iter()
+                                .map(|f| match f.resolved() {
+                                    Some(t) => {
+                                        me.of(&crate::values::substituted(&Ty::of(t), def, &args))
+                                    }
+                                    None => me.opaque(&Ty::Unknown),
+                                })
+                                .collect();
+                            (name.clone(), fields)
+                        })
+                        .collect()
+                })
+            }
+            other => self.opaque(other),
+        }
+    }
+
+    /// An instance's ADT, declared once: before its constructors are
+    /// computed, so a type that contains itself finds its own.
+    fn adt(
+        &mut self,
+        ty: &crate::values::Ty,
+        def: Option<crate::resolve::DefId>,
+        ctors: impl FnOnce(&mut Self) -> Vec<(String, Vec<Type>)>,
+    ) -> Type {
+        let key = format!("{ty:?}");
+        if let Some(t) = self.memo.get(&key) {
+            return t.clone();
+        }
+        let id = self.program.declare_adt(&self.name(ty), Vec::new());
+        if let Some(d) = def {
+            self.defs.insert(id, d);
+        }
+        self.memo.insert(key, Type::Adt(id));
+        let ctors = ctors(self);
+        self.program.adts[id].ctors = ctors
+            .into_iter()
+            .map(|(name, fields)| Ctor { name, fields })
+            .collect();
+        Type::Adt(id)
+    }
+
+    /// A type no pattern takes apart: a record, an opaque type, a `Float`,
+    /// a list, a type the program does not state.
+    fn opaque(&mut self, ty: &crate::values::Ty) -> Type {
+        let key = format!("{ty:?}");
+        if let Some(t) = self.memo.get(&key) {
+            return t.clone();
+        }
+        let id = self.program.declare_opaque(&self.name(ty), Type::Str);
+        if matches!(ty, crate::values::Ty::Unknown | crate::values::Ty::Var(_)) {
+            self.unknown.insert(id);
+        }
+        let t = Type::Opaque(id);
+        self.memo.insert(key, t.clone());
+        t
+    }
+
+    /// A type as a witness names it: `Option<Int>`, `Shape`, `Maybe<String>`.
+    fn name(&self, ty: &crate::values::Ty) -> String {
+        use crate::values::Ty;
+        let args = |xs: &[Ty]| match xs.is_empty() {
+            true => String::new(),
+            false => format!(
+                "<{}>",
+                xs.iter()
+                    .map(|x| self.name(x))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        };
+        match ty {
+            Ty::Primitive(p) => p.name().to_string(),
+            Ty::Builtin(b, xs) => format!("{}{}", b.name(), args(xs)),
+            Ty::Nominal(def, xs) => {
+                let path = self.sigs.path_of(*def).unwrap_or("?");
+                let bare = path.rsplit('.').next().unwrap_or(path);
+                format!("{bare}{}", args(xs))
+            }
+            Ty::Parameter { .. } | Ty::Var(_) | Ty::Unknown => "_".to_string(),
+        }
     }
 }
 
@@ -1337,36 +1370,15 @@ fn rebinds(body: &Body, name: &str) -> bool {
         .any(|(_, p, _)| matches!(p, HPat::Bind { name: n, .. } if n == name))
 }
 
-fn declared_adt(
-    env: &Env,
-    def: crate::resolve::DefId,
-    name: String,
-) -> Result<Subject, (String, Option<String>)> {
-    let Some(adt) = env.adt_of(def) else {
-        return Err((
-            "the scrutinee's type is not an algebraic data type this program declares".into(),
-            Some(name),
-        ));
-    };
-    let Some(ctors) = env.ctors_of(def) else {
-        return Err((
-            "the scrutinee's type declares no constructors".into(),
-            Some(name),
-        ));
-    };
-    Ok(Subject {
-        adt,
-        ctors: ctors.to_vec(),
-        name,
-    })
-}
-
 /// A constructor pattern naming a constructor its type does not have.
 struct Foreign {
     constructor: String,
     /// The type the pattern is read against, and that type's constructors.
     ty: String,
     ctors: Vec<String>,
+    /// What a pattern against a type without constructors may be, said
+    /// instead of the list (ADR-0060).
+    note: Option<String>,
     span: hir::Span,
 }
 
@@ -1385,7 +1397,7 @@ enum Found {
     Nothing,
     /// The subject, and each arm as the analysis read it, or why it could
     /// not. Kept per arm, so one arm's fault never hides another's.
-    Arms(Subject, Vec<Result<Arm, PatternFault>>),
+    Arms(Box<Subject>, Vec<Result<Arm, PatternFault>>),
 }
 
 /// The analysis, with no diagnostics in it, and what they are read from.
@@ -1410,8 +1422,8 @@ fn analyse_match(
         Ok(s) => s,
         Err((reason, ty)) => return (blocked(&reason, ty), Found::Nothing),
     };
-    // `Shape.Circle(r)`: the type a qualified pattern names, as the
-    // analysis's ADT, resolved where the match is written (ADR-0059).
+    // `Shape.Circle(r)`: the type a qualified pattern names, resolved where
+    // the match is written (ADR-0059).
     let qualifier = |q: &str| {
         use crate::resolve::{Namespace, Resolution};
         let found = match q.contains('.') {
@@ -1419,19 +1431,25 @@ fn analyse_match(
             false => site.ws.resolve_in(site.at, Namespace::Type, q),
         };
         match found {
-            Resolution::Local(d) | Resolution::Imported { def: d, .. } => env.adt_of(d),
+            Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
             _ => None,
         }
     };
+    // Each literal the match's patterns write, as a constructor of its
+    // type's own (ADR-0060): `1` and `2` are two, and no list of them is
+    // every `Int`.
+    let literals = std::cell::RefCell::new(BTreeMap::new());
     let read: Vec<Result<Arm, PatternFault>> = arms
         .iter()
         .map(|a| {
             to_exhaust_pattern(
                 env,
+                &subject,
                 body,
                 &qualifier,
+                &literals,
                 a.pat,
-                &Type::Adt(subject.adt),
+                &subject.ty,
                 &subject.name,
             )
             .map(|pattern| Arm {
@@ -1463,11 +1481,14 @@ fn analyse_match(
             PatternFault::Unread(why) => why.clone(),
         };
         let name = subject.name.clone();
-        return (blocked(&why, Some(name)), Found::Arms(subject, read));
+        return (
+            blocked(&why, Some(name)),
+            Found::Arms(Box::new(subject), read),
+        );
     }
     let lowered: Vec<Arm> = read.into_iter().filter_map(Result::ok).collect();
 
-    let report = exhaust::check_match(env.program(), &Type::Adt(subject.adt), &lowered);
+    let report = exhaust::check_match(&subject.program, &subject.ty, &lowered);
     let outcome = match report.outcome() {
         crate::outcome::Outcome::Proven(_) => MatchOutcome::Proven,
         crate::outcome::Outcome::Blocked(bs) => MatchOutcome::Blocked {
@@ -1477,7 +1498,7 @@ fn analyse_match(
             missing: report
                 .missing
                 .iter()
-                .map(|w| exhaust::render_witness(env.program(), &Type::Adt(subject.adt), w))
+                .map(|w| exhaust::render_witness(&subject.program, &subject.ty, w))
                 .collect(),
         },
     };
@@ -1488,7 +1509,7 @@ fn analyse_match(
             span,
             outcome,
         },
-        Found::Arms(subject, lowered.into_iter().map(Ok).collect()),
+        Found::Arms(Box::new(subject), lowered.into_iter().map(Ok).collect()),
     )
 }
 
@@ -1554,27 +1575,40 @@ fn exhaustiveness(
             span: body.expr_span(scrutinee),
             label: format!("this has type `{ty_name}`"),
         }],
-        explanation: Some(format!(
-            "`{ty_name}` has {} constructor(s); {} of them {} unmatched. \
-             Adding a variant to a type must break every match on it at compile \
-             time, which is why a wildcard arm is not the default repair.",
-            subject.ctors.len(),
-            missing.len(),
-            if missing.len() == 1 { "is" } else { "are" },
-        )),
-        repairs: missing
-            .iter()
-            .map(|m| Repair {
-                description: format!("add an arm for `{m}`"),
+        explanation: Some(match subject.program.ctors_of(&subject.ty) {
+            Some(ctors) if !subject.ty.is_infinite() => format!(
+                "`{ty_name}` has {} constructor(s), and {} value(s) no arm takes. \
+                 Adding a variant to a type must break every match on it at compile \
+                 time, which is why a wildcard arm is not the default repair.",
+                ctors.len(),
+                missing.len(),
+            ),
+            // `Int` and `String`: no list of literals is every value (ADR-0060).
+            _ => format!(
+                "A `{ty_name}` has more values than any list of literals names, so \
+                 a match over one needs an arm that takes the rest."
+            ),
+        }),
+        repairs: match subject.ty.is_infinite() {
+            // No list of literals is every `Int`: the rest is one arm.
+            true => vec![Repair {
+                description: "add an arm `_ =>` for the values no literal names".to_string(),
                 replacement: None,
-            })
-            .chain(std::iter::once(Repair {
-                description: "or add `_ =>` if the remaining cases are genuinely \
-                              interchangeable — this silences future variants too"
-                    .to_string(),
-                replacement: None,
-            }))
-            .collect(),
+            }],
+            false => missing
+                .iter()
+                .map(|m| Repair {
+                    description: format!("add an arm for `{m}`"),
+                    replacement: None,
+                })
+                .chain(std::iter::once(Repair {
+                    description: "or add `_ =>` if the remaining cases are genuinely \
+                                  interchangeable — this silences future variants too"
+                        .to_string(),
+                    replacement: None,
+                }))
+                .collect(),
+        },
     });
 }
 
@@ -1638,15 +1672,19 @@ fn foreign_constructor(body: &Body, match_id: ExprId, subject: &Subject, f: Fore
             f.ty, f.constructor
         )),
         repairs: vec![Repair {
-            description: format!(
-                "`{}`'s constructors are {}",
-                f.ty,
-                f.ctors
-                    .iter()
-                    .map(|c| format!("`{c}`"))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
+            description: match f.note {
+                // A type without constructors (ADR-0060).
+                Some(note) => note,
+                None => format!(
+                    "`{}`'s constructors are {}",
+                    f.ty,
+                    f.ctors
+                        .iter()
+                        .map(|c| format!("`{c}`"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            },
             replacement: None,
         }],
     }
@@ -1682,43 +1720,94 @@ enum PatternFault {
 /// read blocks it, with the reason: a literal, or a constructor pattern
 /// against a type whose constructors it does not know, such as `Some`'s
 /// payload.
+#[allow(clippy::too_many_arguments)]
 fn to_exhaust_pattern(
     env: &Env,
+    subject: &Subject,
     body: &Body,
-    qualifier: &dyn Fn(&str) -> Option<usize>,
+    qualifier: &dyn Fn(&str) -> Option<crate::resolve::DefId>,
+    literals: &std::cell::RefCell<BTreeMap<String, usize>>,
     id: hir::PatternId,
     ty: &Type,
     ty_name: &str,
 ) -> Result<EPat, PatternFault> {
-    let program = env.program();
+    let program = &subject.program;
     let ctors = program.ctors_of(ty);
     let unread = || {
-        PatternFault::Unread(if *ty == Type::Opaque(env.payload) {
-            "a constructor pattern nested under a built-in variant is not analysed: \
-             the analysis does not see into the payload of `Some`, `Ok` or `Err`"
-                .to_string()
-        } else {
-            format!(
-                "a constructor pattern against `{ty_name}` is not analysed: the \
-                 analysis does not know that type's constructors"
-            )
-        })
+        PatternFault::Unread(format!(
+            "a pattern against `{ty_name}` is not analysed: the analysis does not know \
+             that type's constructors"
+        ))
     };
     let foreign = |name: &str, cs: &[Ctor]| {
         PatternFault::Foreign(Foreign {
             constructor: name.to_string(),
             ty: ty_name.to_string(),
             ctors: cs.iter().map(|c| c.name.clone()).collect(),
+            note: None,
             span: body.pat_span(id),
         })
     };
+    // A type without constructors: an `Int` or a `String` is matched by its
+    // literals, and a record, a list or a `Float` by no pattern at all. A
+    // type the program does not state is not read (ADR-0060).
+    let untakeable = |name: &str| match ty {
+        Type::Opaque(o) if subject.unknown.contains(o) => unread(),
+        _ => PatternFault::Foreign(Foreign {
+            constructor: name.to_string(),
+            ty: ty_name.to_string(),
+            ctors: Vec::new(),
+            note: Some(match ty {
+                Type::Int | Type::Str => {
+                    format!("a pattern against `{ty_name}` is one of its literals, or `_`")
+                }
+                _ => format!(
+                    "a `{ty_name}` is taken apart by no pattern: match it with `_` or a name"
+                ),
+            }),
+            span: body.pat_span(id),
+        }),
+    };
     match body.pat(id) {
         HPat::Wild | HPat::Error => Ok(EPat::Wildcard),
-        HPat::Literal(_) => Err(PatternFault::Unread(
-            "a literal pattern is not analysed: it covers one value, and the \
-             analysis does not enumerate a literal's type"
-                .to_string(),
-        )),
+        // A literal is a constructor of its type's own (ADR-0060). An `Int`
+        // or a `String` has more of them than any match writes, so only an
+        // arm taking the rest covers one; the analysis says which values
+        // the literals leave, as `_`.
+        HPat::Literal(l) => {
+            let key = match (ty, l) {
+                (Type::Int, hir::Literal::Int(n)) => n
+                    .replace('_', "")
+                    .parse::<i64>()
+                    .ok()
+                    .map(|n| format!("i:{n}")),
+                (Type::Str, hir::Literal::Str(_)) => l.string_value().map(|v| format!("s:{v}")),
+                _ => None,
+            };
+            match key {
+                Some(k) => {
+                    let mut seen = literals.borrow_mut();
+                    let next = seen.len();
+                    Ok(EPat::unit(*seen.entry(k).or_insert(next)))
+                }
+                // A `Float` literal: equality on floats decides no case.
+                None if matches!(l, hir::Literal::Float(_)) && ty_name == "Float" => Err(
+                    PatternFault::Unread("a `Float` literal pattern is not analysed".to_string()),
+                ),
+                None => {
+                    let written = match l {
+                        hir::Literal::Int(t)
+                        | hir::Literal::Float(t)
+                        | hir::Literal::Str(t)
+                        | hir::Literal::UnterminatedStr(t) => t.clone(),
+                    };
+                    Err(match &ctors {
+                        Some(cs) => foreign(&written, cs),
+                        None => untakeable(&written),
+                    })
+                }
+            }
+        }
         HPat::Bind { name, .. } => {
             if let Some(cs) = &ctors
                 && let Some(i) = cs.iter().position(|c| &c.name == name)
@@ -1735,11 +1824,12 @@ fn to_exhaust_pattern(
                 };
             }
             // Another type's constructor is not a fresh binding: `None`
-            // against a `Status` names `Option`'s case.
-            if env.names_a_constructor(name) {
+            // against a `Status` names `Option`'s case, and `true` against
+            // an `Int` names a `Bool`.
+            if env.names_a_constructor(name) || matches!(name.as_str(), "true" | "false") {
                 return Err(match &ctors {
                     Some(cs) => foreign(name, cs),
-                    None => unread(),
+                    None => untakeable(name),
                 });
             }
             Ok(EPat::Wildcard)
@@ -1750,10 +1840,11 @@ fn to_exhaust_pattern(
             // its last segment alone, `Other.Invalid` matched a `DecodeError`.
             let short = path.rsplit('.').next().unwrap_or(path);
             let Some(cs) = ctors else {
-                return Err(unread());
+                return Err(untakeable(path));
             };
             if let Some((q, _)) = path.rsplit_once('.')
-                && !matches!(ty, Type::Adt(t) if qualifier(q) == Some(*t))
+                && !matches!(ty, Type::Adt(t)
+                    if qualifier(q).is_some_and(|d| subject.defs.get(t) == Some(&d)))
             {
                 return Err(foreign(path, &cs));
             }
@@ -1773,14 +1864,23 @@ fn to_exhaust_pattern(
                 .iter()
                 .zip(fields)
                 .map(|(a, t)| {
-                    to_exhaust_pattern(env, body, qualifier, *a, t, &program.type_name(t))
+                    to_exhaust_pattern(
+                        env,
+                        subject,
+                        body,
+                        qualifier,
+                        literals,
+                        *a,
+                        t,
+                        &program.type_name(t),
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(EPat::ctor(i, args))
         }
         HPat::Or(ps) => ps
             .iter()
-            .map(|p| to_exhaust_pattern(env, body, qualifier, *p, ty, ty_name))
+            .map(|p| to_exhaust_pattern(env, subject, body, qualifier, literals, *p, ty, ty_name))
             .collect::<Result<Vec<_>, _>>()
             .map(EPat::Or),
     }
