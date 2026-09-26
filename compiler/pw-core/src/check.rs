@@ -805,6 +805,76 @@ fn code_in_markup(hir: &Hir) -> Vec<Diagnostic> {
             };
             let mut found: Vec<(crate::hir::Span, String, &str)> = Vec::new();
             let tag = tag.to_ascii_lowercase();
+            // ADR-0096: what moves a URL rather than writes code.
+            let mut moved: Vec<(crate::hir::Span, String, &str)> = Vec::new();
+            if tag == "base" {
+                moved.push((
+                    body.node_span(n),
+                    "`<base>` moves every relative URL after it, the platform's runtime \
+                     among them"
+                        .to_string(),
+                    "write the path whole; the document's base is the platform's",
+                ));
+            }
+            if matches!(tag.as_str(), "animate" | "set")
+                && let Some(target) = attrs
+                    .iter()
+                    .find(|a| a.name.eq_ignore_ascii_case("attributeName"))
+            {
+                let named = match &target.value {
+                    AttrValue::Static(text) => Some(text.trim_matches('"').to_string()),
+                    _ => None,
+                };
+                let runs = |name: &str| {
+                    let local = name.rsplit(':').next().unwrap_or(name).to_ascii_lowercase();
+                    crate::template_ir::Context::of_attribute(name)
+                        == crate::template_ir::Context::Url
+                        || local.strip_prefix("on").is_some_and(|e| {
+                            !e.is_empty() && e.chars().all(|c| c.is_ascii_alphabetic())
+                        })
+                };
+                match named {
+                    Some(name) if !runs(&name) => {}
+                    Some(name) => moved.push((
+                        target.span.clone(),
+                        format!("`<{tag}>` sets `{name}`, past the check its own attribute gets"),
+                        "write the link's URL on the link, and bind a handler with `on:`",
+                    )),
+                    None => moved.push((
+                        target.span.clone(),
+                        format!("`<{tag}>` sets an attribute a value names"),
+                        "name the animated attribute as text",
+                    )),
+                }
+            }
+            for (span, message, repair) in moved {
+                out.push(Diagnostic {
+                    code: crate::codes::MOVES_A_URL.id,
+                    invariant: crate::codes::MOVES_A_URL.invariant,
+                    reason: "moves_a_url",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message,
+                    primary_span: span,
+                    related: vec![Related {
+                        span: hir.decl_span(decl_id),
+                        label: format!("`{}` renders this", decl.name),
+                    }],
+                    explanation: Some(
+                        "A view renders into a page that loads the platform's runtime after \
+                         the view's markup, by a relative URL; a `<base>` element anywhere in \
+                         the document moves it, and every link after it. An animation sets \
+                         the attribute it names, so `<animate attributeName=\"href\">` gives a \
+                         link a URL that never passed the check a URL attribute gets. Until \
+                         2026-09-26 both checked and built."
+                            .to_string(),
+                    ),
+                    repairs: vec![Repair {
+                        description: repair.to_string(),
+                        replacement: None,
+                    }],
+                });
+            }
             if tag == "script" {
                 found.push((
                     body.node_span(n),

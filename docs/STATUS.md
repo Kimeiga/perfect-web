@@ -78,6 +78,19 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a view could choose where the platform's runtime
+loads from**
+([ADR-0096](DECISIONS/ADR-0096-a-template-moves-no-url.md)). The page a view
+renders into writes the view's markup, then `<script type="module"
+src="/pw-runtime.mjs">`. So `<base href={msg}>` in a view moved the
+runtime, and every relative link after it, to wherever `msg` named. `<animate
+attributeName="href" values={msg}>` set a link's `href` to any URL, past the
+URL check. Both checked and built. A template writes no `<base>` and
+animates no link or handler now (PW5024).
+
+Evidence: [moved-urls.txt](evidence/E10/moved-urls.txt)
+(`just e10-moved-urls`).
+
 **Correction, 2026-09-26: `HREF={msg}` escaped no scheme**
 ([ADR-0095](DECISIONS/ADR-0095-an-attributes-context-is-read-as-html-reads-its-name.md)).
 The template IR chose a value's escaping from the attribute's name as

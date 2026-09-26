@@ -669,3 +669,11 @@ the template IR chose a value's escaping from the attribute's name as
 written, so `<a HREF={msg}>` was escaped as an ordinary attribute and
 `msg = "javascript:alert(1)"` ran. The name is read as HTML reads it now,
 lowercased.
+
+## 2026-09-26: a template moves no URL (E10)
+
+[ADR-0096](DECISIONS/ADR-0096-a-template-moves-no-url.md): `<base
+href={msg}>` chose where the platform's runtime loaded from, since the page
+writes the view before the runtime's script, and an SVG `<animate>` set a
+link's `href` to any URL. A template writes no `<base>` and animates no link
+or handler now (PW5024).

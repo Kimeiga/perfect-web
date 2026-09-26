@@ -1200,6 +1200,19 @@ e10-attribute-case:
      } > docs/evidence/E10/attribute-case.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/attribute-case.txt
 
+# ADR-0096: a template moves no URL. Its tests, and the mutation controls.
+e10-moved-urls:
+    @{ echo "ADR-0096 - a template moves no URL"; echo; \
+       echo "produced by: just e10-moved-urls"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== moved URLs (compiler/pw-core/tests/platform_markup.rs)"; echo; \
+       cargo test --locked -p pw-core --test platform_markup 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/moved_url_mutations.py)"; echo; \
+       python3 scripts/moved_url_mutations.py; \
+     } > docs/evidence/E10/moved-urls.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/moved-urls.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

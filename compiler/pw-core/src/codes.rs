@@ -380,6 +380,11 @@ codes! {
     // checked and built until 2026-09-26, escaped as text or an attribute.
     CODE_IN_MARKUP = "PW5023" / code_in_markup / 1, Markup,
         "a template writes no code, and no value into a stylesheet";
+    // ADR-0096: `<base href={msg}>` moved where the platform's runtime loads
+    // from, and `<animate attributeName="href" values={msg}>` a link's
+    // target, and both checked until 2026-09-26.
+    MOVES_A_URL = "PW5024" / moves_a_url / 1, Markup,
+        "a template moves no URL: no `<base>`, and no animation of a link or a handler";
     // ADR-0093: `on:clik={go}` checked until 2026-09-26, and ran by
     // accident, because the runtime listens for a click whatever the name.
     UNKNOWN_EVENT = "PW5022" / unknown_event / 1, Markup,

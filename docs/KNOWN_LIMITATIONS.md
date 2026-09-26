@@ -300,6 +300,9 @@ awaited in order. What remains:
   (`expression(`, a script scheme in `url(`), then as an attribute. A style
   can still load a URL the value names. A `<style>` element holds text only
   (ADR-0094), and a stylesheet's braces open holes, so none is written.
+- **A view may write `<meta>` and `<link>`** (ADR-0096): a refresh that
+  redirects, a stylesheet from anywhere. Neither runs a script, and which
+  head elements a body may hold needs a ruling.
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.
