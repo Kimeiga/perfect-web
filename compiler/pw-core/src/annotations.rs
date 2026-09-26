@@ -248,6 +248,20 @@ fn handler_matches_event(
             // attributes resolve in `events`, and that is stated here rather
             // than reached by "exactly one module declares a `submit`", which
             // would make the rule depend on an accident of the program.
+            // An event the platform does not declare is not an event
+            // (ADR-0093). A program with no `events` module declares none,
+            // and there is nothing to hold the attribute to.
+            if sigs.by_path(&format!("{EVENTS_MODULE}.{event}")).is_none() {
+                let mut declared: Vec<&str> = sigs
+                    .iter()
+                    .filter_map(|(path, _)| path.strip_prefix(EVENTS_MODULE)?.strip_prefix('.'))
+                    .collect();
+                declared.sort();
+                if !declared.is_empty() {
+                    out.push(unknown_event(decl, at, a, event, &declared));
+                }
+                continue;
+            }
             let Some(expected) = sigs
                 .by_path(&format!("{EVENTS_MODULE}.{event}"))
                 .and_then(|s| s.params.first())
@@ -305,6 +319,45 @@ fn handler_matches_event(
         }
     }
     let _ = hir;
+}
+
+/// `on:clik={go}`: an event the platform does not declare (ADR-0093).
+fn unknown_event(
+    decl: &Decl,
+    at: &Span,
+    attr: &crate::hir::Attr,
+    event: &str,
+    declared: &[&str],
+) -> Diagnostic {
+    Diagnostic {
+        code: codes::UNKNOWN_EVENT.id,
+        invariant: codes::UNKNOWN_EVENT.invariant,
+        reason: "unknown_event",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`on:{event}` names no event the platform declares: {}",
+            crate::check::listed(declared)
+        ),
+        primary_span: attr.span.clone(),
+        related: vec![Related {
+            span: at.clone(),
+            label: format!("`{}` binds a handler to it here", decl.name),
+        }],
+        explanation: Some(
+            "Which event an `on:` attribute delivers is declared by the platform, in \
+             `events`. An attribute naming no declared event binds its handler to nothing. \
+             The runtime listens for a click whatever the name, so until 2026-09-26 such \
+             a handler ran by accident, and a runtime that listens for the named event \
+             would never run it."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "name a declared event, or declare it in the platform's `events`"
+                .to_string(),
+            replacement: None,
+        }],
+    }
 }
 
 // --- shared ------------------------------------------------------------------

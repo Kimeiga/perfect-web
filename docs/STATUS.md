@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: an element handles an event the platform declares**
+([ADR-0093](DECISIONS/ADR-0093-an-element-handles-an-event-the-platform-declares.md)).
+`<button on:clik={go}>` checked. The platform declares its events in
+`events`, and the one rule that reads them skipped a name it did not find.
+The runtime listens for a click whatever the name, so the handler ran by
+accident. An `on:` attribute names a declared event now (PW5022).
+
+Evidence: [declared-events.txt](evidence/E10/declared-events.txt)
+(`just e10-declared-events`).
+
 **Correction, 2026-09-26: ADR-0089 refused `idempotent_by Int`.** A type a
 policy names was looked up among declarations alone, and `Int` is not one.
 It is resolved as a written type is now (ADR-0089's correction).

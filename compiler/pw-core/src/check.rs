@@ -760,8 +760,8 @@ fn listener_keys(hir: &Hir, src: &str) -> Vec<Diagnostic> {
     out
 }
 
-/// `a`, `b` and `c`, each in backticks, for a message.
-fn listed<S: AsRef<str>>(words: &[S]) -> String {
+/// `a`, `b` or `c`, each in backticks, for a message.
+pub(crate) fn listed<S: AsRef<str>>(words: &[S]) -> String {
     let words: Vec<String> = words.iter().map(|w| format!("`{}`", w.as_ref())).collect();
     match words.split_last() {
         None => String::new(),

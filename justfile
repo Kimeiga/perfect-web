@@ -1159,6 +1159,20 @@ e10-clause-places:
      } > docs/evidence/E10/clause-places.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/clause-places.txt
 
+# ADR-0093: an element handles an event the platform declares. Its tests,
+# and the mutation controls.
+e10-declared-events:
+    @{ echo "ADR-0093 - an element handles an event the platform declares"; echo; \
+       echo "produced by: just e10-declared-events"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== declared events (compiler/pw-core/tests/declared_events.rs)"; echo; \
+       cargo test --locked -p pw-core --test declared_events 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/declared_event_mutations.py)"; echo; \
+       python3 scripts/declared_event_mutations.py; \
+     } > docs/evidence/E10/declared-events.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/declared-events.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

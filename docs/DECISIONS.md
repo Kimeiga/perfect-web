@@ -645,3 +645,10 @@ a query that `emits`, a command that listens, a `fn` that emits and a page
 that invalidates each checked, and nothing read what they said. A command
 emits and invalidates, a resource or a materialization listens, and a
 materialization depends (PW5105).
+
+## 2026-09-26: an element handles an event the platform declares (E10)
+
+[ADR-0093](DECISIONS/ADR-0093-an-element-handles-an-event-the-platform-declares.md):
+`on:clik={go}` checked, skipped by the rule that reads the platform's
+`events`, and ran by accident, since the runtime listens for a click
+whatever the name. An `on:` attribute names a declared event now (PW5022).

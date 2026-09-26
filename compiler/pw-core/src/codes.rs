@@ -376,6 +376,10 @@ codes! {
     // `(item.id)` in a loop over `x` keyed on `x.id`, and `(k.r.id)` on `k.id`.
     LOOP_KEY = "PW5021" / loop_key / 1, Markup,
         "a loop's key is its element, or a field read from it";
+    // ADR-0093: `on:clik={go}` checked until 2026-09-26, and ran by
+    // accident, because the runtime listens for a click whatever the name.
+    UNKNOWN_EVENT = "PW5022" / unknown_event / 1, Markup,
+        "an element handles an event the platform declares";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //
