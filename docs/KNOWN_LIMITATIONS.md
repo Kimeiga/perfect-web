@@ -283,11 +283,6 @@ awaited in order. What remains:
   (ADR-0088). A secret passed in `emits` or `invalidates` reaches the graph
   unlabelled, and what a key performs (`current_session()`'s
   `session.read`) is not the declaration's (ruling needed).
-- **`invalidates_on` keeps its text** (ADR-0088). What each of its
-  arguments binds is not settled. The materializer matches an event's
-  values against an entry's key as a set, so `InventoryChanged(store 47,
-  item 3)` is deferred forever, and store 47's menu is never invalidated
-  (NEXT).
 - **A policy's value is checked by its domain where it heads a declaration**
   (ADR-0089), not where a block writes it: `observe .. { scope application }`
   and a `handler_policy { .. }` are body statements, read by the scope graph

@@ -694,12 +694,14 @@ impl Materializer {
                     continue;
                 }
                 // The narrowing the whole milestone is about. An event's
-                // arguments are matched against the entry's key, so
+                // arguments are matched against the entry's key, position by
+                // position as its listener binds them (ADR-0091), so
                 // `MenuChanged(store_47)` reaches store 47's fragment and no
-                // other store's — and an event with NO arguments matches every
-                // instance, which is the honest reading of "the menu changed"
-                // with nothing said about which.
-                if !c.event.args.is_empty() && !c.event.args.iter().all(|a| key.key.contains(a)) {
+                // other store's, and `InventoryChanged(store_47, item)` does
+                // too. An event with NO arguments matches every instance,
+                // which is the honest reading of "the menu changed" with
+                // nothing said about which.
+                if !g.listens(&key.fragment, &c.event.name, &c.event.args, &key.key) {
                     continue;
                 }
                 matched = true;

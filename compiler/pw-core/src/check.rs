@@ -127,6 +127,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
+        // ADR-0091: a listener binds its declaration's key.
+        per_unit.extend(listener_keys(&u.hir, &u.src));
         // ADR-0090: the declaration rules. Only `pw check` ran them, beside
         // this function; `pw build` checks through here, and compiled what
         // they refuse: R-015's `retry forever` became a component.
@@ -245,6 +247,11 @@ fn unresolved_uses(
         let mut reachable = body.walk();
         for (policy, root) in decl.term_roots() {
             reachable.extend(body.walk_from(root.root));
+            // A listener's argument names a parameter or `_`, and its own
+            // rule says so (PW5104, ADR-0091).
+            if root.context == crate::hir::ExecutionContext::Listener {
+                continue;
+            }
 
             // **Every name inside a named root must come from somewhere.**
             //
@@ -600,6 +607,67 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
                     replacement: None,
                 }],
             });
+        }
+    }
+    out
+}
+
+/// **A listener binds its declaration's key** (ADR-0091).
+///
+/// `invalidates_on InventoryChanged(id, _)`: each argument is one of the
+/// declaration's parameters, which an event's value at that position must
+/// equal, or `_`, which any value does. The materializer compares them so.
+/// Until 2026-09-26 the value was text: `InventoryChanged(id, item)`, with
+/// `item` naming nothing, checked, and the materializer read an event's
+/// values as a set, so an inventory change never reached its store's menu.
+fn listener_keys(hir: &Hir, src: &str) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+            continue;
+        };
+        for p in &decl.policies {
+            if crate::policy::domain_of(&p.name) != Some(crate::policy::Domain::Listener) {
+                continue;
+            }
+            for key in &p.keys {
+                for arg in &key.args {
+                    if let Expr::Name(n) = body.expr(arg.value)
+                        && (n == "_" || decl.params.iter().any(|q| q.name == *n))
+                    {
+                        continue;
+                    }
+                    let written = src.get(body.expr_span(arg.value)).unwrap_or("?");
+                    out.push(Diagnostic {
+                        code: crate::codes::LISTENER_KEY.id,
+                        invariant: crate::codes::LISTENER_KEY.invariant,
+                        reason: "listener_key",
+                        detector: Detector::ResourceGraph,
+                        severity: Severity::Error,
+                        message: format!(
+                            "`{}` listens for `{}` with `{written}`, which is none of its parameters",
+                            decl.name, key.name
+                        ),
+                        primary_span: body.expr_span(arg.value),
+                        related: vec![Related {
+                            span: key.span.clone(),
+                            label: format!("what `{}` is listened for with", key.name),
+                        }],
+                        explanation: Some(format!(
+                            "A listener's argument says which part of `{}`'s key an event's \
+                             value must equal: one of its parameters, or `_` for any value. \
+                             The materializer invalidates the entries whose key the event's \
+                             values match, position by position, so an argument that is \
+                             neither names nothing it can compare.",
+                            decl.name
+                        )),
+                        repairs: vec![Repair {
+                            description: "name a parameter, or write `_` for any value".to_string(),
+                            replacement: None,
+                        }],
+                    });
+                }
+            }
         }
     }
     out

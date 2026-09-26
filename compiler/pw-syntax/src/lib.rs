@@ -48,7 +48,7 @@ pub use tree::{TreeBuilder, flat_tree, tree_text};
 ///
 /// ```text
 /// invalidates_on MenuChanged(id),
-///     InventoryChanged(id, item)
+///     InventoryChanged(id, _)
 /// ```
 ///
 /// declares the same two events as the one-line spelling, and every consumer

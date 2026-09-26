@@ -661,7 +661,7 @@ fn varies_by(decl: &Decl) -> Vec<Dimension> {
 
 /// `Store(id), Menu(id)` -> `[("Store", ["id"]), ("Menu", ["id"])]`.
 ///
-/// Split at top level only, so `InventoryChanged(id, _item: MenuItemId)` is one
+/// Split at top level only, so `InventoryChanged(id, _)` is one
 /// call with two arguments rather than two calls. A bare name with no argument
 /// list is a call with no arguments: `invalidates_on Rebuild` means "any".
 fn calls(value: &str) -> Vec<(String, Vec<String>)> {

@@ -78,6 +78,23 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: an inventory change never invalidated its
+store's menu**
+([ADR-0091](DECISIONS/ADR-0091-a-listener-binds-its-entrys-key.md)). The
+materializer asked whether each of an event's values was somewhere in an
+entry's key. `InventoryChanged(47, item 3)` was deferred forever, since no
+menu is keyed by an item, so the store's `MenuFragment` and A-009 stayed
+fresh when their inventory changed. A value at one position also matched a
+key at another. Nothing checked what a listener wrote either. The store,
+A-009 and two witnesses listened with `item` or `_item: MenuItemId`, which
+name nothing, and one witness gave a store's event a consumer. A
+listener's argument is a parameter the entry's key binds, or `_` (PW5104),
+related to the event's values. The materializer compares them position by
+position.
+
+Evidence: [listeners.txt](evidence/E10/listeners.txt)
+(`just e10-listeners`).
+
 **Correction, 2026-09-26: `pw build` compiled programs `pw check` refuses**
 ([ADR-0090](DECISIONS/ADR-0090-the-build-checks-what-pw-check-checks.md)).
 The declaration rules (PW0312, PW0313, PW0102, PW0325, ..) ran only in the

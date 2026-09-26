@@ -59,8 +59,8 @@ MUTANTS = [
     (
         "an `emits` clause names no kind of declaration",
         POLICY,
-        "        Domain::EventRef => Some((Namespace::Event, &[K::Event])),",
-        "        Domain::EventRef => Some((Namespace::Event, &[])),",
+        "        Domain::EventRef | Domain::Listener => Some((Namespace::Event, &[K::Event])),",
+        "        Domain::EventRef | Domain::Listener => Some((Namespace::Event, &[])),",
     ),
     (
         "an event has no signature",

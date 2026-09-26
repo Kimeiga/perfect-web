@@ -10,9 +10,9 @@
 module generality.materialize_private_cache
 
 import Events.{ CartChanged }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
-query Draft(session: SessionId) -> Int
+query Draft(session: Session<SessionId>) -> Int
     freshness     0.seconds
     consistency   read_your_writes
     cache         private
@@ -23,7 +23,7 @@ query Draft(session: SessionId) -> Int
     0
 }
 
-materialize DraftBadge(session: SessionId) {
+materialize DraftBadge(session: Session<SessionId>) {
     placement      edge
     partition      public
     depends_on     Draft(session)

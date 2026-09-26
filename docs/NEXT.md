@@ -137,10 +137,10 @@ Next, in order:
    the privacy rule and three rules bypassed by spelling, and this:
    ~~**`pw build` does not run the declaration rules**~~, done
    (ADR-0090): it compiled R-015's `retry forever` query into a component;
-2. **a listener's key.** What each argument of `invalidates_on` binds, and
-   the materializer's matching, which reads an event's arguments as a set:
-   `InventoryChanged(store 47, item 3)` is deferred forever, and store 47's
-   menu stays fresh (A-009, the store's `MenuFragment`);
+2. ~~**a listener's key**~~, done (ADR-0091): an inventory change never
+   reached its store's menu. Next, what is left of policy position:
+   `requires`, whose predicates nothing declares, and `privacy`'s label
+   constructor, then a key's labels (ADR-0088);
 3. ~~**a policy operator's arguments**~~, done with the values
    (ADR-0089).
 

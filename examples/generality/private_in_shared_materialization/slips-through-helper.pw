@@ -24,10 +24,10 @@ module generality.materialize_slips_helper
 import Resources.{ Cart }
 import Events.{ CartChanged }
 import Carts
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
 // Public by declaration. Session-derived in fact.
-public query Summary(session: SessionId) -> Int
+public query Summary(session: Session<SessionId>) -> Int
     freshness     5.seconds
     consistency   snapshot
     cache         shared
@@ -38,11 +38,11 @@ public query Summary(session: SessionId) -> Int
     line_count(session)
 }
 
-fn line_count(session: SessionId) -> Int !{ database.read<Carts> } {
+fn line_count(session: Session<SessionId>) -> Int !{ database.read<Carts> } {
     todo
 }
 
-materialize SummaryStrip(session: SessionId) {
+materialize SummaryStrip(session: Session<SessionId>) {
     placement      edge
     partition      public
     depends_on     Summary(session)

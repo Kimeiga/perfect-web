@@ -390,6 +390,11 @@ pub enum ExecutionContext {
     /// it may read invocation context, and its effects are not the
     /// declaration's work.
     Key,
+    /// **A listener's argument** (ADR-0091): `id` in `invalidates_on
+    /// MenuChanged(id)`. The declaration's parameter an event's value must
+    /// equal, or `_`. Nothing in it is evaluated; it says which part of an
+    /// entry's key a value is compared with.
+    Listener,
 }
 
 impl ExecutionContext {
@@ -444,6 +449,7 @@ impl ExecutionContext {
             ExecutionContext::Acquire => "a resource's acquire block",
             ExecutionContext::Release => "a resource's release block",
             ExecutionContext::Key => "a clause's key",
+            ExecutionContext::Listener => "a listener's argument",
         }
     }
 }

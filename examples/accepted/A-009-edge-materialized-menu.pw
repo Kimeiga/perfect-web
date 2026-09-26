@@ -10,7 +10,7 @@
 
 module store.menu_materialization
 
-import domain.{ StoreId, MenuItemId }
+import domain.{ StoreId }
 // E6: what this fragment depends on and what invalidates it are now
 // resolved against declarations. Before, both lists were names nobody
 // checked, and a graph of edges to nothing looks exactly like a graph of
@@ -22,8 +22,10 @@ materialize MenuFragment(id: StoreId) {
     placement      edge
     partition      public
     depends_on     Store(id), Menu(id)
+    // Any item of this store: `_` is any value (ADR-0091). This read
+    // `_item: MenuItemId`, which named nothing the materializer compares.
     invalidates_on MenuChanged(id),
-        InventoryChanged(id, _item: MenuItemId)
+        InventoryChanged(id, _)
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good

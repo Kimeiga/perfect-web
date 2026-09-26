@@ -73,9 +73,10 @@ pub enum Domain {
     /// the declaration runs (ADR-0088).
     EventRef,
     /// A declared event a declaration listens for, and what each of its
-    /// values must be: `invalidates_on InventoryChanged(id, _item:
-    /// MenuItemId)`. Not an `EventRef`: nothing is evaluated, and what each
-    /// argument binds is not settled (docs/NEXT.md).
+    /// values must equal: `invalidates_on InventoryChanged(id, _)`. Each
+    /// argument is one of the declaration's parameters, binding that part of
+    /// its key, or `_`, any value (ADR-0091). Not an `EventRef`: nothing in it
+    /// is evaluated.
     Listener,
     /// A predicate over the caller: `requires SignedIn, OwnsOrder(order)`.
     PredicateRef,
@@ -405,7 +406,7 @@ pub fn keyed(head: &str) -> Option<(crate::resolve::Namespace, &'static [crate::
     use crate::resolve::Namespace;
     match domain_of(head)? {
         Domain::ResourceRef => Some((Namespace::Term, &[K::Query, K::Subscription, K::Resource])),
-        Domain::EventRef => Some((Namespace::Event, &[K::Event])),
+        Domain::EventRef | Domain::Listener => Some((Namespace::Event, &[K::Event])),
         _ => None,
     }
 }

@@ -124,7 +124,7 @@ pub const RESOURCE_NOUNS: &[&str] = &[
     "resource",
     "materialize",
     // E6. A typed event is a declaration because `invalidates_on
-    // InventoryChanged(id, _item: MenuItemId)` has to be checkable against
+    // InventoryChanged(id, _)` has to be checkable against
     // something — otherwise a materialization can name an event that does not
     // exist and nothing notices until the materializer never fires.
     "event",

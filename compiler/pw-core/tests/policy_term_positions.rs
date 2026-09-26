@@ -140,24 +140,10 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         // which is the list doing its job, not a new defect. `privacy` is a
         // `LabelCtor` and `Public` is a nullary one.
         ("privacy", "Public"),
-        ("invalidates_on", "CartChanged(session)"),
-        ("invalidates_on", "MenuChanged(id)"),
-        (
-            "invalidates_on",
-            "MenuChanged(id), InventoryChanged(id, _item: MenuItemId)",
-        ),
-        (
-            "invalidates_on",
-            "MenuChanged(id), InventoryChanged(id, item), StoreChanged(id)",
-        ),
-        (
-            "invalidates_on",
-            "MenuChanged(id), InventoryChanged(id, item)",
-        ),
-        ("invalidates_on", "MenuChanged(id), PriceChanged(id)"),
-        ("invalidates_on", "MenuChanged(id), StoreChanged(id)"),
-        ("invalidates_on", "StoreChanged(consumer)"),
-        ("invalidates_on", "StoreChanged(id)"),
+        // `invalidates_on` left this list on 2026-09-26: each argument is a
+        // parameter its listener binds, or `_` (ADR-0091). Three of its
+        // values named nothing (`item`, `_item: MenuItemId`), and one gave a
+        // store's event a consumer.
         // `optimistic` left this list on 2026-08-11: its clauses are parsed
         // into two named roots with a binder and a context, so they are no
         // longer values nothing has looked at. What remains is what remains.

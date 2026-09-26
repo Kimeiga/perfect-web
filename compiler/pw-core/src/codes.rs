@@ -390,6 +390,10 @@ codes! {
     // ADR-0088: `invalidates CartChanged(..)` invalidated an event and `emits
     // Cart(..)` emitted a resource, and both checked. The graph looked a name
     // up wherever it might be, and did not ask what it found.
+    // ADR-0091: `invalidates_on InventoryChanged(id, item)`, with `item`
+    // naming nothing, checked until 2026-09-26.
+    LISTENER_KEY = "PW5104" / listener_key / 1, ResourceGraph,
+        "a listener's argument is one of its declaration's parameters, or `_`";
     CLAUSE_NAMES_ANOTHER_KIND = "PW5103" / clause_names_another_kind / 1, ResourceGraph,
         "a clause names a declaration of its kind: a resource to read or invalidate, an event to emit or listen for";
 

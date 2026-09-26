@@ -95,6 +95,42 @@ impl Graph {
         self.nodes.iter().find(|n| n.path == path)
     }
 
+    /// **Does `listener`'s entry keyed `key` listen for `event` carrying
+    /// `values`?** (ADR-0091)
+    ///
+    /// An `invalidated_by` edge's key is the listener's arguments as written.
+    /// One that names a parameter of the listener binds that part of the
+    /// entry's key: the event's value at its position must equal it. `_`
+    /// binds nothing, and neither does a position the list leaves out. An
+    /// event that carries no values says nothing about which entry, and
+    /// reaches every one.
+    ///
+    /// Until 2026-09-26 the materializer asked whether each of an event's
+    /// values was somewhere in the entry's key. `InventoryChanged(47, item 3)`
+    /// was deferred forever, since no menu is keyed by an item, and a value at
+    /// one position matched a key at another.
+    pub fn listens(&self, listener: &str, event: &str, values: &[String], key: &[String]) -> bool {
+        let params = self
+            .node(listener)
+            .map(|n| n.params.as_slice())
+            .unwrap_or_default();
+        self.edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::InvalidatedBy && e.from == listener && e.to == event)
+            .any(|e| {
+                values.iter().enumerate().all(|(i, value)| {
+                    match e
+                        .key
+                        .get(i)
+                        .and_then(|arg| params.iter().position(|p| p == arg))
+                    {
+                        Some(j) => key.get(j) == Some(value),
+                        None => true,
+                    }
+                })
+            })
+    }
+
     /// Everything that declared `invalidates_on <event>`.
     ///
     /// The edge is written on the listener and points at the event, so this

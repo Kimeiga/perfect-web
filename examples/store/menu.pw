@@ -19,7 +19,7 @@
 
 module store.menu_fragment
 
-import domain.{ StoreId, MenuItemId }
+import domain.{ StoreId }
 import Events.{ MenuChanged, InventoryChanged, StoreChanged }
 // The queries this fragment materializes. An explicit import, because
 // `depends_on` names a declaration and a name that resolves to nothing is an
@@ -31,7 +31,9 @@ materialize MenuFragment(id: StoreId) {
     placement      edge
     partition      public
     depends_on     Store(id), Menu(id)
-    invalidates_on MenuChanged(id), InventoryChanged(id, item), StoreChanged(id)
+    // `_`: any item of this store (ADR-0091). `item` named nothing, and the
+    // materializer never reached this menu when an item's inventory changed.
+    invalidates_on MenuChanged(id), InventoryChanged(id, _), StoreChanged(id)
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good

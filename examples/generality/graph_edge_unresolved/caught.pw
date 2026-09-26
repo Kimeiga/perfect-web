@@ -17,7 +17,7 @@ materialize AlmostRight(id: StoreId) {
     // imports two of its neighbours. It is still not visible here, and an
     // invalidation that never arrives is the same silence whether the name is
     // a typo or a missing import.
-    invalidates_on MenuChanged(id), InventoryChanged(id, item)
+    invalidates_on MenuChanged(id), InventoryChanged(id, _)
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good

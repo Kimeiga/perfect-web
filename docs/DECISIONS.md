@@ -628,3 +628,12 @@ the declaration rules ran only in the `pw check` command, so `pw build`
 compiled R-015's `retry forever` query into a component and built R-014.
 One checker runs them now, and their diagnostics meet the checker's
 standard: the registry's invariant, a boundary span, an explanation.
+
+## 2026-09-26: a listener binds its entry's key (E10)
+
+[ADR-0091](DECISIONS/ADR-0091-a-listener-binds-its-entrys-key.md): the
+materializer read an event's values as a set, so `InventoryChanged(47, item
+3)` never reached store 47's menu, and nothing checked what a listener
+wrote. Each argument of `invalidates_on` is a parameter the entry's key
+binds, or `_` (PW5104), related to the event's values, and the materializer
+compares them position by position.

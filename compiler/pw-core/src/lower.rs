@@ -770,11 +770,16 @@ impl Lowerer<'_> {
         b.pats.shift_spans_from(before.1, offset);
         b.types.shift_spans_from(before.2, offset);
         b.nodes.shift_spans_from(before.3, offset);
+        // A listener's arguments bind; a key's are evaluated (ADR-0091).
+        let context = match crate::policy::domain_of(&p.name) {
+            Some(crate::policy::Domain::Listener) => crate::hir::ExecutionContext::Listener,
+            _ => crate::hir::ExecutionContext::Key,
+        };
         p.roots = keys
             .iter()
             .flat_map(|k| &k.args)
             .map(|a| crate::hir::TermRoot {
-                context: crate::hir::ExecutionContext::Key,
+                context,
                 binders: Vec::new(),
                 root: a.value,
             })

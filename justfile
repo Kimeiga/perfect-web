@@ -1129,6 +1129,22 @@ e10-one-checker:
      } > docs/evidence/E10/one-checker.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/one-checker.txt
 
+# ADR-0091: a listener binds its entry's key. The checker's tests, the
+# materializer's, and the mutation controls.
+e10-listeners:
+    @{ echo "ADR-0091 - a listener binds its entry's key"; echo; \
+       echo "produced by: just e10-listeners"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== listener keys (compiler/pw-core/tests/listener_keys.rs)"; echo; \
+       cargo test --locked -p pw-core --test listener_keys 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the materializer (runtime/pw-materialize/tests/listeners.rs)"; echo; \
+       cargo test --locked -p pw-materialize --test listeners 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/listener_mutations.py)"; echo; \
+       python3 scripts/listener_mutations.py; \
+     } > docs/evidence/E10/listeners.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/listeners.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

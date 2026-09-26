@@ -5,7 +5,11 @@
 module generality.materialize_user_scoped
 
 import domain.{ ConsumerId, OrderId, OrderProgress, OrderFailure }
-import Events.{ StoreChanged }
+
+// What changes a consumer's orders. `StoreChanged(consumer)` gave a store's
+// event a consumer until 2026-09-26, when a listener was first related to the
+// event it names (ADR-0091).
+event OrdersChanged(consumer: ConsumerId)
 
 private query Orders(consumer: ConsumerId) -> Result<OrderProgress, OrderFailure>
     freshness     0.seconds
@@ -22,7 +26,7 @@ materialize OrderStrip(consumer: ConsumerId) {
     placement      edge
     partition      public
     depends_on     Orders(consumer)
-    invalidates_on StoreChanged(consumer)
+    invalidates_on OrdersChanged(consumer)
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good

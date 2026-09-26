@@ -11,7 +11,7 @@ materialize AllRight(id: StoreId) {
     placement      edge
     partition      public
     depends_on     Menu(id)
-    invalidates_on MenuChanged(id), InventoryChanged(id, item)
+    invalidates_on MenuChanged(id), InventoryChanged(id, _)
     regenerate     on_invalidation
     stampede       single_flight
     fallback       last_known_good

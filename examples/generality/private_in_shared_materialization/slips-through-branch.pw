@@ -19,9 +19,9 @@ module generality.materialize_slips_branch
 import Resources.{ Cart }
 import Events.{ CartChanged }
 import Carts
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 
-public query Personalised(session: SessionId) -> Int
+public query Personalised(session: Session<SessionId>) -> Int
     freshness     5.seconds
     consistency   snapshot
     cache         shared
@@ -36,11 +36,11 @@ public query Personalised(session: SessionId) -> Int
     }
 }
 
-fn signed_in(session: SessionId) -> Bool !{} { todo }
+fn signed_in(session: Session<SessionId>) -> Bool !{} { todo }
 
-fn private_total(session: SessionId) -> Int !{ database.read<Carts> } { todo }
+fn private_total(session: Session<SessionId>) -> Int !{ database.read<Carts> } { todo }
 
-materialize PersonalStrip(session: SessionId) {
+materialize PersonalStrip(session: Session<SessionId>) {
     placement      edge
     partition      public
     depends_on     Personalised(session)
