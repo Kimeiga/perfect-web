@@ -1,0 +1,18 @@
+ADR-0109 - a timeout is a budget above zero
+
+produced by: just e10-timeouts
+commit: efaa3135c93a6362eafb80183dc32597d736654b
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== timeouts (compiler/pw-core/tests/timeouts.rs)
+
+test a_timeout_is_a_budget_above_zero ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+== mutation controls (scripts/timeout_mutations.py)
+
+baseline: 1 passed, 0 failed
+a timeout is any duration: KILLED (1 of 1 tests fail)
+a budget of zero is a budget: KILLED (1 of 1 tests fail)
+a freshness is a budget: KILLED (1 of 1 tests fail)
+3 of 3 mutants killed
