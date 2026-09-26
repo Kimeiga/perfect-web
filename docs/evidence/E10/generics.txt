@@ -1,0 +1,47 @@
+ADR-0062 - generic types in the backend
+
+produced by: just e10-generics
+commit: 6c07ec0fb7035d9e086bfb48c8d9fac3e9fd0c74
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== through the E8 host (compiler/pw-conformance/tests/generics.rs)
+
+test a_type_parameter_nothing_fixes_is_refused_by_name ... ok
+test a_generic_opaque_type_is_built_and_read ... ok
+test two_instances_of_one_record_are_two_layouts ... ok
+test a_generic_record_is_built_and_read ... ok
+test a_generic_sum_type_is_built_and_matched ... ok
+test an_instance_inside_an_instance ... ok
+test a_generic_case_as_a_function_and_a_record_in_a_lambda ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+== a type and a query of one name (compiler/pw-conformance/tests/wit_names.rs)
+
+test a_type_and_a_query_of_one_name_are_two_things ... ok
+test a_query_named_by_a_keyword_is_exported_under_its_name ... ok
+test a_field_named_by_a_keyword_is_named_unescaped ... ok
+test a_case_named_by_a_keyword_is_built_and_named_unescaped ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+== the component and the JavaScript module
+
+javascript: 86 queries, 17200 calls, component and module agree (943 trapped in both)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.21s
+
+== mutation controls (scripts/generic_mutations.py)
+
+baseline: 15 passed, 0 failed
+an instance's arguments are dropped: KILLED (5 of 15 tests fail)
+a field is read without its instance's arguments: KILLED (5 of 15 tests fail)
+a field's type does not fix the instance: KILLED (6 of 15 tests fail)
+the instance the context names is not read: KILLED (1 of 15 tests fail)
+a declaration is defined once, whatever its instance: KILLED (4 of 15 tests fail)
+a case's elements do not fix its instance: KILLED (1 of 15 tests fail)
+an instance is laid out as another of its declaration: KILLED (5 of 15 tests fail)
+an instance inside another is taken for recursion: KILLED (1 of 15 tests fail)
+a type takes a query's place in the world: KILLED (3 of 15 tests fail)
+9 of 9 mutants killed
+
+NOT CLAIMED: a generic type at the component boundary, which has no WIT
+form. NOT CLAIMED: an instance only a lambda's branches name.
