@@ -176,8 +176,6 @@ refused by name:
   `on_first_interaction`, is a word of its clause and not a name. A word
   outside its clause's closed set is left to the analysis that reads the
   clause, and most clauses written inside a block have none.
-- **`derived e` is parsed, not checked** (ADR-0047). It is one expression,
-  and the charter calls it pure; no rule refuses an effect inside it.
 - **The standard library is small** (ADR-0040, ADR-0055).
   - `List` has `length`, `get`, `take`, `drop`, `slice`, `reverse`,
     `concat`, `map`, `filter`, `fold`, `any`, `all`, `find`, `sort_by`,
@@ -276,9 +274,9 @@ awaited in order. What remains:
   call through an annotated value or a parameter is checked.
 - **The name check keeps its own scope walk** (ADR-0066). `names.rs`
   resolves scopes for PW0021 itself, where every other analysis reads
-  `crate::lexical`. They differ in one rule: the name check binds any keyword
-  statement's first word (`query Store(..)`'s `Store` too), to keep a
-  modifier quiet.
+  `crate::lexical`. They differ in one rule: the name check binds a keyword
+  statement's first word, to keep a modifier quiet, except the resource a
+  `query` or `subscription` names, which it resolves (ADR-0108).
 - **A clause's key is checked for names, count and types, not labels**
   (ADR-0088). A secret passed in `emits` or `invalidates` reaches the graph
   unlabelled, and what a key performs (`current_session()`'s

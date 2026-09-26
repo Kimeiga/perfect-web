@@ -161,7 +161,8 @@ stale; ~~an event that stops at its listeners~~ (ADR-0102); ~~a fragment
 no write reaches~~ (ADR-0103); ~~an event no command declared~~ (ADR-0104);
 ~~a speculation nothing reconciles~~ (ADR-0105); ~~a file whose name
 another has~~ (ADR-0106), which `pw check` passed with an error; ~~a key
-that omits a parameter~~ (ADR-0107). Next, in order:
+that omits a parameter~~ (ADR-0107); ~~a query naming nothing~~ (ADR-0108).
+Next, in order:
 1. ~~**a materialization is not reached through what it reads**~~, done
    (ADR-0102): A-009's fragment kept a changed store's old name. Then
    ~~**a command's write held to the fragments built on it**~~, done
@@ -178,7 +179,12 @@ that omits a parameter~~ (ADR-0107). Next, in order:
    checker and the dev server accept an event, and a command anywhere
    (KNOWN_LIMITATIONS).
 5. ~~**a key that omits what its entry depends on**~~, done (ADR-0107):
-   two calls differing in an unkeyed parameter shared one entry.
+   two calls differing in an unkeyed parameter shared one entry;
+6. **a timeout of zero**: `timeout 0.seconds` checks, and the resource
+   runtime ends every request before it starts;
+7. **a resumable handler reading what it does not capture**:
+   `resumable() => add_to_cart(item.id, ..)` inside `{#each menu as item}`
+   checks, and `pw emit-handlers` refuses it ("`item` is not bound here").
 
 Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates

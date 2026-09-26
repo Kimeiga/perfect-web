@@ -1374,6 +1374,20 @@ e10-keys-cover-reads:
      } > docs/evidence/E10/keys-cover-reads.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/keys-cover-reads.txt
 
+# ADR-0108: a query names a resource that exists. Its tests, and the
+# mutation controls.
+e10-queries-name-resources:
+    @{ echo "ADR-0108 - a query names a resource that exists"; echo; \
+       echo "produced by: just e10-queries-name-resources"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== queries name resources (compiler/pw-core/tests/queries_name_resources.rs)"; echo; \
+       cargo test --locked -p pw-core --test queries_name_resources 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/query_name_mutations.py)"; echo; \
+       python3 scripts/query_name_mutations.py; \
+     } > docs/evidence/E10/queries-name-resources.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/queries-name-resources.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

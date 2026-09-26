@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a query names a resource that exists**
+([ADR-0108](DECISIONS/ADR-0108-a-query-names-a-resource-that-exists.md)).
+`let menu = query Nonexistent(id)` in a page checked. The name check bound a
+keyword statement's first word as if the statement declared it, and PW5100
+reports a dangling edge only for a graph clause, which a page has none of.
+The resource a `query` or `subscription` names is resolved now (PW0021).
+
+Evidence: [queries-name-resources.txt](evidence/E10/queries-name-resources.txt)
+(`just e10-queries-name-resources`).
+
 **2026-09-26: a cache key names each parameter its entry depends on**
 ([ADR-0107](DECISIONS/ADR-0107-a-cache-key-names-what-its-entry-depends-on.md)).
 `query Other(id, other)` with `key id` and a body reading `other` checked, so

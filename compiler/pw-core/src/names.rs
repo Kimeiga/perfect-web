@@ -373,6 +373,24 @@ impl Walk<'_> {
                     }
                 }
             }
+            // `query Menu(id)` and `subscription Follow(order)` name a
+            // resource: the first word is a use, resolved as any other
+            // (ADR-0108). It was bound as if the statement declared it, so a
+            // page querying a resource nothing declares checked.
+            Expr::Keyword {
+                keyword,
+                modifiers,
+                args,
+                ..
+            } if matches!(keyword.as_str(), "query" | "subscription") => {
+                let (resource, args) = (modifiers.first().cloned(), args.clone());
+                if let Some(r) = resource {
+                    self.name(&r, self.body.expr_span(id));
+                }
+                for a in args {
+                    self.expr(a);
+                }
+            }
             // `use key: T = acquire()` binds `key` for the statements after it,
             // and for its own block. `observe resize` binds nothing, and a
             // modifier bound needlessly can only make this walk quieter.

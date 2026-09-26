@@ -768,3 +768,11 @@ and a file whose name is shared is named by its path.
 `query Other(id, other)` with `key id` and a body reading `other` checked, and
 two calls differing in `other` shared one cache entry. A `key` or `dedupe_by`
 names each parameter the body reads now (PW0336).
+
+## 2026-09-26: a query names a resource that exists (E10)
+
+[ADR-0108](DECISIONS/ADR-0108-a-query-names-a-resource-that-exists.md): the
+name check bound a keyword statement's first word, so `let menu = query
+Nonexistent(id)` in a page checked, and the graph kept the read as a dangling
+edge no rule reports for a page. The resource a `query` or `subscription`
+statement names is resolved now (PW0021).
