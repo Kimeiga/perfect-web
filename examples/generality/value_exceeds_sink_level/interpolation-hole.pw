@@ -5,6 +5,10 @@
 // containing an EXPRESSION, not a bare name. The rule used to read `{name}`
 // out of the literal's characters, so `{token.value}` was a hole it could not
 // see into — a value could leave through it unobserved.
+//
+// The hole was `{token.value}` until 2026-09-25. A `Secret`'s `.value` is read
+// only in `capability`, which declares the type (ADR-0048), so the expression
+// is now the call that produces the secret.
 
 module generality.sink_nested_hole
 
@@ -14,6 +18,5 @@ import capability.{ Payments, Public }
 import domain.{ OrderId }
 
 fn audit(order: OrderId) -> () !{ log<Public>, secret<Payments> } {
-    let token = secrets.payments()
-    log.public("charging with {token.value} now")
+    log.public("charging with {secrets.payments()} now")
 }

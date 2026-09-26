@@ -225,10 +225,15 @@ const CLAIMS: &[(&str, Observer, Reach, &str)] = &[
         Reach::Witnessed,
         "a resumable handler's identity is the hash of its code and captures",
     ),
+    // Missing until 2026-09-25: its measure block called `anchor.bounds()`
+    // and its mutate block assigned `self.style.transform`, members nothing
+    // declares, so neither phase performed an effect an observer could see.
+    // With the platform's `getBoundingClientRect` and `set_transform`, both
+    // phases carry their rows (ADR-0048).
     (
         "A-015",
         Observer::Effect,
-        Reach::Missing,
+        Reach::Witnessed,
         "a measure is scheduled before a mutate",
     ),
     (

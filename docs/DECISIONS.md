@@ -288,3 +288,9 @@ for its own body, and a template's blocks for their children. Clauses
 written as statements are read by position from the policy table. The walk
 found `derived` parsed as a bare name, so A-016 and A-018 computed nothing,
 and a statement's named argument read as an assignment.
+
+[ADR-0048](DECISIONS/ADR-0048-members-exist.md): a read or a call through a
+value names a member its type has (PW0610): a field, or a declaration whose
+first parameter takes the type. An opaque type's `.value` is its
+representation in its own module only. It found eight reads of members no
+type has, among them the store page's `{cart.line_count}`.

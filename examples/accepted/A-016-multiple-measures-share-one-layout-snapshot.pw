@@ -20,7 +20,9 @@ component MenuAligner(items: List<ElementRef>) {
         // All three reads are satisfied from a single flush. The compiler
         // deduplicates by (element, property) within the frame.
         let widths: List<LayoutSnapshot<Float>> = measure {
-            items |> List.map(fn(it) it.width())
+            // `offsetWidth`, which the platform declares; `width()` was a
+            // member no declaration has (ADR-0048).
+            items |> List.map(fn(it) it.offsetWidth())
         }
         let total = derived widths |> List.map(fn(w) w.value) |> List.sum()
         let max = derived widths |> List.map(fn(w) w.value) |> List.maximum()

@@ -18,10 +18,17 @@ import browser.{ ElementRef, LayoutSnapshot, Rect }
 component Tooltip(anchor: ElementRef, content: String) {
     placement browser
 
+    // Until 2026-09-25 this read `anchor.bounds()`, `box.x` and `box.bottom`,
+    // and assigned `self.style.transform`: no declaration has any of them, and
+    // nothing checked a member (ADR-0048). The geometry is the platform's
+    // `getBoundingClientRect`, read through the snapshot's `value`, and the
+    // write is the declared `set_transform`.
     frame {
-        let box: LayoutSnapshot<Rect> = measure { anchor.bounds() }
+        let box: LayoutSnapshot<Rect> = measure { anchor.getBoundingClientRect() }
         mutate {
-            self.style.transform = translate(box.x, box.bottom + 8.px)
+            self.style.set_transform(
+                translate(box.value.left, box.value.top + box.value.height + 8.px),
+            )
         }
     }
 

@@ -15,14 +15,18 @@ module cart.summary_view
 
 import domain.{ Cart }
 import cart.queries
-// See R-011: `checkout` was called and declared nowhere.
-import Carts.{ checkout }
+
+// 2026-09-25: the handler called `checkout(cart.id)`, and `Cart` has no `id`
+// (ADR-0048). The callee takes the captured cart, and is declared here so the
+// witness depends on no library signature; its subject, the capture, is
+// unchanged.
+fn checkout_cart(cart: Cart) -> () !{} { todo }
 
 view CartSummary(cart: Cart) !{} {
     <section aria-label="Cart">
         <button
             // ERROR: capturing session-labeled data into the resume manifest.
-            on:press={resumable(captures = { cart }) => checkout(cart.id)}
+            on:press={resumable(captures = { cart }) => checkout_cart(cart)}
         >
             Checkout ({cart.line_count})
         </button>

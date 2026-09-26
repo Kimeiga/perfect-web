@@ -26,7 +26,9 @@ type Cart = Cart {
 
 // !{} — no effects. Enforced, not merely intended.
 fn line_total(line: CartLine) -> Money<USD> !{} {
-    Money(line.unit_price.minor_units * line.quantity.value)
+    // `PositiveInt` is opaque here: `.value` is `domain`'s alone, and
+    // `count` is what `domain` gives other modules (ADR-0048).
+    Money(line.unit_price.minor_units * line.quantity.count)
 }
 
 fn subtotal(cart: Cart) -> Money<USD> !{} {

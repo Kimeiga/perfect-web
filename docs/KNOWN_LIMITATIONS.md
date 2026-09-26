@@ -15,10 +15,9 @@ Those historical statements must not override current source or test results.
 decide is Undecided, counted by `pw audit-values`, and never reported as
 agreement:
 
-- **Member existence.** `box.x` on a `Rect` with no `x`, or `{row.status}` on
-  a type without it, is unknown rather than refused. A-015 reads `box.x` and
-  `box.bottom` from a `Rect` that declares neither; the corpus was written
-  without this relation, and it is the next one to add.
+- **A member of a value of unknown type is not judged** (ADR-0048). Member
+  existence is a relation now (PW0610), and a read whose value's type nothing
+  states is undecided, as every relation's is.
 - **Sum-type variant constructors** (`Circle(3)`) have no type, because the
   workspace does not resolve variant names as terms. Record and opaque
   constructions are checked.
@@ -60,6 +59,9 @@ rather than approximated:
   Search reaches 3.2 MB for the one-letter query `T`.
 - **Each call instantiates afresh** (ADR-0032). At 7–14 µs it costs more than
   most kiokun calls themselves (ADR-0046).
+- **An opaque value is not built or read inside a component** (ADR-0048).
+  `PositiveInt(1)` and an opaque type's `.value` are refused by the Wasm
+  encoder; opaque values cross the boundary as their representations.
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
 

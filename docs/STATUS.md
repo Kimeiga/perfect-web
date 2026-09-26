@@ -78,6 +78,23 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-25: a member no type has was never refused**
+([ADR-0048](DECISIONS/ADR-0048-members-exist.md)). A read or call through a
+value is related to its type's members now (PW0610). Eight reads in code that
+checked clean named members nothing declares:
+- the store's page rendered `{cart.line_count}`, and `Cart` has only `lines`;
+  the dev server filled the path from its own state. `domain` now declares
+  `line_count`, the count it was computing.
+- A-015 read `box.x` and `box.bottom`, called `anchor.bounds()`, and assigned
+  `self.style.transform`. It now uses the platform's declared geometry and
+  setter, and its claim is witnessed by the effect analysis for the first
+  time.
+- A-001 read an opaque `PositiveInt`'s `.value` from another module, and
+  A-016 and A-018 read members their types lack.
+
+An opaque type's `.value` is its representation in its own module, and
+refused elsewhere.
+
 **Correction, 2026-09-25: a name used as a value was never resolved**
 ([ADR-0047](DECISIONS/ADR-0047-every-name-resolves.md)). `PW0021` examined
 calls and qualified paths only, so `let x = nothing` and `{nothing.here}` in a
@@ -136,6 +153,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0048: an opaque type's representation is read as `.value`, only in the
+  module that declares it, rather than by a constructor pattern.
 - ADR-0047: clauses written as statements (`scope component`,
   `release(h) { .. }`, `view { .. }`) are recognised by position, from the
   policy table, rather than re-parsed as policies; `derived` is reserved and

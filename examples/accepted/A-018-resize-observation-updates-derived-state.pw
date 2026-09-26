@@ -10,9 +10,11 @@
 
 module store.responsive_menu
 
-import domain.{ MenuItemId }
+import domain.{ MenuItem }
 
-component ResponsiveMenu(items: List<MenuItemId>) {
+// The items, not their ids: until 2026-09-25 this took `List<MenuItemId>` and
+// rendered `{item.name}`, a member an id does not have (ADR-0048).
+component ResponsiveMenu(items: List<MenuItem>) {
     placement browser
 
     // `observe.resize` delivers into a later transaction (charter §7.5A step 7).
@@ -21,7 +23,7 @@ component ResponsiveMenu(items: List<MenuItemId>) {
 
     view {
         <ul aria-label="Menu" style:grid-template-columns={repeat(columns)}>
-            {#each items as item (item)}
+            {#each items as item (item.id)}
                 <li>{item.name}</li>
             {/each}
         </ul>

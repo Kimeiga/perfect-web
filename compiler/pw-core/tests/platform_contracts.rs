@@ -390,7 +390,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-09-25: `float.pw` declares the `Float` module and `from_int`
     // (ADR-0043). Arithmetic takes two values of one type, which the checker
     // now enforces, so a count used in a `Float` computation is converted.
-    const EXPECTED: u64 = 0x488035e419364f6b;
+    // 2026-09-25: `examples/domain.pw` declares `count` for `PositiveInt` and
+    // `line_count` for `Cart`, and imports `List` for the second (ADR-0048).
+    // A member no type has is refused now: A-001 read `.value` from an opaque
+    // `PositiveInt` outside its module, and the store's page rendered a
+    // `cart.line_count` that `Cart` did not have.
+    const EXPECTED: u64 = 0x9c7ffd50875f9fbd;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

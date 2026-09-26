@@ -1090,6 +1090,12 @@ fn check_unit_with(
         }
         scopes(decl, body, &mut out);
     }
+    // **One finding, one diagnostic.** Two rules can reach one defect: a field
+    // read through an `Option` bound by `let` is PW0600 to `annotations` and to
+    // the member relation (ADR-0048). The first reported is kept; the order
+    // above puts the more specific rule first.
+    let mut seen = BTreeSet::new();
+    out.retain(|d| seen.insert((d.code, d.primary_span.start, d.primary_span.end)));
     out.sort_by_key(|d| d.primary_span.start);
     out
 }

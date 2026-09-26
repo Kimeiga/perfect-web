@@ -19,7 +19,7 @@ view CartLines(lines: List<CartLine>) !{} {
     <ul aria-label="Cart">
         // ERROR: no key for a mutable list.
         {#each lines as line}
-            <li>{line.item_name} x{line.quantity}</li>
+            <li>{line.item_id} x{line.quantity}</li>
         {/each}
     </ul>
 }

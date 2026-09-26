@@ -30,6 +30,11 @@ fn disconnect(c: DatabaseConnection) -> ()
     todo
 }
 
+// Sends what the connection holds buffered. R-010 and its witnesses call it
+// from a handler that captures the connection; until 2026-09-25 they called a
+// `flush` that nothing declared, and nothing checked a member (ADR-0048).
+fn flush(c: DatabaseConnection) -> () !{ database.connect } { todo }
+
 // `resource.acquire<T>` in the row is what makes the returned value affine.
 // The checker reads the row; it holds no list of functions that open things,
 // so a new resource is declared here rather than in the compiler.

@@ -20,5 +20,13 @@ import domain.{ StoreId }
 view StorePage(store_id: StoreId) !{} {
     // ERROR: network effect inside a pure view.
     let store = fetch_store(store_id)
-    <main><h1>{store.name}</h1></main>
+    // Taken apart: a `Result` has no `name` (ADR-0048).
+    <main>
+        {#match store}
+            {:Ok(found)}
+                <h1>{found.name}</h1>
+            {:Err(_error)}
+                <p>Unavailable</p>
+        {/match}
+    </main>
 }

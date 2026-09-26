@@ -333,7 +333,18 @@ pub enum RelationKind {
     /// An operator's operand, or an `if`'s condition, against the type it
     /// takes (PW0609).
     Operand,
+    /// `value.name`: the member a read or a call names, against the members
+    /// the value's type has (PW0610, ADR-0048).
+    Member,
 }
+
+/// A member relation's expectation when the member is an opaque type's
+/// representation, read outside the module that declares the type.
+const PRIVATE_REPRESENTATION: &str = "its representation, which only its own module reads";
+
+/// A member relation's expectation when the member is the contents' of an
+/// `Option` or a `Result`, read from the container (PW0600).
+const OPTIONAL_CONTENTS: &str = "its contents, taken apart first";
 
 /// Why a relation was not decided.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -910,7 +921,11 @@ impl<'a> Typer<'a> {
             .receiver()
             .and_then(|r| self.sigs.member_by(r, name))
         else {
-            return Ty::Unknown;
+            // An opaque type's `.value`, read in its own module (ADR-0048).
+            return match self.representation(&receiver, name) {
+                Some((def, rep)) if def.unit == self.at => rep,
+                _ => Ty::Unknown,
+            };
         };
         // A callable member whose only parameter is the receiver is read as a
         // property — `self.style`, `snapshot.value` — exactly as `infer.rs`
@@ -1405,6 +1420,7 @@ impl<'a> Typer<'a> {
                     out.extend(self.call(id).relations)
                 }
                 Expr::Record { name: Some(_), .. } => out.extend(self.construct(id).relations),
+                Expr::Field { base, name } => out.extend(self.member(id, *base, name)),
                 // An operator's operands, and a condition. Until 2026-09-25 a
                 // comparison was typed `Bool` whatever it compared, so
                 // `1 == "a"` checked, and the backend was the first to refuse.
@@ -1457,6 +1473,92 @@ impl<'a> Typer<'a> {
                 _ => {}
             }
         }
+    }
+
+    /// **`value.name` names a member the value's type has** (PW0610,
+    /// ADR-0048): a record's field, or a declaration whose first parameter
+    /// takes the type, read as a property or called as a method. Until
+    /// 2026-09-25 a member no type had was unknown, so A-015 read `box.x`
+    /// from a snapshot of a `Rect`, which has no `x`, and every analysis
+    /// after it read nothing.
+    ///
+    /// Not a member: a path through a module (`List.map`, a name, ADR-0047's),
+    /// and a unit on a numeric literal (`900.px`, `30.seconds`), which is a
+    /// dimensioned literal. A value whose type is not known is undecided.
+    fn member(&self, id: ExprId, base: ExprId, name: &str) -> Option<ValueRelation> {
+        if self.resolves_as_path(id)
+            || matches!(
+                self.body.expr(base),
+                Expr::Literal(Literal::Int(_) | Literal::Float(_))
+            )
+        {
+            return None;
+        }
+        let receiver = self.of(base);
+        let outcome = match receiver.receiver() {
+            None => Outcome::Undecided(Undecided::Unknown),
+            Some(r) if self.sigs.member_by(r, name).is_some() => Outcome::Agree,
+            Some(_) => match self.representation(&receiver, name) {
+                Some((def, _)) if def.unit == self.at => Outcome::Agree,
+                Some(_) => Outcome::Disagree {
+                    expected: PRIVATE_REPRESENTATION.to_string(),
+                    actual: self.display(&receiver),
+                },
+                // `store.name` on an `Option<Store>`: the contents have the
+                // member and the container does not. PW0600's invariant, an
+                // optional value used as its contents.
+                None if self.contents_have(&receiver, name) => Outcome::Disagree {
+                    expected: OPTIONAL_CONTENTS.to_string(),
+                    actual: self.display(&receiver),
+                },
+                None => Outcome::Disagree {
+                    expected: format!("a member `{name}`"),
+                    actual: self.display(&receiver),
+                },
+            },
+        };
+        Some(ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Member,
+            span: self.body.expr_span(id),
+            target: name.to_string(),
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary: (self.body.expr_span(base), "the value read".to_string()),
+        })
+    }
+
+    /// Does the `Some` or `Ok` side of an `Option` or a `Result` have the
+    /// member `name`?
+    fn contents_have(&self, receiver: &Ty, name: &str) -> bool {
+        let Ty::Builtin(Builtin::Option | Builtin::Result, args) = receiver else {
+            return false;
+        };
+        args.first()
+            .and_then(Ty::receiver)
+            .is_some_and(|r| self.sigs.member_by(r, name).is_some())
+    }
+
+    /// **An opaque type's representation, as `.value`** (ADR-0048): the
+    /// declaring type and the representation under the receiver's
+    /// arguments, when `receiver` is an opaque type that declares no member
+    /// of that name. Who may read it is the caller's question: only the
+    /// module that declares the type, for which it is not opaque.
+    fn representation(&self, receiver: &Ty, name: &str) -> Option<(DefId, Ty)> {
+        let Ty::Nominal(def, _) = receiver else {
+            return None;
+        };
+        if name != "value" {
+            return None;
+        }
+        let TypeResolution::Resolved(rep) = self.sigs.type_decl(*def)?.representation.as_ref()?
+        else {
+            return None;
+        };
+        let mut s = Subst::default();
+        unify(&mut s, &self.applied(*def).instantiate(*def), receiver);
+        Some((*def, s.close(&Ty::of(rep).instantiate(*def))))
     }
 
     /// **An operator's operands** (PW0609). A logical operator takes `Bool`s;
@@ -2038,6 +2140,58 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  representation are still two types",
             )
             .repair(format!("make it a `{expected}`")),
+            RelationKind::Member if expected == OPTIONAL_CONTENTS => Diagnostic::error(
+                crate::codes::OPTION_USED_AS_VALUE.id,
+                crate::codes::OPTION_USED_AS_VALUE.invariant,
+                Detector::Signature,
+                format!(
+                    "`{actual}` has no member `{}`: what it may hold does, and must be taken \
+                     out first",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("member_of_optional_contents")
+            .explain(
+                "an `Option` or a `Result` is a value that may be absent or failed; its \
+                 contents' members are reached by taking it apart, which says what happens \
+                 when there are none",
+            )
+            .repair("`match` it, and read the member in the `Some` or `Ok` arm"),
+            RelationKind::Member if expected == PRIVATE_REPRESENTATION => Diagnostic::error(
+                crate::codes::UNKNOWN_MEMBER.id,
+                crate::codes::UNKNOWN_MEMBER.invariant,
+                Detector::Signature,
+                format!(
+                    "`{actual}` is opaque here: its `.value` is read only in the module that \
+                     declares it"
+                ),
+                r.span.clone(),
+            )
+            .reason("opaque_representation_outside_its_module")
+            .explain(
+                "an opaque type's representation is its own module's; everywhere else the \
+                 type has only the members that module declares for it",
+            )
+            .repair(format!(
+                "declare an accessor for `{actual}` in its module, and read that"
+            )),
+            RelationKind::Member => Diagnostic::error(
+                crate::codes::UNKNOWN_MEMBER.id,
+                crate::codes::UNKNOWN_MEMBER.invariant,
+                Detector::Signature,
+                format!("`{actual}` has no member `{}`", r.target),
+                r.span.clone(),
+            )
+            .reason("member_not_declared_by_type")
+            .explain(
+                "a value's members are its type's fields and the declarations whose first \
+                 parameter takes that type; a name the type does not have reads nothing",
+            )
+            .repair(format!(
+                "read a member `{actual}` declares, or declare `{}` for it",
+                r.target
+            )),
             RelationKind::Annotation => Diagnostic::error(
                 crate::codes::UNRESOLVED_TYPE.id,
                 crate::codes::UNRESOLVED_TYPE.invariant,

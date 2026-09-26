@@ -24,7 +24,7 @@ component MenuAligner(items: List<ElementRef>) {
             items |> List.map(fn(it) {
                 // ERROR: mutating inside the measure phase.
                 it.style.set_padding(4.px)
-                it.width()
+                it.offsetWidth()
             })
         }
         mutate { self.style.set_width(widths |> List.maximum()) }

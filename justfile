@@ -606,6 +606,30 @@ e10-affine:
      } > docs/evidence/E10/affine.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
 
+# ADR-0048: a read names a member its value's type has (PW0610). The member
+# tests, the corpus that must stay clean, and the mutation controls.
+e10-members:
+    @cargo build --quiet --locked -p pw-cli
+    @{ echo "ADR-0048 - a read names a member its value's type has"; echo; \
+       echo "produced by: just e10-members"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the member tests (compiler/pw-core/tests/members.rs)"; echo; \
+       cargo test --locked -p pw-core --test members 2>&1 | grep -E '^test result'; \
+       echo; echo "== what must stay clean: errors reported"; echo; \
+       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       echo; echo "== what the audit decided (member relations, the accepted corpus)"; echo; \
+       ./target/debug/pw audit-values packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | grep -E '^  Member' || true; \
+       echo; echo "== mutation controls (scripts/member_mutations.py)"; echo; \
+       python3 scripts/member_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: an opaque value built or read inside a component, which the"; \
+       echo "Wasm encoder refuses."; \
+     } > docs/evidence/E10/members.txt
+    @grep -E "^(accepted corpus|store|kiokun):|mutants killed" docs/evidence/E10/members.txt
+
 # ADR-0047: every name resolves, in lexical scope (PW0021). The name tests, the
 # corpus that must stay clean, and the mutation controls.
 e10-names:

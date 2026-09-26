@@ -20,6 +20,9 @@
 
 module domain
 
+// `line_count` sums a cart's quantities (ADR-0048).
+import List
+
 // --- identities -----------------------------------------------------------
 //
 // Opaque, so a raw String cannot be passed where an id is expected. E0 finding
@@ -47,6 +50,10 @@ type MenuItem = MenuItem {
 // --- quantities -----------------------------------------------------------
 
 opaque type PositiveInt = Int
+
+// The count a `PositiveInt` holds, for other modules. The type is opaque
+// outside this one, where `.value` reads its representation (ADR-0048).
+fn count(n: PositiveInt) -> Int !{} { n.value }
 
 type USD = USD { code: String }
 
@@ -93,6 +100,15 @@ type CartLine = CartLine {
 
 type Cart = Cart {
     lines: List<CartLine>,
+}
+
+// **What a cart count shows**: the quantity across its lines. The store's page
+// rendered `{cart.line_count}` from the first E7 demo, and `Cart` has no such
+// field: the dev server filled that path from its own state, and nothing
+// checked that the type had it (ADR-0048). It is a member of `Cart` now, and
+// the host's value is this function's.
+fn line_count(cart: Cart) -> Int !{} {
+    List.fold(cart.lines, 0, fn(n, line) n + line.quantity.count)
 }
 
 type CartError =
