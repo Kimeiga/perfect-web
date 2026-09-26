@@ -386,6 +386,10 @@ impl<'p> Emitter<'p> {
                     given.join(", ")
                 ));
             }
+            // An opaque type is its representation (ADR-0054).
+            Instr::Retype { value, .. } => {
+                self.line(&format!("const {r} = {};", val(*value)));
+            }
             Instr::Apply { function, args, .. } => {
                 let args: Vec<String> = args.iter().map(|a| val(*a)).collect();
                 self.line(&format!(

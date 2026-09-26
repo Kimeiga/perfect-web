@@ -188,6 +188,30 @@ fn an_opaque_types_value_is_refused_outside_its_module() {
 }
 
 #[test]
+fn a_generic_representation_is_read_as_value() {
+    // Until 2026-09-25 the representation was kept as a spelling, and one
+    // with arguments never resolved: `.value` was refused as a member the
+    // type did not have (ADR-0054).
+    let src = "module names\n\nimport List\n\nopaque type Names = List<String>\n\n\
+               fn count(n: Names) -> Int !{} {\n    List.length(n.value)\n}\n";
+    assert_eq!(codes(src), Vec::<&str>::new());
+
+    // It is `List<String>`: not an `Int`.
+    let wrong = src.replace("List.length(n.value)", "n.value + 1");
+    assert!(codes(&wrong).contains(&"PW0609"), "{:?}", codes(&wrong));
+
+    // And it is still private to its module.
+    let user = "module user\n\nimport names.{ Names }\n\nfn raw(n: Names) -> Int !{} {\n    0 + n.value\n}\n";
+    let found = diagnostics(&[("names.pw", src), ("user.pw", user)]);
+    assert!(
+        found
+            .iter()
+            .any(|(c, m)| *c == "PW0610" && m.contains("opaque here")),
+        "{found:?}"
+    );
+}
+
+#[test]
 fn a_declared_value_member_is_the_member() {
     // `LayoutSnapshot<T>` is opaque, and its module declares `value`, which
     // gives the `T`: that is what `snapshot.value` reads, anywhere.

@@ -66,9 +66,10 @@ rather than approximated:
   Search reaches 3.2 MB for the one-letter query `T`.
 - **Each call instantiates afresh** (ADR-0032). At 7–14 µs it costs more than
   most kiokun calls themselves (ADR-0046).
-- **An opaque value is not built or read inside a component** (ADR-0048).
-  `PositiveInt(1)` and an opaque type's `.value` are refused by the Wasm
-  encoder; opaque values cross the boundary as their representations.
+- **A generic opaque type is refused inside a component** (ADR-0054), as a
+  generic record is. An opaque value is built and read inside a component,
+  as its representation retyped; it crosses the boundary as that
+  representation.
 - **The data layer is not Pleris.** `store:data/carts` is the deployment's
   (`owner: external`), as the contract records.
 

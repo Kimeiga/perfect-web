@@ -324,3 +324,8 @@ declared function type, where it gave the first parameter the element type
 of any list beside it; `values.rs` keeps the types a solved call, an
 annotation or a declared result gives them. `fold`'s accumulator was typed
 as the element and refused.
+
+[ADR-0054](DECISIONS/ADR-0054-opaque-values.md): an opaque value is built and
+read inside a component, as its representation retyped (`Instr::Retype`),
+in the component and the module. An opaque type's representation is a type
+tree, where it was a spelling that never resolved with type arguments.

@@ -78,6 +78,19 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: an opaque value is built and read inside a component**
+([ADR-0054](DECISIONS/ADR-0054-opaque-values.md)). `Count(n)` and `c.value`
+are the same value under another type, `Instr::Retype`. In the component
+the value keeps its locals or its address; in the module it is the same
+JavaScript value. Evidence: [opaque.txt](evidence/E10/opaque.txt)
+(`just e10-opaque`).
+
+**Correction, 2026-09-25: a generic representation never resolved**
+(ADR-0054). An opaque type's representation was kept as a spelling, and one
+with type arguments was Blocked. So `opaque type Names = List<String>` had
+no representation, and `n.value` was refused in its own module (PW0610) as
+a member the type did not have. The representation is a type tree now.
+
 **Correction, 2026-09-25: a callback's parameters had the wrong types**
 ([ADR-0053](DECISIONS/ADR-0053-callback-parameters.md)). The checker gave a
 lambda's first parameter the element type of any list beside it, whatever
@@ -226,6 +239,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0054: building an opaque value checks nothing, since the language
+  states no invariant for it.
 - ADR-0053: a callee with no signature types no parameter of a lambda passed
   to it.
 - ADR-0052: a closure captures by value; a `let mut` binding assigned after

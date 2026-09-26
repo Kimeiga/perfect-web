@@ -1985,6 +1985,34 @@ impl Enc<'_> {
                 };
                 self.held.insert(*result, placeholder);
             }
+            // The same value as another type (ADR-0054): the same locals, or
+            // the same address. An opaque type's component type is an alias
+            // of its representation's.
+            Instr::Retype { result, value, ty } => {
+                let Some(h) = self.held.get(value).cloned() else {
+                    blocked!("`{}` retypes {value:?} and nothing defines it", self.export);
+                };
+                let Some(rt) = self.type_of(*result, ty) else {
+                    refuse!(
+                        "an opaque value whose component type nothing fixes",
+                        "`{}` makes a {ty:?} with no component type here",
+                        self.export
+                    );
+                };
+                let held = match h {
+                    Held::Flat { ty: from, locals } if same_type(self.resolve, &from, &rt) => {
+                        Held::Flat { ty: rt, locals }
+                    }
+                    Held::Memory { ty: from, ptr } if same_type(self.resolve, &from, &rt) => {
+                        Held::Memory { ty: rt, ptr }
+                    }
+                    _ => blocked!(
+                        "`{}` retypes a value to a component type with another layout",
+                        self.export
+                    ),
+                };
+                self.held.insert(*result, held);
+            }
             // A function value (ADR-0052): an environment in the region, its
             // first word the table slot of its code, then each capture.
             Instr::Closure {

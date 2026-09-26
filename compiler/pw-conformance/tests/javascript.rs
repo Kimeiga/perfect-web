@@ -218,6 +218,21 @@ public query SumOf(xs: List<Int>, i: Int) -> Option<Int> {
 public query Escapes() -> String { \"tab\\there \\\"q\\\" \\\\ \\{x\\} \\u{1F600}\\n\" }
 
 public query Framed(text: String) -> String { \"[\\t{text}\\n]\" }
+
+// ADR-0054: an opaque value is its representation, in both.
+opaque type Count = Int
+
+opaque type Tag = String
+
+fn counted(n: Int) -> Count { Count(n) }
+
+public query Counts(xs: List<Int>) -> List<Count> { List.map(xs, x => counted(x * 2)) }
+
+public query CountTotal(cs: List<Count>) -> Int { List.fold(cs, 0, (t, c) => t + c.value) }
+
+public query Tagged(s: String) -> Tag { Tag(\"#{s}\") }
+
+public query Untagged(t: Tag) -> String { t.value }
 ";
 
 const CASES: usize = 200;

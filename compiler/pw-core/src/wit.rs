@@ -237,7 +237,14 @@ impl Types {
                         out.known.insert(path.clone(), ident(&path));
                         out.defs.push(TypeDef::Alias {
                             name: path,
-                            of: resolve_fragment(ws, unit, d, def, of),
+                            of: resolved::resolve(
+                                ws,
+                                unit,
+                                Some(def),
+                                &d.type_params,
+                                of,
+                                d.name_span.clone(),
+                            ),
                         });
                     }
                     _ => out.push_type(&path, unit, d, ws, def),

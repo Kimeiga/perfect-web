@@ -634,6 +634,30 @@ e10-function-values:
      } > docs/evidence/E10/function-values.txt
     @grep -E "^javascript:|mutants killed" docs/evidence/E10/function-values.txt
 
+# ADR-0054: an opaque value is built and read inside a component. The opaque
+# values through the host, the component against the JavaScript module, the
+# member rule over a generic representation, and the mutation controls.
+e10-opaque:
+    @{ echo "ADR-0054 - an opaque value is built and read inside a component"; echo; \
+       echo "produced by: just e10-opaque"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== opaque values through the host (pw-conformance/tests/opaque.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test opaque 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module, on the same arguments"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*"; \
+       echo; echo "== a generic representation's .value (pw-core/tests/members.rs)"; echo; \
+       cargo test --locked -p pw-core --test members 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/opaque_mutations.py)"; echo; \
+       python3 scripts/opaque_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a generic opaque type inside a component, which is refused"; \
+       echo "as a generic record is. NOT CLAIMED: an opaque type's invariant; none is"; \
+       echo "stated."; \
+     } > docs/evidence/E10/opaque.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/opaque.txt
+
 # ADR-0053: a lambda's parameters take the types its use declares. The
 # callback tests, the effect chain through a callback, what must stay clean,
 # and the mutation controls.
@@ -749,8 +773,8 @@ e10-members:
        echo; echo "== mutation controls (scripts/member_mutations.py)"; echo; \
        python3 scripts/member_mutations.py; \
        echo; \
-       echo "NOT CLAIMED: an opaque value built or read inside a component, which the"; \
-       echo "Wasm encoder refuses."; \
+       echo "NOT CLAIMED here: an opaque value built or read inside a component. It"; \
+       echo "compiles since 2026-09-25 (ADR-0054): just e10-opaque."; \
      } > docs/evidence/E10/members.txt
     @grep -E "^(accepted corpus|store|kiokun):|mutants killed" docs/evidence/E10/members.txt
 

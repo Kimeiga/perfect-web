@@ -451,13 +451,13 @@ impl Lowerer<'_> {
         )
     }
 
-    fn opaque_of(&self, node: &SyntaxNode) -> Option<String> {
+    fn opaque_of(&self, node: &SyntaxNode) -> Option<crate::hir::DeclaredType> {
         if node.kind() != K::OpaqueDecl {
             return None;
         }
         node.children()
             .find(|c| c.kind() == K::TypeRef)
-            .map(|t| declared_type(&t).written())
+            .map(|t| declared_type(&t))
     }
 
     fn effect_row(&self, row: &SyntaxNode) -> Vec<EffectRef> {

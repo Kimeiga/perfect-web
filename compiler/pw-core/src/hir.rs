@@ -473,8 +473,10 @@ pub struct Decl {
     /// `public`, `session`, `private` — the visibility keyword as written.
     /// This is where a declaration's privacy label starts (charter §7.8).
     pub visibility: Option<String>,
-    /// `opaque type StoreId = String` — the representation, as written.
-    pub opaque_of: Option<String>,
+    /// `opaque type StoreId = String` — the representation, as written: a
+    /// tree, so `opaque type Names = List<String>` keeps its argument
+    /// (ADR-0054). It was a spelling, and a generic one never resolved.
+    pub opaque_of: Option<DeclaredType>,
     /// The type parameters this declaration binds: `["C"]` for
     /// `opaque type Secret<C>`, `["T"]` for `effect database.read<T>`.
     ///

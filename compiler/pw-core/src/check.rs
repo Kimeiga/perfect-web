@@ -80,7 +80,7 @@ impl Env {
                     ));
                 }
                 if let Some(rep) = &d.opaque_of {
-                    program.declare_opaque(&d.name, primitive(rep).unwrap_or(Type::Str));
+                    program.declare_opaque(&d.name, primitive(&rep.written()).unwrap_or(Type::Str));
                 }
             }
         }

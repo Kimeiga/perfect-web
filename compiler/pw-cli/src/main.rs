@@ -149,7 +149,9 @@ fn explain_with(
                 let _ = writeln!(
                     s,
                     "             represented as {} — distinct from it everywhere in the checker",
-                    d.opaque_of.as_deref().unwrap_or("?")
+                    d.opaque_of
+                        .as_ref()
+                        .map_or_else(|| "?".to_string(), |t| t.written())
                 );
             }
             DeclKind::Type if d.variants.is_some() => {

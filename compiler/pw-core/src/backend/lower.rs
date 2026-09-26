@@ -2186,6 +2186,51 @@ impl<'a> Lower<'a> {
         }
     }
 
+    /// **`PositiveInt(1)`** (ADR-0054): the representation, lowered as what
+    /// it is, and given the opaque type.
+    fn opaque(
+        &mut self,
+        body: &Body,
+        def: DefId,
+        rep: &TypeResolution,
+        args: &[crate::hir::Arg],
+        piped: Option<ValueId>,
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let want = match self.ty(rep, &span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        };
+        let v = match (piped, args) {
+            (Some(v), []) => v,
+            (None, [a]) => match self.expr(body, a.value, Some(&want)) {
+                Lowering::Lowered(v) => v,
+                other => return other,
+            },
+            _ => {
+                return Lowering::Blocked {
+                    why: "an opaque type is built from one value".to_string(),
+                    span,
+                };
+            }
+        };
+        if self.types.get(&v) != Some(&want) {
+            return Lowering::Blocked {
+                why: format!(
+                    "an opaque type over {want:?} is built from a {:?}",
+                    self.types.get(&v)
+                ),
+                span,
+            };
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Retype {
+            result,
+            value: v,
+            ty: Type::Nominal(def),
+        }))
+    }
+
     /// **A lambda as a value** (ADR-0052): its code compiled as a function of
     /// its captures and its parameters, and a value holding the captures.
     /// Its type is the one its use gives it: an annotation, or the parameter
@@ -2900,6 +2945,26 @@ impl<'a> Lower<'a> {
                 reason: format!("`.{name}` is read from a value of no declared record type"),
             };
         };
+        // **An opaque type's `.value`** (ADR-0048): its representation. The
+        // checker allows it only in the module that declares the type.
+        if name == "value"
+            && let Some(rep) = self
+                .cx
+                .sigs
+                .type_decl(def)
+                .and_then(|t| t.representation.clone())
+        {
+            let ty = match self.ty(&rep, &span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            };
+            let result = self.fresh();
+            return Lowering::Lowered(self.push(Instr::Retype {
+                result,
+                value: of,
+                ty,
+            }));
+        }
         let Some(fields) = self.cx.sigs.type_decl(def).and_then(|t| t.record.as_ref()) else {
             return Lowering::Unsupported {
                 construct: "a field of something that is not a record",
@@ -3162,6 +3227,27 @@ impl<'a> Lower<'a> {
             Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
             _ => None,
         };
+        // **An opaque type built from its representation** (ADR-0054):
+        // `PositiveInt(1)`. The type is in the Type namespace, where a call's
+        // callee is not looked for.
+        if resolved.is_none() {
+            let as_type = match path.contains('.') {
+                true => self
+                    .cx
+                    .ws
+                    .resolve_path_in(self.unit, Namespace::Type, &path),
+                false => self.cx.ws.resolve_in(self.unit, Namespace::Type, &path),
+            };
+            if let Resolution::Local(def) | Resolution::Imported { def, .. } = as_type
+                && let Some(rep) = self
+                    .cx
+                    .sigs
+                    .type_decl(def)
+                    .and_then(|t| t.representation.clone())
+            {
+                return self.opaque(body, def, &rep, args, piped, span);
+            }
+        }
         // **An operation the compiler supplies** (ADR-0040): read from the
         // declaration's `intrinsic` clause, before its arguments are lowered,
         // because a function argument is compiled where it is called.

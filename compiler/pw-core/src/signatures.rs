@@ -122,24 +122,17 @@ impl Signatures {
                 if decl.kind == DeclKind::Opaque
                     && let Some(rep) = &decl.opaque_of
                 {
-                    // The representation is kept as a spelling by lowering,
-                    // so only a head without arguments can be resolved from
-                    // it faithfully. A generic one is Blocked, not re-parsed.
-                    let representation = match rep.contains('<') {
-                        false => resolved::resolve(
-                            workspace,
-                            m.unit,
-                            Some(def),
-                            &decl.type_params,
-                            &DeclaredType::new(rep.clone(), Vec::new()),
-                            decl.name_span.clone(),
-                        ),
-                        true => TypeResolution::Blocked {
-                            why: format!(
-                                "the representation `{rep}` is kept as a spelling, not a tree"
-                            ),
-                        },
-                    };
+                    // A tree since 2026-09-25 (ADR-0054). It was a spelling,
+                    // and a generic one, `List<String>`, was Blocked, so its
+                    // `.value` was refused as a member it did not have.
+                    let representation = resolved::resolve(
+                        workspace,
+                        m.unit,
+                        Some(def),
+                        &decl.type_params,
+                        rep,
+                        decl.name_span.clone(),
+                    );
                     out.types.entry(def).or_default().representation = Some(representation);
                 }
                 if decl.kind == DeclKind::Type

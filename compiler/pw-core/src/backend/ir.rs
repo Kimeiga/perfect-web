@@ -329,6 +329,15 @@ pub enum Instr {
         captures: Vec<ValueId>,
         ty: Type,
     },
+    /// **The same value, as another type with its representation**
+    /// (ADR-0054): an opaque type built from its representation,
+    /// `PositiveInt(1)`, and its representation read back, `n.value`. The
+    /// bits do not change.
+    Retype {
+        result: ValueId,
+        value: ValueId,
+        ty: Type,
+    },
     /// **A call through a function value** (ADR-0052). `function_ty` is the
     /// value's type, which fixes how it is called.
     Apply {
@@ -522,6 +531,7 @@ impl Instr {
             | Instr::Set { result, .. }
             | Instr::Get { result, .. }
             | Instr::Closure { result, .. }
+            | Instr::Retype { result, .. }
             | Instr::Apply { result, .. } => *result,
         }
     }
@@ -548,6 +558,7 @@ impl Instr {
             | Instr::Set { ty, .. }
             | Instr::Get { ty, .. }
             | Instr::Closure { ty, .. }
+            | Instr::Retype { ty, .. }
             | Instr::Apply { ty, .. } => ty,
         }
     }
