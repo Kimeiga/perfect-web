@@ -56,9 +56,10 @@ done:
 
 **2026-09-25, "ok fix all the known gaps":** the six gaps named that day, in
 order. Every name resolves (ADR-0047, done). Every member exists (ADR-0048,
-done). String escapes are defined (ADR-0049, done). Next: the standard
-library; then the backend's control flow and function values (with opaque
-values inside a component), and handlers that compute.
+done). String escapes are defined (ADR-0049, done). Recursion and generic
+callees compile (ADR-0050, done). Next: an early `return`, `?` and `for`
+loops; function values; opaque values inside a component; then the standard
+library (maps and sets want generic records), and handlers that compute.
 
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe

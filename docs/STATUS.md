@@ -78,6 +78,14 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-25: recursion and generic callees compile**
+([ADR-0050](DECISIONS/ADR-0050-recursion-and-generic-callees.md)). A call is
+still inlined, and one that recurses is compiled beside its export, once per
+instance, and called: in the Wasm component and in the JavaScript module
+alike. A generic callee is instantiated from its arguments. Programs with no
+recursion compile as they did: the store's and kiokun's 19 artifacts are
+byte-identical to `fd95b59`'s.
+
 **2026-09-25: a string's escapes are the language's**
 ([ADR-0049](DECISIONS/ADR-0049-string-escapes.md), settling A-023). One
 decoder reads a string token: `\n` `\t` `\r` `\\` `\"` `\{` `\}` and
@@ -167,6 +175,8 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0050: a callee is inlined until it recurses, and only the recursion is
+  a call, rather than every declaration being a function of its component.
 - ADR-0048: an opaque type's representation is read as `.value`, only in the
   module that declares it, rather than by a constructor pattern.
 - ADR-0047: clauses written as statements (`scope component`,

@@ -49,6 +49,9 @@ to components and run through the E8 host, and the Rust closure path is deleted.
 The component backend is narrow, and everything outside it is refused by name
 rather than approximated:
 
+- **A generic record is not instantiated** (ADR-0050). `Box<Int>` has no
+  layout: `Type::Nominal` names a declaration without its arguments. A
+  generic *function* is instantiated.
 - **Straight-line bodies, at E10-I.** Import calls and scalar constants were
   supported, and values moved flat or in their canonical layout. Matches over
   `Option` and `Result`, field reads and their cases came after (ADR-0036),
@@ -68,12 +71,13 @@ rather than approximated:
 **The backend matches over `Option` and `Result`**, reads fields, and builds
 their cases (2026-09-25, ADR-0036). **It computes** (2026-09-25, ADR-0039):
 `Int` and `Float` arithmetic, comparisons, `&`, `|`, `!`, `if`, string
-literals, interpolation, records built, and calls to other declarations,
-inlined. Still refused by name:
+literals, interpolation, pipelines, records built, and calls to other
+declarations, inlined, or compiled beside the export when they recurse, at
+the types a generic callee's arguments give it (ADR-0050). Still refused by
+name:
 
 - nested patterns, and a declared variant built or matched;
-- recursion, and a call to a generic declaration: calls are inlined;
-- an early `return`, an assignment, a pipeline, and a loop;
+- an early `return`, an assignment, and a loop;
 - `%` on a `Float`, and a `Float` interpolated: their semantics are not
   decided;
 - list and string operations beyond the ones the standard library declares

@@ -197,12 +197,16 @@ pub fn core_module_with(
     declared: &[TypeDef],
     idents: &BTreeMap<DefId, String>,
 ) -> Encoding<Vec<u8>> {
+    // The export, and every function compiled beside it (ADR-0050).
+    let all: Vec<&super::ir::Function> = std::iter::once(function)
+        .chain(function.callees.iter())
+        .collect();
     let mut private = world_resolve.clone();
-    let wit = internal_types(&mut private, function, declared, idents);
+    let wit = internal_types(&mut private, &all, declared, idents);
     let resolve = &private;
     let mut sizes = SizeAlign::default();
     sizes.fill(resolve);
-    let literals = Literals::of(function);
+    let literals = Literals::of(&all);
 
     // --- the export, by the world's own description --------------------------
     let Some((export_key, export_fn)) = world_function(resolve, world, true, export) else {
@@ -235,7 +239,14 @@ pub fn core_module_with(
     let mut used: Vec<(super::ir::ImportId, WorldKey, WitFunction)> = Vec::new();
     // Inside a match arm or an `if` too: until 2026-09-25 only the top of the
     // body was read, so an import called only in an arm had no core import.
-    for i in all_instrs(&entry.instrs) {
+    // And in every function compiled beside the export (ADR-0050).
+    let calls: Vec<&Instr> = all
+        .iter()
+        .flat_map(|f| f.blocks.iter())
+        .flat_map(|b| all_instrs(&b.instrs))
+        .collect();
+    let _ = entry;
+    for i in calls {
         let Instr::ImportCall { import, .. } = i else {
             continue;
         };
@@ -320,33 +331,82 @@ pub fn core_module_with(
     );
     let post_ty = ty(core_types(&export_sig.results), vec![]);
 
+    // --- the functions compiled beside the export (ADR-0050) --------------------
+    let mut callees: BTreeMap<(DefId, Vec<Type>), Callee> = BTreeMap::new();
+    let mut callee_types = Vec::new();
+    for (n, c) in function.callees.iter().enumerate() {
+        let passing = |t: &Type| -> Option<(WitType, Passed)> {
+            let w = wit.get(t).copied()?;
+            Some((w, passed(resolve, &w)))
+        };
+        let mut params = Vec::new();
+        for (_, t) in &c.params {
+            let Some(p) = passing(t) else {
+                refuse!(
+                    "a parameter with no component type",
+                    "`{}` takes a {t:?}, which has no component type here",
+                    c.export
+                );
+            };
+            params.push(p);
+        }
+        let result = match &c.ret {
+            Type::Unit => None,
+            t => match passing(t) {
+                Some(r) => Some(r),
+                None => refuse!(
+                    "a result with no component type",
+                    "`{}` returns a {t:?}, which has no component type here",
+                    c.export
+                ),
+            },
+        };
+        let core_params: Vec<ValType> = params.iter().flat_map(|(_, p)| p.core()).collect();
+        let core_results: Vec<ValType> = result.iter().flat_map(|(_, p)| p.core()).collect();
+        callee_types.push(ty(core_params, core_results));
+        callees.insert(
+            (c.def, c.instance.clone()),
+            Callee {
+                index: post_index + 1 + n as u32,
+                params,
+                result,
+            },
+        );
+    }
+
     // --- the export's body --------------------------------------------------------
     let mut helpers = Helpers {
-        first: post_index + 1,
+        first: post_index + 1 + function.callees.len() as u32,
         used: Vec::new(),
     };
-    let body = match export_body(
-        Shared {
-            resolve,
-            sizes: &sizes,
-            wit: &wit,
-            literals: &literals,
-            imports: &import_index,
-            realloc_index,
-        },
-        function,
-        &export_fn,
-        &export_sig,
-        &mut helpers,
-    ) {
+    let shared = Shared {
+        resolve,
+        sizes: &sizes,
+        wit: &wit,
+        literals: &literals,
+        imports: &import_index,
+        realloc_index,
+        callees: &callees,
+    };
+    let body = match export_body(shared, function, &export_fn, &export_sig, &mut helpers) {
         Encoding::Encoded(b) => b,
         other => return other.map(|_| unreachable!()),
     };
+    let mut internal_bodies = Vec::new();
+    for c in &function.callees {
+        match internal_body(shared, c, &mut helpers) {
+            Encoding::Encoded(b) => internal_bodies.push(b),
+            other => return other.map(|_| unreachable!()),
+        }
+    }
 
     let mut funcs = FunctionSection::new();
     funcs.function(realloc_ty);
     funcs.function(export_ty);
     funcs.function(post_ty);
+    for t in &callee_types {
+        funcs.function(*t);
+    }
     for h in &helpers.used {
         let (params, results) = h.signature();
         funcs.function(ty(params, results));
@@ -413,6 +473,9 @@ pub fn core_module_with(
     code.function(&realloc());
     code.function(&body);
     code.function(&post_return(heap_base));
+    for b in &internal_bodies {
+        code.function(b);
+    }
     for h in &helpers.used {
         code.function(&h.body(realloc_index));
     }
@@ -448,7 +511,7 @@ struct Literals {
 }
 
 impl Literals {
-    fn of(function: &super::ir::Function) -> Literals {
+    fn of(functions: &[&super::ir::Function]) -> Literals {
         let mut out = Literals {
             at: BTreeMap::new(),
             bytes: Vec::new(),
@@ -460,7 +523,7 @@ impl Literals {
                 out.bytes.extend_from_slice(s.as_bytes());
             }
         };
-        for b in &function.blocks {
+        for b in functions.iter().flat_map(|f| f.blocks.iter()) {
             for i in all_instrs(&b.instrs) {
                 match i {
                     Instr::Const {
@@ -497,7 +560,7 @@ impl Literals {
 /// is left out, and the encoder refuses whatever needs it.
 fn internal_types(
     resolve: &mut Resolve,
-    function: &super::ir::Function,
+    functions: &[&super::ir::Function],
     declared: &[TypeDef],
     idents: &BTreeMap<DefId, String>,
 ) -> BTreeMap<Type, WitType> {
@@ -506,11 +569,14 @@ fn internal_types(
             .then(|| p.interfaces.get("types").copied())
             .flatten()
     });
-    let mut wanted: Vec<Type> = function.params.iter().map(|(_, t)| t.clone()).collect();
-    wanted.push(function.ret.clone());
-    for b in &function.blocks {
-        for i in all_instrs(&b.instrs) {
-            wanted.push(i.ty().clone());
+    let mut wanted: Vec<Type> = Vec::new();
+    for function in functions {
+        wanted.extend(function.params.iter().map(|(_, t)| t.clone()));
+        wanted.push(function.ret.clone());
+        for b in &function.blocks {
+            for i in all_instrs(&b.instrs) {
+                wanted.push(i.ty().clone());
+            }
         }
     }
     let mut out = BTreeMap::new();
@@ -816,6 +882,48 @@ struct Shared<'a> {
     literals: &'a Literals,
     imports: &'a BTreeMap<String, (u32, WasmSignature, WitFunction)>,
     realloc_index: u32,
+    /// The functions compiled beside the export, by instance (ADR-0050).
+    callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
+}
+
+/// **How a function compiled beside the export passes one value**
+/// (ADR-0050): a primitive, a string or a list as its flat values; anything
+/// else, a record or a variant, as a pointer to its canonical layout in the
+/// region. A record or variant built in the body already lives there, and
+/// this encoder writes a variant's joined flat slots but does not read them
+/// back from memory.
+#[derive(Clone)]
+enum Passed {
+    Flat(Vec<ValType>),
+    Pointer,
+}
+
+impl Passed {
+    fn core(&self) -> Vec<ValType> {
+        match self {
+            Passed::Flat(v) => v.clone(),
+            Passed::Pointer => vec![ValType::I32],
+        }
+    }
+}
+
+fn passed(resolve: &Resolve, t: &WitType) -> Passed {
+    let compound = match dealias(resolve, *t) {
+        WitType::Id(id) => !matches!(resolve.types[id].kind, TypeDefKind::List(_)),
+        _ => false,
+    };
+    match flat(resolve, t) {
+        Some(f) if !compound => Passed::Flat(core_types(&f)),
+        _ => Passed::Pointer,
+    }
+}
+
+/// A function compiled beside the export: its index, and how it passes its
+/// parameters and its result.
+struct Callee {
+    index: u32,
+    params: Vec<(WitType, Passed)>,
+    result: Option<(WitType, Passed)>,
 }
 
 /// The instructions of the export's body. Encoded against a scratch list so
@@ -844,6 +952,7 @@ fn export_body(
         wit: shared.wit,
         literals: shared.literals,
         helpers,
+        callees: shared.callees,
         export: &function.export,
         ops: Vec::new(),
         locals: Locals {
@@ -851,7 +960,14 @@ fn export_body(
             types: Vec::new(),
         },
         held: BTreeMap::new(),
-        expected: expected_types(resolve, shared.wit, function, export_fn, imports),
+        expected: expected_types(
+            resolve,
+            shared.wit,
+            function,
+            export_fn.result,
+            imports,
+            shared.callees,
+        ),
     };
 
     // Parameters arrive flat, in the order the world lists them.
@@ -935,18 +1051,98 @@ fn export_body(
     }
     enc.ops.push(I::End);
 
-    let mut groups: Vec<(u32, ValType)> = Vec::new();
-    for t in &enc.locals.types {
-        match groups.last_mut() {
-            Some((n, seen)) if seen == t => *n += 1,
-            _ => groups.push((1, *t)),
+    Encoding::Encoded(enc.finish())
+}
+
+/// **A function compiled beside the export** (ADR-0050): its parameters as
+/// its [`Callee`] entry passes them, its body, and its result the same way.
+fn internal_body(
+    shared: Shared<'_>,
+    function: &super::ir::Function,
+    helpers: &mut Helpers,
+) -> Encoding<Function> {
+    use wasm_encoder::Instruction as I;
+    let Some(me) = shared
+        .callees
+        .get(&(function.def, function.instance.clone()))
+    else {
+        blocked!(
+            "`{}` has no entry among the functions compiled",
+            function.export
+        );
+    };
+    let first: usize = me.params.iter().map(|(_, p)| p.core().len()).sum();
+    let result_ty = me.result.as_ref().map(|(t, _)| *t);
+    let mut enc = Enc {
+        resolve: shared.resolve,
+        sizes: shared.sizes,
+        imports: shared.imports,
+        realloc_index: shared.realloc_index,
+        wit: shared.wit,
+        literals: shared.literals,
+        helpers,
+        callees: shared.callees,
+        export: &function.export,
+        ops: Vec::new(),
+        locals: Locals {
+            first: first as u32,
+            types: Vec::new(),
+        },
+        held: BTreeMap::new(),
+        expected: expected_types(
+            shared.resolve,
+            shared.wit,
+            function,
+            result_ty,
+            shared.imports,
+            shared.callees,
+        ),
+    };
+    let mut next = 0u32;
+    for ((value, _), (ty, passing)) in function.params.iter().zip(&me.params) {
+        let held = match passing {
+            Passed::Flat(v) => {
+                let locals: Vec<u32> = (next..next + v.len() as u32).collect();
+                next += v.len() as u32;
+                Held::Flat { ty: *ty, locals }
+            }
+            Passed::Pointer => {
+                next += 1;
+                Held::Memory {
+                    ty: *ty,
+                    ptr: next - 1,
+                }
+            }
+        };
+        enc.held.insert(*value, held);
+    }
+    let Some(entry) = function.entry() else {
+        blocked!("`{}` has no entry block", function.export);
+    };
+    if let other @ (Encoding::Unsupported { .. } | Encoding::Blocked { .. }) =
+        enc.region(&entry.instrs)
+    {
+        return other.map(|_| unreachable!());
+    }
+    let Terminator::Return(v) = &entry.terminator else {
+        refuse!(
+            "a terminator other than `return`",
+            "`{}` ends in {:?}",
+            function.export,
+            entry.terminator
+        );
+    };
+    if let Some((ty, passing)) = &me.result {
+        let Some(h) = enc.held.get(v).cloned() else {
+            blocked!("`{}` returns {v:?} and nothing defines it", function.export);
+        };
+        match enc.pass(&h, ty, passing) {
+            Encoding::Encoded(()) => {}
+            other => return other.map(|_| unreachable!()),
         }
     }
-    let mut f = Function::new(groups);
-    for op in &enc.ops {
-        f.instruction(op);
-    }
-    Encoding::Encoded(f)
+    enc.ops.push(I::End);
+    Encoding::Encoded(enc.finish())
 }
 
 /// **The component type each value must have where it is used.**
@@ -962,27 +1158,44 @@ fn expected_types(
     resolve: &Resolve,
     wit: &BTreeMap<Type, WitType>,
     function: &super::ir::Function,
-    export_fn: &WitFunction,
+    result: Option<WitType>,
     imports: &BTreeMap<String, (u32, WasmSignature, WitFunction)>,
+    callees: &BTreeMap<(DefId, Vec<Type>), Callee>,
 ) -> BTreeMap<ValueId, WitType> {
     let mut out = BTreeMap::new();
     let Some(entry) = function.entry() else {
         return out;
     };
-    if let (Some(rt), Terminator::Return(v)) = (&export_fn.result, &entry.terminator) {
-        out.insert(*v, *rt);
+    if let (Some(rt), Terminator::Return(v)) = (result, &entry.terminator) {
+        out.insert(*v, rt);
     }
-    expect_region(resolve, wit, &entry.instrs, imports, &mut out);
+    let cx = Expecting {
+        resolve,
+        wit,
+        imports,
+        callees,
+    };
+    cx.region(&entry.instrs, &mut out);
     out
 }
 
-fn expect_region(
-    resolve: &Resolve,
-    wit: &BTreeMap<Type, WitType>,
-    instrs: &[Instr],
-    imports: &BTreeMap<String, (u32, WasmSignature, WitFunction)>,
-    out: &mut BTreeMap<ValueId, WitType>,
-) {
+/// What fixes a value's component type from its use: the world's imports,
+/// and the functions compiled beside the export (ADR-0050).
+struct Expecting<'a> {
+    resolve: &'a Resolve,
+    wit: &'a BTreeMap<Type, WitType>,
+    imports: &'a BTreeMap<String, (u32, WasmSignature, WitFunction)>,
+    callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
+}
+
+impl Expecting<'_> {
+    fn region(&self, instrs: &[Instr], out: &mut BTreeMap<ValueId, WitType>) {
+        expect_region(self, instrs, out);
+    }
+}
+
+fn expect_region(cx: &Expecting<'_>, instrs: &[Instr], out: &mut BTreeMap<ValueId, WitType>) {
+    let (resolve, wit, imports) = (cx.resolve, cx.wit, cx.imports);
     // Backwards: a use comes after the value it uses.
     for instr in instrs.iter().rev() {
         match instr {
@@ -993,6 +1206,18 @@ fn expect_region(
                     }
                 }
             }
+            Instr::Call {
+                callee,
+                instance,
+                args,
+                ..
+            } => {
+                if let Some(c) = cx.callees.get(&(*callee, instance.clone())) {
+                    for (a, (t, _)) in args.iter().zip(&c.params) {
+                        out.entry(*a).or_insert(*t);
+                    }
+                }
+            }
             Instr::Match { result, arms, .. } => {
                 if let Some(t) = out.get(result).copied() {
                     for arm in arms {
@@ -1000,7 +1225,7 @@ fn expect_region(
                     }
                 }
                 for arm in arms {
-                    expect_region(resolve, wit, &arm.body.instrs, imports, out);
+                    cx.region(&arm.body.instrs, out);
                 }
             }
             Instr::If {
@@ -1010,8 +1235,8 @@ fn expect_region(
                     out.entry(then.value).or_insert(t);
                     out.entry(els.value).or_insert(t);
                 }
-                expect_region(resolve, wit, &then.instrs, imports, out);
-                expect_region(resolve, wit, &els.instrs, imports, out);
+                cx.region(&then.instrs, out);
+                cx.region(&els.instrs, out);
             }
             // A record's field fixes the type of what is stored in it: the
             // `None` in `Entry { redirect: None, .. }`.
@@ -1092,6 +1317,7 @@ struct Enc<'a> {
     wit: &'a BTreeMap<Type, WitType>,
     literals: &'a Literals,
     helpers: &'a mut Helpers,
+    callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
     export: &'a str,
     ops: Vec<wasm_encoder::Instruction<'static>>,
     locals: Locals,
@@ -1100,6 +1326,50 @@ struct Enc<'a> {
 }
 
 impl Enc<'_> {
+    /// The encoded function: its locals, grouped, and its instructions.
+    fn finish(self) -> Function {
+        let mut groups: Vec<(u32, ValType)> = Vec::new();
+        for t in &self.locals.types {
+            match groups.last_mut() {
+                Some((n, seen)) if seen == t => *n += 1,
+                _ => groups.push((1, *t)),
+            }
+        }
+        let mut f = Function::new(groups);
+        for op in &self.ops {
+            f.instruction(op);
+        }
+        f
+    }
+
+    /// Push a value the way a function compiled beside the export takes it
+    /// (ADR-0050): its flat values, or a pointer to its layout, stored first
+    /// when the value is held flat.
+    fn pass(&mut self, h: &Held, ty: &WitType, passing: &Passed) -> Encoding<()> {
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        match (passing, h) {
+            (Passed::Flat(_), h) => push_flat_values(resolve, sizes, h, &mut self.ops),
+            (Passed::Pointer, Held::Memory { ptr, .. }) => {
+                self.ops.push(I::LocalGet(*ptr));
+                Encoding::Encoded(())
+            }
+            (Passed::Pointer, Held::Flat { locals, .. }) => {
+                let area = self.locals.fresh(ValType::I32);
+                allocate(sizes, ty, self.realloc_index, area, &mut self.ops);
+                match store(resolve, sizes, ty, area, 0, locals, &mut self.ops) {
+                    Encoding::Encoded(_) => {}
+                    other => return other.map(|_| unreachable!()),
+                }
+                self.ops.push(I::LocalGet(area));
+                Encoding::Encoded(())
+            }
+            (Passed::Pointer, Held::Nothing) => {
+                blocked!("`{}` passes a call with no result", self.export)
+            }
+        }
+    }
+
     /// Emit a region's instructions in order.
     fn region(&mut self, instrs: &[Instr]) -> Encoding<()> {
         for instr in instrs {
@@ -1256,12 +1526,48 @@ impl Enc<'_> {
                     },
                 );
             }
-            Instr::Call { callee, .. } => refuse!(
-                "a call to another Pleris declaration",
-                "`{}` calls {callee:?}; a component calls another declaration through \
-                 an import, and linking two compiled components is not encoded yet",
-                self.export
-            ),
+            // A call to a function compiled beside the export (ADR-0050).
+            Instr::Call {
+                result,
+                callee,
+                instance,
+                args,
+                ..
+            } => {
+                let Some(c) = self.callees.get(&(*callee, instance.clone())) else {
+                    blocked!(
+                        "`{}` calls an instance of {callee:?} that nothing compiled",
+                        self.export
+                    );
+                };
+                let (index, params, ret) = (c.index, c.params.clone(), c.result.clone());
+                for (a, (ty, passing)) in args.iter().zip(&params) {
+                    let Some(h) = self.held.get(a).cloned() else {
+                        blocked!("`{}` passes {a:?} and nothing defines it", self.export);
+                    };
+                    match self.pass(&h, ty, passing) {
+                        Encoding::Encoded(()) => {}
+                        other => return other,
+                    }
+                }
+                self.ops.push(I::Call(index));
+                let held = match ret {
+                    None => Held::Nothing,
+                    Some((ty, Passed::Flat(vs))) => {
+                        let ls: Vec<u32> = vs.iter().map(|v| self.locals.fresh(*v)).collect();
+                        for l in ls.iter().rev() {
+                            self.ops.push(I::LocalSet(*l));
+                        }
+                        Held::Flat { ty, locals: ls }
+                    }
+                    Some((ty, Passed::Pointer)) => {
+                        let p = self.locals.fresh(ValType::I32);
+                        self.ops.push(I::LocalSet(p));
+                        Held::Memory { ty, ptr: p }
+                    }
+                };
+                self.held.insert(*result, held);
+            }
             Instr::Construct {
                 result, args, ty, ..
             } => return self.construct(*result, args, ty),

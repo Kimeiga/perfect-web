@@ -606,6 +606,26 @@ e10-affine:
      } > docs/evidence/E10/affine.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
 
+# ADR-0050: recursion and generic callees compile. The compiled recursions
+# through the host, the component against the JavaScript module, and the
+# mutation controls.
+e10-recursion:
+    @{ echo "ADR-0050 - recursion and generic callees compile"; echo; \
+       echo "produced by: just e10-recursion"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== recursions through the host (pw-conformance/tests/recursion.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test recursion 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the component and the JavaScript module, on the same arguments"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
+         | grep -oE "javascript: [0-9]+ queries.*"; \
+       echo; echo "== mutation controls (scripts/recursion_mutations.py)"; echo; \
+       python3 scripts/recursion_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: an early return, a loop, a function value, or a generic record."; \
+     } > docs/evidence/E10/recursion.txt
+    @grep -E "^javascript:|mutants killed" docs/evidence/E10/recursion.txt
+
 # ADR-0049: a string's escapes are the language's. The decoder's tests, the
 # checker's, the compiled values, and the mutation controls.
 e10-strings:

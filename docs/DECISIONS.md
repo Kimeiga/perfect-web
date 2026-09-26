@@ -299,3 +299,9 @@ type has, among them the store page's `{cart.line_count}`.
 language's, settling A-023. One decoder in `pw_syntax::strings` reads every
 string token; an undefined escape is PW0014; `"""` strings are raw; each
 backend encodes the value in its own syntax.
+
+[ADR-0050](DECISIONS/ADR-0050-recursion-and-generic-callees.md): recursion
+and generic callees compile. A call is inlined until it recurses; the
+recursion is compiled beside the export, once per instance, and called, in
+the component and the JavaScript module. A generic callee is instantiated
+from its arguments. Existing artifacts are byte-identical.

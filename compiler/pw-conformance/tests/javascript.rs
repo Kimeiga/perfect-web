@@ -102,6 +102,41 @@ public query Head(xs: List<Int>) -> Int {
 
 public query AsFloat(n: Int) -> Float { Float.from_int(n) }
 
+// ADR-0050: recursion, compiled beside the query in both. The inputs are
+// bounded, so a generated `Int` does not ask for a depth nothing has.
+fn fib(n: Int) -> Int { if n < 2 { n } else { fib(n - 1) + fib(n - 2) } }
+
+public query Fib(n: Int) -> Int { fib(n % 20) }
+
+fn is_even(n: Int) -> Bool { if n == 0 { true } else { is_odd(n - 1) } }
+
+fn is_odd(n: Int) -> Bool { if n == 0 { false } else { is_even(n - 1) } }
+
+public query Even(n: Int) -> Bool { is_even(n % 64) }
+
+fn count_from<T>(xs: List<T>, i: Int) -> Int {
+    match List.get(xs, i) {
+        Some(x) => 1 + count_from(xs, i + 1),
+        None => 0,
+    }
+}
+
+public query CountWords(words: List<Word>) -> Int { count_from(words, 0) }
+
+public query CountInts(xs: List<Int>) -> Int { count_from(xs, 0) }
+
+fn largest(xs: List<Int>, i: Int, best: Option<Int>) -> Option<Int> {
+    match List.get(xs, i) {
+        None => best,
+        Some(x) => match best {
+            None => largest(xs, i + 1, Some(x)),
+            Some(b) => largest(xs, i + 1, if x > b { Some(x) } else { Some(b) }),
+        },
+    }
+}
+
+public query Largest(xs: List<Int>) -> Option<Int> { largest(xs, 0, None) }
+
 // ADR-0049: a string's escapes are the language's, the same in both.
 public query Escapes() -> String { \"tab\\there \\\"q\\\" \\\\ \\{x\\} \\u{1F600}\\n\" }
 

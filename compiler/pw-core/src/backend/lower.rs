@@ -35,6 +35,7 @@
 //! keeps that honest: the refusal names the construct, so widening the backend
 //! is a visible act rather than a fixture that started passing.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ir::{
@@ -260,6 +261,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         })
         .unwrap_or_default();
 
+    let internal = RefCell::new(Internal::default());
     let mut f = Lower {
         cx,
         unit,
@@ -268,6 +270,8 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         locals: BTreeMap::new(),
         types: BTreeMap::new(),
         inlining: vec![def],
+        subst: BTreeMap::new(),
+        internal: &internal,
     };
 
     // Parameters first, so a body naming one finds it.
@@ -322,6 +326,116 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
             terminator: Terminator::Return(result),
         }],
         capabilities,
+        instance: Vec::new(),
+        callees: internal.into_inner().done,
+    })
+}
+
+/// **The functions compiled beside one export** (ADR-0050), shared by every
+/// `Lower` working on it: each instance begun, so a recursive call finds its
+/// own, and each one finished.
+#[derive(Default)]
+struct Internal {
+    started: BTreeSet<(DefId, Vec<Type>)>,
+    done: Vec<Function>,
+}
+
+/// **One declaration, compiled beside the export that reaches it**, at the
+/// type arguments `instance` (ADR-0050). Its body is lowered as an export's
+/// is, with its own values; a call inside it to a declaration it is already
+/// lowering is a call, to its own instance.
+fn lower_internal(
+    cx: &Context<'_>,
+    internal: &RefCell<Internal>,
+    def: DefId,
+    instance: Vec<Type>,
+    subst: BTreeMap<(DefId, u32), Type>,
+    span: Span,
+) -> Lowering<Function> {
+    let Some(decl) = crate::resolve::declaration(cx.hirs, def) else {
+        return Lowering::Blocked {
+            why: "a callee no unit holds".to_string(),
+            span,
+        };
+    };
+    let Some(body_id) = decl.body else {
+        return Lowering::Unsupported {
+            construct: "a call to a declaration with no body",
+            span,
+            reason: format!("`{}` has neither a body nor a `host` binding", decl.name),
+        };
+    };
+    let Some(sig) = cx.sigs.by_def(def) else {
+        return Lowering::Blocked {
+            why: format!("`{}` has no resolved signature", decl.name),
+            span,
+        };
+    };
+    let mut f = Lower {
+        cx,
+        unit: def.unit,
+        next_value: 0,
+        instrs: Vec::new(),
+        locals: BTreeMap::new(),
+        types: BTreeMap::new(),
+        inlining: vec![def],
+        subst,
+        internal,
+    };
+    let mut params = Vec::new();
+    for (index, p) in decl.params.iter().enumerate() {
+        let Some(declared) = sig.params.get(index).and_then(Option::as_ref) else {
+            return Lowering::Unsupported {
+                construct: "an unannotated parameter",
+                span: p.span.clone(),
+                reason: format!("`{}` has no declared type", p.name),
+            };
+        };
+        let ty = match f.ty(declared, &p.span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        };
+        let v = f.fresh();
+        f.locals.insert(p.name.clone(), v);
+        f.types.insert(v, ty.clone());
+        params.push((v, ty));
+    }
+    let ret = match &sig.returns {
+        Some(r) => match f.ty(r, &span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        },
+        None => Type::Unit,
+    };
+    let body = cx.hirs[def.unit].body(body_id);
+    let result = match f.expr(body, body.root, Some(&ret)) {
+        Lowering::Lowered(v) => v,
+        other => return other.map(|_| unreachable!()),
+    };
+    if f.types.get(&result) != Some(&ret) {
+        return Lowering::Blocked {
+            why: format!(
+                "`{}` produces a {:?} and declares {ret:?}",
+                decl.name,
+                f.types.get(&result)
+            ),
+            span,
+        };
+    }
+    let instrs = std::mem::take(&mut f.instrs);
+    Lowering::Lowered(Function {
+        def,
+        export: decl.name.clone(),
+        params,
+        ret,
+        blocks: vec![Block {
+            id: BlockId(0),
+            instrs,
+            terminator: Terminator::Return(result),
+        }],
+        capabilities: Vec::new(),
+        instance,
+        callees: Vec::new(),
     })
 }
 
@@ -479,11 +593,79 @@ struct Lower<'a> {
     types: BTreeMap<ValueId, Type>,
     /// The declarations whose bodies are being lowered, outermost first: the
     /// export, then each callee inlined into it (ADR-0039 §4). A call to one
-    /// of them is a recursion.
+    /// of them is a recursion, compiled as a call (ADR-0050).
     inlining: Vec<DefId>,
+    /// The type arguments of every generic declaration being lowered, by
+    /// the parameter's identity: what `T` is in this instance (ADR-0050).
+    subst: BTreeMap<(DefId, u32), Type>,
+    /// The functions compiled beside this export.
+    internal: &'a RefCell<Internal>,
+}
+
+/// **Instantiate a declared type against the type a value has** (ADR-0050):
+/// bind each type parameter it mentions to what stands there, and say whether
+/// the two agree. `List<T>` against `List<Int>` binds `T` to `Int`.
+fn instantiate(
+    sigs: &Signatures,
+    declared: &ResolvedType,
+    actual: &Type,
+    subst: &mut BTreeMap<(DefId, u32), Type>,
+) -> bool {
+    if let Some(key) = declared.parameter_binding() {
+        return match subst.get(&key) {
+            Some(t) => t == actual,
+            None => {
+                subst.insert(key, actual.clone());
+                true
+            }
+        };
+    }
+    if let Some(p) = declared.as_primitive() {
+        return matches!(
+            (p, actual),
+            (Primitive::Int, Type::Int)
+                | (Primitive::Float, Type::Float)
+                | (Primitive::Bool, Type::Bool)
+                | (Primitive::Str, Type::Str)
+                | (Primitive::Unit, Type::Unit)
+        );
+    }
+    let args = declared.args();
+    if let Some(b) = declared.as_builtin() {
+        return match (b, actual) {
+            (Builtin::List, Type::List(t)) | (Builtin::Option, Type::Option(t)) => {
+                args.first().is_some_and(|a| instantiate(sigs, a, t, subst))
+            }
+            (Builtin::Result, Type::Result(o, e)) => {
+                args.len() == 2
+                    && instantiate(sigs, &args[0], o, subst)
+                    && instantiate(sigs, &args[1], e, subst)
+            }
+            _ => false,
+        };
+    }
+    if sigs.privacy_qualifier(declared).is_some() && args.len() == 1 {
+        return instantiate(sigs, &args[0], actual, subst);
+    }
+    match declared.def_id() {
+        Some(def) if args.is_empty() => actual == &Type::Nominal(def),
+        _ => false,
+    }
 }
 
 impl<'a> Lower<'a> {
+    /// A declared type, under the type arguments this body was instantiated
+    /// at (ADR-0050).
+    fn ty(&self, resolution: &TypeResolution, span: &Span) -> Lowering<Type> {
+        match resolution.resolved() {
+            Some(t) => ty_resolved_with(self.cx.sigs, t, span, &self.subst),
+            None => Lowering::Blocked {
+                why: resolution.to_string(),
+                span: span.clone(),
+            },
+        }
+    }
+
     fn fresh(&mut self) -> ValueId {
         let v = ValueId(self.next_value);
         self.next_value += 1;
@@ -533,6 +715,27 @@ fn ty_resolution(sigs: &Signatures, resolution: &TypeResolution, span: &Span) ->
 /// ABI projection: semantic identity arrives resolved. Privacy qualification
 /// is erased only for the selected qualifier definition, not for its spelling.
 fn ty_resolved(sigs: &Signatures, ty: &ResolvedType, span: &Span) -> Lowering<Type> {
+    ty_resolved_with(sigs, ty, span, &BTreeMap::new())
+}
+
+/// [`ty_resolved`], where a type parameter is the type it was instantiated
+/// at (ADR-0050).
+fn ty_resolved_with(
+    sigs: &Signatures,
+    ty: &ResolvedType,
+    span: &Span,
+    subst: &BTreeMap<(DefId, u32), Type>,
+) -> Lowering<Type> {
+    if let Some(key) = ty.parameter_binding() {
+        return match subst.get(&key) {
+            Some(t) => Lowering::Lowered(t.clone()),
+            None => Lowering::Unsupported {
+                construct: "a type parameter no call instantiates",
+                span: span.clone(),
+                reason: format!("`{ty}` is not fixed by what reaches it here"),
+            },
+        };
+    }
     if let Some(p) = ty.as_primitive() {
         return Lowering::Lowered(match p {
             Primitive::Int => Type::Int,
@@ -543,7 +746,7 @@ fn ty_resolved(sigs: &Signatures, ty: &ResolvedType, span: &Span) -> Lowering<Ty
         });
     }
     let arg = |i: usize| match ty.args().get(i) {
-        Some(t) => ty_resolved(sigs, t, span),
+        Some(t) => ty_resolved_with(sigs, t, span, subst),
         None => Lowering::Blocked {
             why: "resolved constructor is missing an argument".into(),
             span: span.clone(),
@@ -1209,7 +1412,7 @@ impl<'a> Lower<'a> {
                     span,
                 };
             };
-            let want = match ty_resolution(self.cx.sigs, resolution, &span) {
+            let want = match self.ty(resolution, &span) {
                 Lowering::Lowered(t) => t,
                 other => return other.map(|_| unreachable!()),
             };
@@ -1581,17 +1784,7 @@ impl<'a> Lower<'a> {
                         span,
                         reason: format!("`{path}` takes a function itself"),
                     },
-                    None => {
-                        let returns = self.cx.sigs.by_def(def).and_then(|s| s.returns.clone());
-                        let ret = match returns {
-                            Some(r) => ty_resolution(self.cx.sigs, &r, &span),
-                            None => Lowering::Lowered(Type::Unit),
-                        };
-                        match ret {
-                            Lowering::Lowered(ret) => self.inline(def, bound.clone(), &ret, span),
-                            other => other.map(|_| unreachable!()),
-                        }
-                    }
+                    None => self.inline(def, bound.clone(), None, span),
                 };
                 let instrs = std::mem::replace(&mut self.instrs, outer);
                 value.map(|v| (bound, Region { instrs, value: v }))
@@ -1622,7 +1815,7 @@ impl<'a> Lower<'a> {
         &mut self,
         callee: DefId,
         args: Vec<ValueId>,
-        ret: &Type,
+        expected: Option<&Type>,
         span: Span,
     ) -> Lowering<ValueId> {
         let Some(decl) = crate::resolve::declaration(self.cx.hirs, callee) else {
@@ -1631,25 +1824,6 @@ impl<'a> Lower<'a> {
                 span,
             };
         };
-        if self.inlining.contains(&callee) {
-            return Lowering::Unsupported {
-                construct: "a recursive call",
-                span,
-                reason: format!(
-                    "`{}` calls itself, directly or through another declaration; calls are \
-                     inlined (ADR-0039 §4) and an inlined recursion has no end the compiler \
-                     can see",
-                    decl.name
-                ),
-            };
-        }
-        if !decl.type_params.is_empty() {
-            return Lowering::Unsupported {
-                construct: "a call to a generic declaration",
-                span,
-                reason: format!("`{}` needs specialization before it is inlined", decl.name),
-            };
-        }
         let Some(body_id) = decl.body else {
             return Lowering::Unsupported {
                 construct: "a call to a declaration with no body",
@@ -1677,45 +1851,130 @@ impl<'a> Lower<'a> {
                 span,
             };
         }
-        let mut bound = BTreeMap::new();
+
+        // **The instance**: each type parameter the callee declares, bound by
+        // what its arguments are (ADR-0050). Until 2026-09-25 a generic callee
+        // was refused, because nothing specialized it.
+        let mut subst = BTreeMap::new();
         for (i, (p, a)) in decl.params.iter().zip(&args).enumerate() {
-            let Some(declared) = sig.params.get(i).and_then(Option::as_ref) else {
+            let Some(declared) = sig
+                .params
+                .get(i)
+                .and_then(Option::as_ref)
+                .and_then(TypeResolution::resolved)
+            else {
                 return Lowering::Unsupported {
                     construct: "an unannotated parameter",
                     span,
                     reason: format!("`{}`'s `{}` has no declared type", decl.name, p.name),
                 };
             };
-            let want = match ty_resolution(self.cx.sigs, declared, &span) {
-                Lowering::Lowered(t) => t,
-                other => return other.map(|_| unreachable!()),
+            let Some(actual) = self.types.get(a).cloned() else {
+                return Lowering::Blocked {
+                    why: format!("`{}`'s argument `{}` has no type", decl.name, p.name),
+                    span,
+                };
             };
-            if self.types.get(a) != Some(&want) {
+            if !instantiate(self.cx.sigs, declared, &actual, &mut subst) {
                 return Lowering::Blocked {
                     why: format!(
-                        "`{}` receives a {:?} as `{}`, declared {want:?}",
-                        decl.name,
-                        self.types.get(a),
-                        p.name
+                        "`{}` receives a {actual:?} as `{}`, declared `{declared}`",
+                        decl.name, p.name
                     ),
                     span,
                 };
             }
+        }
+        // A parameter only the result mentions is what the use needs:
+        // `fn empty<T>() -> List<T>` where a `List<Int>` is wanted.
+        let returns = sig.returns.as_ref().and_then(TypeResolution::resolved);
+        if let (Some(r), Some(want)) = (returns, expected) {
+            let mut trial = subst.clone();
+            if instantiate(self.cx.sigs, r, want, &mut trial) {
+                subst = trial;
+            }
+        }
+        let mut instance = Vec::new();
+        for index in 0..decl.type_params.len() as u32 {
+            match subst.get(&(callee, index)) {
+                Some(t) => instance.push(t.clone()),
+                None => {
+                    return Lowering::Unsupported {
+                        construct: "a type parameter no call instantiates",
+                        span,
+                        reason: format!(
+                            "`{}`'s `{}` is fixed by neither its arguments nor its use",
+                            decl.name, decl.type_params[index as usize]
+                        ),
+                    };
+                }
+            }
+        }
+        let ret = match returns {
+            Some(r) => match ty_resolved_with(self.cx.sigs, r, &span, &subst) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            },
+            None if sig.returns.is_some() => {
+                return Lowering::Blocked {
+                    why: format!("`{}`'s result does not resolve", decl.name),
+                    span,
+                };
+            }
+            None => Type::Unit,
+        };
+
+        // **A recursion is a call** (ADR-0050): the callee is compiled once,
+        // beside the export, at this instance, and called. Until 2026-09-25
+        // it was refused: calls are inlined (ADR-0039 §4), and an inlined
+        // recursion has no end.
+        if self.inlining.contains(&callee) {
+            let key = (callee, instance.clone());
+            let begun = !self.internal.borrow_mut().started.insert(key);
+            if !begun {
+                match lower_internal(
+                    self.cx,
+                    self.internal,
+                    callee,
+                    instance.clone(),
+                    subst,
+                    span.clone(),
+                ) {
+                    Lowering::Lowered(f) => self.internal.borrow_mut().done.push(f),
+                    other => return other.map(|_| unreachable!()),
+                }
+            }
+            let result = self.fresh();
+            return Lowering::Lowered(self.push(Instr::Call {
+                result,
+                callee,
+                instance,
+                args,
+                ty: ret,
+            }));
+        }
+
+        let mut bound = BTreeMap::new();
+        for (p, a) in decl.params.iter().zip(&args) {
             bound.insert(p.name.clone(), *a);
         }
         let body = self.cx.hirs[callee.unit].body(body_id);
-        let caller = (std::mem::replace(&mut self.locals, bound), self.unit);
+        let caller = (
+            std::mem::replace(&mut self.locals, bound),
+            self.unit,
+            std::mem::replace(&mut self.subst, subst),
+        );
         self.unit = callee.unit;
         self.inlining.push(callee);
-        let out = self.expr(body, body.root, Some(ret));
+        let out = self.expr(body, body.root, Some(&ret));
         self.inlining.pop();
-        (self.locals, self.unit) = caller;
+        (self.locals, self.unit, self.subst) = caller;
         let v = match out {
             Lowering::Lowered(v) => v,
             other => return other,
         };
         match self.types.get(&v) {
-            Some(t) if t == ret => Lowering::Lowered(v),
+            Some(t) if *t == ret => Lowering::Lowered(v),
             other => Lowering::Blocked {
                 why: format!("`{}` produces a {other:?} and declares {ret:?}", decl.name),
                 span,
@@ -1819,7 +2078,7 @@ impl<'a> Lower<'a> {
                 span,
             };
         };
-        let ty = match ty_resolution(self.cx.sigs, declared, &span) {
+        let ty = match self.ty(declared, &span) {
             Lowering::Lowered(t) => t,
             other => return other.map(|_| unreachable!()),
         };
@@ -2098,15 +2357,6 @@ impl<'a> Lower<'a> {
             }
         }
 
-        // What the callee returns, from that signature. Not inferred here.
-        let ty = match &sig.returns {
-            Some(resolution) => match ty_resolution(self.cx.sigs, resolution, &span) {
-                Lowering::Lowered(ty) => ty,
-                other => return other.map(|_| unreachable!()),
-            },
-            None => Type::Unit,
-        };
-
         let def = resolved;
 
         // **Where does this callee's implementation come from?**
@@ -2134,34 +2384,46 @@ impl<'a> Lower<'a> {
             .and_then(|d| crate::resolve::declaration(self.cx.hirs, d))
             .and_then(crate::backend::host_binding);
 
+        // Allocated whichever way the call goes, as it was before a compiled
+        // call learned its type from its instance (ADR-0050): an inlined
+        // call leaves it unused, and every value numbered after it, and so
+        // every artifact, is what it was.
         let result = self.fresh();
         match binding {
             Some(import) => {
+                // What the host returns, from the signature. Not inferred here.
+                let ty = match &sig.returns {
+                    Some(resolution) => match self.ty(resolution, &span) {
+                        Lowering::Lowered(ty) => ty,
+                        other => return other.map(|_| unreachable!()),
+                    },
+                    None => Type::Unit,
+                };
                 self.push(Instr::ImportCall {
                     result,
                     import,
                     args: lowered,
                     ty,
                 });
+                Lowering::Lowered(result)
             }
             None => match def {
                 // Compiled Pleris: inlined, so the component still exports
-                // one function and imports only the host (ADR-0039 §4).
-                Some(callee) => return self.inline(callee, lowered, &ty, span),
+                // one function and imports only the host (ADR-0039 §4); a
+                // recursion is a call to an instance compiled beside it
+                // (ADR-0050).
+                Some(callee) => self.inline(callee, lowered, expected, span),
                 // A call that needs no authority and whose callee has no
                 // resolved identity here — a platform declaration reached
                 // through the prelude. Refused rather than emitted as a call to
                 // nothing, which is what an invented `DefId` would be.
-                None => {
-                    return Lowering::Unsupported {
-                        construct: "a call to a declaration with no resolved identity",
-                        span,
-                        reason: format!("`{path}` has a signature but no `DefId` visible here"),
-                    };
-                }
+                None => Lowering::Unsupported {
+                    construct: "a call to a declaration with no resolved identity",
+                    span,
+                    reason: format!("`{path}` has a signature but no `DefId` visible here"),
+                },
             },
         }
-        Lowering::Lowered(result)
     }
 }
 

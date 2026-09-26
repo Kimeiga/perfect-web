@@ -279,8 +279,9 @@ fn every_capability_a_function_calls_has_an_import() {
 ///
 /// A call to another declaration encoded to a zero would produce a module that
 /// validates, links, instantiates and does the wrong thing. The lowering
-/// inlines such calls (ADR-0039 §4), so the IR's `Call` reaches the encoder
-/// only from a program built by hand, and it is refused.
+/// inlines such calls (ADR-0039 §4), and compiles a recursive one beside the
+/// export (ADR-0050); a `Call` to an instance nothing compiled comes only from
+/// a program built by hand, and it is refused.
 #[test]
 fn an_unimplemented_instruction_is_refused_rather_than_faked() {
     use pw_core::backend::ir::{Block, BlockId, Function, Instr, Terminator, Type, ValueId};
@@ -299,18 +300,21 @@ fn an_unimplemented_instruction_is_refused_rather_than_faked() {
             instrs: vec![Instr::Call {
                 result: ValueId(0),
                 callee: DefId { unit: 0, decl: 1 },
+                instance: vec![],
                 args: vec![],
                 ty: Type::Int,
             }],
             terminator: Terminator::Return(ValueId(0)),
         }],
         capabilities: vec![],
+        instance: vec![],
+        callees: vec![],
     };
     match wasm::core_module(&resolve, world, &f, "builds", &[]) {
-        Encoding::Unsupported { construct, .. } => {
-            assert!(construct.contains("call to another"), "{construct}")
+        Encoding::Blocked { why } => {
+            assert!(why.contains("nothing compiled"), "{why}")
         }
-        other => panic!("a call must be refused by name: {other}"),
+        other => panic!("a call to nothing compiled must be refused: {other}"),
     }
 }
 
@@ -340,6 +344,8 @@ fn building_a_declared_variant_is_refused() {
             terminator: Terminator::Return(ValueId(0)),
         }],
         capabilities: vec![],
+        instance: vec![],
+        callees: vec![],
     };
     match wasm::core_module(&resolve, world, &f, "builds", &[]) {
         Encoding::Unsupported { construct, .. } => {

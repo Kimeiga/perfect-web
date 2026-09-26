@@ -423,19 +423,30 @@ fn refused(program: &str, id: &str) -> String {
 
 #[test]
 fn what_stays_outside_is_refused_by_name() {
-    let recursion = refused(
-        "module r\n\nfn down(n: Int) -> Int {\n    if n == 0 { 0 } else { down(n - 1) }\n}\n\npublic query Q(n: Int) -> Int { down(n) }\n",
+    // A recursion and a generic callee were refused here until 2026-09-25.
+    // Both compile now (ADR-0050): the recursion beside the export, the
+    // generic callee at the types its arguments give it.
+    let recursion = Runnable::new(compile(
+        &units(&[(
+            "r.pw",
+            "module r\n\nfn down(n: Int) -> Int {\n    if n == 0 { 0 } else { down(n - 1) }\n}\n\npublic query Q(n: Int) -> Int { down(n) }\n",
+        )]),
         "r.Q",
+    ));
+    assert_eq!(
+        recursion.call(&BTreeMap::new(), &[Val::S64(5)]),
+        Ok(vec![Val::S64(0)])
     );
-    assert!(recursion.contains("a recursive call"), "{recursion}");
-
-    let generic = refused(
-        "module r\n\nfn same<T>(x: T) -> T { x }\n\npublic query Q(n: Int) -> Int { same(n) }\n",
+    let generic = Runnable::new(compile(
+        &units(&[(
+            "r.pw",
+            "module r\n\nfn same<T>(x: T) -> T { x }\n\npublic query Q(n: Int) -> Int { same(n) }\n",
+        )]),
         "r.Q",
-    );
-    assert!(
-        generic.contains("generic") || generic.contains("specialization"),
-        "{generic}"
+    ));
+    assert_eq!(
+        generic.call(&BTreeMap::new(), &[Val::S64(7)]),
+        Ok(vec![Val::S64(7)])
     );
 
     // `pw check` refuses it now, before the backend sees it (PW0609,

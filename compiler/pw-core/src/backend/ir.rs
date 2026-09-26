@@ -145,10 +145,16 @@ pub enum Instr {
         value: Const,
         ty: Type,
     },
-    /// A call to another Pleris declaration, by resolved identity.
+    /// **A call to another Pleris declaration, compiled beside this one**
+    /// (ADR-0050): one of the exported function's [`Function::callees`],
+    /// named by its identity and the types it was instantiated at. A call the
+    /// lowering can inline is inlined (ADR-0039 §4); this is a recursive one.
     Call {
         result: ValueId,
         callee: DefId,
+        /// The callee's type arguments, in the order it declares them: which
+        /// of its compiled instances this call reaches.
+        instance: Vec<Type>,
         args: Vec<ValueId>,
         ty: Type,
     },
@@ -544,6 +550,14 @@ pub struct Function {
     /// the contract's `required_capabilities`, narrowed to this declaration,
     /// and the E8 audit compares the built artifact against it.
     pub capabilities: Vec<CapabilityId>,
+    /// For a function compiled beside an export: the type arguments it was
+    /// instantiated at. Empty for an export, and for a callee that declares
+    /// no type parameters.
+    pub instance: Vec<Type>,
+    /// **The declarations this one calls rather than inlines** (ADR-0050),
+    /// every instance the export reaches, transitively, each once. Only an
+    /// exported function has any: a callee's own calls are in this list too.
+    pub callees: Vec<Function>,
 }
 
 impl Function {
@@ -831,6 +845,7 @@ mod tests {
         let ordinary = Instr::Call {
             result: ValueId(1),
             callee: def(7),
+            instance: vec![],
             args: vec![],
             ty: Type::Unit,
         };
