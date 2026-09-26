@@ -1,0 +1,22 @@
+ADR-0076 - an arm no value reaches is refused
+
+produced by: just e10-unreachable-arms
+commit: 99afe09de26e528ae03073a22c7dd8b4a9c2f9e4
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== unreachable arms (compiler/pw-core/tests/unreachable_arms.rs)
+
+test the_analysis_says_which_arm ... ok
+test a_wildcard_after_every_case_is_refused ... ok
+test a_literal_matched_twice_is_refused ... ok
+test an_arm_after_a_wildcard_is_refused ... ok
+test a_case_matched_twice_is_refused ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+== mutation controls (scripts/unreachable_arm_mutations.py)
+
+baseline: 5 passed, 0 failed
+an unreachable arm is not reported: KILLED (4 of 5 tests fail)
+the analysis records no unreachable arm: KILLED (5 of 5 tests fail)
+the arm recorded is the one after: KILLED (4 of 5 tests fail)
+3 of 3 mutants killed
