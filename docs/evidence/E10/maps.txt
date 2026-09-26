@@ -1,0 +1,47 @@
+ADR-0057 - maps and sets
+
+produced by: just e10-maps
+commit: c0eb257ec7c14132a5b52d07a20fde2cc6c3c7b1
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== against BTreeMap and BTreeSet (compiler/pw-conformance/tests/maps.rs)
+
+test a_maps_value_may_be_a_record ... ok
+test a_map_a_host_answers_is_checked_when_it_arrives ... ok
+test a_map_or_set_out_of_order_stops_the_invocation ... ok
+test a_map_is_built_from_two_lists_and_counted_into ... ok
+test a_set_answers_as_a_btreeset_does ... ok
+test a_map_answers_as_a_btreemap_does ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+== the component and the JavaScript module
+
+javascript: 70 queries, 14000 calls, component and module agree (749 trapped in both)
+test the_modules_entry_check_is_the_components ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.61s
+
+== mutation controls (scripts/map_mutations.py)
+
+baseline: 10 passed, 0 failed
+an Int key is never above another: KILLED (4 of 10 tests fail)
+String keys are ordered backwards: KILLED (7 of 10 tests fail)
+a search passes over the key it seeks: KILLED (6 of 10 tests fail)
+a replaced entry is kept beside its replacement: KILLED (4 of 10 tests fail)
+a map's value is read from its key's place: KILLED (5 of 10 tests fail)
+a sort of entries is not stable: KILLED (2 of 10 tests fail)
+a repeated key is kept: KILLED (3 of 10 tests fail)
+a union leaves out what only the second has: KILLED (2 of 10 tests fail)
+the entry check lets a key through twice: KILLED (3 of 10 tests fail)
+a map from outside is not checked: KILLED (2 of 10 tests fail)
+a map a host answers is not checked: KILLED (1 of 10 tests fail)
+the module orders Int keys backwards: KILLED (1 of 10 tests fail)
+the module keeps the first of a repeated key: KILLED (1 of 10 tests fail)
+the module's union leaves out what only the second has: KILLED (1 of 10 tests fail)
+the module's entry check lets a key through twice: KILLED (2 of 10 tests fail)
+15 of 15 mutants killed
+
+NOT CLAIMED: a key of a type other than Int or String, which is refused
+by name. NOT CLAIMED: a map or set inside a parameter's value or a
+host's answer, which is refused because nothing would check it; or a
+for loop over a map or set, which reads it through keys or to_list.
