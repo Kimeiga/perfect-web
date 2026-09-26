@@ -241,13 +241,19 @@ awaited in order. What remains:
   browser's arguments by the component's parameters: `PositiveInt` arrives as
   an `s64`, and any `s64` is accepted. `opaque type PositiveInt = Int` states
   no invariant that could be checked.
-- **A privacy label is not carried through a declared function**
-  (ADR-0063). `List.get(tokens, 0)`, over a list of secrets, is public, and
-  so is `List.map`'s result: a declaration's label is its contract, and
-  `get` declares none for a result holding its argument's element. A name
-  bound over a labelled collection's elements carries its label since
-  ADR-0063: a `for` loop's, an `{#each}` block's, and a lambda's parameters
-  where the lambda is passed to a call.
+- **A privacy label is a value's, not the control flow's** (ADR-0064). An
+  element chosen by a secret index is its list's label, not the index's. A
+  generic function's result carries the labels of the arguments that bring
+  in its type parameters, which stands in for signatures stating how a
+  result's label is made (ruling needed). A name bound over a labelled
+  collection's elements carries its label (ADR-0063).
+- **A call to a function value outside its scope is not reported.**
+  `g(v)`, where `g` is bound only in an earlier block, checks, and the
+  backend refuses it. The call check reads every name the body binds
+  anywhere, where the name check reads scopes. Found 2026-09-26.
+- **A lambda with one parenthesised parameter,** `(x) => x + 1`, reports its
+  `x` as not resolving (PW0021). `x => ..` and `(a, b) => ..` bind. Found
+  2026-09-26.
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.

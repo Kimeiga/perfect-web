@@ -78,6 +78,17 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-09-26: a secret passed through a generic function came
+out public** ([ADR-0064](DECISIONS/ADR-0064-a-label-through-a-call.md)). A
+call to a declared function was labelled by the declaration alone, and none
+of the standard library's list functions declares a label. So a
+`Secret<Payments>` logged publicly passed `pw check` when it went through
+`List.get`, `List.map`'s result, `List.fold`, or a program's own
+`fn first<T>(xs: List<T>) -> Option<T>` on the way. So did `tokens.get(0)`
+over a list nothing typed, whose receiver an undeclared call left out. A
+result that mentions one of its callee's type parameters now carries the
+labels of the arguments that bring it in.
+
 **Correction, 2026-09-26: a name bound twice was checked by none of its
 bindings, and typed and labelled by the wrong one**
 ([ADR-0063](DECISIONS/ADR-0063-every-name-means-one-binding.md)). Three
@@ -119,6 +130,17 @@ had no signature and the whole WIT package failed ("missing component
 signature"): every component of the program was refused. A type is never a
 component now. `a_type_and_a_query_of_one_name_are_two_things` in
 `compiler/pw-conformance/tests/wit_names.rs` is the regression test.
+
+**2026-09-26: a label carried through a call**
+([ADR-0064](DECISIONS/ADR-0064-a-label-through-a-call.md)).
+- A declared call's result joins its declaration's label with the label of
+  each argument whose type mentions a type parameter the result mentions. A
+  piped value and a method call's receiver are the first argument.
+- A lambda is labelled by what it computes, and an undeclared call by all
+  that goes into it, its receiver included.
+- Not done: an implicit flow, such as an element chosen by a secret index.
+
+Evidence: [labels.txt](evidence/E10/labels.txt) (`just e10-labels`).
 
 **2026-09-26: every name means one binding**
 ([ADR-0063](DECISIONS/ADR-0063-every-name-means-one-binding.md)).
@@ -443,6 +465,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0064: a declared call's result carries the labels of the arguments
+  that bring in the type parameters it mentions, standing in for signatures
+  that state how a result's label is made.
 - ADR-0063: an element of a labelled collection carries the collection's
   label, as a `for` loop's names, an `{#each}` block's and a `{#match}`
   arm's do; a lambda passed to a call takes the join of the call's other

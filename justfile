@@ -711,6 +711,24 @@ e10-lexical:
      } > docs/evidence/E10/lexical.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/lexical.txt
 
+# ADR-0064: a label carried through a call. The privacy tests of a result
+# made of its arguments, and the mutation controls.
+e10-labels:
+    @{ echo "ADR-0064 - a label carried through a call"; echo; \
+       echo "produced by: just e10-labels"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== labels through calls (compiler/pw-core/tests/labels_through_calls.rs)"; echo; \
+       cargo test --locked -p pw-core --test labels_through_calls 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/label_call_mutations.py)"; echo; \
+       python3 scripts/label_call_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: an implicit flow, such as an element chosen by a secret"; \
+       echo "index. NOT CLAIMED: a declaration that states how its result's label is"; \
+       echo "made; the rule stands in for one."; \
+     } > docs/evidence/E10/labels.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/labels.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

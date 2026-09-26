@@ -86,18 +86,21 @@ matched (ADR-0059, done), which found four ways a wrong program passed
    ill-typed.
 
 Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
-1. a privacy label carried through a declared function: `List.get` over a
-   list of secrets is public (ADR-0064);
+1. ~~a privacy label carried through a declared function~~, done
+   (ADR-0064), with an undeclared call's receiver;
 2. a value with a hole that means any type (`None`, `[]`, `Err(e)`, `todo`,
    `Secret("")`), which is all 20 of kiokun's undecided relations;
-3. a function passed to a generic declaration in the backend (found writing
+3. the name check and the call check read scopes as `crate::lexical` does:
+   a call to a function value outside its scope is not reported, and
+   `(x) => x + 1` does not bind its `x` (both found 2026-09-26);
+4. a function passed to a generic declaration in the backend (found writing
    ADR-0062's tests), then a generic type at the boundary, a WIT type per
    instance;
-4. structural `==`, and reporting an arm no case reaches;
-5. named-argument calls, the unit value `()`, `derived` purity, calling a
+5. structural `==`, and reporting an arm no case reaches;
+6. named-argument calls, the unit value `()`, `derived` purity, calling a
    function held in a record field, and a hole holding a string;
-6. `Float` `%` and `Float` formatting, then `split` and `range`;
-7. each needing a ruling first:
+7. `Float` `%` and `Float` formatting, then `split` and `range`;
+8. each needing a ruling first:
    - the event as a handler parameter;
    - instance reuse;
    - captures and patches for templates;

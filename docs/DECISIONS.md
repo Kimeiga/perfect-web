@@ -406,3 +406,12 @@ kept them by name. It fixes type errors that passed through any name bound
 twice, a handler capture typed by another binding of its name, and secrets
 logged or rendered through a `for` loop's, a lambda's or an `{#each}` block's
 name.
+
+## 2026-09-26: a label carried through a call (E10)
+
+[ADR-0064](DECISIONS/ADR-0064-a-label-through-a-call.md): a declared call's
+result joins its declaration's label with the label of each argument whose
+type mentions a type parameter the result mentions, so a secret passed
+through `List.get`, `List.map`, `List.fold` or a program's own generic
+function stays secret. A lambda is labelled by what it computes, and a call
+no declaration answers by all that goes into it, its receiver included.

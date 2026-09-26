@@ -55,12 +55,19 @@
 //! bindings were keyed by name, so a name bound twice carried its first
 //! binding's label at both.
 //!
+//! # Through a call
+//!
+//! A declared call's result is the declaration's label, joined with the
+//! label of each argument whose declared type mentions a type parameter the
+//! result mentions (ADR-0064): `List.get(xs, 0)` over a list of secrets is
+//! secret, and `List.length(xs)` is what `length` declares. A lambda is
+//! labelled by what it computes, and a call no declaration answers by all
+//! that goes into it, its receiver included.
+//!
 //! # What it does not do
 //!
-//! Track a label *through* a declared function — `List.get(xs, 0)` over a
-//! list of secrets is public, because `get` declares no label for its result
-//! and a declaration's label is its contract. A witness for that belongs in
-//! `examples/generality/` when someone writes one; it is not claimed here.
+//! Track an implicit flow: an element chosen by a secret index is its list's
+//! label, not the index's. A label is a value's (charter §7.8).
 
 use std::collections::BTreeMap;
 
@@ -79,6 +86,9 @@ pub struct Labels<'a> {
     /// Each binding's label and where it acquired one, by where it is bound
     /// (ADR-0063): two bindings of one name are two entries.
     bindings: BTreeMap<Binder, (Label, Span)>,
+    /// The value each `|>` feeds, keyed by the call on its right: that
+    /// call's first argument.
+    piped: BTreeMap<ExprId, ExprId>,
 }
 
 impl<'a> Labels<'a> {
@@ -98,6 +108,7 @@ impl<'a> Labels<'a> {
             module,
             types: crate::infer::Types::of_body(sigs, decl, body, module),
             bindings: BTreeMap::new(),
+            piped: BTreeMap::new(),
         };
 
         // A label comes from the resolved annotation in its real lexical
@@ -115,7 +126,6 @@ impl<'a> Labels<'a> {
                 }
             }
         }
-        let mut piped: BTreeMap<ExprId, ExprId> = BTreeMap::new();
         for id in body.walk() {
             if let Expr::Binary {
                 op: crate::hir::BinOp::Pipe,
@@ -123,9 +133,10 @@ impl<'a> Labels<'a> {
                 rhs,
             } = body.expr(id)
             {
-                piped.insert(*rhs, *lhs);
+                me.piped.insert(*rhs, *lhs);
             }
         }
+        let piped = me.piped.clone();
 
         // Bindings, to a fixed point. A binding's label is the label of its
         // initialiser, and an initialiser may mention an earlier binding, so
@@ -360,13 +371,62 @@ impl<'a> Labels<'a> {
                     // model is that one declaration answers this, so a helper
                     // that launders a secret is a library-contract defect and
                     // not something to second-guess here.
-                    Some(sig) => sig.label.clone(),
+                    //
+                    // Except where the result is made of what the call is
+                    // given (ADR-0064). A result that mentions one of the
+                    // callee's type parameters carries the label of each
+                    // argument whose declared type mentions it: `List.get`'s
+                    // `Option<T>` is an element of its `List<T>`, whatever
+                    // `get` declares. `List.length`'s `Int` mentions none,
+                    // and keeps the contract.
+                    Some(sig) => {
+                        let mut l = sig.label.clone();
+                        let carried = carried_parameters(sig);
+                        if carried.is_empty() {
+                            return l;
+                        }
+                        // What each parameter is given: a piped value, or a
+                        // method call's receiver, first.
+                        let first = self.piped.get(&id).copied().or(match body.expr(*callee) {
+                            Expr::Field { base, .. }
+                                if self
+                                    .declaration_named(&crate::infer::path_of(body, *callee))
+                                    .is_none() =>
+                            {
+                                Some(*base)
+                            }
+                            _ => None,
+                        });
+                        let given = first.into_iter().chain(args.iter().map(|a| a.value));
+                        for (param, value) in sig.params.iter().zip(given) {
+                            if param
+                                .as_ref()
+                                .and_then(crate::resolved::TypeResolution::resolved)
+                                .is_some_and(|t| mentions_any(t, sig.definition, &carried))
+                            {
+                                l = l.join(&self.label(body, value));
+                            }
+                        }
+                        l
+                    }
                     // Undeclared: conservative. A call whose contract this
                     // program does not state carries whatever went into it,
-                    // which is what stops `wrap(token)` from laundering.
-                    None => args.iter().fold(Label::public(), |acc, a| {
-                        acc.join(&self.label(body, a.value))
-                    }),
+                    // which is what stops `wrap(token)` from laundering: its
+                    // arguments, a piped value, and a method call's receiver.
+                    // The receiver was left out until 2026-09-26, so
+                    // `tokens.get(0)`, over a list nothing typed, was public
+                    // (ADR-0064).
+                    None => {
+                        let receiver = match body.expr(*callee) {
+                            Expr::Field { base, .. } => Some(*base),
+                            _ => None,
+                        };
+                        args.iter()
+                            .map(|a| a.value)
+                            .chain(receiver)
+                            .chain(self.piped.get(&id).copied())
+                            .fold(Label::public(), |acc, v| acc.join(&self.label(body, v)))
+                    }
                 }
             }
 
@@ -408,6 +468,9 @@ impl<'a> Labels<'a> {
                 .unwrap_or_else(Label::public),
 
             Expr::Cast { value, .. } => self.label(body, *value),
+            // A function is labelled by what it computes: `t => "{t}"`,
+            // mapped over secrets, makes secrets (ADR-0064).
+            Expr::Lambda { body: inner, .. } => self.label(body, *inner),
             // The success value carries what the whole value carried.
             Expr::Try { value } => self.label(body, *value),
 
@@ -427,6 +490,40 @@ impl<'a> Labels<'a> {
             _ => Label::public(),
         }
     }
+}
+
+/// The type parameters of `sig`'s own declaration its result mentions.
+fn carried_parameters(sig: &crate::signatures::Signature) -> std::collections::BTreeSet<u32> {
+    fn walk(
+        t: &crate::resolved::ResolvedType,
+        binder: crate::resolve::DefId,
+        out: &mut std::collections::BTreeSet<u32>,
+    ) {
+        if let Some((b, i)) = t.parameter_binding()
+            && b == binder
+        {
+            out.insert(i);
+        }
+        for a in t.args() {
+            walk(a, binder, out);
+        }
+    }
+    let mut out = std::collections::BTreeSet::new();
+    if let Some(r) = sig.result() {
+        walk(r, sig.definition, &mut out);
+    }
+    out
+}
+
+/// Does `t` mention one of `binder`'s type parameters in `these`?
+fn mentions_any(
+    t: &crate::resolved::ResolvedType,
+    binder: crate::resolve::DefId,
+    these: &std::collections::BTreeSet<u32>,
+) -> bool {
+    t.parameter_binding()
+        .is_some_and(|(b, i)| b == binder && these.contains(&i))
+        || t.args().iter().any(|a| mentions_any(a, binder, these))
 }
 
 /// Where a pattern binds each of its names, with their spans.
