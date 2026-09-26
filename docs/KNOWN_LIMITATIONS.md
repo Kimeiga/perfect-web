@@ -289,6 +289,13 @@ awaited in order. What remains:
   and the handler rules. A `requires` predicate names nothing declared, and
   is not checked; nor is a `privacy` label constructor's name, a length, or
   a `conflict` strategy's field.
+- **A `replicated` declaration is parsed, and nothing else** (A-011): no
+  syntax reads one, no runtime keeps one, and its `privacy` clause labels
+  nothing. A declaration's label comes from its `session` or `private`
+  keyword alone, so `privacy User(consumer)` leaves `OrderDraft` public to
+  every analysis. Its values are checked by their domains (ADR-0089).
+- **Which declarations a policy belongs to is checked for the four graph
+  clauses only** (ADR-0092).
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.

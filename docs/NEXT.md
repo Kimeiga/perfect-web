@@ -138,9 +138,14 @@ Next, in order:
    ~~**`pw build` does not run the declaration rules**~~, done
    (ADR-0090): it compiled R-015's `retry forever` query into a component;
 2. ~~**a listener's key**~~, done (ADR-0091): an inventory change never
-   reached its store's menu. Next, what is left of policy position:
-   `requires`, whose predicates nothing declares, and `privacy`'s label
-   constructor, then a key's labels (ADR-0088);
+   reached its store's menu. Then ~~**where a graph clause is written**~~,
+   done (ADR-0092). Next, what is left of policy position, each needing a
+   ruling first:
+   - `requires`, whose predicates nothing declares;
+   - `privacy`, which nothing reads: `replicated OrderDraft` is labelled
+     public whatever it declares;
+   - which declarations every other head belongs to;
+   - a key's labels (ADR-0088);
 3. ~~**a policy operator's arguments**~~, done with the values
    (ADR-0089).
 

@@ -637,3 +637,11 @@ materializer read an event's values as a set, so `InventoryChanged(47, item
 wrote. Each argument of `invalidates_on` is a parameter the entry's key
 binds, or `_` (PW5104), related to the event's values, and the materializer
 compares them position by position.
+
+## 2026-09-26: a dependency-graph clause belongs to a declaration that can mean it (E10)
+
+[ADR-0092](DECISIONS/ADR-0092-a-graph-clause-belongs-to-a-declaration-that-can-mean-it.md):
+a query that `emits`, a command that listens, a `fn` that emits and a page
+that invalidates each checked, and nothing read what they said. A command
+emits and invalidates, a resource or a materialization listens, and a
+materialization depends (PW5105).

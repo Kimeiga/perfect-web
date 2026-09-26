@@ -1145,6 +1145,20 @@ e10-listeners:
      } > docs/evidence/E10/listeners.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/listeners.txt
 
+# ADR-0092: a dependency-graph clause belongs to a declaration that can mean
+# it. Its tests, and the mutation controls.
+e10-clause-places:
+    @{ echo "ADR-0092 - a dependency-graph clause belongs to a declaration that can mean it"; echo; \
+       echo "produced by: just e10-clause-places"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== clause places (compiler/pw-core/tests/clause_places.rs)"; echo; \
+       cargo test --locked -p pw-core --test clause_places 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/clause_place_mutations.py)"; echo; \
+       python3 scripts/clause_place_mutations.py; \
+     } > docs/evidence/E10/clause-places.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/clause-places.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

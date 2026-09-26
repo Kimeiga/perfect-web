@@ -411,6 +411,27 @@ pub fn keyed(head: &str) -> Option<(crate::resolve::Namespace, &'static [crate::
     }
 }
 
+/// **Which declarations a dependency-graph clause belongs to** (ADR-0092),
+/// and what they are, for a message.
+///
+/// ADR-0007 made invalidation explicit: a command emits typed events and
+/// invalidates the entries it changes, and a resource or a materialization
+/// listens for events and depends on resources. A clause elsewhere means
+/// nothing: nothing reads a query's `emits`, and a `fn` is not in the graph.
+/// Other heads are not in this table yet (ruling needed).
+pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'static str)> {
+    use crate::hir::DeclKind as K;
+    Some(match head {
+        "emits" | "invalidates" => (&[K::Command], "a command"),
+        "invalidates_on" => (
+            &[K::Query, K::Subscription, K::Resource, K::Materialize],
+            "a resource or a materialization",
+        ),
+        "depends_on" => (&[K::Materialize], "a materialization"),
+        _ => return None,
+    })
+}
+
 /// The operator a spelling names, within a head's domain.
 ///
 /// Contextual: `merge_by_field` is an operator under `conflict` and nothing

@@ -78,6 +78,17 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a dependency-graph clause belongs to a declaration that can
+mean it**
+([ADR-0092](DECISIONS/ADR-0092-a-graph-clause-belongs-to-a-declaration-that-can-mean-it.md)).
+A query that `emits` or `invalidates`, a command that `invalidates_on` or
+`depends_on`, a `fn` that emits and a page that invalidates each checked.
+The graph drew edges nothing reads, or dropped the clause. Each clause
+belongs to the declarations ADR-0007 gives it now (PW5105).
+
+Evidence: [clause-places.txt](evidence/E10/clause-places.txt)
+(`just e10-clause-places`).
+
 **Correction, 2026-09-26: an inventory change never invalidated its
 store's menu**
 ([ADR-0091](DECISIONS/ADR-0091-a-listener-binds-its-entrys-key.md)). The

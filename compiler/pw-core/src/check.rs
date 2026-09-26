@@ -129,6 +129,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0091: a listener binds its declaration's key.
         per_unit.extend(listener_keys(&u.hir, &u.src));
+        // ADR-0092: a graph clause belongs to a declaration that can mean it.
+        per_unit.extend(clauses_in_place(&u.hir));
         // ADR-0090: the declaration rules. Only `pw check` ran them, beside
         // this function; `pw build` checks through here, and compiled what
         // they refuse: R-015's `retry forever` became a component.
@@ -610,6 +612,81 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
         }
     }
     out
+}
+
+/// **A dependency-graph clause belongs to a declaration that can mean it**
+/// (ADR-0092).
+///
+/// A command emits and invalidates; a resource or a materialization listens;
+/// a materialization depends (`crate::policy::declared_by`). Until 2026-09-26
+/// each clause checked on any declaration: the graph drew a query's `emits`,
+/// which nothing emits, and left out a `fn`'s, which is not in the graph.
+fn clauses_in_place(hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        for p in &decl.policies {
+            let Some((kinds, whom)) = crate::policy::declared_by(&p.name) else {
+                continue;
+            };
+            if kinds.contains(&decl.kind) {
+                continue;
+            }
+            out.push(Diagnostic {
+                code: crate::codes::CLAUSE_OUT_OF_PLACE.id,
+                invariant: crate::codes::CLAUSE_OUT_OF_PLACE.invariant,
+                reason: "clause_out_of_place",
+                detector: Detector::ResourceGraph,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}` is {}, and `{}` belongs to {whom}",
+                    decl.name,
+                    described(decl.kind),
+                    p.name
+                ),
+                primary_span: p.span.clone(),
+                related: vec![Related {
+                    span: hir.decl_span(id),
+                    label: format!("`{}` is declared here", decl.name),
+                }],
+                explanation: Some(
+                    "Invalidation is explicit (ADR-0007): a command emits typed events and \
+                     invalidates the entries it changes, and a resource or a materialization \
+                     listens for events and depends on resources. A clause on another \
+                     declaration means nothing: the materializer reads no query's events and \
+                     no command's dependencies, and a function is not in the graph at all."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: format!("move `{}` to {whom}, or remove it", p.name),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// What a declaration of `kind` is, for a message.
+fn described(kind: DeclKind) -> &'static str {
+    match kind {
+        DeclKind::Query => "a query",
+        DeclKind::Command => "a command",
+        DeclKind::Subscription => "a subscription",
+        DeclKind::Resource => "a resource",
+        DeclKind::Materialize => "a materialization",
+        DeclKind::View => "a view",
+        DeclKind::Component => "a component",
+        DeclKind::Page => "a page",
+        DeclKind::Task => "a task",
+        DeclKind::Event => "an event",
+        DeclKind::Effect => "an effect",
+        DeclKind::Prelude => "a prelude",
+        DeclKind::Fn => "a function",
+        DeclKind::Type | DeclKind::Opaque => "a type",
+        DeclKind::Let => "a value",
+        DeclKind::Import => "an import",
+        DeclKind::Other => "a declaration",
+    }
 }
 
 /// **A listener binds its declaration's key** (ADR-0091).
