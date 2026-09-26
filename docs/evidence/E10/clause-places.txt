@@ -1,0 +1,22 @@
+ADR-0092 - a dependency-graph clause belongs to a declaration that can mean it
+
+produced by: just e10-clause-places
+commit: dd8a5fe1fc702b9ff7d9a3e0b32d332bede825cf
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== clause places (compiler/pw-core/tests/clause_places.rs)
+
+test a_materialization_depends ... ok
+test a_resource_listens ... ok
+test a_command_emits_and_invalidates ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/clause_place_mutations.py)
+
+baseline: 3 passed, 0 failed
+the rule does not run: KILLED (3 of 3 tests fail)
+a clause is in place on any declaration: KILLED (3 of 3 tests fail)
+a query or a function may emit: KILLED (1 of 3 tests fail)
+a command may listen: KILLED (1 of 3 tests fail)
+a command may depend: KILLED (1 of 3 tests fail)
+5 of 5 mutants killed
