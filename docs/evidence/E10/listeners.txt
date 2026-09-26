@@ -1,0 +1,32 @@
+ADR-0091 - a listener binds its entry's key
+
+produced by: just e10-listeners
+commit: 581bae422183350bf415e2e47ba06d15b3cfc233
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== listener keys (compiler/pw-core/tests/listener_keys.rs)
+
+test a_listener_is_given_what_the_event_carries ... ok
+test a_listener_names_a_parameter_or_any_value ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== the materializer (runtime/pw-materialize/tests/listeners.rs)
+
+test a_value_is_compared_at_the_position_its_listener_binds ... ok
+test a_value_is_not_a_match_for_another_part_of_the_key ... ok
+test an_event_reaches_the_entry_its_listener_binds ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== mutation controls (scripts/listener_mutations.py)
+
+baseline: 5 passed, 0 failed
+a listener's argument is a key's: KILLED (2 of 5 tests fail)
+a listener names no event: KILLED (2 of 5 tests fail)
+the listener rule does not run: KILLED (1 of 5 tests fail)
+any name is a parameter: KILLED (1 of 5 tests fail)
+`_` is not any value: KILLED (2 of 5 tests fail)
+a listener's argument is resolved as a term: KILLED (2 of 5 tests fail)
+an event's values are read as a set: KILLED (3 of 5 tests fail)
+a position `_` binds must match: KILLED (2 of 5 tests fail)
+a value matches any part of the key: KILLED (1 of 5 tests fail)
+9 of 9 mutants killed
