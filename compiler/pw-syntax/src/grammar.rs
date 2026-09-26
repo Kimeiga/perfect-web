@@ -962,7 +962,12 @@ impl<'a> P<'a> {
                 self.finish();
                 continue;
             }
-            if self.at(Kind::LParen) {
+            // A call's arguments open on the callee's line. A `(` at the start
+            // of a line begins a new statement, as `<`, `-` and `!` do: `g(n)`
+            // then `()` on the next line are a call and the unit value. Until
+            // 2026-09-26 they parsed as one call, `g(n)()`, which a checker
+            // refused as a name that does not resolve (ADR-0083).
+            if self.at(Kind::LParen) && !self.newline_ahead() {
                 self.b.start_at(cp, K::CallExpr);
                 self.start(K::ArgList);
                 self.bump();

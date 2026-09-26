@@ -1014,6 +1014,22 @@ e10-derived:
      } > docs/evidence/E10/derived.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/derived.txt
 
+# ADR-0083: a call's arguments open on the callee's line. Its tests, the
+# grammar's, and the mutation control.
+e10-call-lines:
+    @{ echo "ADR-0083 - a call's arguments open on the callee's line"; echo; \
+       echo "produced by: just e10-call-lines"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== call lines (compiler/pw-core/tests/call_lines.rs)"; echo; \
+       cargo test --locked -p pw-core --test call_lines 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the grammar (compiler/pw-syntax)"; echo; \
+       cargo test --locked -p pw-syntax 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation control (scripts/call_line_mutations.py)"; echo; \
+       python3 scripts/call_line_mutations.py; \
+     } > docs/evidence/E10/call-lines.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/call-lines.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

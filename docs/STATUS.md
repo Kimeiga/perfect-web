@@ -78,6 +78,15 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a call's arguments open on the callee's line**
+([ADR-0083](DECISIONS/ADR-0083-a-call-opens-on-its-callees-line.md)). A `(`
+at the start of a line continued the expression before it: `g(n)` then `()`
+parsed as `g(n)()`, and a correct function was refused for "`` does not
+resolve". A `(` at the start of a line begins a statement now, as `<`, `-`
+and `!` did already.
+
+Evidence: [call-lines.txt](evidence/E10/call-lines.txt) (`just e10-call-lines`).
+
 **2026-09-26: a `derived` value performs no effect**
 ([ADR-0082](DECISIONS/ADR-0082-a-derived-value-performs-no-effect.md)). The
 charter's `derived` is "a pure value computed from other values", and

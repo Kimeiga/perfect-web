@@ -563,3 +563,10 @@ arrangement serves the checker, the labels and the backend (PW0617).
 charter's `derived` is a pure value computed from other values, and nothing
 held it to that: `let t = derived clock.now()` checked. PW0334 refuses an
 effect inside one, whether called, read through a member or named.
+
+## 2026-09-26: a call's arguments open on the callee's line (E10)
+
+[ADR-0083](DECISIONS/ADR-0083-a-call-opens-on-its-callees-line.md): a `(`
+at the start of a line continued the expression before it, so `g(n)` then
+`()` parsed as `g(n)()` and a correct program was refused for "`` does not
+resolve". It begins a new statement now, as `<`, `-` and `!` do.

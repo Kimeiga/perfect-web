@@ -117,8 +117,8 @@ Next, in order, taken up 2026-09-26 after ADR-0063, findings before features:
    instance;
 5. structural `==`; ~~reporting an arm no case reaches~~, done (ADR-0076);
 6. ~~named-argument calls~~, done (ADR-0081), which found them compiled
-   in written order; ~~`derived` purity~~, done (ADR-0082); the unit
-   value `()`, calling a
+   in written order; ~~`derived` purity~~, done (ADR-0082); ~~`()` on the
+   next line parsed as a call~~, done (ADR-0083); calling a
    function held in a record field (checked since ADR-0077; the backend
    refuses it by name), and a hole holding a string;
 7. `Float` `%` and `Float` formatting, then `split` and `range`;
