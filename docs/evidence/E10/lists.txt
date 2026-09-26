@@ -1,0 +1,19 @@
+ADR-0069 - a list's items share one type, and an Int literal fits an Int
+
+produced by: just e10-lists
+commit: 34d1511cc2992ea4d6f2b5c59a0e849d9f36c642
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== lists and literals (compiler/pw-core/tests/lists_and_literals.rs)
+
+test an_int_literal_fits_an_int ... ok
+test a_lists_items_share_one_type ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+== mutation controls (scripts/list_literal_mutations.py)
+
+baseline: 2 passed, 0 failed
+a list's items are not related: KILLED (1 of 2 tests fail)
+a list's items agree whatever their types: KILLED (1 of 2 tests fail)
+an `Int` literal of any size is an `Int`: KILLED (1 of 2 tests fail)
+3 of 3 mutants killed
