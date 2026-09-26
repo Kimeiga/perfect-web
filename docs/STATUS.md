@@ -78,6 +78,20 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a declared sum type in a template's match**
+([ADR-0061](DECISIONS/ADR-0061-template-matches-over-sum-types.md)).
+- A template's `{#match}` takes a declared sum type apart, where it was
+  refused (PW5019). Its arms are checked as any match's: a missing case
+  (PW0305), a case the type lacks (PW0608), a field count (PW0603).
+- An arm binds each field of its case, `{:Rect(w, h)}`, and may name its
+  type, `{:Shape.Circle(r)}`.
+- The template IR names a declared case by its WIT name, as the value a
+  component gives does; the renderer binds a case's several fields from a
+  list, and kiokun's server carries a declared case to it.
+
+Evidence: [template-sum-types.txt](evidence/E10/template-sum-types.txt)
+(`just e10-template-sum-types`).
+
 **Correction, 2026-09-26: a case named under another compiled as a
 binding** ([ADR-0060](DECISIONS/ADR-0060-nested-and-literal-patterns.md)).
 `match o { Some(Empty) => 1, None => 0 }` over an `Option<Shape>` passed
@@ -358,6 +372,9 @@ E9 claims generic callables are instantiated per call.
 The parser now refuses such a name (PW0013, ADR-0041, ruling needed).
 
 Decisions awaiting a ruling:
+- ADR-0061: a declared case named like the language's own (`Some`, `None`,
+  `Ok`, `Err`) is refused in a template, whose value names those cases the
+  language's way.
 - ADR-0060: a match that is not one level deep compiles to a decision tree
   that copies an arm's body onto each path reaching it, rather than a join
   point, which the structured IR has no jump for.

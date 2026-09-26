@@ -2898,12 +2898,7 @@ fn template_blocks(
         let span = body.node_span(n);
         // Each branch marker with what it carries: as written, whether it has
         // a condition, and the arm it names.
-        type Marker<'b> = (
-            hir::NodeId,
-            String,
-            bool,
-            &'b Option<(String, Option<String>)>,
-        );
+        type Marker<'b> = (hir::NodeId, String, bool, &'b Option<hir::TemplateArm>);
         let branches: Vec<Marker<'_>> = children
             .iter()
             .filter_map(|c| match body.node(*c) {
@@ -3021,85 +3016,179 @@ fn template_blocks(
                             .to_string(),
                     ));
                 }
-                let family = |case: &str| match case {
+                // What the subject is, and its cases with each one's field
+                // count: the language's `Option` or `Result`, or a declared
+                // sum type (ADR-0061). A subject of unknown type takes its
+                // family from its first arm, if that arm is the language's.
+                // A subject's family: its name, each case with its field
+                // count, and the declaration of a declared one.
+                type Family = (String, Vec<(String, usize)>, Option<crate::resolve::DefId>);
+                let builtin = |family: &str| -> Family {
+                    let cases = match family {
+                        "Option" => vec![("Some".to_string(), 1), ("None".to_string(), 0)],
+                        _ => vec![("Ok".to_string(), 1), ("Err".to_string(), 1)],
+                    };
+                    (family.to_string(), cases, None)
+                };
+                let family_of = |case: &str| match case {
                     "Some" | "None" => Some("Option"),
                     "Ok" | "Err" => Some("Result"),
                     _ => None,
                 };
-                let subject_family =
-                    subject
-                        .and_then(|s| types.of(body, s))
-                        .map(|ty| match ty.as_builtin() {
-                            Some(Builtin::Option) => Ok("Option"),
-                            Some(Builtin::Result) => Ok("Result"),
-                            _ => Err(ty.to_string()),
-                        });
-                if let Some(Err(other)) = &subject_family {
-                    out.push(malformed(
-                        span.clone(),
-                        format!(
-                            "a `{{#match}}` takes an `Option` or a `Result` apart, and its \
-                             subject is `{other}`"
-                        ),
-                    ));
-                    continue;
-                }
+                let subject_ty = subject.and_then(|s| types.of(body, s));
+                let mut cases: Option<Family> = match &subject_ty {
+                    Some(ty) => match ty.as_builtin() {
+                        Some(Builtin::Option) => Some(builtin("Option")),
+                        Some(Builtin::Result) => Some(builtin("Result")),
+                        _ => {
+                            let declared = ty.def_id().and_then(|d| {
+                                let vs = sigs.type_decl(d)?.variants.as_ref()?;
+                                Some((d, vs))
+                            });
+                            let Some((def, vs)) = declared else {
+                                out.push(malformed(
+                                    span.clone(),
+                                    format!(
+                                        "a `{{#match}}` takes an `Option`, a `Result` or a \
+                                             sum type apart, and its subject is `{ty}`"
+                                    ),
+                                ));
+                                continue;
+                            };
+                            Some((
+                                ty.to_string(),
+                                vs.iter().map(|(n, fs)| (n.clone(), fs.len())).collect(),
+                                Some(def),
+                            ))
+                        }
+                    },
+                    None => None,
+                };
+                let unit = sigs.unit_of(hir.module_of(id));
                 let mut seen: Vec<String> = Vec::new();
-                let mut typed: Option<&str> = subject_family.and_then(Result::ok);
                 for (b, marker, _, arm) in &branches {
-                    let Some((case, _)) = arm else {
+                    let Some(arm) = arm else {
                         out.push(malformed(
                             body.node_span(*b),
                             format!(
-                                "`{marker}` is not an arm: a `{{#match}}` arm is \
-                                 `{{:Some(x)}}`, `{{:None}}`, `{{:Ok(v)}}` or `{{:Err(e)}}`"
+                                "`{marker}` is not an arm: a `{{#match}}` arm is a case, \
+                                 `{{:Some(x)}}`, `{{:None}}` or a declared case like \
+                                 `{{:Circle(r)}}`"
                             ),
                         ));
                         continue;
                     };
-                    let Some(f) = family(case) else {
-                        out.push(malformed(
-                            body.node_span(*b),
-                            format!(
-                                "`{case}` is a declared type's constructor; a template \
-                                 matches `Option` and `Result` only (ADR-0042)"
-                            ),
-                        ));
+                    let short = arm.short().to_string();
+                    if cases.is_none() {
+                        match family_of(&short) {
+                            Some(f) => cases = Some(builtin(f)),
+                            None => {
+                                out.push(malformed(
+                                    body.node_span(*b),
+                                    format!(
+                                        "`{short}` is a declared type's case, and the \
+                                         subject's type is not known here"
+                                    ),
+                                ));
+                                continue;
+                            }
+                        }
+                    }
+                    let Some((ty_name, declared, def)) = cases.as_ref() else {
                         continue;
                     };
-                    match typed {
-                        Some(t) if t != f => out.push(Diagnostic {
-                            code: crate::codes::PATTERN_CONSTRUCTOR.id,
-                            invariant: crate::codes::PATTERN_CONSTRUCTOR.invariant,
-                            reason: "pattern_names_a_constructor_its_type_lacks",
+                    let not_a_case = |why: &str| Diagnostic {
+                        code: crate::codes::PATTERN_CONSTRUCTOR.id,
+                        invariant: crate::codes::PATTERN_CONSTRUCTOR.invariant,
+                        reason: "pattern_names_a_constructor_its_type_lacks",
+                        detector: Detector::PatternMatrix,
+                        severity: Severity::Error,
+                        message: format!("`{why}` is not a constructor of `{ty_name}`"),
+                        primary_span: body.node_span(*b),
+                        related: related(),
+                        explanation: None,
+                        repairs: vec![Repair {
+                            description: format!(
+                                "`{ty_name}`'s constructors are {}",
+                                declared
+                                    .iter()
+                                    .map(|(c, _)| format!("`{c}`"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
+                            replacement: None,
+                        }],
+                    };
+                    // `{:Shape.Circle(r)}`: the qualifier names the type
+                    // matched.
+                    if let Some((q, _)) = arm.case.rsplit_once('.') {
+                        use crate::resolve::{Namespace, Resolution};
+                        let named = unit.map(|u| match q.contains('.') {
+                            true => sigs.workspace().resolve_path_in(u, Namespace::Type, q),
+                            false => sigs.workspace().resolve_in(u, Namespace::Type, q),
+                        });
+                        let same = matches!(
+                            (named, def),
+                            (Some(Resolution::Local(d) | Resolution::Imported { def: d, .. }), Some(t))
+                                if d == *t
+                        );
+                        if !same {
+                            out.push(not_a_case(&arm.case));
+                            continue;
+                        }
+                    }
+                    let Some((_, fields)) = declared.iter().find(|(c, _)| *c == short) else {
+                        out.push(not_a_case(&short));
+                        continue;
+                    };
+                    // A payload's fields, bound all or not at all.
+                    if !arm.bindings.is_empty() && arm.bindings.len() != *fields {
+                        out.push(Diagnostic {
+                            code: crate::codes::CONSTRUCTOR_ARITY.id,
+                            invariant: crate::codes::CONSTRUCTOR_ARITY.invariant,
+                            reason: "constructor_pattern_arity_mismatch",
                             detector: Detector::PatternMatrix,
                             severity: Severity::Error,
-                            message: format!("`{case}` is not a constructor of `{t}`"),
+                            message: format!(
+                                "`{short}` binds {} field(s) but declares {fields}",
+                                arm.bindings.len()
+                            ),
                             primary_span: body.node_span(*b),
                             related: related(),
                             explanation: None,
-                            repairs: Vec::new(),
-                        }),
-                        Some(_) => {}
-                        None => typed = Some(f),
+                            repairs: vec![Repair {
+                                description: format!(
+                                    "bind each of `{short}`'s {fields} field(s), or none"
+                                ),
+                                replacement: None,
+                            }],
+                        });
                     }
-                    if seen.contains(case) {
+                    // A declared case named like the language's own reaches a
+                    // template as that name, which is the language's.
+                    if def.is_some() && family_of(&short).is_some() {
                         out.push(malformed(
                             body.node_span(*b),
-                            format!("a second `{{:{case}}}` arm can never render"),
+                            format!(
+                                "`{short}` is a declared case named like the language's own, \
+                                 which a template cannot tell apart"
+                            ),
                         ));
                     }
-                    seen.push(case.clone());
+                    if seen.contains(&short) {
+                        out.push(malformed(
+                            body.node_span(*b),
+                            format!("a second `{{:{short}}}` arm can never render"),
+                        ));
+                    }
+                    seen.push(short);
                 }
-                let Some(t) = typed else { continue };
-                let cases: &[&str] = if t == "Option" {
-                    &["Some", "None"]
-                } else {
-                    &["Ok", "Err"]
+                let Some((_, declared, _)) = &cases else {
+                    continue;
                 };
-                let missing: Vec<&str> = cases
+                let missing: Vec<&str> = declared
                     .iter()
-                    .copied()
+                    .map(|(c, _)| c.as_str())
                     .filter(|c| !seen.iter().any(|s| s == c))
                     .collect();
                 if !missing.is_empty() {

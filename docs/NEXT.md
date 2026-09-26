@@ -75,7 +75,7 @@ matched (ADR-0059, done), which found four ways a wrong program passed
 `pw check`. Next, in order:
 1. ~~nested and literal patterns~~, done (ADR-0060), which found a silent
    miscompile: `Some(Empty)` bound every payload;
-2. a declared sum type in a template's `{#match}`;
+2. ~~a declared sum type in a template's `{#match}`~~, done (ADR-0061);
 3. generic records and generic sum types in the backend: a nominal type
    carrying its arguments;
 4. the value relations' flat environment: a name bound at two sites;

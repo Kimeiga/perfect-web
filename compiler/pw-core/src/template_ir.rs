@@ -303,14 +303,20 @@ pub enum Part {
     Blocked { reason: String, at: String },
 }
 
-/// One arm of a [`Part::Match`]: its case, the name its payload is bound to,
-/// and what it renders.
+/// One arm of a [`Part::Match`]: its case, the names its payload is bound
+/// to, and what it renders.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Arm {
-    /// `Some`, `None`, `Ok` or `Err`.
+    /// `Some`, `None`, `Ok` or `Err`; a declared case by its WIT name,
+    /// `circle` (ADR-0061).
     pub case: String,
+    /// The payload of a case of one field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub binding: Option<String>,
+    /// Each field of a case of several, whose payload is a list of them
+    /// (ADR-0061).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<String>,
     pub body: Vec<Chunk>,
 }
 
@@ -991,15 +997,27 @@ fn lower_block(
         }
         let mut arms = Vec::new();
         for (marker, run) in &branches {
-            let Some((case, binding)) = marker.arm else {
+            let Some(arm) = marker.arm else {
                 out.push(blocked(
                     "a `{#match}` arm is `{:Some(x)}` or `{:None}`".to_string(),
                 ));
                 return;
             };
+            // A declared case as a component value names it: `circle` for
+            // `Circle`, as its WIT case is (ADR-0061). The language's own
+            // four keep their names.
+            let case = match arm.short() {
+                c @ ("Some" | "None" | "Ok" | "Err") => c.to_string(),
+                c => crate::wit::ident(c),
+            };
+            let (binding, fields) = match arm.bindings.as_slice() {
+                [one] => (Some(one.clone()), Vec::new()),
+                many => (None, many.to_vec()),
+            };
             arms.push(Arm {
-                case: case.clone(),
-                binding: binding.clone(),
+                case,
+                binding,
+                fields,
                 body: lower_run(body, run, ctx, ix),
             });
         }
@@ -1108,7 +1126,7 @@ fn opens(d: &str, head: &str) -> bool {
 struct Marker<'b> {
     written: &'b str,
     condition: Option<ExprId>,
-    arm: &'b Option<(String, Option<String>)>,
+    arm: &'b Option<crate::hir::TemplateArm>,
 }
 
 /// A block's children split at its branch markers: the run before the first

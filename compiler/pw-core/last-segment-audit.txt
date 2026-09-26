@@ -35,6 +35,8 @@ effects.rs:infer_rooted    display    the short name for `Via::Helper { helper }
 
 effects.rs:resolved   scoped     the scoped-and-unique member branch. Matched against the declarations THIS UNIT can see — its own module and its imports — and two matches means no answer. Never program-wide.
 
+lower.rs:constructor_arm    syntax    takes the case out of a template arm's marker as written, `Shape.Circle` in `{:Shape.Circle(r)}` (ADR-0061). Pure text handling of source syntax; the checker resolves the qualifier and the case against the subject's type.
+
 koka.rs:lower_pattern      encoding   emits a constructor name into generated Koka source. Koka is the differential oracle, not a product surface, and its namespace is flat by construction. Nothing reads this back as a pw identity.
 
 

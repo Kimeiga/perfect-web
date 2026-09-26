@@ -339,7 +339,8 @@ impl App {
 /// A component value as the renderer reads it. A WIT record field is named in
 /// kebab-case and a template reads the Pleris name, so `unit-price` becomes
 /// `unit_price`. An `Option` or a `Result` is a variant, which a template
-/// takes apart with `{#match}` (ADR-0042).
+/// takes apart with `{#match}` (ADR-0042); so is a declared sum type's case,
+/// by its WIT name, its fields a list when it has several (ADR-0061).
 pub fn value(v: &Val) -> Option<Value> {
     let case = |case: &str, payload: Option<&Val>| {
         Some(Value::Variant {
@@ -365,6 +366,9 @@ pub fn value(v: &Val) -> Option<Value> {
         Val::Option(None) => case("None", None)?,
         Val::Result(Ok(ok)) => case("Ok", ok.as_deref())?,
         Val::Result(Err(err)) => case("Err", err.as_deref())?,
+        Val::Variant(name, payload) => case(name, payload.as_deref())?,
+        // A case's several fields (ADR-0061).
+        Val::Tuple(parts) => Value::List(parts.iter().map(value).collect::<Option<_>>()?),
         _ => return None,
     })
 }

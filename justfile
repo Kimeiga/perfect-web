@@ -655,6 +655,29 @@ e10-handlers-compute:
      } > docs/evidence/E10/handlers-compute.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-compute.txt
 
+# ADR-0061: a declared sum type in a template's `{#match}`. The checker's
+# reading of each arm, the template IR's names for the cases, the renderer
+# binding a case's fields, kiokun's server carrying a case, and the mutation
+# controls.
+e10-template-sum-types:
+    @{ echo "ADR-0061 - a declared sum type in a template's match"; echo; \
+       echo "produced by: just e10-template-sum-types"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker and the template IR (compiler/pw-core/tests/template_blocks.rs)"; echo; \
+       cargo test --locked -p pw-core --test template_blocks 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer (runtime/pw-render/tests/branches.rs)"; echo; \
+       cargo test --locked -p pw-render --test branches 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== kiokun's server"; echo; \
+       cargo test --locked -p kiokun-server a_declared_case 2>&1 | grep -E '^(test |test result: ok. [1-9])'; \
+       echo; echo "== mutation controls (scripts/template_match_mutations.py)"; echo; \
+       python3 scripts/template_match_mutations.py; \
+       echo; \
+       echo "NOT CLAIMED: a nested or literal pattern in a template arm. NOT CLAIMED:"; \
+       echo "patches for a {#match} region, which renders on the server."; \
+     } > docs/evidence/E10/template-sum-types.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/template-sum-types.txt
+
 # ADR-0060: nested and literal patterns. The checker's analysis and the
 # typing of what a nested pattern binds, each match compiled to a decision
 # tree and run through the E8 host against a Rust model, the component

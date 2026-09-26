@@ -185,6 +185,33 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn a_declared_case_reaches_the_renderer_by_its_wit_name() {
+        // `Rect(3, 4)` from a component, as a template's `{:Rect(w, h)}`
+        // takes it apart (ADR-0061).
+        let rect = Val::Variant(
+            "rect".into(),
+            Some(Box::new(Val::Tuple(vec![Val::S64(3), Val::S64(4)]))),
+        );
+        assert_eq!(
+            app::value(&rect),
+            Some(pw_render::Value::Variant {
+                case: "rect".into(),
+                payload: Some(Box::new(pw_render::Value::List(vec![
+                    pw_render::Value::Int(3),
+                    pw_render::Value::Int(4)
+                ]))),
+            })
+        );
+        assert_eq!(
+            app::value(&Val::Variant("empty".into(), None)),
+            Some(pw_render::Value::Variant {
+                case: "empty".into(),
+                payload: None,
+            })
+        );
+    }
+
     fn field<'a>(v: &'a Val, name: &str) -> &'a Val {
         let Val::Record(fields) = v else {
             panic!("not a record: {v:?}")

@@ -279,12 +279,6 @@ fn a_malformed_block_is_refused() {
             "is not an arm",
         ),
         (
-            "s: Shape",
-            "{#match s}{:Circle}<p>c</p>{:Square}<p>s</p>{/match}",
-            "PW5019",
-            "its subject is",
-        ),
-        (
             "name: String",
             "{#match name}{:Some(x)}<p>x</p>{:None}<p>-</p>{/match}",
             "PW5019",
@@ -294,7 +288,7 @@ fn a_malformed_block_is_refused() {
             "found",
             "{#match found}{:Circle}<p>c</p>{/match}",
             "PW5019",
-            "declared type's constructor",
+            "declared type's case",
         ),
         (
             "found: Option<Hit>",
@@ -321,6 +315,73 @@ fn a_malformed_block_is_refused() {
         assert!(
             ds.iter()
                 .any(|d| d.code == *code && d.message.contains(says)),
+            "{view}: expected {code} saying {says:?}, got {ds:?}"
+        );
+    }
+}
+
+/// A page over `f: Figure`, a declared sum type with fields (ADR-0061).
+fn figure_page(view: &str) -> String {
+    format!(
+        "module m\n\ntype Figure =\n    | Rect(Int, Int)\n    | Dot(String)\n    | Nothing\n\n\
+         type Other =\n    | Rect(Int, Int)\n\n\
+         page P(f: Figure) {{\n    view {{\n        <main>\n{view}\n        </main>\n    }}\n}}\n"
+    )
+}
+
+#[test]
+fn a_declared_sum_type_is_taken_apart_in_a_template() {
+    // Refused (PW5019) until ADR-0061.
+    let src = page(
+        "s: Shape",
+        "{#match s}{:Circle}<p>c</p>{:Square}<p>s</p>{/match}",
+    );
+    assert!(diagnostics(&src).is_empty(), "{:?}", diagnostics(&src));
+
+    // Each case by its WIT name, as a component value carries it; a case of
+    // several fields binds each; one of one field binds its payload.
+    let src = figure_page(
+        "{#match f}{:Rect(w, h)}<p>{w}x{h}</p>{:Figure.Dot(t)}<p>{t}</p>{:Nothing}<p>-</p>{/match}",
+    );
+    assert!(diagnostics(&src).is_empty(), "{:?}", diagnostics(&src));
+    let ir = chunks(&src);
+    let m = one(&ir, "match");
+    let arms = m["arms"].as_array().expect("arms");
+    let cases: Vec<&str> = arms.iter().map(|a| a["case"].as_str().unwrap()).collect();
+    assert_eq!(cases, ["rect", "dot", "nothing"]);
+    assert_eq!(arms[0]["fields"], serde_json::json!(["w", "h"]));
+    assert_eq!(arms[1]["binding"], "t");
+    assert!(arms[2].get("binding").is_none() && arms[2].get("fields").is_none());
+}
+
+#[test]
+fn a_template_match_over_a_declared_type_is_checked_as_any_match() {
+    for (view, code, says) in [
+        (
+            "{#match f}{:Rect(w, h)}<p>x</p>{:Nothing}<p>-</p>{/match}",
+            "PW0305",
+            "does not cover `Dot`",
+        ),
+        (
+            "{#match f}{:Rect(w, h)}<p>x</p>{:Dot(t)}<p>x</p>{:Nothing}<p>-</p>{:Square}<p>s</p>{/match}",
+            "PW0608",
+            "`Square` is not a constructor of",
+        ),
+        (
+            "{#match f}{:Rect(w)}<p>x</p>{:Dot(t)}<p>x</p>{:Nothing}<p>-</p>{/match}",
+            "PW0603",
+            "`Rect` binds 1 field(s) but declares 2",
+        ),
+        (
+            "{#match f}{:Other.Rect(w, h)}<p>x</p>{:Dot(t)}<p>x</p>{:Nothing}<p>-</p>{/match}",
+            "PW0608",
+            "`Other.Rect` is not a constructor of",
+        ),
+    ] {
+        let ds = diagnostics(&figure_page(view));
+        assert!(
+            ds.iter()
+                .any(|d| d.code == code && d.message.contains(says)),
             "{view}: expected {code} saying {says:?}, got {ds:?}"
         );
     }

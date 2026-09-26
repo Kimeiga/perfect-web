@@ -192,10 +192,16 @@ pub enum Part {
 /// One arm of a [`Part::Match`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Arm {
-    /// `Some`, `None`, `Ok` or `Err`.
+    /// `Some`, `None`, `Ok` or `Err`; a declared sum type's case by its WIT
+    /// name, `circle` (ADR-0061).
     pub case: String,
+    /// The payload of a case of one field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub binding: Option<String>,
+    /// Each field of a case of several, whose payload is a list of them
+    /// (ADR-0061).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<String>,
     pub body: Vec<Chunk>,
 }
 

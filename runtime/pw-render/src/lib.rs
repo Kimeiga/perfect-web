@@ -138,8 +138,10 @@ pub enum Value {
         capability: String,
     },
     /// `Some(v)`, `None`, `Ok(v)` or `Err(e)`: a case and its payload, which
-    /// `{#match}` takes apart (ADR-0042). It has no text form, and it is not
-    /// a condition: `{#if}` on one is refused.
+    /// `{#match}` takes apart (ADR-0042). A declared sum type's case is named
+    /// as its WIT case is, and a payload of several fields is a list of them
+    /// (ADR-0061). It has no text form, and it is not a condition: `{#if}` on
+    /// one is refused.
     Variant {
         case: String,
         payload: Option<Box<Value>>,
@@ -729,7 +731,7 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                     at: value.clone(),
                 }
             })?;
-            let scoped = match (&arm.binding, payload) {
+            let mut scoped = match (&arm.binding, payload) {
                 (Some(name), Some(p)) => env.with(name, (**p).clone()),
                 (Some(_), None) => {
                     return Err(Blocked::UnrepresentedConstruct {
@@ -739,6 +741,29 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
                 }
                 (None, _) => env.clone(),
             };
+            // A case of several fields: its payload is a list of them, one
+            // per name (ADR-0061).
+            if !arm.fields.is_empty() {
+                let Some(Value::List(parts)) = payload.as_deref() else {
+                    return Err(Blocked::UnrepresentedConstruct {
+                        reason: format!("`{case}` has no fields to bind"),
+                        at: value.clone(),
+                    });
+                };
+                if parts.len() != arm.fields.len() {
+                    return Err(Blocked::UnrepresentedConstruct {
+                        reason: format!(
+                            "`{case}` has {} field(s), and the arm binds {}",
+                            parts.len(),
+                            arm.fields.len()
+                        ),
+                        at: value.clone(),
+                    });
+                }
+                for (name, part) in arm.fields.iter().zip(parts) {
+                    scoped = scoped.with(name, part.clone());
+                }
+            }
             out.push_str(&format!("<!--pw:s{id}-->"));
             emit(&arm.body, &scoped, others, out)?;
             out.push_str(&format!("<!--pw:e{id}-->"));

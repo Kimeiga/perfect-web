@@ -376,3 +376,12 @@ type, and `true`, `false` and each literal are constructors. The backend
 compiles any match that is not one level deep to a decision tree of nested
 matches and tests. It fixes a silent miscompile: `Some(Empty)` bound every
 payload to a name `Empty`.
+
+## 2026-09-26: a declared sum type in a template's match (E10)
+
+[ADR-0061](DECISIONS/ADR-0061-template-matches-over-sum-types.md): a
+template's `{#match}` takes a declared sum type apart, checked as any match
+is. An arm binds each field of its case, `{:Rect(w, h)}`, and may name its
+type. The template IR names a declared case by its WIT name, as the value a
+component gives does, and a case of several fields is a list the renderer
+binds field by field.

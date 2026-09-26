@@ -627,7 +627,7 @@ impl Walk<'_> {
                                 w.expr(e);
                             }
                             w.scopes
-                                .push(case.and_then(|(_, b)| b).into_iter().collect());
+                                .push(case.into_iter().flat_map(|a| a.bindings).collect());
                             in_arm = true;
                             continue;
                         }

@@ -733,12 +733,8 @@ pub fn local_bindings_from(body: &crate::hir::Body, root: crate::hir::ExprId) ->
             // `{:Some(x)}` arm binds `x` for its own (ADR-0042).
             Expr::Template { roots, .. } => {
                 for n in body.walk_markup(roots) {
-                    if let Node::Branch {
-                        arm: Some((_, Some(name))),
-                        ..
-                    } = body.node(n)
-                    {
-                        out.insert(name.clone());
+                    if let Node::Branch { arm: Some(arm), .. } = body.node(n) {
+                        out.extend(arm.bindings.iter().cloned());
                         continue;
                     }
                     let Node::Block { directive, .. } = body.node(n) else {

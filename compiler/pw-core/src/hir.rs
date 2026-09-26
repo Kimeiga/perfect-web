@@ -995,10 +995,27 @@ pub enum Node {
         marker: String,
         /// `c` in `{:else if c}`.
         condition: Option<ExprId>,
-        /// `("Some", Some("x"))` for `{:Some(x)}`, `("None", None)` for
-        /// `{:None}`: a `{#match}` arm.
-        arm: Option<(String, Option<String>)>,
+        /// `{:Some(x)}`, `{:None}`, `{:Shape.Rect(w, h)}`: a `{#match}` arm.
+        arm: Option<TemplateArm>,
     },
+}
+
+/// **A `{#match}` arm's marker** (ADR-0042, ADR-0061): the case it takes,
+/// and the name each field of the case's payload is bound to.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TemplateArm {
+    /// As written: `Some`, `Circle`, or `Shape.Circle` through its type.
+    pub case: String,
+    /// One name per field, in order: `x` in `{:Some(x)}`, `w` and `h` in
+    /// `{:Rect(w, h)}`; none for `{:None}`.
+    pub bindings: Vec<String>,
+}
+
+impl TemplateArm {
+    /// The case's own name, without the type a qualified marker names.
+    pub fn short(&self) -> &str {
+        self.case.rsplit_once('.').map_or(&self.case, |(_, c)| c)
+    }
 }
 
 #[derive(Debug, Clone)]

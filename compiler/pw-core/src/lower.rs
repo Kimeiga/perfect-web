@@ -1561,24 +1561,35 @@ fn is_expr(k: K) -> bool {
 
 /// `Some(x)` in `{:Some(x)}`: a constructor and at most one name it binds.
 /// `None` for anything else, `else` included, which the markup rules judge.
-fn constructor_arm(inner: &str) -> Option<(String, Option<String>)> {
+fn constructor_arm(inner: &str) -> Option<crate::hir::TemplateArm> {
     let ident = |s: &str| {
         let mut c = s.chars();
         c.next().is_some_and(|f| f.is_alphabetic() || f == '_')
             && c.all(|x| x.is_alphanumeric() || x == '_')
     };
-    let (name, binding) = match inner.split_once('(') {
+    let (name, fields) = match inner.split_once('(') {
         Some((n, rest)) => (n.trim(), Some(rest.strip_suffix(')')?.trim())),
         None => (inner, None),
     };
-    if !name.starts_with(|c: char| c.is_uppercase()) || !ident(name) {
+    // `Circle`, or `Shape.Circle` through its type (ADR-0061).
+    let case = name.rsplit('.').next().unwrap_or(name);
+    if !case.starts_with(|c: char| c.is_uppercase()) || !name.split('.').all(ident) {
         return None;
     }
-    match binding {
-        None => Some((name.to_string(), None)),
-        Some(b) if ident(b) => Some((name.to_string(), Some(b.to_string()))),
-        Some(_) => None,
-    }
+    let bindings = match fields {
+        None => Vec::new(),
+        Some(f) => {
+            let names: Vec<&str> = f.split(',').map(str::trim).collect();
+            if !names.iter().all(|n| ident(n)) {
+                return None;
+            }
+            names.into_iter().map(str::to_string).collect()
+        }
+    };
+    Some(crate::hir::TemplateArm {
+        case: name.to_string(),
+        bindings,
+    })
 }
 
 /// Is this node one of a block's own `{#..}` / `{/..}` / `{:..}` markers?

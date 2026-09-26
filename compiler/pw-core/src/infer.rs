@@ -186,22 +186,35 @@ impl<'a> Types<'a> {
                 continue;
             };
             for c in children {
-                let crate::hir::Node::Branch {
-                    arm: Some((case, Some(name))),
-                    ..
-                } = body.node(*c)
-                else {
+                let crate::hir::Node::Branch { arm: Some(arm), .. } = body.node(*c) else {
                     continue;
                 };
-                let payload = match (ty.as_builtin(), case.as_str()) {
+                let payload = match (ty.as_builtin(), arm.short()) {
                     (Some(Builtin::Option), "Some") | (Some(Builtin::Result), "Ok") => {
                         ty.args().first()
                     }
                     (Some(Builtin::Result), "Err") => ty.args().get(1),
                     _ => None,
                 };
-                if let Some(p) = payload.cloned() {
+                if let (Some(p), [name]) = (payload.cloned(), arm.bindings.as_slice()) {
                     types.bindings.insert(name.clone(), p);
+                    continue;
+                }
+                // A declared case's fields (ADR-0061), where the type has
+                // no arguments a field could mention.
+                if let Some(def) = ty.def_id()
+                    && ty.args().is_empty()
+                    && let Some((_, fields)) = sigs
+                        .type_decl(def)
+                        .and_then(|t| t.variants.as_ref())
+                        .and_then(|cases| cases.iter().find(|(n, _)| n == arm.short()))
+                    && fields.len() == arm.bindings.len()
+                {
+                    for (name, f) in arm.bindings.iter().zip(fields) {
+                        if let Some(t) = f.resolved() {
+                            types.bindings.insert(name.clone(), t.clone());
+                        }
+                    }
                 }
             }
         }

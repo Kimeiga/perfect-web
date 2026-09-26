@@ -131,10 +131,10 @@ refused by name:
   constructor, and against another type it is PW0608.
 - **`return` is a statement, not an expression.** Its value is the statement
   after it, in a block or on its line in a match arm (ADR-0038).
-- **Template matches take apart `Option` and `Result` only** (ADR-0042). A
-  declared sum type's constructors in `{#match}` are refused (PW5019). The
-  component backend builds and matches them since ADR-0059; the renderers do
-  not. `{:else}` in `{#each}` is refused;
+- **A template arm takes one case apart** (ADR-0042, ADR-0061). A template's
+  `{#match}` takes an `Option`, a `Result` or a declared sum type apart, an
+  arm binding each field of its case. A nested or literal pattern in an arm
+  is not read: the runtime has no decision tree. `{:else}` in `{#each}` is refused;
   `{#if xs}` around the list says the same.
 - **An interpolated attribute is refused in a `style`**, and a URL with holes
   must begin with text (ADR-0042). A hole must be a value path.

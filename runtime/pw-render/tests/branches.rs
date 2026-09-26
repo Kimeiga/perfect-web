@@ -61,11 +61,13 @@ fn found_page() -> Template {
             Arm {
                 case: "Some".into(),
                 binding: Some("h".into()),
+                fields: vec![],
                 body: vec![st("<p>"), text(1, "h.word"), st("</p>")],
             },
             Arm {
                 case: "None".into(),
                 binding: None,
+                fields: vec![],
                 body: vec![st("<p>-</p>")],
             },
         ],
@@ -132,6 +134,67 @@ fn a_match_refuses_what_it_cannot_take_apart() {
     ] {
         assert!(render(&t, &env, &[]).is_err(), "{why}");
     }
+}
+
+/// `{#match shape}{:Rect(w, h)}<p>{w}x{h}</p>{:Circle(r)}<p>r{r}</p>
+/// {:Empty}<p>-</p>{/match}` over a declared sum type (ADR-0061): its cases
+/// by their WIT names, and a case of several fields bound field by field.
+fn shape_page() -> Template {
+    let arm = |case: &str, binding: Option<&str>, fields: &[&str], body: Vec<Chunk>| Arm {
+        case: case.into(),
+        binding: binding.map(Into::into),
+        fields: fields.iter().map(|f| f.to_string()).collect(),
+        body,
+    };
+    template(vec![Chunk::Dynamic(Part::Match {
+        id: PartId(0),
+        value: "shape".into(),
+        arms: vec![
+            arm(
+                "rect",
+                None,
+                &["w", "h"],
+                vec![st("<p>"), text(1, "w"), st("x"), text(2, "h"), st("</p>")],
+            ),
+            arm(
+                "circle",
+                Some("r"),
+                &[],
+                vec![st("<p>r"), text(3, "r"), st("</p>")],
+            ),
+            arm("empty", None, &[], vec![st("<p>-</p>")]),
+        ],
+    })])
+}
+
+#[test]
+fn a_declared_case_renders_with_each_field_bound() {
+    let t = shape_page();
+    let case = |name: &str, payload: Option<Value>| Value::Variant {
+        case: name.into(),
+        payload: payload.map(Box::new),
+    };
+    let rect = case(
+        "rect",
+        Some(Value::List(vec![Value::Int(3), Value::Int(4)])),
+    );
+    assert_eq!(
+        render(&t, &Env::new().set("shape", rect), &[]).unwrap(),
+        "<!--pw:s0--><p><!--pw:s1-->3<!--pw:e1-->x<!--pw:s2-->4<!--pw:e2--></p><!--pw:e0-->"
+    );
+    let circle = case("circle", Some(Value::Int(2)));
+    assert_eq!(
+        render(&t, &Env::new().set("shape", circle), &[]).unwrap(),
+        "<!--pw:s0--><p>r<!--pw:s3-->2<!--pw:e3--></p><!--pw:e0-->"
+    );
+    assert_eq!(
+        render(&t, &Env::new().set("shape", case("empty", None)), &[]).unwrap(),
+        "<!--pw:s0--><p>-</p><!--pw:e0-->"
+    );
+    // A payload whose fields the arm does not have is refused, not bound
+    // short.
+    let short = case("rect", Some(Value::List(vec![Value::Int(3)])));
+    assert!(render(&t, &Env::new().set("shape", short), &[]).is_err());
 }
 
 #[test]
