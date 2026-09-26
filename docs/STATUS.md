@@ -78,6 +78,22 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a name is written once where it is declared**
+([ADR-0098](DECISIONS/ADR-0098-a-name-is-written-once-where-it-is-declared.md)).
+Each of these checked, and one of its two writings was dropped:
+- `fn f(x: Int, x: String)`;
+- a field or a case declared twice;
+- `cache private` then `cache shared`, where every reader takes the first,
+  so the order decided whether a session's data was refused a shared cache;
+- `<a href="/a" href="/b">`;
+- `P.Pair(a, a)`, binding `a` twice in one pattern.
+
+Each is written once now (PW0028). An effect's `impact` is the one head
+that repeats.
+
+Evidence: [declared-once.txt](evidence/E10/declared-once.txt)
+(`just e10-declared-once`).
+
 **2026-09-26: data embedded in a page cannot end its script element**
 ([ADR-0097](DECISIONS/ADR-0097-embedded-data-cannot-end-its-script.md)). The
 parts manifest's JSON, in `<script type="application/json">`, broke only a

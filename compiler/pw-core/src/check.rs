@@ -129,6 +129,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(code_in_markup(&u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
+        // ADR-0098: a name is written once where it is declared.
+        per_unit.extend(declared_once(&u.hir));
         // ADR-0091: a listener binds its declaration's key.
         per_unit.extend(listener_keys(&u.hir, &u.src));
         // ADR-0092: a graph clause belongs to a declaration that can mean it.
@@ -769,6 +771,153 @@ pub(crate) fn listed<S: AsRef<str>>(words: &[S]) -> String {
         None => String::new(),
         Some((last, [])) => last.clone(),
         Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
+    }
+}
+
+/// **A name is written once where it is declared** (ADR-0098).
+///
+/// A module declares a name once in a namespace (PW0024); inside a
+/// declaration nothing held a name to that. A parameter taken twice, a
+/// field or a case declared twice, a policy written twice and an attribute
+/// given twice each checked until 2026-09-26. Every reader of a policy took
+/// its first writing, so `cache private` then `cache shared` decided by its
+/// order whether a session's data was refused a shared cache; and HTML keeps
+/// an attribute's first value.
+fn declared_once(hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        let mut twice: Vec<(crate::hir::Span, String)> = Vec::new();
+        let mut seen = BTreeSet::new();
+        for p in &decl.params {
+            if !seen.insert(p.name.as_str()) {
+                twice.push((
+                    p.span.clone(),
+                    format!("`{}` takes `{}` twice", decl.name, p.name),
+                ));
+            }
+        }
+        let mut seen = BTreeSet::new();
+        for t in &decl.type_params {
+            if !seen.insert(t.as_str()) {
+                twice.push((
+                    decl.name_span.clone(),
+                    format!("`{}` takes `{t}` twice", decl.name),
+                ));
+            }
+        }
+        let mut seen = BTreeSet::new();
+        for f in decl.fields.iter().flatten() {
+            if !seen.insert(f.name.as_str()) {
+                twice.push((
+                    f.span.clone(),
+                    format!("`{}` declares `{}` twice", decl.name, f.name),
+                ));
+            }
+        }
+        let mut seen = BTreeSet::new();
+        for v in decl.variants.iter().flatten() {
+            if !seen.insert(v.name.as_str()) {
+                twice.push((
+                    v.span.clone(),
+                    format!("`{}` declares `{}` twice", decl.name, v.name),
+                ));
+            }
+        }
+        let mut seen = BTreeSet::new();
+        for p in &decl.policies {
+            if !crate::policy::repeats(&p.name) && !seen.insert(p.name.as_str()) {
+                twice.push((
+                    p.span.clone(),
+                    format!("`{}` declares `{}` twice", decl.name, p.name),
+                ));
+            }
+        }
+        if let Some(body_id) = decl.body {
+            let body = hir.body(body_id);
+            // A pattern, a lambda's parameters and a `let` bind a name once.
+            let mut trees = vec![body.root];
+            trees.extend(decl.term_roots().map(|(_, r)| r.root));
+            for e in trees.iter().flat_map(|t| body.walk_from(*t)) {
+                let groups: Vec<Vec<crate::hir::PatternId>> = match body.expr(e) {
+                    Expr::Match { arms, .. } => arms.iter().map(|a| vec![a.pat]).collect(),
+                    Expr::Lambda { params, .. } => vec![params.clone()],
+                    Expr::Let { pat: Some(p), .. } | Expr::For { pat: Some(p), .. } => {
+                        vec![vec![*p]]
+                    }
+                    _ => continue,
+                };
+                for group in groups {
+                    let mut seen = BTreeSet::new();
+                    for (name, span) in group.iter().flat_map(|p| bound_names(body, *p)) {
+                        if !seen.insert(name.clone()) {
+                            twice.push((span, format!("`{name}` is bound twice in one pattern")));
+                        }
+                    }
+                }
+            }
+            let mut roots = Vec::new();
+            for e in body.walk() {
+                if let Expr::Template { roots: r, .. } = body.expr(e) {
+                    roots.extend(r.iter().copied());
+                }
+            }
+            for n in body.walk_markup(&roots) {
+                let Node::Element { tag, attrs, .. } = body.node(n) else {
+                    continue;
+                };
+                let mut seen = BTreeSet::new();
+                for a in attrs {
+                    // HTML reads an attribute's name in any case (ADR-0095).
+                    if !seen.insert(a.name.to_ascii_lowercase()) {
+                        twice.push((
+                            a.span.clone(),
+                            format!("`<{tag}>` is given `{}` twice", a.name),
+                        ));
+                    }
+                }
+            }
+        }
+        for (span, message) in twice {
+            out.push(Diagnostic {
+                code: crate::codes::DECLARED_TWICE.id,
+                invariant: crate::codes::DECLARED_TWICE.invariant,
+                reason: "declared_twice",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: span,
+                related: vec![Related {
+                    span: hir.decl_span(id),
+                    label: format!("`{}` is declared here", decl.name),
+                }],
+                explanation: Some(
+                    "A name written twice where it is declared says two things, and one of \
+                     them is dropped: a body sees one of two parameters, a field access one of \
+                     two fields, every reader of a policy its first writing, and HTML an \
+                     attribute's first value. Until 2026-09-26 each checked."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write it once, or give the second its own name".to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// The names a pattern binds, with where. An or-pattern's alternatives bind
+/// the same names, so its first alternative speaks for it.
+fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, crate::hir::Span)> {
+    match body.pat(pat) {
+        HPat::Bind { name, .. } => vec![(name.clone(), body.pat_span(pat))],
+        HPat::Ctor { args, .. } => args.iter().flat_map(|a| bound_names(body, *a)).collect(),
+        HPat::Or(alternatives) => alternatives
+            .first()
+            .map(|a| bound_names(body, *a))
+            .unwrap_or_default(),
+        HPat::Wild | HPat::Literal(_) | HPat::Error => Vec::new(),
     }
 }
 

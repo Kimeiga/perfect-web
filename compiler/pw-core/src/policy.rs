@@ -432,6 +432,15 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
     })
 }
 
+/// **May `head` be written more than once in one declaration?** Only an
+/// effect's `impact`: an effect has as many impacts as it has facets
+/// (`impact dom_write`, `impact layout_write when LayoutAffect`). Any other
+/// head written twice says two things, and every reader took the first
+/// (ADR-0098).
+pub fn repeats(head: &str) -> bool {
+    matches!(domain_of(head), Some(Domain::ConditionedWord(_)))
+}
+
 /// The operator a spelling names, within a head's domain.
 ///
 /// Contextual: `merge_by_field` is an operator under `conflict` and nothing

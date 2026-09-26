@@ -149,6 +149,11 @@ codes! {
     // correctly refused to run on it, and nothing told the author. E9-V5.
     UNRESOLVED_TYPE = "PW0026" / unresolved_type / 1, Resolution,
         "a written type must name a type visible here, applied to exactly its parameters";
+    // ADR-0098: `fn f(x: Int, x: String)`, a field or a case declared twice,
+    // `cache private` then `cache shared`, and `href` given twice checked
+    // until 2026-09-26.
+    DECLARED_TWICE = "PW0028" / declared_twice / 1, Resolution,
+        "a parameter, a field, a case, a policy or an attribute is written once";
     // ADR-0087: a view, a page, an event or an effect called as a function
     // passed `pw check` until 2026-09-26, answered for as a call to nothing.
     NOT_A_TERM = "PW0027" / not_a_term / 1, Resolution,

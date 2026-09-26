@@ -684,3 +684,12 @@ or handler now (PW5024).
 parts manifest's JSON broke only a lowercase `</script`, and `</SCRIPT>` or
 `<!--<script>` in it would end or swallow the element. It holds no `<` now:
 `escape::json_in_script` writes `\u003c`.
+
+## 2026-09-26: a name is written once where it is declared (E10)
+
+[ADR-0098](DECISIONS/ADR-0098-a-name-is-written-once-where-it-is-declared.md):
+a parameter taken twice, a field or a case declared twice, a policy written
+twice and an attribute given twice each checked, and one of the two was
+dropped: `cache private` then `cache shared` decided by its order whether
+a session's data was refused a shared cache. Each is written once now
+(PW0028), an effect's `impact` excepted.
