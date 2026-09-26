@@ -309,6 +309,10 @@ Decisions awaiting a ruling:
 - ADR-0051: `for` over a list is the only loop; there is no `while`.
 - ADR-0050: a callee is inlined until it recurses, and only the recursion is
   a call, rather than every declaration being a function of its component.
+- ADR-0049: the escape set, the common core of Rust, Swift and JavaScript
+  (no `\0`, no `\xHH`, one form of `\u`); a `"""` string is raw, rather than
+  having its closing delimiter's indentation removed. Missing from this list
+  until 2026-09-26.
 - ADR-0048: an opaque type's representation is read as `.value`, only in the
   module that declares it, rather than by a constructor pattern.
 - ADR-0047: clauses written as statements (`scope component`,
