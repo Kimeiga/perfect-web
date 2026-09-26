@@ -1,0 +1,22 @@
+ADR-0107 - a cache key names each parameter its entry depends on
+
+produced by: just e10-keys-cover-reads
+commit: 7106daf11f5e0c9790b3c0fa20117e8b69f9bf10
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== keys cover reads (compiler/pw-core/tests/keys_cover_reads.rs)
+
+test a_read_on_one_branch_is_a_read ... ok
+test the_key_is_underlined_and_the_read_shown ... ok
+test a_subscription_dedupes_by_what_it_reads ... ok
+test a_key_names_each_parameter_its_body_reads ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+== mutation controls (scripts/key_read_mutations.py)
+
+baseline: 4 passed, 0 failed
+the rule does not run: KILLED (4 of 4 tests fail)
+every parameter is read: KILLED (2 of 4 tests fail)
+a key PW0335 refuses is read too: KILLED (1 of 4 tests fail)
+`dedupe_by` is not a key: KILLED (1 of 4 tests fail)
+4 of 4 mutants killed
