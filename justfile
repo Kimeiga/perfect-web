@@ -1213,6 +1213,20 @@ e10-moved-urls:
      } > docs/evidence/E10/moved-urls.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/moved-urls.txt
 
+# ADR-0097: data embedded in a page cannot end its script element. The
+# renderer's security matrix, and the mutation controls.
+e10-embedded-json:
+    @{ echo "ADR-0097 - data embedded in a page cannot end its script element"; echo; \
+       echo "produced by: just e10-embedded-json"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the escaping matrix (runtime/pw-render/tests/security.rs)"; echo; \
+       cargo test --locked -p pw-render --test security 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/embedded_json_mutations.py)"; echo; \
+       python3 scripts/embedded_json_mutations.py; \
+     } > docs/evidence/E10/embedded-json.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/embedded-json.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

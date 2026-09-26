@@ -365,3 +365,29 @@ fn a_record_field_in_a_hostile_position_is_escaped_the_same_way() {
     let out = visible(&render(&t, &env, &[]).unwrap());
     assert!(!out.contains("onclick=\""), "{out}");
 }
+
+/// **Data embedded in a page cannot end its script element** (ADR-0097).
+///
+/// The parts manifest travels in `<script type="application/json">`. The
+/// HTML tokenizer ends that element at `</script` in any case, and `<!--`
+/// changes how it reads the rest, so the embedded text holds no `<` at all.
+/// Until 2026-09-26 only a lowercase `</script` was broken, and `</SCRIPT>`
+/// in a value ended the element, leaving what followed to be parsed as HTML.
+#[test]
+fn embedded_json_cannot_end_its_script() {
+    for hostile in [
+        "</SCRIPT><img src=x onerror=alert(1)>",
+        "</script ><b>",
+        "<!--<script>",
+    ] {
+        let value = serde_json::json!({ "parts": [hostile] });
+        let text = serde_json::to_string(&value).expect("json");
+        let embedded = escape::json_in_script(&text);
+        assert!(!embedded.contains('<'), "{embedded}");
+        let back: serde_json::Value = serde_json::from_str(&embedded).expect("still JSON");
+        assert_eq!(back, value, "the same data, read back");
+    }
+    // The control: JSON with no `<` is written as it is.
+    let plain = r#"{"template":"store.page","parts":[]}"#;
+    assert_eq!(escape::json_in_script(plain), plain);
+}

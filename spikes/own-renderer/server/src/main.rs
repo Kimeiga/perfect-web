@@ -1885,9 +1885,9 @@ fn document(body: &str, templates: &[Template], cursor: u64) -> String {
             },
         },
     });
-    let json = serde_json::to_string(&manifest)
-        .unwrap_or_default()
-        .replace("</script", "<\\/script");
+    // No `<` in a script element's text (ADR-0097).
+    let json =
+        pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <title>Store</title>\n</head>\n<body>\n{body}\n\

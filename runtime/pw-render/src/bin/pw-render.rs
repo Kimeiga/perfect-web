@@ -178,12 +178,10 @@ fn document(
             "parts": manifest,
             "resume": resume,
         });
-        // In `<script type="application/json">`, `</script` is the only
-        // sequence that ends the element, so it is the only one that has to be
-        // broken. Escaping the JSON as HTML would corrupt it.
-        let json = serde_json::to_string(&json)
-            .unwrap_or_default()
-            .replace("</script", "<\\/script");
+        // Escaping the JSON as HTML would corrupt it; `json_in_script` keeps
+        // the element's text free of `<`, which is what ends it (ADR-0097).
+        let json =
+            pw_render::escape::json_in_script(&serde_json::to_string(&json).unwrap_or_default());
         tail.push_str(&format!(
             "<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n"
         ));

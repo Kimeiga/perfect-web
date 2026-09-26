@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: data embedded in a page cannot end its script element**
+([ADR-0097](DECISIONS/ADR-0097-embedded-data-cannot-end-its-script.md)). The
+parts manifest's JSON, in `<script type="application/json">`, broke only a
+lowercase `</script`. `</SCRIPT>` would end the element and `<!--<script>`
+swallow the page. The manifest holds what the compiler wrote, so no page
+carried either. The embedded text holds no `<` now.
+
+Evidence: [embedded-json.txt](evidence/E10/embedded-json.txt)
+(`just e10-embedded-json`).
+
 **Correction, 2026-09-26: a view could choose where the platform's runtime
 loads from**
 ([ADR-0096](DECISIONS/ADR-0096-a-template-moves-no-url.md)). The page a view

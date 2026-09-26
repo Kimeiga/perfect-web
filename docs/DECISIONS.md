@@ -677,3 +677,10 @@ href={msg}>` chose where the platform's runtime loaded from, since the page
 writes the view before the runtime's script, and an SVG `<animate>` set a
 link's `href` to any URL. A template writes no `<base>` and animates no link
 or handler now (PW5024).
+
+## 2026-09-26: data embedded in a page cannot end its script element (E10)
+
+[ADR-0097](DECISIONS/ADR-0097-embedded-data-cannot-end-its-script.md): the
+parts manifest's JSON broke only a lowercase `</script`, and `</SCRIPT>` or
+`<!--<script>` in it would end or swallow the element. It holds no `<` now:
+`escape::json_in_script` writes `\u003c`.

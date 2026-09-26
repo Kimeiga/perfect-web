@@ -182,6 +182,18 @@ pub fn style(value: &str) -> String {
     attribute(value)
 }
 
+/// **JSON embedded in a `<script type="application/json">` element.**
+///
+/// The HTML tokenizer ends a script element at `</script` in any case —
+/// `</SCRIPT` too — and `<!--` changes how it reads everything after it, so
+/// the element's text may hold no `<` at all. `\u003c` is the same character
+/// to a JSON parser, and JSON writes `<` only inside a string, where the
+/// escape means it. Until 2026-09-26 only `</script`, in lowercase, was
+/// broken (ADR-0097).
+pub fn json_in_script(json: &str) -> String {
+    json.replace('<', "\\u003c")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
