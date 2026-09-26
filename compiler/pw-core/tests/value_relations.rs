@@ -207,14 +207,16 @@ fn v1_a_query_invocation_is_a_typed_call() {
 fn v1_a_call_inside_a_policy_term_is_checked_with_its_binder_typed() {
     // `optimistic Cart(..) as cart => ..` binds `cart` to the target's value
     // (ADR-0025). The transition's call was checked by nothing until
-    // 2026-09-24: term roots are trees the body walk does not reach.
+    // 2026-09-24: term roots are trees the body walk does not reach. The
+    // command invalidates the entry it speculates on (ADR-0105).
     let src = |arg: &str| {
         format!(
             "module o\n\ntype Cart = Cart {{ n: Int }}\ntype E = | Bad\n\n\
              query Current(k: Int) -> Result<Cart, E> {{ todo }}\n\n\
              fn bump(c: Cart, by: Int) -> Cart {{ c }}\n\n\
              command add(k: Int) -> Result<Cart, E>\n    \
-             optimistic Current(k) as cart => bump({arg}, 1)\n{{\n    todo\n}}\n"
+             optimistic Current(k) as cart => bump({arg}, 1)\n    \
+             invalidates Current(k)\n{{\n    todo\n}}\n"
         )
     };
     assert!(

@@ -138,8 +138,18 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(listener_keys(&u.hir, &u.src));
         // ADR-0092: a graph clause belongs to a declaration that can mean it.
         per_unit.extend(clauses_in_place(&u.hir));
-        // ADR-0101: a command invalidates what it writes.
-        per_unit.extend(writes_invalidated(&inference, &graph, &readers, i, &u.hir));
+        // ADR-0105: a command invalidates the entry it speculates on; and
+        // ADR-0101, what it writes, where it does not speculate on it.
+        let speculated = speculations(&workspace, &hirs, i);
+        per_unit.extend(speculation_reconciled(&graph, &speculated, &u.hir));
+        per_unit.extend(writes_invalidated(
+            &inference,
+            &graph,
+            &readers,
+            &speculated,
+            i,
+            &u.hir,
+        ));
         // ADR-0090: the declaration rules. Only `pw check` ran them, beside
         // this function; `pw build` checks through here, and compiled what
         // they refuse: R-015's `retry forever` became a component.
@@ -808,6 +818,7 @@ fn writes_invalidated(
     inference: &crate::effects::Inference,
     graph: &crate::graph::Graph,
     readers: &[Reader],
+    speculated: &[Speculation],
     unit: usize,
     hir: &Hir,
 ) -> Vec<Diagnostic> {
@@ -818,20 +829,7 @@ fn writes_invalidated(
             continue;
         }
         let path = crate::graph::path_of(hir, id);
-        // A clause naming nothing, or a declaration of another kind, is
-        // PW5100's or PW5103's to report, and what it meant is not known.
-        let refused =
-            graph.dangling.iter().any(|d| {
-                d.from == path && matches!(d.kind, EdgeKind::Invalidates | EdgeKind::Emits)
-            }) || graph.edges.iter().any(|e| {
-                e.from == path
-                    && match (e.kind, graph.node(&e.to).map(|n| &n.kind)) {
-                        (EdgeKind::Invalidates, Some(NodeKind::Resource { .. }))
-                        | (EdgeKind::Emits, Some(NodeKind::Event)) => false,
-                        (kind, _) => matches!(kind, EdgeKind::Invalidates | EdgeKind::Emits),
-                    }
-            });
-        if refused {
+        if clauses_refused(graph, &path) {
             continue;
         }
         let writes: BTreeSet<String> = inference
@@ -848,6 +846,13 @@ fn writes_invalidated(
             .map(|b| inference.infer_at(unit, hir.body(b)).sources)
             .unwrap_or_default();
         for r in readers {
+            // An entry the command speculates on is PW5107's (ADR-0105).
+            if speculated
+                .iter()
+                .any(|s| s.command == path && s.target == r.path)
+            {
+                continue;
+            }
             let shared: Vec<&str> = writes.intersection(&r.reads).map(String::as_str).collect();
             // A fragment is rebuilt when an event reaches it, directly or
             // through what it reads (ADR-0102), and the materializer reads
@@ -1013,6 +1018,179 @@ fn writes_invalidated(
                 ],
             });
         }
+    }
+    out
+}
+
+/// Does a clause of `command` name nothing, or a declaration of another
+/// kind? That is PW5100's or PW5103's to report, and what it meant to
+/// invalidate is not known, so the rules that ask what a command reaches
+/// set the command aside.
+fn clauses_refused(graph: &crate::graph::Graph, command: &str) -> bool {
+    use crate::graph::{EdgeKind, NodeKind};
+    graph
+        .dangling
+        .iter()
+        .any(|d| d.from == command && matches!(d.kind, EdgeKind::Invalidates | EdgeKind::Emits))
+        || graph.edges.iter().any(|e| {
+            e.from == command
+                && match (e.kind, graph.node(&e.to).map(|n| &n.kind)) {
+                    (EdgeKind::Invalidates, Some(NodeKind::Resource { .. }))
+                    | (EdgeKind::Emits, Some(NodeKind::Event)) => false,
+                    (kind, _) => matches!(kind, EdgeKind::Invalidates | EdgeKind::Emits),
+                }
+        })
+}
+
+/// The entry an optimistic clause speculates on (ADR-0105).
+struct Speculation {
+    /// The command's graph node, and the target's.
+    command: String,
+    target: String,
+    /// The command's declaration.
+    decl: hir::DeclId,
+    /// The target resource, as written: `Cart`.
+    written: String,
+    /// The target entry, `Cart(current_session())`, and its clause.
+    at: crate::diagnostics::Span,
+    clause: crate::diagnostics::Span,
+}
+
+/// Every optimistic clause of a command in `unit`, with the resource its
+/// target names. A target that names no resource is PW0331's.
+fn speculations(
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+) -> Vec<Speculation> {
+    use crate::resolve::{Namespace, Resolution};
+    let hir = hirs[unit];
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if decl.kind != DeclKind::Command {
+            continue;
+        }
+        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+            continue;
+        };
+        for (policy, target, _) in decl.optimistic_clauses() {
+            let Expr::Call { callee, .. } = body.expr(target.root) else {
+                continue;
+            };
+            let written = path_of(body, *callee);
+            // As `resource_value_type` reads it: a bare name in the term
+            // namespace, a qualified path whole.
+            let resolution = match written.contains('.') {
+                true => workspace.resolve_path(unit, &written),
+                false => workspace.resolve_in(unit, Namespace::Term, &written),
+            };
+            let (Resolution::Local(def) | Resolution::Imported { def, .. }) = resolution else {
+                continue;
+            };
+            if !crate::resolve::declaration(hirs, def).is_some_and(|d| {
+                matches!(
+                    d.kind,
+                    DeclKind::Query | DeclKind::Resource | DeclKind::Subscription
+                )
+            }) {
+                continue;
+            }
+            out.push(Speculation {
+                command: crate::graph::path_of(hir, id),
+                target: crate::graph::path_of(hirs[def.unit], hir::DeclId(def.decl)),
+                decl: id,
+                written,
+                at: body.expr_span(target.root),
+                clause: policy.span.clone(),
+            });
+        }
+    }
+    out
+}
+
+/// **A command invalidates the entry it speculates on** (ADR-0105).
+///
+/// ADR-0025: an optimistic transition shows a speculative value, and the
+/// command's success reconciles it. Both backends reconcile through the
+/// entry: the Marko backend gives a binding its command's result when the
+/// command `invalidates` the query, and the dev server's page learns the new
+/// value when an event reaches the entry. Until 2026-09-26 a command
+/// speculating on `Cart` with neither clause checked, and the speculation
+/// stayed on the page as if it had been committed.
+fn speculation_reconciled(
+    graph: &crate::graph::Graph,
+    speculated: &[Speculation],
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    use crate::graph::EdgeKind;
+    let mut out = Vec::new();
+    for s in speculated {
+        if clauses_refused(graph, &s.command) || graph.invalidates(&s.command, &s.target) {
+            continue;
+        }
+        let decl = hir.decl(s.decl);
+        let events: Vec<String> = graph
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::InvalidatedBy && e.from == s.target)
+            .filter_map(|e| graph.node(&e.to).map(|n| format!("`{}`", n.name)))
+            .collect();
+        out.push(Diagnostic {
+            code: crate::codes::OPTIMISTIC_NOT_RECONCILED.id,
+            invariant: crate::codes::OPTIMISTIC_NOT_RECONCILED.invariant,
+            reason: "optimistic_not_reconciled",
+            detector: Detector::ResourceGraph,
+            severity: Severity::Error,
+            message: format!(
+                "`{}` speculates on `{}` and does not invalidate it",
+                decl.name, s.written
+            ),
+            primary_span: s.at.clone(),
+            related: vec![
+                Related {
+                    span: s.clause.clone(),
+                    label: "the speculation".to_string(),
+                },
+                Related {
+                    span: hir.decl_span(s.decl),
+                    label: format!("`{}` is the command", decl.name),
+                },
+            ],
+            explanation: Some(format!(
+                "An optimistic transition shows a speculative value until the command \
+                 answers (ADR-0025). If it succeeds, what it committed replaces the \
+                 speculation, and that happens through the entry: a command that \
+                 `invalidates` it, or emits an event it listens for. `{}` does neither \
+                 for `{}`, so the speculation stays on the page as if it had been \
+                 committed, whatever was.",
+                decl.name, s.written
+            )),
+            repairs: vec![
+                Repair {
+                    description: format!(
+                        "declare `invalidates {}(..)` on `{}`",
+                        s.written, decl.name
+                    ),
+                    replacement: None,
+                },
+                Repair {
+                    description: if events.is_empty() {
+                        format!(
+                            "or emit an event, and have `{}` listen for it with \
+                             `invalidates_on`",
+                            s.written
+                        )
+                    } else {
+                        format!(
+                            "or emit {}, which `{}` listens for",
+                            events.join(" or "),
+                            s.written
+                        )
+                    },
+                    replacement: None,
+                },
+            ],
+        });
     }
     out
 }

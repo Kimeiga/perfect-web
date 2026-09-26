@@ -78,6 +78,16 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**2026-09-26: a command invalidates the entry it speculates on**
+([ADR-0105](DECISIONS/ADR-0105-a-command-invalidates-the-entry-it-speculates-on.md)).
+A command speculating on `Cart` with neither `invalidates` nor an event
+`Cart` listens for checked. ADR-0025 has the command's success reconcile the
+speculation, and both backends do that through the entry, so nothing
+replaced it. A command now reaches each entry it speculates on (PW5107).
+
+Evidence: [speculation-reconciled.txt](evidence/E10/speculation-reconciled.txt)
+(`just e10-speculation-reconciled`).
+
 **Correction, 2026-09-26: the dev server committed an event no command
 declared**
 ([ADR-0104](DECISIONS/ADR-0104-the-dev-server-commits-what-a-command-declares.md)).

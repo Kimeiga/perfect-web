@@ -158,7 +158,8 @@ and an animated link~~ (ADR-0096); ~~a page's embedded JSON~~ (ADR-0097);
 (ADR-0099); ~~a write inside a query~~ (ADR-0100); ~~a command's write that
 invalidates nothing~~ (ADR-0101), which found A-005 leaving A-004's cart
 stale; ~~an event that stops at its listeners~~ (ADR-0102); ~~a fragment
-no write reaches~~ (ADR-0103). Next, in order:
+no write reaches~~ (ADR-0103); ~~an event no command declared~~ (ADR-0104);
+~~a speculation nothing reconciles~~ (ADR-0105). Next, in order:
 1. ~~**a materialization is not reached through what it reads**~~, done
    (ADR-0102): A-009's fragment kept a changed store's old name. Then
    ~~**a command's write held to the fragments built on it**~~, done
@@ -168,14 +169,20 @@ no write reaches~~ (ADR-0103). Next, in order:
    (ADR-0104): it commits the events a command declares. Next, the event a
    command's own arguments key, which needs the compiled command to return
    its events (ruling needed);
-3. **an optimistic target no command invalidates**: `optimistic Cart(..)`
-   without `invalidates` or an event `Cart` hears keeps the speculation on
-   the page as if committed (ADR-0025's reconciliation).
+3. ~~**an optimistic target no command invalidates**~~, done (ADR-0105):
+   the speculation stayed on the page as if committed;
+4. **a Marko page's refresh**: a binding refreshes only for a query that a
+   command in the page's own module names in `invalidates`, where the
+   checker and the dev server accept an event, and a command anywhere
+   (KNOWN_LIMITATIONS).
 
 Then, each needing a ruling first:
 - **authorization**: `requires` is enforced by nothing, and its predicates
   are declared nowhere (KNOWN_LIMITATIONS). The first, being security;
 - head elements in a body, `<meta>` and `<link>` (ADR-0096);
+- what `consistency strong` promises beside a staleness window: the
+  library's `Order` declares `freshness 2.seconds` with it, and PW5106
+  exempts such a reader (A-026);
 - the host's `wasi:` exemption from contract membership, which rests on
   the WASI context the host links (`pw_host::is_runtime`).
 

@@ -426,6 +426,10 @@ codes! {
     // 2026-09-26, and the cart it wrote stayed as it was on every page.
     WRITE_NOT_INVALIDATED = "PW5106" / write_not_invalidated / 1, ResourceGraph,
         "a command invalidates what it writes: each cached reader of the data it changes, by name or through an event the reader listens for";
+    // ADR-0105: `optimistic Cart(..)` with neither `invalidates` nor an event
+    // `Cart` hears checked until 2026-09-26, and the speculation stayed.
+    OPTIMISTIC_NOT_RECONCILED = "PW5107" / optimistic_not_reconciled / 1, ResourceGraph,
+        "a command invalidates the entry it speculates on, so what it committed replaces the speculation";
 
     // --- what a capability names (PW52xx, E8) -----------------------------
     //

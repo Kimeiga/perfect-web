@@ -1328,7 +1328,23 @@ e10-committed-events:
        echo; echo "== mutation controls (scripts/committed_events_mutations.py)"; echo; \
        python3 scripts/committed_events_mutations.py; \
      } > docs/evidence/E10/committed-events.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/declared-events.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/committed-events.txt
+
+# ADR-0105: a command invalidates the entry it speculates on. Its tests,
+# ADR-0101's and ADR-0103's it must keep passing, and the mutation controls.
+e10-speculation-reconciled:
+    @{ echo "ADR-0105 - a command invalidates the entry it speculates on"; echo; \
+       echo "produced by: just e10-speculation-reconciled"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== speculations reconciled (compiler/pw-core/tests/speculation_reconciled.rs)"; echo; \
+       cargo test --locked -p pw-core --test speculation_reconciled 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== ADR-0101's readers and ADR-0103's fragments, unchanged"; echo; \
+       cargo test --locked -p pw-core --test writes_invalidated --test writes_reach_fragments 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/speculation_mutations.py)"; echo; \
+       python3 scripts/speculation_mutations.py; \
+     } > docs/evidence/E10/speculation-reconciled.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/speculation-reconciled.txt
 
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer

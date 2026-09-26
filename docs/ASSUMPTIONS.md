@@ -473,7 +473,12 @@ minutes old. A command writing what it reads need not invalidate it, since the
 entries expire. Charter §9.4 admits time-based freshness "as a fallback or
 explicit policy". A reader with no window, or a zero one, must be invalidated.
 
+A reader declaring `consistency strong` beside a window is exempted too. The
+library's `Order` declares `freshness 2.seconds` with `consistency strong`,
+and what `strong` promises beside a window is not stated.
+
 **Validated by** the owner confirming a window is an invalidation source (as
-PW0200 already treats one for a shared cache). **If false** (if a command
-must reach every reader of what it writes): PW5106 would hold every reader,
-and a public aggregate read by many would be invalidated by every write.
+PW0200 already treats one for a shared cache), and saying what `strong`
+means beside one. **If false** (if a command must reach every reader of what
+it writes): PW5106 would hold every reader, and a public aggregate read by
+many would be invalidated by every write.

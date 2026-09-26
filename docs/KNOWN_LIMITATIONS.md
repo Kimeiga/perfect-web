@@ -305,9 +305,17 @@ awaited in order. What remains:
 - **A command's write is matched to its readers by domain, not by key**
   (ADR-0101). PW5106 requires a command writing `Carts` to reach each
   cart reader with no staleness window. It does not check that the event
-  it emits carries the key of the entry it wrote. A reader with a positive
+  it emits carries the key of the entry it wrote, and PW5107 does not check
+  that `invalidates Cart(..)` names the entry a command speculates on
+  (ADR-0105). A reader with a positive
   `freshness` is exempt (A-026), and a row naming only the family,
   `!{ database }`, matches nothing (A-025).
+- **A Marko page refreshes a binding only for a query that a command in
+  its own module names in `invalidates`** (`marko.rs`). A query reached only
+  by an event, or invalidated by a command in another module, keeps its
+  first value on a Marko page, and a speculation on it stays. PW5106 and
+  PW5107 accept both kinds of reach, and the dev server honours both
+  (ADR-0105).
 - **The dev server computes one event key: `current_session()`**
   (ADR-0104). It commits the events a command declares, and refuses a
   command whose event carries anything else, such as its own argument, until

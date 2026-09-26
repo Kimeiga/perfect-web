@@ -744,3 +744,11 @@ the dev server committed `CartChanged` after any cart write, whatever the
 command declared, which hid ADR-0101's finding at run time. It now reads the
 command's `emits` edges from the compiler's graph, commits those events, and
 refuses a key it cannot compute before the command runs.
+
+## 2026-09-26: a command invalidates the entry it speculates on (E10)
+
+[ADR-0105](DECISIONS/ADR-0105-a-command-invalidates-the-entry-it-speculates-on.md):
+a command speculating on `Cart` with neither `invalidates` nor an event
+`Cart` hears checked, and nothing replaced the speculation with what the
+command committed (ADR-0025's reconciliation). A command now reaches each
+entry it speculates on (PW5107).

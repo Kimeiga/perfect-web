@@ -81,14 +81,14 @@ MUTANTS = [
     (
         "a clause naming nothing is not set aside",
         CHECK,
-        "        if refused {",
+        "        if clauses_refused(graph, &path) {",
         "        if false {",
     ),
     (
         "a clause naming another kind is not set aside",
         CHECK,
-        "            }) || graph.edges.iter().any(|e| {",
-        "            }) || false && graph.edges.iter().any(|e| {",
+        "        || graph.edges.iter().any(|e| {\n            e.from == command\n",
+        "        || false && graph.edges.iter().any(|e| {\n            e.from == command\n",
     ),
     (
         "a read is a write",
