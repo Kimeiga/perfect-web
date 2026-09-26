@@ -78,6 +78,14 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Recorded 2026-09-26: authorization is written and not held.** `requires
+SignedIn` on a command is read by no manifest, contract, host or server,
+and its predicates are declared nowhere. The store's `add_to_cart` runs for
+any session. Nothing claimed otherwise, but the charter's command is "an
+explicit mutation with authorization", and the gap was unrecorded.
+KNOWN_LIMITATIONS and NEXT carry it; it needs a ruling on where predicates
+are declared and who evaluates them.
+
 **2026-09-26: a name is written once where it is declared**
 ([ADR-0098](DECISIONS/ADR-0098-a-name-is-written-once-where-it-is-declared.md)).
 Each of these checked, and one of its two writings was dropped:

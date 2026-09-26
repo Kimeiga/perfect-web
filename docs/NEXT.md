@@ -149,6 +149,18 @@ Next, in order:
 3. ~~**a policy operator's arguments**~~, done with the values
    (ADR-0089).
 
+**Found 2026-09-26 probing markup and declarations.** ~~An `on:` naming no
+declared event~~ (ADR-0093); ~~code a template writes~~ (ADR-0094: a script
+element, an inline handler, a script URL, `srcdoc`, a stylesheet's value);
+~~an attribute's context read by its written case~~ (ADR-0095); ~~a `<base>`
+and an animated link~~ (ADR-0096); ~~a page's embedded JSON~~ (ADR-0097);
+~~a name written twice~~ (ADR-0098). Next, each needing a ruling first:
+- **authorization**: `requires` is enforced by nothing, and its predicates
+  are declared nowhere (KNOWN_LIMITATIONS). The first, being security;
+- head elements in a body, `<meta>` and `<link>` (ADR-0096);
+- the host's `wasi:` exemption from contract membership, which rests on
+  the WASI context the host links (`pw_host::is_runtime`).
+
 **The dated material below is the decision history and original migration
 sequence, not a second current status.** Its old NEXT/BLOCKED labels describe
 the state at those dates and are superseded by this section where applicable.

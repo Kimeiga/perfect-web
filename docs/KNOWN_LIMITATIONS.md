@@ -283,6 +283,12 @@ awaited in order. What remains:
   (ADR-0088). A secret passed in `emits` or `invalidates` reaches the graph
   unlabelled, and what a key performs (`current_session()`'s
   `session.read`) is not the declaration's (ruling needed).
+- **`requires` is enforced by nothing.** A command declaring `requires
+  SignedIn` runs for any session: no manifest, contract, host or server
+  reads the clause, and its predicates (`SignedIn`, `OwnsOrder(order)`) are
+  declared nowhere. The store's `add_to_cart` and `clear_cart` declare it.
+  The charter's command is "an explicit mutation with authorization"; the
+  authorization is written and not yet held (NEXT, ruling needed).
 - **A policy's value is checked by its domain where it heads a declaration**
   (ADR-0089), not where a block writes it: `observe .. { scope application }`
   and a `handler_policy { .. }` are body statements, read by the scope graph
