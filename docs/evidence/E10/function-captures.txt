@@ -1,0 +1,17 @@
+ADR-0086 - a function crosses no boundary
+
+produced by: just e10-function-captures
+commit: 9a0ecc32645839d7a3752f7a1d6221d39e6f2931
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== function captures (compiler/pw-core/tests/function_captures.rs)
+
+test a_handler_that_captures_a_function_is_refused ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== mutation controls (scripts/function_capture_mutations.py)
+
+baseline: 1 passed, 0 failed
+a function crosses a boundary: KILLED (1 of 1 tests fail)
+a function type is not found in a value's type: KILLED (1 of 1 tests fail)
+2 of 2 mutants killed
