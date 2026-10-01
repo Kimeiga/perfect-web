@@ -827,3 +827,13 @@ a `placement build` page rendering its `id` passed `pw check`, and the file
 it is built into exists before any request supplies one. A build-placed
 declaration reads none of its parameters now (PW5026). Whether a build may
 enumerate a parameter's values needs a ruling.
+
+## 2026-10-01: a command's `requires` is held before its body runs (E10)
+
+[ADR-0115](DECISIONS/ADR-0115-a-commands-requires-is-held-before-its-body-runs.md):
+`requires SignedIn` was parsed and then ignored: no contract or host read it,
+so the store command ran for any session. Authorization is now an invocation
+precondition on the compiled export. The deployment evaluates every predicate
+over the typed command arguments before execution; unknown, denied, malformed
+or unevaluated requirements fail closed. Static capabilities remain separate
+from per-request authorization.
