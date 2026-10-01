@@ -561,6 +561,29 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
                                 && crate::privacy::Label::PARTITIONS.contains(n))
                     })
                     .map(|n| format!("`{n}` is not a parameter of `{}`", decl.name)),
+                // Authorization predicates are deployment vocabulary, not Pleris
+                // declarations. Their arguments ARE Pleris command parameters,
+                // and must bind to the values the host will receive. Anything
+                // richer would execute application code before authorization.
+                Some(Domain::PredicateRef) => {
+                    if decl.kind != crate::hir::DeclKind::Command {
+                        Some("`requires` is an invocation precondition and belongs to a command".to_string())
+                    } else {
+                        match crate::policy::predicates(value) {
+                            Err(why) => Some(why),
+                            Ok(predicates) => predicates.into_iter().find_map(|predicate| {
+                                predicate.arguments.into_iter().find_map(|argument| {
+                                    (!decl.params.iter().any(|p| p.name == argument)).then(|| {
+                                        format!(
+                                            "`{}` receives command parameters, and `{argument}` is not a parameter of `{}`",
+                                            predicate.name, decl.name
+                                        )
+                                    })
+                                })
+                            }),
+                        }
+                    }
+                }
                 // Resolved as a written type is, so the language's own types
                 // are types too: `idempotent_by Int` was "no type visible
                 // here" when only declarations were asked (ADR-0089).
@@ -638,8 +661,9 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
                 }],
                 explanation: Some(
                     "A policy's value is one its domain has: a word the policy lists, a \
-                     duration, a world, a parameter of the declaration, a type, or an \
-                     operator given its arguments by name. A value the compiler does not \
+                     duration, a world, a parameter of the declaration, a type, an \
+                     authorization predicate over command parameters, or an operator given \
+                     its arguments by name. A value the compiler does not \
                      understand is not a policy nobody wrote. Until 2026-09-26 such a \
                      value checked, and each reader of the clause decided alone what it \
                      meant: `cache Shared` was no shared cache to the privacy rule, and \
