@@ -395,12 +395,31 @@ pub struct Export {
     pub component: Option<ComponentExport>,
 }
 
+/// One precondition the deployment must approve before invoking an export.
+///
+/// The predicate name belongs to the deployment's authorization vocabulary.
+/// Arguments are zero-based indices into the export's already-typed command
+/// parameters, so authorization receives values without reparsing source text.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct AuthorizationRequirement {
+    pub predicate: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub arguments: Vec<usize>,
+}
+
 /// An export's place in a component: `pw:app/store-page-add-to-cart-api@0.1.0`
 /// and `add-to-cart`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ComponentExport {
     pub interface: String,
     pub function: String,
+    /// Invocation preconditions from the declaration's `requires` clause.
+    ///
+    /// Kept on the export rather than the component because authorization is a
+    /// property of one invocation edge. A component may eventually expose more
+    /// than one operation with different preconditions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authorization: Vec<AuthorizationRequirement>,
 }
 
 /// **What the compiler tells the host about one component.**
@@ -1078,11 +1097,13 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                     },
                 },
             };
+            let mut component = crate::wit::component_export(&component_id, &decl.name);
+            component.authorization = authorization_of(decl);
             let exports = vec![Export {
                 name: decl.name.clone(),
                 kind: kind.to_string(),
                 binding,
-                component: Some(crate::wit::component_export(&component_id, &decl.name)),
+                component: Some(component),
             }];
 
             let abi_schema = schema_of(&component_id, &exports, &capabilities, &allowed_placements);
@@ -1101,6 +1122,40 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     out
 }
 
+/// The authorization requirements a declaration contributes to its export.
+///
+/// Checked builds only reach the first arm. The fallback is deliberately
+/// impossible to satisfy rather than empty: callers of this lower-level API can
+/// construct HIR without running `check`, and malformed authorization must not
+/// turn into "no authorization required".
+fn authorization_of(decl: &Decl) -> Vec<AuthorizationRequirement> {
+    let Some(policy) = decl.policy("requires") else {
+        return Vec::new();
+    };
+    match crate::policy::predicates(&policy.value) {
+        Ok(predicates) => predicates
+            .into_iter()
+            .map(|predicate| AuthorizationRequirement {
+                predicate: predicate.name,
+                arguments: predicate
+                    .arguments
+                    .into_iter()
+                    .map(|name| {
+                        decl.params
+                            .iter()
+                            .position(|parameter| parameter.name == name)
+                            .unwrap_or(usize::MAX)
+                    })
+                    .collect(),
+            })
+            .collect(),
+        Err(_) => vec![AuthorizationRequirement {
+            predicate: "__invalid_requires__".to_string(),
+            arguments: vec![usize::MAX],
+        }],
+    }
+}
+
 /// A hash over the interface, and over nothing else.
 ///
 /// Exports, their kinds, the capabilities and the placements. Not the bodies:
@@ -1117,6 +1172,20 @@ fn schema_of(
     let mut text = String::from(module);
     for e in exports {
         text.push_str(&format!("|{}:{}", e.kind, e.name));
+        if let Some(component) = &e.component {
+            for requirement in &component.authorization {
+                text.push_str("|requires:");
+                text.push_str(&requirement.predicate);
+                text.push('(');
+                for (i, argument) in requirement.arguments.iter().enumerate() {
+                    if i > 0 {
+                        text.push(',');
+                    }
+                    text.push_str(&argument.to_string());
+                }
+                text.push(')');
+            }
+        }
     }
     for c in capabilities {
         text.push_str(&format!("|cap:{}", c.name()));
