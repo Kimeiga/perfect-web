@@ -110,6 +110,26 @@ fn a_capability_survives_the_crossing_with_its_argument() {
 }
 
 #[test]
+fn command_authorization_survives_the_compiler_host_boundary() {
+    let command = find("store.page.add_to_cart");
+    let component = command.exports[0]
+        .component
+        .as_ref()
+        .expect("compiled command export");
+    assert_eq!(component.authorization.len(), 1);
+    assert_eq!(component.authorization[0].predicate, "SignedIn");
+    assert!(component.authorization[0].arguments.is_empty());
+
+    let clear = find("store.page.clear_cart");
+    let component = clear.exports[0]
+        .component
+        .as_ref()
+        .expect("compiled command export");
+    assert_eq!(component.authorization.len(), 1);
+    assert_eq!(component.authorization[0].predicate, "SignedIn");
+}
+
+#[test]
 fn the_store_page_does_not_inherit_its_handlers_authority() {
     // ADR-0020's least-authority decision, checked against the real artifact
     // rather than against a fixture written to agree with it.
