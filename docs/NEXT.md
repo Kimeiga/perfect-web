@@ -4,6 +4,14 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ## Current: E10-I closed, handlers compiled; the rest of E10, then the kiokun proof slice
 
+**2026-10-01, authorization held (ADR-0115).** A command's `requires`
+predicates now cross the compiler-host contract and are evaluated before the
+component can run. The raw host call refuses an export with unevaluated
+preconditions; unknown predicates fail closed. The own-renderer development
+deployment explicitly models its local demo session as `SignedIn`; real
+identity verification remains a deployment integration, not a compiler guess.
+Next remains the first unresolved item in the lists below.
+
 **2026-09-25:** resumable handler bodies compile to ES modules
 ([ADR-0033](DECISIONS/ADR-0033-compiled-handlers.md),
 [evidence](evidence/E10/handlers-2026-09-25.md)). The store page's behaviour is
@@ -197,8 +205,9 @@ page reading its parameter~~ (ADR-0114). Next, in order:
    into exists before any request supplies `id`.
 
 Then, each needing a ruling first:
-- **authorization**: `requires` is enforced by nothing, and its predicates
-  are declared nowhere (KNOWN_LIMITATIONS). The first, being security;
+- ~~**authorization**~~, done 2026-10-01 (ADR-0115): `requires` is an
+  export-level invocation precondition and cannot reach the component body
+  without a deployment authorization decision. Unknown predicates fail closed;
 - head elements in a body, `<meta>` and `<link>` (ADR-0096);
 - what a handler that is not resumable compiles to: the runtime leaves
   its element inert (KNOWN_LIMITATIONS);
