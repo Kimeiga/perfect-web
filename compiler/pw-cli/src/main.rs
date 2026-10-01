@@ -824,6 +824,24 @@ fn emit_contracts_command(paths: &[&String], plain: bool) -> ExitCode {
             }
             for e in &c.exports {
                 println!("  exports   {} {}", e.kind, e.name);
+                if let Some(component) = &e.component {
+                    for requirement in &component.authorization {
+                        let arguments = requirement
+                            .arguments
+                            .iter()
+                            .map(|index| format!("arg {index}"))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        if arguments.is_empty() {
+                            println!("  requires  {}", requirement.predicate);
+                        } else {
+                            println!(
+                                "  requires  {}({})",
+                                requirement.predicate, arguments
+                            );
+                        }
+                    }
+                }
             }
             println!();
         }
