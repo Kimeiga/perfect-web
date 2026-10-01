@@ -143,10 +143,17 @@ calls `admit` before acting, so `add_to_cart` requires `database.write<Carts>`
 by its own contract and refuses on a node without it. The obligation is about
 the BODY being compiled Pleris, not about the authority decision.
 
-**Closing condition.** E10-I is met when a `.pw`-authored command runs as a
-component through `pw_host::engine::call_within` and the Rust closure path is
-deleted rather than left beside it. "Both work" is not the obligation met; it is
-the obligation avoided.
+**Closing condition.** E10-I was met when a `.pw`-authored command ran as a
+component through the E8 host and the Rust closure path was deleted rather than
+left beside it. "Both work" is not the obligation met; it is the obligation
+avoided.
+
+**2026-10-01 amendment (ADR-0115):** the store commands declare `requires
+SignedIn`. Their current execution path is therefore
+`call_authorized_within`: the deployment must approve the invocation before the
+component body runs. The raw `call_within` path now refuses an export with an
+unevaluated precondition. This strengthens the already-closed E10-I execution
+proof; it does not reopen the compiled-body obligation.
 
 ## Invalidated — claims the charter made that measurement removed
 
