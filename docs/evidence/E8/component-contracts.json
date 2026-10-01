@@ -468,7 +468,7 @@
   {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "667b06541a47fc42",
+    "abi_schema": "d8292a918f9a4334",
     "required_capabilities": [
       {
         "family": "database",
@@ -590,7 +590,12 @@
         },
         "component": {
           "interface": "pw:app/store-page-add-to-cart-api@0.1.0",
-          "function": "add-to-cart"
+          "function": "add-to-cart",
+          "authorization": [
+            {
+              "predicate": "SignedIn"
+            }
+          ]
         }
       }
     ]
@@ -598,7 +603,7 @@
   {
     "component_id": "store.page.clear_cart",
     "capability_mapping": 1,
-    "abi_schema": "a3bcfeb6f0683204",
+    "abi_schema": "1d560296d65a503e",
     "required_capabilities": [
       {
         "family": "database",
@@ -710,7 +715,12 @@
         },
         "component": {
           "interface": "pw:app/store-page-clear-cart-api@0.1.0",
-          "function": "clear-cart"
+          "function": "clear-cart",
+          "authorization": [
+            {
+              "predicate": "SignedIn"
+            }
+          ]
         }
       }
     ]
