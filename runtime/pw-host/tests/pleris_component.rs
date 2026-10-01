@@ -177,6 +177,30 @@ fn the_artifact_imports_exactly_what_its_contract_allows() {
 }
 
 #[test]
+fn an_export_not_declared_by_the_contract_cannot_be_invoked() {
+    let c = contract();
+    let bytes = component();
+    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let calls: Calls = Arc::default();
+    let err = engine::call_authorized_within(
+        &bytes,
+        &c,
+        &granted,
+        &limits(),
+        &host(
+            &calls,
+            Val::Result(Ok(Some(Box::new(cart("cortado", 1))))),
+        ),
+        &["pw:app/not-the-contract@0.1.0", "add-to-cart"],
+        &[Val::String("cortado".into()), Val::S64(1)],
+        approve_store_authorization,
+    )
+    .expect_err("an undeclared export path must fail closed");
+    assert!(err.contains("not an export declared"), "{err}");
+    assert!(calls.lock().unwrap().is_empty(), "nothing ran");
+}
+
+#[test]
 fn requires_cannot_be_bypassed_by_the_raw_call_api() {
     let c = contract();
     let bytes = component();
