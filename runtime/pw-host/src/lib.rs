@@ -6,19 +6,21 @@
 //! > that authority physically exists. Neither should reconstruct the other's
 //! > answer.
 //!
-//! So this crate answers exactly one question, in three parts:
+//! This crate answers two host-boundary questions:
 //!
 //! ```text
 //! may this component be instantiated on this node?
-//!
 //!   1. does the node grant every capability the contract requires?   topology
 //!   2. is the node's world one the contract allows?                  placement
 //!   3. does the artifact import only what the contract allows?       audit
+//!
+//! may this particular export be invoked for this caller?
+//!   4. did the deployment approve every declared precondition?       authorization
 //! ```
 //!
-//! and it never asks a fourth. It does not infer effects, it does not solve
-//! placements, and it does not decide what a component needs — those are
-//! answered in `pw_core::contract` and arrive here as a JSON artifact.
+//! It does not infer effects, solve placements, invent authorization predicates,
+//! or decide what a component needs. Those answers arrive from the compiler or
+//! the deployment and this boundary refuses execution when one is missing.
 //!
 //! # Placement is not capability
 //!
@@ -857,9 +859,11 @@ pub mod engine {
     fn authorization_for<'a>(
         contract: &'a crate::ComponentContract,
         export: &[&str],
-    ) -> &'a [crate::AuthorizationRequirement] {
+    ) -> Result<&'a [crate::AuthorizationRequirement], String> {
         let [interface, function] = export else {
-            return &[];
+            return Err(format!(
+                "an export path is `interface`, `function`; got {export:?}"
+            ));
         };
         contract
             .exports
@@ -867,7 +871,13 @@ pub mod engine {
             .filter_map(|e| e.component.as_ref())
             .find(|e| e.interface == *interface && e.function == *function)
             .map(|e| e.authorization.as_slice())
-            .unwrap_or(&[])
+            .ok_or_else(|| {
+                format!(
+                    "`{}` is not an export declared by component contract `{}`",
+                    export.join("#"),
+                    contract.component_id
+                )
+            })
     }
 
     /// Evaluate every `requires` predicate before an invocation.
@@ -886,7 +896,7 @@ pub mod engine {
     where
         F: FnMut(&str, &[&Val]) -> Result<bool, String>,
     {
-        for requirement in authorization_for(contract, export) {
+        for requirement in authorization_for(contract, export)? {
             let mut selected = Vec::with_capacity(requirement.arguments.len());
             for index in &requirement.arguments {
                 let Some(value) = args.get(*index) else {
@@ -920,7 +930,7 @@ pub mod engine {
         contract: &crate::ComponentContract,
         export: &[&str],
     ) -> Result<(), String> {
-        let requirements = authorization_for(contract, export);
+        let requirements = authorization_for(contract, export)?;
         if requirements.is_empty() {
             Ok(())
         } else {
