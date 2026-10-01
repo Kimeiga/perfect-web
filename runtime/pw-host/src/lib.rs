@@ -294,11 +294,22 @@ pub struct Export {
     pub component: Option<ComponentExport>,
 }
 
-/// An export's place in a component: its interface and function.
+/// One authorization precondition the deployment must approve.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct AuthorizationRequirement {
+    pub predicate: String,
+    #[serde(default)]
+    pub arguments: Vec<usize>,
+}
+
+/// An export's place in a component: its interface, function, and invocation
+/// preconditions. Mirrored by field name from the compiler, ADR-0018.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ComponentExport {
     pub interface: String,
     pub function: String,
+    #[serde(default)]
+    pub authorization: Vec<AuthorizationRequirement>,
 }
 
 /// **What binding modes an interface edge supports**, as the compiler derived
@@ -839,6 +850,88 @@ pub mod engine {
         Ok(out)
     }
 
+    /// Authorization requirements for the exact export being invoked.
+    ///
+    /// A contract may expose more than one operation later, so matching the
+    /// component's interface and function is part of selecting the policy.
+    fn authorization_for<'a>(
+        contract: &'a crate::ComponentContract,
+        export: &[&str],
+    ) -> &'a [crate::AuthorizationRequirement] {
+        let [interface, function] = export else {
+            return &[];
+        };
+        contract
+            .exports
+            .iter()
+            .filter_map(|e| e.component.as_ref())
+            .find(|e| e.interface == *interface && e.function == *function)
+            .map(|e| e.authorization.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Evaluate every `requires` predicate before an invocation.
+    ///
+    /// Predicate names are deployment vocabulary. The host never guesses their
+    /// meaning. Arguments are selected from the already-typed component
+    /// arguments by the indices the compiler recorded. Unknown predicates are
+    /// therefore naturally fail-closed when the deployment evaluator returns an
+    /// error.
+    pub fn authorize_export<F>(
+        contract: &crate::ComponentContract,
+        export: &[&str],
+        args: &[Val],
+        mut evaluate: F,
+    ) -> Result<(), String>
+    where
+        F: FnMut(&str, &[&Val]) -> Result<bool, String>,
+    {
+        for requirement in authorization_for(contract, export) {
+            let mut selected = Vec::with_capacity(requirement.arguments.len());
+            for index in &requirement.arguments {
+                let Some(value) = args.get(*index) else {
+                    return Err(format!(
+                        "authorization predicate `{}` refers to missing argument {}",
+                        requirement.predicate, index
+                    ));
+                };
+                selected.push(value);
+            }
+            match evaluate(&requirement.predicate, &selected) {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(format!(
+                        "authorization predicate `{}` denied the invocation",
+                        requirement.predicate
+                    ));
+                }
+                Err(why) => {
+                    return Err(format!(
+                        "authorization predicate `{}` could not be evaluated: {why}",
+                        requirement.predicate
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn refuse_unevaluated_authorization(
+        contract: &crate::ComponentContract,
+        export: &[&str],
+    ) -> Result<(), String> {
+        let requirements = authorization_for(contract, export);
+        if requirements.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "`{}` has {} authorization precondition(s) that have not been evaluated; use `call_authorized_within`",
+                export.join("#"),
+                requirements.len()
+            ))
+        }
+    }
+
     /// **Instantiate a component with exactly the capabilities it was granted.**
     ///
     /// E8 gate item: *"typed linking only from a `Granted`. A component whose
@@ -933,6 +1026,26 @@ pub mod engine {
         Prepared::compile(bytes)?.call_within(contract, granted, limits, host, export, args)
     }
 
+    /// Invoke an export after the deployment explicitly evaluates its
+    /// authorization preconditions.
+    #[allow(clippy::too_many_arguments)]
+    pub fn call_authorized_within<F>(
+        bytes: &[u8],
+        contract: &crate::ComponentContract,
+        granted: &crate::Granted,
+        limits: &crate::Limits,
+        host: &std::collections::BTreeMap<String, HostFn>,
+        export: &[&str],
+        args: &[wasmtime::component::Val],
+        evaluate: F,
+    ) -> Result<Vec<wasmtime::component::Val>, String>
+    where
+        F: FnMut(&str, &[&Val]) -> Result<bool, String>,
+    {
+        Prepared::compile(bytes)?
+            .call_authorized_within(contract, granted, limits, host, export, args, evaluate)
+    }
+
     /// **A component compiled once, run many times.**
     ///
     /// Compiling is the expensive half of a call: Cranelift translates the
@@ -971,6 +1084,35 @@ pub mod engine {
             export: &[&str],
             args: &[wasmtime::component::Val],
         ) -> Result<Vec<wasmtime::component::Val>, String> {
+            refuse_unevaluated_authorization(contract, export)?;
+            run(
+                &self.engine,
+                &self.component,
+                contract,
+                granted,
+                limits,
+                host,
+                export,
+                args,
+            )
+        }
+
+        /// `call_within`, with every invocation precondition evaluated first.
+        #[allow(clippy::too_many_arguments)]
+        pub fn call_authorized_within<F>(
+            &self,
+            contract: &crate::ComponentContract,
+            granted: &crate::Granted,
+            limits: &crate::Limits,
+            host: &std::collections::BTreeMap<String, HostFn>,
+            export: &[&str],
+            args: &[wasmtime::component::Val],
+            evaluate: F,
+        ) -> Result<Vec<wasmtime::component::Val>, String>
+        where
+            F: FnMut(&str, &[&Val]) -> Result<bool, String>,
+        {
+            authorize_export(contract, export, args, evaluate)?;
             run(
                 &self.engine,
                 &self.component,
@@ -1153,6 +1295,7 @@ pub mod engine {
             export: &[&str],
             args: &[wasmtime::component::Val],
         ) -> Result<(Vec<wasmtime::component::Val>, Usage), String> {
+            refuse_unevaluated_authorization(contract, export)?;
             run_measured(
                 &self.engine,
                 &self.component,
