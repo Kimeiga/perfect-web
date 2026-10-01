@@ -274,6 +274,12 @@ fixtures discard theirs by a name that says so.
 Evidence: [results-handled.txt](evidence/E10/results-handled.txt)
 (`just e10-results-handled`).
 
+**2026-10-01: the Node advisory gate is clean of the newly published
+`brace-expansion` findings** ([ADR-0117](DECISIONS/ADR-0117-patched-brace-expansion-stays-below-markos-glob-layer.md)).
+Marko's `glob 13.0.6 -> minimatch 10.2.6` path had resolved
+`brace-expansion 5.0.9`; pnpm now resolves the patched 5.0.12 through a
+range-scoped override. No advisory was allow-listed.
+
 **2026-10-01: Wasmtime 47.x is no longer a live execution pin**
 ([ADR-0116](DECISIONS/ADR-0116-wasmtime-48-0-3-replaces-the-vulnerable-47-x-pin.md)).
 The supply-chain gate found RUSTSEC-2026-0315 and RUSTSEC-2026-0316 in 47.0.4.

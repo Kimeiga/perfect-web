@@ -845,3 +845,11 @@ the supply-chain gate found RUSTSEC-2026-0315 and RUSTSEC-2026-0316 in Wasmtime
 47.0.4. The host, conformance engine, standalone spike and bootstrapped CLI now
 pin 48.0.3. The advisories are not suppressed, and historical measurements keep
 their original engine labels.
+ 
+## 2026-10-01: patch brace expansion below Marko's glob layer
+
+[ADR-0117](DECISIONS/ADR-0117-patched-brace-expansion-stays-below-markos-glob-layer.md):
+the Node advisory gate found three denial-of-service advisories in
+`brace-expansion 5.0.9` through Marko's glob dependency. The 5.x transitive
+dependency is pinned to 5.0.12 and the lockfile was regenerated; no advisory
+exception was added.
