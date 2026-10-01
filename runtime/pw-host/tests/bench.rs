@@ -125,13 +125,17 @@ fn the_compiled_command_through_the_host() {
     );
     measure("store.page.add_to_cart through the host", 7, 2_000, |i| {
         let out = prepared
-            .call_within(
+            .call_authorized_within(
                 &contract,
                 &granted,
                 &limits(),
                 &ops,
                 &[&export.interface, &export.function],
                 &[Val::String(format!("item-{i}")), Val::S64(1)],
+                |predicate, _arguments| match predicate {
+                    "SignedIn" => Ok(true),
+                    other => Err(format!("benchmark deployment does not define `{other}`")),
+                },
             )
             .expect("runs");
         assert_eq!(out, vec![cart.clone()]);
