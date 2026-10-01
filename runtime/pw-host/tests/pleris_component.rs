@@ -130,6 +130,37 @@ fn limits() -> Limits {
     }
 }
 
+fn approve_store_authorization(
+    predicate: &str,
+    _arguments: &[&Val],
+) -> Result<bool, String> {
+    match predicate {
+        "SignedIn" => Ok(true),
+        other => Err(format!("test deployment does not define `{other}`")),
+    }
+}
+
+fn authorized_call(
+    bytes: &[u8],
+    contract: &ComponentContract,
+    granted: &Granted,
+    limits: &Limits,
+    host: &BTreeMap<String, HostFn>,
+    export: &[&str],
+    args: &[Val],
+) -> Result<Vec<Val>, String> {
+    engine::call_authorized_within(
+        bytes,
+        contract,
+        granted,
+        limits,
+        host,
+        export,
+        args,
+        approve_store_authorization,
+    )
+}
+
 #[test]
 fn the_artifact_imports_exactly_what_its_contract_allows() {
     let actual = engine::imports_of(&component()).expect("the component reads");
@@ -146,6 +177,30 @@ fn the_artifact_imports_exactly_what_its_contract_allows() {
 }
 
 #[test]
+fn requires_cannot_be_bypassed_by_the_raw_call_api() {
+    let c = contract();
+    let bytes = component();
+    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let calls: Calls = Arc::default();
+    let [interface, function] = export(&c);
+    let err = engine::call_within(
+        &bytes,
+        &c,
+        &granted,
+        &limits(),
+        &host(
+            &calls,
+            Val::Result(Ok(Some(Box::new(cart("cortado", 1))))),
+        ),
+        &[&interface, &function],
+        &[Val::String("cortado".into()), Val::S64(1)],
+    )
+    .expect_err("a requires clause must be evaluated before the body can run");
+    assert!(err.contains("authorization precondition"), "{err}");
+    assert!(calls.lock().unwrap().is_empty(), "nothing ran before authorization");
+}
+
+#[test]
 fn the_compiled_command_runs_through_the_host() {
     let c = contract();
     let bytes = component();
@@ -154,7 +209,7 @@ fn the_compiled_command_runs_through_the_host() {
     let returned = Val::Result(Ok(Some(Box::new(cart("cortado", 2)))));
     let [interface, function] = export(&c);
 
-    let out = engine::call_within(
+    let out = authorized_call(
         &bytes,
         &c,
         &granted,
@@ -201,7 +256,7 @@ fn a_data_layer_failure_is_the_commands_failure() {
         None,
     )))));
     let [interface, function] = export(&c);
-    let out = engine::call_within(
+    let out = authorized_call(
         &bytes,
         &c,
         &granted,
@@ -237,7 +292,7 @@ fn an_ungranted_operation_is_refused_by_the_engine() {
     let granted = Granted::from(&admission, &BTreeMap::new()).expect("admitted as edited");
     let calls: Calls = Arc::default();
     let [interface, function] = export(&c);
-    let err = engine::call_within(
+    let err = authorized_call(
         &bytes,
         &c,
         &granted,
@@ -261,7 +316,7 @@ fn a_granted_operation_the_host_does_not_implement_is_refused() {
     let mut ops = host(&calls, Val::Bool(false));
     ops.remove("store:data/carts#add");
     let [interface, function] = export(&c);
-    let err = engine::call_within(
+    let err = authorized_call(
         &bytes,
         &c,
         &granted,
@@ -286,7 +341,7 @@ fn the_instance_runs_within_its_fuel() {
         memory_bytes: None,
         table_elements: None,
     };
-    let err = engine::call_within(
+    let err = authorized_call(
         &bytes,
         &c,
         &granted,
@@ -417,13 +472,14 @@ fn sustained_calls_leave_memory_flat() {
     let ops = host(&calls, returned.clone());
     let call = |n: i64| {
         let out = prepared
-            .call_within(
+            .call_authorized_within(
                 &c,
                 &granted,
                 &limits(),
                 &ops,
                 &[&interface, &function],
                 &[Val::String(format!("item-{n}")), Val::S64(n)],
+                approve_store_authorization,
             )
             .expect("runs");
         assert_eq!(out, vec![returned.clone()]);
