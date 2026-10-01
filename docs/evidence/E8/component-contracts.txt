@@ -59,19 +59,21 @@ store.page.StorePage  abi d803b26130c7cf49
   host      pw:host/session#read  (session.read)
   exports   page StorePage
 
-store.page.add_to_cart  abi 667b06541a47fc42
+store.page.add_to_cart  abi d8292a918f9a4334
   runs at   origin
   needs     database.write<Carts>
   needs     session.read
   host      pw:host/session#read  (session.read)
   host      store:data/carts#add  (database.write<Carts>)
   exports   command add_to_cart
+  requires  SignedIn
 
-store.page.clear_cart  abi a3bcfeb6f0683204
+store.page.clear_cart  abi 1d560296d65a503e
   runs at   origin
   needs     database.write<Carts>
   needs     session.read
   host      pw:host/session#read  (session.read)
   host      store:data/carts#clear  (database.write<Carts>)
   exports   command clear_cart
+  requires  SignedIn
 
