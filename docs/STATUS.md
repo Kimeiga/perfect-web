@@ -274,13 +274,19 @@ fixtures discard theirs by a name that says so.
 Evidence: [results-handled.txt](evidence/E10/results-handled.txt)
 (`just e10-results-handled`).
 
-**Recorded 2026-09-26: authorization is written and not held.** `requires
-SignedIn` on a command is read by no manifest, contract, host or server,
-and its predicates are declared nowhere. The store's `add_to_cart` runs for
-any session. Nothing claimed otherwise, but the charter's command is "an
-explicit mutation with authorization", and the gap was unrecorded.
-KNOWN_LIMITATIONS and NEXT carry it; it needs a ruling on where predicates
-are declared and who evaluates them.
+**Closed 2026-10-01: authorization is held before a command runs**
+([ADR-0115](DECISIONS/ADR-0115-a-commands-requires-is-held-before-its-body-runs.md)).
+`requires SignedIn` is an invocation precondition on the compiled command
+export now. Predicate names are deployment authorization vocabulary; their
+arguments are command parameters carried by index. `pw-host` refuses an
+export whose requirements were not evaluated, and an unknown, denied, failed
+or malformed requirement cannot reach the component body. The development
+store explicitly models every local demo session as `SignedIn`; it remains a
+development identity model, not production authentication.
+
+Evidence boundary: [component-contracts.json](evidence/E8/component-contracts.json)
+records `SignedIn` on both store commands; compiler, host-mirror, component
+execution and development-server tests cover the source-to-invocation path.
 
 **2026-09-26: a name is written once where it is declared**
 ([ADR-0098](DECISIONS/ADR-0098-a-name-is-written-once-where-it-is-declared.md)).
