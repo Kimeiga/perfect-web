@@ -218,6 +218,39 @@ public query Menu(id: Int) -> Int
 }
 
 #[test]
+fn requires_is_an_export_precondition_and_part_of_the_abi() {
+    let restock = one(&[PROGRAM], "shop.origin.Restock");
+    let export = restock.exports[0]
+        .component
+        .as_ref()
+        .expect("compiled export");
+    assert_eq!(export.authorization.len(), 1);
+    assert_eq!(export.authorization[0].predicate, "SignedIn");
+    assert!(export.authorization[0].arguments.is_empty());
+
+    let parameterized = PROGRAM.replace(
+        "requires SignedIn",
+        "requires SignedIn, OwnsOrder(id)",
+    );
+    let c = one(&[&parameterized], "shop.origin.Restock");
+    let requirements = &c.exports[0]
+        .component
+        .as_ref()
+        .expect("compiled export")
+        .authorization;
+    assert_eq!(requirements.len(), 2);
+    assert_eq!(requirements[1].predicate, "OwnsOrder");
+    assert_eq!(requirements[1].arguments, [0]);
+
+    // Removing a precondition changes the ABI identity even though the Wasm
+    // function's value signature is unchanged. A deployment must not confuse
+    // the weaker invocation contract with the stronger one.
+    let unrestricted = PROGRAM.replace("    requires SignedIn\n", "");
+    let without = one(&[&unrestricted], "shop.origin.Restock");
+    assert_ne!(restock.abi_schema, without.abi_schema);
+}
+
+#[test]
 fn required_capabilities_come_from_the_effect_row() {
     // Per DECLARATION, so the query that reads does not also get the write the
     // command in the same module needs. Aggregating by module would give both
