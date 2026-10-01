@@ -270,7 +270,7 @@ fn main() -> Result<()> {
         );
     }
 
-    println!("wasmtime crate: 47.0.3");
+    println!("wasmtime crate: 48.0.3");
     println!();
 
     let mut any_failed = false;

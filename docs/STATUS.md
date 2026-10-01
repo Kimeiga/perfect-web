@@ -274,6 +274,14 @@ fixtures discard theirs by a name that says so.
 Evidence: [results-handled.txt](evidence/E10/results-handled.txt)
 (`just e10-results-handled`).
 
+**2026-10-01: Wasmtime 47.x is no longer a live execution pin**
+([ADR-0116](DECISIONS/ADR-0116-wasmtime-48-0-3-replaces-the-vulnerable-47-x-pin.md)).
+The supply-chain gate found RUSTSEC-2026-0315 and RUSTSEC-2026-0316 in 47.0.4.
+The workspace engine, conformance engine, standalone host spike and bootstrapped
+CLI now pin Wasmtime 48.0.3. Both Cargo lockfiles were resolved by Cargo, not
+edited by hand. Historical evidence remains labelled with the engine version
+that produced it.
+
 **Closed 2026-10-01: authorization is held before a command runs**
 ([ADR-0115](DECISIONS/ADR-0115-a-commands-requires-is-held-before-its-body-runs.md)).
 `requires SignedIn` is an invocation precondition on the compiled command

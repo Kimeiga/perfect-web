@@ -837,3 +837,11 @@ precondition on the compiled export. The deployment evaluates every predicate
 over the typed command arguments before execution; unknown, denied, malformed
 or unevaluated requirements fail closed. Static capabilities remain separate
 from per-request authorization.
+
+## 2026-10-01: Wasmtime 48.0.3 replaces the vulnerable 47.x pin (E8/E10)
+
+[ADR-0116](DECISIONS/ADR-0116-wasmtime-48-0-3-replaces-the-vulnerable-47-x-pin.md):
+the supply-chain gate found RUSTSEC-2026-0315 and RUSTSEC-2026-0316 in Wasmtime
+47.0.4. The host, conformance engine, standalone spike and bootstrapped CLI now
+pin 48.0.3. The advisories are not suppressed, and historical measurements keep
+their original engine labels.

@@ -43,3 +43,12 @@ core wasm instances, so `instances(1)` rejects a valid component.
 - WASI 0.3 component tooling becomes reliable (see ADR-0008).
 - A required capability cannot be expressed in WIT.
 - Wasmtime's MSRV exceeds the Rust pin.
+ 
+## 2026-10-01 security amendment
+
+ADR-0116 advances the host and CLI pin from the historically measured 47.x
+release to **Wasmtime 48.0.3**. The capability-host architecture above is
+unchanged. The version moved because RustSec advisories RUSTSEC-2026-0315 and
+RUSTSEC-2026-0316 affect 47.0.4's fuel accounting, including dynamic component
+record lifting. Historical E0 evidence remains labelled with the version that
+produced it; current execution uses the patched pin.
