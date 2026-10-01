@@ -43,10 +43,12 @@
 //!
 //! # Deliberately not
 //!
-//! A deployment abstraction, an authentication system, a plugin host, a Wasm
-//! executor of its own (the one it uses is `pw-host`'s), an HTTP/3 experiment,
-//! or a distributed materializer. Each of those belongs to a milestone that has
-//! not started.
+//! A deployment abstraction, a production authentication system, a plugin host,
+//! a Wasm executor of its own (the one it uses is `pw-host`'s), an HTTP/3
+//! experiment, or a distributed materializer. This development deployment
+//! explicitly models every local session as `SignedIn` so the store demo can
+//! exercise command authorization; any other predicate is refused. Real identity
+//! verification belongs to the deployment, not to this test server.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -463,6 +465,7 @@ impl Server {
     fn run(
         &self,
         component_id: &str,
+        session: &str,
         host: &BTreeMap<String, HostFn>,
         args: &[Val],
     ) -> Result<Vec<Val>, String> {
@@ -476,7 +479,7 @@ impl Server {
             .component
             .clone()
             .ok_or_else(|| format!("`{component_id}`'s contract does not locate its export"))?;
-        self.components[component_id].prepared.call_within(
+        self.components[component_id].prepared.call_authorized_within(
             contract,
             &granted,
             &Limits {
@@ -487,6 +490,17 @@ impl Server {
             host,
             &[&export.interface, &export.function],
             args,
+            |predicate, _bound| match predicate {
+                // This is a DEVELOPMENT identity model, not authentication:
+                // every session the local server issued is the signed-in demo
+                // principal. The important property here is that `requires`
+                // is evaluated explicitly and an unknown predicate cannot run.
+                "SignedIn" if !session.is_empty() => Ok(true),
+                "SignedIn" => Ok(false),
+                other => Err(format!(
+                    "the development deployment has no authorization predicate `{other}`"
+                )),
+            },
         )
     }
 
@@ -557,7 +571,7 @@ impl Server {
             // it runs: a value this server cannot compute is refused, and a
             // refused command has written nothing.
             let events = declared_events(&self.graph, component_id, session)?;
-            let out = self.run(component_id, &host, args)?;
+            let out = self.run(component_id, session, &host, args)?;
             if let [Val::Result(Err(e))] = out.as_slice() {
                 return Err(format!("{component_id} failed: {e:?}"));
             }
@@ -2476,6 +2490,51 @@ mod tests {
         let reply = poll(0);
         assert!(!reply.contains("recovery"), "{reply}");
         assert!(s.pending.lock().unwrap().contains_key("gone"));
+    }
+
+    #[test]
+    fn store_commands_carry_and_enforce_their_signed_in_precondition() {
+        let mut s = server(dev_topology());
+        for id in [ADD, CLEAR] {
+            let contract = s
+                .contracts
+                .iter()
+                .find(|c| c.component_id == id)
+                .expect("command contract");
+            let requirements = &contract.exports[0]
+                .component
+                .as_ref()
+                .expect("compiled export")
+                .authorization;
+            assert_eq!(requirements.len(), 1, "{id}: {requirements:?}");
+            assert_eq!(requirements[0].predicate, "SignedIn");
+            assert!(requirements[0].arguments.is_empty());
+        }
+
+        // The development deployment knows SignedIn, so the ordinary demo
+        // principal may execute it.
+        s.command(ADD, "signed-in-demo", &add("espresso", 1), false)
+            .expect("SignedIn is explicitly approved");
+
+        // A predicate the deployment does not know is denied before the
+        // component or staged data layer can change state.
+        let requirement = &mut s
+            .contracts
+            .iter_mut()
+            .find(|c| c.component_id == ADD)
+            .expect("command contract")
+            .exports[0]
+            .component
+            .as_mut()
+            .expect("compiled export")
+            .authorization[0];
+        requirement.predicate = "OwnsOrder".to_string();
+        let before = s.cart_value("signed-in-demo");
+        let err = s
+            .command(ADD, "signed-in-demo", &add("cortado", 1), false)
+            .expect_err("unknown authorization must fail closed");
+        assert!(err.contains("no authorization predicate"), "{err}");
+        assert_eq!(s.cart_value("signed-in-demo"), before);
     }
 
     /// A component the build has no contract for is refused, not run.
