@@ -397,7 +397,6 @@ pub fn carries_terms(head: &str) -> bool {
             | Some(Domain::ResourceRef)
             | Some(Domain::EventRef)
             | Some(Domain::Listener)
-            | Some(Domain::PredicateRef)
             | Some(Domain::LabelCtor)
     )
 }
@@ -473,6 +472,116 @@ pub fn duration(v: &str) -> Option<u64> {
         _ => return None,
     };
     n.checked_mul(per)
+}
+
+/// One deployment authorization predicate written by a command.
+///
+/// `requires SignedIn, OwnsOrder(order)` is declarative. The compiler records
+/// the predicate names and which command parameters they receive; the deployment
+/// supplies their meaning at invocation time. A predicate is therefore not a
+/// Pleris term and cannot silently execute inside the component.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Predicate {
+    pub name: String,
+    pub arguments: Vec<String>,
+}
+
+/// Parse a `requires` value.
+///
+/// Predicates may be bare or applied to command parameters. Their names belong
+/// to the deployment's authorization vocabulary, not to the program's term
+/// namespace. Arguments are deliberately only names: the host evaluates a
+/// precondition over the authenticated caller and the already-typed command
+/// arguments, rather than running arbitrary Pleris code before authorization.
+pub fn predicates(value: &str) -> Result<Vec<Predicate>, String> {
+    let items = split_top_level(value)?;
+    if items.is_empty() {
+        return Err("`requires` names no predicate".to_string());
+    }
+
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for item in items {
+        let item = item.trim();
+        if item.is_empty() {
+            return Err("an authorization predicate is empty".to_string());
+        }
+        let (name, arguments) = match item.split_once('(') {
+            Some((name, rest)) => {
+                let Some(inner) = rest.strip_suffix(')') else {
+                    return Err(format!("`{}`'s arguments are not closed with `)`", name.trim()));
+                };
+                let args = split_top_level(inner)?;
+                (name.trim(), args.into_iter().map(str::trim).collect::<Vec<_>>())
+            }
+            None => (item, Vec::new()),
+        };
+
+        if !predicate_name(name) {
+            return Err(format!("`{name}` is not an authorization predicate name"));
+        }
+        let mut args = Vec::new();
+        for argument in arguments {
+            if !predicate_name(argument) || argument.contains('.') {
+                return Err(format!(
+                    "`{name}` receives command parameter names; `{argument}` is not one"
+                ));
+            }
+            args.push(argument.to_string());
+        }
+
+        let predicate = Predicate {
+            name: name.to_string(),
+            arguments: args,
+        };
+        if !seen.insert((predicate.name.clone(), predicate.arguments.clone())) {
+            return Err(format!("`{item}` is required twice"));
+        }
+        out.push(predicate);
+    }
+    Ok(out)
+}
+
+/// Comma-separated items, without splitting commas inside an argument list.
+fn split_top_level(value: &str) -> Result<Vec<&str>, String> {
+    if value.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    for (i, ch) in value.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                if depth == 0 {
+                    return Err("an authorization predicate has an unmatched `)`".to_string());
+                }
+                depth -= 1;
+            }
+            ',' if depth == 0 => {
+                out.push(&value[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 {
+        return Err("an authorization predicate has an unclosed `(`".to_string());
+    }
+    out.push(&value[start..]);
+    Ok(out)
+}
+
+fn predicate_name(name: &str) -> bool {
+    fn segment(s: &str) -> bool {
+        let mut chars = s.chars();
+        chars
+            .next()
+            .is_some_and(|c| c == '_' || c.is_alphabetic())
+            && chars.all(|c| c == '_' || c.is_alphanumeric())
+    }
+    !name.is_empty() && name.split('.').all(segment)
 }
 
 /// **What is wrong with a policy's value, by its domain** (ADR-0089).
@@ -811,7 +920,6 @@ mod tests {
             "optimistic",
             "emits",
             "invalidates",
-            "requires",
             "acquire",
             "release",
             "draw",
@@ -826,6 +934,7 @@ mod tests {
         for head in [
             "cache",
             "key",
+            "requires",
             "consistency",
             "freshness",
             "placement",
