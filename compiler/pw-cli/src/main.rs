@@ -835,10 +835,7 @@ fn emit_contracts_command(paths: &[&String], plain: bool) -> ExitCode {
                         if arguments.is_empty() {
                             println!("  requires  {}", requirement.predicate);
                         } else {
-                            println!(
-                                "  requires  {}({})",
-                                requirement.predicate, arguments
-                            );
+                            println!("  requires  {}({})", requirement.predicate, arguments);
                         }
                     }
                 }

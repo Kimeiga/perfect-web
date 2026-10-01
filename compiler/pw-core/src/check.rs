@@ -567,7 +567,10 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
                 // richer would execute application code before authorization.
                 Some(Domain::PredicateRef) => {
                     if decl.kind != crate::hir::DeclKind::Command {
-                        Some("`requires` is an invocation precondition and belongs to a command".to_string())
+                        Some(
+                            "`requires` is an invocation precondition and belongs to a command"
+                                .to_string(),
+                        )
                     } else {
                         match crate::policy::predicates(value) {
                             Err(why) => Some(why),

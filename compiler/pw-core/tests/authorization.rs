@@ -21,7 +21,8 @@ fn requires_accepts_deployment_predicates_over_command_parameters() {
 
 #[test]
 fn requires_belongs_to_a_command() {
-    let src = "module t\n\nfn read(order: Int) -> Int !{}\n    requires SignedIn\n{\n    order\n}\n";
+    let src =
+        "module t\n\nfn read(order: Int) -> Int !{}\n    requires SignedIn\n{\n    order\n}\n";
     let found = reported(src);
     assert!(
         found

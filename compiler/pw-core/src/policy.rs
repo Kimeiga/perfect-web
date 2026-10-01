@@ -509,10 +509,16 @@ pub fn predicates(value: &str) -> Result<Vec<Predicate>, String> {
         let (name, arguments) = match item.split_once('(') {
             Some((name, rest)) => {
                 let Some(inner) = rest.strip_suffix(')') else {
-                    return Err(format!("`{}`'s arguments are not closed with `)`", name.trim()));
+                    return Err(format!(
+                        "`{}`'s arguments are not closed with `)`",
+                        name.trim()
+                    ));
                 };
                 let args = split_top_level(inner)?;
-                (name.trim(), args.into_iter().map(str::trim).collect::<Vec<_>>())
+                (
+                    name.trim(),
+                    args.into_iter().map(str::trim).collect::<Vec<_>>(),
+                )
             }
             None => (item, Vec::new()),
         };
@@ -576,9 +582,7 @@ fn split_top_level(value: &str) -> Result<Vec<&str>, String> {
 fn predicate_name(name: &str) -> bool {
     fn segment(s: &str) -> bool {
         let mut chars = s.chars();
-        chars
-            .next()
-            .is_some_and(|c| c == '_' || c.is_alphabetic())
+        chars.next().is_some_and(|c| c == '_' || c.is_alphabetic())
             && chars.all(|c| c == '_' || c.is_alphanumeric())
     }
     !name.is_empty() && name.split('.').all(segment)

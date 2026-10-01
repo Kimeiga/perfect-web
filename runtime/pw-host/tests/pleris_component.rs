@@ -130,10 +130,7 @@ fn limits() -> Limits {
     }
 }
 
-fn approve_store_authorization(
-    predicate: &str,
-    _arguments: &[&Val],
-) -> Result<bool, String> {
+fn approve_store_authorization(predicate: &str, _arguments: &[&Val]) -> Result<bool, String> {
     match predicate {
         "SignedIn" => Ok(true),
         other => Err(format!("test deployment does not define `{other}`")),
@@ -187,10 +184,7 @@ fn an_export_not_declared_by_the_contract_cannot_be_invoked() {
         &c,
         &granted,
         &limits(),
-        &host(
-            &calls,
-            Val::Result(Ok(Some(Box::new(cart("cortado", 1))))),
-        ),
+        &host(&calls, Val::Result(Ok(Some(Box::new(cart("cortado", 1)))))),
         &["pw:app/not-the-contract@0.1.0", "add-to-cart"],
         &[Val::String("cortado".into()), Val::S64(1)],
         approve_store_authorization,
@@ -212,16 +206,16 @@ fn requires_cannot_be_bypassed_by_the_raw_call_api() {
         &c,
         &granted,
         &limits(),
-        &host(
-            &calls,
-            Val::Result(Ok(Some(Box::new(cart("cortado", 1))))),
-        ),
+        &host(&calls, Val::Result(Ok(Some(Box::new(cart("cortado", 1)))))),
         &[&interface, &function],
         &[Val::String("cortado".into()), Val::S64(1)],
     )
     .expect_err("a requires clause must be evaluated before the body can run");
     assert!(err.contains("authorization precondition"), "{err}");
-    assert!(calls.lock().unwrap().is_empty(), "nothing ran before authorization");
+    assert!(
+        calls.lock().unwrap().is_empty(),
+        "nothing ran before authorization"
+    );
 }
 
 #[test]

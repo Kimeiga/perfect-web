@@ -228,10 +228,7 @@ fn requires_is_an_export_precondition_and_part_of_the_abi() {
     assert_eq!(export.authorization[0].predicate, "SignedIn");
     assert!(export.authorization[0].arguments.is_empty());
 
-    let parameterized = PROGRAM.replace(
-        "requires SignedIn",
-        "requires SignedIn, OwnsOrder(id)",
-    );
+    let parameterized = PROGRAM.replace("requires SignedIn", "requires SignedIn, OwnsOrder(id)");
     let c = one(&[&parameterized], "shop.origin.Restock");
     let requirements = &c.exports[0]
         .component
