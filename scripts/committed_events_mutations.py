@@ -53,8 +53,11 @@ MUTANTS = [
     (
         "a value is guessed",
         SERVER,
-        "                    other => Err(format!(",
-        "                    _ if true => Ok(session),\n                    other => Err(format!(",
+        "                    other => Err(format!(\n"
+        "                        \"\`{command}\` emits",
+        "                    _ if true => Ok(session),\n"
+        "                    other => Err(format!(\n"
+        "                        \"\`{command}\` emits",
     ),
 ]
 
