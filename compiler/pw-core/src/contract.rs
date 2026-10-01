@@ -1129,7 +1129,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
 /// impossible to satisfy rather than empty: callers of this lower-level API can
 /// construct HIR without running `check`, and malformed authorization must not
 /// turn into "no authorization required".
-fn authorization_of(decl: &Decl) -> Vec<AuthorizationRequirement> {
+fn authorization_of(decl: &crate::hir::Decl) -> Vec<AuthorizationRequirement> {
     let Some(policy) = decl.policy("requires") else {
         return Vec::new();
     };
