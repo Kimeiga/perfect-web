@@ -21,6 +21,6 @@ pw-host = { path = "../../runtime/pw-host", features = ["engine"] }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-# Already in the graph through pw-host (47.0.4 in Cargo.lock): the oracle reads
+# Already in the graph through pw-host (48.0.3 in Cargo.lock): the oracle reads
 # each artifact's own types to generate its inputs.
-wasmtime = "47.0.3"
+wasmtime = "48.0.3"
