@@ -1,0 +1,40 @@
+name: codex refresh rust artifacts
+
+on:
+  push:
+    branches:
+      - codex/hold-requires-at-runtime
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: codex/hold-requires-at-runtime
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Refresh lockfiles and formatting
+        run: |
+          set -euo pipefail
+          cargo update -p wasmtime --precise 48.0.3
+          (
+            cd spikes/wasmtime-component/host
+            cargo update -p wasmtime --precise 48.0.3
+          )
+          cargo fmt --all
+          rm .github/workflows/codex-refresh-rust.yml
+      - name: Commit generated artifacts
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Refresh Wasmtime 48.0.3 lockfiles and formatting"
+          git push origin HEAD:codex/hold-requires-at-runtime
