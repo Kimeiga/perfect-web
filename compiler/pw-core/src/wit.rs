@@ -611,6 +611,7 @@ pub fn component_export(component_id: &str, export: &str) -> crate::contract::Co
     crate::contract::ComponentExport {
         interface: format!("{package}/{}{at}", api(component_id)),
         function: ident(export),
+        authorization: Vec::new(),
     }
 }
 
