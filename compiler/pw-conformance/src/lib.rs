@@ -143,7 +143,7 @@ impl Runnable {
             .component
             .clone()
             .expect("the contract locates its export");
-        self.prepared.call_within(
+        self.prepared.call_authorized_within(
             &self.contract,
             &self.granted,
             &Limits {
@@ -154,6 +154,10 @@ impl Runnable {
             ops,
             &[&export.interface, &export.function],
             args,
+            // This harness measures compiled body semantics. Authorization has
+            // its own host-level tests; approving here keeps that variable out
+            // of the oracle comparison while still taking the explicit path.
+            |_predicate, _arguments| Ok(true),
         )
     }
 
