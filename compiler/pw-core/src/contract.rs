@@ -438,8 +438,9 @@ pub struct ComponentContract {
     /// capabilities under its own — see [`CAPABILITY_MAPPING`].
     #[serde(default = "default_mapping")]
     pub capability_mapping: u32,
-    /// A hash over the component's INTERFACE — its exports, their kinds, its
-    /// capabilities and its placements. Not over source text: a comment must
+    /// A hash over the component's INTERFACE — its exports, their kinds and
+    /// invocation preconditions, its capabilities and its placements. Not over
+    /// source text: a comment must
     /// not change it, and a new capability must.
     pub abi_schema: String,
     pub required_capabilities: Vec<Capability>,
@@ -1158,7 +1159,8 @@ fn authorization_of(decl: &Decl) -> Vec<AuthorizationRequirement> {
 
 /// A hash over the interface, and over nothing else.
 ///
-/// Exports, their kinds, the capabilities and the placements. Not the bodies:
+/// Exports, their kinds and invocation preconditions, the capabilities and the
+/// placements. Not the bodies:
 /// a component whose implementation changed but whose authority and interface
 /// did not is the same contract, and a host that reloaded on every edit would
 /// be reacting to noise. Not the source text either — see
