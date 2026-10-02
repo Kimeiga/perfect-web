@@ -122,6 +122,104 @@ pub struct Part {
     pub steps: Vec<Step>,
 }
 
+/// **A page's signal** (ADR-0130): its name and its first value, as the
+/// browser's compiled modules read a value (`js_pure`'s wire form). The
+/// server renders the first value; the browser holds it from there.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Signal {
+    pub name: String,
+    pub initial: serde_json::Value,
+}
+
+/// **A part a signal decides** (ADR-0130): the browser renders it again when
+/// the signal changes. A text or attribute part reads `path`; a conditional
+/// or match part is a block the signal chooses between.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Live {
+    pub part: u32,
+    pub signal: String,
+    pub path: String,
+    /// The part's kind, as the parts manifest names it.
+    pub kind: String,
+    /// Every signal a block reads anywhere inside it, its own included: the
+    /// block is rendered again when any of them changes. Empty for a text
+    /// part, which reads `signal` alone.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reads: Vec<String>,
+}
+
+/// Every path a part reads, itself and anything inside it.
+fn paths_read(part: &crate::template_ir::Part, out: &mut Vec<String>) {
+    use crate::template_ir::{Chunk, Part, Segment};
+    fn chunks(cs: &[Chunk], out: &mut Vec<String>) {
+        for c in cs {
+            if let Chunk::Dynamic(p) = c {
+                paths_read(p, out);
+            }
+        }
+    }
+    match part {
+        Part::Text { value, .. }
+        | Part::Attribute { value, .. }
+        | Part::BooleanAttribute { value, .. }
+        | Part::RawHtml { value, .. } => out.push(value.clone()),
+        Part::InterpolatedAttribute { segments, .. } => {
+            for s in segments {
+                if let Segment::Value(v) = s {
+                    out.push(v.clone());
+                }
+            }
+        }
+        Part::Conditional {
+            value,
+            then,
+            otherwise,
+            ..
+        } => {
+            out.push(value.clone());
+            chunks(then, out);
+            chunks(otherwise, out);
+        }
+        Part::Match { value, arms, .. } => {
+            out.push(value.clone());
+            for a in arms {
+                chunks(&a.body, out);
+            }
+        }
+        Part::Each {
+            collection, body, ..
+        } => {
+            out.push(collection.clone());
+            chunks(body, out);
+        }
+        Part::Component { args, .. } => out.extend(args.iter().map(|(_, v)| v.clone())),
+        Part::Event { .. } | Part::Blocked { .. } => {}
+    }
+}
+
+/// The part numbered `id`, wherever it is in `chunks`.
+fn find_part(chunks: &[crate::template_ir::Chunk], id: u32) -> Option<&crate::template_ir::Part> {
+    use crate::template_ir::{Chunk, Part};
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if p.id().is_some_and(|i| i.0 == id) {
+            return Some(p);
+        }
+        let inner = match p {
+            Part::Conditional {
+                then, otherwise, ..
+            } => find_part(then, id).or_else(|| find_part(otherwise, id)),
+            Part::Match { arms, .. } => arms.iter().find_map(|a| find_part(&a.body, id)),
+            Part::Each { body, .. } => find_part(body, id),
+            _ => None,
+        };
+        if inner.is_some() {
+            return inner;
+        }
+    }
+    None
+}
+
 /// A page's plan.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PageValues {
@@ -134,6 +232,36 @@ pub struct PageValues {
     /// Each binding a block iterates or matches, which a host gives the
     /// renderer whole: `menu`.
     pub collections: Vec<String>,
+    /// The page's signals (ADR-0130). Their first values are the backend's
+    /// to compute, and `build` writes them here.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signals: Vec<Signal>,
+    /// The parts its signals decide.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub live: Vec<Live>,
+}
+
+/// **A body's signals, in order** (ADR-0130): each one's name and the
+/// expression its first value is.
+pub fn signals_of(body: &Body) -> Vec<(String, ExprId, ExprId)> {
+    let mut out = Vec::new();
+    for id in body.walk() {
+        if !body.signals.contains(&id) {
+            continue;
+        }
+        let Expr::Let {
+            pat: Some(p),
+            init: Some(init),
+            ..
+        } = body.expr(id)
+        else {
+            continue;
+        };
+        if let crate::hir::Pattern::Bind { name, .. } = body.pat(*p) {
+            out.push((name.clone(), *init, id));
+        }
+    }
+    out
 }
 
 /// The plan, or why there is none, for one page.
@@ -310,12 +438,33 @@ fn plan(
         });
     }
 
+    let signals: Vec<String> = signals_of(body).into_iter().map(|(n, ..)| n).collect();
+    let mut live = Vec::new();
     let mut parts = Vec::new();
     let mut members = BTreeSet::new();
     for hole in crate::template_ir::text_holes(hir, id) {
         let Some((root, reads)) = path_of(body, hole.expr) else {
             continue;
         };
+        // A part a signal decides is the browser's to render again
+        // (ADR-0130). Inside a block a query decides, its address carries a
+        // frame the browser would have to compute: not this slice.
+        if signals.contains(&root) {
+            if hole.nested {
+                continue;
+            }
+            live.push(Live {
+                part: hole.part.0,
+                signal: root.clone(),
+                path: std::iter::once(root.clone())
+                    .chain(reads.iter().cloned())
+                    .collect::<Vec<_>>()
+                    .join("."),
+                kind: "text".to_string(),
+                reads: Vec::new(),
+            });
+            continue;
+        }
         let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == root) else {
             // A loop's or an arm's name: the renderer reads it from the
             // collection, by field. A member read there is refused below.
@@ -380,6 +529,40 @@ fn plan(
             {
                 collections.push(root.to_string());
             }
+            // A block or an attribute a signal decides (ADR-0130).
+            if matches!(
+                entry.kind,
+                "conditional" | "match" | "attribute" | "boolean_attribute"
+            ) && let Some(root) = entry.value.split('.').next()
+                && signals.iter().any(|s| s == root)
+            {
+                if entry.kind == "attribute" || entry.kind == "boolean_attribute" {
+                    return Err(format!(
+                        "part {} is an attribute a signal decides, which this slice does not \
+                         render again (ADR-0130)",
+                        entry.id.0
+                    ));
+                }
+                let mut read = Vec::new();
+                if let Some(part) = find_part(&t.chunks, entry.id.0) {
+                    paths_read(part, &mut read);
+                }
+                let mut reads: Vec<String> = read
+                    .iter()
+                    .filter_map(|p| p.split('.').next())
+                    .filter(|r| signals.iter().any(|s| s == r))
+                    .map(str::to_string)
+                    .collect();
+                reads.sort();
+                reads.dedup();
+                live.push(Live {
+                    part: entry.id.0,
+                    signal: root.to_string(),
+                    path: entry.value.clone(),
+                    kind: entry.kind.to_string(),
+                    reads,
+                });
+            }
         }
     }
 
@@ -390,6 +573,8 @@ fn plan(
             bindings,
             parts,
             collections,
+            signals: Vec::new(),
+            live,
         },
         members,
     ))

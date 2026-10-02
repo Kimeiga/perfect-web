@@ -162,7 +162,20 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
 
     let graph = crate::graph::Graph::build(&hirs, &ws);
     let speculations = crate::backend::speculation::compile(units)?;
-    let pages = crate::page_values::pages(&hirs, &ws, &sigs);
+    let mut pages = crate::page_values::pages(&hirs, &ws, &sigs);
+    // Each page's signals' first values (ADR-0130), which the backend
+    // computes, into the plan the server renders from. A page whose signals
+    // did not compile has no plan: the server would render it guessing.
+    for compiled in crate::backend::signals::compile(units)? {
+        let Some(planned) = pages.iter_mut().find(|p| p.page == compiled.page) else {
+            continue;
+        };
+        match (compiled.signals, &mut planned.plan) {
+            (Ok(signals), Ok(plan)) => plan.signals = signals,
+            (Err(why), plan @ Ok(_)) => *plan = Err(format!("its signals: {why}")),
+            (_, Err(_)) => {}
+        }
+    }
     Ok(Build {
         templates,
         handlers,

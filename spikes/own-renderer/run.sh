@@ -45,6 +45,14 @@ STORE=(
   "$SOURCES/lib/"*.pw
   "$SOURCES/store/"*.pw
 )
+# What the development server serves: the store, and the signals demo
+# (ADR-0130) beside it and not in it. A benchmark sandbox's sources have no
+# `demo/`, and then this is the store's alone. The store's own static render
+# below reads the store's sources only.
+SERVED=("${STORE[@]}")
+if [ -d "$SOURCES/demo" ]; then
+  SERVED+=("$SOURCES/demo/"*.pw)
+fi
 
 echo "== 1. the pages are checked before they are rendered =="
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
@@ -77,10 +85,13 @@ echo "== 3c. the store's resumable handlers, compiled from their bodies (E10) ==
 # One build (ADR-0123): the handlers, the components the server runs, their
 # contracts, the graph and the speculations, from the sources just checked.
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
-  build --out "$OUT/build" "${STORE[@]}"
+  build --out "$OUT/build" "${SERVED[@]}"
+# The browser's WebAssembly, built for size (`[profile.browser]`): the resume
+# decision, and the renderer a signal's block is rendered again by (ADR-0130).
 cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" \
-  -p pw-resume-wasm --target wasm32-unknown-unknown --release
-cp "$REPO_ROOT/target/wasm32-unknown-unknown/release/pw_resume_wasm.wasm" "$OUT/pw-resume.wasm"
+  -p pw-resume-wasm -p pw-render-wasm --target wasm32-unknown-unknown --profile browser
+cp "$REPO_ROOT/target/wasm32-unknown-unknown/browser/pw_resume_wasm.wasm" "$OUT/pw-resume.wasm"
+cp "$REPO_ROOT/target/wasm32-unknown-unknown/browser/pw_render_wasm.wasm" "$OUT/pw-render.wasm"
 echo "   $(ls "$OUT" | tr '\n' ' ')"
 
 echo

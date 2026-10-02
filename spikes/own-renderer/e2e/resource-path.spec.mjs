@@ -47,8 +47,14 @@ test("the cart updates from the resource, not from the command", async ({ page }
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
 
-  const log = await page.evaluate(() => window.__pw.log.join("\n"));
-  expect(log, "the update names the version it came from").toMatch(/at version \d+/);
+  // The count shows the speculation first (ADR-0122); the resource's patch
+  // follows, and is what this test is about. Waited for, not assumed: read at
+  // once, the log raced the patch and failed about one run in fifty.
+  await expect
+    .poll(() => page.evaluate(() => window.__pw.log.join("\n")), {
+      message: "the update names the version it came from",
+    })
+    .toMatch(/at version \d+/);
 });
 
 test("a rolled-back command produces no browser update", async ({ page, request }) => {

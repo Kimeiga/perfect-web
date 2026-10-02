@@ -984,3 +984,15 @@ of plain data read synchronously by the runtime, synchronous behaviour is a
 static modifier (`on:submit|prevent`), `bind:value` is shorthand with a codec,
 a form submits one typed record, and a handler may read its command's answer.
 Neither is built yet.
+
+## 2026-10-02: the resume decision knows the build; a page holds its own UI state
+
+[ADR-0132](DECISIONS/ADR-0132-the-resume-decision-knows-what-the-build-compiled.md):
+the browser's resume decision knew the store page's two handlers by name, so
+every other handler built and was refused in the browser. It now knows the
+build's handlers by identity, from the build the runtime was served with.
+[ADR-0133](DECISIONS/ADR-0133-a-page-holds-its-own-ui-state.md): `signal x: T =
+v` in a page, changed by handlers that need call no command, read in text and
+blocks, held by the browser and rendered again there by the server's renderer
+built for the browser. Three rules (PW5300-PW5302) keep it written by
+handlers and read where the browser reads it again. ADR-0130's first step.

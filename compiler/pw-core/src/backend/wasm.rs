@@ -2269,6 +2269,13 @@ impl Enc<'_> {
                 "`{}` calls `{command}`; only a handler's module calls a command",
                 self.export
             ),
+            // A handler's (ADR-0130): a signal lives in the browser.
+            Instr::SignalGet { signal, .. } | Instr::SignalSet { signal, .. } => refuse!(
+                "a signal reached from inside a component",
+                "`{}` reaches `{signal}`; a signal lives in the browser, and only a handler's \
+                 module reaches one",
+                self.export
+            ),
             Instr::Retype { result, value, ty } => {
                 let Some(h) = self.held.get(value).cloned() else {
                     blocked!("`{}` retypes {value:?} and nothing defines it", self.export);

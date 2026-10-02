@@ -54,6 +54,7 @@ struct BodyBuilder {
     pats: Arena<Pattern>,
     types: Arena<TypeRef>,
     nodes: Arena<Node>,
+    signals: std::collections::BTreeSet<ExprId>,
 }
 
 impl BodyBuilder {
@@ -559,6 +560,7 @@ impl Lowerer<'_> {
             types: b.types,
             nodes: b.nodes,
             root,
+            signals: b.signals,
         };
         (
             Some(BodyId(self.hir.bodies.alloc(body, span_of(node)))),
@@ -1141,9 +1143,11 @@ impl Lowerer<'_> {
             .map(|t| t.text().to_string())
             .unwrap_or_default();
 
-        if head == "let" {
+        if head == "let" || head == "signal" {
             let pat = node.children().find(|c| c.kind() == K::Name).map(|n| {
-                let mutable = toks.iter().any(|t| t.text() == "mut");
+                // A signal is assigned by its handlers (ADR-0130); where it
+                // may be is `signals::check`'s question.
+                let mutable = head == "signal" || toks.iter().any(|t| t.text() == "mut");
                 b.pat(
                     Pattern::Bind {
                         name: n.text().to_string(),
@@ -1160,7 +1164,11 @@ impl Lowerer<'_> {
                 .children()
                 .find(|c| is_expr(c.kind()))
                 .map(|e| self.expr(b, &e));
-            return b.expr(Expr::Let { pat, ty, init }, span);
+            let id = b.expr(Expr::Let { pat, ty, init }, span);
+            if head == "signal" {
+                b.signals.insert(id);
+            }
+            return id;
         }
 
         // `unsafe.imperative`, `observe resize`, `use key: Secret<T> = ..`.

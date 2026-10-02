@@ -258,6 +258,9 @@ struct Server {
     /// that binding's value. Until 2026-10-02 this server computed the page's
     /// values itself and ran none of the store's queries.
     plan: serde_json::Value,
+    /// Every page's plan, by its template path (ADR-0130): what a page
+    /// whose values are its signals alone renders from.
+    plans: BTreeMap<String, serde_json::Value>,
     /// **The store's queries, run by their declared policies** (ADR-0127):
     /// freshness, cache partition, key, concurrency, timeout and retries are
     /// `pw-resource`'s to decide, on its own clock, which this server keeps at
@@ -399,6 +402,8 @@ struct Built {
     components: BTreeMap<String, Loaded>,
     graph: pw_materialize::Graph,
     plan: serde_json::Value,
+    /// Every page's plan, by its template path (ADR-0130).
+    plans: BTreeMap<String, serde_json::Value>,
 }
 
 /// Every component a build wrote, by its file name (ADR-0123).
@@ -492,6 +497,18 @@ impl Server {
         let plan: serde_json::Value =
             serde_json::from_str(&read("pages/store.page.StorePage.json")?)
                 .map_err(|e| format!("pages/store.page.StorePage.json: {e}"))?;
+        let mut plans = BTreeMap::new();
+        for entry in std::fs::read_dir(build.join("pages")).map_err(|e| format!("pages: {e}"))? {
+            let path = entry.map_err(|e| format!("pages: {e}"))?.path();
+            let Some(page) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let text = std::fs::read_to_string(&path).map_err(|e| format!("{page}: {e}"))?;
+            plans.insert(
+                page.to_string(),
+                serde_json::from_str(&text).map_err(|e| format!("{page}: {e}"))?,
+            );
+        }
         Ok(Server::with(
             dist,
             dev_topology(),
@@ -502,6 +519,7 @@ impl Server {
                 components,
                 graph,
                 plan,
+                plans,
             },
         ))
     }
@@ -526,6 +544,7 @@ impl Server {
                     "../../../../docs/evidence/E10/pages/store.page.StorePage.json"
                 ))
                 .expect("the committed page plan parses"),
+                plans: BTreeMap::new(),
             },
         )
     }
@@ -540,6 +559,7 @@ impl Server {
             components,
             graph,
             plan,
+            plans,
         }: Built,
     ) -> Server {
         let speculation = speculation_manifest(&artifacts);
@@ -563,6 +583,7 @@ impl Server {
             topology,
             speculation,
             plan,
+            plans,
             queries: pw_resource::Resources::caching(query_clock.clone()),
             query_clock: (
                 query_clock,
@@ -1702,6 +1723,53 @@ impl Server {
             .collect()
     }
 
+    /// **Each handler this build compiled, with the capture schema its
+    /// document presents** (ADR-0132): the identity, and the paths it
+    /// captures joined, which is empty for a handler that captures nothing.
+    /// What `/pw-handlers` tells the browser's resume decision.
+    fn handler_table(&self) -> BTreeMap<String, String> {
+        handler_table(&self.templates)
+    }
+
+    /// **A page whose values are its signals alone** (ADR-0130), rendered at
+    /// each signal's first value, as `pw build`'s plan states it. A page that
+    /// reads a query is the store's route's: this one asks the server for
+    /// nothing, and neither does the page it serves.
+    fn render_signal_page(&self, path: &str, session: &str) -> Result<String, String> {
+        let plan = self
+            .plans
+            .get(path)
+            .ok_or_else(|| format!("no page `{path}` in this build"))?;
+        if plan["bindings"].as_array().is_some_and(|b| !b.is_empty()) {
+            return Err(format!(
+                "`{path}` reads a query; this route renders a page's signals alone"
+            ));
+        }
+        let template = self
+            .templates
+            .iter()
+            .find(|t| t.path == path)
+            .ok_or_else(|| format!("no template `{path}`"))?;
+        let mut env = Env::new();
+        for s in plan["signals"].as_array().into_iter().flatten() {
+            let name = s["name"].as_str().unwrap_or_default();
+            env = env.set(name, Value::from_wire(&s["initial"]));
+        }
+        let env = env.in_domain(
+            IdentityDomain::document(
+                path,
+                Partition::Session {
+                    id: session.to_string(),
+                },
+                BUILD,
+            )
+            .keyed("own-renderer-spike-key"),
+        );
+        let body = pw_render::render(template, &env, &self.templates)
+            .map_err(|e| format!("`{path}` does not render: {e:?}"))?;
+        Ok(signal_document(&body, template, plan, &self.templates))
+    }
+
     /// Where `pw emit-handlers` wrote the module for a handler identity.
     fn handler_module(&self, identity: &str) -> std::path::PathBuf {
         self.artifacts
@@ -2471,6 +2539,47 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 ),
             }
         }
+        // A page whose values are its signals alone (ADR-0130).
+        ("GET", route) if route.starts_with("/page/") => {
+            let path = route.trim_start_matches("/page/");
+            match server.render_signal_page(path, &session) {
+                Ok(body) => respond(
+                    &mut stream,
+                    200,
+                    "text/html; charset=utf-8",
+                    &session,
+                    fresh,
+                    body.as_bytes(),
+                ),
+                Err(why) => respond(
+                    &mut stream,
+                    404,
+                    "text/plain; charset=utf-8",
+                    &session,
+                    fresh,
+                    why.as_bytes(),
+                ),
+            }
+        }
+        // What this build compiled, for the browser's resume decision
+        // (ADR-0132): one `identity|capture` line per handler. Served with
+        // the build, so a document cached from another build cannot vouch
+        // for a handler this one lacks.
+        ("GET", "/pw-handlers") => {
+            let table: String = server
+                .handler_table()
+                .into_iter()
+                .map(|(identity, capture)| format!("{identity}|{capture}\n"))
+                .collect();
+            respond(
+                &mut stream,
+                200,
+                "text/plain; charset=utf-8",
+                &session,
+                fresh,
+                table.as_bytes(),
+            );
+        }
         // What the server did (ADR-0127, charter §10.5): how many times each
         // data-layer operation ran, and how many query values are kept.
         ("GET", "/metrics") => {
@@ -2735,6 +2844,149 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &st
     }
 }
 
+/// **A page whose values are its signals alone, as a document** (ADR-0130).
+///
+/// Its parts manifest carries what the browser holds and renders again:
+/// each signal's first value, each part a signal decides, and the template
+/// of each block one decides, which the browser's copy of the renderer
+/// renders when it changes.
+fn signal_document(
+    body: &str,
+    template: &Template,
+    plan: &serde_json::Value,
+    templates: &[Template],
+) -> String {
+    let signals: serde_json::Map<String, serde_json::Value> = plan["signals"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|s| {
+            (
+                s["name"].as_str().unwrap_or_default().to_string(),
+                s["initial"].clone(),
+            )
+        })
+        .collect();
+    let mut blocks = serde_json::Map::new();
+    for live in plan["live"].as_array().into_iter().flatten() {
+        if !matches!(live["kind"].as_str(), Some("conditional" | "match")) {
+            continue;
+        }
+        let id = live["part"].as_u64().unwrap_or_default() as u32;
+        if let Some(part) = find_part(&template.chunks, id) {
+            blocks.insert(
+                id.to_string(),
+                serde_json::to_value(part).unwrap_or_default(),
+            );
+        }
+    }
+    let manifest = serde_json::json!({
+        "template": template.path,
+        "schema": template.schema,
+        "cursor": 0,
+        "parts": template.manifest(),
+        "resume": resume_manifest(templates),
+        "signals": signals,
+        "live": plan["live"].clone(),
+        "blocks": blocks,
+        // Nothing on this page is a resource's, so nothing is listened for.
+        "listens": false,
+    });
+    // No `<` in a script element's text (ADR-0097).
+    let json =
+        pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
+    format!(
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <title>{}</title>\n</head>\n<body>\n{body}\n\
+         <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
+         <script type=\"module\" src=\"/pw-runtime.mjs\"></script>\n\
+         </body>\n</html>\n",
+        pw_render::escape::text(&template.name)
+    )
+}
+
+/// The part numbered `id`, wherever it is in `chunks`.
+fn find_part(chunks: &[pw_render::ir::Chunk], id: u32) -> Option<&pw_render::ir::Part> {
+    use pw_render::ir::{Chunk, Part};
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if p.id().is_some_and(|i| i.0 == id) {
+            return Some(p);
+        }
+        let inner = match p {
+            Part::Conditional {
+                then, otherwise, ..
+            } => find_part(then, id).or_else(|| find_part(otherwise, id)),
+            Part::Match { arms, .. } => arms.iter().find_map(|a| find_part(&a.body, id)),
+            Part::Each { body, .. } => find_part(body, id),
+            _ => None,
+        };
+        if inner.is_some() {
+            return inner;
+        }
+    }
+    None
+}
+
+/// Each handler `templates` hold, by identity, with the paths it captures
+/// joined (ADR-0132).
+fn handler_table(templates: &[Template]) -> BTreeMap<String, String> {
+    fn walk(chunks: &[pw_render::ir::Chunk], out: &mut BTreeMap<String, String>) {
+        for c in chunks {
+            let pw_render::ir::Chunk::Dynamic(p) = c else {
+                continue;
+            };
+            match p {
+                pw_render::ir::Part::Event {
+                    handler, captures, ..
+                } if !handler.is_empty() => {
+                    out.insert(handler.clone(), captures.join(","));
+                }
+                pw_render::ir::Part::Conditional {
+                    then, otherwise, ..
+                } => {
+                    walk(then, out);
+                    walk(otherwise, out);
+                }
+                pw_render::ir::Part::Each { body, .. } => walk(body, out),
+                pw_render::ir::Part::Match { arms, .. } => {
+                    for a in arms {
+                        walk(&a.body, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut out = BTreeMap::new();
+    for t in templates {
+        walk(&t.chunks, &mut out);
+    }
+    out
+}
+
+/// The document's resume manifest (ADR-0132): one base, and one entry per
+/// handler, keyed by its identity, presenting its capture schema. The base
+/// names no handler, so a part with no entry of its own authorises nothing.
+fn resume_manifest(templates: &[Template]) -> serde_json::Value {
+    let handlers: serde_json::Map<String, serde_json::Value> = handler_table(templates)
+        .into_iter()
+        .map(|(identity, capture)| {
+            let bytes = if capture.is_empty() { "" } else { "x" };
+            (
+                identity.clone(),
+                serde_json::json!({ "handler": identity, "capture": capture, "captures": bytes }),
+            )
+        })
+        .collect();
+    serde_json::json!({
+        "scheme": "2", "abi": "1", "build": BUILD, "handler": "",
+        "capture": "", "document": "cart-doc", "scope": "public",
+        "captures": "", "construct": "region",
+        "handlers": handlers,
+    })
+}
+
 /// The document shell, with the parts manifest and the runtime.
 fn document(
     body: &str,
@@ -2761,15 +3013,7 @@ fn document(
         // one the page-wide manifest described. `clear_cart` captures nothing,
         // so its capture schema is the schema of nothing — which is still a
         // schema, and still has to match.
-        "resume": {
-            "scheme": "2", "abi": "1", "build": BUILD, "handler": "add_to_cart",
-            "capture": "cart", "document": "cart-doc", "scope": "public",
-            "captures": "x", "construct": "region",
-            "handlers": {
-                "add_to_cart": { "handler": "add_to_cart", "capture": "cart", "captures": "x" },
-                "clear_cart": { "handler": "clear_cart", "capture": "", "captures": "" },
-            },
-        },
+        "resume": resume_manifest(templates),
     });
     // The page's speculation module and the values it starts from (ADR-0122).
     // A private page's own session's values: this document is `cache private`.

@@ -373,6 +373,20 @@ within stated bounds (ADR-0120 found both unexecuted):
   cart line is priced zero until the server answers (ruling offered).
 E14's shared store contract still excludes both, for every stack.
 
+**A page's signals are its own** (ADR-0133). Only a page declares one;
+a view's signals, a signal provided to views, and views composing wait for
+view composition (ADR-0130, steps 2 and 3). A first value is data, not a
+computation. A signal read inside an `{#each}` a query decides, an attribute
+a signal decides, and an `{#each}` inside a signal's block are refused by the
+plan. A block renders again whenever any signal it reads changes, even when
+the arm shown does not read it. The browser's renderer is 90 KB gzipped,
+loaded on the first block a press renders.
+
+**A handler not written `resumable(..)` is inert** (found 2026-10-02 writing
+ADR-0133). `on:press={() => ..}` gets an event part with no handler identity
+and no module, and nothing refuses it: the page ships a dead button. The next
+ruling.
+
 **A label does not follow a value through storage, a later call of a
 function value, or time** (ADR-0129). A value's label follows it through
 calls, bodies, branches and assignments, and a public log takes only a public

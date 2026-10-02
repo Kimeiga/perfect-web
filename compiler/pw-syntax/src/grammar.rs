@@ -169,6 +169,9 @@ fn is_decl_kind(k: K) -> bool {
 /// *unknown policy `if`*, because nothing said that `if` starts an expression.
 const EXPR_KEYWORDS: &[&str] = &[
     "if", "elif", "else", "match", "let", "for", "fn", "return", "true", "false",
+    // A page's `signal open: Bool = false` (ADR-0130) is a statement, not a
+    // policy clause named `signal`.
+    "signal",
 ];
 
 pub const STMT_CLAUSE_KEYWORDS: &[&str] =
@@ -900,6 +903,12 @@ impl<'a> P<'a> {
                 if self.at_kw("let") {
                     return self.let_stmt();
                 }
+                // **`signal x: T = e`: UI state the page holds** (ADR-0130).
+                // A keyword only before a name on its line, so a value named
+                // `signal` elsewhere is still a name.
+                if self.at_kw("signal") && self.nth_is(1, Kind::Ident) && !self.nth_starts_line(1) {
+                    return self.signal_stmt();
+                }
                 // **`derived e`: a pure value computed from other values**
                 // (charter §7.5). A bare name until 2026-09-25, so `let total =
                 // derived widths |> List.sum()` parsed as `let total = derived`
@@ -1509,6 +1518,28 @@ impl<'a> P<'a> {
                 ),
             );
         }
+    }
+
+    /// `signal x: T = e` (ADR-0130): a `let`, whose type is written and
+    /// whose value the page's handlers change.
+    fn signal_stmt(&mut self) {
+        self.start(K::LetStmt);
+        self.bump(); // signal
+        self.not_a_statement_keyword("a signal");
+        self.name("a signal's name");
+        if self.expect(
+            Kind::Colon,
+            "and the signal's type: `signal name: Type = value`",
+        ) {
+            self.type_ref();
+        }
+        if self.expect(
+            Kind::Eq,
+            "and the signal's first value: `signal name: Type = value`",
+        ) {
+            self.expr(0);
+        }
+        self.finish();
     }
 
     fn let_stmt(&mut self) {

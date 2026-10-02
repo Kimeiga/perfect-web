@@ -78,8 +78,9 @@ MUTANTS = [
     (
         "a handler that calls no command is compiled",
         JS,
-        "    if commands.is_empty() {",
-        "    if false && commands.is_empty() {",
+        # Re-anchored by ADR-0133: a handler may change a signal instead.
+        "    if commands.is_empty() && !changes_a_signal {",
+        "    if false && commands.is_empty() && !changes_a_signal {",
     ),
 ]
 

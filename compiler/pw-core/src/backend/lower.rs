@@ -277,6 +277,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         ret: Type::Unit,
         captured: BTreeMap::new(),
         handler: false,
+        signals: BTreeMap::new(),
     };
 
     // Parameters first, so a body naming one finds it.
@@ -447,7 +448,25 @@ pub fn handler(
         ret: Type::Unit,
         captured: BTreeMap::new(),
         handler: true,
+        signals: BTreeMap::new(),
     };
+    // The page's signals, each by the type its declaration writes
+    // (ADR-0130). A signal is a `let` of the page's body, so the lexical
+    // rules that would hide one behind a local do so here too: a local of
+    // the same name is in `locals`, and wins.
+    for (name, _, declared) in crate::page_values::signals_of(body) {
+        let Expr::Let { ty: Some(t), .. } = body.expr(declared) else {
+            continue;
+        };
+        let Some(ty) = f.annotation(body, *t, &span) else {
+            return Lowering::Unsupported {
+                construct: "a signal whose type the backend cannot lower",
+                span,
+                reason: format!("`{name}`'s written type"),
+            };
+        };
+        f.signals.insert(name, ty);
+    }
     let (mut captured, mut paths) = (Vec::new(), Vec::new());
     for path in crate::resume::capture_paths(body, lambda) {
         let mut parts = path.split('.');
@@ -549,6 +568,23 @@ pub fn pure_expr(
     export: &str,
     span: Span,
 ) -> Lowering<Function> {
+    pure_expr_as(cx, unit, decl_id, root, inputs, None, export, span)
+}
+
+/// [`pure_expr`], where the expression must be of type `expected`: a
+/// signal's first value, whose declaration writes its type (ADR-0130), so
+/// `None` and `[]` have one.
+#[allow(clippy::too_many_arguments)]
+pub fn pure_expr_as(
+    cx: &Context<'_>,
+    unit: usize,
+    decl_id: crate::hir::DeclId,
+    root: ExprId,
+    inputs: &[(String, Type)],
+    expected: Option<&Type>,
+    export: &str,
+    span: Span,
+) -> Lowering<Function> {
     let hir = cx.hirs[unit];
     let decl = hir.decl(decl_id);
     let Some(def) = decl_def(cx, unit, decl) else {
@@ -580,6 +616,7 @@ pub fn pure_expr(
         ret: Type::Unit,
         captured: BTreeMap::new(),
         handler: false,
+        signals: BTreeMap::new(),
     };
     let mut params = Vec::new();
     for (name, ty) in inputs {
@@ -588,7 +625,7 @@ pub fn pure_expr(
         f.types.insert(v, ty.clone());
         params.push((v, ty.clone()));
     }
-    let result = match f.expr(body, root, None) {
+    let result = match f.expr(body, root, expected) {
         Lowering::Lowered(v) => v,
         other => return other.map(|_| unreachable!()),
     };
@@ -707,6 +744,7 @@ fn lower_internal(
         ret: Type::Unit,
         captured: BTreeMap::new(),
         handler: false,
+        signals: BTreeMap::new(),
     };
     let mut params = Vec::new();
     for (index, p) in decl.params.iter().enumerate() {
@@ -801,6 +839,7 @@ fn lower_closure(
         ret: ret.clone(),
         captured: BTreeMap::new(),
         handler: false,
+        signals: BTreeMap::new(),
     };
     let mut values = Vec::new();
     for (name, ty) in captures.into_iter().chain(params) {
@@ -1051,6 +1090,10 @@ struct Lower<'a> {
     /// A handler's body is being lowered: a command it calls is
     /// `Instr::Command`, which its module awaits.
     handler: bool,
+    /// **The page's signals a handler reaches, by name** (ADR-0130), with
+    /// their types: a read of one is `Instr::SignalGet`, an assignment to one
+    /// `Instr::SignalSet`. Empty outside a handler.
+    signals: BTreeMap<String, Type>,
 }
 
 /// **Instantiate a declared type against the type a value has** (ADR-0050):
@@ -1396,6 +1439,17 @@ impl<'a> Lower<'a> {
                 // A mutable binding is read as what it holds here (ADR-0051).
                 Some(v) if self.vars.contains(&v) => Lowering::Lowered(self.read(v)),
                 Some(v) => Lowering::Lowered(v),
+                // A page's signal, read through the handler's context
+                // (ADR-0130).
+                None if self.signals.contains_key(n) => {
+                    let ty = self.signals[n].clone();
+                    let result = self.fresh();
+                    Lowering::Lowered(self.push(Instr::SignalGet {
+                        result,
+                        signal: n.clone(),
+                        ty,
+                    }))
+                }
                 // `Empty` alone: the case of that name of the one sum type
                 // this unit sees with one, by the typer's rule (ADR-0059).
                 None if crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, n)
@@ -3438,6 +3492,39 @@ impl<'a> Lower<'a> {
                 reason: "a variable is assigned; a field of a value is not".to_string(),
             };
         };
+        // A page's signal, changed through the handler's context (ADR-0130).
+        if !self.locals.contains_key(n)
+            && let Some(ty) = self.signals.get(n).cloned()
+        {
+            if self.in_lambda > 0 {
+                return Lowering::Unsupported {
+                    construct: "a signal changed inside a function value",
+                    span,
+                    reason: "a lambda a list operation runs is not the handler's own body"
+                        .to_string(),
+                };
+            }
+            let v = match self.expr(body, rhs, Some(&ty)) {
+                Lowering::Lowered(v) => v,
+                other => return other,
+            };
+            if self.types.get(&v) != Some(&ty) {
+                return Lowering::Blocked {
+                    why: format!(
+                        "the signal `{n}` holds a {ty:?}, and is assigned a {:?}",
+                        self.types.get(&v)
+                    ),
+                    span,
+                };
+            }
+            let result = self.fresh();
+            return Lowering::Lowered(self.push(Instr::SignalSet {
+                result,
+                signal: n.clone(),
+                value: v,
+                ty: Type::Unit,
+            }));
+        }
         let Some(var) = self
             .locals
             .get(n)

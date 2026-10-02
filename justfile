@@ -1527,6 +1527,47 @@ e14-value-labels:
      } > docs/evidence/E14/value-labels.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/value-labels.txt
 
+# ADR-0132: the browser's resume decision knows what the build compiled.
+e14-resume-gate:
+    @{ echo "ADR-0132 - the browser's resume decision knows what the build compiled"; echo; \
+       echo "produced by: just e14-resume-gate"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the decision (runtime/pw-resume-wasm)"; echo; \
+       cargo test --locked -p pw-resume-wasm 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser, each engine (e2e/lazy-handler.spec.mjs)"; echo; \
+       for e in webkit chromium; do \
+         (cd spikes/own-renderer && pnpm exec playwright test e2e/lazy-handler.spec.mjs --project=$e --reporter=list 2>&1 \
+           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+       done; \
+       echo; echo "== mutation controls (scripts/resume_gate_mutations.py)"; echo; \
+       python3 scripts/resume_gate_mutations.py; \
+     } > docs/evidence/E14/resume-gate.txt
+    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/resume-gate.txt
+
+# ADR-0133: a page holds its own UI state, the first slice of signals. The
+# compiler's tests, the browser's renderer, the page in each engine, and a
+# mutant per piece.
+e14-signals:
+    @{ echo "ADR-0133 - a page holds its own UI state (signals, first slice)"; echo; \
+       echo "produced by: just e14-signals"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/signals.rs)"; echo; \
+       cargo test --locked -p pw-core --test signals 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser's renderer (runtime/pw-render-wasm)"; echo; \
+       cargo test --locked -p pw-render-wasm 2>&1 | grep -E '^(test |test result)'; \
+       ls -l target/wasm32-unknown-unknown/browser/pw_render_wasm.wasm 2>/dev/null | awk '{print "   pw-render.wasm: " $5 " bytes"}'; \
+       echo; echo "== the page, each engine (e2e/signals.spec.mjs)"; echo; \
+       for e in webkit chromium; do \
+         (cd spikes/own-renderer && pnpm exec playwright test e2e/signals.spec.mjs --project=$e --reporter=list 2>&1 \
+           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+       done; \
+       echo; echo "== mutation controls (scripts/signals_mutations.py)"; echo; \
+       python3 scripts/signals_mutations.py; \
+     } > docs/evidence/E14/signals.txt
+    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/signals.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

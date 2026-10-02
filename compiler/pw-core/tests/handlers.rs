@@ -474,7 +474,13 @@ fn an_int_a_javascript_number_cannot_carry_stops_the_handler_before_it_sends() {
 
 #[test]
 fn a_handler_that_calls_no_command_is_refused() {
-    refused("helper(1)", "a handler that calls no command", "calls none");
+    // A handler may change a signal instead since ADR-0130; this one does
+    // neither.
+    refused(
+        "helper(1)",
+        "a handler that calls no command and changes no signal",
+        "does neither",
+    );
     refused(
         "Look(item.id)",
         "a query called from a handler",

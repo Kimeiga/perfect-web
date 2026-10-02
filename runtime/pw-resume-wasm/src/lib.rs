@@ -32,6 +32,36 @@ use pw_resume::*;
 static TRACE: Mutex<String> = Mutex::new(String::new());
 static RECOVERY: Mutex<u32> = Mutex::new(0);
 
+/// **The handlers this build compiled**, each by its identity and the
+/// capture schema its document presents (ADR-0132). Until 2026-10-02 this was
+/// the store page's two handlers, by name, written here; any other handler a
+/// program declared built, and its button never attached.
+static KNOWN: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+/// **Tell the decision what this build compiled**: one `identity|capture`
+/// line per handler, as the server's build lists it. Replaces what was
+/// known, and returns how many handlers that is.
+///
+/// From the build the runtime was served with, never from the document: a
+/// document cached from an older build names handlers this build may not
+/// have, and the decision is what refuses them.
+///
+/// # Safety
+///
+/// `ptr` must point at `len` bytes the caller obtained from [`alloc`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn know(ptr: *const u8, len: usize) -> u32 {
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let text = String::from_utf8_lossy(bytes);
+    let mut known = KNOWN.lock().unwrap();
+    known.clear();
+    for line in text.lines().filter(|l| !l.is_empty()) {
+        let (identity, capture) = line.split_once('|').unwrap_or((line, ""));
+        known.push((identity.to_string(), capture.to_string()));
+    }
+    known.len() as u32
+}
+
 /// Bytes the caller may write a manifest into. Leaked deliberately: a page
 /// makes a handful of decisions, and a free() across the ABI is more ways to
 /// be wrong than it is worth.
@@ -153,12 +183,11 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
         &schema(field(4)),
         &abi,
     );
-    // What this build knows: the store page's TWO handlers, at scheme 2.
-    //
-    // Two, because E7-L's claim is that the exact handler is loaded — and with
-    // one known handler, "the right one was authorised" is satisfied by
-    // authorising anything. `clear_cart` captures nothing, so its capture
-    // schema is the schema of nothing, which is still a schema.
+    // What this build knows: each handler it compiled, by identity, at
+    // scheme 2 (ADR-0132). E7-L's claim is that the exact handler is loaded,
+    // which a table of every compiled handler keeps: one identity among many
+    // is authorised only by its own. A handler that captures nothing has the
+    // schema of nothing, which is still a schema.
     let known = |name: &str, capture: &str| {
         (
             HandlerId::derive(
@@ -183,8 +212,11 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
     let rt = Runtime {
         abi: vec![PlatformAbi(1)],
         build: Some(BuildId("B1".into())),
-        handlers: [known("add_to_cart", "cart"), known("clear_cart", "")]
-            .into_iter()
+        handlers: KNOWN
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(identity, capture)| known(identity, capture))
             .collect(),
         document_schema: Some(schema("cart-doc")),
         scope: Some(PrivacyScope::Public),
@@ -197,4 +229,51 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
         _ => Construct::PublicRegion,
     };
     (entry, rt, construct)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// One decision over `manifest`, as the browser asks it.
+    fn decide_text(manifest: &str) -> u32 {
+        unsafe { decide_manifest(manifest.as_ptr(), manifest.len()) }
+    }
+
+    fn know_text(table: &str) -> u32 {
+        unsafe { know(table.as_ptr(), table.len()) }
+    }
+
+    /// `scheme|abi|build|handler|capture|document|scope|captures|construct`
+    fn manifest(handler: &str, capture: &str) -> String {
+        let bytes = if capture.is_empty() { "" } else { "x" };
+        format!("2|1|B1|{handler}|{capture}|cart-doc|public|{bytes}|region")
+    }
+
+    /// ADR-0132, in one test because the table is one process's: what the
+    /// decision knows is what it was told the build compiled, and nothing
+    /// else.
+    #[test]
+    fn the_decision_knows_what_the_build_compiled_and_nothing_else() {
+        // Told nothing: every handler is refused as unknown, the closed side.
+        assert_eq!(know_text(""), 0);
+        assert_eq!(decide_text(&manifest("e1ab9fca1f6fc15b", "item.id")), 4);
+
+        // Told the build's table: its handlers resume, by identity and capture.
+        assert_eq!(
+            know_text("e1ab9fca1f6fc15b|item.id\n5e53c6a9aaee307a|\n"),
+            2
+        );
+        assert_eq!(decide_text(&manifest("e1ab9fca1f6fc15b", "item.id")), 0);
+        assert_eq!(decide_text(&manifest("5e53c6a9aaee307a", "")), 0);
+
+        // An identity the build lacks is refused, however it is presented.
+        assert_eq!(decide_text(&manifest("ffffffffffffffff", "item.id")), 4);
+        // And so is a name: the store's handlers are not known by name.
+        assert_eq!(decide_text(&manifest("add_to_cart", "cart")), 4);
+
+        // Told again, the table is replaced, not added to.
+        assert_eq!(know_text("5e53c6a9aaee307a|\n"), 1);
+        assert_eq!(decide_text(&manifest("e1ab9fca1f6fc15b", "item.id")), 4);
+    }
 }

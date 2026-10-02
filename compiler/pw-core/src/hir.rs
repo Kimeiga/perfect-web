@@ -614,6 +614,11 @@ pub struct Body {
     pub nodes: Arena<Node>,
     /// The block expression the body consists of.
     pub root: ExprId,
+    /// **The `let`s that are signals** (ADR-0130): `signal x: T = e` lowers
+    /// to the `let` it is, and this says which. A side set rather than a
+    /// field on `Expr::Let`, so every rule about a binding reads a signal
+    /// as the binding it is, and the rules about signals ask here.
+    pub signals: std::collections::BTreeSet<ExprId>,
 }
 
 impl Body {

@@ -149,6 +149,38 @@ pub enum Value {
 }
 
 impl Value {
+    /// **A value as JSON carries it** (ADR-0130): the form the browser's
+    /// compiled modules read and write, and a page's signals are held in. A
+    /// case is `{ "$case": name, "value": payload }`, its payload a list of
+    /// its fields when it has several; a record is an object by field name.
+    /// The server renders a signal's first value with this, and the browser's
+    /// copy of this renderer each value after it, so the two agree by being
+    /// one function.
+    pub fn from_wire(j: &serde_json::Value) -> Value {
+        use serde_json::Value as J;
+        match j {
+            J::Null => Value::Text(String::new()),
+            J::Bool(b) => Value::Bool(*b),
+            J::Number(n) => match n.as_i64() {
+                Some(i) => Value::Int(i),
+                None => Value::Text(n.to_string()),
+            },
+            J::String(s) => Value::Text(s.clone()),
+            J::Array(items) => Value::List(items.iter().map(Value::from_wire).collect()),
+            J::Object(o) => match o.get("$case").and_then(J::as_str) {
+                Some(case) => Value::Variant {
+                    case: case.to_string(),
+                    payload: o.get("value").map(|v| Box::new(Value::from_wire(v))),
+                },
+                None => Value::Record(
+                    o.iter()
+                        .map(|(k, v)| (k.clone(), Value::from_wire(v)))
+                        .collect(),
+                ),
+            },
+        }
+    }
+
     /// How this value reads in text or attribute position.
     fn as_str(&self) -> Option<String> {
         Some(match self {

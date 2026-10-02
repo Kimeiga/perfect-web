@@ -282,7 +282,7 @@ let decide = null;
 async function bootDecision() {
   const response = await fetch("/pw-resume.wasm");
   const { instance } = await WebAssembly.instantiateStreaming(response, {});
-  const { memory, alloc, decide_manifest, last_recovery } = instance.exports;
+  const { memory, alloc, decide_manifest, last_recovery, know } = instance.exports;
 
   const write = (s) => {
     const bytes = new TextEncoder().encode(s);
@@ -290,6 +290,13 @@ async function bootDecision() {
     new Uint8Array(memory.buffer, ptr, bytes.length).set(bytes);
     return [ptr, bytes.length];
   };
+  // What this build compiled (ADR-0132), from the server that served this
+  // runtime and never from the document: a document cached from another
+  // build names handlers this one may not have. If the table cannot be read,
+  // nothing is known and every handler is refused, which is the closed side.
+  const table = await fetch("/pw-handlers").then((r) => (r.ok ? r.text() : ""));
+  const known = know(...write(table));
+  log.push(`knows ${known} handler(s)`);
   // `last_recovery` returns an INDEX into this list, not a pointer. A first
   // version read it as one and every decision threw `Start offset -1 is
   // outside the bounds of the buffer`, which the page reported as "boot
@@ -365,7 +372,9 @@ const RESUME_FIELDS = [
 function manifestFor(part) {
   const r = parts.resume;
   if (!r) return null;
-  const per = (r.handlers ?? {})[part?.name] ?? {};
+  // By the handler's IDENTITY (ADR-0132), which names its code; a name does
+  // not, and a handler that calls nothing has none.
+  const per = (r.handlers ?? {})[part?.value] ?? {};
   return RESUME_FIELDS.map((f) => per[f] ?? r[f] ?? "").join("|");
 }
 
@@ -572,19 +581,114 @@ async function reapplySpeculations() {
   }
 }
 
-async function attach() {
-  // Marked, so activation cost is a MEASUREMENT rather than a wall-clock guess
-  // taken from outside. `performance.measure` attributes the work to this
-  // runtime; a stopwatch around navigation would also count the network, the
-  // parser and the paint.
-  performance.mark("pw:activate:start");
+// --- ADR-0130: signals ---------------------------------------------------
+//
+// A page's UI state. The document carries each signal's first value, each
+// part a signal decides, and the template of each block one decides. A
+// handler changes a signal through its context; this holds the value and
+// renders again exactly the parts that read it: a text part by setting its
+// range, a block by rendering its template with the browser's build of the
+// server's renderer (`pw-render-wasm`), so the two agree by being one
+// implementation. Nothing here asks the server for anything.
 
-  // One traversal, before anything else. Every later lookup is a map hit.
-  const indexed = buildIndex();
-  log.push(`indexed ${indexed} address(es)`);
+/** name → its value, as JSON carries it (`js_pure`'s wire form). */
+const signals = new Map(Object.entries(parts.signals ?? {}));
+let renderer = null;
 
-  await bootDecision();
+/** The renderer, loaded with the first block a signal renders again. */
+function renderModule() {
+  renderer ??= fetch("/pw-render.wasm")
+    .then((r) => WebAssembly.instantiateStreaming(r, {}))
+    .then(({ instance }) => instance.exports);
+  return renderer;
+}
 
+/** A path read from the signals' values: `greeting`, or `panel.item`. */
+function signalAt(path) {
+  const [root, ...fields] = path.split(".");
+  let v = signals.get(root);
+  for (const f of fields) v = v?.[f];
+  return v;
+}
+
+/** The block numbered `id`, rendered at the signals' values now. */
+async function renderBlock(id) {
+  const x = await renderModule();
+  const request = new TextEncoder().encode(
+    JSON.stringify({ part: parts.blocks[id], values: Object.fromEntries(signals) }),
+  );
+  const ptr = x.alloc(request.length);
+  new Uint8Array(x.memory.buffer, ptr, request.length).set(request);
+  const code = x.render_part(ptr, request.length);
+  const out = new TextDecoder().decode(new Uint8Array(x.memory.buffer, x.out_ptr(), x.out_len()));
+  if (code !== 0) throw new Error(`block ${id} did not render: ${out}`);
+  return out;
+}
+
+/** Replace a block's range, its anchors included, with what was rendered. */
+function replaceBlock(id, html) {
+  const r = index.get(addressOf([], id));
+  if (!r?.start) return false;
+  const parent = r.start.parentNode;
+  const after = r.end.nextSibling;
+  for (let n = r.start; n; ) {
+    const next = n.nextSibling;
+    const last = n === r.end;
+    n.remove();
+    if (last) break;
+    n = next;
+  }
+  for (const node of parseInstance(html)) parent.insertBefore(node, after);
+  return true;
+}
+
+let dirty = new Set();
+let flushing = null;
+
+/** A handler changed `name`: held now, and rendered once per press. */
+function setSignal(name, value) {
+  signals.set(name, value);
+  dirty.add(name);
+  flushing ??= Promise.resolve().then(flushSignals);
+}
+
+async function flushSignals() {
+  const changed = dirty;
+  dirty = new Set();
+  flushing = null;
+  let rendered = false;
+  for (const live of parts.live ?? []) {
+    if (live.kind === "text") {
+      if (!changed.has(live.signal)) continue;
+      setRange(addressOf([], live.part), textOf(signalAt(live.path)));
+      log.push(`signal ${live.signal} -> part ${live.part}`);
+    } else if ((live.reads ?? [live.signal]).some((s) => changed.has(s))) {
+      replaceBlock(live.part, await renderBlock(live.part));
+      rendered = true;
+      log.push(`signal ${[...changed].join(",")} -> block ${live.part}`);
+    }
+  }
+  if (rendered) {
+    buildIndex();
+    bindEvents();
+  }
+  window.__pw.signals = Object.fromEntries(signals);
+}
+
+/** Each event part's decision, asked once (E7-L): before anything binds. */
+const verdicts = new Map();
+/** The elements a listener is bound to. */
+const bound = new WeakSet();
+let booted = false;
+
+/**
+ * Bind each authorised handler to each of its elements not bound yet.
+ *
+ * At boot, every element the document has. After a block a signal decides
+ * is rendered again (ADR-0130), what it made: its old elements are gone with
+ * their listeners, and the elements still standing keep theirs.
+ */
+function bindEvents() {
   for (const part of parts.parts ?? []) {
     if (part.kind !== "event") continue;
     // Every INSTANCE of this template position. A template-scoped id names a
@@ -593,7 +697,8 @@ async function attach() {
     const addresses = addressesFor(`e${part.owner}`);
     const owners = addresses.map((a) => index.get(a).element).filter(Boolean);
     if (owners.length === 0) {
-      log.push(`no element ${part.owner} for part ${part.id}`);
+      // A part in a block not rendered now (ADR-0130) is bound when it is.
+      if (!booted) log.push(`no element ${part.owner} for part ${part.id}`);
       continue;
     }
 
@@ -604,19 +709,29 @@ async function attach() {
     // Asked NOW rather than on interaction, deliberately. A refused handler
     // must never load its code: fetching first and checking after would make
     // the refusal a formality the network had already ignored.
-    const manifest = manifestFor(part);
-    const verdict =
-      decide && manifest ? decide(manifest) : { attach: false, recovery: "no-decision" };
-    if (!verdict.attach) {
-      // The CODE as well as the recovery. "refused 5: none" says a handler
-      // was refused and nothing about why; the code is the one field that
-      // distinguishes an unknown handler from a widened privacy scope from a
-      // stale document schema.
-      log.push(`refused ${part.id}: code ${verdict.code} recovery ${verdict.recovery}`);
-      continue;
+    let verdict = verdicts.get(part.id);
+    if (!verdict) {
+      const manifest = manifestFor(part);
+      verdict =
+        decide && manifest ? decide(manifest) : { attach: false, recovery: "no-decision" };
+      verdicts.set(part.id, verdict);
+      if (!verdict.attach) {
+        // The CODE as well as the recovery. "refused 5: none" says a handler
+        // was refused and nothing about why; the code is the one field that
+        // distinguishes an unknown handler from a widened privacy scope from
+        // a stale document schema.
+        log.push(`refused ${part.id}: code ${verdict.code} recovery ${verdict.recovery}`);
+      }
     }
+    if (!verdict.attach) continue;
 
+    let fresh = 0;
     for (const el of owners) {
+      // Bound once: a block a signal renders again binds what it made, and
+      // leaves what was bound before alone (ADR-0130).
+      if (bound.has(el)) continue;
+      bound.add(el);
+      fresh++;
       el.addEventListener("click", async (e) => {
         e.preventDefault();
         try {
@@ -645,6 +760,9 @@ async function attach() {
           let calls = 0;
           await module.run({
             captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
+            // The page's signals (ADR-0130), as JSON carries them.
+            get: (name) => signals.get(name),
+            set: setSignal,
             // Each command speculates before its request (ADR-0122), and its
             // speculation is resolved by the answer, whatever it is.
             command: async (component, args) => {
@@ -673,15 +791,38 @@ async function attach() {
         }
       });
     }
-    log.push(
-      `attached ${part.id} to ${owners.length} instance(s): ${addresses.join(" ")}`,
-    );
+    if (fresh > 0) {
+      log.push(
+        `attached ${part.id} to ${owners.length} instance(s): ${addresses.join(" ")}`,
+      );
+    }
   }
+
+}
+
+async function attach() {
+  // Marked, so activation cost is a MEASUREMENT rather than a wall-clock guess
+  // taken from outside. `performance.measure` attributes the work to this
+  // runtime; a stopwatch around navigation would also count the network, the
+  // parser and the paint.
+  performance.mark("pw:activate:start");
+
+  // One traversal, before anything else. Every later lookup is a map hit.
+  const indexed = buildIndex();
+  log.push(`indexed ${indexed} address(es)`);
+
+  await bootDecision();
+
+  bindEvents();
+  booted = true;
 
   performance.mark("pw:activate:end");
   performance.measure("pw:activate", "pw:activate:start", "pw:activate:end");
 
-  subscribe();
+  // A page whose values are its signals alone listens for nothing
+  // (ADR-0130): no resource of its changes on the server.
+  if (parts.listens !== false) subscribe();
+  window.__pw.signals = Object.fromEntries(signals);
   window.__pw.ready = true;
   document.documentElement.dataset.pwReady = "1";
 }

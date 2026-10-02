@@ -156,6 +156,7 @@ fn module(
         Lowering::Blocked { why, .. } => return Encoding::Blocked { why },
     };
     let mut commands: Vec<String> = Vec::new();
+    let mut changes_a_signal = false;
     for b in &function.blocks {
         for i in all_instrs(&b.instrs) {
             if let Instr::Command { command, .. } = i
@@ -163,13 +164,17 @@ fn module(
             {
                 commands.push(command.clone());
             }
+            changes_a_signal |= matches!(i, Instr::SignalSet { .. });
         }
     }
-    if commands.is_empty() {
+    // A handler changes something: the server's state through a command, or
+    // the page's through a signal (ADR-0130).
+    if commands.is_empty() && !changes_a_signal {
         return Encoding::Unsupported {
-            construct: "a handler that calls no command",
-            reason: "a handler reaches the server through a command, and this one calls \
-                     none, so pressing it would change nothing"
+            construct: "a handler that calls no command and changes no signal",
+            reason: "a handler reaches the server through a command and changes the page \
+                     through a signal, and this one does neither, so pressing it would \
+                     change nothing"
                 .to_string(),
         };
     }

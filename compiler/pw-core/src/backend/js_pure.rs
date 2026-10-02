@@ -213,6 +213,117 @@ pub(crate) fn isolated(function: &Function, program: &Program) -> Result<String,
 /// **A JSON value read as the module's value of `ty`** (ADR-0122), by the
 /// rule a handler reads its captures by: an `Int` into a `BigInt`, a record
 /// by its field names, an opaque type as its representation.
+/// **A constant, as JSON carries it** (ADR-0130): a signal's first value,
+/// which the server renders and the document hands the browser. The value
+/// a function of no parameters makes from literals, cases, records and
+/// lists, in the form `decode` reads and `wire_value` writes, with each
+/// case named as the browser's modules name it. Anything computed is
+/// refused: the first value is data the build writes, not a program it runs.
+pub(crate) fn constant(
+    program: &Program,
+    function: &Function,
+) -> Result<serde_json::Value, String> {
+    use serde_json::Value as J;
+    let none = BTreeMap::new();
+    let e = Emitter::new(program, &none, &[]);
+    let [entry] = function.blocks.as_slice() else {
+        return Err("a first value of several blocks".into());
+    };
+    let Terminator::Return(result) = &entry.terminator else {
+        return Err("a first value that returns nothing".into());
+    };
+    let mut held: BTreeMap<ValueId, J> = BTreeMap::new();
+    let get = |held: &BTreeMap<ValueId, J>, v: &ValueId| {
+        held.get(v)
+            .cloned()
+            .ok_or_else(|| format!("{v:?} is not a constant"))
+    };
+    for i in &entry.instrs {
+        let value = match i {
+            Instr::Const { value, .. } => match value {
+                Const::Int(n) if n.unsigned_abs() <= 1 << 53 => J::from(*n),
+                Const::Int(n) => {
+                    return Err(format!("{n}, which JSON does not carry exactly (ADR-0033)"));
+                }
+                Const::Float(f) => serde_json::Number::from_f64(*f)
+                    .map(J::Number)
+                    .ok_or_else(|| format!("{f}, which JSON does not carry"))?,
+                Const::Bool(b) => J::Bool(*b),
+                Const::Str(s) => J::String(s.clone()),
+                Const::Unit => J::Null,
+            },
+            Instr::Case {
+                case, fields, ty, ..
+            } => {
+                let (name, _) = e.case_of(ty, VariantCase::Declared(*case))?;
+                let mut out = serde_json::Map::new();
+                out.insert("$case".into(), J::String(name));
+                match fields.as_slice() {
+                    [] => {}
+                    [one] => {
+                        out.insert("value".into(), get(&held, one)?);
+                    }
+                    many => {
+                        let each = many
+                            .iter()
+                            .map(|f| get(&held, f))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        out.insert("value".into(), J::Array(each));
+                    }
+                }
+                J::Object(out)
+            }
+            Instr::Variant { case, payload, .. } => {
+                let mut out = serde_json::Map::new();
+                out.insert("$case".into(), J::String(case_name(*case).into()));
+                if let Some(p) = payload {
+                    out.insert("value".into(), get(&held, p)?);
+                }
+                J::Object(out)
+            }
+            Instr::Construct { args, ty, .. } => {
+                let Type::Nominal(def, targs) = ty else {
+                    return Err(format!("a record of type {ty:?}"));
+                };
+                let Some(Shape::Record { fields }) = e.shape(*def, targs) else {
+                    return Err(format!("a record of type {ty:?} with no shape"));
+                };
+                let mut out = serde_json::Map::new();
+                for ((n, _), a) in fields.iter().zip(args) {
+                    out.insert(n.clone(), get(&held, a)?);
+                }
+                J::Object(out)
+            }
+            Instr::MakeList { items, .. } => J::Array(
+                items
+                    .iter()
+                    .map(|v| get(&held, v))
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            Instr::Retype { value, .. } => get(&held, value)?,
+            other => {
+                return Err(format!(
+                    "a computed first value ({}); a signal's first value is a literal, a \
+                     case, or a record or list of them",
+                    instr_name(other)
+                ));
+            }
+        };
+        held.insert(i.result(), value);
+    }
+    get(&held, result)
+}
+
+/// An instruction's kind, for a refusal.
+fn instr_name(i: &Instr) -> &'static str {
+    match i {
+        Instr::Call { .. } | Instr::ImportCall { .. } | Instr::Apply { .. } => "a call",
+        Instr::Binary { .. } | Instr::Unary { .. } => "an operation",
+        Instr::Match { .. } | Instr::If { .. } => "a branch",
+        _ => "a computation",
+    }
+}
+
 pub(crate) fn decoder(program: &Program, ty: &Type, expr: &str) -> Result<String, String> {
     let none = BTreeMap::new();
     Emitter::new(program, &none, &[]).decode(expr, ty)
@@ -558,10 +669,126 @@ impl<'p> Emitter<'p> {
                         .collect::<Result<_, String>>()?;
                     format!("((o) => ({{ {} }}))({expr})", fields.join(", "))
                 }
+                // A case, as the wire holds one (ADR-0130): its name and its
+                // payload, one field as the value and several as an array.
+                Some(Shape::Variant { cases }) => {
+                    let cases = cases.clone();
+                    self.decode_cases(expr, &cases)?
+                }
                 _ => return Err(refused()),
             },
+            Type::Option(t) => self.decode_cases(
+                expr,
+                &[
+                    ("some".to_string(), vec![(**t).clone()]),
+                    ("none".to_string(), Vec::new()),
+                ],
+            )?,
+            Type::Result(t, e) => self.decode_cases(
+                expr,
+                &[
+                    ("ok".to_string(), vec![(**t).clone()]),
+                    ("err".to_string(), vec![(**e).clone()]),
+                ],
+            )?,
             _ => return Err(refused()),
         })
+    }
+
+    /// A case from the wire, by its name, with its payload decoded. A name
+    /// the type does not have traps rather than becoming a value of no case.
+    fn decode_cases(&self, expr: &str, cases: &[(String, Vec<Type>)]) -> Result<String, String> {
+        let mut arms = Vec::new();
+        for (name, fields) in cases {
+            let wire = json(&crate::wit::ident(name));
+            let built = match fields.as_slice() {
+                [] => format!("{{ $case: {wire} }}"),
+                [one] => format!(
+                    "{{ $case: {wire}, value: {} }}",
+                    self.decode("c.value", one)?
+                ),
+                many => {
+                    let each: Vec<String> = many
+                        .iter()
+                        .enumerate()
+                        .map(|(i, t)| self.decode(&format!("c.value[{i}]"), t))
+                        .collect::<Result<_, String>>()?;
+                    format!("{{ $case: {wire}, value: [{}] }}", each.join(", "))
+                }
+            };
+            arms.push(format!("case {wire}: return {built};"));
+        }
+        Ok(format!(
+            "((c) => {{ switch (c.$case) {{ {} default: throw new Error(\"trap: no such case \" + c.$case); }} }})({expr})",
+            arms.join(" ")
+        ))
+    }
+
+    /// **A value as JSON carries it**, whole (ADR-0130): what a signal
+    /// holds in the browser. An `Int` as a number, exact within ±2^53 or a
+    /// trap; a record as an object by field name; a case as its name and
+    /// payload, as `decode` reads it.
+    fn wire_value(&mut self, v: &str, ty: &Type) -> Result<String, String> {
+        Ok(match ty {
+            Type::Int => format!("{}({v})", self.uses("exact")),
+            Type::Float | Type::Str | Type::Bool => v.to_string(),
+            Type::List(t) => format!("{v}.map((x) => {})", self.wire_value("x", t)?),
+            Type::Option(t) => {
+                let t = (**t).clone();
+                self.wire_cases(v, &[("some".into(), vec![t]), ("none".into(), Vec::new())])?
+            }
+            Type::Result(t, e) => {
+                let (t, e) = ((**t).clone(), (**e).clone());
+                self.wire_cases(v, &[("ok".into(), vec![t]), ("err".into(), vec![e])])?
+            }
+            Type::Nominal(def, args) => match self.shape(*def, args).cloned() {
+                Some(Shape::Alias(of)) => self.wire_value(v, &of)?,
+                Some(Shape::Record { fields }) => {
+                    let mut out = Vec::new();
+                    for (n, t) in &fields {
+                        out.push(format!(
+                            "{}: {}",
+                            json(n),
+                            self.wire_value(&format!("o[{}]", json(n)), t)?
+                        ));
+                    }
+                    format!("((o) => ({{ {} }}))({v})", out.join(", "))
+                }
+                Some(Shape::Variant { cases }) => self.wire_cases(v, &cases)?,
+                None => return Err(format!("a value of type {ty:?}, whose shape is unknown")),
+            },
+            other => {
+                return Err(format!(
+                    "a value of type {other:?}, which JSON cannot carry"
+                ));
+            }
+        })
+    }
+
+    fn wire_cases(&mut self, v: &str, cases: &[(String, Vec<Type>)]) -> Result<String, String> {
+        let mut arms = Vec::new();
+        for (name, fields) in cases {
+            let wire = json(&crate::wit::ident(name));
+            let built = match fields.as_slice() {
+                [] => format!("{{ $case: {wire} }}"),
+                [one] => format!(
+                    "{{ $case: {wire}, value: {} }}",
+                    self.wire_value("c.value", one)?
+                ),
+                many => {
+                    let mut each = Vec::new();
+                    for (i, t) in many.iter().enumerate() {
+                        each.push(self.wire_value(&format!("c.value[{i}]"), t)?);
+                    }
+                    format!("{{ $case: {wire}, value: [{}] }}", each.join(", "))
+                }
+            };
+            arms.push(format!("case {wire}: return {built};"));
+        }
+        Ok(format!(
+            "((c) => {{ switch (c.$case) {{ {} default: throw new Error(\"trap: no such case \" + c.$case); }} }})({v})",
+            arms.join(" ")
+        ))
     }
 
     /// **A value sent to a command, as JSON carries it** (ADR-0058): an `Int`
@@ -755,6 +982,28 @@ impl<'p> Emitter<'p> {
                     json(command),
                     sent.join(", ")
                 ));
+            }
+            // A page's signal (ADR-0130), through the handler's context, as
+            // JSON carries it.
+            Instr::SignalGet { signal, ty, .. } => {
+                if !self.handler {
+                    return Err(format!(
+                        "a read of the signal `{signal}`, which only a handler's own body makes"
+                    ));
+                }
+                let decoded = self.decode(&format!("context.get({})", json(signal)), ty)?;
+                self.line(&format!("const {r} = {decoded};"));
+            }
+            Instr::SignalSet { signal, value, .. } => {
+                if !self.handler {
+                    return Err(format!(
+                        "a change to the signal `{signal}`, which only a handler's own body makes"
+                    ));
+                }
+                let t = self.type_of(*value)?.clone();
+                let sent = self.wire_value(&val(*value), &t)?;
+                self.line(&format!("context.set({}, {sent});", json(signal)));
+                self.line(&format!("const {r} = undefined;"));
             }
             // An opaque type is its representation (ADR-0054).
             Instr::Retype { value, .. } => {

@@ -1360,24 +1360,32 @@ fn handlers_read_their_captures(sigs: &Signatures, unit: usize, hir: &Hir) -> Ve
             let captured: BTreeSet<String> =
                 crate::resume::capture_roots(body, *d).into_keys().collect();
             let own = crate::resolve::local_bindings_from(body, lambda);
+            // A page's signal is the browser's, and the handler reaches it
+            // through its context: it is not captured (ADR-0130).
+            let signal = |b: Option<crate::lexical::Binder>| {
+                b.is_some_and(|b| {
+                    body.signals.iter().any(|s| {
+                        matches!(body.expr(*s), Expr::Let { pat: Some(p), .. }
+                            if b == crate::lexical::Binder::Pattern(*p))
+                    })
+                })
+            };
             let mut reported: BTreeSet<&str> = BTreeSet::new();
             for e in body.walk_from(*inner) {
                 // A name, and a record's shorthand field, `Pick { n: 1, item }`,
                 // which reads one: each with whether a scope binds it.
                 let reads: Vec<(&str, crate::diagnostics::Span, bool)> = match body.expr(e) {
                     Expr::Name(n) => {
-                        vec![(n.as_str(), body.expr_span(e), lexical.binder(e).is_some())]
+                        let b = lexical.binder(e);
+                        vec![(n.as_str(), body.expr_span(e), b.is_some() && !signal(b))]
                     }
                     Expr::Record { fields, .. } => fields
                         .iter()
                         .enumerate()
                         .filter(|(_, f)| f.value.is_none())
                         .map(|(i, f)| {
-                            (
-                                f.name.as_str(),
-                                f.span.clone(),
-                                lexical.shorthand(e, i).is_some(),
-                            )
+                            let b = lexical.shorthand(e, i);
+                            (f.name.as_str(), f.span.clone(), b.is_some() && !signal(b))
                         })
                         .collect(),
                     _ => continue,
@@ -2801,6 +2809,8 @@ fn check_unit_with(
 
     // Charter §8.5: the resume manifest ships with the document.
     crate::resume::check(&unit.hir, sigs, summaries, manifest, &mut out);
+    // Where UI state is read and written (ADR-0130).
+    crate::signals::check(&unit.hir, sigs, at, &mut out);
 
     // E7 generator: the resume manifest and the handler artifact, derived by
     // two different walks and compared. A disagreement within one build is a

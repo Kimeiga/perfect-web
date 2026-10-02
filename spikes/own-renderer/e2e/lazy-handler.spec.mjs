@@ -183,6 +183,35 @@ test("an unauthorised handler is never fetched", async ({ page }) => {
   await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {});
 });
 
+test("a handler this build did not compile is refused, whatever the document says", async ({
+  page,
+}) => {
+  // ADR-0132: what the decision knows comes from the build the runtime was
+  // served with (`/pw-handlers`), never from the document. A document that
+  // names a handler the build lacks, as one cached from another build would,
+  // gets no listener and fetches no code, however consistently it names it.
+  const fetched = watch(page);
+  await page.route("**/StorePage.html", async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
+    const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+    await route.fulfill({ response, body: body.replaceAll(add, "ffffffffffffffff") });
+  });
+
+  await page.goto("/StorePage.html");
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady);
+  await page.locator("#menu button").first().click();
+  await page.waitForTimeout(400);
+
+  const log = await page.evaluate(() => window.__pw.log.join("\n"));
+  expect(log, "the build's handlers are known").toMatch(/knows \d+ handler\(s\)/);
+  expect(log, "this one is not among them").toMatch(/refused \d+: code 4 /);
+  expect(fetched, "and nothing was fetched").toEqual([]);
+  await expect(page.locator("#cart-count"), "the button is inert").toHaveText("0");
+  await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {});
+});
+
 test("a handler that fails to load is visible and recoverable", async ({ page }) => {
   // The failure a user would otherwise experience as "the button does
   // nothing". It must be visible on the element and it must not be permanent:

@@ -109,7 +109,7 @@ There is no `useEffect` equivalent. Distinct primitives instead:
 
 | primitive | meaning | corpus |
 |---|---|---|
-| `signal` | ephemeral local UI state | — |
+| `signal` | ephemeral local UI state: a page's, written by its handlers, read where the browser reads it again (ADR-0130, ADR-0133) | `examples/demo/panel.pw` |
 | `derived` | pure value computed from other values | — |
 | `query` | keyed remote read: cache, freshness, lifecycle, cancellation, dedupe | A-003, A-004, A-008 |
 | `command` | mutation: authorization, idempotency, transaction, optimistic behavior, invalidation | A-005, A-010 |

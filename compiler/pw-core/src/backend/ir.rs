@@ -366,6 +366,22 @@ pub enum Instr {
         args: Vec<ValueId>,
         ty: Type,
     },
+    /// **A page's signal, read** (ADR-0130): the value the browser holds now,
+    /// through the handler's context. Only a handler's body holds one.
+    SignalGet {
+        result: ValueId,
+        signal: String,
+        ty: Type,
+    },
+    /// **A page's signal, changed** (ADR-0130): the browser holds `value`
+    /// from now, and renders again each part that reads it. Its value is the
+    /// unit value. Only a handler's body holds one.
+    SignalSet {
+        result: ValueId,
+        signal: String,
+        value: ValueId,
+        ty: Type,
+    },
     /// **The same value, as another type with its representation**
     /// (ADR-0054): an opaque type built from its representation,
     /// `PositiveInt(1)`, and its representation read back, `n.value`. The
@@ -652,6 +668,8 @@ impl Instr {
             | Instr::Closure { result, .. }
             | Instr::Retype { result, .. }
             | Instr::Command { result, .. }
+            | Instr::SignalGet { result, .. }
+            | Instr::SignalSet { result, .. }
             | Instr::Apply { result, .. } => *result,
         }
     }
@@ -681,6 +699,8 @@ impl Instr {
             | Instr::Closure { ty, .. }
             | Instr::Retype { ty, .. }
             | Instr::Command { ty, .. }
+            | Instr::SignalGet { ty, .. }
+            | Instr::SignalSet { ty, .. }
             | Instr::Apply { ty, .. } => ty,
         }
     }

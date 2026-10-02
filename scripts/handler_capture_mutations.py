@@ -42,7 +42,8 @@ MUTANTS = [
     (
         "a declaration's name is a binding",
         CHECK,
-        "vec![(n.as_str(), body.expr_span(e), lexical.binder(e).is_some())]",
+        # Re-anchored by ADR-0133, where a signal is read uncaptured.
+        "vec![(n.as_str(), body.expr_span(e), b.is_some() && !signal(b))]",
         "vec![(n.as_str(), body.expr_span(e), true)]",
     ),
     (

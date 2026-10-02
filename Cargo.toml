@@ -10,6 +10,7 @@ members = [
     "runtime/pw-materialize",
     "runtime/pw-protocol",
     "runtime/pw-render",
+    "runtime/pw-render-wasm",
     "runtime/pw-resource",
     "runtime/pw-resume",
     "runtime/pw-resume-wasm",
@@ -68,3 +69,13 @@ blake3 = "1.8.6"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# The browser's WebAssembly (ADR-0130): `pw-render-wasm` and `pw-resume-wasm`,
+# downloaded by a page, so built for size. `release` stays as it is for the
+# native binaries.
+[profile.browser]
+inherits = "release"
+opt-level = "z"
+lto = true
+panic = "abort"
+strip = true

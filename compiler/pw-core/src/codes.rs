@@ -76,6 +76,9 @@ pub enum Owner {
     /// on a node. It is a source-program error with a span and an obvious
     /// repair.
     Capability,
+    /// ADR-0130: UI state. Where a signal may be read and written, and what
+    /// may hold UI state at all.
+    UiState,
 }
 
 impl fmt::Display for Code {
@@ -476,6 +479,18 @@ codes! {
     // package could lose an import and a facet would stop applying in silence.
     UNRESOLVED_IMPACT_MARKER = "PW5204" / unresolved_impact_marker / 1, Capability,
         "an effect's impact condition must name a type the declaring module can see";
+
+    // --- UI state (PW53xx, ADR-0130) -------------------------------------
+    //
+    // A signal lives in the browser and changes when a person acts. So it is
+    // written by a handler, read where the browser can read it again, and it
+    // is the one thing a handler changes.
+    SIGNAL_WRITTEN_OUTSIDE_HANDLER = "PW5300" / signal_written_outside_handler / 1, UiState,
+        "a signal changes only in a handler";
+    SIGNAL_READ_WHERE_IT_CANNOT_CHANGE = "PW5301" / signal_read_where_it_cannot_change / 1, UiState,
+        "a signal is read only where the browser reads it again when it changes: a template part or a handler";
+    UI_STATE_NOT_A_SIGNAL = "PW5302" / ui_state_not_a_signal / 1, UiState,
+        "a handler changes a signal, not a binding of the body it is written in";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
@@ -561,6 +576,7 @@ impl Owner {
             Owner::Types => "PW06",
             Owner::ResourceGraph => "PW51",
             Owner::Capability => "PW52",
+            Owner::UiState => "PW53",
             _ => "",
         }
     }

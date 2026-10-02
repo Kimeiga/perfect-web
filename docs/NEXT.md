@@ -29,12 +29,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
    T01, T08 and T12 are written. T12's Pleris wrong fix is refused since
    ADR-0128.
    - ~~**E14-L, a value's label.**~~ Done 2026-10-02 (ADR-0129).
-   - **Next: UI state, view composition and typed events** (ADR-0126's,
-     ADR-0072's and ADR-0058's rulings). T06 and T11 need them, and so does
-     every DoorDash screen: a drawer, an item modal, a checkout form. First
-     the rulings, then local signals on a page: declared, read in text,
-     attributes, `{#if}` and `{#match}`, written by a handler that need call
-     no command, rendered in the browser and resumed.
+   - ~~**Rulings: UI state, view composition, typed events.**~~ Done
+     2026-10-02 (ADR-0130, ADR-0131).
+   - ~~**Local signals on a page.**~~ Done 2026-10-02 (ADR-0133), with the
+     resume decision knowing the build (ADR-0132).
+   - **Next: every handler is resumable.** `on:press={() => ..}` builds an
+     inert button today. Acceptance: such a handler either compiles, its
+     captures inferred from what it reads, or is refused at check; never
+     both silent and dead.
+   - **Then: view composition** (ADR-0130's step 2), provided signals
+     (step 3), typed events and `bind:value` (ADR-0131). T11's dialog and
+     T06's form follow.
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

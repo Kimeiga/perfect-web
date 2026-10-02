@@ -1,0 +1,52 @@
+// @corpus: fixture
+// @id: DEMO-panel
+// @category: UI state — a page's signals, rendered and changed in the browser
+// @charter: §8, §9.1
+// @milestone: E14
+//
+// ADR-0130's first slice: UI state that is the page's own. Nothing here asks
+// the server for anything. A press changes a signal, and the browser renders
+// again exactly the parts that read it.
+//
+// Outside the store on purpose. The benchmark's tasks add a dialog to the
+// store (T11), so the store's baseline must not already have one.
+
+module demo.panel
+
+// Which panel is open. A sum type, not a flag and a nullable id, so a panel
+// that is open for nothing cannot be written (ADR-0126, R7).
+type Panel = Shut | Cart | Help
+
+page PanelPage() {
+    cache private
+
+    signal panel: Panel = Panel.Shut
+    signal presses: Int = 0
+    signal greeting: String = "Hello"
+
+    view {
+        <main>
+            <h1 id="greeting">{greeting}</h1>
+            <p>Pressed <span id="presses">{presses}</span> time(s).</p>
+            <button id="press" type="button" on:press={resumable() => presses = presses + 1}>Press</button>
+            <button id="open-cart" type="button" on:press={resumable() => panel = Panel.Cart}>Cart</button>
+            <button id="open-help" type="button" on:press={resumable() => panel = Panel.Help}>Help</button>
+            <button id="shout" type="button" on:press={resumable() => greeting = "<b>Hi</b> & bye"}>Shout</button>
+            {#match panel}
+                {:Shut}
+                    <p id="shut">Nothing is open.</p>
+                {:Cart}
+                    <aside id="cart-panel" aria-label="Cart">
+                        <p>Your cart.</p>
+                        <button id="close" type="button" on:press={resumable() => panel = Panel.Shut}>Close</button>
+                    </aside>
+                {:Help}
+                    <aside id="help-panel" aria-label="Help">
+                        <p>Pressed {presses} time(s) so far.</p>
+                        <p id="help-greeting">{greeting}</p>
+                        <button id="close-help" type="button" on:press={resumable() => panel = Panel.Shut}>Close</button>
+                    </aside>
+            {/match}
+        </main>
+    }
+}

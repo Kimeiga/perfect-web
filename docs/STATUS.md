@@ -13,6 +13,23 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0133, 2026-10-02: a page holds its own UI state** (signals, first
+slice; [ADR-0133](DECISIONS/ADR-0133-a-page-holds-its-own-ui-state.md), after
+the rulings of [ADR-0130](DECISIONS/ADR-0130-ui-state-is-a-signal-provided-where-it-lives.md)
+and [ADR-0131](DECISIONS/ADR-0131-a-handler-is-given-its-event-as-plain-data.md)).
+`signal panel: Panel = Panel.Shut` in a page, changed by a handler that need
+call no command, read in text and `{#if}`/`{#match}` blocks. The server
+renders first values; the browser holds the signals and renders again exactly
+what reads them, blocks by the server's renderer built for the browser
+(`pw-render-wasm`, 90 KB gzipped, loaded on first use). Demonstrated by
+`examples/demo/panel.pw` in WebKit and Chromium. Found on the way:
+- **every handler but the store's two was refused in the browser**: the
+  resume decision knew them by name
+  ([ADR-0132](DECISIONS/ADR-0132-the-resume-decision-knows-what-the-build-compiled.md),
+  fixed: it knows the build's handlers by identity);
+- **a handler not written `resumable(..)` builds, and its button is inert**
+  (open; the next ruling).
+
 **ADR-0129, 2026-10-02: a value's label follows it through calls, bodies,
 branches and assignments** (E14-L,
 [ADR-0129](DECISIONS/ADR-0129-a-values-label-follows-it.md)). Seven ways a
