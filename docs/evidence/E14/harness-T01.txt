@@ -1,7 +1,7 @@
 E14-B - the offline harness, and T01's controls
 
 produced by: just e14-harness T01
-commit: b64a99514096b4f4be0caac061d7c2f130f6cc05
+commit: 936e1c74eee07ae023b7ac675b2f49dc291457f7
 node: v22.21.1  pnpm: 10.15.1  rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == isolation (benchmarks/harness/test/isolation.test.mjs)
