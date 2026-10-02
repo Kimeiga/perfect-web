@@ -1,0 +1,27 @@
+ADR-0137 - what the browser renders again, it can
+
+produced by: just e14-signals-render-again
+commit: 26075bb851ff36c9d942981ee1bc7b980159a2ba
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the plan's refusals (compiler/pw-core/tests/signals_render_again.rs)
+
+test an_attribute_a_signal_decides_is_refused_as_before ... ok
+test a_list_a_signal_holds_is_rendered_again_only_inside_its_block ... ok
+test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
+test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
+test a_block_a_signal_decides_reads_the_signals_and_its_own_names ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s
+
+== mutation controls (scripts/signals_render_again_mutations.py)
+
+baseline: 5 passed, 0 failed
+the plan does not ask what the browser renders again: KILLED (5 of 5 tests fail)
+a loop a query decides is not a frame: KILLED (1 of 5 tests fail)
+a block a signal decides may read anything: KILLED (2 of 5 tests fail)
+a loop's name is not its block's: KILLED (2 of 5 tests fail)
+an arm's names are not its block's: KILLED (1 of 5 tests fail)
+a list a signal holds is live outside its block: KILLED (1 of 5 tests fail)
+an attribute a signal decides is live: KILLED (1 of 5 tests fail)
+the plan does not know what a handler captures: KILLED (1 of 5 tests fail)
+8 of 8 mutants killed
