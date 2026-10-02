@@ -664,3 +664,22 @@ fn an_uncached_result_is_not_kept_and_one_entry_can_be_dropped() {
     rt.evict_where(|k| k.key == "b");
     assert_eq!(rt.stored(), 1);
 }
+
+/// **A cache holds the host's own values, and hands them to the fetch**
+/// (ADR-0127, corrected). A host that cached a token and kept the value in a
+/// table of its own could be handed a token whose value it had dropped.
+#[test]
+fn a_cache_of_any_value_hands_the_fetch_its_value() {
+    let rt: Resources<Arc<Vec<u8>>> = Resources::caching(Clock::new());
+    let manifest = Manifest::new("q").freshness(10_000);
+    let key = Key::new("q", "a");
+    let made = Arc::new(vec![1u8, 2, 3]);
+    let Fetched::Fresh(first) = rt.fetch(&manifest, &key, |_| Ok(made.clone())) else {
+        panic!("a first fetch runs its load");
+    };
+    let Fetched::FromCache(again) = rt.fetch(&manifest, &key, |_| Ok(Arc::new(vec![9]))) else {
+        panic!("a second fetch is served from the cache");
+    };
+    assert!(Arc::ptr_eq(&first, &made) && Arc::ptr_eq(&again, &made));
+    assert_eq!(rt.public_cache_contents().len(), 1);
+}

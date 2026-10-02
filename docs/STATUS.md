@@ -13,6 +13,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Correction to ADR-0127, 2026-10-02: a concurrency defect shipped in the
+second E14-Q slice.** `concurrent_commands_on_one_session_all_commit` failed
+in about one CI run in three. The server kept query values in a side table
+bounded to four per key, and a reader could be handed a token whose value
+had already been dropped; and a reader invalidated eight times by concurrent
+commits gave up. `pw-resource` now caches the value itself
+(`Resources<V>`), and an invalidated read reads directly after one retry.
+The test then passed 300 runs in a row.
+
 **ADR-0128, 2026-10-02: a shared cache holds no one reader's value, whatever
 its declaration says**
 ([ADR-0128](DECISIONS/ADR-0128-a-shared-cache-holds-no-one-readers-value.md)).

@@ -261,20 +261,21 @@ struct Server {
     /// **The store's queries, run by their declared policies** (ADR-0127):
     /// freshness, cache partition, key, concurrency, timeout and retries are
     /// `pw-resource`'s to decide, on its own clock, which this server keeps at
-    /// wall time. What it caches is a token; the value is in `held`.
-    queries: pw_resource::Resources,
+    /// wall time. It caches each value itself, and hands it to the fetch.
+    ///
+    /// Until 2026-10-02 it cached a token, and the value was in a table here
+    /// bounded to four per key. Eight threads committing on one session could
+    /// invalidate more than four flights between a reader being handed the
+    /// cached token and reading its value, and the reader found it gone
+    /// (`concurrent_commands_on_one_session_all_commit`, 1 run in 3).
+    queries: pw_resource::Resources<Arc<Val>>,
     query_clock: (
         pw_resource::Clock,
         std::time::Instant,
         std::sync::atomic::AtomicU64,
     ),
-    /// Each kept query value by its token, and each key's last few tokens.
-    /// Not one per key: a flight a commit invalidated can finish after the
-    /// flight that replaced it, and must not take the newer value away from
-    /// the reader it was fetched for. Bounded: `HELD_PER_KEY` per key, and
-    /// the keys `queries` holds.
-    held: Mutex<Held>,
-    tokens: std::sync::atomic::AtomicU64,
+    /// A number for each `concurrency parallel` flight's own key.
+    parallel: std::sync::atomic::AtomicU64,
     /// How many times each data-layer operation ran: what `/metrics` reports,
     /// and what shows a policy saved a request.
     calls: Arc<Mutex<BTreeMap<String, u64>>>,
@@ -387,14 +388,6 @@ fn components() -> BTreeMap<String, Loaded> {
         out.insert(id.to_string(), Loaded { prepared, imports });
     }
     out
-}
-
-/// Query values a server keeps (ADR-0127): each by its token, and each key's
-/// last few tokens, oldest first.
-#[derive(Default)]
-struct Held {
-    values: BTreeMap<String, Val>,
-    recent: BTreeMap<(String, String), std::collections::VecDeque<String>>,
 }
 
 /// **What one build gave the server** (ADR-0123, ADR-0125): where its
@@ -570,14 +563,13 @@ impl Server {
             topology,
             speculation,
             plan,
-            queries: pw_resource::Resources::new(query_clock.clone()),
+            queries: pw_resource::Resources::caching(query_clock.clone()),
             query_clock: (
                 query_clock,
                 std::time::Instant::now(),
                 std::sync::atomic::AtomicU64::new(0),
             ),
-            held: Mutex::new(Held::default()),
-            tokens: std::sync::atomic::AtomicU64::new(0),
+            parallel: std::sync::atomic::AtomicU64::new(0),
             calls: Arc::default(),
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
             interactions: Mutex::new(BTreeMap::new()),
@@ -962,19 +954,6 @@ impl Server {
             let own = format!("session={session}");
             let mine = |k: &str| k == own || k.starts_with(&format!("{own}\u{1f}"));
             self.queries.evict_where(|k| mine(&k.key));
-            let mut held = self.held.lock().expect("held");
-            let gone: Vec<(String, String)> = held
-                .recent
-                .keys()
-                .filter(|(_, k)| mine(k))
-                .cloned()
-                .collect();
-            for k in gone {
-                for token in held.recent.remove(&k).unwrap_or_default() {
-                    held.values.remove(&token);
-                }
-            }
-            drop(held);
             // And its interactions: a forgotten session's retry runs again,
             // which is the bound's stated cost (ADR-0121).
             let keys = self
@@ -1067,7 +1046,7 @@ impl Server {
         if policy["parallel"] == true {
             // `concurrency parallel`: no shared flight, so a key of its own.
             let n = self
-                .tokens
+                .parallel
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             key.push_str(&format!("\u{1f}#{n}"));
         }
@@ -1075,33 +1054,28 @@ impl Server {
         // A flight a commit invalidated is not an error: its result was about
         // to be stale, and a reader asks again (found 2026-10-02: two presses
         // at once made one command's re-read fail on the other's commit).
-        let mut fetched = pw_resource::Fetched::Cancelled(pw_resource::StopReason::Invalidated);
-        for _ in 0..8 {
-            fetched = self.fetch_once(session, resource, &manifest, &key, args);
-            if !matches!(
-                fetched,
-                pw_resource::Fetched::Cancelled(pw_resource::StopReason::Invalidated)
-            ) {
-                break;
+        //
+        // Once more through `pw-resource`, then directly. Asking again
+        // through it can be invalidated again by each commit that lands
+        // during the read, and eight times was no bound on that: eight
+        // threads committing on one session invalidated a reader eight times
+        // in about one run of a hundred. A direct read starts after the
+        // invalidation, so it is as new as the commit that caused it, and
+        // nothing can take its result away.
+        for _ in 0..2 {
+            match self.fetch_once(session, resource, &manifest, &key, args) {
+                pw_resource::Fetched::Cancelled(pw_resource::StopReason::Invalidated) => continue,
+                pw_resource::Fetched::Fresh(v)
+                | pw_resource::Fetched::FromCache(v)
+                | pw_resource::Fetched::Deduplicated(v) => return Ok(Val::clone(&v)),
+                pw_resource::Fetched::Failed(e) => return Err(format!("{resource}: {e}")),
+                pw_resource::Fetched::Cancelled(r) => {
+                    return Err(format!("{resource}: stopped, {r:?}"));
+                }
+                pw_resource::Fetched::TimedOut => return Err(format!("{resource}: timed out")),
             }
         }
-        let token = match fetched {
-            pw_resource::Fetched::Fresh(t)
-            | pw_resource::Fetched::FromCache(t)
-            | pw_resource::Fetched::Deduplicated(t) => t,
-            pw_resource::Fetched::Failed(e) => return Err(format!("{resource}: {e}")),
-            pw_resource::Fetched::Cancelled(r) => {
-                return Err(format!("{resource}: stopped, {r:?}"));
-            }
-            pw_resource::Fetched::TimedOut => return Err(format!("{resource}: timed out")),
-        };
-        self.held
-            .lock()
-            .expect("held")
-            .values
-            .get(&token)
-            .cloned()
-            .ok_or_else(|| format!("{resource}: the value for its entry is gone"))
+        self.query(resource, session, args)
     }
 
     /// One fetch of a binding's query through `pw-resource`.
@@ -1112,28 +1086,10 @@ impl Server {
         manifest: &pw_resource::Manifest,
         key: &pw_resource::Key,
         args: &[Val],
-    ) -> pw_resource::Fetched {
+    ) -> pw_resource::Fetched<Arc<Val>> {
         self.sync_query_clock();
         self.queries.fetch(manifest, key, |_attempt| {
-            let value = self.query(resource, session, args)?;
-            let token = self
-                .tokens
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-                .to_string();
-            let mut held = self.held.lock().expect("held");
-            let k = (key.resource.clone(), key.key.clone());
-            let recent = held.recent.entry(k).or_default();
-            recent.push_back(token.clone());
-            let old: Vec<String> = (recent.len() > HELD_PER_KEY)
-                .then(|| recent.pop_front())
-                .flatten()
-                .into_iter()
-                .collect();
-            for t in old {
-                held.values.remove(&t);
-            }
-            held.values.insert(token.clone(), value);
-            Ok(token)
+            self.query(resource, session, args).map(Arc::new)
         })
     }
 
@@ -2014,9 +1970,6 @@ fn entry_key(session: &str, policy: &serde_json::Value, args: &[Val]) -> Option<
     }
     Some(parts.join("\u{1f}"))
 }
-
-/// How many recent values one query entry keeps (ADR-0127).
-const HELD_PER_KEY: usize = 4;
 
 /// The one store this server holds (ADR-0125): what `stores#get` answers.
 const STORE_ID: &str = "47";

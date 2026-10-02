@@ -213,8 +213,8 @@ impl Manifest {
 }
 
 #[derive(Debug, Clone)]
-struct Entry {
-    value: String,
+struct Entry<V> {
+    value: V,
     stored_at: Millis,
     privacy: Privacy,
 }
@@ -233,7 +233,7 @@ enum QueryError {
     Stopped(StopReason),
 }
 
-type QueryResult = Result<String, QueryError>;
+type QueryResult<V> = Result<V, QueryError>;
 
 /// The result and its wakeup predicate have one mutex. No user code runs here.
 struct Completion<T> {
@@ -274,13 +274,13 @@ impl<T: Clone> Completion<T> {
     }
 }
 
-struct Flight {
+struct Flight<V> {
     manifest: Manifest,
     started: Millis,
-    completion: Completion<QueryResult>,
+    completion: Completion<QueryResult<V>>,
 }
 
-impl Flight {
+impl<V> Flight<V> {
     fn expired(&self, now: Millis) -> bool {
         now >= self.started.saturating_add(self.manifest.timeout)
     }
@@ -289,13 +289,21 @@ impl Flight {
 /// A synchronous adapter may inspect this between interruptible operations.
 /// Signalling cancellation fences publication; stopping foreign I/O is the
 /// adapter's responsibility. A cancelled request cannot be made valid again.
-#[derive(Clone)]
-pub struct Cancellation {
-    flight: Arc<Flight>,
+pub struct Cancellation<V = String> {
+    flight: Arc<Flight<V>>,
     clock: Clock,
 }
 
-impl Cancellation {
+impl<V> Clone for Cancellation<V> {
+    fn clone(&self) -> Self {
+        Self {
+            flight: self.flight.clone(),
+            clock: self.clock.clone(),
+        }
+    }
+}
+
+impl<V: Clone> Cancellation<V> {
     pub fn reason(&self) -> Option<StopReason> {
         match self.flight.completion.get() {
             Some(Err(QueryError::Stopped(reason))) => Some(reason),
@@ -319,37 +327,70 @@ pub enum CommandError {
 
 type CommandResult = Result<String, CommandError>;
 
-#[derive(Default)]
-struct State {
-    cache: HashMap<Key, Entry>,
-    in_flight: HashMap<Key, Arc<Flight>>,
+struct State<V> {
+    cache: HashMap<Key, Entry<V>>,
+    in_flight: HashMap<Key, Arc<Flight<V>>>,
     subscribers: HashMap<Key, usize>,
     /// Reservations and results are kept for this runtime's lifetime.
     applied: HashMap<String, Arc<Completion<CommandResult>>>,
     trace: Vec<Trace>,
 }
 
+impl<V> Default for State<V> {
+    fn default() -> Self {
+        Self {
+            cache: HashMap::new(),
+            in_flight: HashMap::new(),
+            subscribers: HashMap::new(),
+            applied: HashMap::new(),
+            trace: Vec::new(),
+        }
+    }
+}
+
 /// The runtime. Cheap to clone; every clone shares one state.
-#[derive(Clone)]
-pub struct Resources {
-    state: Arc<Mutex<State>>,
+///
+/// **Generic over the value it caches** (2026-10-02): a host that holds
+/// values of its own type is handed them by the fetch that cached them,
+/// with no side table to keep in step. ADR-0127's server kept values by a
+/// token in one, bounded by count per key, and under contention a reader
+/// could be handed a token whose value the bound had already dropped.
+pub struct Resources<V = String> {
+    state: Arc<Mutex<State<V>>>,
     clock: Clock,
+}
+
+impl<V> Clone for Resources<V> {
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state.clone(),
+            clock: self.clock.clone(),
+        }
+    }
 }
 
 /// What a fetch did, so a caller can tell a cache hit from real work.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Fetched {
-    FromCache(String),
-    Fresh(String),
+pub enum Fetched<V = String> {
+    FromCache(V),
+    Fresh(V),
     /// Another caller's request was already running; this one joined it.
-    Deduplicated(String),
+    Deduplicated(V),
     Failed(String),
     Cancelled(StopReason),
     TimedOut,
 }
 
-impl Resources {
+impl Resources<String> {
+    /// A runtime caching text, as every caller before 2026-10-02 did.
     pub fn new(clock: Clock) -> Self {
+        Self::caching(clock)
+    }
+}
+
+impl<V: Clone> Resources<V> {
+    /// A runtime caching values of type `V`.
+    pub fn caching(clock: Clock) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
             clock,
@@ -380,7 +421,7 @@ impl Resources {
 
     /// Everything a public cache would serve. Used to assert that private
     /// values are not in it.
-    pub fn public_cache_contents(&self) -> Vec<(Key, String)> {
+    pub fn public_cache_contents(&self) -> Vec<(Key, V)> {
         self.state
             .lock()
             .expect("state")
@@ -392,7 +433,7 @@ impl Resources {
     }
 
     /// Take a reference to a key. The value is kept while anyone holds one.
-    pub fn subscribe(&self, key: &Key) -> Subscription {
+    pub fn subscribe(&self, key: &Key) -> Subscription<V> {
         let mut st = self.state.lock().expect("state");
         let n = st.subscribers.entry(key.clone()).or_insert(0);
         *n += 1;
@@ -414,8 +455,8 @@ impl Resources {
         &self,
         manifest: &Manifest,
         key: &Key,
-        mut load: impl FnMut(u32) -> Result<String, String>,
-    ) -> Fetched {
+        mut load: impl FnMut(u32) -> Result<V, String>,
+    ) -> Fetched<V> {
         self.fetch_cancellable(manifest, key, |attempt, _| load(attempt))
     }
 
@@ -426,8 +467,8 @@ impl Resources {
         &self,
         manifest: &Manifest,
         key: &Key,
-        mut load: impl FnMut(u32, &Cancellation) -> Result<String, String>,
-    ) -> Fetched {
+        mut load: impl FnMut(u32, &Cancellation<V>) -> Result<V, String>,
+    ) -> Fetched<V> {
         if manifest.resource != key.resource {
             return Fetched::Failed("manifest resource does not match the key".into());
         }
@@ -549,7 +590,7 @@ impl Resources {
         unreachable!("at least one attempt; final attempt returns")
     }
 
-    fn fetched(result: QueryResult, joined: bool) -> Fetched {
+    fn fetched(result: QueryResult<V>, joined: bool) -> Fetched<V> {
         match result {
             Ok(value) if joined => Fetched::Deduplicated(value),
             Ok(value) => Fetched::Fresh(value),
@@ -561,7 +602,7 @@ impl Resources {
 
     /// Lock order is always state -> completion. Joiners release completion
     /// before asking the runtime to expire a flight, preventing lock inversion.
-    fn join_query(&self, key: &Key, flight: &Arc<Flight>) -> QueryResult {
+    fn join_query(&self, key: &Key, flight: &Arc<Flight<V>>) -> QueryResult<V> {
         let mut result = flight.completion.result.lock().expect("completion");
         loop {
             if let Some(value) = &*result {
@@ -585,11 +626,11 @@ impl Resources {
     }
 
     fn stopped(
-        st: &mut State,
+        st: &mut State<V>,
         key: &Key,
-        flight: &Arc<Flight>,
+        flight: &Arc<Flight<V>>,
         now: Millis,
-    ) -> Option<QueryResult> {
+    ) -> Option<QueryResult<V>> {
         if let Some(outcome) = flight.completion.get() {
             return Some(outcome);
         }
@@ -604,17 +645,22 @@ impl Resources {
         None
     }
 
-    fn finish_query(&self, key: &Key, flight: &Arc<Flight>, result: QueryResult) -> QueryResult {
+    fn finish_query(
+        &self,
+        key: &Key,
+        flight: &Arc<Flight<V>>,
+        result: QueryResult<V>,
+    ) -> QueryResult<V> {
         let mut st = self.state.lock().expect("state");
         Self::finish_locked(&mut st, key, flight, result)
     }
 
     fn finish_locked(
-        st: &mut State,
+        st: &mut State<V>,
         key: &Key,
-        flight: &Arc<Flight>,
-        result: QueryResult,
-    ) -> QueryResult {
+        flight: &Arc<Flight<V>>,
+        result: QueryResult<V>,
+    ) -> QueryResult<V> {
         if let Some(previous) = flight.completion.get() {
             return previous;
         }
@@ -803,13 +849,13 @@ impl Resources {
 
 /// A reference to a key. Dropping it releases the reference, and the last one
 /// out cancels work nobody is waiting for.
-pub struct Subscription {
-    rt: Resources,
+pub struct Subscription<V: Clone = String> {
+    rt: Resources<V>,
     key: Key,
     released: bool,
 }
 
-impl Subscription {
+impl<V: Clone> Subscription<V> {
     pub fn key(&self) -> &Key {
         &self.key
     }
@@ -820,7 +866,7 @@ impl Subscription {
     }
 }
 
-impl Drop for Subscription {
+impl<V: Clone> Drop for Subscription<V> {
     fn drop(&mut self) {
         if !self.released {
             self.rt.release(&self.key);

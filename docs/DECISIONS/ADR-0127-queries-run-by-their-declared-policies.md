@@ -93,3 +93,29 @@ test fed it compiler manifests. Nothing connected the two in a running server.
   still checks. At run time its entries are keyed by its session argument, so
   this server would not serve one session's cart to another; the defect is the
   label rule, and its fix is a ruling on ADR-0085.
+
+## Corrected 2026-10-02, after it was committed
+
+`concurrent_commands_on_one_session_all_commit` failed in CI on the next
+commit, and in 3 of 300 runs of it alone once the first defect below was
+fixed. Both defects are in decisions 2 and 6 above.
+
+1. **A kept value could be gone before its reader read it.**
+   - `pw-resource` cached a token, and the server kept the value in a table,
+     four per key.
+   - When more than four invalidated flights for a key landed between a
+     reader being handed the cached token and the reader looking it up, the
+     value had already been dropped.
+   - The fix: `pw-resource` is generic over the value it caches
+     (`Resources<V>`, `Resources::caching`), and the fetch hands the server
+     its value. There is no table to keep in step. `Resources::new` still
+     makes a text cache, so no other caller changed.
+2. **"An invalidated read reads again" was bounded at eight.**
+   - With eight threads committing on one session, a reader could be
+     invalidated on every attempt, and it gave up with an error.
+   - Now a reader asks once more through `pw-resource`, then reads directly.
+     A direct read starts after the invalidation, so it is as new as the
+     commit that caused it, and nothing can take its result away.
+
+Evidence: the test passes 300 times in a row (it failed 3 times in 300
+between the two fixes).
