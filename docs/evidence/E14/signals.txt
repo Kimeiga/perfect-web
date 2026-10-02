@@ -1,7 +1,7 @@
 ADR-0133 - a page holds its own UI state (signals, first slice)
 
 produced by: just e14-signals
-commit: e0434a0e1de4106dd22a7f27858d1eeb150d6c76
+commit: e3c3325e43ed32400fd723492ad641b17f0cc74d
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the compiler (compiler/pw-core/tests/signals.rs)
@@ -11,35 +11,35 @@ test a_signal_is_written_by_a_handler_and_read_where_the_browser_reads_again ...
 test the_plan_holds_each_signals_first_value_and_the_parts_it_decides ... ok
 test a_handler_reaches_a_signal_through_its_context ... ok
 test a_first_value_that_computes_is_refused_by_name ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
 
 == the browser's renderer (runtime/pw-render-wasm)
 
 test tests::a_request_that_is_not_one_is_refused ... ok
-test tests::a_text_part_is_escaped_as_the_server_escapes_it ... ok
 test tests::a_match_renders_the_case_it_is_given ... ok
+test tests::a_text_part_is_escaped_as_the_server_escapes_it ... ok
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-   pw-render.wasm: 286005 bytes
+   pw-render.wasm: 288747 bytes
 
 == the page, each engine (e2e/signals.spec.mjs)
 
-  ✓  2 [webkit] › e2e/signals.spec.mjs:22:1 › the server renders each signal at its first value (21ms)
-  ✓  4 [webkit] › e2e/signals.spec.mjs:33:1 › the page reads with JavaScript disabled (1.7s)
-  ✓  7 [webkit] › e2e/signals.spec.mjs:108:1 › a page of signals alone listens for nothing (1.7s)
-  ✓  5 [webkit] › e2e/signals.spec.mjs:43:1 › a press changes a signal, and its text part, in the browser (1.8s)
-  ✓  1 [webkit] › e2e/signals.spec.mjs:94:1 › what the browser renders is escaped as the server escapes it (1.8s)
-  ✓  3 [webkit] › e2e/signals.spec.mjs:84:1 › a block reading a second signal is rendered again when it changes (1.9s)
-  ✓  6 [webkit] › e2e/signals.spec.mjs:58:1 › a block a signal decides is rendered again, and its handler bound once (1.9s)
-  7 passed (5.4s)
-  ✓  5 [chromium] › e2e/signals.spec.mjs:22:1 › the server renders each signal at its first value (20ms)
-  ✓  3 [chromium] › e2e/signals.spec.mjs:33:1 › the page reads with JavaScript disabled (489ms)
-  ✓  7 [chromium] › e2e/signals.spec.mjs:108:1 › a page of signals alone listens for nothing (682ms)
-  ✓  6 [chromium] › e2e/signals.spec.mjs:43:1 › a press changes a signal, and its text part, in the browser (724ms)
-  ✓  4 [chromium] › e2e/signals.spec.mjs:84:1 › a block reading a second signal is rendered again when it changes (729ms)
-  ✓  2 [chromium] › e2e/signals.spec.mjs:94:1 › what the browser renders is escaped as the server escapes it (739ms)
-  ✓  1 [chromium] › e2e/signals.spec.mjs:58:1 › a block a signal decides is rendered again, and its handler bound once (898ms)
-  7 passed (5.5s)
+  ✓  1 [webkit] › e2e/signals.spec.mjs:22:1 › the server renders each signal at its first value (24ms)
+  ✓  2 [webkit] › e2e/signals.spec.mjs:33:1 › the page reads with JavaScript disabled (1.8s)
+  ✓  7 [webkit] › e2e/signals.spec.mjs:108:1 › a page of signals alone listens for nothing (1.9s)
+  ✓  3 [webkit] › e2e/signals.spec.mjs:43:1 › a press changes a signal, and its text part, in the browser (2.0s)
+  ✓  4 [webkit] › e2e/signals.spec.mjs:94:1 › what the browser renders is escaped as the server escapes it (2.0s)
+  ✓  6 [webkit] › e2e/signals.spec.mjs:84:1 › a block reading a second signal is rendered again when it changes (2.0s)
+  ✓  5 [webkit] › e2e/signals.spec.mjs:58:1 › a block a signal decides is rendered again, and its handler bound once (2.1s)
+  7 passed (7.0s)
+  ✓  5 [chromium] › e2e/signals.spec.mjs:22:1 › the server renders each signal at its first value (19ms)
+  ✓  1 [chromium] › e2e/signals.spec.mjs:33:1 › the page reads with JavaScript disabled (492ms)
+  ✓  7 [chromium] › e2e/signals.spec.mjs:108:1 › a page of signals alone listens for nothing (675ms)
+  ✓  2 [chromium] › e2e/signals.spec.mjs:94:1 › what the browser renders is escaped as the server escapes it (681ms)
+  ✓  6 [chromium] › e2e/signals.spec.mjs:43:1 › a press changes a signal, and its text part, in the browser (691ms)
+  ✓  3 [chromium] › e2e/signals.spec.mjs:84:1 › a block reading a second signal is rendered again when it changes (712ms)
+  ✓  4 [chromium] › e2e/signals.spec.mjs:58:1 › a block a signal decides is rendered again, and its handler bound once (732ms)
+  7 passed (4.7s)
 
 == mutation controls (scripts/signals_mutations.py)
 
