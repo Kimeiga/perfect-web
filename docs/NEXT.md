@@ -16,7 +16,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
    Acceptance: the suite is green on three stacks, and a deliberately broken
    copy of each fails it (negative control). Framework versions verified
    against primary sources and pinned in `tools/versions.lock`.
-2. **E14-B, the harness, offline.** Copy a baseline into an isolated
+2. ~~**E14-B, the harness, offline.**~~ Done 2026-10-02 (ADR-0123,
+   ADR-0124, `just e14-harness`), with T08 as its pilot task. Copy a baseline into an isolated
    directory without `hidden/` or `reference/`, run an agent command, grade
    with the hidden tests and the stack's checkers, write one result JSON.
    Acceptance: the no-op agent scores 0 and the reference replay scores 1 on

@@ -377,6 +377,12 @@ within stated bounds (ADR-0120 found both unexecuted):
   cart line is priced zero until the server answers (ruling offered).
 E14's shared store contract still excludes both, for every stack.
 
+**E14's harness grades Pleris's commands and not its queries** (ADR-0123,
+E14-Q): the development server runs the program's compiled commands, and
+computes the store's query values itself. **Its sandbox is checked, not
+enforced** (ADR-0124, E14-I): no hidden file is copied in, and a process in
+it can read the repository by absolute path.
+
 **E7 gate 8 is unstable on this machine** (2026-10-02, E7-G8). About half
 of runs see one long animation frame of 52-63 ms, with no script attributed
 and 4-6 ms blocking, at HEAD and at `6545029` alike. `just e10-bench` stops at

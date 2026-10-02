@@ -11,7 +11,12 @@
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SPIKE="$REPO_ROOT/spikes/own-renderer"
-OUT="$SPIKE/dist"
+OUT="${PW_OUT:-$SPIKE/dist}"
+# E14's harness builds a sandbox's copy of the store (ADR-0123): its sources
+# in place of `examples/`, its documents and IR outside the spike. The
+# platform packages and the toolchain are the repository's.
+SOURCES="${PW_SOURCES:-$REPO_ROOT/examples}"
+STORE_IR="${PW_STORE_IR:-$SPIKE/store-ir.json}"
 EVIDENCE="$REPO_ROOT/docs/evidence/E7"
 PORT="${PORT:-3141}"
 
@@ -36,9 +41,9 @@ PAGES=(
 STORE=(
   "$REPO_ROOT/packages/pw-std/"*.pw
   "$REPO_ROOT/packages/pw-platform-web/"*.pw
-  "$REPO_ROOT/examples/domain.pw"
-  "$REPO_ROOT/examples/lib/"*.pw
-  "$REPO_ROOT/examples/store/"*.pw
+  "$SOURCES/domain.pw"
+  "$SOURCES/lib/"*.pw
+  "$SOURCES/store/"*.pw
 )
 
 echo "== 1. the pages are checked before they are rendered =="
@@ -59,22 +64,20 @@ cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-
 echo
 echo "== 3b. the store page, with its parts manifest and the E7V decision =="
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
-  emit-template "${STORE[@]}" > "$SPIKE/store-ir.json"
+  emit-template "${STORE[@]}" > "$STORE_IR"
 cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
   --out "$OUT" --values "$SPIKE/store-values.json" --resume "$SPIKE/store-resume.json" \
   --document "StorePage(47)" --partition public --compatibility B1 \
   --identity-key "own-renderer-spike-key" \
-  --runtime /pw-runtime.mjs < "$SPIKE/store-ir.json"
+  --runtime /pw-runtime.mjs < "$STORE_IR"
 cp "$SPIKE/public/pw-runtime.mjs" "$OUT/"
 
 echo
 echo "== 3c. the store's resumable handlers, compiled from their bodies (E10) =="
+# One build (ADR-0123): the handlers, the components the server runs, their
+# contracts, the graph and the speculations, from the sources just checked.
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
-  emit-handlers --out "$OUT/handlers" "${STORE[@]}"
-# ADR-0122: the store page's optimistic speculations, and the bindings whose
-# values the server sends it.
-cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
-  emit-speculations --out "$OUT/speculations" "${STORE[@]}"
+  build --out "$OUT/build" "${STORE[@]}"
 cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" \
   -p pw-resume-wasm --target wasm32-unknown-unknown --release
 cp "$REPO_ROOT/target/wasm32-unknown-unknown/release/pw_resume_wasm.wasm" "$OUT/pw-resume.wasm"

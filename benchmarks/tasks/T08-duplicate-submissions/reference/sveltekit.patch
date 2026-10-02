@@ -1,0 +1,85 @@
+diff --git a/src/lib/server/store.ts b/src/lib/server/store.ts
+index 7291a61..0b2d4e3 100644
+--- a/src/lib/server/store.ts
++++ b/src/lib/server/store.ts
+@@ -62,6 +62,20 @@ export function addToCart(session: string, item: MenuItemId, quantity: number):
+   return getCart(session);
+ }
+ 
++// Each session's recent interactions, so a press whose request arrives twice
++// is applied once. Bounded: the last 64 per session.
++const seen = new Map<string, string[]>();
++
++/** True the first time a session presents an interaction, false after. */
++export function firstTime(session: string, interaction: string): boolean {
++  const mine = seen.get(session) ?? [];
++  if (mine.includes(interaction)) return false;
++  mine.push(interaction);
++  if (mine.length > 64) mine.shift();
++  seen.set(session, mine);
++  return true;
++}
++
+ export function clearCart(session: string): Cart {
+   carts.delete(session);
+   return getCart(session);
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 1cebba6..9a73f6d 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,6 +1,15 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import {
++  addToCart,
++  clearCart,
++  firstTime,
++  getCart,
++  getMenu,
++  getStore,
++  isMenuItem,
++  lineCount,
++} from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+ export const load: PageServerLoad = ({ params, cookies }) => {
+@@ -16,11 +25,16 @@ export const load: PageServerLoad = ({ params, cookies }) => {
+ 
+ export const actions: Actions = {
+   add: async ({ params, request, cookies }) => {
+-    const item = String((await request.formData()).get("item") ?? "");
++    const form = await request.formData();
++    const item = String(form.get("item") ?? "");
+     if (!isMenuItem(params.storeId, item)) {
+       return fail(400, { error: `no menu item ${item}` });
+     }
+-    addToCart(ensureSession(cookies), item, 1);
++    const session = ensureSession(cookies);
++    const interaction = String(form.get("interaction") ?? "");
++    if (!interaction || firstTime(session, interaction)) {
++      addToCart(session, item, 1);
++    }
+   },
+   clear: async ({ cookies }) => {
+     clearCart(ensureSession(cookies));
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..d042060 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -13,7 +13,14 @@
+       {#each data.menu as item (item.id)}
+         <li>
+           <span>{item.name}</span>
+-          <form method="POST" action="?/add" use:enhance>
++          <form
++            method="POST"
++            action="?/add"
++            use:enhance={({ formData }) => {
++              // One interaction per press: a retried request carries it again.
++              formData.set("interaction", crypto.randomUUID());
++            }}
++          >
+             <input type="hidden" name="item" value={item.id} />
+             <button type="submit">Add</button>
+           </form>

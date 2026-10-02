@@ -12,6 +12,8 @@
 //! the handler modules      backend::js::compile
 //! the components           backend::component::compile_all, each audited
 //! the contracts, the WIT   contract::contracts, wit::package
+//! the resource graph       graph::Graph::build (since ADR-0123)
+//! the speculations         backend::speculation::compile (ADR-0122)
 //! ```
 //!
 //! Nothing here reaches Koka or Marko. `pw emit-koka` and `pw emit-marko` are
@@ -36,6 +38,12 @@ pub struct Build {
     pub modules: Vec<(String, String)>,
     pub contracts: Vec<crate::contract::ComponentContract>,
     pub wit: String,
+    /// What each command emits and each entry listens for (ADR-0123): what
+    /// a host's materializer consumes. Until 2026-10-02 the development
+    /// server compiled a committed copy into itself.
+    pub graph: crate::graph::Graph,
+    /// Each page's optimistic speculation module (ADR-0122).
+    pub speculations: Vec<crate::backend::speculation::Compiled>,
 }
 
 impl Build {
@@ -73,7 +81,24 @@ impl Build {
                 })
                 .collect::<Vec<_>>()
         });
-        handlers.chain(components).chain(depended).collect()
+        // A declared optimistic clause the browser cannot execute is a
+        // declaration that silently does nothing (ADR-0120).
+        let speculations = self.speculations.iter().filter_map(|s| match &s.module {
+            crate::backend::wasm::Encoding::Encoded(_) => None,
+            other => Some(format!("`{}`'s speculations: {other}", s.page)),
+        });
+        // A graph edge naming nothing never fires (`pw emit-graph`'s rule).
+        let dangling = self
+            .graph
+            .dangling
+            .iter()
+            .map(|d| format!("a graph edge from `{}` names nothing: `{}`", d.from, d.name));
+        handlers
+            .chain(components)
+            .chain(depended)
+            .chain(speculations)
+            .chain(dangling)
+            .collect()
     }
 
     /// The contracts whose bodies are placeholders nothing depends on: listed
@@ -124,6 +149,8 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         ));
     }
 
+    let graph = crate::graph::Graph::build(&hirs, &ws);
+    let speculations = crate::backend::speculation::compile(units)?;
     Ok(Build {
         templates,
         handlers,
@@ -131,6 +158,8 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         modules,
         contracts,
         wit,
+        graph,
+        speculations,
     })
 }
 

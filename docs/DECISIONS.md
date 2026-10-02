@@ -900,3 +900,19 @@ speculation module per page, the browser holds the speculated entry's value
 from `entry_value` frames, and a speculation is reconciled by version or
 restored exactly. An unpriced optimistic line and the new frame are offered
 for reversal.
+
+## 2026-10-02: the development server runs what `pw build` built (E14)
+
+[ADR-0123](DECISIONS/ADR-0123-the-development-server-runs-what-pw-build-built.md):
+the server read its commands and contracts from `docs/evidence/` and compiled
+the graph in, so a rebuilt program kept running the repository's commands.
+`pw build` writes the graph and speculations too, and the server loads one
+build directory. Query values remain the server's (E14-Q).
+
+## 2026-10-02: the benchmark harness, and the controls a score needs (E14)
+
+[ADR-0124](DECISIONS/ADR-0124-the-benchmark-harness-and-its-controls.md):
+a sandbox per run, isolation checked, grading by checker, build, the shared
+contract and hidden tests against the sandbox's own server, and four controls
+per task and stack, each requiring tests that ran. T08 holds all four on
+three stacks; Pleris's unsafe patch is refused by `pw check`.

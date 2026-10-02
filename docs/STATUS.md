@@ -13,6 +13,22 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-B done 2026-10-02: the offline harness**
+([ADR-0124](DECISIONS/ADR-0124-the-benchmark-harness-and-its-controls.md),
+`just e14-harness`). One task, T08 (a press delivered twice adds once), on
+three stacks, with all four controls holding on each. Pleris's plausible
+wrong fix is refused by `pw check` (PW0312), whose repair names the right
+one; Next.js's and SvelteKit's fail a contract test and both hidden tests.
+Found building it:
+- **the development server ran the repository's committed commands, not the
+  program it served** ([ADR-0123](DECISIONS/ADR-0123-the-development-server-runs-what-pw-build-built.md)):
+  components and contracts came from `docs/evidence/`, the graph was
+  compiled in. It runs `pw build`'s output now. Query values are still the
+  server's (E14-Q);
+- the controls found a broken harness twice: every Next.js build failing
+  (Turbopack and a symlinked `node_modules`), and a stage of zero tests read
+  as a failure. Each control now requires tests that ran.
+
 **Held 2026-10-02: an optimistic transition runs in the browser**
 ([ADR-0122](DECISIONS/ADR-0122-an-optimistic-transition-runs-in-the-browser.md)).
 `add_to_cart`'s `optimistic` clause was checked and executed by nothing, its
@@ -1795,13 +1811,12 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **E14-B:** the benchmark harness, offline: isolation, grading, result
-   records, and the four controls (baseline fails, reference passes, unsafe
-   patch fails, no-op agent scores 0).
-2. **E14-C:** tasks T01-T12 with prompts, hidden tests, reference and unsafe
+1. **E14-C:** tasks T01-T12 with prompts, hidden tests, reference and unsafe
    patches, every control green on every stack.
-3. **Rulings offered by ADR-0122**: an unpriced optimistic line, and
-   `entry_value` as a protocol frame.
+2. **E14-Q**: the store's queries as components in the server, before the
+   query tasks (T02, T07, T09) can be graded on Pleris.
+3. **Rulings**: whether task baselines are stripped of design comments
+   (ADR-0124); an unpriced optimistic line and `entry_value` (ADR-0122).
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

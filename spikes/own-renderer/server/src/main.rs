@@ -242,6 +242,11 @@ struct Server {
     components: BTreeMap<String, Loaded>,
     /// The document's static assets.
     dist: std::path::PathBuf,
+    /// **Where the compiler's browser artifacts are** (ADR-0123): the
+    /// handler modules and speculation modules. `pw build`'s output directory
+    /// for a running server; the document directory for the unit tests,
+    /// which `run.sh` fills the same way.
+    artifacts: std::path::PathBuf,
     /// **The store page's speculation manifest** (ADR-0122), as `pw
     /// emit-speculations` wrote it to `dist/speculations/`: which bindings
     /// the page speculates on, and so which entries' values it is sent.
@@ -330,6 +335,7 @@ struct Loaded {
     imports: Vec<String>,
 }
 
+#[cfg(test)]
 fn components() -> BTreeMap<String, Loaded> {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../docs/evidence/E10");
     let mut out = BTreeMap::new();
@@ -350,6 +356,30 @@ fn components() -> BTreeMap<String, Loaded> {
     out
 }
 
+/// Every component a build wrote, by its file name (ADR-0123).
+fn components_in(dir: &std::path::Path) -> Result<BTreeMap<String, Loaded>, String> {
+    let mut out = BTreeMap::new();
+    let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    for entry in entries {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        let Some(id) = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .and_then(|n| n.strip_suffix(".wasm"))
+        else {
+            continue;
+        };
+        let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let imports =
+            pw_host::engine::imports_of(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        let prepared = pw_host::engine::Prepared::compile(&bytes)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        out.insert(id.to_string(), Loaded { prepared, imports });
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
 fn contracts() -> Vec<ComponentContract> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../docs/evidence/E8/component-contracts.json");
@@ -397,17 +427,62 @@ fn dev_topology() -> Topology {
 }
 
 impl Server {
-    fn new(dist: std::path::PathBuf, templates: Vec<Template>) -> Server {
-        Server::on(dist, templates, dev_topology())
+    /// **The server for what `pw build` built** (ADR-0123): its templates,
+    /// contracts, components, graph, handlers and speculations, all from one
+    /// build directory. Until 2026-10-02 the commands and contracts came from
+    /// `docs/evidence/` and the graph was compiled into this binary, so a
+    /// program changed and rebuilt kept running its old commands.
+    fn from_build(dist: std::path::PathBuf, build: std::path::PathBuf) -> Result<Server, String> {
+        let read = |rel: &str| {
+            std::fs::read_to_string(build.join(rel))
+                .map_err(|e| format!("{}: {e}", build.join(rel).display()))
+        };
+        let templates: Vec<Template> = serde_json::from_str(&read("templates.json")?)
+            .map_err(|e| format!("templates.json: {e}"))?;
+        let contracts = ComponentContract::from_json(&read("contracts.json")?)
+            .map_err(|e| format!("contracts.json: {e}"))?;
+        let graph = pw_materialize::Graph::from_json(&read("graph.json")?)
+            .map_err(|e| format!("graph.json: {e:?}"))?;
+        let components = components_in(&build.join("components"))?;
+        Ok(Server::with(
+            dist,
+            build,
+            templates,
+            dev_topology(),
+            contracts,
+            components,
+            graph,
+        ))
     }
 
-    /// [`Server::new`], on a topology the caller chooses.
+    /// The server on the committed artifacts, on a topology the caller chooses.
     ///
     /// Exists so a test can run the command path against a node that grants
     /// nothing. A refusal that only ever happens in production is a refusal
     /// nobody has seen work.
+    #[cfg(test)]
     fn on(dist: std::path::PathBuf, templates: Vec<Template>, topology: Topology) -> Server {
-        let speculation = speculation_manifest(&dist);
+        Server::with(
+            dist.clone(),
+            dist,
+            templates,
+            topology,
+            contracts(),
+            components(),
+            pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses"),
+        )
+    }
+
+    fn with(
+        dist: std::path::PathBuf,
+        artifacts: std::path::PathBuf,
+        templates: Vec<Template>,
+        topology: Topology,
+        contracts: Vec<ComponentContract>,
+        components: BTreeMap<String, Loaded>,
+        graph: pw_materialize::Graph,
+    ) -> Server {
+        let speculation = speculation_manifest(&artifacts);
         let clock = Clock::new();
         let materializer = Materializer::new(clock.clone(), BUILD);
         materializer.declare("store.page.Cart", FragmentPolicy::default());
@@ -416,13 +491,14 @@ impl Server {
             templates,
             clock,
             materializer,
-            graph: pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses"),
+            graph,
             carts: Mutex::new(BTreeMap::new()),
-            components: components(),
+            components,
             menu: Mutex::new(default_menu()),
             dist,
+            artifacts,
             pending: Mutex::new(BTreeMap::new()),
-            contracts: contracts(),
+            contracts,
             topology,
             speculation,
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
@@ -1229,7 +1305,9 @@ impl Server {
 
     /// Where `pw emit-handlers` wrote the module for a handler identity.
     fn handler_module(&self, identity: &str) -> std::path::PathBuf {
-        self.dist.join("handlers").join(format!("{identity}.mjs"))
+        self.artifacts
+            .join("handlers")
+            .join(format!("{identity}.mjs"))
     }
 
     /// Handler identities the document names and no compiled module exists
@@ -1522,6 +1600,7 @@ fn declared_events(
 
 /// The graph, as `pw emit-graph` produced it. Read at build time so the server
 /// cannot drift from the compiler's answer between runs.
+#[cfg(test)]
 const GRAPH: &str = include_str!("../../../../runtime/pw-materialize/tests/store-graph.json");
 
 fn main() {
@@ -1533,11 +1612,18 @@ fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3143);
 
-    let ir = std::fs::read_to_string(format!("{dist}/../store-ir.json"))
-        .expect("the template IR is emitted before the server starts");
-    let templates: Vec<Template> = serde_json::from_str(&ir).expect("the template IR parses");
-
-    let server = Arc::new(Server::new(dist.into(), templates));
+    // What `pw build` wrote (ADR-0123): the second argument, or `build/`
+    // beside the documents, where `run.sh` writes it.
+    let build = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| format!("{dist}/build"));
+    let server = match Server::from_build(dist.into(), build.into()) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            eprintln!("pw dev server: {e}\nrun spikes/own-renderer/run.sh, which runs `pw build`");
+            std::process::exit(1);
+        }
+    };
     let missing = server.uncompiled_handlers();
     if !missing.is_empty() {
         eprintln!(
@@ -1815,7 +1901,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
         {
             let module = route.trim_start_matches("/speculation/");
             let module = module.split('?').next().unwrap_or(module);
-            match std::fs::read(server.dist.join("speculations").join(module)) {
+            match std::fs::read(server.artifacts.join("speculations").join(module)) {
                 Ok(bytes) => respond(
                     &mut stream,
                     200,
@@ -2358,7 +2444,11 @@ mod tests {
     #[test]
     fn the_commands_and_handlers_are_the_compilers() {
         let src = include_str!("main.rs");
-        let server_code = &src[..src.find("#[cfg(test)]").expect("the tests")];
+        // The test module, not the first test-only item: `Server::on` and the
+        // committed-artifact loaders are test-only too (ADR-0123).
+        let server_code = &src[..src
+            .find(&["#[cfg(test)]\nmod ", "tests"].concat())
+            .expect("the tests")];
         let start = server_code.find("fn command(").expect("the command path");
         let body =
             &server_code[start..start + server_code[start..].find("\n    }\n").expect("its end")];

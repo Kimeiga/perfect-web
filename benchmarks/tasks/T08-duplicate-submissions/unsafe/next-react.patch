@@ -1,0 +1,40 @@
+diff --git a/app/stores/[storeId]/AddButton.tsx b/app/stores/[storeId]/AddButton.tsx
+new file mode 100644
+index 0000000..0d9bd13
+--- /dev/null
++++ b/app/stores/[storeId]/AddButton.tsx
+@@ -0,0 +1,13 @@
++"use client";
++
++import { useFormStatus } from "react-dom";
++
++// Disabled while its request is pending, so a press cannot be repeated.
++export function AddButton() {
++  const { pending } = useFormStatus();
++  return (
++    <button type="submit" disabled={pending}>
++      Add
++    </button>
++  );
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..f9e9c26 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
+ import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
++import { AddButton } from "./AddButton";
+ 
+ export default async function StorePage({
+   params,
+@@ -26,7 +27,7 @@ export default async function StorePage({
+               <form action={addToCartAction}>
+                 <input type="hidden" name="store" value={store.id} />
+                 <input type="hidden" name="item" value={item.id} />
+-                <button type="submit">Add</button>
++                <AddButton />
+               </form>
+             </li>
+           ))}

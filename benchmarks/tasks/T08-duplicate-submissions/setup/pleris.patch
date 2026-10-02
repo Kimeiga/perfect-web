@@ -1,0 +1,28 @@
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..ad88859 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -96,13 +96,11 @@ session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+     Carts.current(session)
+ }
+ 
+-// The mutation. Idempotent by interaction id, so a double-tap is one add, and
+-// optimistic with a declared rollback so the count moves before the round trip
+-// and moves back if it fails.
++// The mutation. Optimistic with a declared rollback so the count moves before
++// the round trip and moves back if it fails.
+ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+     -> Result<Cart, CartError>
+     requires      SignedIn
+-    idempotent_by InteractionId
+     optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
+     invalidates   Cart(current_session())
+     emits         CartChanged(current_session())
+@@ -119,7 +117,6 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+ command clear_cart()
+     -> Result<Cart, CartError>
+     requires      SignedIn
+-    idempotent_by InteractionId
+     invalidates   Cart(current_session())
+     emits         CartChanged(current_session())
+ {

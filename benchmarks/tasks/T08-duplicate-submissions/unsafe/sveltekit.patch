@@ -1,0 +1,35 @@
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..37b37c0 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -3,6 +3,8 @@
+   import type { PageProps } from "./$types";
+ 
+   let { data }: PageProps = $props();
++  // Each Add button disabled while its own request is pending.
++  let pending = $state<Record<string, boolean>>({});
+ </script>
+ 
+ <main>
+@@ -13,9 +15,19 @@
+       {#each data.menu as item (item.id)}
+         <li>
+           <span>{item.name}</span>
+-          <form method="POST" action="?/add" use:enhance>
++          <form
++            method="POST"
++            action="?/add"
++            use:enhance={() => {
++              pending[item.id] = true;
++              return async ({ update }) => {
++                await update();
++                pending[item.id] = false;
++              };
++            }}
++          >
+             <input type="hidden" name="item" value={item.id} />
+-            <button type="submit">Add</button>
++            <button type="submit" disabled={pending[item.id]}>Add</button>
+           </form>
+         </li>
+       {/each}

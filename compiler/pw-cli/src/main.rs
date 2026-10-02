@@ -1133,6 +1133,39 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
             write(&format!("modules/{id}.mjs"), source.as_bytes())?;
             lines.push(format!("  module     {id}  {} bytes", source.len()));
         }
+        // What a host's materializer consumes (ADR-0123).
+        let graph = serde_json::to_string_pretty(&build.graph).map_err(|e| e.to_string())?;
+        write("graph.json", format!("{graph}\n").as_bytes())?;
+        for s in &build.speculations {
+            if let pw_core::backend::wasm::Encoding::Encoded(m) = &s.module {
+                let manifest = serde_json::json!({
+                    "page": m.page,
+                    "module": format!("{}.mjs", m.page),
+                    "bindings": m.bindings,
+                    "commands": m.commands,
+                });
+                write(&format!("speculations/{}.mjs", m.page), m.source.as_bytes())?;
+                write(
+                    &format!("speculations/{}.json", m.page),
+                    format!(
+                        "{}\n",
+                        serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?
+                    )
+                    .as_bytes(),
+                )?;
+                lines.push(format!(
+                    "  speculate  {}  {} on {}  {} bytes",
+                    m.page,
+                    m.commands.join(", "),
+                    m.bindings
+                        .iter()
+                        .map(|b| b.binding.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    m.source.len()
+                ));
+            }
+        }
         Ok(())
     })();
     if let Err(e) = result {

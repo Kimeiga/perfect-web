@@ -2078,6 +2078,26 @@ e14-optimistic:
      } > docs/evidence/E14/optimistic.txt
     @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed" docs/evidence/E14/optimistic.txt
 
+# ADR-0123/0124: the offline benchmark harness. Its isolation self-test, and
+# each task's four controls on every stack, every run's result kept.
+e14-harness TASK="T08":
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "E14-B - the offline harness, and {{TASK}}'s controls"; echo; \
+       echo "produced by: just e14-harness {{TASK}}"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "node: $(node --version)  pnpm: $(pnpm --version)  rust: $(rustc --version)"; echo; \
+       echo "== isolation (benchmarks/harness/test/isolation.test.mjs)"; echo; \
+       (cd benchmarks/harness && node --test test/isolation.test.mjs 2>&1 | grep -E "^(ok|not ok) "); \
+       echo; echo "== the controls (node bench.mjs controls --task {{TASK}})"; echo; \
+       (cd benchmarks/harness && node bench.mjs controls --task {{TASK}} 2>&1) || true; \
+       echo; echo "== each run, from benchmarks/results/ (this recipe's runs)"; echo; \
+       ls -t benchmarks/results/{{TASK}}-*.json | head -9 | sort | while read -r f; do \
+         node -e 'const r=require("./"+process.argv[1]); const t=r.stages.filter(s=>"passed" in s).map(s=>`${s.name} ${s.passed}/${s.passed+s.failed}`).join(", "); console.log(`  ${r.stack} ${r.agent}: score ${r.score}${r.failed_at?" (failed at "+r.failed_at+")":""}; ${t||"no tests run"}; ${r.changed_lines} line(s)`)' "$f"; \
+       done; \
+     } > docs/evidence/E14/harness-{{TASK}}.txt
+    @cat docs/evidence/E14/harness-{{TASK}}.txt
+
 # The development server under sustained commands and session churn: frames
 # held, subscribers, outbox rows and materialized entries, each bounded. The
 # compiled command called 20,000 times through the E8 host, with resident memory

@@ -35,7 +35,8 @@ next-env.d.ts
 .DS_Store
 
 # Test / benchmark scratch
-/benchmarks/results/tmp/
+/benchmarks/results/
+/benchmarks/harness/.grading/
 playwright-report/
 test-results/
 blob-report/
