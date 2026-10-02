@@ -1,7 +1,7 @@
 ADR-0128 - a shared cache holds no one reader's value, whatever its declaration says
 
 produced by: just e14-shared-cache
-commit: 61438b4b1f874a9959048cdad34c8101c3d589b2 + uncommitted changes
+commit: b6ca2014dbfe230a48c4f38f25bad55bfe1ff575
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == regression tests (compiler/pw-core/tests/shared_cache_holds_no_readers_value.rs)
@@ -11,7 +11,7 @@ test a_key_naming_the_reader_does_not_make_their_value_shareable ... ok
 test a_shared_fragment_of_a_query_given_the_session_is_refused ... ok
 test a_tenants_value_may_be_shared_keyed_by_its_tenant ... ok
 test a_query_given_the_session_holds_the_sessions_value_whatever_its_keyword ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
 
 == generality (just generality)
 

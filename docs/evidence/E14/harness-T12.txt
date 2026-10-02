@@ -1,7 +1,7 @@
 E14-B - the offline harness, and T12's controls
 
 produced by: just e14-harness T12
-commit: 61438b4b1f874a9959048cdad34c8101c3d589b2 + uncommitted changes
+commit: b6ca2014dbfe230a48c4f38f25bad55bfe1ff575
 node: v22.21.1  pnpm: 10.15.1  rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == isolation (benchmarks/harness/test/isolation.test.mjs)
@@ -23,6 +23,6 @@ T12 sveltekit: negative ok, positive ok, unsafe ok (caught at contract), harness
   pleris noop: score 0 (failed at check); no tests run; 0 line(s)
   pleris replay:reference: score 1; contract 9/9, hidden 2/2; 4 line(s)
   pleris replay:unsafe: score 0 (failed at check); no tests run; 4 line(s)
-  sveltekit noop: score 0 (failed at contract); contract 8/9, hidden 0/2; 0 line(s)
+  sveltekit noop: score 0 (failed at contract); contract 7/9, hidden 0/2; 0 line(s)
   sveltekit replay:reference: score 1; contract 9/9, hidden 2/2; 6 line(s)
   sveltekit replay:unsafe: score 0 (failed at contract); contract 7/9, hidden 0/2; 4 line(s)
