@@ -1,0 +1,36 @@
+E14-A - one store contract, three stacks
+
+produced by: just e14-contract
+commit: 57016d7d9572f5f20a301d407ad46f78f6d11f6a
+node: v22.21.1  pnpm: 10.15.1
+  @playwright/test   1.58.0  (benchmarks/harness)
+  @sveltejs/kit      2.70.3  (benchmarks/baselines/sveltekit)
+  next               16.3.8  (benchmarks/baselines/next-react)
+  react              19.3.0  (benchmarks/baselines/next-react)
+  svelte             5.57.1  (benchmarks/baselines/sveltekit)
+  typescript         6.0.3  (benchmarks/baselines/next-react)
+  typescript         6.0.3  (benchmarks/baselines/sveltekit)
+  vite               8.3.2  (benchmarks/baselines/sveltekit)
+
+== builds and typechecks
+  next-react: built
+  next-react: tsc clean
+  sveltekit: built
+  sveltekit: svelte-check 0 ERRORS 0 WARNINGS
+  pleris: pw check: 42 file(s), no diagnostics
+
+== the contract, every stack, three times (benchmarks/harness/contract)
+
+  81 passed (22.1s)
+
+== negative controls (scripts/bench_contract_mutations.py)
+
+baseline pleris: 9 passed, 0 failed
+baseline next-react: 9 passed, 0 failed
+baseline sveltekit: 9 passed, 0 failed
+next-react: the count is distinct items, not their quantities: KILLED (4 of 9 contract tests fail)
+next-react: every session reads the first session's cart: KILLED (3 of 9 contract tests fail)
+sveltekit: the count is distinct items, not their quantities: KILLED (4 of 9 contract tests fail)
+sveltekit: every session reads the first session's cart: KILLED (4 of 9 contract tests fail)
+pleris: Add adds two: KILLED (6 of 9 contract tests fail)
+5 of 5 mutants killed
