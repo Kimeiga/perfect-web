@@ -1993,8 +1993,9 @@ e10-close-bench RUNS="8":
        for i in $(seq {{RUNS}}); do \
          (cd spikes/own-renderer && PW_PERFORMANCE=1 PORT=3141 pnpm exec playwright test e2e/performance.spec.mjs \
             --project=chromium --workers=1 --reporter=list -g 'gate 8' 2>&1 \
-            | grep -oE 'interaction-long-frames=[0-9]+ worst-ms=[0-9.]+' | sed "s/^/  run $i: /"); \
+            | grep -oE 'interaction-long-frames=[0-9]+ worst-ms=[0-9.]+' | sed "s/^/  run $i: /") || true; \
        done; \
+       echo; echo "  A run reporting a long frame fails gate 8's assertion; it is recorded, not retried."; \
      } > docs/evidence/E10/close-bench.txt
     @cat docs/evidence/E10/close-bench.txt
 
