@@ -1,0 +1,41 @@
+ADR-0139 - a frame is forgotten when the page says it applied it
+
+produced by: just e14-stream-ack
+commit: 061ec494a7c3b8c59e3ce64069061a3165b7741b
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the server (spikes/own-renderer/server)
+
+test tests::a_frame_a_stream_wrote_to_a_page_that_is_gone_still_reaches_the_next ... ok
+test tests::a_stream_drops_what_its_page_says_it_applied ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 2.39s
+
+== mutation controls (scripts/stream_ack_mutations.py)
+
+baseline: 2 passed, 0 failed
+the stream acknowledges what it wrote: KILLED (1 of 2 tests fail)
+the stream does not acknowledge what the page sent: KILLED (1 of 2 tests fail)
+2 of 2 mutants killed
+
+== the keyed-list suite, twenty runs
+
+  42 passed (14.6s) 
+  42 passed (12.7s) 
+  42 passed (12.8s) 
+  42 passed (12.3s) 
+  42 passed (12.7s) 
+  42 passed (12.8s) 
+  42 passed (12.7s) 
+  42 passed (12.3s) 
+  42 passed (12.3s) 
+  42 passed (12.7s) 
+  42 passed (12.8s) 
+  42 passed (12.3s) 
+  42 passed (13.1s) 
+  42 passed (13.5s) 
+  42 passed (12.7s) 
+  42 passed (12.8s) 
+  42 passed (12.4s) 
+  42 passed (12.8s) 
+  42 passed (14.1s) 
+  42 passed (13.6s) 
