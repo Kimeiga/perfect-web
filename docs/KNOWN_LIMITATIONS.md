@@ -380,11 +380,13 @@ E14's shared store contract still excludes both, for every stack.
 
 **A page's signals are its own** (ADR-0133). Only a page declares one;
 a view's signals and a signal provided to views wait for ADR-0130's step 3.
-A first value is data, not a computation. An attribute a signal decides is
-refused by the plan. **Corrected 2026-10-02:** a signal read inside an
-`{#each}` a query decides, and a query's `{#each}` inside a block a signal
-decides, were listed here as refused, and each builds; neither is rendered
-again in the browser. The refusals are ADR-0137, next. A block renders again whenever any signal it reads changes, even when
+A first value is data, not a computation. The browser renders again a text
+part outside any block and a block a signal decides, and the plan refuses a
+signal read anywhere else, and a block it renders that reads anything but the
+signals and its own names (ADR-0137). So a dialog over a query's value, an
+attribute a signal decides, and a signal's list outside its block, wait for
+the browser to hold more than the signals. Until 2026-10-02 two of these were
+listed here as refused, and built. A block renders again whenever any signal it reads changes, even when
 the arm shown does not read it. The browser's renderer is 90 KB gzipped,
 loaded on the first block a press renders.
 

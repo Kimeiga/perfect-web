@@ -1025,3 +1025,14 @@ and the template says where the page holds what it captures. Props are
 checked as arguments (PW0619). What a view's handler captures is checked
 where the page gives it, and a signal it would capture is refused.
 ADR-0130's second step.
+
+## 2026-10-02: what the browser renders again, it can (a correction)
+
+[ADR-0137](DECISIONS/ADR-0137-what-the-browser-renders-again-it-can.md):
+ADR-0133's limits said a signal read inside a query's `{#each}`, and a
+query's `{#each}` inside a block a signal decides, were refused by the plan.
+Each built: the first would have shown its first value forever, and the
+browser could not render the second again. The plan now refuses every part a
+signal decides that the browser does not render again, and every part of a
+block it renders that reads what it does not hold: three more of the same
+kind, which ADR-0133 did not list, with them.

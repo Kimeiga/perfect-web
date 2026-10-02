@@ -13,14 +13,18 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
-**Correction found 2026-10-02, fix next (ADR-0137): ADR-0133's limits
-claimed two refusals the plan does not make.** A signal read inside an
-`{#each}` a query decides, and an `{#each}` over a query's value inside a
-block a signal decides, each build. The first would show the signal's first
-value forever, and the browser cannot render the second again: it holds the
-signals alone. No served page has either, since a page of signals reads no
-query, but `pw build` accepts both, and KNOWN_LIMITATIONS said it refused
-them.
+**Correction, ADR-0137, 2026-10-02: ADR-0133's limits claimed two
+refusals the plan did not make.** A signal read inside an `{#each}` a query
+decides, and a query's `{#each}` inside a block a signal decides, each built.
+The first would have shown the signal's first value forever, and the browser
+could not render the second again: it holds the signals alone. No served page
+had either, since a page of signals reads no query. The plan now refuses
+every part a signal decides that the browser does not render again, and every
+part of a block it renders that reads what it does not hold. That covers
+three more of the same kind, unlisted until now: a signal's block inside a
+query's loop, a signal's list outside its block, and a handler in a signal's
+block capturing the page's value
+([ADR-0137](DECISIONS/ADR-0137-what-the-browser-renders-again-it-can.md)).
 
 **ADR-0136, 2026-10-02: a view is written where it is used**
 ([ADR-0136](DECISIONS/ADR-0136-a-view-is-written-where-it-is-used.md),

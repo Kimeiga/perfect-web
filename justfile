@@ -1615,6 +1615,21 @@ e14-views-compose:
      } > docs/evidence/E14/views-compose.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/views-compose.txt
 
+# ADR-0137: a part a signal decides is one the browser renders again, and a
+# block the browser renders reads what it holds. The plan's refusals, with
+# controls, and the mutation controls.
+e14-signals-render-again:
+    @{ echo "ADR-0137 - what the browser renders again, it can"; echo; \
+       echo "produced by: just e14-signals-render-again"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the plan's refusals (compiler/pw-core/tests/signals_render_again.rs)"; echo; \
+       cargo test --locked -p pw-core --test signals_render_again 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/signals_render_again_mutations.py)"; echo; \
+       python3 scripts/signals_render_again_mutations.py; \
+     } > docs/evidence/E14/signals-render-again.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/signals-render-again.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

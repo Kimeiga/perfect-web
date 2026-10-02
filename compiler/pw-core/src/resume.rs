@@ -107,6 +107,33 @@ fn captured_by(
     found
 }
 
+/// **What each handler in the program captures, by where it is written**
+/// (ADR-0134): the paths a template's event part carries, derived as the
+/// resume artifacts derive them, without the identities those derive from
+/// source. What a plan needs to know what a document holds (ADR-0137).
+pub fn capture_map(hirs: &[&Hir], sigs: &Signatures) -> crate::template_ir::Handlers {
+    let mut out = crate::template_ir::Handlers::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            let Some(body) = decl.body.map(|b| hir.body(b)) else {
+                continue;
+            };
+            let lambdas = handlers_in(body);
+            if lambdas.is_empty() {
+                continue;
+            }
+            let types = crate::infer::Types::of_decl(sigs, hir, id, body);
+            for lambda in lambdas {
+                out.insert(
+                    (unit, id, lambda),
+                    (String::new(), capture_paths(body, types.lexical(), lambda)),
+                );
+            }
+        }
+    }
+    out
+}
+
 /// Each prop a view is given in `body`: its value, the view and its name as
 /// written, and the parameter.
 fn props_in(

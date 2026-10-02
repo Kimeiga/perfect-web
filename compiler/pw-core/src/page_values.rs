@@ -220,6 +220,170 @@ fn find_part(chunks: &[crate::template_ir::Chunk], id: u32) -> Option<&crate::te
     None
 }
 
+/// Where a part is, for what the browser renders again (ADR-0137).
+#[derive(Debug, Clone)]
+enum Reach {
+    /// Outside any block: a text part here is rendered again by its range.
+    Top,
+    /// Inside a block a value other than a signal decides: an instance the
+    /// browser does not address.
+    Frame,
+    /// Inside a block a signal decides, which the browser renders whole from
+    /// the page's signals; with the names bound inside it.
+    Live(Vec<String>),
+}
+
+/// **What the browser renders again, it can** (ADR-0137). The browser holds
+/// a page's signals and nothing else, and renders again two kinds of part: a
+/// text part outside any block, by its range, and a block a signal decides,
+/// whole, from the signals' values (ADR-0133). A signal read anywhere else
+/// would show its first value forever, and a block the browser renders that
+/// reads anything but the signals and its own names would not render. Each
+/// is refused, by its part, before a page is served with it.
+fn rendered_again(
+    chunks: &[crate::template_ir::Chunk],
+    signals: &[String],
+    reach: &Reach,
+) -> Result<(), String> {
+    use crate::template_ir::{Chunk, Part, Segment};
+    let root = |path: &str| path.split('.').next().unwrap_or_default().to_string();
+    let signal = |path: &str| signals.contains(&root(path));
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        let id = p.id().map(|i| i.0).unwrap_or_default();
+        // What the part reads itself, not inside its regions.
+        let own: Vec<String> = match p {
+            Part::Text { value, .. }
+            | Part::Attribute { value, .. }
+            | Part::BooleanAttribute { value, .. }
+            | Part::RawHtml { value, .. }
+            | Part::Conditional { value, .. }
+            | Part::Match { value, .. } => vec![value.clone()],
+            Part::Each { collection, .. } => vec![collection.clone()],
+            Part::InterpolatedAttribute { segments, .. } => segments
+                .iter()
+                .filter_map(|s| match s {
+                    Segment::Value(v) => Some(v.clone()),
+                    Segment::Static(_) => None,
+                })
+                .collect(),
+            Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
+            // What the document carries for a handler, read where the
+            // template holds it (ADR-0136).
+            Part::Event {
+                captures, renames, ..
+            } => captures
+                .iter()
+                .map(|c| match c.split_once('.') {
+                    Some((r, rest)) => renames
+                        .get(r)
+                        .map_or_else(|| c.clone(), |to| format!("{to}.{rest}")),
+                    None => renames.get(c).cloned().unwrap_or_else(|| c.clone()),
+                })
+                .collect(),
+            Part::Blocked { .. } => Vec::new(),
+        };
+        match reach {
+            Reach::Live(bound) => {
+                if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v))) {
+                    return Err(format!(
+                        "part {id} reads `{other}` inside a block a signal decides, and the \
+                         browser renders that block again from the page's signals alone \
+                         (ADR-0137)"
+                    ));
+                }
+            }
+            Reach::Top | Reach::Frame => {
+                if let Some(s) = own.iter().find(|v| signal(v)) {
+                    let s = root(s);
+                    match (p, reach) {
+                        (
+                            Part::Text { .. } | Part::Conditional { .. } | Part::Match { .. },
+                            Reach::Top,
+                        ) => {}
+                        (
+                            Part::Attribute { .. }
+                            | Part::BooleanAttribute { .. }
+                            | Part::InterpolatedAttribute { .. },
+                            _,
+                        ) => {
+                            return Err(format!(
+                                "part {id} is an attribute a signal decides, which this slice \
+                                 does not render again (ADR-0130)"
+                            ));
+                        }
+                        (Part::Event { .. }, _) => {
+                            return Err(format!(
+                                "part {id}'s handler captures the signal `{s}` as the page was \
+                                 rendered; a handler reads a signal through its context (ADR-0133)"
+                            ));
+                        }
+                        (Part::Each { .. }, Reach::Top) => {
+                            return Err(format!(
+                                "part {id} is a list the signal `{s}` holds, which the browser \
+                                 does not render again outside a block a signal decides (ADR-0137)"
+                            ));
+                        }
+                        (_, Reach::Frame) => {
+                            return Err(format!(
+                                "part {id} reads the signal `{s}` inside a block a value other \
+                                 than a signal decides, which the browser does not render again \
+                                 (ADR-0137)"
+                            ));
+                        }
+                        _ => {
+                            return Err(format!(
+                                "part {id} is a {} part the signal `{s}` decides, which the \
+                                 browser does not render again (ADR-0137)",
+                                p.kind()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        // Into the part's regions.
+        match p {
+            Part::Each { binding, body, .. } => {
+                let inner = match reach {
+                    Reach::Live(bound) => {
+                        Reach::Live([bound.clone(), vec![binding.clone()]].concat())
+                    }
+                    _ => Reach::Frame,
+                };
+                rendered_again(body, signals, &inner)?;
+            }
+            Part::Conditional {
+                value,
+                then,
+                otherwise,
+                ..
+            } => {
+                let inner = match reach {
+                    Reach::Live(bound) => Reach::Live(bound.clone()),
+                    Reach::Top if signal(value) => Reach::Live(Vec::new()),
+                    _ => Reach::Frame,
+                };
+                rendered_again(then, signals, &inner)?;
+                rendered_again(otherwise, signals, &inner)?;
+            }
+            Part::Match { value, arms, .. } => {
+                for a in arms {
+                    let names: Vec<String> = a.binding.iter().chain(&a.fields).cloned().collect();
+                    let inner = match reach {
+                        Reach::Live(bound) => Reach::Live([bound.clone(), names].concat()),
+                        Reach::Top if signal(value) => Reach::Live(names),
+                        _ => Reach::Frame,
+                    };
+                    rendered_again(&a.body, signals, &inner)?;
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// A page's plan.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PageValues {
@@ -378,6 +542,8 @@ fn plan(
     hirs: &[&Hir],
     ws: &Workspace,
     sigs: &Signatures,
+    // What each handler captures (ADR-0137): the document holds it.
+    captures: &crate::template_ir::Handlers,
     unit: usize,
     id: DeclId,
 ) -> Result<(PageValues, BTreeSet<DefId>), String> {
@@ -433,8 +599,10 @@ fn plan(
     // what the build renders, numbered as the build numbers it.
     let crate::template_ir::Lowered {
         template, holes, ..
-    } = crate::template_ir::lowered(hirs, ws, &crate::template_ir::Handlers::new(), unit, id)
+    } = crate::template_ir::lowered(hirs, ws, captures, unit, id)
         .ok_or_else(|| format!("`{}` has no template", decl.name))?;
+    // What a signal decides, the browser renders again (ADR-0137).
+    rendered_again(&template.chunks, &signals, &Reach::Top)?;
     for hole in holes {
         // The path as the template reads it, through each view around it.
         let mut segments = hole.path.split('.').map(str::to_string);
@@ -521,20 +689,12 @@ fn plan(
         {
             collections.push(root.to_string());
         }
-        // A block or an attribute a signal decides (ADR-0130).
-        if matches!(
-            entry.kind,
-            "conditional" | "match" | "attribute" | "boolean_attribute"
-        ) && let Some(root) = entry.value.split('.').next()
+        // A block a signal decides (ADR-0130). What the browser cannot
+        // render again was refused above (ADR-0137).
+        if matches!(entry.kind, "conditional" | "match")
+            && let Some(root) = entry.value.split('.').next()
             && signals.iter().any(|s| s == root)
         {
-            if entry.kind == "attribute" || entry.kind == "boolean_attribute" {
-                return Err(format!(
-                    "part {} is an attribute a signal decides, which this slice does not \
-                     render again (ADR-0130)",
-                    entry.id.0
-                ));
-            }
             let mut read = Vec::new();
             if let Some(part) = find_part(&template.chunks, entry.id.0) {
                 paths_read(part, &mut read);
@@ -573,6 +733,7 @@ fn plan(
 
 /// **Every page's plan.**
 pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
+    let captures = crate::resume::capture_map(hirs, sigs);
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -589,7 +750,7 @@ pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
             };
             out.push(Planned {
                 page,
-                plan: plan(hirs, ws, sigs, unit, id).map(|(p, _)| p),
+                plan: plan(hirs, ws, sigs, &captures, unit, id).map(|(p, _)| p),
             });
         }
     }
@@ -599,11 +760,12 @@ pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
 /// **The member functions some page's plan calls**: each gets a contract of
 /// kind `function` and is compiled as a component of its own (ADR-0125).
 pub fn members(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> BTreeSet<DefId> {
+    let captures = crate::resume::capture_map(hirs, sigs);
     let mut out = BTreeSet::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             if decl.kind == DeclKind::Page
-                && let Ok((_, m)) = plan(hirs, ws, sigs, unit, id)
+                && let Ok((_, m)) = plan(hirs, ws, sigs, &captures, unit, id)
             {
                 out.extend(m);
             }
