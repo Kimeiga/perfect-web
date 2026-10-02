@@ -1962,6 +1962,42 @@ e10-ownership:
      } > docs/evidence/E10/ownership.txt
     @cat docs/evidence/E10/ownership.txt
 
+# E10 gate item 4 at the close, 2026-10-02: code size and the host benchmark at
+# HEAD, and E7 gate 8 (no long animation frame during standard interactions)
+# run RUNS times with every result kept. `just e10-bench` stops at the first
+# gate-8 failure, and on this machine gate 8 fails in about half of runs at
+# HEAD and at 6545029, the commit E10's bench was recorded at: a frame of
+# 52-63 ms with no attributed script. Recording one passing run would be the
+# lucky sample `docs/RISK_QUEUE.md` warns about, so every run is kept.
+e10-close-bench RUNS="8":
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @{ echo "E10 gate item 4 at the close - size, host cost, and E7 gate 8's stability"; echo; \
+       echo "produced by: just e10-close-bench {{RUNS}}"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "host: $(uname -m) $(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)"; echo; \
+       out="$(mktemp -d)"; \
+       ./target/debug/pw build --out "$out" packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw > /dev/null; \
+       echo "== code size: the store's artifacts (bytes, gzip -9 bytes)"; \
+       (cd "$out" && for f in components/*.wasm handlers/*.mjs; do \
+         printf '  %6d  %6d  %s\n' "$(wc -c < "$f")" "$(gzip -9c "$f" | wc -c)" "$f"; done); \
+       rm -rf "$out"; \
+       printf '  %6d  %6d  %s\n' "$(wc -c < spikes/own-renderer/public/pw-runtime.mjs)" "$(gzip -9c spikes/own-renderer/public/pw-runtime.mjs | wc -c)" "pw-runtime.mjs"; \
+       echo "  baselines: docs/evidence/E10/bench.txt (hand-written Rust guests 5276 and 43837 bytes)"; \
+       echo; echo "== the host, release: runtime/pw-host/tests/bench.rs"; echo; \
+       cargo test --quiet --locked --release -p pw-host --features engine --test bench -- --include-ignored --nocapture --test-threads=1 2>&1 \
+         | grep -E "^bench:|^test result"; \
+       echo; echo "== E7 gate 8, {{RUNS}} runs (chromium, 1 worker): every result"; echo; \
+       for i in $(seq {{RUNS}}); do \
+         (cd spikes/own-renderer && PW_PERFORMANCE=1 PORT=3141 pnpm exec playwright test e2e/performance.spec.mjs \
+            --project=chromium --workers=1 --reporter=list -g 'gate 8' 2>&1 \
+            | grep -oE 'interaction-long-frames=[0-9]+ worst-ms=[0-9.]+' | sed "s/^/  run $i: /"); \
+       done; \
+     } > docs/evidence/E10/close-bench.txt
+    @cat docs/evidence/E10/close-bench.txt
+
 # The development server under sustained commands and session churn: frames
 # held, subscribers, outbox rows and materialized entries, each bounded. The
 # compiled command called 20,000 times through the E8 host, with resident memory

@@ -218,6 +218,40 @@ fn requires_cannot_be_bypassed_by_the_raw_call_api() {
     );
 }
 
+/// **A world-level export is reachable when declared, and refused when not.**
+///
+/// `run` finds an export by a path of any length, and a function the world
+/// exports directly has a one-segment path. The authorization lookup took only
+/// two segments, so such an export was refused as a malformed path whatever
+/// the contract said, and the hand-written baseline guest of `just e10-bench`
+/// could not be called (found 2026-10-02 closing E10).
+#[test]
+fn a_world_level_export_is_found_by_its_declaration() {
+    let allow = |_: &str, _: &[&Val]| Ok(true);
+    let mut c = contract();
+    let [_, function] = export(&c);
+
+    // The store command lives in an interface: its bare name is not it.
+    let err = engine::authorize_export(&c, &[&function], &[], allow)
+        .expect_err("a bare name does not name an interface export");
+    assert!(err.contains("is not an export declared"), "{err}");
+
+    // Declared at the world level, the same bare name is found.
+    let declared = c
+        .exports
+        .iter_mut()
+        .find_map(|e| e.component.as_mut())
+        .expect("the command's export");
+    declared.interface = String::new();
+    declared.authorization.clear();
+    engine::authorize_export(&c, &[&function], &[], allow).expect("declared at the world level");
+
+    // A path of any other shape is malformed.
+    let err = engine::authorize_export(&c, &["a", "b", &function], &[], allow)
+        .expect_err("three segments name nothing");
+    assert!(err.contains("an export path is"), "{err}");
+}
+
 #[test]
 fn the_compiled_command_runs_through_the_host() {
     let c = contract();

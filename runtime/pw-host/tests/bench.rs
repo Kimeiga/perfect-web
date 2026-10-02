@@ -187,7 +187,12 @@ fn a_hand_written_rust_guest_through_the_host() {
             name: "lookup".into(),
             kind: "query".into(),
             binding: BindingSupport::default(),
-            component: None,
+            // The guest's world exports `lookup` directly: no interface.
+            component: Some(ComponentExport {
+                interface: String::new(),
+                function: "lookup".into(),
+                authorization: Vec::new(),
+            }),
         }],
     };
     let admission = admit(&contract, &node(&["store.read"]), "origin-1", &actual);

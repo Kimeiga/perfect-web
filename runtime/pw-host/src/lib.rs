@@ -856,14 +856,23 @@ pub mod engine {
     ///
     /// A contract may expose more than one operation later, so matching the
     /// component's interface and function is part of selecting the policy.
+    ///
+    /// A one-segment path is a function the component's world exports
+    /// directly, declared with an empty interface. `run` reaches such an
+    /// export, and a hand-written guest has one; refusing the path shape made
+    /// it unreachable rather than undeclared (2026-10-02).
     fn authorization_for<'a>(
         contract: &'a crate::ComponentContract,
         export: &[&str],
     ) -> Result<&'a [crate::AuthorizationRequirement], String> {
-        let [interface, function] = export else {
-            return Err(format!(
-                "an export path is `interface`, `function`; got {export:?}"
-            ));
+        let (interface, function) = match export {
+            [function] => ("", *function),
+            [interface, function] => (*interface, *function),
+            _ => {
+                return Err(format!(
+                    "an export path is `function` or `interface`, `function`; got {export:?}"
+                ));
+            }
         };
         contract
             .exports
