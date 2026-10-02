@@ -55,6 +55,9 @@ opaque type PositiveInt = Int
 // outside this one, where `.value` reads its representation (ADR-0048).
 fn count(n: PositiveInt) -> Int !{} { n.value }
 
+// The sum of two counts, for a transition that adds to a line (ADR-0122).
+fn added(a: PositiveInt, b: PositiveInt) -> PositiveInt !{} { PositiveInt(a.value + b.value) }
+
 type USD = USD { code: String }
 
 type Money<C> = Money { minor_units: Int }
@@ -209,3 +212,13 @@ type RecommendationError =
 type SyncError =
     | Conflict
     | Offline
+
+// Whether two ids name one item. The representation is readable only here
+// (ADR-0048), so the comparison is written here (ADR-0122).
+fn same_item(a: MenuItemId, b: MenuItemId) -> Bool !{} { a.value == b.value }
+
+// **A line's price before the server has priced it** (ADR-0122). An
+// optimistic transition adds a line for an item the cart did not hold, and
+// the price is the server's to say: `add_to_cart` takes none. Zero until the
+// command's result replaces the speculation. No page renders it.
+fn unpriced() -> Money<USD> !{} { Money { minor_units: 0 } }

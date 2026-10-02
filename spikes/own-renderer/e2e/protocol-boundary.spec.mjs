@@ -46,10 +46,16 @@ test("every frame the browser receives is a protocol frame", async ({ page }) =>
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
+  // The count moves before the round trip (ADR-0122), so it no longer says
+  // the server's patch has arrived; the runtime's log does.
+  await expect
+    .poll(() => page.evaluate(() => window.__pw.log.some((l) => l.startsWith("updated "))))
+    .toBe(true);
 
   expect(frames.length, "frames were observed").toBeGreaterThan(0);
 
-  const KNOWN = new Set(["resource_changed", "patch", "recovery"]);
+  // `entry_value` since ADR-0122: the value of an entry the page speculates on.
+  const KNOWN = new Set(["resource_changed", "patch", "recovery", "entry_value"]);
   for (const frame of frames) {
     expect(KNOWN.has(frame.frame), `unknown frame kind ${frame.frame}`).toBe(true);
     expect(frame.protocol, "every frame carries its protocol version").toBe(1);

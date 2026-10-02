@@ -1,0 +1,569 @@
+//! **Optimistic transitions, compiled for the browser** (ADR-0122).
+//!
+//! ADR-0025 states the meaning:
+//!
+//! ```text
+//! optimistic Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
+//!
+//! Cart(current_session())   which resource ENTRY is speculatively updated
+//! cart                      a lexical name for its current value
+//! Carts.with_line(..)       a PURE transition producing the speculative value
+//! ```
+//!
+//! and until 2026-10-02 nothing executed it: `pw check` checked the clause and
+//! no backend emitted anything for it. This module emits, per page, what the
+//! browser needs to show a speculation and to abandon one:
+//!
+//! - `decode`: each speculated binding's value, read from the JSON the server
+//!   sends (the page's embedded value, then each `entry_value` frame);
+//! - `commands`: for each command a handler on the page calls, its
+//!   transitions, as functions of the binding's value and the command's
+//!   arguments as the handler sends them;
+//! - `parts`: for each speculated binding, each text part that reads it, as a
+//!   function of its value, so the page re-renders the speculative value.
+//!
+//! The runtime holds the authoritative value. A rejected command is undone by
+//! restoring it, never by an inverse anyone wrote (ADR-0025).
+//!
+//! # What is refused, by name
+//!
+//! - a target whose key is not the page binding's: the page must show the
+//!   entry the clause names, and the keys are compared by what they resolve
+//!   to, an invocation-context call each (`current_session()`);
+//! - a text part reading the binding inside a block (`{#each}`, `{#match}`,
+//!   `{#if}`): its address carries a frame this slice does not compute;
+//! - a part whose value has no text form here (a `Float`, ADR-0074).
+
+use crate::hir::{DeclId, DeclKind, Expr, ExprId, Hir, Pattern};
+use crate::resolve::{DefId, Namespace, Resolution, Workspace};
+use crate::signatures::Signatures;
+
+use super::ir::Lowering;
+use super::ir::{Function, Type};
+use super::lower::{self, Context};
+use super::wasm::Encoding;
+
+/// One page binding the module speculates on.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Binding {
+    /// The page's name for it: `cart`.
+    pub binding: String,
+    /// The resource it reads, as a component id: `store.page.Cart`.
+    pub resource: String,
+    /// Its key, as written: `["current_session()"]`. The server computes
+    /// the entry from this, as it computes an event's key (ADR-0104).
+    pub key: Vec<String>,
+}
+
+/// One page's speculation module.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Speculation {
+    /// The page's template path: `store.page.StorePage`.
+    pub page: String,
+    /// The bindings the module speculates on.
+    pub bindings: Vec<Binding>,
+    /// The commands it speculates for, by component id.
+    pub commands: Vec<String>,
+    /// The ES module.
+    pub source: String,
+}
+
+/// What one page compiled to, or why it did not.
+#[derive(Debug, Clone)]
+pub struct Compiled {
+    pub page: String,
+    pub module: Encoding<Speculation>,
+}
+
+/// **Every page's speculation module.** A page none of whose handlers calls a
+/// command with an optimistic clause has none, and is not listed.
+pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
+    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
+    let ws = Workspace::build(&hirs);
+    let sigs = Signatures::build(&ws, &hirs);
+    let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
+    let cx = Context {
+        hirs: &hirs,
+        ws: &ws,
+        sigs: &sigs,
+        contracts: &contracts,
+    };
+    lower::Checked::of(units, cx).map_err(|ds| {
+        format!(
+            "the program does not check, so nothing is compiled: {}",
+            ds.iter()
+                .map(|d| format!("[{}] {}", d.code, d.message))
+                .collect::<Vec<_>>()
+                .join("; ")
+        )
+    })?;
+    let sources: Vec<&str> = units.iter().map(|u| u.src.as_str()).collect();
+    let handlers = super::js::handlers(&hirs, &sources, &ws, &sigs);
+    let cx = Context {
+        hirs: &hirs,
+        ws: &ws,
+        sigs: &sigs,
+        contracts: &contracts,
+    };
+    let mut out = Vec::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != DeclKind::Page {
+                continue;
+            }
+            let component = crate::contract::component_id(hir, id);
+            let mut commands: Vec<String> = Vec::new();
+            for h in handlers.iter().filter(|h| h.declaration == component) {
+                if let Encoding::Encoded(m) = &h.module {
+                    for c in &m.commands {
+                        if !commands.contains(c) {
+                            commands.push(c.clone());
+                        }
+                    }
+                }
+            }
+            let speculating: Vec<String> = commands
+                .into_iter()
+                .filter(|c| {
+                    command_decl(&hirs, c)
+                        .is_some_and(|(u, d)| !hirs[u].decl(d).optimistic_clauses().is_empty())
+                })
+                .collect();
+            if speculating.is_empty() {
+                continue;
+            }
+            let page = template_path(hir, id);
+            out.push(Compiled {
+                page: page.clone(),
+                module: page_module(&cx, unit, id, &page, &speculating),
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn template_path(hir: &Hir, id: DeclId) -> String {
+    let module = hir.module_of(id).unwrap_or_default();
+    let name = &hir.decl(id).name;
+    if module.is_empty() {
+        name.clone()
+    } else {
+        format!("{module}.{name}")
+    }
+}
+
+/// The command a component id names.
+fn command_decl(hirs: &[&Hir], component: &str) -> Option<(usize, DeclId)> {
+    hirs.iter().enumerate().find_map(|(u, hir)| {
+        hir.all_decls()
+            .find(|(id, d)| {
+                d.kind == DeclKind::Command && crate::contract::component_id(hir, *id) == component
+            })
+            .map(|(id, _)| (u, id))
+    })
+}
+
+/// A path written in `unit`, resolved as a term: a resource, a function.
+fn resolve_term(ws: &Workspace, unit: usize, path: &str) -> Option<DefId> {
+    let r = match path.contains('.') {
+        true => ws.resolve_path(unit, path),
+        false => ws.resolve_in(unit, Namespace::Term, path),
+    };
+    match r {
+        Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
+        _ => None,
+    }
+}
+
+/// A key argument, as what it resolves to: an invocation-context call with
+/// no arguments, `current_session()`. Anything else is not compared.
+fn context_call(ws: &Workspace, unit: usize, body: &crate::hir::Body, e: ExprId) -> Option<DefId> {
+    let Expr::Call { callee, args } = body.expr(e) else {
+        return None;
+    };
+    if !args.is_empty() {
+        return None;
+    }
+    resolve_term(ws, unit, &crate::infer::path_of(body, *callee))
+}
+
+/// A page binding `let b = query R(k..)`.
+struct PageBinding {
+    name: String,
+    resource: DefId,
+    key: Vec<ExprId>,
+}
+
+fn page_bindings(ws: &Workspace, unit: usize, body: &crate::hir::Body) -> Vec<PageBinding> {
+    let mut out = Vec::new();
+    for e in body.walk() {
+        let Expr::Let {
+            pat: Some(pat),
+            init: Some(init),
+            ..
+        } = body.expr(e)
+        else {
+            continue;
+        };
+        let Pattern::Bind { name, .. } = body.pat(*pat) else {
+            continue;
+        };
+        let Expr::Keyword {
+            keyword,
+            modifiers,
+            args,
+            ..
+        } = body.expr(*init)
+        else {
+            continue;
+        };
+        if keyword != "query" {
+            continue;
+        }
+        let Some(resource) = modifiers.first().and_then(|p| resolve_term(ws, unit, p)) else {
+            continue;
+        };
+        out.push(PageBinding {
+            name: name.clone(),
+            resource,
+            key: args.clone(),
+        });
+    }
+    out
+}
+
+/// The name a hole's path starts at: `cart` in `cart.line_count`.
+fn root_name(body: &crate::hir::Body, e: ExprId) -> Option<&str> {
+    match body.expr(e) {
+        Expr::Name(n) => Some(n),
+        Expr::Field { base, .. } => root_name(body, *base),
+        _ => None,
+    }
+}
+
+/// The value a resource's entry holds: its result, or `Ok`'s payload.
+fn value_type(cx: &Context<'_>, resource: DefId, span: &crate::hir::Span) -> Lowering<Type> {
+    let Some(sig) = cx.sigs.by_def(resource) else {
+        return Lowering::Blocked {
+            why: "a resource with no resolved signature".into(),
+            span: span.clone(),
+        };
+    };
+    let Some(result) = sig.result() else {
+        return Lowering::Blocked {
+            why: "a resource whose result is unresolved".into(),
+            span: span.clone(),
+        };
+    };
+    let value = match result.as_builtin() {
+        Some(crate::resolved::Builtin::Result) => match result.args().first() {
+            Some(t) => t.clone(),
+            None => {
+                return Lowering::Blocked {
+                    why: "a `Result` with no arguments".into(),
+                    span: span.clone(),
+                };
+            }
+        },
+        _ => result.clone(),
+    };
+    lower::backend_type(cx, &value, span)
+}
+
+/// Lowered, or the reason as an `Encoding`.
+macro_rules! lowered {
+    ($e:expr) => {
+        match $e {
+            Lowering::Lowered(x) => x,
+            Lowering::Unsupported {
+                construct, reason, ..
+            } => return Encoding::Unsupported { construct, reason },
+            Lowering::Blocked { why, .. } => return Encoding::Blocked { why },
+        }
+    };
+}
+
+/// One transition, ready to emit.
+struct Transition {
+    command: String,
+    binding: String,
+    function: usize,
+    params: Vec<Type>,
+}
+
+fn page_module(
+    cx: &Context<'_>,
+    unit: usize,
+    page_id: DeclId,
+    page: &str,
+    commands: &[String],
+) -> Encoding<Speculation> {
+    let hir = cx.hirs[unit];
+    let Some(body_id) = hir.decl(page_id).body else {
+        return Encoding::Blocked {
+            why: format!("`{page}` has no body"),
+        };
+    };
+    let body = hir.body(body_id);
+    let bindings = page_bindings(cx.ws, unit, body);
+
+    let mut functions: Vec<Function> = Vec::new();
+    let mut transitions: Vec<Transition> = Vec::new();
+    // binding name → (resource, its key as written, its value type)
+    let mut speculated: Vec<(String, DefId, Vec<String>, Type)> = Vec::new();
+
+    for command in commands {
+        let Some((cu, cid)) = command_decl(cx.hirs, command) else {
+            return Encoding::Blocked {
+                why: format!("no command declares component `{command}`"),
+            };
+        };
+        let chir = cx.hirs[cu];
+        let cdecl = chir.decl(cid);
+        let Some(cbody_id) = cdecl.body else {
+            return Encoding::Blocked {
+                why: format!("`{command}` has no body"),
+            };
+        };
+        let cbody = chir.body(cbody_id);
+        for (_, target, transition) in cdecl.optimistic_clauses() {
+            let span = cbody.expr_span(target.root);
+            let Expr::Call { callee, args } = cbody.expr(target.root) else {
+                return Encoding::Blocked {
+                    why: format!(
+                        "`{command}`'s optimistic target is not a resource applied to a key"
+                    ),
+                };
+            };
+            let Some(resource) = resolve_term(cx.ws, cu, &crate::infer::path_of(cbody, *callee))
+            else {
+                return Encoding::Blocked {
+                    why: format!("`{command}`'s optimistic target resolves to nothing"),
+                };
+            };
+            let target_key: Vec<Option<DefId>> = args
+                .iter()
+                .map(|a| context_call(cx.ws, cu, cbody, a.value))
+                .collect();
+            let shown = bindings.iter().find(|b| {
+                b.resource == resource
+                    && b.key.len() == target_key.len()
+                    && b.key
+                        .iter()
+                        .zip(&target_key)
+                        .all(|(k, t)| t.is_some() && context_call(cx.ws, unit, body, *k) == *t)
+            });
+            let Some(shown) = shown else {
+                return Encoding::Unsupported {
+                    construct: "a speculation on an entry the page does not show by the same key",
+                    reason: format!(
+                        "`{command}` speculates on an entry `{page}` reads by no binding whose \
+                         key resolves to the same invocation context"
+                    ),
+                };
+            };
+            let value = lowered!(value_type(cx, resource, &span));
+            // The command's parameters, typed as its signature declares.
+            let Some(def) = cx.sigs.iter().map(|(_, s)| s).find(|s| {
+                crate::resolve::declaration(cx.hirs, s.definition)
+                    .is_some_and(|d| std::ptr::eq(d, cdecl))
+            }) else {
+                return Encoding::Blocked {
+                    why: format!("`{command}` has no resolved signature"),
+                };
+            };
+            let binder_name = transition
+                .binders
+                .first()
+                .map(|(n, _)| n.clone())
+                .unwrap_or_default();
+            let mut inputs: Vec<(String, Type)> = vec![(binder_name, value.clone())];
+            let mut params = Vec::new();
+            for (i, p) in cdecl.params.iter().enumerate() {
+                let Some(declared) = def
+                    .params
+                    .get(i)
+                    .and_then(Option::as_ref)
+                    .and_then(crate::resolved::TypeResolution::resolved)
+                else {
+                    return Encoding::Unsupported {
+                        construct: "a command parameter with no declared type",
+                        reason: format!("`{}` of `{command}`", p.name),
+                    };
+                };
+                let ty = lowered!(lower::backend_type(cx, declared, &p.span));
+                inputs.push((p.name.clone(), ty.clone()));
+                params.push(ty);
+            }
+            let f = lowered!(lower::pure_expr(
+                cx,
+                cu,
+                cid,
+                transition.root,
+                &inputs,
+                &format!("{command}#optimistic"),
+                cbody.expr_span(transition.root),
+            ));
+            functions.push(f);
+            transitions.push(Transition {
+                command: command.clone(),
+                binding: shown.name.clone(),
+                function: functions.len() - 1,
+                params,
+            });
+            if !speculated.iter().any(|(n, ..)| *n == shown.name) {
+                // Each key is an invocation-context call (`context_call`
+                // matched it), written as the server computes it.
+                let key = shown
+                    .key
+                    .iter()
+                    .map(|k| match body.expr(*k) {
+                        Expr::Call { callee, .. } => {
+                            format!("{}()", crate::infer::path_of(body, *callee))
+                        }
+                        _ => crate::infer::path_of(body, *k),
+                    })
+                    .collect();
+                speculated.push((shown.name.clone(), resource, key, value));
+            }
+        }
+    }
+
+    // Each part reading a speculated binding.
+    let mut reads: Vec<(String, u32, usize)> = Vec::new();
+    for hole in crate::template_ir::text_holes(hir, page_id) {
+        let Some(root) = root_name(body, hole.expr) else {
+            continue;
+        };
+        let Some((_, _, _, value)) = speculated.iter().find(|(n, ..)| n == root) else {
+            continue;
+        };
+        if hole.nested {
+            return Encoding::Unsupported {
+                construct: "a speculated value read inside a block",
+                reason: format!(
+                    "part {} of `{page}` reads `{root}` inside a block, whose instances \
+                     this module does not address",
+                    hole.part.0
+                ),
+            };
+        }
+        let f = lowered!(lower::pure_expr(
+            cx,
+            unit,
+            page_id,
+            hole.expr,
+            &[(root.to_string(), value.clone())],
+            &format!("{page}#part{}", hole.part.0),
+            body.expr_span(hole.expr),
+        ));
+        if !matches!(f.ret, Type::Int | Type::Str | Type::Bool) {
+            return Encoding::Unsupported {
+                construct: "a speculated part with no text form here",
+                reason: format!("part {} of `{page}` is a {:?}", hole.part.0, f.ret),
+            };
+        }
+        functions.push(f);
+        reads.push((root.to_string(), hole.part.0, functions.len() - 1));
+    }
+
+    let program = lower::program_of(cx, functions);
+    let mut source = format!(
+        "// Generated by pw: optimistic speculation for {page} (ADR-0122). Do not edit.\n\n"
+    );
+    for (n, f) in program.functions.iter().enumerate() {
+        match super::js_pure::isolated(f, &program) {
+            Ok(js) => source.push_str(&format!("const f{n} = {js};\n\n")),
+            Err(reason) => {
+                return Encoding::Unsupported {
+                    construct: "a speculation outside the JavaScript backend",
+                    reason,
+                };
+            }
+        }
+    }
+    source.push_str("export const decode = {\n");
+    for (name, _, _, value) in &speculated {
+        match super::js_pure::decoder(&program, value, "j") {
+            Ok(d) => source.push_str(&format!("  {}: (j) => {d},\n", json(name))),
+            Err(reason) => {
+                return Encoding::Unsupported {
+                    construct: "a speculated value the server cannot send",
+                    reason,
+                };
+            }
+        }
+    }
+    source.push_str("};\n\nexport const parts = {\n");
+    for (name, ..) in &speculated {
+        let mine: Vec<String> = reads
+            .iter()
+            .filter(|(b, ..)| b == name)
+            .map(|(_, part, f)| format!("{}: f{f}", json(&part.to_string())))
+            .collect();
+        source.push_str(&format!("  {}: {{ {} }},\n", json(name), mine.join(", ")));
+    }
+    source.push_str("};\n\nexport const commands = {\n");
+    for command in commands {
+        let mine: Vec<String> = transitions
+            .iter()
+            .filter(|t| t.command == *command)
+            .map(|t| {
+                let args: Vec<String> = t
+                    .params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ty)| super::js_pure::decoder(&program, ty, &format!("args[{i}]")))
+                    .collect::<Result<_, _>>()?;
+                Ok(format!(
+                    "{{ binding: {}, transition: (value, args) => f{}(value, {}) }}",
+                    json(&t.binding),
+                    t.function,
+                    args.join(", ")
+                ))
+            })
+            .collect::<Result<_, String>>()
+            .unwrap_or_default();
+        if !mine.is_empty() {
+            source.push_str(&format!("  {}: [{}],\n", json(command), mine.join(", ")));
+        }
+    }
+    source.push_str("};\n");
+
+    Encoding::Encoded(Speculation {
+        page: page.to_string(),
+        bindings: speculated
+            .iter()
+            .map(|(name, resource, key, _)| Binding {
+                binding: name.clone(),
+                resource: crate::resolve::declaration(cx.hirs, *resource)
+                    .and_then(|_| {
+                        cx.hirs.iter().find_map(|h| {
+                            h.all_decls()
+                                .find(|(_, d)| {
+                                    crate::resolve::declaration(cx.hirs, *resource)
+                                        .is_some_and(|r| std::ptr::eq(r, *d))
+                                })
+                                .map(|(id, _)| crate::contract::component_id(h, id))
+                        })
+                    })
+                    .unwrap_or_default(),
+                key: key.clone(),
+            })
+            .collect(),
+        commands: transitions
+            .iter()
+            .map(|t| t.command.clone())
+            .fold(Vec::new(), |mut v, c| {
+                if !v.contains(&c) {
+                    v.push(c);
+                }
+                v
+            }),
+        source,
+    })
+}
+
+fn json(s: &str) -> String {
+    serde_json::Value::String(s.to_string()).to_string()
+}

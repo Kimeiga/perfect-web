@@ -404,7 +404,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // mapping per code point, from tables the compiler generates (ADR-0056).
     // 2026-09-25: `map.pw` and `set.pw` declare the `Map` and `Set` modules,
     // over the language's `Map<K, V>` and `Set<T>` (ADR-0057).
-    const EXPECTED: u64 = 0x93c244402bb16dde;
+    // 2026-10-02: `examples/domain.pw` declares `added`, `same_item` and
+    // `unpriced`, the helpers `Carts.with_line` is written with now that an
+    // optimistic transition runs (ADR-0122). Its body was `cart`, a stub.
+    const EXPECTED: u64 = 0xefd68d6f43cd0a62;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

@@ -442,6 +442,22 @@ pub enum Chunk {
 struct Indexer {
     next_part: u32,
     next_element: u32,
+    /// How many blocks (`{#each}`, `{#match}`, `{#if}`) enclose the node
+    /// being lowered.
+    depth: u32,
+    /// Each text part, with the expression its hole holds (ADR-0122).
+    holes: Vec<Hole>,
+}
+
+/// **A text part and the expression it shows** (ADR-0122): what an optimistic
+/// speculation recomputes in the browser. Recorded by the same traversal that
+/// numbers the parts, so the two cannot disagree about which part is which.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hole {
+    pub part: PartId,
+    pub expr: ExprId,
+    /// Inside a block: an instance of it, whose address carries a frame.
+    pub nested: bool,
 }
 
 impl Indexer {
@@ -671,6 +687,26 @@ pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
     out
 }
 
+/// **Each text part of a renderable declaration, with its hole's expression**
+/// (ADR-0122), numbered by the traversal [`build_with`] numbers them by.
+pub fn text_holes(hir: &Hir, decl: crate::hir::DeclId) -> Vec<Hole> {
+    let Some(body_id) = hir.decl(decl).body else {
+        return Vec::new();
+    };
+    let body = hir.body(body_id);
+    let handlers = Handlers::new();
+    let ctx = Lowering {
+        handlers: &handlers,
+        decl,
+    };
+    let mut ix = Indexer::default();
+    let mut chunks = Vec::new();
+    for root in roots_of(body) {
+        lower_node(body, root, &ctx, &mut ix, &mut chunks);
+    }
+    ix.holes
+}
+
 /// What lowering needs beyond the body: which declaration it is in, and the
 /// handler identities derived for it.
 struct Lowering<'a> {
@@ -753,11 +789,19 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
     match body.node(id) {
         Node::Text(t) => out.push(Chunk::Static(escape_static_text(t))),
         Node::Interpolation(e) => out.push(Chunk::Dynamic(match value_path(body, *e) {
-            Some(value) => Part::Text {
-                id: ix.part(),
-                value,
-                context: Context::Text,
-            },
+            Some(value) => {
+                let id = ix.part();
+                ix.holes.push(Hole {
+                    part: id,
+                    expr: *e,
+                    nested: ix.depth > 0,
+                });
+                Part::Text {
+                    id,
+                    value,
+                    context: Context::Text,
+                }
+            }
             None => Part::Blocked {
                 reason: format!(
                     "a template hole is read by path, and this is {}",
@@ -1284,9 +1328,11 @@ fn split_branches<'b>(
 /// Some nodes, lowered in order and coalesced.
 fn lower_run(body: &Body, nodes: &[NodeId], ctx: &Lowering<'_>, ix: &mut Indexer) -> Vec<Chunk> {
     let mut out = Vec::new();
+    ix.depth += 1;
     for n in nodes {
         lower_node(body, *n, ctx, ix, &mut out);
     }
+    ix.depth -= 1;
     coalesce(out)
 }
 

@@ -98,7 +98,7 @@ test("arguments the command does not declare are refused before it runs", async 
     data: ["espresso", 1],
     headers: { "pw-interaction": "control-1" },
   });
-  expect(await ok.json()).toEqual({ committed: true });
+  expect(await ok.json()).toMatchObject({ committed: true });
   await expect(page.locator("#cart-count")).toHaveText("1");
 });
 

@@ -131,6 +131,11 @@ test.describe("the update touches only what changed", () => {
     await ready(page);
     await page.locator("#menu button").first().click();
     await expect(page.locator("#cart-count")).toHaveText("1");
+    // The count moves before the round trip (ADR-0122), so it no longer says
+    // the server's patch has arrived; the runtime's record of it does.
+    await expect
+      .poll(() => page.evaluate(() => window.__pw.updated.length))
+      .toBeGreaterThan(0);
 
     const pw = await page.evaluate(() => window.__pw);
     const cart = pw.parts.parts.find((p) => p.value === "cart.line_count");

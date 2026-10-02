@@ -71,6 +71,10 @@ echo
 echo "== 3c. the store's resumable handlers, compiled from their bodies (E10) =="
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
   emit-handlers --out "$OUT/handlers" "${STORE[@]}"
+# ADR-0122: the store page's optimistic speculations, and the bindings whose
+# values the server sends it.
+cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
+  emit-speculations --out "$OUT/speculations" "${STORE[@]}"
 cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" \
   -p pw-resume-wasm --target wasm32-unknown-unknown --release
 cp "$REPO_ROOT/target/wasm32-unknown-unknown/release/pw_resume_wasm.wasm" "$OUT/pw-resume.wasm"

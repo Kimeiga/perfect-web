@@ -8,9 +8,10 @@
 
 module Carts
 
-import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+import domain.{ StoreId, Store, StoreError, Cart, CartLine, CartError, MenuItemId,
     OrderId, OrderProgress, PositiveInt, Recommendation,
-    RecommendationError, PaymentError, TrackingError }
+    RecommendationError, PaymentError, TrackingError, same_item, added, unpriced }
+import List
 import capability.{ Session, SessionId }
 import browser.{ Element, MapHandle, MapError }
 
@@ -69,7 +70,23 @@ fn add(s: Session<SessionId>, item: MenuItemId, quantity: PositiveInt) -> Result
 // discarded by restoring the value that was held, so it may not perform
 // anything an externally visible effect would leave behind.
 fn with_line(cart: Cart, item: MenuItemId, quantity: PositiveInt) -> Cart !{} {
-    cart
+    let held = List.any(cart.lines, fn(line) same_item(line.item_id, item))
+    if held {
+        Cart { lines: List.map(cart.lines, fn(line) grown(line, item, quantity)) }
+    } else {
+        Cart {
+            lines: List.concat(cart.lines, [CartLine { item_id: item, quantity: quantity, unit_price: unpriced() }]),
+        }
+    }
+}
+
+// One line, grown by `quantity` when it holds `item` (ADR-0122).
+fn grown(line: CartLine, item: MenuItemId, quantity: PositiveInt) -> CartLine !{} {
+    if same_item(line.item_id, item) {
+        CartLine { item_id: line.item_id, quantity: added(line.quantity, quantity), unit_price: line.unit_price }
+    } else {
+        line
+    }
 }
 
 fn checkout(id: Session<SessionId>) -> Result<Cart, CartError> !{ database.write<Carts> } {

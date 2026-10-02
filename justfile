@@ -2053,6 +2053,31 @@ e14-idempotent-commands:
      } > docs/evidence/E14/idempotent-commands.txt
     @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed" docs/evidence/E14/idempotent-commands.txt
 
+# ADR-0122: an optimistic transition runs in the browser. The compiled
+# speculation module under Node, the server's values and versions, the
+# browser in each engine alone, and the mutation controls.
+e14-optimistic:
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server -p kiokun-server
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0122 - an optimistic transition runs in the browser"; echo; \
+       echo "produced by: just e14-optimistic"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)  node: $(node --version)"; echo; \
+       echo "== the store's speculation module (compiler/pw-conformance/tests/speculation.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test speculation 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what the server sends a page that speculates (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server -- speculat 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser, each engine alone (e2e/optimistic.spec.mjs)"; echo; \
+       for e in chromium firefox webkit; do \
+         (cd spikes/own-renderer && pnpm exec playwright test e2e/optimistic.spec.mjs --project=$e --reporter=list 2>&1 \
+           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+       done; \
+       echo; echo "== mutation controls (scripts/optimistic_transitions_mutations.py)"; echo; \
+       python3 scripts/optimistic_transitions_mutations.py; \
+     } > docs/evidence/E14/optimistic.txt
+    @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed" docs/evidence/E14/optimistic.txt
+
 # The development server under sustained commands and session churn: frames
 # held, subscribers, outbox rows and materialized entries, each bounded. The
 # compiled command called 20,000 times through the E8 host, with resident memory

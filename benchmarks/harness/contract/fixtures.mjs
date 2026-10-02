@@ -2,6 +2,12 @@
 // store page is, and when the page is ready for interaction.
 import { test as base, expect } from "@playwright/test";
 
+async function pressed(p, button) {
+  const answered = p.waitForResponse((r) => r.request().method() === "POST");
+  await button.click();
+  await answered;
+}
+
 export const test = base.extend({
   storePath: ["/", { option: true }],
   stack: ["", { option: true }],
@@ -19,8 +25,11 @@ export const test = base.extend({
           await p.waitForLoadState("networkidle");
         }
       },
-      add: (p = page, n = 0) => p.locator("#menu button").nth(n).click(),
-      clear: (p = page) => p.locator("#clear-cart").click(),
+      // A press, and its request's answer. The Pleris page shows the count
+      // before the round trip (ADR-0122), so the count alone no longer says
+      // the server has the change; every stack's mutation is a POST.
+      add: (p = page, n = 0) => pressed(p, p.locator("#menu button").nth(n)),
+      clear: (p = page) => pressed(p, p.locator("#clear-cart")),
       count: (p = page) => p.locator("#cart-count"),
     });
   },

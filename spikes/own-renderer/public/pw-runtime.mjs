@@ -444,6 +444,134 @@ async function command(component, args, interaction) {
   return response.json();
 }
 
+// --- ADR-0122: optimistic transitions -----------------------------------
+//
+// ADR-0025: an optimistic clause targets a resource ENTRY, binds its current
+// value, and transforms it with a pure function. The runtime holds the value
+// it displayed, so a rejected command is undone by restoring that value, not
+// by an inverse anyone wrote.
+//
+//   held        the authoritative value and version: the document's, then
+//               each `entry_value` frame's
+//   pending     speculations not yet reconciled, oldest first
+//   displayed   fold(pending, held): what the speculated parts show
+//
+// A speculation is dropped when its command fails (restored) or when the
+// entry reaches the version its commit produced (reconciled). The parts are
+// then re-rendered from what remains, so a later press's speculation survives
+// an earlier one's resolution, and nothing is restored over a newer value.
+
+/** binding → { entry, version, raw, value, pending } */
+const speculated = new Map();
+for (const [binding, e] of Object.entries(parts.entries ?? {})) {
+  speculated.set(binding, {
+    entry: e.entry,
+    version: e.version,
+    raw: e.value,
+    value: undefined,
+    pending: [],
+  });
+}
+
+let speculationModule = null;
+
+/** The page's speculation module, loaded with the first press that needs it. */
+function speculations() {
+  if (!parts.speculation) return Promise.resolve(null);
+  speculationModule ??= import(parts.speculation);
+  return speculationModule;
+}
+
+function current(module, binding) {
+  const state = speculated.get(binding);
+  if (state && state.value === undefined && state.raw !== undefined) {
+    state.value = module.decode[binding](state.raw);
+    state.raw = undefined;
+  }
+  return state;
+}
+
+/** What a template writes has a text form (ADR-0074). */
+function textOf(v) {
+  return typeof v === "string" ? v : String(v);
+}
+
+function render(module, binding) {
+  const state = current(module, binding);
+  if (!state || state.value === undefined) return;
+  let value = state.value;
+  for (const p of state.pending) value = p.transition(value, p.args);
+  for (const [part, read] of Object.entries(module.parts[binding] ?? {})) {
+    setRange(addressOf([], Number(part)), textOf(read(value)));
+  }
+}
+
+let nextSpeculation = 0;
+
+/** Before a command's request: show each of its transitions this page can. */
+async function speculate(component, args) {
+  const module = await speculations();
+  const ids = [];
+  for (const s of module?.commands?.[component] ?? []) {
+    const state = current(module, s.binding);
+    if (!state || state.value === undefined) continue;
+    const id = nextSpeculation++;
+    state.pending.push({ id, transition: s.transition, args, until: undefined });
+    ids.push([s.binding, id]);
+    render(module, s.binding);
+    log.push(`speculated ${component} on ${s.binding}`);
+  }
+  return ids;
+}
+
+/** The command answered: reconciled when its version arrives, or restored. */
+async function resolveSpeculation(ids, committed, basis) {
+  if (ids.length === 0) return;
+  const module = await speculations();
+  for (const [binding, id] of ids) {
+    const state = speculated.get(binding);
+    const i = state?.pending.findIndex((p) => p.id === id) ?? -1;
+    if (i < 0) continue;
+    const version = (basis ?? []).find((b) => b.entry === state.entry)?.version;
+    if (!committed) {
+      state.pending.splice(i, 1);
+      log.push(`restored ${binding}`);
+    } else if (version === undefined || version <= state.version) {
+      // The value the page holds already includes this commit.
+      state.pending.splice(i, 1);
+      log.push(`reconciled ${binding} at version ${state.version}`);
+    } else {
+      state.pending[i].until = version;
+    }
+    render(module, binding);
+  }
+}
+
+/** An `entry_value` frame: the authoritative value at a version. */
+function entryValue(frame) {
+  for (const [binding, state] of speculated) {
+    if (state.entry !== frame.entry || frame.version <= state.version) continue;
+    state.version = frame.version;
+    state.raw = frame.value;
+    state.value = undefined;
+    const before = state.pending.length;
+    state.pending = state.pending.filter((p) => p.until === undefined || p.until > frame.version);
+    if (before !== state.pending.length) {
+      log.push(`reconciled ${binding} at version ${frame.version}`);
+    }
+  }
+}
+
+/** After a batch: a patch writes the authoritative text, and a speculation
+ * still pending is shown over it again. */
+async function reapplySpeculations() {
+  if (!speculationModule) return;
+  const module = await speculationModule;
+  for (const [binding, state] of speculated) {
+    if (state.pending.length > 0) render(module, binding);
+  }
+}
+
 async function attach() {
   // Marked, so activation cost is a MEASUREMENT rather than a wall-clock guess
   // taken from outside. `performance.measure` attributes the work to this
@@ -517,7 +645,20 @@ async function attach() {
           let calls = 0;
           await module.run({
             captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
-            command: (component, args) => command(component, args, `${press}-${calls++}`),
+            // Each command speculates before its request (ADR-0122), and its
+            // speculation is resolved by the answer, whatever it is.
+            command: async (component, args) => {
+              const ids = await speculate(component, args);
+              let answer;
+              try {
+                answer = await command(component, args, `${press}-${calls++}`);
+              } catch (error) {
+                await resolveSpeculation(ids, false);
+                throw error;
+              }
+              await resolveSpeculation(ids, answer.committed === true, answer.basis);
+              return answer;
+            },
           });
         } catch (error) {
           // A load or a refused command is VISIBLE and leaves the button
@@ -660,6 +801,10 @@ function applyFrame(frame) {
       return;
     }
 
+    case "entry_value":
+      entryValue(frame);
+      return;
+
     case "recovery":
       // Never "try anyway".
       log.push(`recovery: ${JSON.stringify(frame.recovery)}`);
@@ -701,6 +846,7 @@ let cursor = parts.cursor ?? 0;
 function applyBatch(batch) {
   window.__pw.updated = [];
   for (const frame of batch.frames ?? []) applyFrame(frame);
+  reapplySpeculations();
   // Advanced only AFTER applying. Advancing on receipt would acknowledge
   // frames a mid-batch failure never applied, and the server would drop them.
   cursor = batch.cursor ?? cursor;

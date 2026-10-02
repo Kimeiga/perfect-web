@@ -116,6 +116,11 @@ test("the session-scoped part is addressed per session", async ({ browser }) => 
     [a.page, b.page].map(async (p) => {
       await p.locator("#menu button").first().click();
       await expect(p.locator("#cart-count")).toHaveText("1");
+      // The server's patch, not only the speculation (ADR-0122): the count moves
+      // before the round trip.
+      await expect
+        .poll(() => p.evaluate(() => Object.keys(window.__pwHeld()).length))
+        .toBeGreaterThan(0);
       return Object.keys(await p.evaluate(() => window.__pwHeld()));
     }),
   );

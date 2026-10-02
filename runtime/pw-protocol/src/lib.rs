@@ -230,6 +230,20 @@ pub enum StreamFrame {
         protocol: ProtocolVersion,
         recovery: Recovery,
     },
+    /// **An entry's value, to a page that speculates on it** (ADR-0122).
+    ///
+    /// An optimistic transition is a function of the entry's value, and a
+    /// patch carries rendered text, not the value. So a page whose handlers
+    /// call a command with an optimistic clause is sent the value of the
+    /// entry the clause targets, each time it advances: the base its next
+    /// speculation starts from, and the value a rejected one restores. Only
+    /// that entry, and only to the subscriber whose entry it is.
+    EntryValue {
+        protocol: ProtocolVersion,
+        entry: ResourceEntryId,
+        version: Version,
+        value: serde_json::Value,
+    },
 }
 
 /// Why a frame was refused.
@@ -276,7 +290,8 @@ impl StreamFrame {
     pub fn protocol(&self) -> ProtocolVersion {
         match self {
             StreamFrame::ResourceChanged { protocol, .. }
-            | StreamFrame::Recovery { protocol, .. } => *protocol,
+            | StreamFrame::Recovery { protocol, .. }
+            | StreamFrame::EntryValue { protocol, .. } => *protocol,
             StreamFrame::Patch(p) => p.protocol,
         }
     }

@@ -83,6 +83,11 @@ test("both adapters deliver the same frames", async ({ browser }) => {
   for (const page of pages) {
     await page.locator("#menu button").first().click();
     await expect(page.locator("#cart-count")).toHaveText("1");
+    // The count moves before the round trip (ADR-0122), so it no longer says
+    // the server's patch has arrived; the runtime's log does.
+    await expect
+      .poll(() => page.evaluate(() => window.__pw.log.some((l) => l.startsWith("updated "))))
+      .toBe(true);
   }
 
   // Normalized on the two things that are legitimately per-session: the cart's
@@ -160,6 +165,13 @@ test("the long poll opens a connection per batch", async ({ page }) => {
   for (const n of ["1", "2", "3"]) {
     await page.locator("#menu button").first().click();
     await expect(page.locator("#cart-count")).toHaveText(n);
+    // Each change's patch, not only its speculation (ADR-0122): the count
+    // moves before the round trip.
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__pw.log.filter((l) => l.startsWith("updated ")).length),
+      )
+      .toBe(Number(n));
   }
 
   expect(opened.every((u) => !u.includes("mode=stream"))).toBe(true);
@@ -181,8 +193,14 @@ test("the frames carry no trace of which adapter delivered them", async ({ page 
   await ready(page, "poll");
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
+  // The count moves before the round trip (ADR-0122), so it no longer says
+  // the server's patch has arrived; the runtime's log does.
+  await expect
+    .poll(() => page.evaluate(() => window.__pw.log.some((l) => l.startsWith("updated "))))
+    .toBe(true);
 
-  const FRAME_FIELDS = new Set(["frame", "protocol", "basis", "target", "operation", "entry", "version", "reason"]);
+  // `value` since ADR-0122: an `entry_value` frame's, a protocol field.
+  const FRAME_FIELDS = new Set(["frame", "protocol", "basis", "target", "operation", "entry", "version", "reason", "value"]);
   let checked = 0;
   for (const body of bodies) {
     for (const line of body.split("\n").filter(Boolean)) {

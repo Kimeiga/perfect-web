@@ -158,6 +158,66 @@ pub(crate) fn handler_source(
     Ok(e.finish_handler(identity, name, &sources))
 }
 
+/// **A function as a JavaScript expression of its own scope** (ADR-0122):
+/// `(() => { helpers; callees; return function (..) { body }; })()`. A
+/// speculation module holds several, each with the callees it numbered, so
+/// each gets its own scope rather than a shared namespace.
+pub(crate) fn isolated(function: &Function, program: &Program) -> Result<String, String> {
+    let callees: BTreeMap<(DefId, Vec<Type>), usize> = function
+        .callees
+        .iter()
+        .enumerate()
+        .map(|(n, c)| ((c.def, c.instance.clone()), n))
+        .collect();
+    let mut helpers = BTreeSet::new();
+    let mut sources = Vec::new();
+    for (n, c) in function.closures.iter().enumerate() {
+        let mut e = Emitter::new(program, &callees, &function.closures);
+        e.function(&c.function)?;
+        helpers.extend(e.helpers.iter().copied());
+        let params: Vec<String> = c.function.params.iter().map(|(v, _)| val(*v)).collect();
+        sources.push(format!(
+            "function {}({}) {{\n{}}}",
+            closure_name(n),
+            params.join(", "),
+            e.body
+        ));
+    }
+    for (n, c) in function.callees.iter().enumerate() {
+        let mut e = Emitter::new(program, &callees, &function.closures);
+        e.function(c)?;
+        helpers.extend(e.helpers.iter().copied());
+        let params: Vec<String> = c.params.iter().map(|(v, _)| val(*v)).collect();
+        sources.push(format!(
+            "function {}({}) {{\n{}}}",
+            callee_name(n),
+            params.join(", "),
+            e.body
+        ));
+    }
+    let mut e = Emitter::new(program, &callees, &function.closures);
+    e.function(function)?;
+    e.helpers.extend(helpers);
+    let mut before: Vec<String> = e.prelude();
+    before.extend(sources);
+    let params: Vec<String> = function.params.iter().map(|(v, _)| val(*v)).collect();
+    Ok(format!(
+        "(() => {{\n{}{}return function ({}) {{\n{}}};\n}})()",
+        before.join("\n\n"),
+        if before.is_empty() { "" } else { "\n\n" },
+        params.join(", "),
+        e.body
+    ))
+}
+
+/// **A JSON value read as the module's value of `ty`** (ADR-0122), by the
+/// rule a handler reads its captures by: an `Int` into a `BigInt`, a record
+/// by its field names, an opaque type as its representation.
+pub(crate) fn decoder(program: &Program, ty: &Type, expr: &str) -> Result<String, String> {
+    let none = BTreeMap::new();
+    Emitter::new(program, &none, &[]).decode(expr, ty)
+}
+
 fn json(s: &str) -> String {
     serde_json::Value::String(s.to_string()).to_string()
 }

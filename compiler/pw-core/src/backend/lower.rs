@@ -522,6 +522,106 @@ pub(crate) fn handler_program(cx: &Context<'_>, function: Function) -> Program {
     p
 }
 
+/// **Several functions' program** (ADR-0122): a speculation module's, whose
+/// decoders and functions read the nominal types they reach.
+pub(crate) fn program_of(cx: &Context<'_>, functions: Vec<Function>) -> Program {
+    let mut p = Program {
+        functions,
+        ..Program::default()
+    };
+    p.types = type_defs(cx, &p);
+    p
+}
+
+/// **An expression of a declaration's body, as a pure function of named
+/// values** (ADR-0122): an optimistic transition of its binder and its
+/// command's parameters, or a template hole of the binding it reads. Each
+/// name in `inputs` is a parameter, in order, of the type given; the
+/// expression sees those and nothing else of the body. A command it would
+/// call is refused: a speculation runs before the round trip, and performs
+/// nothing (ADR-0025).
+pub fn pure_expr(
+    cx: &Context<'_>,
+    unit: usize,
+    decl_id: crate::hir::DeclId,
+    root: ExprId,
+    inputs: &[(String, Type)],
+    export: &str,
+    span: Span,
+) -> Lowering<Function> {
+    let hir = cx.hirs[unit];
+    let decl = hir.decl(decl_id);
+    let Some(def) = decl_def(cx, unit, decl) else {
+        return Lowering::Blocked {
+            why: format!("`{}` has no resolved identity", decl.name),
+            span,
+        };
+    };
+    let Some(body_id) = decl.body else {
+        return Lowering::Blocked {
+            why: format!("`{}` has no body to read the expression from", decl.name),
+            span,
+        };
+    };
+    let body = hir.body(body_id);
+    let internal = RefCell::new(Internal::default());
+    let mut f = Lower {
+        cx,
+        unit,
+        next_value: 0,
+        instrs: Vec::new(),
+        locals: BTreeMap::new(),
+        types: BTreeMap::new(),
+        inlining: vec![def],
+        subst: BTreeMap::new(),
+        internal: &internal,
+        vars: BTreeSet::new(),
+        in_lambda: 0,
+        ret: Type::Unit,
+        captured: BTreeMap::new(),
+        handler: false,
+    };
+    let mut params = Vec::new();
+    for (name, ty) in inputs {
+        let v = f.fresh();
+        f.locals.insert(name.clone(), v);
+        f.types.insert(v, ty.clone());
+        params.push((v, ty.clone()));
+    }
+    let result = match f.expr(body, root, None) {
+        Lowering::Lowered(v) => v,
+        other => return other.map(|_| unreachable!()),
+    };
+    let ret = f.types.get(&result).cloned().unwrap_or(Type::Unit);
+    let instrs = std::mem::take(&mut f.instrs);
+    drop(f);
+    let internal = internal.into_inner();
+    Lowering::Lowered(Function {
+        def,
+        export: export.to_string(),
+        params,
+        ret,
+        blocks: vec![Block {
+            id: BlockId(0),
+            instrs,
+            terminator: Terminator::Return(result),
+        }],
+        capabilities: Vec::new(),
+        instance: Vec::new(),
+        callees: internal.done,
+        closures: internal
+            .closures
+            .into_iter()
+            .map(|c| c.expect("every closure slot is filled when its code lowers"))
+            .collect(),
+    })
+}
+
+/// A declared type, as the backend's [`Type`] (ADR-0122).
+pub(crate) fn backend_type(cx: &Context<'_>, ty: &ResolvedType, span: &Span) -> Lowering<Type> {
+    ty_resolved(cx.sigs, ty, span)
+}
+
 /// Can a browser send a value of this type to a command? A primitive, or an
 /// opaque type over one, which crosses as its representation (ADR-0033 §4).
 fn sendable(cx: &Context<'_>, t: &Type) -> bool {
@@ -3719,15 +3819,29 @@ impl<'a> Lower<'a> {
                 ty,
             }));
         }
-        let Some(fields) = self.cx.sigs.type_decl(def).and_then(|t| t.record.as_ref()) else {
+        let fields = self.cx.sigs.type_decl(def).and_then(|t| t.record.as_ref());
+        let field = fields.and_then(|fs| fs.iter().enumerate().find(|(_, (n, _))| n == name));
+        // **A member function read as a member** (ADR-0048): `cart.line_count`
+        // is `line_count(cart)` where `Cart` has no field of that name, by the
+        // member table the checker typed it with (ADR-0122). Until 2026-10-02
+        // the backend knew only fields, and the page's own count did not build.
+        if field.is_none()
+            && let Some(member) = self
+                .cx
+                .sigs
+                .member_by(crate::signatures::Receiver::Nominal(def), name)
+        {
+            let callee = member.definition;
+            return self.inline(callee, vec![of], None, span);
+        }
+        if fields.is_none() {
             return Lowering::Unsupported {
                 construct: "a field of something that is not a record",
                 span,
                 reason: format!("`.{name}` is read from a type with no record fields"),
             };
-        };
-        let Some((index, (_, declared))) = fields.iter().enumerate().find(|(_, (n, _))| n == name)
-        else {
+        }
+        let Some((index, (_, declared))) = field else {
             return Lowering::Blocked {
                 why: format!(
                     "the record has no field `{name}`; the checker should have refused it"

@@ -242,6 +242,11 @@ struct Server {
     components: BTreeMap<String, Loaded>,
     /// The document's static assets.
     dist: std::path::PathBuf,
+    /// **The store page's speculation manifest** (ADR-0122), as `pw
+    /// emit-speculations` wrote it to `dist/speculations/`: which bindings
+    /// the page speculates on, and so which entries' values it is sent.
+    /// `None` when the build wrote none.
+    speculation: Option<serde_json::Value>,
     /// Frames waiting for each session's subscriber.
     pending: Mutex<BTreeMap<String, Subscriber>>,
     /// **The compiler's contracts, and the node this server is.**
@@ -402,6 +407,7 @@ impl Server {
     /// nothing. A refusal that only ever happens in production is a refusal
     /// nobody has seen work.
     fn on(dist: std::path::PathBuf, templates: Vec<Template>, topology: Topology) -> Server {
+        let speculation = speculation_manifest(&dist);
         let clock = Clock::new();
         let materializer = Materializer::new(clock.clone(), BUILD);
         materializer.declare("store.page.Cart", FragmentPolicy::default());
@@ -418,6 +424,7 @@ impl Server {
             pending: Mutex::new(BTreeMap::new()),
             contracts: contracts(),
             topology,
+            speculation,
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
             interactions: Mutex::new(BTreeMap::new()),
         }
@@ -864,6 +871,21 @@ impl Server {
                 text: value.to_string(),
             },
         }));
+        // And the value itself, to a page that speculates on it (ADR-0122).
+        if self.speculates_on_cart().is_some() {
+            drop(queue);
+            let cart = self.cart_json(session);
+            let mut queue = self.pending.lock().expect("pending");
+            queue
+                .entry(session.to_string())
+                .or_default()
+                .push(StreamFrame::EntryValue {
+                    protocol: CURRENT,
+                    entry: cart_entry(session),
+                    version,
+                    value: cart,
+                });
+        }
     }
 
     // --- E7-P: keyed collections -------------------------------------
@@ -1089,7 +1111,16 @@ impl Server {
     ///
     /// Returns the cursor the document should subscribe from, so a reloaded
     /// page does not ask for frames the reload already made meaningless.
+    #[cfg(test)]
     fn serve_document(&self, session: &str) -> (String, u64) {
+        let (rendered, cursor, _) = self.serve_document_with_entries(session);
+        (rendered, cursor)
+    }
+
+    /// The document, its cursor, and the values of the entries it speculates
+    /// on (ADR-0122), all read under one hold of the subscriber table, so the
+    /// values are the ones the rendered parts show.
+    fn serve_document_with_entries(&self, session: &str) -> (String, u64, serde_json::Value) {
         self.drain(session);
         self.forget_idle_subscribers();
         let mut queue = self.pending.lock().expect("pending");
@@ -1102,7 +1133,63 @@ impl Server {
         let cursor = waiting.last_seq;
         // Rendered while the table is held, so a change cannot land between
         // the clear and the render and be lost by it.
-        (self.render_store(session), cursor)
+        (
+            self.render_store(session),
+            cursor,
+            self.speculated_entries(session),
+        )
+    }
+
+    /// **The cart, as the page's speculation module decodes it** (ADR-0122):
+    /// the WIT `domain-cart` record by its Pleris field names, as
+    /// `cart_value` builds it for a component. Every line is priced 450, as
+    /// the data layer prices it.
+    fn cart_json(&self, session: &str) -> serde_json::Value {
+        let carts = self.carts.lock().expect("carts");
+        let lines = carts.get(session).cloned().unwrap_or_default();
+        serde_json::json!({
+            "lines": lines.iter().map(|(item, quantity)| serde_json::json!({
+                "item_id": item,
+                "quantity": quantity,
+                "unit_price": { "minor_units": 450 },
+            })).collect::<Vec<_>>(),
+        })
+    }
+
+    /// Does the page speculate on the session's cart? Read from the manifest:
+    /// a binding of `store.page.Cart` keyed by `current_session()`, the one
+    /// key this server computes, as it computes an event's (ADR-0104).
+    fn speculates_on_cart(&self) -> Option<String> {
+        self.speculation.as_ref()?["bindings"]
+            .as_array()?
+            .iter()
+            .find(|b| {
+                b["resource"] == "store.page.Cart"
+                    && b["key"] == serde_json::json!(["current_session()"])
+            })
+            .and_then(|b| b["binding"].as_str().map(str::to_string))
+    }
+
+    /// Each speculated binding's entry, version and value, for the document.
+    fn speculated_entries(&self, session: &str) -> serde_json::Value {
+        let mut out = serde_json::Map::new();
+        if let Some(binding) = self.speculates_on_cart() {
+            out.insert(
+                binding,
+                serde_json::json!({
+                    "entry": cart_entry(session),
+                    "version": self.version(session),
+                    "value": self.cart_json(session),
+                }),
+            );
+        }
+        serde_json::Value::Object(out)
+    }
+
+    /// The versions a committed command's writes produced (ADR-0122): what a
+    /// page reconciles a speculation against.
+    fn committed_basis(&self, session: &str) -> serde_json::Value {
+        serde_json::json!([{ "entry": cart_entry(session), "version": self.version(session) }])
     }
 
     /// Where the cart's value appears.
@@ -1579,14 +1666,18 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     {
                         eprintln!("{id}: {e}");
                     }
-                    let ok = result.is_ok();
-                    respond_json(
-                        &mut stream,
-                        202,
-                        &session,
-                        fresh,
-                        &format!("{{\"committed\":{ok}}}"),
-                    );
+                    // A commit says which versions it produced (ADR-0122), so a
+                    // page can tell when the value it is sent includes it. A
+                    // version, not a value: the value reaches the page from the
+                    // resource, as every change does.
+                    let body = match result {
+                        Ok(()) => serde_json::json!({
+                            "committed": true,
+                            "basis": server.committed_basis(&session),
+                        }),
+                        Err(_) => serde_json::json!({ "committed": false }),
+                    };
+                    respond_json(&mut stream, 202, &session, fresh, &body.to_string());
                 }
             }
         }
@@ -1711,6 +1802,38 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // module here itself. An identity this build's templates do not name
         // is refused before the file system is asked, so a request can only
         // ever reach a file the compiler named.
+        // The page's speculation module (ADR-0122), as `pw emit-speculations`
+        // wrote it. Only the one the manifest names.
+        ("GET", route)
+            if route.strip_prefix("/speculation/").is_some_and(|m| {
+                server
+                    .speculation
+                    .as_ref()
+                    .and_then(|s| s["module"].as_str())
+                    == Some(m.split('?').next().unwrap_or(m))
+            }) =>
+        {
+            let module = route.trim_start_matches("/speculation/");
+            let module = module.split('?').next().unwrap_or(module);
+            match std::fs::read(server.dist.join("speculations").join(module)) {
+                Ok(bytes) => respond(
+                    &mut stream,
+                    200,
+                    "text/javascript; charset=utf-8",
+                    &session,
+                    fresh,
+                    &bytes,
+                ),
+                Err(_) => respond(
+                    &mut stream,
+                    404,
+                    "text/plain; charset=utf-8",
+                    &session,
+                    fresh,
+                    b"this speculation was not compiled",
+                ),
+            }
+        }
         ("GET", route) if route.starts_with("/handler/") => {
             let id = route
                 .trim_start_matches("/handler/")
@@ -1789,8 +1912,13 @@ fn handle(server: &Server, mut stream: TcpStream) {
             // from this moment on, so a structural change after this moment
             // has an address in it. A registration deferred to the first poll
             // would silently drop every change that raced it.
-            let (rendered, cursor) = server.serve_document(&session);
-            let body = document(&rendered, &server.templates, cursor);
+            let (rendered, cursor, entries) = server.serve_document_with_entries(&session);
+            let speculation = server
+                .speculation
+                .as_ref()
+                .and_then(|m| m["module"].as_str())
+                .map(|module| (format!("/speculation/{module}"), entries));
+            let body = document(&rendered, &server.templates, cursor, speculation);
             respond(
                 &mut stream,
                 200,
@@ -2001,7 +2129,12 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &st
 }
 
 /// The document shell, with the parts manifest and the runtime.
-fn document(body: &str, templates: &[Template], cursor: u64) -> String {
+fn document(
+    body: &str,
+    templates: &[Template],
+    cursor: u64,
+    speculation: Option<(String, serde_json::Value)>,
+) -> String {
     let template = templates
         .iter()
         .find(|t| t.name == "StorePage")
@@ -2031,6 +2164,13 @@ fn document(body: &str, templates: &[Template], cursor: u64) -> String {
             },
         },
     });
+    // The page's speculation module and the values it starts from (ADR-0122).
+    // A private page's own session's values: this document is `cache private`.
+    let mut manifest = manifest;
+    if let Some((module, entries)) = speculation {
+        manifest["speculation"] = serde_json::Value::String(module);
+        manifest["entries"] = entries;
+    }
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
@@ -2042,6 +2182,13 @@ fn document(body: &str, templates: &[Template], cursor: u64) -> String {
          <script type=\"module\" src=\"/pw-runtime.mjs\"></script>\n\
          </body>\n</html>\n"
     )
+}
+
+/// The store page's speculation manifest, if the build wrote one (ADR-0122).
+fn speculation_manifest(dist: &std::path::Path) -> Option<serde_json::Value> {
+    let text = std::fs::read_to_string(dist.join("speculations").join("store.page.StorePage.json"))
+        .ok()?;
+    serde_json::from_str(&text).ok()
 }
 
 fn session_of(headers: &str) -> String {
@@ -2298,6 +2445,92 @@ mod tests {
     /// **`clear_cart` commits its state as well as its event.** Until the
     /// command path was one path, `clear_cart` committed only the event, and
     /// the materializer's `cart:<session>` state kept the old total.
+    /// The manifest `pw emit-speculations` writes for the store page.
+    fn speculating_server() -> Server {
+        let mut s = rendering_server();
+        s.speculation = Some(serde_json::json!({
+            "page": "store.page.StorePage",
+            "module": "store.page.StorePage.mjs",
+            "bindings": [{ "binding": "cart", "resource": "store.page.Cart", "key": ["current_session()"] }],
+            "commands": ["store.page.add_to_cart"],
+        }));
+        s
+    }
+
+    /// **A page that speculates is sent the value it speculates on**
+    /// (ADR-0122): in its document, and as an `entry_value` frame each time
+    /// the entry advances, with the version a commit produced in the
+    /// command's answer. A page that does not speculate is sent none of it.
+    #[test]
+    fn a_speculating_page_is_sent_its_carts_value() {
+        let s = speculating_server();
+        let (_, _, entries) = s.serve_document_with_entries("session-v");
+        assert_eq!(entries["cart"]["value"], serde_json::json!({ "lines": [] }));
+        let before = entries["cart"]["version"].as_u64().expect("a version");
+
+        s.command_json(
+            ADD,
+            "session-v",
+            &[serde_json::json!("cortado"), serde_json::json!(2)],
+            Some("press-v"),
+        )
+        .expect("well-formed")
+        .expect("committed");
+        let basis = s.committed_basis("session-v");
+        let version = basis[0]["version"].as_u64().expect("a version");
+        assert!(version > before, "the commit produced a newer version");
+        assert_eq!(
+            basis[0]["entry"], entries["cart"]["entry"],
+            "of the same entry"
+        );
+
+        let queue = s.pending.lock().expect("pending");
+        let values: Vec<&StreamFrame> = queue["session-v"]
+            .frames
+            .iter()
+            .map(|(_, f)| f)
+            .filter(|f| matches!(f, StreamFrame::EntryValue { .. }))
+            .collect();
+        let [
+            StreamFrame::EntryValue {
+                version: v, value, ..
+            },
+        ] = values.as_slice()
+        else {
+            panic!("one entry_value frame, got {values:?}");
+        };
+        assert_eq!(v.0, version, "at the version the commit produced");
+        assert_eq!(
+            *value,
+            serde_json::json!({ "lines": [
+                { "item_id": "cortado", "quantity": 2, "unit_price": { "minor_units": 450 } }
+            ] })
+        );
+        drop(queue);
+
+        // The control: the same page, built without speculations.
+        let plain = rendering_server();
+        let (_, _, entries) = plain.serve_document_with_entries("session-w");
+        assert_eq!(entries, serde_json::json!({}));
+        plain
+            .command_json(
+                ADD,
+                "session-w",
+                &[serde_json::json!("cortado"), serde_json::json!(1)],
+                Some("press-w"),
+            )
+            .expect("well-formed")
+            .expect("committed");
+        let queue = plain.pending.lock().expect("pending");
+        assert!(
+            !queue["session-w"]
+                .frames
+                .iter()
+                .any(|(_, f)| matches!(f, StreamFrame::EntryValue { .. })),
+            "no value to a page that does not speculate"
+        );
+    }
+
     /// **An idempotent command runs once per interaction** (ADR-0121).
     /// `add_to_cart` declares `idempotent_by InteractionId`, and until
     /// 2026-10-02 nothing read it: a retried request added twice.

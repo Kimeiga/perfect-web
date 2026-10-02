@@ -890,3 +890,13 @@ interaction per press, and the host runs an idempotent command once per
 interaction through `pw-resource`'s reservation, keeping a bounded number per
 session. A request without an interaction, or one reusing an interaction with
 other arguments, is refused.
+
+## 2026-10-02: an optimistic transition runs in the browser (E14)
+
+[ADR-0122](DECISIONS/ADR-0122-an-optimistic-transition-runs-in-the-browser.md):
+`optimistic` was checked and executed by nothing, its store transition was a
+stub, and the backend could not compile the page's count. The compiler emits a
+speculation module per page, the browser holds the speculated entry's value
+from `entry_value` frames, and a speculation is reconciled by version or
+restored exactly. An unpriced optimistic line and the new frame are offered
+for reversal.

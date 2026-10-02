@@ -1161,6 +1161,87 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
 /// All or nothing. A page whose handlers were partly written would render
 /// buttons that cannot work, so any refusal writes no file and fails the
 /// build, naming each refused handler and why.
+/// **Each page's optimistic speculations** (ADR-0122): `DIR/<page>.mjs`, the
+/// module the runtime loads on a press, and `DIR/<page>.json`, the bindings
+/// whose values the server sends it.
+fn emit_speculations_command(paths: &[&String], out: &str) -> ExitCode {
+    let mut units = Vec::new();
+    for path in paths {
+        let src = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pw: cannot read {path}: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        let parsed = pw_syntax::parse_tree(&src);
+        if !parsed.ok() {
+            eprintln!("pw: {path} does not parse; nothing emitted");
+            return ExitCode::FAILURE;
+        }
+        let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        units.push(pw_core::check::Unit {
+            path: path.to_string(),
+            src,
+            hir,
+        });
+    }
+    let compiled = match pw_core::backend::speculation::compile(&units) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("pw: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut modules = Vec::new();
+    for c in &compiled {
+        match &c.module {
+            pw_core::backend::wasm::Encoding::Encoded(m) => modules.push(m),
+            other => {
+                eprintln!("pw: `{}`'s speculations were not compiled: {other}", c.page);
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+    if let Err(e) = std::fs::create_dir_all(out) {
+        eprintln!("pw: cannot create {out}: {e}");
+        return ExitCode::from(2);
+    }
+    for m in &modules {
+        let dir = std::path::Path::new(out);
+        let manifest = serde_json::json!({
+            "page": m.page,
+            "module": format!("{}.mjs", m.page),
+            "bindings": m.bindings,
+            "commands": m.commands,
+        });
+        for (file, text) in [
+            (dir.join(format!("{}.mjs", m.page)), m.source.clone()),
+            (
+                dir.join(format!("{}.json", m.page)),
+                serde_json::to_string_pretty(&manifest).unwrap_or_default() + "\n",
+            ),
+        ] {
+            if let Err(e) = std::fs::write(&file, text) {
+                eprintln!("pw: cannot write {}: {e}", file.display());
+                return ExitCode::from(2);
+            }
+        }
+        println!(
+            "speculation `{}`: {} on {} ({} bytes)",
+            m.page,
+            m.commands.join(", "),
+            m.bindings
+                .iter()
+                .map(|b| b.binding.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+            m.source.len()
+        );
+    }
+    ExitCode::SUCCESS
+}
+
 fn emit_handlers_command(paths: &[&String], out: &str) -> ExitCode {
     let mut units = Vec::new();
     for path in paths {
@@ -1357,13 +1438,14 @@ fn run() -> ExitCode {
             | "audit-values"
             | "emit-component"
             | "emit-handlers"
+            | "emit-speculations"
             | "build"
     ) || paths.is_empty()
     {
         eprintln!(
             "usage: pw <check|explain|fmt|emit-koka|emit-marko|emit-manifest|emit-graph|\
              emit-contracts|emit-template|emit-wit|audit-values|emit-component|emit-handlers|\
-             build> <path.pw>... [--plain]"
+             emit-speculations|build> <path.pw>... [--plain]"
         );
         eprintln!();
         eprintln!("  check          parse and report diagnostics");
@@ -1402,6 +1484,19 @@ fn run() -> ExitCode {
         return build_command(&sources, &out);
     }
 
+    if cmd == "emit-speculations" {
+        let out = args
+            .iter()
+            .position(|a| a == "--out")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
+        let Some(out) = out else {
+            eprintln!("usage: pw emit-speculations --out DIR <path.pw>...");
+            return ExitCode::from(2);
+        };
+        let sources: Vec<&String> = paths.iter().copied().filter(|p| **p != out).collect();
+        return emit_speculations_command(&sources, &out);
+    }
     if cmd == "emit-handlers" {
         let out = args
             .iter()

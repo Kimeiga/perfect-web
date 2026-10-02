@@ -33,8 +33,12 @@ test("the command's response carries no cart value", async ({ page, request }) =
     headers: { "pw-interaction": "response-1" },
   });
   const body = await response.json();
-  expect(body).toEqual({ committed: true });
-  expect(JSON.stringify(body)).not.toMatch(/line_count/);
+  // A commit names the versions it produced (ADR-0122), so a page can tell
+  // when the value it is sent includes it. Versions, and nothing else.
+  expect(Object.keys(body).sort()).toEqual(["basis", "committed"]);
+  expect(body.committed).toBe(true);
+  for (const b of body.basis) expect(Object.keys(b).sort()).toEqual(["entry", "version"]);
+  expect(JSON.stringify(body)).not.toMatch(/line_count|lines|quantity/);
 });
 
 test("the cart updates from the resource, not from the command", async ({ page }) => {
@@ -118,6 +122,11 @@ test("a stale version does not overwrite newer state", async ({ page }) => {
   await ready(page);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
+  // The server's patch, not only the speculation (ADR-0122): the count moves
+  // before the round trip.
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(window.__pwHeld()).length))
+    .toBeGreaterThan(0);
 
   const state = await page.evaluate(() => ({
     held: window.__pwHeld(),
@@ -173,6 +182,11 @@ test("a notice is not an application", async ({ page }) => {
   await ready(page);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
+  // The server's patch, not only the speculation (ADR-0122): the count moves
+  // before the round trip.
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(window.__pwHeld()).length))
+    .toBeGreaterThan(0);
 
   const state = await page.evaluate(() => ({
     held: window.__pwHeld(),

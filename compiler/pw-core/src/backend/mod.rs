@@ -50,6 +50,7 @@ pub mod ir;
 pub mod js;
 pub mod js_pure;
 pub mod lower;
+pub mod speculation;
 pub mod wasm;
 
 /// **Is this declaration's implementation supplied from outside, and by what?**

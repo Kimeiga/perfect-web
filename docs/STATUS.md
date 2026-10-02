@@ -13,6 +13,17 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Held 2026-10-02: an optimistic transition runs in the browser**
+([ADR-0122](DECISIONS/ADR-0122-an-optimistic-transition-runs-in-the-browser.md)).
+`add_to_cart`'s `optimistic` clause was checked and executed by nothing, its
+transition `Carts.with_line` returned the cart unchanged, and the backend
+could not compile the page's `cart.line_count`. The compiler now emits a
+speculation module per page; the browser holds the value of the entry it
+speculates on (`entry_value` frames); the count moves before the round trip,
+reconciles to the server's version, and is restored exactly when a command
+fails. Nine browser tests had used the count as evidence the server's patch
+had arrived, and each now waits for the patch.
+
 **Held 2026-10-02: an idempotent command runs once per interaction**
 ([ADR-0121](DECISIONS/ADR-0121-an-idempotent-command-runs-once-per-interaction.md)).
 `idempotent_by InteractionId` was checked and read by nothing: a retried
@@ -1789,9 +1800,8 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
    patch fails, no-op agent scores 0).
 2. **E14-C:** tasks T01-T12 with prompts, hidden tests, reference and unsafe
    patches, every control green on every stack.
-3. **Ruling, before T01 and T08 are written:** whether the Pleris runtime
-   executes `optimistic` and `idempotent_by` first, or the tasks measure
-   Pleris without them (ADR-0120).
+3. **Rulings offered by ADR-0122**: an unpriced optimistic line, and
+   `entry_value` as a protocol frame.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

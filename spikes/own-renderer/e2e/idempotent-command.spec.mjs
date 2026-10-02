@@ -26,8 +26,10 @@ test("a request sent twice is one add", async ({ page }) => {
   });
 
   await page.locator("#menu button").first().click();
+  // Both sends complete before the count is read: the count moves before the
+  // round trip (ADR-0122), so it alone says nothing about the server.
+  await expect.poll(() => sent).toBe(2);
   await expect(page.locator("#cart-count")).toHaveText("1");
-  expect(sent).toBe(2);
 
   // The second send's patch, if it had committed, would land after the
   // first's. Reloading reads the server's state rather than waiting on a frame.
