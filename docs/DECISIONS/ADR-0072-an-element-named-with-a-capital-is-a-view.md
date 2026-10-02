@@ -72,3 +72,11 @@ a ruling.
   ADR-0058's two handlers.
 - **Mutation controls:** `scripts/view_element_mutations.py`,
   `just e10-view-elements`, 6 mutants.
+
+## Ruled 2026-10-02
+
+[ADR-0130](ADR-0130-ui-state-is-a-signal-provided-where-it-lives.md) rules the
+open question: a view composes at compile time and is instantiated at run
+time, which is the first design above, with each part addressed by its
+instance path. A view may contain itself only inside a block, where it is an
+instance made at run time.

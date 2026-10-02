@@ -1,7 +1,8 @@
 # ADR-0126: scoped signals (proposed)
 
-Status: **proposed**, 2026-10-02. Needs the owner's ruling before any of it
-is built. Unblocks E14 tasks T06 (forms) and T11 (dialogs), and the DoorDash
+Status: **accepted with changes by [ADR-0130](ADR-0130-ui-state-is-a-signal-provided-where-it-lives.md)**,
+2026-10-02: a shared signal is a declaration provided by a scope, shadowing is
+explicit, and the four rulings below are made there. Proposed 2026-10-02. Unblocks E14 tasks T06 (forms) and T11 (dialogs), and the DoorDash
 target the project exists to reach.
 
 ## Why now

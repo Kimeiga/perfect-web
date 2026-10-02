@@ -919,7 +919,7 @@ three stacks; Pleris's unsafe patch is refused by `pw check`.
 
 ## 2026-10-02: scoped signals (proposed)
 
-[ADR-0126](DECISIONS/ADR-0126-scoped-signals.md), **proposed, not accepted**:
+[ADR-0126](DECISIONS/ADR-0126-scoped-signals.md), **proposed; accepted with changes by ADR-0130**:
 UI state as `signal`s declared in a scope, read by name and resolved by the
 compiler, written only by handlers, updating only what reads them, dropped
 with their scope, typed and resumable. Four rulings are needed before it is
@@ -968,3 +968,19 @@ its condition to its value and to every sink it decides, an assignment
 labels its binding, and a public log takes only a public value. Settles
 ADR-0085's open ruling: inference over bodies, keys only for stated secrets,
 and declassification only at a host binding until a program needs more.
+
+## 2026-10-02: UI state is a signal; a handler's event is plain data (rulings)
+
+[ADR-0130](DECISIONS/ADR-0130-ui-state-is-a-signal-provided-where-it-lives.md)
+accepts ADR-0126 with its four rulings: the keyword `signal`; views composed
+at compile time and instantiated at run time (ADR-0072's question, Marko 6's
+model); a signal ephemeral or in the URL; and a handler may not assign a
+body's `let mut`. It changes two rules: a shared signal is a declaration a
+scope `provide`s and views read by its own name, and an inner `provide`
+shadows an outer one explicitly.
+[ADR-0131](DECISIONS/ADR-0131-a-handler-is-given-its-event-as-plain-data.md)
+settles ADR-0058's two rulings: a handler takes its event as a closed record
+of plain data read synchronously by the runtime, synchronous behaviour is a
+static modifier (`on:submit|prevent`), `bind:value` is shorthand with a codec,
+a form submits one typed record, and a handler may read its command's answer.
+Neither is built yet.

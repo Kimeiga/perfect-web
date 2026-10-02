@@ -110,3 +110,11 @@ unchanged.
 - **A command's answer**, read by the handler.
 - **The development server hosts the store's two commands only.** A handler
   that calls another command compiles and is tested under Node, not served.
+
+## Ruled 2026-10-02
+
+[ADR-0131](ADR-0131-a-handler-is-given-its-event-as-plain-data.md) rules both
+open questions. A handler binds its event by a typed parameter, a closed
+record of plain data that the runtime reads synchronously in the listener. A
+handler may read its command's answer, decoded by the codec the server
+encoded it with.
