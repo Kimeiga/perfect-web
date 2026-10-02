@@ -434,10 +434,11 @@ e10-build:
        echo; echo "== compiler/pw-core/tests/build.rs"; echo; \
        cargo test --locked -p pw-core --test build 2>&1 | grep -E '^(test |test result)'; \
        echo; \
-       echo "NOT CLAIMED: the queries run as components in the development server."; \
-       echo "They compile and are audited; the server still computes the page's"; \
-       echo "values itself (NEXT). The four Resources.* queries are 'todo' in the"; \
-       echo "library, and nothing the store builds depends on them."; \
+       echo "Since ADR-0125 the development server runs the store's queries and"; \
+       echo "domain.line_count by pages/store.page.StorePage.json. NOT CLAIMED: their"; \
+       echo "policies (freshness, cache, key, concurrency); E14-Q's second slice. The"; \
+       echo "four Resources.* queries are 'todo' in the library, and nothing the store"; \
+       echo "builds depends on them."; \
      } > docs/evidence/E10/build.txt
     @cat docs/evidence/E10/build.txt
 
