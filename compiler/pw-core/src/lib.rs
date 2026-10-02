@@ -50,6 +50,7 @@ pub mod marko;
 pub mod names;
 pub mod ontology;
 pub mod outcome;
+pub mod page_values;
 pub mod placement;
 pub mod policy;
 pub mod privacy;

@@ -149,7 +149,17 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
             src,
         })
         .collect();
-    for id in ["store.page.add_to_cart", "store.page.clear_cart"] {
+    // The store's queries since ADR-0125: the development server runs them to
+    // decide what the page shows.
+    for id in [
+        "store.page.add_to_cart",
+        "store.page.clear_cart",
+        "store.page.Store",
+        "store.page.Menu",
+        "store.page.Cart",
+        // The member function the page reads `cart.line_count` through.
+        "domain.line_count",
+    ] {
         let fresh = pw_core::backend::component::compile(&units, id)
             .unwrap_or_else(|e| panic!("{id} compiles: {e}"));
         let path = format!("docs/evidence/E10/{id}.wasm");
@@ -164,6 +174,45 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
             fresh.component.bytes.len()
         );
     }
+}
+
+/// **The committed page plan is what the compiler plans now** (ADR-0125).
+///
+/// The development server's tests render the store page by
+/// `docs/evidence/E10/pages/store.page.StorePage.json` without linking the
+/// compiler. A stale plan would let them pass against bindings or reads the
+/// compiler no longer produces.
+#[test]
+fn the_committed_page_plan_is_what_the_compiler_plans_now() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let units: Vec<pw_core::check::Unit> = store_sources(&root)
+        .into_iter()
+        .enumerate()
+        .map(|(i, src)| pw_core::check::Unit {
+            path: format!("{i}.pw"),
+            hir: lower_file(&src, &parse_tree(&src).green),
+            src,
+        })
+        .collect();
+    let hirs: Vec<&pw_core::hir::Hir> = units.iter().map(|u| &u.hir).collect();
+    let ws = pw_core::resolve::Workspace::build(&hirs);
+    let sigs = pw_core::signatures::Signatures::build(&ws, &hirs);
+    let plans = pw_core::page_values::pages(&hirs, &ws, &sigs);
+    let store = plans
+        .iter()
+        .find(|p| p.page == "store.page.StorePage")
+        .expect("the store page is planned");
+    let fresh = serde_json::to_value(store.plan.as_ref().expect("its plan")).expect("serializes");
+    let path = "docs/evidence/E10/pages/store.page.StorePage.json";
+    let committed: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join(path))
+            .unwrap_or_else(|e| panic!("{path}: {e} — run `just e10-component`")),
+    )
+    .expect("the committed plan parses");
+    assert_eq!(
+        committed, fresh,
+        "{path} is stale. Run `just e10-component` and commit it."
+    );
 }
 
 /// **The committed handler modules are what the compiler emits now.**

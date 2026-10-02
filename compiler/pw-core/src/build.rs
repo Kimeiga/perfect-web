@@ -44,6 +44,8 @@ pub struct Build {
     pub graph: crate::graph::Graph,
     /// Each page's optimistic speculation module (ADR-0122).
     pub speculations: Vec<crate::backend::speculation::Compiled>,
+    /// What each page shows, as reads of what its queries return (ADR-0125).
+    pub pages: Vec<crate::page_values::Planned>,
 }
 
 impl Build {
@@ -93,11 +95,20 @@ impl Build {
             .dangling
             .iter()
             .map(|d| format!("a graph edge from `{}` names nothing: `{}`", d.from, d.name));
+        // A page whose values no plan states would be rendered by a host
+        // guessing them (ADR-0125).
+        let pages = self.pages.iter().filter_map(|p| {
+            p.plan
+                .as_ref()
+                .err()
+                .map(|why| format!("`{}`'s values: {why}", p.page))
+        });
         handlers
             .chain(components)
             .chain(depended)
             .chain(speculations)
             .chain(dangling)
+            .chain(pages)
             .collect()
     }
 
@@ -151,6 +162,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
 
     let graph = crate::graph::Graph::build(&hirs, &ws);
     let speculations = crate::backend::speculation::compile(units)?;
+    let pages = crate::page_values::pages(&hirs, &ws, &sigs);
     Ok(Build {
         templates,
         handlers,
@@ -160,6 +172,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         wit,
         graph,
         speculations,
+        pages,
     })
 }
 

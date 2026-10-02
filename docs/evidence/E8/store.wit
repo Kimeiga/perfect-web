@@ -32,6 +32,11 @@ interface resources-store-api {
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
 }
 
+interface domain-line-count-api {
+    use pw:types/types.{domain-cart};
+    line-count: func(arg0: domain-cart) -> s64;
+}
+
 interface store-page-cart-api {
     use pw:types/types.{capability-session-id, domain-cart, domain-cart-error};
     cart: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
@@ -76,6 +81,10 @@ world resources-order {
 
 world resources-store {
     export resources-store-api;
+}
+
+world domain-line-count {
+    export domain-line-count-api;
 }
 
 world store-page-cart {

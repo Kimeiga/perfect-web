@@ -356,12 +356,19 @@ e9-values:
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.Store store.page.Menu store.page.Cart domain.line_count; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
         examples/lib/*.pw examples/store/*.pw; \
     done
+    @# The store page's plan (ADR-0125): what the development server's tests
+    @# run the page by. Written by `pw build`, which is the one place it is made.
+    @out="$(mktemp -d)"; cargo run --quiet --locked -p pw-cli -- build --out "$out" \
+        packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
+        examples/lib/*.pw examples/store/*.pw > /dev/null; \
+      mkdir -p docs/evidence/E10/pages; \
+      cp "$out"/pages/*.json docs/evidence/E10/pages/; rm -rf "$out"
 
 # E10-I — a Pleris-compiled command, executed through the E8 host, with the
 # Rust closure path deleted. The compiled components, the host running them

@@ -1,0 +1,54 @@
+{
+  "page": "store.page.StorePage",
+  "params": [
+    "id"
+  ],
+  "bindings": [
+    {
+      "binding": "store",
+      "resource": "store.page.Store",
+      "args": [
+        "id"
+      ]
+    },
+    {
+      "binding": "menu",
+      "resource": "store.page.Menu",
+      "args": [
+        "id"
+      ]
+    },
+    {
+      "binding": "cart",
+      "resource": "store.page.Cart",
+      "args": [
+        "current_session()"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "part": 0,
+      "path": "store.name",
+      "binding": "store",
+      "steps": [
+        {
+          "field": "name"
+        }
+      ]
+    },
+    {
+      "part": 4,
+      "path": "cart.line_count",
+      "binding": "cart",
+      "steps": [
+        {
+          "member": "domain.line_count"
+        }
+      ]
+    }
+  ],
+  "collections": [
+    "menu"
+  ]
+}

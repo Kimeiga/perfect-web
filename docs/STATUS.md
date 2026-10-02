@@ -13,6 +13,13 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-Q, first slice, 2026-10-02: the page shows what its queries return**
+([ADR-0125](DECISIONS/ADR-0125-a-page-shows-what-its-queries-return.md)). The
+server ran none of the store's queries; `store.name` was a literal and the
+count a Rust sum. The compiler now plans each page's values, compiles
+`domain.line_count` as a component of its own, and the server runs the plan.
+Query policies (freshness, cache, key, concurrency) are the second slice.
+
 **E14-C started 2026-10-02: three of twelve tasks written**
 ([plan](milestones/E14.md)). T01 and T08 hold all four controls on all three
 stacks. T12 holds them on Next.js and SvelteKit, and **on Pleris its unsafe

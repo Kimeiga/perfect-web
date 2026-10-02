@@ -868,9 +868,12 @@ pub fn program_by_declaration(
     let cx = checked.context();
     let mut out = Program::default();
     let mut refusals = Vec::new();
+    // And each function a page's template reads as a member (ADR-0125).
+    let members = crate::page_values::members(cx.hirs, cx.ws, cx.sigs);
     for (unit, hir) in cx.hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
-            if !matches!(decl.kind, DeclKind::Command | DeclKind::Query) {
+            let member = members.contains(&DefId { unit, decl: id.0 });
+            if !member && !matches!(decl.kind, DeclKind::Command | DeclKind::Query) {
                 continue;
             }
             match function(cx, unit, decl, hir.decl_span(id)) {

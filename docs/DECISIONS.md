@@ -924,3 +924,12 @@ UI state as `signal`s declared in a scope, read by name and resolved by the
 compiler, written only by handlers, updating only what reads them, dropped
 with their scope, typed and resumable. Four rulings are needed before it is
 built.
+
+## 2026-10-02: a page shows what its queries return (E14)
+
+[ADR-0125](DECISIONS/ADR-0125-a-page-shows-what-its-queries-return.md): the
+development server computed the store page's values itself and ran none of
+its queries. The compiler now plans each page (its bindings' queries, each
+part's field and member reads), compiles each member function a plan names
+as a component, and the server follows the plan. Query policies are the next
+slice.

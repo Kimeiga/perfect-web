@@ -1133,6 +1133,22 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
             write(&format!("modules/{id}.mjs"), source.as_bytes())?;
             lines.push(format!("  module     {id}  {} bytes", source.len()));
         }
+        // What each page shows, as a host computes it (ADR-0125).
+        for page in &build.pages {
+            if let Ok(plan) = &page.plan {
+                let text = serde_json::to_string_pretty(plan).map_err(|e| e.to_string())?;
+                write(
+                    &format!("pages/{}.json", plan.page),
+                    format!("{text}\n").as_bytes(),
+                )?;
+                lines.push(format!(
+                    "  page       {}  {} binding(s), {} part(s)",
+                    plan.page,
+                    plan.bindings.len(),
+                    plan.parts.len()
+                ));
+            }
+        }
         // What a host's materializer consumes (ADR-0123).
         let graph = serde_json::to_string_pretty(&build.graph).map_err(|e| e.to_string())?;
         write("graph.json", format!("{graph}\n").as_bytes())?;

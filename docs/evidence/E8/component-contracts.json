@@ -129,6 +129,43 @@
     ]
   },
   {
+    "component_id": "domain.line_count",
+    "capability_mapping": 1,
+    "abi_schema": "79995784a8451fc2",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "line_count",
+        "kind": "function",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "argument 0",
+                "ty": "Cart"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/domain-line-count-api@0.1.0",
+          "function": "line-count"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Cart",
     "capability_mapping": 1,
     "abi_schema": "37cb9e8b9dc1738c",

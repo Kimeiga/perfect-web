@@ -252,6 +252,12 @@ struct Server {
     /// the page speculates on, and so which entries' values it is sent.
     /// `None` when the build wrote none.
     speculation: Option<serde_json::Value>,
+    /// **What the store page shows, as reads of what its queries return**
+    /// (ADR-0125): `pw build`'s `pages/store.page.StorePage.json`. Each
+    /// binding names the query component it runs; each part, the steps from
+    /// that binding's value. Until 2026-10-02 this server computed the page's
+    /// values itself and ran none of the store's queries.
+    plan: serde_json::Value,
     /// Frames waiting for each session's subscriber.
     pending: Mutex<BTreeMap<String, Subscriber>>,
     /// **The compiler's contracts, and the node this server is.**
@@ -339,7 +345,14 @@ struct Loaded {
 fn components() -> BTreeMap<String, Loaded> {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../docs/evidence/E10");
     let mut out = BTreeMap::new();
-    for id in ["store.page.add_to_cart", "store.page.clear_cart"] {
+    for id in [
+        "store.page.add_to_cart",
+        "store.page.clear_cart",
+        "store.page.Store",
+        "store.page.Menu",
+        "store.page.Cart",
+        "domain.line_count",
+    ] {
         let path = dir.join(format!("{id}.wasm"));
         let bytes = std::fs::read(&path).unwrap_or_else(|e| {
             panic!(
@@ -354,6 +367,17 @@ fn components() -> BTreeMap<String, Loaded> {
         out.insert(id.to_string(), Loaded { prepared, imports });
     }
     out
+}
+
+/// **What one build gave the server** (ADR-0123, ADR-0125): where its
+/// browser artifacts are, and what it runs the store by.
+struct Built {
+    artifacts: std::path::PathBuf,
+    templates: Vec<Template>,
+    contracts: Vec<ComponentContract>,
+    components: BTreeMap<String, Loaded>,
+    graph: pw_materialize::Graph,
+    plan: serde_json::Value,
 }
 
 /// Every component a build wrote, by its file name (ADR-0123).
@@ -444,14 +468,20 @@ impl Server {
         let graph = pw_materialize::Graph::from_json(&read("graph.json")?)
             .map_err(|e| format!("graph.json: {e:?}"))?;
         let components = components_in(&build.join("components"))?;
+        let plan: serde_json::Value =
+            serde_json::from_str(&read("pages/store.page.StorePage.json")?)
+                .map_err(|e| format!("pages/store.page.StorePage.json: {e}"))?;
         Ok(Server::with(
             dist,
-            build,
-            templates,
             dev_topology(),
-            contracts,
-            components,
-            graph,
+            Built {
+                artifacts: build,
+                templates,
+                contracts,
+                components,
+                graph,
+                plan,
+            },
         ))
     }
 
@@ -464,23 +494,32 @@ impl Server {
     fn on(dist: std::path::PathBuf, templates: Vec<Template>, topology: Topology) -> Server {
         Server::with(
             dist.clone(),
-            dist,
-            templates,
             topology,
-            contracts(),
-            components(),
-            pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses"),
+            Built {
+                artifacts: dist,
+                templates,
+                contracts: contracts(),
+                components: components(),
+                graph: pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses"),
+                plan: serde_json::from_str(include_str!(
+                    "../../../../docs/evidence/E10/pages/store.page.StorePage.json"
+                ))
+                .expect("the committed page plan parses"),
+            },
         )
     }
 
     fn with(
         dist: std::path::PathBuf,
-        artifacts: std::path::PathBuf,
-        templates: Vec<Template>,
         topology: Topology,
-        contracts: Vec<ComponentContract>,
-        components: BTreeMap<String, Loaded>,
-        graph: pw_materialize::Graph,
+        Built {
+            artifacts,
+            templates,
+            contracts,
+            components,
+            graph,
+            plan,
+        }: Built,
     ) -> Server {
         let speculation = speculation_manifest(&artifacts);
         let clock = Clock::new();
@@ -501,6 +540,7 @@ impl Server {
             contracts,
             topology,
             speculation,
+            plan,
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
             interactions: Mutex::new(BTreeMap::new()),
         }
@@ -548,7 +588,9 @@ impl Server {
         EntryKey::from_identity(&cart_identity(session))
     }
 
-    /// How many items the session's cart holds: what the page shows.
+    /// How many items the data layer holds for the session: the tests' view
+    /// of the state. The page's count is `domain.line_count`'s (ADR-0125).
+    #[cfg(test)]
     fn cart_value(&self, session: &str) -> i64 {
         self.carts
             .lock()
@@ -580,7 +622,9 @@ impl Server {
             .component
             .clone()
             .ok_or_else(|| format!("`{component_id}`'s contract does not locate its export"))?;
-        self.components[component_id]
+        self.components
+            .get(component_id)
+            .ok_or_else(|| format!("no compiled component `{component_id}`"))?
             .prepared
             .call_authorized_within(
                 contract,
@@ -887,13 +931,171 @@ impl Server {
         }
     }
 
+    /// **The deployment's catalogue** (ADR-0125): `store:data/stores#get` and
+    /// `store:data/menus#for-store`, what the `Store` and `Menu` queries read.
+    /// This server holds one store; its menu is the keyed list E7-P mutates.
+    fn catalog(&self) -> BTreeMap<String, HostFn> {
+        let menu = self.menu.lock().expect("menu").clone();
+        let not_found = || {
+            vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                "not-found".into(),
+                None,
+            )))))]
+        };
+        let get: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] if id == STORE_ID => {
+                Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![
+                    ("id".into(), Val::String(STORE_ID.into())),
+                    ("name".into(), Val::String(STORE_NAME.into())),
+                    (
+                        "hours".into(),
+                        Val::Record(vec![
+                            ("opens-minute".into(), Val::S64(7 * 60)),
+                            ("closes-minute".into(), Val::S64(19 * 60)),
+                        ]),
+                    ),
+                ])))))])
+            }
+            [Val::String(_)] => Ok(not_found()),
+            other => Err(format!("stores#get received {other:?}")),
+        });
+        let for_store: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] if id == STORE_ID => {
+                Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
+                    menu.iter()
+                        .map(|(id, name)| {
+                            Val::Record(vec![
+                                ("id".into(), Val::String(id.clone())),
+                                ("name".into(), Val::String(name.clone())),
+                            ])
+                        })
+                        .collect(),
+                )))))])
+            }
+            [Val::String(_)] => Ok(not_found()),
+            other => Err(format!("menus#for-store received {other:?}")),
+        });
+        BTreeMap::from([
+            ("store:data/stores#get".to_string(), get),
+            ("store:data/menus#for-store".to_string(), for_store),
+        ])
+    }
+
+    /// **Run a query's compiled component** (ADR-0125), with the data layer,
+    /// the session and the catalogue, and return its `Ok` value. Nothing a
+    /// query does is committed: it reads.
+    fn query(&self, component_id: &str, session: &str, args: &[Val]) -> Result<Val, String> {
+        let current = self
+            .carts
+            .lock()
+            .expect("carts")
+            .get(session)
+            .cloned()
+            .unwrap_or_default();
+        let mut host = Self::data_layer(session, current, Arc::default(), false);
+        host.insert(
+            "pw:host/session#read".to_string(),
+            Self::session_operation(session),
+        );
+        host.extend(self.catalog());
+        let out = self.run(component_id, session, &host, args)?;
+        match out.into_iter().next() {
+            Some(Val::Result(Ok(Some(v)))) => Ok(*v),
+            Some(Val::Result(Err(e))) => Err(format!("{component_id} answered {e:?}")),
+            Some(v) => Ok(v),
+            None => Err(format!("{component_id} returned nothing")),
+        }
+    }
+
+    /// **Each binding of the store page, by its query** (ADR-0125): the page
+    /// parameter `id` is the store this server holds, and `current_session()`
+    /// is the request's session.
+    fn bindings(&self, session: &str) -> Result<BTreeMap<String, Val>, String> {
+        let mut out = BTreeMap::new();
+        for b in self.plan["bindings"].as_array().into_iter().flatten() {
+            let args = b["args"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|a| match a.as_str() {
+                    Some("id") => Ok(Val::String(STORE_ID.into())),
+                    Some("current_session()") => Ok(Val::String(session.into())),
+                    other => Err(format!("an argument this server cannot compute: {other:?}")),
+                })
+                .collect::<Result<Vec<Val>, String>>()?;
+            let resource = b["resource"].as_str().unwrap_or_default();
+            out.insert(
+                b["binding"].as_str().unwrap_or_default().to_string(),
+                self.query(resource, session, &args)?,
+            );
+        }
+        Ok(out)
+    }
+
+    /// **A part's value**, by the steps the compiler planned: a record field,
+    /// or a member function run as its own component.
+    fn read_part(
+        &self,
+        bindings: &BTreeMap<String, Val>,
+        part: &serde_json::Value,
+    ) -> Result<Val, String> {
+        let binding = part["binding"].as_str().unwrap_or_default();
+        let mut value = bindings
+            .get(binding)
+            .cloned()
+            .ok_or_else(|| format!("no binding `{binding}`"))?;
+        for step in part["steps"].as_array().into_iter().flatten() {
+            value = if let Some(field) = step["field"].as_str() {
+                let wit = field.replace('_', "-");
+                match &value {
+                    Val::Record(fields) => fields
+                        .iter()
+                        .find(|(n, _)| *n == wit)
+                        .map(|(_, v)| v.clone())
+                        .ok_or_else(|| format!("no field `{field}`"))?,
+                    other => return Err(format!("`.{field}` read from {other:?}")),
+                }
+            } else if let Some(member) = step["member"].as_str() {
+                let out = self.run(member, "", &BTreeMap::new(), &[value])?;
+                out.into_iter()
+                    .next()
+                    .ok_or_else(|| format!("{member} returned nothing"))?
+            } else {
+                return Err(format!("a step this server does not know: {step}"));
+            };
+        }
+        Ok(value)
+    }
+
+    /// The text a part shows, found by its template path.
+    fn part_text(&self, session: &str, path: &str) -> Result<String, String> {
+        let part = self.plan["parts"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|p| p["path"] == path)
+            .ok_or_else(|| format!("the plan has no part `{path}`"))?
+            .clone();
+        let bindings = self.bindings(session)?;
+        Ok(match val_to_value(&self.read_part(&bindings, &part)?) {
+            Value::Text(t) => t,
+            Value::Int(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            other => return Err(format!("`{path}` has no text form: {other:?}")),
+        })
+    }
+
     /// Consume committed events and regenerate what they invalidate.
     fn drain(&self, session: &str) {
         let key = self.cart_key(session);
         let invalidated = self
             .materializer
             .drain(&self.graph, std::slice::from_ref(&key));
-        let value = self.cart_value(session);
+        // The count the page shows, as the page computes it: the cart query's
+        // value, read through `domain.line_count` (ADR-0125).
+        let value = self
+            .part_text(session, "cart.line_count")
+            .unwrap_or_else(|e| panic!("the cart part could not be computed: {e}"));
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!(
                 "drain session={session} invalidated={} value={value} existing={}",
@@ -1221,15 +1423,15 @@ impl Server {
     /// `cart_value` builds it for a component. Every line is priced 450, as
     /// the data layer prices it.
     fn cart_json(&self, session: &str) -> serde_json::Value {
-        let carts = self.carts.lock().expect("carts");
-        let lines = carts.get(session).cloned().unwrap_or_default();
-        serde_json::json!({
-            "lines": lines.iter().map(|(item, quantity)| serde_json::json!({
-                "item_id": item,
-                "quantity": quantity,
-                "unit_price": { "minor_units": 450 },
-            })).collect::<Vec<_>>(),
-        })
+        // The cart query's value, by its Pleris field names (ADR-0125).
+        let cart = self
+            .query(
+                "store.page.Cart",
+                session,
+                &[Val::String(session.to_string())],
+            )
+            .unwrap_or_else(|e| panic!("the cart query failed: {e}"));
+        val_to_json(&cart)
     }
 
     /// Does the page speculate on the session's cart? Read from the manifest:
@@ -1331,16 +1533,29 @@ impl Server {
         // menu inside the chain and locking it again inside `menu_fragment`
         // deadlocked a non-reentrant mutex against itself — presenting as a
         // request that simply never returned.
-        let items = self.menu.lock().expect("menu").clone();
+        //
+        // Every value is a query's (ADR-0125): each binding runs its compiled
+        // component, and each part reads the binding's value by the steps the
+        // compiler planned. The menu's items are the `Menu` query's.
+        let bindings = self
+            .bindings(session)
+            .unwrap_or_else(|e| panic!("the store page's queries: {e}"));
+        let items = menu_items(&bindings["menu"]);
         let fragment = self.menu_fragment(&items);
-        let env = Env::new()
-            .set("store.name", Value::Text("Blue Bottle".into()))
+        let mut env = Env::new()
             .set("menu", menu_value(&items))
             // The public fragment, EMITTED rather than rendered. Its instance
             // tokens are the fragment's own, so every reader's document
             // contains the same bytes and one patch addresses all of them.
-            .materialized(self.menu_part().1, &fragment)
-            .set("cart.line_count", Value::Int(self.cart_value(session)))
+            .materialized(self.menu_part().1, &fragment);
+        for part in self.plan["parts"].as_array().into_iter().flatten() {
+            let path = part["path"].as_str().unwrap_or_default();
+            let value = self
+                .read_part(&bindings, part)
+                .unwrap_or_else(|e| panic!("part `{path}`: {e}"));
+            env = env.set(path, val_to_value(&value));
+        }
+        let env = env
             // A page, not a materialization: its domain is the route identity
             // and its partition. The generation is carried whatever the
             // partition is — the two are orthogonal.
@@ -1525,6 +1740,72 @@ fn cart_value(lines: &[(String, i64)]) -> Val {
                 .collect(),
         ),
     )])
+}
+
+/// The one store this server holds (ADR-0125): what `stores#get` answers.
+const STORE_ID: &str = "47";
+const STORE_NAME: &str = "Blue Bottle";
+
+/// A component value as the renderer reads it: a record by its Pleris field
+/// names (the WIT's kebab case undone), an `Int` as an `Int`.
+fn val_to_value(v: &Val) -> Value {
+    match v {
+        Val::String(s) => Value::Text(s.clone()),
+        Val::Bool(b) => Value::Bool(*b),
+        Val::S64(n) => Value::Int(*n),
+        Val::S32(n) => Value::Int(i64::from(*n)),
+        Val::List(items) => Value::List(items.iter().map(val_to_value).collect()),
+        Val::Record(fields) => Value::Record(
+            fields
+                .iter()
+                .map(|(n, v)| (n.replace('-', "_"), val_to_value(v)))
+                .collect(),
+        ),
+        other => Value::Text(format!("{other:?}")),
+    }
+}
+
+/// A component value as a speculation module decodes it (ADR-0122).
+fn val_to_json(v: &Val) -> serde_json::Value {
+    match v {
+        Val::String(s) => serde_json::json!(s),
+        Val::Bool(b) => serde_json::json!(b),
+        Val::S64(n) => serde_json::json!(n),
+        Val::S32(n) => serde_json::json!(n),
+        Val::List(items) => serde_json::Value::Array(items.iter().map(val_to_json).collect()),
+        Val::Record(fields) => serde_json::Value::Object(
+            fields
+                .iter()
+                .map(|(n, v)| (n.replace('-', "_"), val_to_json(v)))
+                .collect(),
+        ),
+        other => serde_json::json!(format!("{other:?}")),
+    }
+}
+
+/// The menu's `(id, name)` items, from the `Menu` query's value.
+fn menu_items(menu: &Val) -> Vec<(String, String)> {
+    let Val::List(items) = menu else {
+        return Vec::new();
+    };
+    items
+        .iter()
+        .filter_map(|item| {
+            let Val::Record(fields) = item else {
+                return None;
+            };
+            let field = |name: &str| {
+                fields
+                    .iter()
+                    .find(|(n, _)| n == name)
+                    .and_then(|(_, v)| match v {
+                        Val::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+            };
+            Some((field("id")?, field("name")?))
+        })
+        .collect()
 }
 
 fn default_menu() -> Vec<(String, String)> {
@@ -2618,6 +2899,41 @@ mod tests {
                 .iter()
                 .any(|(_, f)| matches!(f, StreamFrame::EntryValue { .. })),
             "no value to a page that does not speculate"
+        );
+    }
+
+    /// **What the page shows is its queries'** (ADR-0125). Structural, as
+    /// `the_commands_and_handlers_are_the_compilers` is: a value written here
+    /// in Rust would render correctly and pass every behavioural test while
+    /// the compiled queries ran for nothing. The needles are assembled.
+    #[test]
+    fn the_pages_values_are_its_queries() {
+        let src = include_str!("main.rs");
+        let server_code = &src[..src
+            .find(&["#[cfg(test)]\nmod ", "tests"].concat())
+            .expect("the tests")];
+        for gone in [
+            [".set(\"store", ".name\""].concat(),
+            [".set(\"cart", ".line_count\""].concat(),
+            ["Value::Text(\"Blue", " Bottle\""].concat(),
+        ] {
+            assert!(
+                !server_code.contains(&gone),
+                "`{gone}` is back: a page value computed by the server, not its query"
+            );
+        }
+        // And the render goes through the plan.
+        let s = rendering_server();
+        let html = s.render_store("session-q");
+        assert!(
+            html.contains(STORE_NAME),
+            "the Store query's name is rendered"
+        );
+        s.command(ADD, "session-q", &add("cortado", 3), false)
+            .expect("runs");
+        assert_eq!(
+            s.part_text("session-q", "cart.line_count").as_deref(),
+            Ok("3")
         );
     }
 

@@ -907,12 +907,19 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     let labels: BTreeMap<crate::resolve::DefId, Label> =
         crate::check::Reads::of(hirs, sigs, &inference).labels();
 
+    // The functions a page's template reads as members (ADR-0125): a host
+    // calls each to compute what the page shows, so each is a component with
+    // a contract of its own. Not a dependency target: a call to one from
+    // Pleris code is still compiled into its caller.
+    let members = crate::page_values::members(hirs, ws, sigs);
+
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             // Components are the things a host runs: the units with behaviour.
             // A type or an import declaration has no authority to describe.
-            let Some(kind) = component_kind(decl.kind) else {
+            let member = members.contains(&crate::resolve::DefId { unit, decl: id.0 });
+            let Some(kind) = component_kind(decl.kind).or(member.then_some("function")) else {
                 continue;
             };
 

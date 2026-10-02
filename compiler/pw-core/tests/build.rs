@@ -63,6 +63,9 @@ fn the_store_builds_every_artifact_from_source() {
     assert_eq!(
         components,
         [
+            // The member function the page's count is read through, a
+            // component of its own since ADR-0125.
+            "domain.line_count",
             "store.page.Cart",
             "store.page.Menu",
             "store.page.Store",

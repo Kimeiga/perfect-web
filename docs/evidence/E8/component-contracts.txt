@@ -30,6 +30,10 @@ Resources.Store  abi 67b9938482d95947
   runs at   build, browser, edge, origin
   exports   query Store
 
+domain.line_count  abi 79995784a8451fc2
+  runs at   build, browser, edge, origin
+  exports   function line_count
+
 store.page.Cart  abi 37cb9e8b9dc1738c
   runs at   origin
   needs     database.read<Carts>
