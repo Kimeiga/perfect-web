@@ -13,6 +13,19 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-A done 2026-10-02**
+([ADR-0120](DECISIONS/ADR-0120-three-stores-one-contract.md),
+[evidence](evidence/E14/contract.txt), `just e14-contract`): the store in
+Next.js 16.3.8 and SvelteKit 2.70.3 beside the Pleris store, one behavioural
+contract passing on all three, and five mutant stores each failing it. Found
+on the way:
+- **the Pleris store declares an optimistic update and per-interaction
+  idempotency, and its runtime performs neither.** `pw check` checks both
+  clauses; no backend executes them. The shared contract excludes both;
+- the first SvelteKit store lost an add when two presses raced its session
+  cookie. Both framework stores now issue the session on the first response,
+  as Pleris does.
+
 **E10 closed 2026-10-02.** All five gate items were re-recorded at `bff437c`
 rather than closed on the 2026-09-25 evidence, since about 80 ADRs and a
 Wasmtime upgrade had landed since:
@@ -1756,14 +1769,14 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **E14-A:** the canonical store in Next.js and in SvelteKit, at feature
-   parity with `examples/store`, and one Playwright suite all three stores
-   pass. Versions verified against primary sources and pinned.
-2. **E14-B:** the benchmark harness, offline: isolation, grading, result
+1. **E14-B:** the benchmark harness, offline: isolation, grading, result
    records, and the four controls (baseline fails, reference passes, unsafe
    patch fails, no-op agent scores 0).
-3. **E14-C:** tasks T01-T12 with prompts, hidden tests, reference and unsafe
+2. **E14-C:** tasks T01-T12 with prompts, hidden tests, reference and unsafe
    patches, every control green on every stack.
+3. **Ruling, before T01 and T08 are written:** whether the Pleris runtime
+   executes `optimistic` and `idempotent_by` first, or the tasks measure
+   Pleris without them (ADR-0120).
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

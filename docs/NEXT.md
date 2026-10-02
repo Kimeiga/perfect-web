@@ -8,7 +8,8 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 E14 comes before E11-E13. Its plan, controls and task list are
 [docs/milestones/E14.md](milestones/E14.md). In order:
 
-1. **E14-A, the store in Next.js and in SvelteKit.** Feature parity with
+1. ~~**E14-A, the store in Next.js and in SvelteKit.**~~ Done 2026-10-02
+   (ADR-0120, `just e14-contract`). Feature parity with
    `examples/store`: the store heading, the menu, Add with an idempotent,
    optimistic, rolled-back cart update, Clear, a private cart beside a shared
    menu. One Playwright suite, run against all three stores, passes on each.

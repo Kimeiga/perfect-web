@@ -20,6 +20,10 @@ _build/
 node_modules/
 .pnpm-store/
 *.tsbuildinfo
+# Framework build output (benchmarks/baselines, E14)
+.next/
+.svelte-kit/
+next-env.d.ts
 
 # Generated intermediate sources (never authoring source of truth)
 /generated/

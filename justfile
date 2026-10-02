@@ -1999,6 +1999,33 @@ e10-close-bench RUNS="8":
      } > docs/evidence/E10/close-bench.txt
     @cat docs/evidence/E10/close-bench.txt
 
+# E14-A (ADR-0120): the canonical store in three stacks, one behavioural
+# contract. Each store builds and typechecks, the contract suite passes on all
+# three three times over, and each mutant store fails it.
+e14-contract:
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @mkdir -p docs/evidence/E14
+    @{ echo "E14-A - one store contract, three stacks"; echo; \
+       echo "produced by: just e14-contract"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "node: $(node --version)  pnpm: $(pnpm --version)"; \
+       for p in next react svelte @sveltejs/kit vite typescript @playwright/test; do \
+         for d in benchmarks/baselines/next-react benchmarks/baselines/sveltekit benchmarks/harness; do \
+           f="$d/node_modules/$p/package.json"; [ -f "$f" ] && printf '  %-18s %s  (%s)\n' "$p" "$(node -p "require('./$f').version")" "$d"; \
+         done; done | sort -u; echo; \
+       echo "== builds and typechecks"; \
+       (cd benchmarks/baselines/next-react && pnpm --silent build > /dev/null && echo "  next-react: built" && pnpm --silent typecheck && echo "  next-react: tsc clean"); \
+       (cd benchmarks/baselines/sveltekit && pnpm --silent build > /dev/null 2>&1 && echo "  sveltekit: built" && pnpm --silent typecheck 2>&1 | grep -oE "[0-9]+ ERRORS [0-9]+ WARNINGS" | sed 's/^/  sveltekit: svelte-check /'); \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw | sed 's/^/  pleris: /'; \
+       echo; echo "== the contract, every stack, three times (benchmarks/harness/contract)"; echo; \
+       (cd benchmarks/harness && pnpm exec playwright test --repeat-each=3 --reporter=list 2>&1 \
+         | sed 's/\x1b\[[0-9;]*m//g' | grep -E "^ +[0-9]+ (passed|failed|flaky)|✘" ); \
+       echo; echo "== negative controls (scripts/bench_contract_mutations.py)"; echo; \
+       python3 scripts/bench_contract_mutations.py; \
+     } > docs/evidence/E14/contract.txt
+    @cat docs/evidence/E14/contract.txt
+
 # The development server under sustained commands and session churn: frames
 # held, subscribers, outbox rows and materialized entries, each bounded. The
 # compiled command called 20,000 times through the E8 host, with resident memory

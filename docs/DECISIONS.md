@@ -872,3 +872,11 @@ and E7 gate 8 unstable on this machine at HEAD and at the recorded tree alike
 (open, E7-G8). Tasks that are not gate items are carried to E15. E14 runs
 before E11-E13, harness and tasks first, agents after the owner chooses
 models and budget.
+
+## 2026-10-02: three stores, one contract (E14)
+
+[ADR-0120](DECISIONS/ADR-0120-three-stores-one-contract.md): the canonical
+store in Next.js 16.3.8 and SvelteKit 2.70.3 (not the day-old 3.0.0) beside
+the Pleris store, held to one behavioural contract with mutant stores as
+negative controls. Found that the Pleris store's `optimistic` and
+`idempotent_by` are checked and not executed; the contract excludes both.

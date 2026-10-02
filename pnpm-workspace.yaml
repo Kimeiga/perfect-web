@@ -6,5 +6,11 @@ packages:
   # pages are static files `pw-render` produced, and the only devDependency is
   # the browser harness that reads them.
   - "spikes/own-renderer"
+  # E14-A: the canonical store in Next.js and SvelteKit, the baselines the AI
+  # benchmark compares Pleris against (ADR-0120). In the workspace so that
+  # `just audit` scans their dependency trees too (charter §3.6).
+  - "benchmarks/baselines/next-react"
+  - "benchmarks/baselines/sveltekit"
+  - "benchmarks/harness"
   # runtime/*, benchmarks/baselines/* and examples/* join as milestones need them
   # (PROJECT_CHARTER.md §12: do not create empty directories to look complete).

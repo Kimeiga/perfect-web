@@ -368,6 +368,14 @@ rollout test was run locally in the September 15 review. Prior observations keep
 their original scope. The false-green recipe defect does not prove old tests
 failed, but a recipe's zero exit status alone was insufficient evidence.
 
+**`optimistic` and `idempotent_by` are checked and not executed**
+(2026-10-02, ADR-0120). The store's `add_to_cart` declares both. No backend
+emits code for an `optimistic` clause, so the count moves only when the
+server's patch arrives, and the development server's command path takes no
+interaction id, so a retried request adds twice. `runtime/pw-resource` has
+idempotency keys (E4); the E10 command path does not use them. E14's shared
+store contract excludes both for every stack.
+
 **E7 gate 8 is unstable on this machine** (2026-10-02, E7-G8). About half
 of runs see one long animation frame of 52-63 ms, with no script attributed
 and 4-6 ms blocking, at HEAD and at `6545029` alike. `just e10-bench` stops at

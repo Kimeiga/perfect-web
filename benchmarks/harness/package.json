@@ -1,0 +1,7 @@
+{
+  "name": "pw-bench-harness",
+  "private": true,
+  "type": "module",
+  "//": "1.58.0 to match the browser builds installed on this host, as spikes/own-renderer does.",
+  "devDependencies": { "@playwright/test": "1.58.0" }
+}
