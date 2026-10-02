@@ -377,13 +377,22 @@ within stated bounds (ADR-0120 found both unexecuted):
   cart line is priced zero until the server answers (ruling offered).
 E14's shared store contract still excludes both, for every stack.
 
-**A session's cart can be cached shared by declaring its query `public`**
-(found 2026-10-02 by E14's T12). `public query Cart(session: Session<SessionId>)`
-with `consistency snapshot` and `cache shared` checks clean, though its body
-returns that session's cart: `Carts.current(s)` takes the session in a
-parameter that states its label, so by ADR-0085 the result carries none.
-`session query` with `cache shared` is refused (PW0100, PW5001); the guard is
-the modifier, and dropping it drops the guard. Ruling needed (ADR-0085).
+**A value's label is lost in five ways** (found 2026-10-02 writing
+ADR-0128; each a probe that checks clean). The cache rules read a
+declaration's whole label since ADR-0128, so a session's cart can no longer
+be cached shared by declaring its query `public`. A *value's* label, which
+the sinks read, is still lost:
+- through a parameter that states a label: `fn shown(key: Secret<Payments>)
+  -> String { "{key}" }` returns a public string (ADR-0085's contract);
+- through a helper's body: a call's value is labelled by the callee's
+  signature, so a helper returning a secret it read in a `String` launders it;
+- through a branch: `if secret { "a" } else { "b" }` is public, and a public
+  log inside such a branch is not refused;
+- at `log<Public>`, which refuses a secret and accepts a session's or a
+  user's value;
+- at PW5003, which reads only a label's first restriction, so a value that is
+  both a session's and a secret is not reported rendered into markup.
+The next ruling (ADR-0085's open half).
 
 **The development server honours query policies except two** (ADR-0127):
 `on_key_change` (a served page never changes its key) and `consistency`

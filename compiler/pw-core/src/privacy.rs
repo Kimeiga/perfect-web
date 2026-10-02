@@ -129,9 +129,21 @@ impl Label {
     ///
     /// Charter §7.8: a session or user value in a shared public cache is the
     /// canonical failure. `Device` is included because a shared cache is by
-    /// definition not on one device.
+    /// definition not on one device, and a secret is never cached.
+    ///
+    /// **Whatever its key** (ADR-0128). A key naming the reader keeps one
+    /// reader's entry from another's, and an entry only one reader can hit
+    /// gains nothing from being shared: it only puts that reader's value, and
+    /// their identifier, where every reader's is held. Its place is the
+    /// private partition (charter §15.2). A tenant's value is the exception,
+    /// because a tenant's readers share it: a shared cache may hold one keyed
+    /// by its organization, which is PW5004's to check. Until 2026-10-02 this
+    /// was `is_public`, and a value labelled public by its declaration but
+    /// keyed by `session` or `user` reached the shared cache.
     pub fn safe_in_shared_cache(&self) -> bool {
-        self.is_public()
+        self.0
+            .iter()
+            .all(|r| matches!(r, Restriction::Organization(_)))
     }
 
     /// The partitions a cache key must include for this value to be cacheable
@@ -302,15 +314,20 @@ mod tests {
 
     // --- the rules the algebra exists to serve ------------------------------
 
+    /// ADR-0128: a shared cache holds public values, and a tenant's value
+    /// keyed by its tenant (PW5004 checks the key). One reader's value never,
+    /// whatever the key, and a secret never.
     #[test]
-    fn only_public_values_are_safe_in_a_shared_cache() {
+    fn a_shared_cache_holds_no_one_readers_value() {
         assert!(Label::public().safe_in_shared_cache());
+        assert!(Label::organization("acme").safe_in_shared_cache());
         for l in [
             Label::session("abc"),
             Label::user("u1"),
-            Label::organization("acme"),
             Label::device(),
             Label::secret("payments"),
+            Label::organization("acme").join(&Label::session("abc")),
+            Label::organization("acme").join(&Label::secret("payments")),
         ] {
             assert!(
                 !l.safe_in_shared_cache(),

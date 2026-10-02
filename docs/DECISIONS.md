@@ -943,3 +943,14 @@ partition, key (every argument when no `key` is written), retries, timeout,
 one flight per key; a commit drops exactly the entries it invalidates. Found
 on the way: a page served after a menu change showed the old menu, and two
 presses at once rolled both back.
+
+## 2026-10-02: a shared cache holds no one reader's value (E14)
+
+[ADR-0128](DECISIONS/ADR-0128-a-shared-cache-holds-no-one-readers-value.md):
+charter §7.8's first must-fail example, `SharedCache<Cart@Session>`, passed
+when the cart query was declared `public` and given the session as a
+parameter (T12's wrong fix), and when any reader's value was keyed by its
+reader. A declaration now observes what it is given, every cache rule reads
+that whole label, and no key makes a session's, user's or device's value
+shareable; a tenant's, keyed by its organization, is the one a shared cache
+may hold. Closes generality's last known gap (31 / 31).

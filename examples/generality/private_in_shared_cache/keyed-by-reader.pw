@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: private_in_shared_cache
+// @dimension: keyed by the reader — the user IS in the key
+//
+// The current user's value in a shared cache whose key names the user. Each
+// user gets their own entry, and that is the point: an entry only one reader
+// can hit gains nothing from a cache shared between readers, and puts that
+// reader's value where every reader's is held. Its place is the private
+// partition (charter §15.2). Until 2026-10-02 this was
+// `cache_key_omits_partition`'s valid neighbour; ADR-0128 ruled it a defect.
+module generality.cache_keyed_by_reader
+
+import Menus
+import context
+import domain.{ MenuItem, StoreId }
+import domain.{ StoreError }
+
+query Recent(store: StoreId, limit: Int) -> Result<List<MenuItem>, StoreError>
+    cache shared
+    key   store, limit, user
+{
+    Menus.for_user(store, limit, context.current_user())
+}

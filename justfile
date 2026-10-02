@@ -1495,6 +1495,23 @@ e10-reads-through-calls:
      } > docs/evidence/E10/reads-through-calls.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/reads-through-calls.txt
 
+# ADR-0128: a shared cache holds no one reader's value, whatever its
+# declaration says. The regression tests, the generality score they moved
+# (31 / 31), and a mutant per piece of the decision.
+e14-shared-cache:
+    @{ echo "ADR-0128 - a shared cache holds no one reader's value, whatever its declaration says"; echo; \
+       echo "produced by: just e14-shared-cache"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== regression tests (compiler/pw-core/tests/shared_cache_holds_no_readers_value.rs)"; echo; \
+       cargo test --locked -p pw-core --test shared_cache_holds_no_readers_value 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== generality (just generality)"; echo; \
+       cargo test --quiet --locked -p pw-core --test generality -- --nocapture 2>&1 | grep -E '^  (corpus|generally|narrowly|generality)'; \
+       echo; echo "== mutation controls (scripts/shared_cache_mutations.py)"; echo; \
+       python3 scripts/shared_cache_mutations.py; \
+     } > docs/evidence/E14/shared-cache.txt
+    @grep -E "^test result|mutants killed|generality" docs/evidence/E14/shared-cache.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -1,25 +1,19 @@
-// @status: NARROW
+// @status: GENERAL
 // @invariant: private_in_shared_materialization
 // @dimension: the private value arrives through a PUBLIC query whose body
 //             reads it — the fragment's edge is public, so the graph is right
-//             and the conclusion is wrong
-//
-// This compiles clean and it should not.
+//             and the conclusion was wrong
 //
 // `PW5101` reads the dependency graph, and the graph has one edge per
-// `depends_on` target. `Summary` is declared `public` and cached `shared`, so
-// the edge is public and the fragment looks correct. What `Summary` actually
-// returns is derived from a session-scoped cart.
+// `depends_on` target. `Summary` is declared `public`, so the edge looked
+// public. What `Summary` returns is derived from a session-scoped cart.
 //
-// Seeing this needs label dataflow over the produced VALUE, which is what
-// `private_in_shared_cache` already does for a page's body — over a body a
-// `materialize` block does not have. That is the work, and it is E7's: a
-// fragment gets a body when there is a renderer to give it one.
-//
-// Written as a program rather than as a sentence in a document so the gap
-// cannot drift out of date. `just generality` fails the moment this stops
-// compiling clean, and then the file is promoted rather than deleted.
-module generality.materialize_slips_helper
+// A known gap until 2026-10-02, kept as a NARROW witness. ADR-0128 closed it
+// without a fragment body: a declaration observes its own parameters, and
+// `Summary(session: Session<SessionId>)` is given the session. The query
+// declares no cache since, so neither its own cache nor a private one decides
+// this: only what it is given. The fragment is the one thing reported.
+module generality.materialize_helper
 
 import Resources.{ Cart }
 import Events.{ CartChanged }
@@ -30,7 +24,6 @@ import capability.{ Session, SessionId }
 public query Summary(session: Session<SessionId>) -> Int
     freshness     5.seconds
     consistency   snapshot
-    cache         shared
     key           session
     concurrency   one_per_key
     on_key_change cancel

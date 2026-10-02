@@ -26,6 +26,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
 3. **E14-C, tasks T01-T12**, each with a prompt, hidden tests, a reference
    patch and an unsafe patch per stack, and all four controls green. A task
    Pleris cannot express (T06 forms, T11 dialogs, today) is recorded as such.
+   T01, T08 and T12 are written. T12's Pleris wrong fix is refused since
+   ADR-0128.
+   - **Next: E14-L, a value's label** (EVIDENCE_LEDGER). ADR-0128's probes
+     found five ways a value's label is still lost: a parameter that states
+     one, a helper's body, a branch's condition, `log<Public>` taking a
+     session's value, and PW5003 reading one restriction. Acceptance: each
+     probe is a test that fails at the commit before and passes after, with a
+     control; no accepted, store or kiokun program gains a diagnostic it
+     should not; a mutant per piece.
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

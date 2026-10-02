@@ -1,0 +1,22 @@
+// @status: GENERAL
+// @invariant: private_in_shared_cache
+// @dimension: relabelled — the keyword says public, the parameter says whose
+//
+// T12's plausible wrong fix (ADR-0124): a `session query` refused a shared
+// cache is declared `public` instead, and keyed by its session. The value is
+// still one session's cart. A query is a function of its arguments, so what
+// its parameters carry is what it holds, whatever its keyword (ADR-0128). This
+// compiled clean until 2026-10-02.
+module generality.cache_relabelled
+
+import Carts
+import capability.{ Session, SessionId }
+import domain.{ Cart, CartError }
+
+public query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+    freshness 0.seconds
+    cache     shared
+    key       session
+{
+    Carts.current(session)
+}

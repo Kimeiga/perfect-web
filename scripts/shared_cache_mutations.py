@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0112: a call's privacy is the declaration it
-resolves to.
+"""Mutation controls for ADR-0128: a shared cache holds no one reader's
+value, whatever its declaration says.
 
-Each mutant undoes one piece: resolving a callee as the unit sees it, the
-body's label reading that resolution, a sink's level reading it, and PW5004
-staying silent where PW5001 refuses the value. The tests in
-`privacy_by_resolution.rs` must then fail.
+Each mutant undoes one piece: a declaration observing its own parameters, a
+reader's value being unshareable whatever its key, PW5001 reading the whole
+label, a key item naming a tenant parameter, and PW5004 leaving a reader's
+value to PW5001. The tests in `shared_cache_holds_no_readers_value.rs` and
+the generality witnesses must then fail.
 
-Run from the repository root; `just e10-privacy-by-resolution` records the
-output. The source is restored after every mutant, whatever happens.
+Run from the repository root; `just e14-shared-cache` records the output.
+The source is restored after every mutant, whatever happens.
 """
 
 import pathlib
@@ -18,41 +19,48 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
+PRIVACY = ROOT / "compiler/pw-core/src/privacy.rs"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
     (
-        "a callee is found by its spelling",
+        "a declaration's own parameters are not read",
         CHECK,
-        "    inference\n"
-        "        .called_from(at, &path)\n"
-        "        .and_then(|def| sigs.by_def(def))\n"
-        "        .or_else(|| sigs.by_path(&path))\n",
-        "    let _ = (inference, at);\n"
-        "    sigs.by_path(&path)\n",
+        "                    if let Some(given) = given_label(sigs, sig) {\n",
+        "                    if let Some(given) = None::<(Label, String)> {\n",
     ),
     (
-        "the body's label is read by spelling",
-        CHECK,
-        "        if let Some(sig) = callee_signature(sigs, inference, at, body, *callee) {",
-        "        if let Some(sig) = sigs.by_path(&path_of(body, *callee)) {",
+        "a reader's value keyed by the reader is shareable",
+        PRIVACY,
+        "            .all(|r| matches!(r, Restriction::Organization(_)))\n",
+        "            .all(|r| !matches!(r, Restriction::Secret(_)))\n",
     ),
     (
-        "a sink is read by spelling",
+        "PW5001 reads the declared label only",
         CHECK,
-        "    let sig = callee_signature(sigs, inference, at, body, callee)?;",
-        "    let sig = sigs.by_path(&path_of(body, callee))?;",
+        "    let held = label.join(&reads.observed(def));\n",
+        "    let held = label.clone();\n",
     ),
     (
-        "PW5004 speaks where PW5001 does",
+        "a key item naming a tenant parameter does not count",
         CHECK,
-        "    if !label.safe_in_shared_cache() {",
-        "    if !label.safe_in_shared_cache() && false {",
+        "                covered.extend(sigs.label(ty).required_cache_partitions());\n",
+        "                let _ = ty;\n",
+    ),
+    (
+        "PW5004 does not read what the declaration observes",
+        CHECK,
+        "        .join(&reads.observed(def))\n        .join(&label);\n",
+        "        .join(&label);\n",
     ),
 ]
 
 TESTS = [
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "privacy_by_resolution"],
+    [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+        "--test", "shared_cache_holds_no_readers_value",
+    ],
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "generality"],
 ]
 
 

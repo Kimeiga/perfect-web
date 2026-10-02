@@ -103,7 +103,7 @@ MUTANTS = [
     (
         "a key's partition is found in its text",
         CHECK,
-        "        .filter(|p| !items.contains(&p.as_str()))",
+        "        .filter(|p| !covered.contains(p))",
         "        .filter(|p| !key_text.contains(p.as_str()))",
     ),
     (

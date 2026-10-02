@@ -1,20 +1,19 @@
-// @status: NARROW
+// @status: GENERAL
 // @invariant: private_in_shared_materialization
 // @dimension: the dependency is public on one path and session-derived on the
 //             other, so no single declaration is wrong and the edge is public
 //
-// This compiles clean and it should not.
+// `Personalised` returns 0 for a signed-out reader and a session-derived
+// answer for a signed-in one. Its declaration says `public` about both.
 //
-// The branch shape is the one that defeats a rule reading declarations rather
-// than values: `Personalised` returns the public menu for a signed-out reader
-// and a session-derived answer for a signed-in one. Its declaration is honest
-// about neither, because a declaration describes one type and this returns one
-// type by two routes.
-//
-// `private_in_shared_cache/branch-join.pw` is the same dimension for pages, and
-// it is CAUGHT there — the label algebra joins the two paths. The difference is
-// not the analysis, it is that a page has a body to run it over.
-module generality.materialize_slips_branch
+// A known gap until 2026-10-02: this compiled clean, and was kept as a NARROW
+// witness so the gap could not drift out of date. ADR-0128 closed it. A query
+// is a function of its arguments, so `Personalised(session:
+// Session<SessionId>)` holds the session's value whatever its keyword says,
+// and the fragment depending on it is refused. The query declares no
+// cache since, so neither its own cache nor a private one decides this: only
+// what it is given. The fragment is the one thing reported.
+module generality.materialize_branch
 
 import Resources.{ Cart }
 import Events.{ CartChanged }
@@ -24,7 +23,6 @@ import capability.{ Session, SessionId }
 public query Personalised(session: Session<SessionId>) -> Int
     freshness     5.seconds
     consistency   snapshot
-    cache         shared
     key           session
     concurrency   one_per_key
     on_key_change cancel

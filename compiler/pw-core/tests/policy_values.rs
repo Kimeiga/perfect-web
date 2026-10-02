@@ -167,15 +167,20 @@ fn a_key_names_a_parameter_or_a_partition() {
 /// every user's entry in one place, and the rule found `user` in the text.
 #[test]
 fn a_key_separates_a_partition_by_naming_it() {
+    // A tenant's value, since ADR-0128: a shared cache holds no one reader's
+    // value whatever its key, so a key names a partition only for a tenant.
+    // The case was the user's, with a key item called `username`.
     let src = |key: &str| {
         format!(
-            "module t\n\nimport context\nimport capability.{{ User, UserId }}\n\n\
-             public query Recent(store: Int, username: String) -> User<UserId> !{{ session.read }}\n    \
-             freshness 30.seconds\n    cache shared\n    key {key}\n{{\n    context.current_user()\n}}\n"
+            "module t\n\nimport context\nimport capability.{{ Organization, OrganizationId }}\n\n\
+             public query Recent(store: Int, organization_name: String) -> \
+             Organization<OrganizationId> !{{ session.read }}\n    \
+             freshness 30.seconds\n    cache shared\n    key {key}\n{{\n    \
+             context.current_organization()\n}}\n"
         )
     };
-    says(&src("store, username"), &["PW5004"]);
-    clean(&src("store, user"));
+    says(&src("store, organization_name"), &["PW5004"]);
+    clean(&src("store, organization_name, organization"));
 }
 
 #[test]

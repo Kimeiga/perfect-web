@@ -44,7 +44,7 @@ where applicable. **8/8 complete**, each with its own `DIMENSIONS.md`.
 | invariant | dimensions | notes |
 |---|---|---|
 | `value_exceeds_sink_level` | 9 | the widest matrix; two neighbours |
-| `private_in_shared_cache` | 6 | two neighbours — the invariant is a conjunction |
+| `private_in_shared_cache` | 8 | two neighbours — the invariant is a conjunction; relabelled and reader-keyed since ADR-0128 |
 | `declared_placement_cannot_grant` | 5 | two neighbours — a pairing of world and capability |
 | `undeclared_effect` | 6 | includes an open row, which is not a claim |
 | `forbidden_effect` | 6 | three neighbours — deferred, per-reader, own-world |
@@ -68,7 +68,7 @@ ownership, control flow, higher-order functions, or cross-module contracts.
 | `wrong_frame_phase` | helper extraction, nesting, neighbour | 3 | — |
 | `observation_feedback_cycle` | helper extraction, neighbour, property choice | 3 | — |
 | `false_independence` | nesting, own-definition neighbour | 2 | — |
-| `cache_key_omits_partition` | partition variation, key variation, neighbour | 3 | — |
+| `cache_key_omits_partition` | helper extraction, key variation, neighbour (the tenant, since ADR-0128) | 3 | — |
 | `task_detached` | deferred execution, nesting, neighbour | 3 | — |
 | `no_feasible_placement` | multi-capability, neighbour | 2 | — |
 | `dead_internal_link` | arity variation, neighbour | 2 | — |

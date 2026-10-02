@@ -1,20 +1,30 @@
 // @status: GENERAL
 // @invariant: cache_key_omits_partition
-// @dimension: indirect invalid — a different partition, and a longer key
+// @dimension: indirect invalid — the tenant is read through a helper
 //
-// The key has two components and still omits the one that matters. A rule
-// checking that a key EXISTS, or that it is non-trivial, would pass this.
+// R-005 reads the organization in the query's own body. Here a helper reads
+// it, so nothing in the query names a tenant. A rule reading only the body it
+// is checking would pass this.
+//
+// Until 2026-10-02 this file put the current USER's value in the shared cache
+// with a key that omitted the user. ADR-0128 made that shape
+// `private_in_shared_cache`'s: no key makes one reader's value shareable, and
+// a tenant's is the one partition a shared cache can carry by its key.
 
-module generality.key_user
+module generality.key_tenant_helper
 
 import Menus
 import context
 import domain.{ MenuItem, StoreId }
 import domain.{ StoreError }
 
-query Recent(store: StoreId, limit: Int) -> Result<List<MenuItem>, StoreError>
+fn tenant_menu(store: StoreId) -> Result<List<MenuItem>, StoreError> !{ database.read<Menus>, session.read } {
+    Menus.for_store_in_org(store, context.current_organization())
+}
+
+query Recent(store: StoreId) -> Result<List<MenuItem>, StoreError>
     cache shared
-    key   store, limit
+    key   store
 {
-    Menus.for_user(store, limit, context.current_user())
+    tenant_menu(store)
 }

@@ -112,13 +112,15 @@ fn a_sink_is_one_however_it_is_imported() {
 
 #[test]
 fn a_session_read_is_one_however_it_is_imported() {
+    // PW5001's since ADR-0128: a session's value is refused a shared cache
+    // whatever its key, where PW5004 asked for the session in the key.
     for (import, call) in [
         ("context", "context.current_session()"),
         ("context.{ current_session }", "current_session()"),
     ] {
         assert_eq!(
             reported(&mine(import, call)),
-            ["PW5004 `Mine` is Session<SessionId> but its shared cache key omits session"],
+            ["PW5001 `Mine` is Session<SessionId> and declares a shared cache"],
             "{call}"
         );
     }

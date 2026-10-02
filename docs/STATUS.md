@@ -13,6 +13,22 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0128, 2026-10-02: a shared cache holds no one reader's value, whatever
+its declaration says**
+([ADR-0128](DECISIONS/ADR-0128-a-shared-cache-holds-no-one-readers-value.md)).
+Charter §7.8's first must-fail example, `SharedCache<Cart@Session>`, passed
+`pw check` in two shapes: a cart query declared `public` (or with no keyword)
+and given the session as a parameter, which is T12's plausible wrong fix; and
+any reader's value in a shared cache keyed by that reader, which the
+generality matrix held as a *valid neighbour*. Both are refused now, and a
+tenant's value keyed by its organization is the one partition a shared cache
+may carry. **Generality is 31 / 31 with no known narrow invariant** (30 / 31
+with 1 since C3): the ruling closed both executable known gaps. Found on the
+way and written down as the next ruling: five ways a *value's* label is still
+lost (a labelled parameter, a helper's body, a branch's condition, a public
+log taking a session's value, and PW5003 reading only a label's first
+restriction).
+
 **E14-Q, second slice, 2026-10-02: queries run by their declared policies**
 ([ADR-0127](DECISIONS/ADR-0127-queries-run-by-their-declared-policies.md)).
 `pw-resource` now applies each query's freshness, cache partition, key,
@@ -32,11 +48,9 @@ count a Rust sum. The compiler now plans each page's values, compiles
 Query policies (freshness, cache, key, concurrency) are the second slice.
 
 **E14-C started 2026-10-02: three of twelve tasks written**
-([plan](milestones/E14.md)). T01 and T08 hold all four controls on all three
-stacks. T12 holds them on Next.js and SvelteKit, and **on Pleris its unsafe
-control fails**: moving the cart into a `public` query keeps it in a shared
-cache and checks clean, and the server honours no cache policy, so nothing
-sees the leak. Nine tasks cannot be graded on Pleris today: six need the
+([plan](milestones/E14.md)). T01, T08 and T12 hold all four controls on all
+three stacks. T12's did not on Pleris until ADR-0128: moving the cart into a
+`public` query kept it in a shared cache and checked clean. Nine tasks cannot be graded on Pleris today: six need the
 server to run the store's queries (E14-Q), and three need language features
 that wait on rulings (T05 streams, ADR-0075; T06 the event parameter,
 ADR-0058; T11 view composition, ADR-0072).
@@ -1843,8 +1857,8 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
    T02, T03, T04, T07, T09 and T10 on Pleris, and T12's runtime half.
 2. **E14-C, continued:** the framework halves of the blocked tasks, and each
    task's Pleris half as its blocker closes.
-3. **Rulings**: label polymorphism or declassification (ADR-0085, now
-   T12's checker half); the event parameter (ADR-0058, T06); view
+3. **Rulings**: a value's label (E14-L, ADR-0085's open half: ADR-0128
+   settled the cache half); the event parameter (ADR-0058, T06); view
    composition (ADR-0072, T11); streams (ADR-0075, T05); design comments in
    task baselines (ADR-0124); an unpriced optimistic line and `entry_value`
    (ADR-0122).

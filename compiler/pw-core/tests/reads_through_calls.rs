@@ -183,7 +183,9 @@ fn shared_query(body: &str) -> String {
 
 #[test]
 fn a_shared_cache_reads_through_a_helper() {
-    let expected = ["PW5004 `Mine` is Session<SessionId> but its shared cache key omits session"];
+    // PW5001's since ADR-0128: a session's value is refused a shared cache
+    // whatever its key, where PW5004 asked for the session in the key.
+    let expected = ["PW5001 `Mine` is Session<SessionId> and declares a shared cache"];
     assert_eq!(
         reported(&format!(
             "{IMPORTS}{}",
@@ -224,14 +226,15 @@ fn a_shared_page_reads_through_a_public_query() {
         )),
         ["PW5001 `ShopPage` is Session<SessionId> and declares a shared cache"],
     );
-    // Reading the session: PW5004's, as calling `current_session()` is.
+    // Reading the session: PW5001's too since ADR-0128, where it was PW5004
+    // asking for the session in the key.
     assert_eq!(
         reported(&format!(
             "{IMPORTS}{}{}",
             query("Relay", "", CART, "Carts.current(current_session())"),
             page("shared")
         )),
-        ["PW5004 `ShopPage` is Session<SessionId> but its shared cache key omits session"],
+        ["PW5001 `ShopPage` is Session<SessionId> and declares a shared cache"],
     );
     // The controls: the same page, cached per reader; and a shared page whose
     // handler calls a command that reads the session. A call to a command is

@@ -2823,6 +2823,7 @@ fn check_unit_with(
             &unit.hir,
             &unit.src,
             labels,
+            reads,
             inference,
             // Where each effect is meaningful, as the program declares it.
             // There was a hard-coded family→world table in `placement.rs`
@@ -4098,6 +4099,7 @@ fn privacy_and_placement(
     hir: &Hir,
     src: &str,
     labels: &BTreeMap<crate::resolve::DefId, Label>,
+    reads: &Reads,
     inference: &crate::effects::Inference<'_>,
     declared: &dyn crate::placement::Placements,
     at: usize,
@@ -4113,10 +4115,33 @@ fn privacy_and_placement(
     let (read, read_from) = reads_label_with_source(hir, labels, inference, at, decl);
     let label = label_of(decl).join(&read);
 
-    // 1. A non-public value in a shared cache. Charter §7.8's canonical case.
+    // 1. A reader's value in a shared cache. Charter §7.8's canonical case.
+    //
+    // The value's whole label (ADR-0128): what the declaration observes,
+    // its own parameters included, and not only what its keyword and its
+    // callees' keywords declare. `public query Cart(session:
+    // Session<SessionId>) cache shared` held each session's cart in the
+    // shared cache and passed until 2026-10-02 (T12).
+    let def = crate::resolve::DefId {
+        unit: at,
+        decl: id.0,
+    };
+    let held = label.join(&reads.observed(def));
     if let Some((cache_value, cache_span)) =
-        declared_cache(hir, decl).filter(|(v, _)| v == "shared" && !label.safe_in_shared_cache())
+        declared_cache(hir, decl).filter(|(v, _)| v == "shared" && !held.safe_in_shared_cache())
     {
+        let label = &held;
+        // The parameter, where one is the source: the related span is where
+        // it is declared, not the whole declaration.
+        let param = read_from
+            .is_none()
+            .then(|| reads.given_by(def))
+            .flatten()
+            .and_then(|name| decl.params.iter().find(|p| p.name == name));
+        let read_from = read_from
+            .map(|v| format!("`{v}`"))
+            .or_else(|| param.map(|p| format!("its parameter `{}`", p.name)))
+            .or_else(|| observed_from(hir, reads, inference, at, decl).map(|v| format!("`{v}`")));
         {
             let cache = crate::hir::Policy {
                 name: "cache".to_string(),
@@ -4125,7 +4150,6 @@ fn privacy_and_placement(
                 keys: Vec::new(),
                 span: cache_span,
             };
-            let needed = label.required_cache_partitions();
             out.push(Diagnostic {
                 code: "PW5001",
                 invariant: "a value that is not public cannot live in a shared cache",
@@ -4134,39 +4158,43 @@ fn privacy_and_placement(
                 severity: Severity::Error,
                 message: format!("`{}` is {label} and declares a shared cache", decl.name),
                 primary_span: cache.span.clone(),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id_of(hir, decl)),
-                    label: format!("`{}` is labelled {label} here", decl.name),
+                related: vec![match param {
+                    Some(p) => Related {
+                        span: p.span.clone(),
+                        label: format!(
+                            "`{}` is {label}, so what `{}` makes from it is",
+                            p.name, decl.name
+                        ),
+                    },
+                    None => Related {
+                        span: hir.decl_span(decl_id_of(hir, decl)),
+                        label: format!("`{}` is labelled {label} here", decl.name),
+                    },
                 }],
                 explanation: Some(format!(
                     "A shared cache may contain only `Public` values, because every \
                      user reads it. The cause chain: `{}` materializes {}, which is \
                      labeled `{label}`, and `{label}` does not flow into `Public` — \
-                     so one user's value would be served to another.",
+                     so one user's value would be served to another. A key naming \
+                     the reader does not make it shareable: an entry only that \
+                     reader can hit gains nothing from a shared cache, and puts \
+                     their value where every reader's is held (ADR-0128).",
                     decl.name,
-                    read_from
-                        .as_deref()
-                        .map(|v| format!("`{v}`"))
-                        .unwrap_or_else(|| "a non-public value".to_string()),
+                    read_from.as_deref().unwrap_or("a non-public value"),
                 )),
-                repairs: vec![
-                    Repair {
-                        description: format!(
-                            "partition the cache by {} so each one gets its own entry",
-                            if needed.is_empty() {
-                                "the restriction".to_string()
-                            } else {
-                                needed.join(" and ")
-                            }
-                        ),
-                        replacement: None,
-                    },
-                    Repair {
-                        description: "or make the cache private, which stores per session"
+                repairs: if label.holds_a_secret() {
+                    vec![Repair {
+                        description: "do not cache a value holding a secret: cache what \
+                                      the secret fetched, or nothing"
                             .to_string(),
+                        replacement: None,
+                    }]
+                } else {
+                    vec![Repair {
+                        description: "make the cache private, which stores per session".to_string(),
                         replacement: Some((cache.span.clone(), "cache private".to_string())),
-                    },
-                ],
+                    }]
+                },
             });
         }
     }
@@ -4465,6 +4493,13 @@ pub(crate) struct Reads {
     returned: BTreeMap<crate::resolve::DefId, Label>,
     /// The label each declaration's own result type carries.
     results: BTreeMap<crate::resolve::DefId, Label>,
+    /// **What each declaration is given** (ADR-0128): the labels its own
+    /// parameters state, a secret left out, and the first parameter stating
+    /// one. A query is a function of its arguments, so a `public query
+    /// Cart(session: Session<SessionId>)` holds a session's value whatever
+    /// its keyword says. Until 2026-10-02 nothing read a declaration's own
+    /// parameters, and that query passed `cache shared` (T12).
+    given: BTreeMap<crate::resolve::DefId, (Label, String)>,
 }
 
 impl Reads {
@@ -4481,6 +4516,10 @@ impl Reads {
                 me.declared.insert(def, label_of(decl));
                 if let Some(sig) = sigs.by_def(def) {
                     me.results.insert(def, sig.label.clone());
+                    if let Some(given) = given_label(sigs, sig) {
+                        me.returned.insert(def, given.0.clone());
+                        me.given.insert(def, given);
+                    }
                 }
                 if decl.kind == DeclKind::Command {
                     continue;
@@ -4528,6 +4567,19 @@ impl Reads {
             Some(r) => result.join(r),
             None => result,
         }
+    }
+
+    /// **Everything `def` observes** (ADR-0128): its visibility, what it
+    /// reads through what it calls, its own result, and what it is given.
+    /// What a cache rule reads, so neither its keyword nor its spelling can
+    /// lower the label of the value it holds.
+    pub(crate) fn observed(&self, def: crate::resolve::DefId) -> Label {
+        self.declared(def).join(&self.through(def))
+    }
+
+    /// The parameter that makes `def` hold a reader's value, if one does.
+    pub(crate) fn given_by(&self, def: crate::resolve::DefId) -> Option<&str> {
+        self.given.get(&def).map(|(_, name)| name.as_str())
     }
 
     /// Each declaration's `declared` label, where it is not public: what
@@ -4595,6 +4647,66 @@ fn reads_of(
         }
     }
     out
+}
+
+/// What a declaration reads that makes its value a reader's, by name: the
+/// first declaration it reads whose result, through what that reads, is not
+/// public (ADR-0128). For a cause chain that names a source.
+fn observed_from(
+    hir: &Hir,
+    reads: &Reads,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
+    decl: &Decl,
+) -> Option<String> {
+    let body = hir.body(decl.body?);
+    for id in body.walk() {
+        let called = match body.expr(id) {
+            Expr::Call { callee, .. } => path_of(body, *callee),
+            Expr::Keyword {
+                keyword, modifiers, ..
+            } if keyword == "query" || keyword == "subscribe" => {
+                modifiers.first().cloned().unwrap_or_default()
+            }
+            _ => continue,
+        };
+        let Some(def) = inference.called_from(at, &called) else {
+            continue;
+        };
+        if !reads.through(def).is_public() {
+            return Some(called.rsplit('.').next().unwrap_or(&called).to_string());
+        }
+    }
+    None
+}
+
+/// The labels a declaration's parameters state, a secret left out, with the
+/// first parameter stating one (ADR-0128). A secret a parameter states is a
+/// key the declaration uses, not a value it holds (ADR-0118 §5).
+fn given_label(sigs: &Signatures, sig: &crate::signatures::Signature) -> Option<(Label, String)> {
+    let mut label = Label::public();
+    let mut first = None;
+    for (i, param) in sig.params.iter().enumerate() {
+        let Some(ty) = param
+            .as_ref()
+            .and_then(crate::resolved::TypeResolution::resolved)
+        else {
+            continue;
+        };
+        let held = sigs
+            .label(ty)
+            .restrictions()
+            .filter(|r| !matches!(r, Restriction::Secret(_)))
+            .fold(Label::public(), |l, r| l.join(&Label::of(r.clone())));
+        if held.is_public() {
+            continue;
+        }
+        label = label.join(&held);
+        if first.is_none() {
+            first = Some(sig.names.get(i).cloned().unwrap_or_else(|| format!("#{i}")));
+        }
+    }
+    first.map(|name| (label, name))
 }
 
 /// Every restriction a body picks up by calling something.
@@ -4817,7 +4929,11 @@ fn privacy_flow(
     let body = hir.body(body_id);
     let imports = crate::labels::imported_modules(hir);
     let label = body_label(body, sigs, reads, inference, at);
-    if label.is_public() {
+    let def = crate::resolve::DefId {
+        unit: at,
+        decl: id.0,
+    };
+    if label.is_public() && reads.observed(def).is_public() {
         return;
     }
 
@@ -4884,10 +5000,15 @@ fn privacy_flow(
         return;
     }
     // One defect, one diagnostic (ADR-0112). A value PW5001 already refuses
-    // a shared cache, whose repairs include partitioning it, is not asked
-    // again which partitions its key lacks.
+    // a shared cache is not asked again which partitions its key lacks. What
+    // is left is a tenant's value: the one partition a shared cache can carry
+    // by its key (ADR-0128).
     let (read, _) = reads_label_with_source(hir, declared_labels, inference, at, decl);
-    if !label_of(decl).join(&read).safe_in_shared_cache() {
+    let label = label_of(decl)
+        .join(&read)
+        .join(&reads.observed(def))
+        .join(&label);
+    if !label.safe_in_shared_cache() {
         return;
     }
     let key_policy = decl.policy("key");
@@ -4895,10 +5016,27 @@ fn privacy_flow(
     // Each of the key's items, by name. A substring matched a parameter
     // called `username` as the user's partition until 2026-09-26 (ADR-0089).
     let items: Vec<&str> = key_text.split(',').map(str::trim).collect();
+    // An item names a partition, or a parameter whose declared type carries
+    // one: `key store, org` with `org: Organization<OrganizationId>` keys by
+    // the tenant as surely as `key store, organization` (ADR-0128).
+    let mut covered: Vec<String> = items.iter().map(|i| i.to_string()).collect();
+    if let Some(sig) = sigs.by_def(def) {
+        for (name, param) in sig.names.iter().zip(&sig.params) {
+            let Some(ty) = param
+                .as_ref()
+                .and_then(crate::resolved::TypeResolution::resolved)
+            else {
+                continue;
+            };
+            if items.contains(&name.as_str()) {
+                covered.extend(sigs.label(ty).required_cache_partitions());
+            }
+        }
+    }
     let missing: Vec<String> = label
         .required_cache_partitions()
         .into_iter()
-        .filter(|p| !items.contains(&p.as_str()))
+        .filter(|p| !covered.contains(p))
         .collect();
     if missing.is_empty() {
         return;

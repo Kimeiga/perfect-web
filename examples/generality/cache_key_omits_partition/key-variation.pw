@@ -2,19 +2,22 @@
 // @invariant: cache_key_omits_partition
 // @dimension: key variation — a key naming a DIFFERENT partition
 //
-// The key carries `session`, and the value depends on the user. Partially
-// partitioned is not partitioned.
+// The key carries `user`, and the value depends on the organization.
+// Partially partitioned is not partitioned.
+//
+// Until 2026-10-02 the key named `session` and the value depended on the
+// user; ADR-0128 moved every reader's value out of the shared cache, so the
+// variation is kept on the tenant.
 module generality.key_wrong_partition
 
 import Menus
 import context
-import capability.{ SessionId }
 import domain.{ MenuItem, StoreId }
 import domain.{ StoreError }
 
-query Recent(store: StoreId, session: SessionId) -> Result<List<MenuItem>, StoreError>
+query Recent(store: StoreId) -> Result<List<MenuItem>, StoreError>
     cache shared
-    key   store, session
+    key   store, user
 {
-    Menus.for_user(store, 10, context.current_user())
+    Menus.for_store_in_org(store, context.current_organization())
 }
