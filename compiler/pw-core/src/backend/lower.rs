@@ -407,7 +407,7 @@ pub fn handler(
     let Expr::Lambda {
         params,
         body: inner,
-        descriptor,
+        ..
     } = body.expr(lambda)
     else {
         return Lowering::Blocked {
@@ -426,9 +426,7 @@ pub fn handler(
     // root is typed by the binding its name means where the descriptor
     // writes it (ADR-0063).
     let types = crate::infer::Types::of_decl(cx.sigs, hir, decl_id, body);
-    let roots = descriptor
-        .map(|d| crate::resume::capture_roots(body, d))
-        .unwrap_or_default();
+    let roots = crate::resume::capture_roots(body, types.lexical(), lambda);
     let internal = RefCell::new(Internal {
         in_handler: true,
         ..Internal::default()
@@ -468,7 +466,7 @@ pub fn handler(
         f.signals.insert(name, ty);
     }
     let (mut captured, mut paths) = (Vec::new(), Vec::new());
-    for path in crate::resume::capture_paths(body, lambda) {
+    for path in crate::resume::capture_paths(body, types.lexical(), lambda) {
         let mut parts = path.split('.');
         let root = parts.next().unwrap_or_default();
         let mut ty = roots.get(root).and_then(|e| types.of(body, *e));

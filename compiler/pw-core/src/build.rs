@@ -95,6 +95,24 @@ impl Build {
             .dangling
             .iter()
             .map(|d| format!("a graph edge from `{}` names nothing: `{}`", d.from, d.name));
+        // An event part with no code is a button that does nothing when
+        // pressed (ADR-0134). Every `on:` lambda is a handler with an
+        // identity now; what remains is a handler that is not a lambda,
+        // `on:submit={save}`, which waits for the event to be passed
+        // (ADR-0131).
+        let inert = self.templates.iter().flat_map(|t| {
+            t.manifest()
+                .into_iter()
+                .filter(|p| p.kind == "event" && p.value.is_empty())
+                .map(move |p| {
+                    format!(
+                        "`{}`: element {} handles an event with no code to run: write its \
+                         handler as a lambda, `on:press={{() => ..}}` (ADR-0134)",
+                        t.path,
+                        p.owner.map(|o| o.0).unwrap_or_default()
+                    )
+                })
+        });
         // A page whose values no plan states would be rendered by a host
         // guessing them (ADR-0125).
         let pages = self.pages.iter().filter_map(|p| {
@@ -108,6 +126,7 @@ impl Build {
             .chain(depended)
             .chain(speculations)
             .chain(dangling)
+            .chain(inert)
             .chain(pages)
             .collect()
     }
@@ -204,7 +223,7 @@ pub fn templates(
         for (decl, lambda, m, _) in
             crate::resume_artifacts::located(src, hir, sigs, crate::resume_artifacts::BUILD)
         {
-            identities.insert((decl, lambda), m.handler);
+            identities.insert((decl, lambda), (m.handler, m.capture_paths));
         }
     }
     crate::template_ir::build_with(hirs, &identities)

@@ -27,8 +27,10 @@ what reads them, blocks by the server's renderer built for the browser
   resume decision knew them by name
   ([ADR-0132](DECISIONS/ADR-0132-the-resume-decision-knows-what-the-build-compiled.md),
   fixed: it knows the build's handlers by identity);
-- **a handler not written `resumable(..)` builds, and its button is inert**
-  (open; the next ruling).
+- **a handler not written `resumable(..)` built, and its button was inert**
+  ([ADR-0134](DECISIONS/ADR-0134-every-handler-is-resumable.md), fixed: every
+  `on:` lambda is a handler, its captures inferred from what it reads; a
+  handler that is not a lambda is refused at build).
 
 **ADR-0129, 2026-10-02: a value's label follows it through calls, bodies,
 branches and assignments** (E14-L,

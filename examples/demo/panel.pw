@@ -28,23 +28,23 @@ page PanelPage() {
         <main>
             <h1 id="greeting">{greeting}</h1>
             <p>Pressed <span id="presses">{presses}</span> time(s).</p>
-            <button id="press" type="button" on:press={resumable() => presses = presses + 1}>Press</button>
-            <button id="open-cart" type="button" on:press={resumable() => panel = Panel.Cart}>Cart</button>
-            <button id="open-help" type="button" on:press={resumable() => panel = Panel.Help}>Help</button>
-            <button id="shout" type="button" on:press={resumable() => greeting = "<b>Hi</b> & bye"}>Shout</button>
+            <button id="press" type="button" on:press={() => presses = presses + 1}>Press</button>
+            <button id="open-cart" type="button" on:press={() => panel = Panel.Cart}>Cart</button>
+            <button id="open-help" type="button" on:press={() => panel = Panel.Help}>Help</button>
+            <button id="shout" type="button" on:press={() => greeting = "<b>Hi</b> & bye"}>Shout</button>
             {#match panel}
                 {:Shut}
                     <p id="shut">Nothing is open.</p>
                 {:Cart}
                     <aside id="cart-panel" aria-label="Cart">
                         <p>Your cart.</p>
-                        <button id="close" type="button" on:press={resumable() => panel = Panel.Shut}>Close</button>
+                        <button id="close" type="button" on:press={() => panel = Panel.Shut}>Close</button>
                     </aside>
                 {:Help}
                     <aside id="help-panel" aria-label="Help">
                         <p>Pressed {presses} time(s) so far.</p>
                         <p id="help-greeting">{greeting}</p>
-                        <button id="close-help" type="button" on:press={resumable() => panel = Panel.Shut}>Close</button>
+                        <button id="close-help" type="button" on:press={() => panel = Panel.Shut}>Close</button>
                     </aside>
             {/match}
         </main>

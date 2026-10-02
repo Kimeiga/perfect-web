@@ -33,10 +33,7 @@ E14 comes before E11-E13. Its plan, controls and task list are
      2026-10-02 (ADR-0130, ADR-0131).
    - ~~**Local signals on a page.**~~ Done 2026-10-02 (ADR-0133), with the
      resume decision knowing the build (ADR-0132).
-   - **Next: every handler is resumable.** `on:press={() => ..}` builds an
-     inert button today. Acceptance: such a handler either compiles, its
-     captures inferred from what it reads, or is refused at check; never
-     both silent and dead.
+   - ~~**Every handler is resumable.**~~ Done 2026-10-02 (ADR-0134).
    - **Then: view composition** (ADR-0130's step 2), provided signals
      (step 3), typed events and `bind:value` (ADR-0131). T11's dialog and
      T06's form follow.

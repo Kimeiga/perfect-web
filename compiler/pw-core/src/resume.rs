@@ -49,12 +49,106 @@ use crate::signatures::Signatures;
 fn captures_with_spans(
     body: &crate::hir::Body,
     types: &crate::infer::Types<'_>,
-    descriptor: ExprId,
+    lambda: ExprId,
 ) -> Vec<(String, Span, Option<crate::resolved::ResolvedType>)> {
-    captures(body, descriptor)
+    captures_of(body, types.lexical(), lambda)
         .into_iter()
         .map(|(name, span, expr)| (name, span, types.of(body, expr)))
         .collect()
+}
+
+/// **Each `on:` attribute's value that is a lambda** (ADR-0134): a handler,
+/// written `resumable(..)` or not.
+pub(crate) fn handler_lambdas(body: &crate::hir::Body) -> std::collections::BTreeSet<ExprId> {
+    let mut out = std::collections::BTreeSet::new();
+    for id in body.walk() {
+        let Expr::Template { roots, .. } = body.expr(id) else {
+            continue;
+        };
+        for n in body.walk_markup(roots) {
+            let crate::hir::Node::Element { attrs, .. } = body.node(n) else {
+                continue;
+            };
+            for a in attrs {
+                if let (Some(("on", _)), crate::hir::AttrValue::Expr(e)) = (a.namespace(), &a.value)
+                    && matches!(body.expr(*e), Expr::Lambda { .. })
+                {
+                    out.insert(*e);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// **Every handler in a body, in the order it is written** (ADR-0134): each
+/// `on:` lambda, and each lambda written `resumable(..)`. Until 2026-10-02 only
+/// the second was a handler, and an `on:press={() => ..}` built into a button
+/// with no code behind it.
+pub(crate) fn handlers_in(body: &crate::hir::Body) -> Vec<ExprId> {
+    let on = handler_lambdas(body);
+    body.walk()
+        .into_iter()
+        .filter(|e| match body.expr(*e) {
+            Expr::Lambda {
+                descriptor: Some(d),
+                ..
+            } if is_resumable(body, *d) => true,
+            Expr::Lambda { .. } => on.contains(e),
+            _ => false,
+        })
+        .collect()
+}
+
+/// **What a handler captures** (ADR-0134), each with where it is written and
+/// the expression its binding is resolved at.
+///
+/// A handler that lists its captures, `resumable(captures = { item })`,
+/// captures what it lists, and PW5025 holds it to reading nothing else. One
+/// that lists nothing captures what it reads that the body around it binds:
+/// a parameter, a binding, a loop's item, an arm's name. That is exactly the
+/// list it would have had to write. Not what it binds itself, not a
+/// declaration (its code is compiled, not carried), and not a signal (the
+/// browser holds it, and the handler reaches it through its context).
+pub(crate) fn captures_of(
+    body: &crate::hir::Body,
+    lexical: &crate::lexical::Lexical,
+    lambda: ExprId,
+) -> Vec<(String, Span, ExprId)> {
+    let Expr::Lambda {
+        descriptor,
+        body: inner,
+        ..
+    } = body.expr(lambda)
+    else {
+        return Vec::new();
+    };
+    if let Some(d) = descriptor
+        && is_resumable(body, *d)
+    {
+        return captures(body, *d);
+    }
+    let own = crate::resolve::local_bindings_from(body, lambda);
+    let signal = |b: crate::lexical::Binder| {
+        body.signals.iter().any(|s| {
+            matches!(body.expr(*s), Expr::Let { pat: Some(p), .. }
+                if b == crate::lexical::Binder::Pattern(*p))
+        })
+    };
+    let mut out: Vec<(String, Span, ExprId)> = Vec::new();
+    for e in body.walk_from(*inner) {
+        let Expr::Name(n) = body.expr(e) else {
+            continue;
+        };
+        let Some(b) = lexical.binder(e) else {
+            continue;
+        };
+        if own.contains(n) || signal(b) || out.iter().any(|(m, ..)| m == n) {
+            continue;
+        }
+        out.push((n.clone(), body.expr_span(e), e));
+    }
+    out
 }
 
 /// The capture schema a handler declares: (name, type) per capture.
@@ -82,9 +176,9 @@ pub(crate) fn is_resumable(body: &crate::hir::Body, descriptor: ExprId) -> bool 
 pub(crate) fn capture_names_and_types(
     body: &crate::hir::Body,
     types: &crate::infer::Types<'_>,
-    descriptor: ExprId,
+    lambda: ExprId,
 ) -> Vec<(String, Option<crate::resolved::ResolvedType>)> {
-    captures(body, descriptor)
+    captures_of(body, types.lexical(), lambda)
         .into_iter()
         .map(|(name, _, expr)| (name, types.of(body, expr)))
         .collect()
@@ -191,14 +285,7 @@ pub fn check(
         // document, so what it may hold is what that document may hold.
         let destination = manifest_scope(hir, decl);
 
-        for lambda in body.walk() {
-            let Expr::Lambda {
-                descriptor: Some(d),
-                ..
-            } = body.expr(lambda)
-            else {
-                continue;
-            };
+        for lambda in handlers_in(body) {
             // Build-time artifact agreement: every capture must have a type
             // the manifest can name.
             //
@@ -208,7 +295,7 @@ pub fn check(
             // type". The diagnostic stays here because what a BLOCKED crossing
             // means for a resume manifest (a schema hash derived from a guess)
             // is this policy's to say.
-            for (name, span, ty) in captures_with_spans(body, &types, *d) {
+            for (name, span, ty) in captures_with_spans(body, &types, lambda) {
                 if !matches!(
                     can_cross(
                         &facts.profile(ty.as_ref()),
@@ -264,7 +351,7 @@ pub fn check(
             // `boundary.rs` now; what is left here is which message each
             // verdict earns, which is what makes this a policy rather than a
             // second analysis.
-            for (name, span, expr) in captures(body, *d) {
+            for (name, span, expr) in captures_of(body, types.lexical(), lambda) {
                 let ty = types.of(body, expr);
                 let verdict = can_cross(
                     &facts.profile(ty.as_ref()),
@@ -310,8 +397,12 @@ pub fn check(
 /// order written. The same walk the capture schema is built from, so the
 /// values a document carries and the schema its manifest names cannot list
 /// different captures.
-pub(crate) fn capture_names(body: &crate::hir::Body, descriptor: ExprId) -> Vec<String> {
-    captures(body, descriptor)
+pub(crate) fn capture_names(
+    body: &crate::hir::Body,
+    lexical: &crate::lexical::Lexical,
+    lambda: ExprId,
+) -> Vec<String> {
+    captures_of(body, lexical, lambda)
         .into_iter()
         .map(|(name, _, _)| name)
         .collect()
@@ -338,16 +429,20 @@ pub(crate) fn capture_names(body: &crate::hir::Body, descriptor: ExprId) -> Vec<
 /// the handler rebinds, through its parameters or any pattern inside it, is
 /// carried whole: a field path taken through the wrong binding could name a
 /// field the capture does not have, and the page would fail to render.
-pub(crate) fn capture_paths(body: &crate::hir::Body, lambda: ExprId) -> Vec<String> {
+pub(crate) fn capture_paths(
+    body: &crate::hir::Body,
+    lexical: &crate::lexical::Lexical,
+    lambda: ExprId,
+) -> Vec<String> {
     let Expr::Lambda {
-        descriptor: Some(d),
         params,
         body: inner,
+        ..
     } = body.expr(lambda)
     else {
         return Vec::new();
     };
-    let captured = capture_names(body, *d);
+    let captured = capture_names(body, lexical, lambda);
     let mut rebound: std::collections::BTreeSet<String> = params
         .iter()
         .flat_map(|p| crate::labels::bound_names(body, *p))
@@ -426,10 +521,11 @@ pub(crate) fn capture_paths(body: &crate::hir::Body, lambda: ExprId) -> Vec<Stri
 /// the binding its name means there, not by another binding of the name.
 pub(crate) fn capture_roots(
     body: &crate::hir::Body,
-    descriptor: ExprId,
+    lexical: &crate::lexical::Lexical,
+    lambda: ExprId,
 ) -> std::collections::BTreeMap<String, ExprId> {
     let mut out = std::collections::BTreeMap::new();
-    for (_, _, mut e) in captures(body, descriptor) {
+    for (_, _, mut e) in captures_of(body, lexical, lambda) {
         while let Expr::Field { base, .. } = body.expr(e) {
             e = *base;
         }

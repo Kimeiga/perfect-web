@@ -138,7 +138,7 @@ page PanelPage() {
   the store's two handlers by name. ADR-0132.
 - **A handler that is not `resumable(..)` builds, and its button is
   inert.** `on:press={() => ..}` gets an event part with no handler identity
-  and no module, and nothing refuses it. The next ruling.
+  and no module, and nothing refuses it. Fixed by ADR-0134.
 
 ## Not claimed
 

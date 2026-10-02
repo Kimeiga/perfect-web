@@ -382,10 +382,10 @@ plan. A block renders again whenever any signal it reads changes, even when
 the arm shown does not read it. The browser's renderer is 90 KB gzipped,
 loaded on the first block a press renders.
 
-**A handler not written `resumable(..)` is inert** (found 2026-10-02 writing
-ADR-0133). `on:press={() => ..}` gets an event part with no handler identity
-and no module, and nothing refuses it: the page ships a dead button. The next
-ruling.
+**A handler that is not a lambda is refused at build** (ADR-0134).
+`on:submit={save}` has no code to run until the event is passed to a
+handler (ADR-0131); `pw build` refuses it with the repair, and `pw check`
+accepts it.
 
 **A label does not follow a value through storage, a later call of a
 function value, or time** (ADR-0129). A value's label follows it through

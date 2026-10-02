@@ -996,3 +996,13 @@ v` in a page, changed by handlers that need call no command, read in text and
 blocks, held by the browser and rendered again there by the server's renderer
 built for the browser. Three rules (PW5300-PW5302) keep it written by
 handlers and read where the browser reads it again. ADR-0130's first step.
+
+## 2026-10-02: every handler is resumable
+
+[ADR-0134](DECISIONS/ADR-0134-every-handler-is-resumable.md): a handler not
+written `resumable(captures = { .. })` built into a button with no code
+behind it, silently. Every `on:` lambda is a handler now, and one derivation
+says what it captures: what it lists, or else what it reads that the body
+around it binds, never a signal or its own binding. `() =>` takes no
+parameter. A handler that is not a lambda is refused at build until the
+event is passed (ADR-0131).

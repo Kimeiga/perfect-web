@@ -895,6 +895,15 @@ impl Lowerer<'_> {
                 let mut descriptor = None;
                 let mut params = Vec::new();
                 for p in init {
+                    // `() => e` takes no parameter: an empty list is no
+                    // pattern. It lowered to one, a unit or an error pattern,
+                    // until 2026-10-02 (ADR-0134), and a handler written that
+                    // way was refused as one that takes the event.
+                    if matches!(p.kind(), K::ParenExpr | K::TupleExpr | K::ParamList)
+                        && p.children().next().is_none()
+                    {
+                        continue;
+                    }
                     if is_param_shaped(p.kind()) {
                         params.push(self.param_pattern(b, p));
                     } else {

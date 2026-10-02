@@ -1357,8 +1357,9 @@ fn handlers_read_their_captures(sigs: &Signatures, unit: usize, hir: &Hir) -> Ve
             if !crate::resume::is_resumable(body, *d) {
                 continue;
             }
-            let captured: BTreeSet<String> =
-                crate::resume::capture_roots(body, *d).into_keys().collect();
+            let captured: BTreeSet<String> = crate::resume::capture_roots(body, &lexical, lambda)
+                .into_keys()
+                .collect();
             let own = crate::resolve::local_bindings_from(body, lambda);
             // A page's signal is the browser's, and the handler reaches it
             // through its context: it is not captured (ADR-0130).
@@ -1452,18 +1453,11 @@ fn handlers_run_in_the_browser(
         let Some(body) = decl.body.map(|b| hir.body(b)) else {
             continue;
         };
-        for lambda in body.walk() {
-            let Expr::Lambda {
-                descriptor: Some(d),
-                body: inner,
-                ..
-            } = body.expr(lambda)
-            else {
+        // Every handler (ADR-0134), written `resumable(..)` or not.
+        for lambda in crate::resume::handlers_in(body) {
+            let Expr::Lambda { body: inner, .. } = body.expr(lambda) else {
                 continue;
             };
-            if !crate::resume::is_resumable(body, *d) {
-                continue;
-            }
             // The calls to a command: a request, which the command performs.
             let commands: Vec<crate::diagnostics::Span> = body
                 .walk_from(*inner)
@@ -1509,7 +1503,7 @@ fn handlers_run_in_the_browser(
                     ),
                     primary_span: s.span.clone(),
                     related: vec![Related {
-                        span: body.expr_span(*d),
+                        span: body.expr_span(lambda),
                         label: "a resumable handler runs in the browser".to_string(),
                     }],
                     explanation: Some(format!(

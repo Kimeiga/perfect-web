@@ -635,7 +635,8 @@ pub const BOOLEAN_ATTRIBUTES: &[&str] = &[
 ];
 
 /// Handler identities by where the lambda is, from `resume_artifacts::located`.
-pub type Handlers = std::collections::BTreeMap<(crate::hir::DeclId, crate::hir::ExprId), String>;
+pub type Handlers =
+    std::collections::BTreeMap<(crate::hir::DeclId, crate::hir::ExprId), (String, Vec<String>)>;
 
 /// Build the template IR for every renderable declaration in a program.
 ///
@@ -928,21 +929,19 @@ fn lower_element(
             // The identity `resume_artifacts` derived for this exact lambda.
             // Empty when the handler is not resumable — an ordinary handler has
             // no resume manifest and nothing to compare against.
-            let handler = match &a.value {
+            // And what the document carries for it (ADR-0134): derived with
+            // the identity, once, where names are resolved.
+            let (handler, captures) = match &a.value {
                 AttrValue::Expr(e) => ctx
                     .handlers
                     .get(&(ctx.decl, *e))
                     .cloned()
                     .unwrap_or_default(),
-                _ => String::new(),
+                _ => (String::new(), Vec::new()),
             };
             let name = match &a.value {
                 AttrValue::Expr(e) => called_name(body, *e),
                 _ => String::new(),
-            };
-            let captures = match &a.value {
-                AttrValue::Expr(e) => crate::resume::capture_paths(body, *e),
-                _ => Vec::new(),
             };
             out.push(Chunk::Dynamic(Part::Event {
                 id: ix.part(),

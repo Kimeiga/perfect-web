@@ -58,6 +58,11 @@ pub struct ResumeManifest {
     pub platform_abi: u32,
     pub build: String,
     pub span: Span,
+    /// What the document carries for the handler, as field paths
+    /// (`resume::capture_paths`): what the renderer serializes onto its
+    /// element and its module reads (ADR-0134: derived here, once, for
+    /// every handler, listed or inferred).
+    pub capture_paths: Vec<String>,
 }
 
 /// What the compiled handler exports.
@@ -86,17 +91,16 @@ fn manifest_of(
     body: &crate::hir::Body,
     types: &Types<'_>,
     lambda: ExprId,
-    descriptor: ExprId,
     document_schema: &str,
     build: &str,
 ) -> Option<ResumeManifest> {
-    // Resumable, not "captures something". A handler that captures nothing is
+    // A handler, not "captures something". A handler that captures nothing is
     // still a handler with an identity, an ABI, a build and a document schema;
     // its capture schema is simply the schema of nothing.
-    if !crate::resume::is_resumable(body, descriptor) {
+    let Expr::Lambda { descriptor, .. } = body.expr(lambda) else {
         return None;
-    }
-    let captures = crate::resume::capture_names_and_types(body, types, descriptor);
+    };
+    let captures = crate::resume::capture_names_and_types(body, types, lambda);
     let capture_schema = schema_of(&captures, types);
     Some(ResumeManifest {
         handler: handler_id(src, body, types, lambda, &capture_schema),
@@ -104,7 +108,8 @@ fn manifest_of(
         document_schema: document_schema.to_string(),
         platform_abi: PLATFORM_ABI,
         build: build.to_string(),
-        span: body.expr_span(descriptor),
+        span: body.expr_span(descriptor.unwrap_or(lambda)),
+        capture_paths: crate::resume::capture_paths(body, types.lexical(), lambda),
     })
 }
 
@@ -118,14 +123,10 @@ fn artifact_of(
     body: &crate::hir::Body,
     types: &Types<'_>,
     lambda: ExprId,
-    descriptor: ExprId,
     document_schema: &str,
     build: &str,
 ) -> Option<HandlerArtifact> {
-    if !crate::resume::is_resumable(body, descriptor) {
-        return None;
-    }
-    let declared = crate::resume::capture_names_and_types(body, types, descriptor);
+    let declared = crate::resume::capture_names_and_types(body, types, lambda);
     let Expr::Lambda { body: inner, .. } = body.expr(lambda) else {
         return None;
     };
@@ -336,17 +337,11 @@ pub fn located(
         let body = hir.body(body_id);
         let types = Types::of_decl(sigs, hir, id, body);
         let document_schema = document_schema_of(body);
-        for lambda in body.walk() {
-            let Expr::Lambda {
-                descriptor: Some(d),
-                ..
-            } = body.expr(lambda)
-            else {
-                continue;
-            };
+        // Every handler (ADR-0134): written `resumable(..)` or not.
+        for lambda in crate::resume::handlers_in(body) {
             if let (Some(m), Some(a)) = (
-                manifest_of(src, body, &types, lambda, *d, &document_schema, build),
-                artifact_of(src, body, &types, lambda, *d, &document_schema, build),
+                manifest_of(src, body, &types, lambda, &document_schema, build),
+                artifact_of(src, body, &types, lambda, &document_schema, build),
             ) {
                 out.push((id, lambda, m, a));
             }
@@ -370,17 +365,10 @@ pub fn check(src: &str, hir: &Hir, sigs: &Signatures, build: &str, out: &mut Vec
         let at = hir.decl_span(id);
         let document_schema = document_schema_of(body);
 
-        for lambda in body.walk() {
-            let Expr::Lambda {
-                descriptor: Some(d),
-                ..
-            } = body.expr(lambda)
-            else {
-                continue;
-            };
+        for lambda in crate::resume::handlers_in(body) {
             let (Some(manifest), Some(artifact)) = (
-                manifest_of(src, body, &types, lambda, *d, &document_schema, build),
-                artifact_of(src, body, &types, lambda, *d, &document_schema, build),
+                manifest_of(src, body, &types, lambda, &document_schema, build),
+                artifact_of(src, body, &types, lambda, &document_schema, build),
             ) else {
                 continue;
             };

@@ -81,7 +81,7 @@ fn event_parts(units: &[Unit]) -> Vec<(String, String, Vec<String>)> {
             &sigs,
             pw_core::resume_artifacts::BUILD,
         ) {
-            handlers.insert((decl, lambda), m.handler);
+            handlers.insert((decl, lambda), (m.handler, m.capture_paths));
         }
     }
     let ir = serde_json::to_value(pw_core::template_ir::build_with(&hirs, &handlers))
