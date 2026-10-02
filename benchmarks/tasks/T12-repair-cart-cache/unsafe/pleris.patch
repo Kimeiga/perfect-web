@@ -1,0 +1,16 @@
+diff --git a/store/app.pw b/store/app.pw
+index d93646c..c9a39f2 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -70,9 +70,9 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
+ }
+ 
+ // The cart, cached shared so the page loads faster.
+-session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
++public query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+     freshness      0.seconds
+-    consistency    read_your_writes
++    consistency    snapshot
+     cache          shared
+     key            session
+     // Which event concerns this resource. `add_to_cart` declares `invalidates

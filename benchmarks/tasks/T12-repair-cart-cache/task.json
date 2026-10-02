@@ -1,0 +1,7 @@
+{
+  "id": "T12",
+  "title": "Repair an unsafe cache",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T12.spec.mjs",
+  "start": "broken"
+}

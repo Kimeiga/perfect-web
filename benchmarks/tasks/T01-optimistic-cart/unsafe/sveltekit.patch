@@ -1,0 +1,43 @@
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..c6e4d8b 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -3,6 +3,8 @@
+   import type { PageProps } from "./$types";
+ 
+   let { data }: PageProps = $props();
++  // Adds pressed and not yet confirmed, shown at once.
++  let pending = $state(0);
+ </script>
+ 
+ <main>
+@@ -13,7 +15,19 @@
+       {#each data.menu as item (item.id)}
+         <li>
+           <span>{item.name}</span>
+-          <form method="POST" action="?/add" use:enhance>
++          <form
++            method="POST"
++            action="?/add"
++            use:enhance={() => {
++              pending += 1;
++              return async ({ result, update }) => {
++                if (result.type === "success" || result.type === "redirect") {
++                  await update();
++                  pending -= 1;
++                }
++              };
++            }}
++          >
+             <input type="hidden" name="item" value={item.id} />
+             <button type="submit">Add</button>
+           </form>
+@@ -23,7 +37,7 @@
+   </section>
+ 
+   <section aria-label="Cart">
+-    <p id="cart-count">{data.cartCount}</p>
++    <p id="cart-count">{data.cartCount + pending}</p>
+     <form method="POST" action="?/clear" use:enhance>
+       <button id="clear-cart" type="submit">Clear</button>
+     </form>

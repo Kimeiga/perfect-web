@@ -1,0 +1,20 @@
+diff --git a/lib/store.ts b/lib/store.ts
+index db58059..e689908 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -55,12 +55,12 @@ export function isMenuItem(store: StoreId, item: string): boolean {
+   return (MENUS[store] ?? []).some((m) => m.id === item);
+ }
+ 
+-// The cart, cached for 30 seconds: reading it was the slowest part of the
+-// page. Cleared whenever a cart changes.
++// Each session's cart, cached for 30 seconds: reading it was the slowest part
++// of the page. Keyed by store and session; cleared whenever a cart changes.
+ const recentCarts = new Map<string, { at: number; cart: Cart }>();
+ 
+ export function getCartCached(store: StoreId, session: string | undefined): Cart {
+-  const key = store;
++  const key = `${store}:${session ?? ""}`;
+   const hit = recentCarts.get(key);
+   if (hit && Date.now() - hit.at < 30_000) return hit.cart;
+   const cart = getCart(session);

@@ -1,0 +1,55 @@
+diff --git a/src/lib/server/store.ts b/src/lib/server/store.ts
+index 7291a61..db58059 100644
+--- a/src/lib/server/store.ts
++++ b/src/lib/server/store.ts
+@@ -55,14 +55,29 @@ export function isMenuItem(store: StoreId, item: string): boolean {
+   return (MENUS[store] ?? []).some((m) => m.id === item);
+ }
+ 
++// The cart, cached for 30 seconds: reading it was the slowest part of the
++// page. Cleared whenever a cart changes.
++const recentCarts = new Map<string, { at: number; cart: Cart }>();
++
++export function getCartCached(store: StoreId, session: string | undefined): Cart {
++  const key = store;
++  const hit = recentCarts.get(key);
++  if (hit && Date.now() - hit.at < 30_000) return hit.cart;
++  const cart = getCart(session);
++  recentCarts.set(key, { at: Date.now(), cart });
++  return cart;
++}
++
+ export function addToCart(session: string, item: MenuItemId, quantity: number): Cart {
+   const lines = carts.get(session) ?? new Map<MenuItemId, number>();
+   lines.set(item, (lines.get(item) ?? 0) + quantity);
+   carts.set(session, lines);
++  recentCarts.clear();
+   return getCart(session);
+ }
+ 
+ export function clearCart(session: string): Cart {
+   carts.delete(session);
++  recentCarts.clear();
+   return getCart(session);
+ }
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 1cebba6..dc347a0 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,6 +1,6 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import { addToCart, clearCart, getCartCached, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+ export const load: PageServerLoad = ({ params, cookies }) => {
+@@ -10,7 +10,7 @@ export const load: PageServerLoad = ({ params, cookies }) => {
+   return {
+     store,
+     menu,
+-    cartCount: lineCount(getCart(currentSession(cookies))),
++    cartCount: lineCount(getCartCached(params.storeId, currentSession(cookies))),
+   };
+ };
+ 

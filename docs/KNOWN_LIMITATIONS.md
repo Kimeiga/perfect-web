@@ -377,6 +377,14 @@ within stated bounds (ADR-0120 found both unexecuted):
   cart line is priced zero until the server answers (ruling offered).
 E14's shared store contract still excludes both, for every stack.
 
+**A session's cart can be cached shared by declaring its query `public`**
+(found 2026-10-02 by E14's T12). `public query Cart(session: Session<SessionId>)`
+with `consistency snapshot` and `cache shared` checks clean, though its body
+returns that session's cart: `Carts.current(s)` takes the session in a
+parameter that states its label, so by ADR-0085 the result carries none.
+`session query` with `cache shared` is refused (PW0100, PW5001); the guard is
+the modifier, and dropping it drops the guard. Ruling needed (ADR-0085).
+
 **E14's harness grades Pleris's commands and not its queries** (ADR-0123,
 E14-Q): the development server runs the program's compiled commands, and
 computes the store's query values itself. **Its sandbox is checked, not

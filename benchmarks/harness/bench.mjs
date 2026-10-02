@@ -422,11 +422,15 @@ export async function controls(id, stacks) {
     const stage = (r, name) => r.stages.find((x) => x.name === name);
     rows.push({
       stack,
-      // The unchanged start passes the contract and fails the hidden tests.
+      // The unchanged start passes the contract and fails the hidden tests;
+      // or, for a task that starts from a broken program (`"start":
+      // "broken"`, T12), fails somewhere real: a checker, a build, or a test
+      // that ran.
       negative:
         noop.score === 0 &&
-        stage(noop, "contract")?.ok === true &&
-        (stage(noop, "hidden")?.failed ?? 0) > 0,
+        (task.start === "broken"
+          ? ["check", "build"].includes(noop.failed_at) || (stage(noop, noop.failed_at)?.failed ?? 0) > 0
+          : stage(noop, "contract")?.ok === true && (stage(noop, "hidden")?.failed ?? 0) > 0),
       positive: reference.score === 1 && ran(reference, "contract") > 0 && ran(reference, "hidden") > 0,
       // Caught by a checker, a build, or a test that ran; never by a stage
       // that did not run.

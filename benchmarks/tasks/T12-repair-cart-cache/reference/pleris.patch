@@ -1,0 +1,18 @@
+diff --git a/store/app.pw b/store/app.pw
+index d93646c..f374f25 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -69,11 +69,11 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
+     Stores.get(id)
+ }
+ 
+-// The cart, cached shared so the page loads faster.
++// The cart. Private to its session, so cached privately.
+ session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+     freshness      0.seconds
+     consistency    read_your_writes
+-    cache          shared
++    cache          private
+     key            session
+     // Which event concerns this resource. `add_to_cart` declares `invalidates
+     // Cart(..)` — that is the COMMAND saying which cache entry it drops — and

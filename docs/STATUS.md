@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-C started 2026-10-02: three of twelve tasks written**
+([plan](milestones/E14.md)). T01 and T08 hold all four controls on all three
+stacks. T12 holds them on Next.js and SvelteKit, and **on Pleris its unsafe
+control fails**: moving the cart into a `public` query keeps it in a shared
+cache and checks clean, and the server honours no cache policy, so nothing
+sees the leak. Nine tasks cannot be graded on Pleris today: six need the
+server to run the store's queries (E14-Q), and three need language features
+that wait on rulings (T05 streams, ADR-0075; T06 the event parameter,
+ADR-0058; T11 view composition, ADR-0072).
+
 **E14-B done 2026-10-02: the offline harness**
 ([ADR-0124](DECISIONS/ADR-0124-the-benchmark-harness-and-its-controls.md),
 `just e14-harness`). One task, T08 (a press delivered twice adds once), on
@@ -1811,12 +1821,15 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **E14-C:** tasks T01-T12 with prompts, hidden tests, reference and unsafe
-   patches, every control green on every stack.
-2. **E14-Q**: the store's queries as components in the server, before the
-   query tasks (T02, T07, T09) can be graded on Pleris.
-3. **Rulings**: whether task baselines are stripped of design comments
-   (ADR-0124); an unpriced optimistic line and `entry_value` (ADR-0122).
+1. **E14-Q**: the store's queries as components in the server. It unblocks
+   T02, T03, T04, T07, T09 and T10 on Pleris, and T12's runtime half.
+2. **E14-C, continued:** the framework halves of the blocked tasks, and each
+   task's Pleris half as its blocker closes.
+3. **Rulings**: label polymorphism or declassification (ADR-0085, now
+   T12's checker half); the event parameter (ADR-0058, T06); view
+   composition (ADR-0072, T11); streams (ADR-0075, T05); design comments in
+   task baselines (ADR-0124); an unpriced optimistic line and `entry_value`
+   (ADR-0122).
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).
