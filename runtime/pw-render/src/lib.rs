@@ -631,13 +631,22 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
         // `pw_core::resume::capture_paths` derived, serialized onto the element
         // so the compiled handler reads them from the document rather than
         // asking the server what the button meant.
-        Part::Event { captures, .. } => {
+        Part::Event {
+            captures, renames, ..
+        } => {
             if captures.is_empty() {
                 return Ok(());
             }
             let mut object = serde_json::Map::new();
             for path in captures {
-                let v = value_at(env, path).ok_or(Blocked::MissingValue { path: path.clone() })?;
+                // Read where the value is, written where the handler reads it
+                // (ADR-0136): `item.id` of a view given `entry` is `entry.id`.
+                let at = match path.split_once('.') {
+                    Some((root, rest)) => renames.get(root).map(|to| format!("{to}.{rest}")),
+                    None => renames.get(path.as_str()).cloned(),
+                }
+                .unwrap_or_else(|| path.clone());
+                let v = value_at(env, &at).ok_or(Blocked::MissingValue { path: at.clone() })?;
                 insert_at(&mut object, path, capture_json(v, path)?)?;
             }
             let json = serde_json::Value::Object(object).to_string();

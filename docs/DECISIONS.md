@@ -1013,3 +1013,15 @@ event is passed (ADR-0131).
 build's map from a handler's place to its identity was keyed by indices
 counted within one file, so two pages of one shape in two files shared a key
 and one page's button ran the other's handler. Keyed by the file as well.
+
+## 2026-10-02: a view is written where it is used
+
+[ADR-0136](DECISIONS/ADR-0136-a-view-is-written-where-it-is-used.md): a view
+used in another was refused (ADR-0072), so no page could be built from views.
+A view now composes. Its markup is lowered in place, in the page's one
+numbering, each parameter read as the path its prop gives, and a name it
+binds renamed where it would hide one. A view's handler keeps its own module,
+and the template says where the page holds what it captures. Props are
+checked as arguments (PW0619). What a view's handler captures is checked
+where the page gives it, and a signal it would capture is refused.
+ADR-0130's second step.

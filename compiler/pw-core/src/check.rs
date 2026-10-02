@@ -202,6 +202,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // And what calling each declaration makes from its body (ADR-0129): the
     // value labels a sink reads follow a call into its callee.
     let summaries = summaries(&hirs, &sigs);
+    // And what a view's handlers capture of what it is given (ADR-0136): a
+    // page that uses the view writes it into its own document.
+    let captured = crate::resume::captured_params(&hirs, &sigs);
     units
         .iter()
         .enumerate()
@@ -212,6 +215,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
                 &labels,
                 &reads,
                 &summaries,
+                &captured,
                 &sigs,
                 &inference,
                 &manifest,
@@ -2095,25 +2099,74 @@ fn view_elements(
             }
         }
         for n in body.walk_markup(&roots) {
-            let Node::Element { tag, .. } = body.node(n) else {
+            let Node::Element { tag, attrs, .. } = body.node(n) else {
                 continue;
             };
             if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
                 continue;
             }
-            let named = match workspace.resolve(unit, tag) {
+            let resolved = match workspace.resolve(unit, tag) {
                 Resolution::Local(def) | Resolution::Imported { def, .. } => {
-                    crate::resolve::declaration(hirs, def).map(|d| d.kind)
+                    crate::resolve::declaration(hirs, def).map(|d| (def, d.kind))
                 }
                 Resolution::Unresolved | Resolution::Ambiguous(_) => None,
             };
-            let (message, repair) = match named {
-                Some(DeclKind::View | DeclKind::Component | DeclKind::Page) => (
-                    format!(
-                        "`<{tag}>` uses `{tag}` inside another view, and a view used in \
-                         another view is not compiled yet"
+            let named = resolved.map(|(_, k)| k);
+            // **A view composes** (ADR-0136): its markup is written into the
+            // page where it is used, its parameters read as the props given.
+            // What this slice composes: a view whose body is its markup alone,
+            // that does not contain itself, given a value path for each prop.
+            if let Some((def, DeclKind::View)) = resolved {
+                let mut why = composes(workspace, hirs, def);
+                if why.is_none() {
+                    why = attrs.iter().find_map(|a| match &a.value {
+                        AttrValue::Expr(e)
+                            if crate::template_ir::value_path_of(body, *e).is_none() =>
+                        {
+                            Some(format!(
+                                "`<{tag}>`'s prop `{}` is computed, and a prop is a value: a name, \
+                                 or fields read from one (ADR-0073)",
+                                a.name
+                            ))
+                        }
+                        _ => None,
+                    });
+                }
+                let Some(message) = why else {
+                    continue;
+                };
+                out.push(Diagnostic {
+                    code: crate::codes::VIEW_ELEMENT.id,
+                    invariant: crate::codes::VIEW_ELEMENT.invariant,
+                    reason: "view_element",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message,
+                    primary_span: body.node_span(n),
+                    related: vec![Related {
+                        span: hir.decl_span(decl_id),
+                        label: format!("`{}` renders this", decl.name),
+                    }],
+                    explanation: Some(
+                        "A view used in another is composed when the page is built: its \
+                         markup is written where it is used, and its parameters read as the \
+                         props it is given (ADR-0136)."
+                            .to_string(),
                     ),
-                    format!("write `{tag}`'s markup here until views compose"),
+                    repairs: vec![Repair {
+                        description: format!("write `{tag}`'s markup here, or simplify `{tag}`"),
+                        replacement: None,
+                    }],
+                });
+                continue;
+            }
+            let (message, repair) = match named {
+                Some(DeclKind::Component | DeclKind::Page) => (
+                    format!(
+                        "`<{tag}>` uses `{tag}` inside another view, and only a view is used \
+                         as an element"
+                    ),
+                    format!("make `{tag}` a view, or write its markup here"),
                 ),
                 Some(_) => (
                     format!("`<{tag}>` names a declaration that is not a view"),
@@ -2150,6 +2203,76 @@ fn view_elements(
         }
     }
     out
+}
+
+/// **Why the view `def` cannot be composed yet**, if it cannot (ADR-0136):
+/// it declares bindings of its own, or it contains itself, directly or
+/// through the views it uses. A view it uses that cannot be composed is
+/// reported where that one is used, not again at every use around it.
+fn composes(
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    def: crate::resolve::DefId,
+) -> Option<String> {
+    let decl = crate::resolve::declaration(hirs, def)?;
+    let body = hirs[def.unit].body(decl.body?);
+    if !crate::template_ir::markup_only(body) {
+        return Some(format!(
+            "`<{}>` declares values of its own, and a view composed into another holds its \
+             markup alone in this slice",
+            decl.name
+        ));
+    }
+    if reaches(workspace, hirs, def, def, &mut Vec::new()) {
+        return Some(format!(
+            "`<{}>` contains itself, and a view that contains itself is not composed yet",
+            decl.name
+        ));
+    }
+    None
+}
+
+/// Does the markup of the view `from` use `target`, directly or through the
+/// views it uses? `seen` is each view already followed.
+fn reaches(
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    from: crate::resolve::DefId,
+    target: crate::resolve::DefId,
+    seen: &mut Vec<crate::resolve::DefId>,
+) -> bool {
+    use crate::resolve::Resolution;
+    if seen.contains(&from) {
+        return false;
+    }
+    seen.push(from);
+    let Some(body) = crate::resolve::declaration(hirs, from)
+        .and_then(|d| d.body)
+        .map(|b| hirs[from.unit].body(b))
+    else {
+        return false;
+    };
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    body.walk_markup(&roots).into_iter().any(|n| {
+        let Node::Element { tag, .. } = body.node(n) else {
+            return false;
+        };
+        if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
+            return false;
+        }
+        let (Resolution::Local(d) | Resolution::Imported { def: d, .. }) =
+            workspace.resolve(from.unit, tag)
+        else {
+            return false;
+        };
+        crate::resolve::declaration(hirs, d).is_some_and(|x| x.kind == DeclKind::View)
+            && (d == target || reaches(workspace, hirs, d, target, seen))
+    })
 }
 
 /// **An optimistic transition performs nothing.**
@@ -2725,6 +2848,8 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         // No program-wide pass over one unit: each callee is read by its
         // signature, as before ADR-0129.
         &BTreeMap::new(),
+        // And no view is resolved across files, so none is composed.
+        &BTreeMap::new(),
         &sigs,
         &inference,
         &manifest,
@@ -2749,6 +2874,8 @@ fn check_unit_with(
     reads: &Reads,
     // What calling each declaration makes from its body (ADR-0129).
     summaries: &BTreeMap<crate::resolve::DefId, Label>,
+    // Which parameters each view's handlers capture (ADR-0136).
+    captured: &BTreeMap<crate::resolve::DefId, std::collections::BTreeSet<String>>,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
     manifest: &crate::boundary::TypeFacts,
@@ -2802,9 +2929,9 @@ fn check_unit_with(
     crate::affine::check(&unit.hir, sigs, &mut out);
 
     // Charter §8.5: the resume manifest ships with the document.
-    crate::resume::check(&unit.hir, sigs, summaries, manifest, &mut out);
+    crate::resume::check(&unit.hir, sigs, summaries, manifest, captured, at, &mut out);
     // Where UI state is read and written (ADR-0130).
-    crate::signals::check(&unit.hir, sigs, at, &mut out);
+    crate::signals::check(&unit.hir, sigs, at, captured, &mut out);
 
     // E7 generator: the resume manifest and the handler artifact, derived by
     // two different walks and compared. A disagreement within one build is a

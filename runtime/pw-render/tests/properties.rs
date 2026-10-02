@@ -532,6 +532,7 @@ fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
             handler: "add_to_cart".into(),
             name: "add_to_cart".into(),
             captures: vec![],
+            renames: BTreeMap::new(),
         }),
         Chunk::Static("Add</button>".into()),
     ]);
@@ -544,6 +545,12 @@ fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
 // --- E10: what a compiled handler reads, carried by its element -------------
 
 fn button_capturing(paths: &[&str]) -> Template {
+    button_renaming(paths, &[])
+}
+
+/// A button whose handler names `from` what the template holds at `to`: a
+/// handler written in a view, composed into a page (ADR-0136).
+fn button_renaming(paths: &[&str], renames: &[(&str, &str)]) -> Template {
     t(vec![
         Chunk::Static("<button data-pw=\"3\"".into()),
         Chunk::Dynamic(Part::Event {
@@ -553,6 +560,10 @@ fn button_capturing(paths: &[&str]) -> Template {
             handler: "e1ab9fca1f6fc15b".into(),
             name: "add_to_cart".into(),
             captures: paths.iter().map(|p| p.to_string()).collect(),
+            renames: renames
+                .iter()
+                .map(|(from, to)| (from.to_string(), to.to_string()))
+                .collect(),
         }),
         Chunk::Static(">Add</button>".into()),
     ])
@@ -603,6 +614,54 @@ fn an_element_carries_exactly_the_paths_its_handler_reads() {
     assert_eq!(
         captures_of(&html),
         serde_json::json!({ "item": { "id": "cortado", "name": "Cortado" } })
+    );
+}
+
+#[test]
+fn a_capture_a_view_names_otherwise_is_read_where_it_is() {
+    // ADR-0136: a view's handler captures its parameter `item`, and the view
+    // was given the page's `entry`. The value is read at `entry.id` and
+    // written under `item.id`, where the view's compiled handler reads it.
+    let env = Env::new()
+        .set("entry", item("cortado", "Cortado"))
+        .set("item", item("decoy", "Decoy"));
+    let html = render(
+        &button_renaming(&["item.id"], &[("item", "entry")]),
+        &env,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "cortado" } }),
+        "{html}"
+    );
+    // A parameter given a field: `item` is `order.line`.
+    let env = Env::new().set(
+        "order",
+        Value::Record(BTreeMap::from([(
+            "line".to_string(),
+            item("flat-white", "Flat white"),
+        )])),
+    );
+    let whole = render(
+        &button_renaming(&["item"], &[("item", "order.line")]),
+        &env,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        captures_of(&whole),
+        serde_json::json!({ "item": { "id": "flat-white", "name": "Flat white" } })
+    );
+    // Control: without the rename, the handler's own name is read.
+    let env = Env::new()
+        .set("entry", item("cortado", "Cortado"))
+        .set("item", item("decoy", "Decoy"));
+    let html = render(&button_capturing(&["item.id"]), &env, &[]).unwrap();
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "decoy" } })
     );
 }
 

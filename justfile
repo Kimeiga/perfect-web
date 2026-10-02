@@ -1594,6 +1594,27 @@ e14-handlers-by-file:
      } > docs/evidence/E14/handlers-by-file.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/handlers-by-file.txt
 
+# ADR-0136: a view used in another is written where it is used. The
+# compiler's composition and the checks made where a view is used, the
+# renderer reading a capture where the page holds it, and the mutation
+# controls. The browser half is `e2e/views.spec.mjs`, in the own-renderer
+# suite (`spikes/own-renderer/run.sh`).
+e14-views-compose:
+    @{ echo "ADR-0136 - a view is written where it is used"; echo; \
+       echo "produced by: just e14-views-compose"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== composition (compiler/pw-core/tests/views_compose.rs)"; echo; \
+       cargo test --locked -p pw-core --test views_compose 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a view's props (compiler/pw-core/tests/view_elements.rs)"; echo; \
+       cargo test --locked -p pw-core --test view_elements 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a capture read where the page holds it (runtime/pw-render/tests/properties.rs)"; echo; \
+       cargo test --locked -p pw-render --test properties capture 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/views_compose_mutations.py)"; echo; \
+       python3 scripts/views_compose_mutations.py; \
+     } > docs/evidence/E14/views-compose.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/views-compose.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

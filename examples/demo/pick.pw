@@ -1,0 +1,44 @@
+// @corpus: fixture
+// @id: DEMO-pick
+// @category: composition — a view used twice, its handler given another item
+//            each time
+// @charter: §8.1, §8.5
+// @milestone: E14
+//
+// ADR-0136: a view is written where it is used. `PickOne`'s button captures
+// its parameter, and each use gives it another of the page's: the document
+// carries each button's item under the name the view's handler reads it by,
+// and a press sends that button's item.
+//
+// Outside the store on purpose, as the panel is: the benchmark's baseline is
+// the store's markup, written in place.
+
+module demo.pick
+
+import domain.{ MenuItemId, CartError, InteractionId }
+
+// What a press asks the server: nothing changes, and the item comes back.
+// Not `add_to_cart`, whose optimistic clause speculates on a cart a page must
+// show (ADR-0120), and a page that reads a query is the store's route's.
+command pick(item: MenuItemId) -> Result<MenuItemId, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    Ok(item)
+}
+
+// One button, for one item.
+view PickOne(item: MenuItemId) !{} {
+    <button type="button" on:press={() => pick(item)}>Pick</button>
+}
+
+page PickPage(first: MenuItemId, second: MenuItemId) {
+    cache private
+
+    view {
+        <main>
+            <p id="first"><PickOne item={first} /></p>
+            <p id="second"><PickOne item={second} /></p>
+        </main>
+    }
+}

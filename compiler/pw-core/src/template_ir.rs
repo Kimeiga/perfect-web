@@ -47,9 +47,12 @@
 //! `""` for a region it did not understand would turn "an earlier analysis
 //! failed" into apparently valid HTML, and the page would look fine.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
-use crate::hir::{AttrValue, Body, Expr, ExprId, Hir, Node, NodeId};
+use crate::hir::{AttrValue, Body, DeclId, Expr, ExprId, Hir, Node, NodeId};
+use crate::resolve::{DefId, Resolution, Workspace};
 
 /// Where a value sits in the document, which decides how it is escaped.
 ///
@@ -241,6 +244,14 @@ pub enum Part {
         /// Empty for a handler that reads nothing it captured.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         captures: Vec<String>,
+        /// **Where a capture's value is, when the handler names it otherwise**
+        /// (ADR-0136): a handler written in a view captures the view's
+        /// parameter, `item`, and the view composed into a page reads it as
+        /// the path it was given, `entry`. The renderer reads `item.id` at
+        /// `entry.id` and writes it under `item.id`, which is what the
+        /// handler's module reads. Empty where every name is the handler's.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        renames: BTreeMap<String, String>,
     },
     /// A region rendered only when a condition holds.
     Conditional {
@@ -447,6 +458,11 @@ struct Indexer {
     depth: u32,
     /// Each text part, with the expression its hole holds (ADR-0122).
     holes: Vec<Hole>,
+    /// How many names composition has renamed (ADR-0136), so each new name
+    /// is one no other has.
+    renamed: u32,
+    /// Each view composed into the template, in the order first written.
+    views: Vec<DefId>,
 }
 
 /// **A text part and the expression it shows** (ADR-0122): what an optimistic
@@ -455,7 +471,14 @@ struct Indexer {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hole {
     pub part: PartId,
+    /// The path the part reads, as the template names it: through each view
+    /// composed around it, a view's parameter read as what it was given
+    /// (ADR-0136).
+    pub path: String,
     pub expr: ExprId,
+    /// The file and the declaration whose body `expr` is in: the template's
+    /// own, or a view composed into it (ADR-0136).
+    pub origin: (usize, DeclId),
     /// Inside a block: an instance of it, whose address carries a frame.
     pub nested: bool,
 }
@@ -471,6 +494,13 @@ impl Indexer {
         let id = ElementId(self.next_element);
         self.next_element += 1;
         id
+    }
+
+    /// A name for `name` that nothing written can be: `~` is in no
+    /// identifier (ADR-0136).
+    fn rename(&mut self, name: &str) -> String {
+        self.renamed += 1;
+        format!("{name}~{}", self.renamed)
     }
 }
 
@@ -659,6 +689,9 @@ pub fn build(hirs: &[&Hir]) -> Vec<Template> {
 /// and the disagreement would be silent: `decide` would refuse a handler that
 /// is in fact the right one, and the page would simply not respond.
 pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
+    // The views a template uses are found by name, from the file it is
+    // written in (ADR-0136).
+    let ws = Workspace::build(hirs);
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -666,67 +699,175 @@ pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
             if !matches!(decl.kind, View | Component | Page) {
                 continue;
             }
-            let Some(body_id) = decl.body else { continue };
-            let body = hir.body(body_id);
-            let module = hir.module_of(id).unwrap_or_default();
-            let mut chunks = Vec::new();
-            let mut ix = Indexer::default();
-            let ctx = Lowering {
-                handlers,
-                unit,
-                decl: id,
-            };
-            for root in roots_of(body) {
-                lower_node(body, root, &ctx, &mut ix, &mut chunks);
+            if let Some(l) = lowered(hirs, &ws, handlers, unit, id) {
+                out.push(l.template);
             }
-            let chunks = coalesce(chunks);
-            let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
-            out.push(Template {
-                path: if module.is_empty() {
-                    decl.name.clone()
-                } else {
-                    format!("{module}.{}", decl.name)
-                },
-                name: decl.name.clone(),
-                schema: schema_of(&params, &chunks),
-                params,
-                chunks,
-            });
         }
     }
     out.sort_by(|a, b| a.path.cmp(&b.path));
     out
 }
 
-/// **Each text part of a renderable declaration, with its hole's expression**
-/// (ADR-0122), numbered by the traversal [`build_with`] numbers them by.
-pub fn text_holes(hir: &Hir, decl: crate::hir::DeclId) -> Vec<Hole> {
-    let Some(body_id) = hir.decl(decl).body else {
-        return Vec::new();
-    };
-    let body = hir.body(body_id);
-    let handlers = Handlers::new();
-    // No identities are looked up here, so which file is immaterial.
-    let ctx = Lowering {
-        handlers: &handlers,
-        unit: 0,
-        decl,
-    };
-    let mut ix = Indexer::default();
+/// One declaration's template, as one traversal lowered it.
+#[derive(Debug, Clone)]
+pub struct Lowered {
+    pub template: Template,
+    /// Each text part and the expression it shows (ADR-0122).
+    pub holes: Vec<Hole>,
+    /// **Each view composed into it**, through the views it uses (ADR-0136):
+    /// whose handlers are in its document.
+    pub views: Vec<DefId>,
+}
+
+/// **One renderable declaration's template, and its text holes** (ADR-0122),
+/// numbered by one traversal: the one [`build_with`] numbers them by, with
+/// each view it uses composed in place (ADR-0136).
+pub fn lowered(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    handlers: &Handlers,
+    unit: usize,
+    id: DeclId,
+) -> Option<Lowered> {
+    let hir = hirs.get(unit)?;
+    let decl = hir.decl(id);
+    let body = hir.body(decl.body?);
+    let module = hir.module_of(id).unwrap_or_default();
     let mut chunks = Vec::new();
+    let mut ix = Indexer::default();
+    let ctx = Lowering {
+        handlers,
+        hirs,
+        ws,
+        unit,
+        decl: id,
+        names: BTreeMap::new(),
+        within: Vec::new(),
+    };
     for root in roots_of(body) {
         lower_node(body, root, &ctx, &mut ix, &mut chunks);
     }
-    ix.holes
+    let chunks = coalesce(chunks);
+    let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
+    let template = Template {
+        path: if module.is_empty() {
+            decl.name.clone()
+        } else {
+            format!("{module}.{}", decl.name)
+        },
+        name: decl.name.clone(),
+        schema: schema_of(&params, &chunks),
+        params,
+        chunks,
+    };
+    Some(Lowered {
+        template,
+        holes: ix.holes,
+        views: ix.views,
+    })
 }
 
-/// What lowering needs beyond the body: which declaration it is in, and the
-/// handler identities derived for it.
+/// **Each text part of a renderable declaration, with its hole's expression**
+/// (ADR-0122), numbered by the traversal [`build_with`] numbers them by.
+pub fn holes(hirs: &[&Hir], ws: &Workspace, unit: usize, decl: DeclId) -> Vec<Hole> {
+    lowered(hirs, ws, &Handlers::new(), unit, decl)
+        .map(|l| l.holes)
+        .unwrap_or_default()
+}
+
+/// What lowering needs beyond the body: which declaration it is in, the
+/// handler identities derived for it, and the program its views are in.
+#[derive(Clone)]
 struct Lowering<'a> {
     handlers: &'a Handlers,
-    /// Which file, by its index in the program, and which declaration in it.
+    hirs: &'a [&'a Hir],
+    ws: &'a Workspace,
+    /// Which file, by its index in the program, and which declaration in it:
+    /// the body the nodes being lowered are written in.
     unit: usize,
-    decl: crate::hir::DeclId,
+    decl: DeclId,
+    /// **How a name this body writes is read where the template renders it**
+    /// (ADR-0136): a composed view's parameter as the path it was given, and
+    /// a name the view binds renamed where it would hide one of those paths.
+    /// Empty in a declaration's own markup, whose names are its own.
+    names: BTreeMap<String, String>,
+    /// The views composed around this one. A view that contains itself is
+    /// refused, not followed.
+    within: Vec<DefId>,
+}
+
+impl<'a> Lowering<'a> {
+    /// `path` as the template reads it: its root as this scope names it.
+    fn read(&self, path: String) -> String {
+        let (root, rest) = match path.split_once('.') {
+            Some((root, rest)) => (root, Some(rest)),
+            None => (path.as_str(), None),
+        };
+        match (self.names.get(root), rest) {
+            (Some(to), Some(rest)) => format!("{to}.{rest}"),
+            (Some(to), None) => to.clone(),
+            (None, _) => path,
+        }
+    }
+
+    /// **The scope inside a block that binds `bound`**, and each name as
+    /// the template binds it (ADR-0136). A bound name hides a parameter of
+    /// its own name. In a composed view, one that is the first name of a
+    /// path the view was given would hide it too: `{#each item.tags as
+    /// entry}` given `item={entry}` would read the tag where it meant the
+    /// page's `entry`. Such a name is renamed, to one no source can write.
+    fn binding(&self, bound: &[String], ix: &mut Indexer) -> (Lowering<'a>, Vec<String>) {
+        let mut inner = self.clone();
+        if self.names.is_empty() {
+            return (inner, bound.to_vec());
+        }
+        for b in bound {
+            inner.names.remove(b);
+        }
+        let mut written = Vec::new();
+        for b in bound {
+            let hides = inner
+                .names
+                .values()
+                .any(|p| p.split('.').next() == Some(b.as_str()));
+            if hides {
+                let fresh = ix.rename(b);
+                inner.names.insert(b.clone(), fresh.clone());
+                written.push(fresh);
+            } else {
+                written.push(b.clone());
+            }
+        }
+        (inner, written)
+    }
+
+    /// The view a capitalised tag names, from the file it is written in.
+    fn view_named(&self, tag: &str) -> Option<DefId> {
+        if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
+            return None;
+        }
+        match self.ws.resolve(self.unit, tag) {
+            Resolution::Local(def) | Resolution::Imported { def, .. } => {
+                crate::resolve::declaration(self.hirs, def)
+                    .is_some_and(|d| d.kind == crate::hir::DeclKind::View)
+                    .then_some(def)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// **Is a view's body its markup alone?** What composition writes in place
+/// (ADR-0136): a view that binds values of its own would need them where it
+/// is used, and they are not there.
+pub(crate) fn markup_only(body: &Body) -> bool {
+    match body.expr(body.root) {
+        Expr::Block { stmts } => stmts
+            .iter()
+            .all(|s| matches!(body.expr(*s), Expr::Template { .. })),
+        Expr::Template { .. } => true,
+        _ => false,
+    }
 }
 
 /// The name of the thing a handler lambda calls.
@@ -789,6 +930,12 @@ fn value_path(body: &Body, e: ExprId) -> Option<String> {
     }
 }
 
+/// [`value_path`], for a checker: the path a template reads a value by, or
+/// `None` for anything computed (ADR-0073, ADR-0136).
+pub fn value_path_of(body: &Body, e: ExprId) -> Option<String> {
+    value_path(body, e)
+}
+
 /// What a hole holds when it is not a path, for the reason it is refused.
 fn computed(body: &Body, e: ExprId) -> &'static str {
     match body.expr(e) {
@@ -805,10 +952,13 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
         Node::Text(t) => out.push(Chunk::Static(escape_static_text(t))),
         Node::Interpolation(e) => out.push(Chunk::Dynamic(match value_path(body, *e) {
             Some(value) => {
+                let value = ctx.read(value);
                 let id = ix.part();
                 ix.holes.push(Hole {
                     part: id,
+                    path: value.clone(),
                     expr: *e,
+                    origin: (ctx.unit, ctx.decl),
                     nested: ix.depth > 0,
                 });
                 Part::Text {
@@ -910,6 +1060,19 @@ fn lower_element(
         }));
         return;
     }
+    // A view used in another is written where it is used (ADR-0136). A
+    // capitalised tag that names no view is not an element either: until
+    // 2026-09-26 it was written out as one (ADR-0072).
+    if tag.starts_with(|c: char| c.is_ascii_uppercase()) {
+        match ctx.view_named(tag) {
+            Some(def) => compose(body, def, tag, attrs, ctx, ix, out),
+            None => out.push(Chunk::Dynamic(Part::Blocked {
+                reason: format!("`<{tag}>` names no view this build can see"),
+                at: format!("<{tag}>"),
+            })),
+        }
+        return;
+    }
     // An element gets an identity only if it OWNS something dynamic. Charter
     // §14 M7 task 3: stable IDs for dynamic parts "without making static HTML
     // noisy", and the invariant that gives it meaning is that a static region
@@ -953,6 +1116,16 @@ fn lower_element(
                     .unwrap_or_default(),
                 _ => (String::new(), Vec::new()),
             };
+            // A capture the scope names otherwise is read where it is
+            // (ADR-0136): in a composed view, a parameter or a renamed name.
+            let renames: BTreeMap<String, String> = captures
+                .iter()
+                .filter_map(|c| {
+                    let root = c.split('.').next()?;
+                    let to = ctx.names.get(root)?;
+                    (to != root).then(|| (root.to_string(), to.clone()))
+                })
+                .collect();
             let name = match &a.value {
                 AttrValue::Expr(e) => called_name(body, *e),
                 _ => String::new(),
@@ -964,6 +1137,7 @@ fn lower_element(
                 handler,
                 name,
                 captures,
+                renames,
             }));
             continue;
         }
@@ -1017,12 +1191,12 @@ fn lower_element(
                 let owner = owner.expect("an element with a dynamic attribute owns an identity");
                 if let Expr::Interpolated { text, parts } = body.expr(*e) {
                     out.push(Chunk::Dynamic(interpolated_attribute(
-                        body, &a.name, text, parts, owner, ix,
+                        body, &a.name, text, parts, owner, ctx, ix,
                     )));
                 }
             }
             AttrValue::Expr(e) => {
-                let Some(value) = value_path(body, *e) else {
+                let Some(value) = value_path(body, *e).map(|v| ctx.read(v)) else {
                     out.push(Chunk::Dynamic(Part::Blocked {
                         reason: format!(
                             "`{}` is read by path, and this is {}",
@@ -1076,6 +1250,89 @@ fn lower_element(
     out.push(Chunk::Static(format!("</{tag}>")));
 }
 
+/// **A view used in another, written where it is used** (ADR-0136): its
+/// markup lowered in place, in the template's one numbering, each parameter
+/// read as the path the prop gives it. What cannot be composed is a
+/// `Blocked` part, as everything the IR cannot represent is; `pw check`
+/// refuses each case first (PW5020, PW0619).
+fn compose(
+    body: &Body,
+    def: DefId,
+    tag: &str,
+    attrs: &[crate::hir::Attr],
+    ctx: &Lowering<'_>,
+    ix: &mut Indexer,
+    out: &mut Vec<Chunk>,
+) {
+    let blocked = |reason: String| {
+        Chunk::Dynamic(Part::Blocked {
+            reason,
+            at: format!("<{tag}>"),
+        })
+    };
+    let Some(decl) = crate::resolve::declaration(ctx.hirs, def) else {
+        out.push(blocked(format!("`<{tag}>` names no declaration")));
+        return;
+    };
+    let hir = ctx.hirs[def.unit];
+    let Some(view) = decl.body.map(|b| hir.body(b)) else {
+        out.push(blocked(format!("`{tag}` has no body")));
+        return;
+    };
+    if ctx.within.contains(&def) {
+        out.push(blocked(format!("`<{tag}>` contains itself")));
+        return;
+    }
+    if !markup_only(view) {
+        out.push(blocked(format!(
+            "`{tag}` declares values of its own, and a composed view holds its markup alone"
+        )));
+        return;
+    }
+    if let Some(a) = attrs
+        .iter()
+        .find(|a| !decl.params.iter().any(|p| p.name == a.name))
+    {
+        out.push(blocked(format!("`{tag}` takes no prop `{}`", a.name)));
+        return;
+    }
+    let mut names = BTreeMap::new();
+    for p in &decl.params {
+        let given = attrs
+            .iter()
+            .find(|a| a.name == p.name)
+            .and_then(|a| match &a.value {
+                AttrValue::Expr(e) => value_path(body, *e).map(|v| ctx.read(v)),
+                _ => None,
+            });
+        let Some(path) = given else {
+            out.push(blocked(format!(
+                "`{tag}`'s prop `{}` is given no value path",
+                p.name
+            )));
+            return;
+        };
+        names.insert(p.name.clone(), path);
+    }
+    if !ix.views.contains(&def) {
+        ix.views.push(def);
+    }
+    let mut within = ctx.within.clone();
+    within.push(def);
+    let inner = Lowering {
+        handlers: ctx.handlers,
+        hirs: ctx.hirs,
+        ws: ctx.ws,
+        unit: def.unit,
+        decl: DeclId(def.decl),
+        names,
+        within,
+    };
+    for root in roots_of(view) {
+        lower_node(view, root, &inner, ix, out);
+    }
+}
+
 fn lower_block(
     body: &Body,
     directive: &str,
@@ -1098,7 +1355,7 @@ fn lower_block(
         })
     };
     // `c` in `{#if c}`: a value path, as every template value is.
-    let subject_path = subject.and_then(|e| value_path(body, e));
+    let subject_path = subject.and_then(|e| value_path(body, e).map(|v| ctx.read(v)));
 
     if let Some((binding, collection, key)) = parse_each(d) {
         let written = collection.split('.').map(str::trim).all(|s| {
@@ -1136,11 +1393,13 @@ fn lower_block(
             ));
             return;
         }
-        let inner = lower_run(body, &lead, ctx, ix);
+        let collection = ctx.read(collection);
+        let (scope, mut written) = ctx.binding(std::slice::from_ref(&binding), ix);
+        let inner = lower_run(body, &lead, &scope, ix);
         out.push(Chunk::Dynamic(Part::Each {
             id,
             collection,
-            binding,
+            binding: written.pop().unwrap_or(binding),
             key,
             body: inner,
         }));
@@ -1188,7 +1447,8 @@ fn lower_block(
                 c @ ("Some" | "None" | "Ok" | "Err") => c.to_string(),
                 c => crate::wit::ident(c),
             };
-            let (binding, fields) = match arm.bindings.as_slice() {
+            let (scope, written) = ctx.binding(&arm.bindings, ix);
+            let (binding, fields) = match written.as_slice() {
                 [one] => (Some(one.clone()), Vec::new()),
                 many => (None, many.to_vec()),
             };
@@ -1196,7 +1456,7 @@ fn lower_block(
                 case,
                 binding,
                 fields,
-                body: lower_run(body, run, ctx, ix),
+                body: lower_run(body, run, &scope, ix),
             });
         }
         out.push(Chunk::Dynamic(Part::Match { id, value, arms }));
@@ -1237,6 +1497,7 @@ fn interpolated_attribute(
     text: &str,
     parts: &[ExprId],
     owner: ElementId,
+    ctx: &Lowering<'_>,
     ix: &mut Indexer,
 ) -> Part {
     let blocked = |reason: &str| Part::Blocked {
@@ -1270,7 +1531,7 @@ fn interpolated_attribute(
                 "a hole in an attribute must be a value path, as `{..}` between tags is",
             );
         };
-        segments.push(Segment::Value(path));
+        segments.push(Segment::Value(ctx.read(path)));
         rest = &after[close + 1..];
     }
     if !rest.is_empty() {
@@ -1373,7 +1634,7 @@ fn conditional(
         Some(((marker, run), more)) => match marker.condition {
             Some(c) => {
                 let nested = ix.part();
-                match value_path(body, c) {
+                match value_path(body, c).map(|v| ctx.read(v)) {
                     Some(v) => vec![conditional(body, nested, v, run, more, ctx, ix)],
                     None => blocked(
                         "an `{:else if}` condition must be a value path",
@@ -1445,9 +1706,18 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                             feed(h, name.as_bytes());
                             feed(h, value.as_bytes());
                         }
-                        Part::Event { event, handler, .. } => {
+                        Part::Event {
+                            event,
+                            handler,
+                            renames,
+                            ..
+                        } => {
                             feed(h, event.as_bytes());
                             feed(h, handler.as_bytes());
+                            for (from, to) in renames {
+                                feed(h, from.as_bytes());
+                                feed(h, to.as_bytes());
+                            }
                         }
                         Part::Conditional {
                             value,

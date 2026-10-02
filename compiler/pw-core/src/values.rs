@@ -398,6 +398,10 @@ pub enum RelationKind {
     /// `f(z = 1)`: a named argument, against the parameters the callee names
     /// (PW0617, ADR-0081).
     Named,
+    /// `<MenuRow item={item} />`: the props a view is given, against its
+    /// parameters, each once and nothing else (PW0619, ADR-0136). Each prop's
+    /// type is an `Argument` relation.
+    Props,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -2491,6 +2495,10 @@ impl<'a> Typer<'a> {
                 crate::hir::Node::Interpolation(e) => {
                     out.extend(self.text(self.of(*e), "{..}".to_string(), self.body.expr_span(*e)));
                 }
+                crate::hir::Node::Element { tag, attrs, .. } if self.view_named(tag).is_some() => {
+                    // A view's attributes are its props (ADR-0136), not text.
+                    out.extend(self.props(n, tag, attrs));
+                }
                 crate::hir::Node::Element { tag, attrs, .. } => {
                     // `<map-container resource={StoreMap} center={c} />` mounts
                     // a resource, and its attributes are the resource's
@@ -2565,6 +2573,102 @@ impl<'a> Typer<'a> {
                 _ => {}
             }
         }
+    }
+
+    /// **The view an element named with a capital letter uses** (ADR-0136),
+    /// as this unit resolves the name, and its signature.
+    fn view_named(&self, tag: &str) -> Option<(DefId, &crate::signatures::Signature)> {
+        if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
+            return None;
+        }
+        // A view is rendered, never called: it is named in the namespace a
+        // page and a component are.
+        let def = match self.ws.resolve_in(self.at, Namespace::Ui, tag) {
+            Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
+            _ => return None,
+        };
+        if self.sigs.kind_of(def) != Some(crate::hir::DeclKind::View) {
+            return None;
+        }
+        Some((def, self.sigs.by_def(def)?))
+    }
+
+    /// **A view's props, against its parameters** (ADR-0136): each prop names
+    /// a parameter and has its type, and each parameter is given. A prop
+    /// written twice is an attribute written twice, which the markup rules
+    /// refuse on every element (PW0028); the second is not read again here.
+    fn props(
+        &self,
+        node: crate::hir::NodeId,
+        tag: &str,
+        attrs: &[crate::hir::Attr],
+    ) -> Vec<ValueRelation> {
+        let Some((def, sig)) = self.view_named(tag) else {
+            return Vec::new();
+        };
+        let span = self.body.node_span(node);
+        let presence = |at: Span, expected: &str, actual: &str| ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::Props,
+            span: at,
+            target: tag.to_string(),
+            index: None,
+            outcome: Outcome::Disagree {
+                expected: expected.to_string(),
+                actual: actual.to_string(),
+            },
+            declared_at: None,
+            boundary: (span.clone(), format!("this use of `{tag}`")),
+        };
+        let mut out = Vec::new();
+        let mut given = BTreeSet::new();
+        for a in attrs {
+            let Some(i) = sig.names.iter().position(|n| *n == a.name) else {
+                out.push(presence(a.span.clone(), "unknown", &a.name));
+                continue;
+            };
+            if !given.insert(i) {
+                continue;
+            }
+            let crate::hir::AttrValue::Expr(e) = &a.value else {
+                out.push(presence(a.span.clone(), "a value", &a.name));
+                continue;
+            };
+            let actual = self.of(*e);
+            let outcome = match sig.params.get(i) {
+                Some(Some(TypeResolution::Resolved(t))) => {
+                    let expected = Ty::of(t);
+                    match unify(&mut Subst::default(), &expected, &actual) {
+                        Verdict::Agree => Outcome::Agree,
+                        Verdict::Undecided => Outcome::Undecided(Undecided::Unknown),
+                        Verdict::Disagree => Outcome::Disagree {
+                            expected: self.display(&expected),
+                            actual: self.display(&actual),
+                        },
+                    }
+                }
+                _ => Outcome::Undecided(Undecided::ExpectedUnresolved),
+            };
+            out.push(ValueRelation {
+                declaration: self.decl.name.clone(),
+                kind: RelationKind::Argument,
+                span: self.body.expr_span(*e),
+                target: format!("{tag}'s prop `{}`", a.name),
+                index: Some(i),
+                outcome,
+                declared_at: sig.params[i]
+                    .as_ref()
+                    .and_then(TypeResolution::resolved)
+                    .map(|t| (def.unit, t.span())),
+                boundary: (span.clone(), format!("this use of `{tag}`")),
+            });
+        }
+        for (i, name) in sig.names.iter().enumerate() {
+            if !given.contains(&i) {
+                out.push(presence(span.clone(), "given", name));
+            }
+        }
+        out
     }
 
     /// A template condition: a value that has a truth (ADR-0071). An
@@ -3818,6 +3922,31 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  a `Result` or a sum type has no truth, and the renderer refuses it",
             )
             .repair("take it apart with `{#match}`"),
+            RelationKind::Props => Diagnostic::error(
+                crate::codes::VIEW_PROPS.id,
+                crate::codes::VIEW_PROPS.invariant,
+                Detector::Signature,
+                match expected.as_str() {
+                    "unknown" => format!("`<{}>` takes no prop `{actual}`", r.target),
+                    "a value" => format!(
+                        "`<{}>`'s prop `{actual}` is given as text; a prop is a value, \
+                         `{actual}={{..}}`",
+                        r.target
+                    ),
+                    _ => format!("`<{}>` is used without its prop `{actual}`", r.target),
+                },
+                r.span.clone(),
+            )
+            .reason("view_given_other_props")
+            .explain(
+                "a view used in another is given each of its parameters as a prop, by name, \
+                 and nothing else (ADR-0136)",
+            )
+            .repair(match expected.as_str() {
+                "unknown" => format!("remove `{actual}`, or declare it on `{}`", r.target),
+                "a value" => format!("write `{actual}={{..}}`"),
+                _ => format!("give `{actual}={{..}}`"),
+            }),
             RelationKind::Named => Diagnostic::error(
                 crate::codes::NAMED_ARGUMENT.id,
                 crate::codes::NAMED_ARGUMENT.invariant,

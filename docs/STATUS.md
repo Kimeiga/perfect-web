@@ -13,6 +13,31 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Correction found 2026-10-02, fix next (ADR-0137): ADR-0133's limits
+claimed two refusals the plan does not make.** A signal read inside an
+`{#each}` a query decides, and an `{#each}` over a query's value inside a
+block a signal decides, each build. The first would show the signal's first
+value forever, and the browser cannot render the second again: it holds the
+signals alone. No served page has either, since a page of signals reads no
+query, but `pw build` accepts both, and KNOWN_LIMITATIONS said it refused
+them.
+
+**ADR-0136, 2026-10-02: a view is written where it is used**
+([ADR-0136](DECISIONS/ADR-0136-a-view-is-written-where-it-is-used.md),
+ADR-0130's second step). `<MenuLine item={item} />` composes: the view's
+markup is lowered in place, in the page's one numbering, its parameters read
+as the paths its props give, and a name it binds renamed where it would hide
+one of them. A view's handler keeps its own module, and the document carries
+what it captures under the view's names for it. Checked where a view is used:
+- props, as arguments (PW0619);
+- what a view's handler captures, against the page's resume destination
+  (PW5007, PW5018);
+- a signal a view's handler would capture, refused (PW5301).
+The page plan and the optimistic speculation read the composed page.
+Demonstrated by `examples/demo/panel.pw` (byte-identical, now from views) and
+`examples/demo/pick.pw` (one view used twice) in Chromium, Firefox and
+WebKit.
+
 **Correction, ADR-0135, 2026-10-02: in a program of several files, one
 page's button could run another page's handler.** The build keyed each
 handler's identity by indices counted within a file, so two pages of one

@@ -119,6 +119,8 @@ fn capture_codes(sources: &[&str]) -> Vec<&'static str> {
         &sigs,
         &std::collections::BTreeMap::new(),
         &facts,
+        &pw_core::resume::captured_params(&refs, &sigs),
+        refs.len() - 1,
         &mut ds,
     );
     ds.iter().map(|d| d.code).collect()

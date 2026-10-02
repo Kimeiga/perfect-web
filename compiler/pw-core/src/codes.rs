@@ -303,6 +303,10 @@ codes! {
     // `g(b = 1, a = 10)` computed `g(1, 10)`.
     NAMED_ARGUMENT = "PW0617" / named_argument / 1, Types,
         "a named argument is given to the parameter of its name, once, after the positional ones";
+    // ADR-0136: `<MenuRow item={item} />`. Until 2026-10-02 a view used in
+    // another was refused whole, and its props were checked by nothing.
+    VIEW_PROPS = "PW0619" / view_props / 1, Types,
+        "a view is given each of its parameters, and nothing else";
     // ADR-0099: a statement's `Result` was discarded, and its failure with
     // it, until 2026-09-26.
     RESULT_DROPPED = "PW0618" / result_dropped / 1, Types,

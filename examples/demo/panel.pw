@@ -17,6 +17,19 @@ module demo.panel
 // that is open for nothing cannot be written (ADR-0126, R7).
 type Panel = Shut | Cart | Help
 
+// The page's heading, and what its help panel says, each a view the page
+// uses (ADR-0136). Each is given a signal to show, and shows it where the
+// browser reads it again: the document is the one the markup written in
+// place makes, byte for byte.
+view Greeting(text: String) !{} {
+    <h1 id="greeting">{text}</h1>
+}
+
+view HelpLines(presses: Int, text: String) !{} {
+    <p>Pressed {presses} time(s) so far.</p>
+    <p id="help-greeting">{text}</p>
+}
+
 page PanelPage() {
     cache private
 
@@ -26,7 +39,7 @@ page PanelPage() {
 
     view {
         <main>
-            <h1 id="greeting">{greeting}</h1>
+            <Greeting text={greeting} />
             <p>Pressed <span id="presses">{presses}</span> time(s).</p>
             <button id="press" type="button" on:press={() => presses = presses + 1}>Press</button>
             <button id="open-cart" type="button" on:press={() => panel = Panel.Cart}>Cart</button>
@@ -42,8 +55,7 @@ page PanelPage() {
                     </aside>
                 {:Help}
                     <aside id="help-panel" aria-label="Help">
-                        <p>Pressed {presses} time(s) so far.</p>
-                        <p id="help-greeting">{greeting}</p>
+                        <HelpLines presses={presses} text={greeting} />
                         <button id="close-help" type="button" on:press={() => panel = Panel.Shut}>Close</button>
                     </aside>
             {/match}

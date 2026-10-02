@@ -111,9 +111,24 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
             if decl.kind != DeclKind::Page {
                 continue;
             }
-            let component = crate::contract::component_id(hir, id);
+            // The handlers in the page's document: its own, and each composed
+            // view's (ADR-0136). A view's button that calls an optimistic
+            // command is the page's button.
+            let mut written = vec![crate::contract::component_id(hir, id)];
+            for v in crate::template_ir::lowered(
+                &hirs,
+                &ws,
+                &crate::template_ir::Handlers::new(),
+                unit,
+                id,
+            )
+            .map(|l| l.views)
+            .unwrap_or_default()
+            {
+                written.push(crate::contract::component_id(hirs[v.unit], DeclId(v.decl)));
+            }
             let mut commands: Vec<String> = Vec::new();
-            for h in handlers.iter().filter(|h| h.declaration == component) {
+            for h in handlers.iter().filter(|h| written.contains(&h.declaration)) {
                 if let Encoding::Encoded(m) = &h.module {
                     for c in &m.commands {
                         if !commands.contains(c) {
@@ -230,15 +245,6 @@ fn page_bindings(ws: &Workspace, unit: usize, body: &crate::hir::Body) -> Vec<Pa
         });
     }
     out
-}
-
-/// The name a hole's path starts at: `cart` in `cart.line_count`.
-fn root_name(body: &crate::hir::Body, e: ExprId) -> Option<&str> {
-    match body.expr(e) {
-        Expr::Name(n) => Some(n),
-        Expr::Field { base, .. } => root_name(body, *base),
-        _ => None,
-    }
 }
 
 /// The value a resource's entry holds: its result, or `Ok`'s payload.
@@ -429,12 +435,11 @@ fn page_module(
         }
     }
 
-    // Each part reading a speculated binding.
+    // Each part reading a speculated binding: the page's own, and a view's
+    // composed into it (ADR-0136), by the path the template reads.
     let mut reads: Vec<(String, u32, usize)> = Vec::new();
-    for hole in crate::template_ir::text_holes(hir, page_id) {
-        let Some(root) = root_name(body, hole.expr) else {
-            continue;
-        };
+    for hole in crate::template_ir::holes(cx.hirs, cx.ws, unit, page_id) {
+        let root = hole.path.split('.').next().unwrap_or_default();
         let Some((_, _, _, value)) = speculated.iter().find(|(n, ..)| n == root) else {
             continue;
         };
@@ -448,14 +453,36 @@ fn page_module(
                 ),
             };
         }
+        // The expression is compiled in the body it is written in. In a view,
+        // its first name is the view's parameter, given the binding whole:
+        // the view's path and the template's differ in that name alone.
+        let (at, decl) = hole.origin;
+        let Some(written) = cx.hirs[at].decl(decl).body.map(|b| cx.hirs[at].body(b)) else {
+            continue;
+        };
+        let Some(own) = crate::template_ir::value_path_of(written, hole.expr) else {
+            continue;
+        };
+        let tail = |p: &str| p.split_once('.').map(|(_, t)| t.to_string());
+        if tail(&own) != tail(&hole.path) {
+            return Encoding::Unsupported {
+                construct: "a speculated value given to a view in part",
+                reason: format!(
+                    "part {} of `{page}` reads `{}` through a view given a field of `{root}`, \
+                     and a view's part is recomputed from a binding given whole",
+                    hole.part.0, hole.path
+                ),
+            };
+        }
+        let name = own.split('.').next().unwrap_or_default().to_string();
         let f = lowered!(lower::pure_expr(
             cx,
-            unit,
-            page_id,
+            at,
+            decl,
             hole.expr,
-            &[(root.to_string(), value.clone())],
+            &[(name, value.clone())],
             &format!("{page}#part{}", hole.part.0),
-            body.expr_span(hole.expr),
+            written.expr_span(hole.expr),
         ));
         if !matches!(f.ret, Type::Int | Type::Str | Type::Bool) {
             return Encoding::Unsupported {

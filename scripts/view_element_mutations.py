@@ -4,7 +4,8 @@ a view.
 
 Each mutant undoes one piece of how such an element is read: that it is read
 at all, how its name resolves, and which declarations are views. The
-view-element tests must then fail.
+view-element tests must then fail. Re-anchored for ADR-0136, which composes a
+view where ADR-0072 refused it, and keeps refusing a page or a component.
 
 Run from the repository root; `just e10-view-elements` records the output.
 The source is restored after every mutant, whatever happens.
@@ -41,25 +42,25 @@ MUTANTS = [
     (
         "a tag's name resolves to nothing",
         CHECK,
-        "                    crate::resolve::declaration(hirs, def).map(|d| d.kind)",
+        "                    crate::resolve::declaration(hirs, def).map(|d| (def, d.kind))",
         "                    {\n                        let _ = (hirs, def);\n                        None\n                    }",
     ),
     (
         "an imported view is not resolved",
         CHECK,
         "                Resolution::Local(def) | Resolution::Imported { def, .. } => {\n"
-        "                    crate::resolve::declaration(hirs, def).map(|d| d.kind)\n"
+        "                    crate::resolve::declaration(hirs, def).map(|d| (def, d.kind))\n"
         "                }\n"
         "                Resolution::Unresolved | Resolution::Ambiguous(_) => None,",
         "                Resolution::Local(def) => {\n"
-        "                    crate::resolve::declaration(hirs, def).map(|d| d.kind)\n"
+        "                    crate::resolve::declaration(hirs, def).map(|d| (def, d.kind))\n"
         "                }\n"
         "                Resolution::Imported { .. } | Resolution::Unresolved | Resolution::Ambiguous(_) => None,",
     ),
     (
         "a view is not told from another declaration",
         CHECK,
-        "                Some(DeclKind::View | DeclKind::Component | DeclKind::Page) => (",
+        "                Some(DeclKind::Component | DeclKind::Page) => (",
         "                Some(DeclKind::Type) => (",
     ),
 ]

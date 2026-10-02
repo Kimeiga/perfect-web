@@ -39,7 +39,7 @@ MUTANTS = [
     (
         "a computed attribute lowers with an empty path",
         IR,
-        "                let Some(value) = value_path(body, *e) else {",
+        "                let Some(value) = value_path(body, *e).map(|v| ctx.read(v)) else {",
         "                let Some(value) = Some(crate::infer::path_of(body, *e)) else {",
     ),
     (

@@ -36,14 +36,153 @@
 //! rather than copied — one analysis, or the two would agree until the day one
 //! of them changed.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::boundary::{
     Blocked, Boundary, BoundaryContext, Crossing, Direction, Violation, can_cross,
 };
 use crate::codes;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
-use crate::hir::{Decl, Expr, ExprId, Hir, Span};
+use crate::hir::{AttrValue, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Node, Span};
+use crate::lexical::{Binder, Lexical};
 use crate::privacy::Restriction;
+use crate::resolve::{DefId, Resolution, Workspace};
 use crate::signatures::Signatures;
+
+/// **The parameters of each view whose value a handler captures**
+/// (ADR-0136): a handler written in the view, or in a view it uses, that
+/// captures the parameter or a value read from it. A view composed into a
+/// page writes what its handlers capture into the page's document, so the
+/// page checks each such value where it gives it ([`captured_props`]).
+pub fn captured_params(hirs: &[&Hir], sigs: &Signatures) -> BTreeMap<DefId, BTreeSet<String>> {
+    let mut out = BTreeMap::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind == DeclKind::View {
+                let def = DefId { unit, decl: id.0 };
+                captured_by(hirs, sigs, def, &mut out, &mut Vec::new());
+            }
+        }
+    }
+    out
+}
+
+fn captured_by(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    def: DefId,
+    memo: &mut BTreeMap<DefId, BTreeSet<String>>,
+    within: &mut Vec<DefId>,
+) -> BTreeSet<String> {
+    if let Some(found) = memo.get(&def) {
+        return found.clone();
+    }
+    // A view that contains itself is refused (PW5020), and not followed.
+    if within.contains(&def) {
+        return BTreeSet::new();
+    }
+    let hir = hirs[def.unit];
+    let decl = hir.decl(DeclId(def.decl));
+    let Some(body) = decl.body.map(|b| hir.body(b)) else {
+        return BTreeSet::new();
+    };
+    within.push(def);
+    let lexical = Lexical::build(sigs, Some(def.unit), decl, body);
+    let param = |e: ExprId| {
+        param_of(&lexical, body, e).and_then(|i| decl.params.get(i).map(|p| p.name.clone()))
+    };
+    let mut found = BTreeSet::new();
+    for lambda in handlers_in(body) {
+        for (_, _, e) in captures_of(body, &lexical, lambda) {
+            found.extend(param(e));
+        }
+    }
+    for (e, used, _, given) in props_in(body, sigs.workspace(), def.unit) {
+        if captured_by(hirs, sigs, used, memo, within).contains(&given) {
+            found.extend(param(e));
+        }
+    }
+    within.pop();
+    memo.insert(def, found.clone());
+    found
+}
+
+/// Each prop a view is given in `body`: its value, the view and its name as
+/// written, and the parameter.
+fn props_in(
+    body: &crate::hir::Body,
+    ws: &Workspace,
+    at: usize,
+) -> Vec<(ExprId, DefId, String, String)> {
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    let mut out = Vec::new();
+    for n in body.walk_markup(&roots) {
+        let Node::Element { tag, attrs, .. } = body.node(n) else {
+            continue;
+        };
+        if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
+            continue;
+        }
+        let (Resolution::Local(def) | Resolution::Imported { def, .. }) = ws.resolve(at, tag)
+        else {
+            continue;
+        };
+        for a in attrs {
+            if let AttrValue::Expr(e) = &a.value {
+                out.push((*e, def, tag.clone(), a.name.clone()));
+            }
+        }
+    }
+    out
+}
+
+/// **The props in `body` whose value a composed view's handler captures**
+/// (ADR-0136): each one's expression, the view's name, and the parameter it
+/// gives.
+pub(crate) fn captured_props(
+    body: &crate::hir::Body,
+    ws: &Workspace,
+    at: usize,
+    captured: &BTreeMap<DefId, BTreeSet<String>>,
+) -> Vec<(ExprId, String, String)> {
+    props_in(body, ws, at)
+        .into_iter()
+        .filter(|(_, def, _, given)| captured.get(def).is_some_and(|c| c.contains(given)))
+        .map(|(e, _, tag, given)| (e, tag, given))
+        .collect()
+}
+
+/// The parameter a value in `body` is read from, through the markup's
+/// bindings: `item` for `item.id`, and for `tag.name` inside `{#each
+/// item.tags as tag}`.
+fn param_of(lexical: &Lexical, body: &crate::hir::Body, e: ExprId) -> Option<usize> {
+    let mut root = e;
+    while let Expr::Field { base, .. } = body.expr(root) {
+        root = *base;
+    }
+    param_of_binder(lexical, body, lexical.binder(root)?)
+}
+
+fn param_of_binder(lexical: &Lexical, body: &crate::hir::Body, b: Binder) -> Option<usize> {
+    match b {
+        Binder::Param(i) => Some(i),
+        Binder::Each(node) => lexical
+            .each_blocks()
+            .find(|(n, ..)| *n == node)
+            .and_then(|(_, _, head)| head)
+            .and_then(|head| param_of_binder(lexical, body, head)),
+        Binder::Arm(node, _) => lexical
+            .template_arms()
+            .find(|(n, _)| *n == node)
+            .and_then(|(_, subject)| param_of(lexical, body, subject)),
+        _ => None,
+    }
+}
 
 /// The captures with their spans, for a diagnostic that points at one.
 fn captures_with_spans(
@@ -256,6 +395,10 @@ pub fn check(
     sigs: &Signatures,
     summaries: &std::collections::BTreeMap<crate::resolve::DefId, crate::privacy::Label>,
     facts: &crate::boundary::TypeFacts,
+    // Which parameters each view's handlers capture, and which file this is
+    // (ADR-0136).
+    captured: &BTreeMap<DefId, BTreeSet<String>>,
+    unit: usize,
     out: &mut Vec<Diagnostic>,
 ) {
     for (id, decl) in hir.all_decls() {
@@ -384,6 +527,43 @@ pub fn check(
                     Crossing::Blocked(Blocked::UndeterminedSchema) | Crossing::Proven => {}
                 }
             }
+        }
+
+        // **What a composed view's handler captures, given here** (ADR-0136).
+        // The value a prop gives is written into this declaration's document,
+        // as its own handler's capture would be, and crosses the same
+        // boundary. Its type is the view's to check, where its handler is
+        // written; whose value it is, and so whether this document may hold
+        // it, is decided here, where it is given.
+        for (e, tag, given) in captured_props(body, sigs.workspace(), unit, captured) {
+            let ty = types.of(body, e);
+            let verdict = can_cross(
+                &facts.profile(ty.as_ref()),
+                &BoundaryContext {
+                    boundary: Boundary::Resume,
+                    direction: Direction::Outbound,
+                    label: labels.label(body, e),
+                    destination: destination.clone(),
+                },
+            );
+            let name = crate::infer::path_of(body, e);
+            let span = body.expr_span(e);
+            let mut d = match verdict {
+                Crossing::Violation(Violation::Private { restriction }) => {
+                    private_value(decl, &name, &restriction, span, &at)
+                }
+                Crossing::Blocked(Blocked::UnknownDestination { carries }) => {
+                    unknown_destination(decl, &name, &carries, span, &at)
+                }
+                _ => continue,
+            };
+            for r in &mut d.related {
+                r.label = format!(
+                    "`{}` gives it to `<{tag}>`, whose handler captures `{given}`",
+                    decl.name
+                );
+            }
+            out.push(d);
         }
     }
 }

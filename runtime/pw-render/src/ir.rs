@@ -124,6 +124,11 @@ pub enum Part {
         /// read. See `pw_core::resume::capture_paths`.
         #[serde(default)]
         captures: Vec<String>,
+        /// Where a capture's value is when the handler names it otherwise: a
+        /// view's parameter, composed into a page, read at the path it was
+        /// given (ADR-0136). See `pw_core::template_ir::Part::Event`.
+        #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+        renames: std::collections::BTreeMap<String, String>,
     },
     /// A region rendered only when a condition holds.
     Conditional {

@@ -70,8 +70,8 @@ MUTANTS = [
     (
         "a block reads its own signal alone",
         PLAN,
-        "                    .filter(|r| signals.iter().any(|s| s == r))\n",
-        "                    .filter(|r| *r == root)\n",
+        "                .filter(|r| signals.iter().any(|s| s == r))\n",
+        "                .filter(|r| *r == root)\n",
     ),
     (
         "a first value's case is not named",

@@ -374,19 +374,6 @@ fn steps(
     Ok(out)
 }
 
-/// The path a hole reads: its root name and the reads after it.
-fn path_of(body: &Body, e: ExprId) -> Option<(String, Vec<String>)> {
-    match body.expr(e) {
-        Expr::Name(n) => Some((n.clone(), Vec::new())),
-        Expr::Field { base, name } => {
-            let (root, mut reads) = path_of(body, *base)?;
-            reads.push(name.clone());
-            Some((root, reads))
-        }
-        _ => None,
-    }
-}
-
 fn plan(
     hirs: &[&Hir],
     ws: &Workspace,
@@ -442,10 +429,19 @@ fn plan(
     let mut live = Vec::new();
     let mut parts = Vec::new();
     let mut members = BTreeSet::new();
-    for hole in crate::template_ir::text_holes(hir, id) {
-        let Some((root, reads)) = path_of(body, hole.expr) else {
+    // The page's template, each view it uses composed in place (ADR-0136):
+    // what the build renders, numbered as the build numbers it.
+    let crate::template_ir::Lowered {
+        template, holes, ..
+    } = crate::template_ir::lowered(hirs, ws, &crate::template_ir::Handlers::new(), unit, id)
+        .ok_or_else(|| format!("`{}` has no template", decl.name))?;
+    for hole in holes {
+        // The path as the template reads it, through each view around it.
+        let mut segments = hole.path.split('.').map(str::to_string);
+        let Some(root) = segments.next() else {
             continue;
         };
+        let reads: Vec<String> = segments.collect();
         // A part a signal decides is the browser's to render again
         // (ADR-0130). Inside a block a query decides, its address carries a
         // frame the browser would have to compute: not this slice.
@@ -517,52 +513,47 @@ fn plan(
 
     // A block's collection, given whole: each binding the template iterates.
     let mut collections = Vec::new();
-    for t in crate::template_ir::build(&[hir]) {
-        if t.path != page {
-            continue;
+    for entry in template.manifest() {
+        if entry.kind == "each"
+            && let Some(root) = entry.value.split('.').next()
+            && found.iter().any(|(n, ..)| n == root)
+            && !collections.iter().any(|c: &String| c == root)
+        {
+            collections.push(root.to_string());
         }
-        for entry in t.manifest() {
-            if entry.kind == "each"
-                && let Some(root) = entry.value.split('.').next()
-                && found.iter().any(|(n, ..)| n == root)
-                && !collections.iter().any(|c: &String| c == root)
-            {
-                collections.push(root.to_string());
+        // A block or an attribute a signal decides (ADR-0130).
+        if matches!(
+            entry.kind,
+            "conditional" | "match" | "attribute" | "boolean_attribute"
+        ) && let Some(root) = entry.value.split('.').next()
+            && signals.iter().any(|s| s == root)
+        {
+            if entry.kind == "attribute" || entry.kind == "boolean_attribute" {
+                return Err(format!(
+                    "part {} is an attribute a signal decides, which this slice does not \
+                     render again (ADR-0130)",
+                    entry.id.0
+                ));
             }
-            // A block or an attribute a signal decides (ADR-0130).
-            if matches!(
-                entry.kind,
-                "conditional" | "match" | "attribute" | "boolean_attribute"
-            ) && let Some(root) = entry.value.split('.').next()
-                && signals.iter().any(|s| s == root)
-            {
-                if entry.kind == "attribute" || entry.kind == "boolean_attribute" {
-                    return Err(format!(
-                        "part {} is an attribute a signal decides, which this slice does not \
-                         render again (ADR-0130)",
-                        entry.id.0
-                    ));
-                }
-                let mut read = Vec::new();
-                if let Some(part) = find_part(&t.chunks, entry.id.0) {
-                    paths_read(part, &mut read);
-                }
-                let mut reads: Vec<String> = read
-                    .iter()
-                    .filter_map(|p| p.split('.').next())
-                    .filter(|r| signals.iter().any(|s| s == r))
-                    .map(str::to_string)
-                    .collect();
-                reads.sort();
-                reads.dedup();
-                live.push(Live {
-                    part: entry.id.0,
-                    signal: root.to_string(),
-                    path: entry.value.clone(),
-                    kind: entry.kind.to_string(),
-                    reads,
-                });
+            let mut read = Vec::new();
+            if let Some(part) = find_part(&template.chunks, entry.id.0) {
+                paths_read(part, &mut read);
             }
+            let mut reads: Vec<String> = read
+                .iter()
+                .filter_map(|p| p.split('.').next())
+                .filter(|r| signals.iter().any(|s| s == r))
+                .map(str::to_string)
+                .collect();
+            reads.sort();
+            reads.dedup();
+            live.push(Live {
+                part: entry.id.0,
+                signal: root.to_string(),
+                path: entry.value.clone(),
+                kind: entry.kind.to_string(),
+                reads,
+            });
         }
     }
 

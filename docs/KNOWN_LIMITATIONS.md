@@ -162,11 +162,16 @@ refused by name:
   IR has no representation for `<stream query={..}>` or for an element that
   mounts a resource (`resource={StoreMap}`, A-007), and refuses each by
   name. The Marko adapter renders a stream (ADR-0017).
-- **A view is not used in another view** (ADR-0072). `<Money value={p} />`,
-  as the charter writes it (§8.1), is refused (PW5020): views do not compose
-  yet. Until 2026-09-26 it built as an unknown HTML element. How a view
-  composes needs a ruling: inlined at compile time, or rendered in place at
-  run time.
+- **A view composes when its body is its markup** (ADR-0136). Refused by
+  name (PW5020):
+  - a view with bindings or signals of its own;
+  - a view that contains itself, which ADR-0130 rules a run-time instance;
+  - a prop that is not a value path, a literal included (`label="Add"`).
+  A signal given to a view is shown, not changed: a view's handler that
+  would capture one is refused (PW5301) until signals are provided to views
+  (ADR-0130, step 3). A view's handler that captures a restricted parameter
+  is refused at the view, even where every page using it could hold the
+  value. The Marko adapter is unchanged.
 - **Nothing emits patches for the new template parts.** A `{#match}` region
   or an interpolated attribute renders on the server; the dev server's patch
   generator is written per operation, and the store uses neither. kiokun's
@@ -374,11 +379,12 @@ within stated bounds (ADR-0120 found both unexecuted):
 E14's shared store contract still excludes both, for every stack.
 
 **A page's signals are its own** (ADR-0133). Only a page declares one;
-a view's signals, a signal provided to views, and views composing wait for
-view composition (ADR-0130, steps 2 and 3). A first value is data, not a
-computation. A signal read inside an `{#each}` a query decides, an attribute
-a signal decides, and an `{#each}` inside a signal's block are refused by the
-plan. A block renders again whenever any signal it reads changes, even when
+a view's signals and a signal provided to views wait for ADR-0130's step 3.
+A first value is data, not a computation. An attribute a signal decides is
+refused by the plan. **Corrected 2026-10-02:** a signal read inside an
+`{#each}` a query decides, and a query's `{#each}` inside a block a signal
+decides, were listed here as refused, and each builds; neither is rendered
+again in the browser. The refusals are ADR-0137, next. A block renders again whenever any signal it reads changes, even when
 the arm shown does not read it. The browser's renderer is 90 KB gzipped,
 loaded on the first block a press renders.
 

@@ -38,21 +38,44 @@ enum Place {
     Body,
 }
 
-/// The three rules over every declaration of one unit.
-pub fn check(hir: &Hir, sigs: &Signatures, at: usize, out: &mut Vec<Diagnostic>) {
+/// The three rules over every declaration of one unit. `captured` is which
+/// parameters each view's handlers capture (ADR-0136).
+pub fn check(
+    hir: &Hir,
+    sigs: &Signatures,
+    at: usize,
+    captured: &BTreeMap<crate::resolve::DefId, BTreeSet<String>>,
+    out: &mut Vec<Diagnostic>,
+) {
     for (_, decl) in hir.all_decls() {
         let Some(b) = decl.body else { continue };
         let body = hir.body(b);
-        check_body(decl, body, sigs, at, out);
+        check_body(decl, body, sigs, at, captured, out);
     }
 }
 
-fn check_body(decl: &Decl, body: &Body, sigs: &Signatures, at: usize, out: &mut Vec<Diagnostic>) {
+fn check_body(
+    decl: &Decl,
+    body: &Body,
+    sigs: &Signatures,
+    at: usize,
+    captured: &BTreeMap<crate::resolve::DefId, BTreeSet<String>>,
+    out: &mut Vec<Diagnostic>,
+) {
     let handlers = handlers(body);
     if body.signals.is_empty() && handlers.is_empty() {
         return;
     }
     let places = places(body, &handlers);
+    // Each prop a composed view's handler captures (ADR-0136). A handler
+    // reaches a signal through its context, and reads it as it is when the
+    // handler runs; one given a signal as a prop would capture it as it was
+    // rendered, and read that value however the signal changed after.
+    let given: Vec<(ExprId, String, String)> = if body.signals.is_empty() {
+        Vec::new()
+    } else {
+        crate::resume::captured_props(body, sigs.workspace(), at, captured)
+    };
     let lexical = Lexical::build(sigs, Some(at), decl, body);
 
     // Each signal's binder, and each `let`'s, by its pattern: where it was
@@ -114,6 +137,10 @@ fn check_body(decl: &Decl, body: &Body, sigs: &Signatures, at: usize, out: &mut 
                 }
                 if places.get(&id).copied().unwrap_or(Place::Body) == Place::Body {
                     out.push(read_where_it_cannot_change(body, id, n, *declared));
+                } else if let Some((_, tag, param)) =
+                    given.iter().find(|(e, ..)| within(body, *e, id))
+                {
+                    out.push(captured_through_a_view(body, id, n, *declared, tag, param));
                 }
             }
             _ => {}
@@ -247,6 +274,47 @@ fn read_where_it_cannot_change(
         ),
         repairs: vec![Repair {
             description: "read the signal in the template, or in a handler".to_string(),
+            replacement: None,
+        }],
+    }
+}
+
+/// A signal given to a view whose handler captures it (ADR-0136).
+fn captured_through_a_view(
+    body: &Body,
+    at: ExprId,
+    name: &str,
+    declared: ExprId,
+    tag: &str,
+    param: &str,
+) -> Diagnostic {
+    let code = crate::codes::SIGNAL_READ_WHERE_IT_CANNOT_CHANGE;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "signal_captured_through_a_view",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!(
+            "`{name}` is a signal, and `<{tag}>`'s handler captures it as `{param}`, \
+             as it was rendered"
+        ),
+        primary_span: body.expr_span(at),
+        related: vec![Related {
+            span: body.expr_span(declared),
+            label: format!("`{name}` is declared a signal here"),
+        }],
+        explanation: Some(format!(
+            "A handler reads a signal through its context, as it is when the handler \
+             runs. A view's handler that captures `{param}` reads the value the \
+             document was rendered with, and pressing it after `{name}` changed would \
+             act on the old value. A view is given a signal to change or to read in a \
+             handler when signals are provided to views (ADR-0130, step 3)."
+        )),
+        repairs: vec![Repair {
+            description: format!(
+                "write `<{tag}>`'s handler in this page, where it reads `{name}` itself"
+            ),
             replacement: None,
         }],
     }

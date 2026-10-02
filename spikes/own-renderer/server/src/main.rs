@@ -1731,11 +1731,12 @@ impl Server {
         handler_table(&self.templates)
     }
 
-    /// **A page whose values are its signals alone** (ADR-0130), rendered at
-    /// each signal's first value, as `pw build`'s plan states it. A page that
-    /// reads a query is the store's route's: this one asks the server for
-    /// nothing, and neither does the page it serves.
-    fn render_signal_page(&self, path: &str, session: &str) -> Result<String, String> {
+    /// **A page whose values are its signals and its parameters** (ADR-0130,
+    /// ADR-0136), rendered at each signal's first value, as `pw build`'s plan
+    /// states it, and each parameter as the address gives it: `?item=cortado`.
+    /// A page that reads a query is the store's route's: this one asks the
+    /// server for nothing, and neither does the page it serves.
+    fn render_signal_page(&self, path: &str, query: &str, session: &str) -> Result<String, String> {
         let plan = self
             .plans
             .get(path)
@@ -1751,6 +1752,17 @@ impl Server {
             .find(|t| t.path == path)
             .ok_or_else(|| format!("no template `{path}`"))?;
         let mut env = Env::new();
+        // A parameter is text, as the address carries it. A page whose
+        // parameter is not given is not rendered with a guess.
+        for p in plan["params"].as_array().into_iter().flatten() {
+            let name = p.as_str().unwrap_or_default();
+            let given = query
+                .split('&')
+                .find_map(|kv| kv.strip_prefix(name)?.strip_prefix('='))
+                .and_then(percent_decoded)
+                .ok_or_else(|| format!("`{path}` is given no `{name}`"))?;
+            env = env.set(name, Value::Text(given));
+        }
         for s in plan["signals"].as_array().into_iter().flatten() {
             let name = s["name"].as_str().unwrap_or_default();
             env = env.set(name, Value::from_wire(&s["initial"]));
@@ -2542,7 +2554,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // A page whose values are its signals alone (ADR-0130).
         ("GET", route) if route.starts_with("/page/") => {
             let path = route.trim_start_matches("/page/");
-            match server.render_signal_page(path, &session) {
+            match server.render_signal_page(path, query, &session) {
                 Ok(body) => respond(
                     &mut stream,
                     200,
@@ -2850,6 +2862,33 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &st
 /// each signal's first value, each part a signal decides, and the template
 /// of each block one decides, which the browser's copy of the renderer
 /// renders when it changes.
+/// A query string's value, decoded: `%XX` as the byte it escapes, and `+`
+/// as a space, as a form encodes one. `None` for an escape that is not one,
+/// or bytes that are not UTF-8.
+fn percent_decoded(v: &str) -> Option<String> {
+    let bytes = v.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' => {
+                let hex = std::str::from_utf8(bytes.get(i + 1..i + 3)?).ok()?;
+                out.push(u8::from_str_radix(hex, 16).ok()?);
+                i += 3;
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
 fn signal_document(
     body: &str,
     template: &Template,
@@ -3977,5 +4016,22 @@ mod tests {
         // the refusal above is about the missing record and not about the
         // lookup being broken.
         assert!(s.authorise("store.page.add_to_cart").is_ok());
+    }
+
+    /// A page's parameter, as the address carries it (ADR-0136).
+    #[test]
+    fn a_parameter_is_the_text_the_address_carries() {
+        assert_eq!(percent_decoded("cold-brew").as_deref(), Some("cold-brew"));
+        assert_eq!(
+            percent_decoded("flat%20white").as_deref(),
+            Some("flat white")
+        );
+        assert_eq!(percent_decoded("flat+white").as_deref(), Some("flat white"));
+        assert_eq!(percent_decoded("%E2%82%AC").as_deref(), Some("\u{20ac}"));
+        assert_eq!(percent_decoded("%3Cb%3E").as_deref(), Some("<b>"));
+        // Not an escape, and not text: refused rather than passed through.
+        assert_eq!(percent_decoded("%zz"), None);
+        assert_eq!(percent_decoded("%4"), None);
+        assert_eq!(percent_decoded("%FF"), None);
     }
 }
