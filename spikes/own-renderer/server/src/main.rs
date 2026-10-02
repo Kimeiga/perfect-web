@@ -257,7 +257,23 @@ struct Server {
     /// admitted against the imports the artifact actually has.
     contracts: Vec<ComponentContract>,
     topology: Topology,
+    /// **Each idempotent command's outcome, by interaction** (ADR-0121).
+    ///
+    /// `pw-resource`'s reservation: a key is reserved before its command
+    /// runs, a duplicate waits for and shares the first outcome, and an
+    /// unknown outcome is never re-executed. The key binds the interaction to
+    /// its session and its command; [`Server::interactions`] binds it to the
+    /// arguments and bounds how many are kept.
+    commands: pw_resource::Resources,
+    /// Per session, the interaction keys held in `commands`, oldest first,
+    /// each with the arguments it was first sent with.
+    interactions: Mutex<BTreeMap<String, std::collections::VecDeque<(String, String)>>>,
 }
+
+/// How many interactions' outcomes one session keeps (ADR-0121). A retry of
+/// an interaction older than this many later ones runs again: the bound's
+/// cost, stated rather than unbounded memory.
+const INTERACTIONS_PER_SESSION: usize = 64;
 
 /// The semantic identity of one session's cart.
 ///
@@ -402,6 +418,8 @@ impl Server {
             pending: Mutex::new(BTreeMap::new()),
             contracts: contracts(),
             topology,
+            commands: pw_resource::Resources::new(pw_resource::Clock::new()),
+            interactions: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -602,11 +620,18 @@ impl Server {
     /// from the artifact by the host, and refused otherwise, before anything
     /// runs. The outer error is a malformed request (the arguments); the inner
     /// one is a command that ran and did not commit.
+    ///
+    /// An idempotent command (its contract's `idempotent_by`, ADR-0121) runs
+    /// at most once per `interaction`: a retried request gets the first
+    /// request's outcome, and nothing runs again. Without an interaction it is
+    /// refused before anything runs, and so is an interaction sent again with
+    /// other arguments.
     fn command_json(
         &self,
         component_id: &str,
         session: &str,
         json: &[serde_json::Value],
+        interaction: Option<&str>,
     ) -> Result<Result<(), String>, String> {
         let loaded = self
             .components
@@ -622,7 +647,57 @@ impl Server {
         let args = loaded
             .prepared
             .arguments(&[&export.interface, &export.function], json)?;
-        Ok(self.command(component_id, session, &args, false))
+        let Some(key_type) = &export.idempotent_by else {
+            return Ok(self.command(component_id, session, &args, false));
+        };
+        let id = interaction.ok_or_else(|| {
+            format!(
+                "`{component_id}` is idempotent_by {key_type}, and the request carries no interaction id"
+            )
+        })?;
+        if id.is_empty()
+            || id.len() > 128
+            || !id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(format!("`{id}` is not an interaction id"));
+        }
+        let key = format!("{session}\u{1f}{component_id}\u{1f}{id}");
+        let sent = serde_json::Value::Array(json.to_vec()).to_string();
+        {
+            let mut held = self.interactions.lock().expect("interactions");
+            let queue = held.entry(session.to_string()).or_default();
+            match queue.iter().find(|(k, _)| *k == key) {
+                Some((_, first)) if *first != sent => {
+                    return Err(format!(
+                        "interaction `{id}` was first sent with other arguments"
+                    ));
+                }
+                Some(_) => {}
+                None => {
+                    queue.push_back((key.clone(), sent));
+                    while queue.len() > INTERACTIONS_PER_SESSION {
+                        if let Some((oldest, _)) = queue.pop_front() {
+                            self.commands.forget_command(&oldest);
+                        }
+                    }
+                }
+            }
+        }
+        let outcome = self
+            .commands
+            .try_command(&key, || {
+                match self.command(component_id, session, &args, false) {
+                    Ok(()) => "committed".to_string(),
+                    Err(e) => format!("failed:{e}"),
+                }
+            })
+            .map_err(|e| format!("interaction `{id}`'s outcome is unknown: {e:?}"))?;
+        Ok(match outcome.strip_prefix("failed:") {
+            Some(e) => Err(e.to_string()),
+            None => Ok(()),
+        })
     }
 
     /// **The deployment's data layer: `store:data/carts`, whole.**
@@ -715,6 +790,17 @@ impl Server {
         };
         for session in forgotten {
             self.materializer.evict(&self.cart_key(&session));
+            // And its interactions: a forgotten session's retry runs again,
+            // which is the bound's stated cost (ADR-0121).
+            let keys = self
+                .interactions
+                .lock()
+                .expect("interactions")
+                .remove(&session)
+                .unwrap_or_default();
+            for (key, _) in keys {
+                self.commands.forget_command(&key);
+            }
         }
     }
 
@@ -1467,7 +1553,15 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     return;
                 }
             };
-            match server.command_json(id, &session, &args) {
+            // The interaction this request belongs to, sent by the runtime
+            // once per press and kept by a retry (ADR-0121).
+            let interaction = headers.lines().find_map(|l| {
+                let (k, v) = l.split_once(':')?;
+                k.trim()
+                    .eq_ignore_ascii_case("pw-interaction")
+                    .then(|| v.trim().to_string())
+            });
+            match server.command_json(id, &session, &args, interaction.as_deref()) {
                 // A malformed request: nothing ran.
                 Err(e) => {
                     let why = serde_json::Value::String(e);
@@ -2155,6 +2249,7 @@ mod tests {
                 ADD,
                 "session-5",
                 &[serde_json::json!("cortado"), serde_json::json!(2)],
+                Some("press-1"),
             )
             .expect("well-formed");
         ran.expect("and it committed");
@@ -2184,7 +2279,7 @@ mod tests {
             ),
         ] {
             let err = s
-                .command_json(ADD, "session-5", &args)
+                .command_json(ADD, "session-5", &args, Some("press-2"))
                 .expect_err("malformed");
             assert!(err.contains(why), "{args:?}: {err}");
         }
@@ -2195,7 +2290,7 @@ mod tests {
         );
 
         let err = s
-            .command_json("store.page.nothing_declares_this", "session-5", &[])
+            .command_json("store.page.nothing_declares_this", "session-5", &[], None)
             .expect_err("not hosted");
         assert!(err.contains("no compiled component"), "{err}");
     }
@@ -2203,13 +2298,83 @@ mod tests {
     /// **`clear_cart` commits its state as well as its event.** Until the
     /// command path was one path, `clear_cart` committed only the event, and
     /// the materializer's `cart:<session>` state kept the old total.
+    /// **An idempotent command runs once per interaction** (ADR-0121).
+    /// `add_to_cart` declares `idempotent_by InteractionId`, and until
+    /// 2026-10-02 nothing read it: a retried request added twice.
+    #[test]
+    fn a_retried_interaction_runs_its_command_once() {
+        let s = rendering_server();
+        let espresso = [serde_json::json!("espresso"), serde_json::json!(1)];
+        for _ in 0..3 {
+            s.command_json(ADD, "session-r", &espresso, Some("press-a"))
+                .expect("well-formed")
+                .expect("committed, or the first commit's outcome");
+        }
+        assert_eq!(s.cart_value("session-r"), 1, "three sends, one interaction");
+
+        // Another interaction is another add, and another session's same
+        // interaction id is its own.
+        s.command_json(ADD, "session-r", &espresso, Some("press-b"))
+            .expect("well-formed")
+            .expect("committed");
+        assert_eq!(s.cart_value("session-r"), 2);
+        s.command_json(ADD, "session-q", &espresso, Some("press-a"))
+            .expect("well-formed")
+            .expect("committed");
+        assert_eq!(s.cart_value("session-q"), 1);
+
+        // Refused before anything runs: no interaction, a malformed one, and
+        // one reused with other arguments.
+        let err = s
+            .command_json(ADD, "session-r", &espresso, None)
+            .expect_err("an idempotent command needs its key");
+        assert!(err.contains("carries no interaction id"), "{err}");
+        let err = s
+            .command_json(ADD, "session-r", &espresso, Some("a b"))
+            .expect_err("malformed");
+        assert!(err.contains("is not an interaction id"), "{err}");
+        let other = [serde_json::json!("cortado"), serde_json::json!(1)];
+        let err = s
+            .command_json(ADD, "session-r", &other, Some("press-a"))
+            .expect_err("the same interaction is the same request");
+        assert!(err.contains("first sent with other arguments"), "{err}");
+        assert_eq!(s.cart_value("session-r"), 2, "no refusal moved the state");
+    }
+
+    /// **What an idempotent command keeps is bounded** (ADR-0121, and E10
+    /// gate item 3's property): per session, the last
+    /// `INTERACTIONS_PER_SESSION` interactions.
+    #[test]
+    fn interactions_kept_are_bounded_per_session() {
+        let s = rendering_server();
+        let espresso = [serde_json::json!("espresso"), serde_json::json!(1)];
+        let presses = INTERACTIONS_PER_SESSION + 40;
+        for i in 0..presses {
+            s.command_json(ADD, "session-b", &espresso, Some(&format!("p{i}")))
+                .expect("well-formed")
+                .expect("committed");
+        }
+        assert_eq!(s.cart_value("session-b"), presses as i64);
+        assert_eq!(s.commands.commands_held(), INTERACTIONS_PER_SESSION);
+        // The newest is still recognised; the oldest is the bound's cost.
+        s.command_json(
+            ADD,
+            "session-b",
+            &espresso,
+            Some(&format!("p{}", presses - 1)),
+        )
+        .expect("well-formed")
+        .expect("its first outcome");
+        assert_eq!(s.cart_value("session-b"), presses as i64);
+    }
+
     #[test]
     fn every_command_commits_its_state_and_its_event_together() {
         let s = rendering_server();
         s.command(ADD, "session-6", &add("espresso", 3), false)
             .expect("runs");
         assert_eq!(s.materializer.state("cart:session-6").as_deref(), Some("3"));
-        s.command_json(CLEAR, "session-6", &[])
+        s.command_json(CLEAR, "session-6", &[], Some("clear-1"))
             .expect("well-formed")
             .expect("and it committed");
         assert_eq!(s.cart_value("session-6"), 0);

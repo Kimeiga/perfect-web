@@ -427,10 +427,15 @@ function loadHandler(identity) {
  * A command that ran and did not commit is not a refusal: the page learns what
  * happened from the resource, as it does when a command commits.
  */
-async function command(component, args) {
+async function command(component, args, interaction) {
   const response = await fetch(`/command/${encodeURIComponent(component)}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    // The interaction this request belongs to (ADR-0121). One per press and
+    // per command the press calls, made here and never by the handler, and
+    // carried unchanged by any retry of this request: a command declared
+    // `idempotent_by InteractionId` runs once for it however many times the
+    // request is sent.
+    headers: { "content-type": "application/json", "pw-interaction": interaction },
     body: JSON.stringify(args),
   });
   if (!response.ok) {
@@ -504,9 +509,15 @@ async function attach() {
           // reads what it captured from this element, where the renderer
           // serialized exactly the paths it reads, and calls its command with
           // the arguments it computed.
+          // `getRandomValues`, not `randomUUID`: the second exists only in a
+          // secure context, and a press must have an interaction everywhere.
+          const press = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+            b.toString(16).padStart(2, "0"),
+          ).join("");
+          let calls = 0;
           await module.run({
             captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
-            command,
+            command: (component, args) => command(component, args, `${press}-${calls++}`),
           });
         } catch (error) {
           // A load or a refused command is VISIBLE and leaves the button

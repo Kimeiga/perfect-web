@@ -2026,6 +2026,33 @@ e14-contract:
      } > docs/evidence/E14/contract.txt
     @cat docs/evidence/E14/contract.txt
 
+# ADR-0121: an idempotent command runs once per interaction. The contract,
+# the reservation and its bound, the server's refusals, the browser's retried
+# request in three engines, and the mutation controls.
+e14-idempotent-commands:
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server -p kiokun-server
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0121 - an idempotent command runs once per interaction"; echo; \
+       echo "produced by: just e14-idempotent-commands"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the contract carries it (compiler/pw-core/tests/component_contract.rs)"; echo; \
+       cargo test --locked -p pw-core --test component_contract idempotent 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the reservation keeps what must not run twice (runtime/pw-resource)"; echo; \
+       cargo test --locked -p pw-resource --test concurrency_regressions forgetting 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server -- interaction 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser, each engine alone (e2e/idempotent-command.spec.mjs)"; echo; \
+       for e in chromium firefox webkit; do \
+         (cd spikes/own-renderer && pnpm exec playwright test e2e/idempotent-command.spec.mjs --project=$e --reporter=list 2>&1 \
+           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+       done; \
+       echo; echo "== mutation controls (scripts/idempotent_commands_mutations.py)"; echo; \
+       python3 scripts/idempotent_commands_mutations.py; \
+     } > docs/evidence/E14/idempotent-commands.txt
+    @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed" docs/evidence/E14/idempotent-commands.txt
+
 # The development server under sustained commands and session churn: frames
 # held, subscribers, outbox rows and materialized entries, each bounded. The
 # compiled command called 20,000 times through the E8 host, with resident memory

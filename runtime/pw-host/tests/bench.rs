@@ -192,6 +192,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                 interface: String::new(),
                 function: "lookup".into(),
                 authorization: Vec::new(),
+                idempotent_by: None,
             }),
         }],
     };

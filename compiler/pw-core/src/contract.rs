@@ -420,6 +420,15 @@ pub struct ComponentExport {
     /// than one operation with different preconditions.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub authorization: Vec<AuthorizationRequirement>,
+    /// The type of the key a retried invocation is recognised by, from the
+    /// declaration's `idempotent_by` clause (ADR-0121).
+    ///
+    /// On the export for the reason `authorization` is: the host must refuse
+    /// an invocation of an idempotent command that carries no key, and run
+    /// one key's invocation at most once. A clause read by nothing was the
+    /// defect: `idempotent_by InteractionId` was checked and never held.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotent_by: Option<String>,
 }
 
 /// **What the compiler tells the host about one component.**
@@ -1088,6 +1097,9 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             };
             let mut component = crate::wit::component_export(&component_id, &decl.name);
             component.authorization = authorization_of(decl);
+            component.idempotent_by = decl
+                .policy("idempotent_by")
+                .map(|p| p.value.trim().to_string());
             let exports = vec![Export {
                 name: decl.name.clone(),
                 kind: kind.to_string(),
@@ -1174,6 +1186,10 @@ fn schema_of(
                     text.push_str(&argument.to_string());
                 }
                 text.push(')');
+            }
+            if let Some(key) = &component.idempotent_by {
+                text.push_str("|idempotent_by:");
+                text.push_str(key);
             }
         }
     }

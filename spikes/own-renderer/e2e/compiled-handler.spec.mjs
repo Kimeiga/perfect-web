@@ -91,9 +91,12 @@ test("arguments the command does not declare are refused before it runs", async 
   await page.waitForTimeout(300);
   await expect(page.locator("#cart-count"), "none of them moved the cart").toHaveText("0");
 
-  // The control: the same route with well-typed arguments does commit.
+  // The control: the same route with well-typed arguments does commit. With
+  // an interaction, which an idempotent command requires (ADR-0121); the
+  // refusals above are refused for their arguments, which are typed first.
   const ok = await page.request.post("/command/store.page.add_to_cart", {
     data: ["espresso", 1],
+    headers: { "pw-interaction": "control-1" },
   });
   expect(await ok.json()).toEqual({ committed: true });
   await expect(page.locator("#cart-count")).toHaveText("1");

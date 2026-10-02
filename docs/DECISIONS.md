@@ -880,3 +880,13 @@ store in Next.js 16.3.8 and SvelteKit 2.70.3 (not the day-old 3.0.0) beside
 the Pleris store, held to one behavioural contract with mutant stores as
 negative controls. Found that the Pleris store's `optimistic` and
 `idempotent_by` are checked and not executed; the contract excludes both.
+
+## 2026-10-02: an idempotent command runs once per interaction (E14)
+
+[ADR-0121](DECISIONS/ADR-0121-an-idempotent-command-runs-once-per-interaction.md):
+`idempotent_by InteractionId` was checked and read by nothing, so a retried
+request added twice. The contract carries it, the runtime sends one
+interaction per press, and the host runs an idempotent command once per
+interaction through `pw-resource`'s reservation, keeping a bounded number per
+session. A request without an interaction, or one reusing an interaction with
+other arguments, is refused.

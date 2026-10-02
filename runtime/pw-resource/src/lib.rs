@@ -688,6 +688,30 @@ impl Resources {
         }
     }
 
+    /// **Forget a finished command's outcome**, so the host can bound what it
+    /// keeps (ADR-0121). A key invoked again after this runs again: that is
+    /// the bound's cost, and the host chooses it. Two outcomes are kept:
+    /// a reservation still running, because forgetting it would let a
+    /// duplicate start beside it; and an unknown outcome, because forgetting
+    /// that would re-execute a command that may have taken effect, which is
+    /// what `try_command` exists to prevent. Returns whether one was forgotten.
+    pub fn forget_command(&self, idempotency_key: &str) -> bool {
+        let mut st = self.state.lock().expect("state");
+        let finished = st
+            .applied
+            .get(idempotency_key)
+            .is_some_and(|c| matches!(c.get(), Some(Ok(_))));
+        if finished {
+            st.applied.remove(idempotency_key);
+        }
+        finished
+    }
+
+    /// How many command outcomes are held: what a host bounds.
+    pub fn commands_held(&self) -> usize {
+        self.state.lock().expect("state").applied.len()
+    }
+
     /// Invalidate both stored values and publication rights of outstanding work.
     pub fn invalidate(&self, resource: &str) {
         let mut st = self.state.lock().expect("state");

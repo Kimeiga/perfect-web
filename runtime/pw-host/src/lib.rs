@@ -312,6 +312,11 @@ pub struct ComponentExport {
     pub function: String,
     #[serde(default)]
     pub authorization: Vec<AuthorizationRequirement>,
+    /// The key type a retried invocation is recognised by (ADR-0121). An
+    /// idempotent export's invocation without a key is refused by the host
+    /// that runs it.
+    #[serde(default)]
+    pub idempotent_by: Option<String>,
 }
 
 /// **What binding modes an interface edge supports**, as the compiler derived

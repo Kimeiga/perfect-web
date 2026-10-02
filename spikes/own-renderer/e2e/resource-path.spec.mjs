@@ -30,6 +30,7 @@ test("the command's response carries no cart value", async ({ page, request }) =
   await ready(page);
   const response = await request.post("/command/store.page.add_to_cart", {
     data: ["espresso", 1],
+    headers: { "pw-interaction": "response-1" },
   });
   const body = await response.json();
   expect(body).toEqual({ committed: true });

@@ -13,6 +13,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Held 2026-10-02: an idempotent command runs once per interaction**
+([ADR-0121](DECISIONS/ADR-0121-an-idempotent-command-runs-once-per-interaction.md)).
+`idempotent_by InteractionId` was checked and read by nothing: a retried
+request added twice. The contract now carries it, the runtime sends one
+interaction per press, and the development server runs an idempotent command
+once per interaction, refusing a request without one. What it keeps is
+bounded per session.
+
 **E14-A done 2026-10-02**
 ([ADR-0120](DECISIONS/ADR-0120-three-stores-one-contract.md),
 [evidence](evidence/E14/contract.txt), `just e14-contract`): the store in
@@ -1718,6 +1726,13 @@ commands retain their real toolchain requirements. `just doctor` is read-only;
 `just bootstrap` installs the pinned project dependencies.
 
 ## known environmental issues
+
+**2026-10-02: Firefox hangs under the own-renderer suite on this machine.**
+Running `spikes/own-renderer`'s browser suite, Firefox tests stall for 3 to 24
+minutes and fail on timeouts, a different set on each run. The same specs on
+master `c7cf9c8`, with ADR-0121's changes stashed, failed 6 the same way
+(9.7-minute stalls). Chromium and WebKit pass every spec run one engine at
+a time. Not a regression; not yet diagnosed.
 
 **2026-09-24: the host's disk filled during E10-I.** 460 GB, with between 0
 and 3 GB free, almost all of it used outside this repository. Shell commands

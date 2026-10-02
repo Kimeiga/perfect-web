@@ -592,3 +592,32 @@ fn a_real_empty_value_is_a_valid_shared_result() {
         Fetched::FromCache(String::new())
     );
 }
+
+/// **A host can bound the outcomes it keeps** (ADR-0121), and only a known
+/// one is forgotten: a reservation still running, or an outcome left unknown
+/// by a panic, stays, so neither can be executed a second time.
+#[test]
+fn forgetting_a_command_keeps_what_must_not_run_twice() {
+    let (rt, _, _, _) = runtime();
+    assert_eq!(rt.try_command("known", || "done".into()), Ok("done".into()));
+    assert_eq!(rt.commands_held(), 1);
+    assert!(rt.forget_command("known"), "a known outcome is forgotten");
+    assert_eq!(rt.commands_held(), 0);
+    assert_eq!(
+        rt.try_command("known", || "again".into()),
+        Ok("again".into())
+    );
+
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        rt.try_command("uncertain", || panic!("after side effect"))
+    }));
+    assert!(
+        !rt.forget_command("uncertain"),
+        "an unknown outcome is kept"
+    );
+    assert_eq!(
+        rt.try_command("uncertain", || panic!("must not run again")),
+        Err(CommandError::OutcomeUnknown)
+    );
+    assert!(!rt.forget_command("never-run"));
+}

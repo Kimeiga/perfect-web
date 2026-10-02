@@ -247,6 +247,31 @@ fn requires_is_an_export_precondition_and_part_of_the_abi() {
     assert_ne!(restock.abi_schema, without.abi_schema);
 }
 
+/// **`idempotent_by` reaches the host, and is part of the ABI** (ADR-0121).
+/// It was checked and read by nothing until 2026-10-02, so a retried request
+/// ran its command twice.
+#[test]
+fn idempotent_by_is_an_export_property_and_part_of_the_abi() {
+    let restock = one(&[PROGRAM], "shop.origin.Restock");
+    let export = restock.exports[0]
+        .component
+        .as_ref()
+        .expect("compiled export");
+    assert_eq!(export.idempotent_by, None, "not declared, not claimed");
+
+    let keyed = PROGRAM.replace(
+        "    requires SignedIn\n",
+        "    requires SignedIn\n    idempotent_by InteractionId\n",
+    );
+    let c = one(&[&keyed], "shop.origin.Restock");
+    let export = c.exports[0].component.as_ref().expect("compiled export");
+    assert_eq!(export.idempotent_by.as_deref(), Some("InteractionId"));
+
+    // A host holding the keyed contract must not take the unkeyed one for
+    // it: one runs a key's invocation once, the other every time.
+    assert_ne!(restock.abi_schema, c.abi_schema);
+}
+
 #[test]
 fn required_capabilities_come_from_the_effect_row() {
     // Per DECLARATION, so the query that reads does not also get the write the
