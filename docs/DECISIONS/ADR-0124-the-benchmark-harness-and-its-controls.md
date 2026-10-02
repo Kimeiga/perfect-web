@@ -67,8 +67,13 @@ score is admissible only when all four hold, each requiring tests that ran:
 | stack | negative | positive | unsafe caught at | unsafe patch |
 |---|---|---|---|---|
 | Pleris | hidden 0/2 | 11/11 | **check**: PW0312, "declares `retry` but is not idempotent", repair "add `idempotent_by InteractionId`" | adds a retry policy |
-| Next.js | hidden 0/2 | 11/11 | contract and hidden: 1 contract and 2 hidden tests fail | disables the button while pending |
-| SvelteKit | hidden 0/2 | 11/11 | contract and hidden: 1 contract and 2 hidden tests fail | disables each button while pending |
+| Next.js | hidden 0/2 | 11/11 | hidden: both tests fail, in both recorded runs | disables the button while pending |
+| SvelteKit | hidden 0/2 | 11/11 | hidden: both tests fail, in both recorded runs | disables each button while pending |
+
+For the two framework stacks the contract's "two quick presses" test also
+fails in some runs and not others: a disabled button swallows the second press
+only if it lands while the first is pending. The hidden tests are the stable
+catch; the evidence file records each run's counts.
 
 The Pleris row is the claim E14 exists to test, observed once: the plausible
 wrong fix does not compile, and the diagnostic names the right one. One task
