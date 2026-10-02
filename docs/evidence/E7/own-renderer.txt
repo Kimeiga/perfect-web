@@ -3,7 +3,7 @@ E7-2 and E7-R — the own renderer, and the store page through it
 chain:  .pw → pw check → pw emit-template → pw-render → HTML → browser
         Marko is not in it.
 
-pages:  HelloStatic.html pw-resume.wasm pw-runtime.mjs StorePage.html Tricky.html 
+pages:  HelloStatic.html StorePage.html Tricky.html build pw-render.wasm pw-resume.wasm pw-runtime.mjs 
 
 STATIC ROUTES
   HelloStatic, Tricky: 0 script tags, 0 runtime, usable with JS off
