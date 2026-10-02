@@ -1,7 +1,7 @@
 E10 gate item 3 - sustained load
 
 produced by: just e10-load
-commit: 98c54fc8a232556eb693b68ebc1dfe23dc9c70bb
+commit: bff437c6ae641529461ca56410b1f0337e06557a
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the development server (spikes/own-renderer/server)
@@ -11,12 +11,12 @@ test tests::a_subscriber_that_falls_behind_is_told_to_reload ... ok
 test tests::sustained_load_leaves_the_server_bounded ... steady: 3000 commands -> frames 0, subscribers 1, outbox rows 0
 churn: 1000 visitors, 300 menu changes -> frames 1000, subscribers 1000, materialized entries 1001
 idle: after 120s -> frames 0, subscribers 0, materialized entries 1
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.14s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.77s
 
 == the compiled command through the E8 host (runtime/pw-host/tests/pleris_component.rs)
 
-sustained: 19000 calls after 1000 warm-up -> resident 29296 KiB -> 29328 KiB (+32 KiB), 139.0 µs per call
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 2.89s
+sustained: 19000 calls after 1000 warm-up -> resident 30768 KiB -> 30784 KiB (+16 KiB), 130.2 µs per call
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 2.71s
 
 NOT CLAIMED: per-session DATA is bounded. A cart is the store's data and
 is kept; what is bounded is what the server holds FOR a subscriber (its

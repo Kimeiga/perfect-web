@@ -862,3 +862,13 @@ the session through a helper or another query passed PW5101, PW5004 and
 PW5001, and its page's contract allowed `build`. Labels are joined through
 what each declaration reads, to a fixed point, and the checker and the
 contract share that derivation. A command's reads stay its own.
+
+## 2026-10-02: E10 closes, and the AI benchmark comes next (E10, E14)
+
+[ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md):
+E10's five gate items were re-recorded at `bff437c` and pass. Re-recording
+found world-level exports refused by ADR-0115's authorization lookup (fixed),
+and E7 gate 8 unstable on this machine at HEAD and at the recorded tree alike
+(open, E7-G8). Tasks that are not gate items are carried to E15. E14 runs
+before E11-E13, harness and tasks first, agents after the owner chooses
+models and budget.

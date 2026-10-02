@@ -2,7 +2,38 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Current: E10-I closed, handlers compiled; the rest of E10, then the kiokun proof slice
+## Current: E14, the AI benchmark (E10 closed 2026-10-02)
+
+**2026-10-02, E10 closed and E14 started** ([ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md)).
+E14 comes before E11-E13. Its plan, controls and task list are
+[docs/milestones/E14.md](milestones/E14.md). In order:
+
+1. **E14-A, the store in Next.js and in SvelteKit.** Feature parity with
+   `examples/store`: the store heading, the menu, Add with an idempotent,
+   optimistic, rolled-back cart update, Clear, a private cart beside a shared
+   menu. One Playwright suite, run against all three stores, passes on each.
+   Acceptance: the suite is green on three stacks, and a deliberately broken
+   copy of each fails it (negative control). Framework versions verified
+   against primary sources and pinned in `tools/versions.lock`.
+2. **E14-B, the harness, offline.** Copy a baseline into an isolated
+   directory without `hidden/` or `reference/`, run an agent command, grade
+   with the hidden tests and the stack's checkers, write one result JSON.
+   Acceptance: the no-op agent scores 0 and the reference replay scores 1 on
+   every task and stack; the harness refuses to run if a hidden file is
+   readable from the sandbox.
+3. **E14-C, tasks T01-T12**, each with a prompt, hidden tests, a reference
+   patch and an unsafe patch per stack, and all four controls green. A task
+   Pleris cannot express (T06 forms, T11 dialogs, today) is recorded as such.
+4. **E14-D, `pw diff`** for the store (gate item 1).
+5. **E14-E, agent runs**, after the owner chooses models, budget, and how
+   Pleris is taught to an agent.
+
+Carried from E10, owed at E15 (EVIDENCE_LEDGER): E10-T2, E10-S10, E10-M. Open
+before any P1/P2 publication: E7-G8.
+
+The E10 material below is history.
+
+## E10 (closed): E10-I closed, handlers compiled; the rest of E10, then the kiokun proof slice
 
 **2026-10-01, authorization held (ADR-0115).** A command's `requires`
 predicates now cross the compiler-host contract and are evaluated before the

@@ -1,0 +1,38 @@
+E10 gate item 4 at the close - size, host cost, and E7 gate 8's stability
+
+produced by: just e10-close-bench 8
+commit: bff437c6ae641529461ca56410b1f0337e06557a
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+host: arm64 Apple M2 Pro
+
+== code size: the store's artifacts (bytes, gzip -9 bytes)
+    3520    1183  components/store.page.Cart.wasm
+    3037    1047  components/store.page.Menu.wasm
+    3037    1048  components/store.page.Store.wasm
+    4221    1386  components/store.page.add_to_cart.wasm
+    3797    1305  components/store.page.clear_cart.wasm
+     264     218  handlers/5e53c6a9aaee307a.mjs
+     692     448  handlers/e1ab9fca1f6fc15b.mjs
+   30211   10972  pw-runtime.mjs
+  baselines: docs/evidence/E10/bench.txt (hand-written Rust guests 5276 and 43837 bytes)
+
+== the host, release: runtime/pw-host/tests/bench.rs
+
+bench: compile the Rust no_std guest (5276 bytes): 1.9 ms
+bench: the Rust no_std guest's lookup through the host: median 20.620 µs per call (min 19.932, max 21.570; 7 rounds x 2000 calls)
+bench: store.page.add_to_cart through the host: median 18.767 µs per call (min 18.137, max 19.746; 7 rounds x 2000 calls)
+bench: the data layer's add, called natively: median 0.302 µs per call (min 0.298, max 0.316; 7 rounds x 200000 calls)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.13s
+
+== E7 gate 8, 8 runs (chromium, 1 worker): every result
+
+  run 1: interaction-long-frames=0 worst-ms=0.0
+  run 2: interaction-long-frames=0 worst-ms=0.0
+  run 3: interaction-long-frames=0 worst-ms=0.0
+  run 4: interaction-long-frames=1 worst-ms=59.3
+  run 5: interaction-long-frames=0 worst-ms=0.0
+  run 6: interaction-long-frames=1 worst-ms=64.1
+  run 7: interaction-long-frames=0 worst-ms=0.0
+  run 8: interaction-long-frames=1 worst-ms=61.9
+
+  A run reporting a long frame fails gate 8's assertion; it is recorded, not retried.

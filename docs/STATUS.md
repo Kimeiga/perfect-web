@@ -2,16 +2,36 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-09-25, against master `1e2d0de` plus the exhaustiveness
-change below.
+**Reviewed:** 2026-10-02, against master `bff437c`, closing E10.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
-**Current milestone:** E10. **All five gate items have recorded evidence as
-of 2026-09-25** (see below). Closing E10 is left to the architect's review, with
-this charter task not done: task 2's Wasm for compute-heavy modules in the
-browser (its JavaScript modules for pure computation are ADR-0044's). Task
-4's evaluation of memory strategies is ADR-0046's.
+**Current milestone:** E14, the AI benchmark, ahead of E11-E13 by the
+owner's ruling of 2026-10-02
+([ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md),
+[plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
+and an offline harness; no model is called until the owner chooses the models
+and budget.
+
+**E10 closed 2026-10-02.** All five gate items were re-recorded at `bff437c`
+rather than closed on the 2026-09-25 evidence, since about 80 ADRs and a
+Wasmtime upgrade had landed since:
+[build](evidence/E10/build.txt), [oracle](evidence/E10/oracle.txt),
+[load](evidence/E10/load.txt), [close-bench](evidence/E10/close-bench.txt),
+[ownership](evidence/E10/ownership.txt). Re-recording found:
+- **a defect, fixed in `0ad72c7`:** ADR-0115's authorization lookup refused
+  every world-level export, so gate item 4's hand-written Rust baseline could
+  not be called. Its benchmark is an ignored test, and CI did not see it;
+- **an unstable instrument:** E7's gate 8 sees one 52-63 ms long animation
+  frame, with no script attributed, in about half of runs on this machine, at
+  HEAD and at `6545029`, the recorded tree, alike. Not a regression; the
+  recorded zeros were single passing samples
+  ([control](evidence/E10/gate8-control-2026-10-02.md)). Open as E7-G8.
+
+Charter tasks that are not gate items are carried to E15 as deferred
+obligations (EVIDENCE_LEDGER): task 2's Wasm for compute-heavy browser modules
+(E10-T2), step 10's compiled data layer (E10-S10), and a memory strategy
+beyond invocation regions (E10-M).
 
 Task 7's affine annotations are the effect rows `resource.acquire<T>` and
 `resource.release<T>`, and since ADR-0045 the invariant they express is
@@ -1343,9 +1363,8 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-Baseline master `c200ae3e39934285858064fa56a09dabe882657d` includes the
-recursive-type prerequisite (PR #4) and concurrent resource repair (PR #5). The new change's final-head CI must pass
-before integration; the baseline pass is not a substitute.
+`bff437c` (2026-10-02): `just ci` passes locally, and E10's five gate items
+are recorded at it. GitHub CI is the authority for each pushed head.
 
 ## completed gate items
 
@@ -1636,16 +1655,14 @@ these compiler changes do not independently re-establish those milestones.
 - **Member existence is not a value relation yet.** `box.x` on a `Rect`
   without `x` is unknown rather than refused. This is the first follow-up after
   E10-I, recorded in KNOWN_LIMITATIONS; it was not one of E9-V1..V6.
-- **The rest of E10 is open.** The component backend is narrow. It lacks:
-  - records and variants written into the region;
-  - branches;
-  - calls between compiled declarations;
-  - a compiled data layer;
-  - an automatic memory strategy.
-
-  Each missing construct is refused by name. The handler backend is narrow
-  too: one command call per handler, with no local computation, branches or
-  event parameter. Captures are not a patched part.
+- **E10 is closed; what it carried is not done** (ADR-0119): a compiled data
+  layer (E10-S10), Wasm for compute-heavy browser modules (E10-T2), and a
+  memory strategy beyond invocation regions (E10-M). The handler backend has
+  no event parameter, and captures are not a patched part.
+- **E7 gate 8 is unstable on this machine** (E7-G8): about half of runs see one
+  long frame no page script made long. `just e10-close-bench` records every
+  run. Ruling needed on the instrument.
+- **E14 has no gate item met.** Its plan is `docs/milestones/E14.md`.
 - **CI cost of the engine, measured:** since E10-I every workspace build
   compiles Wasmtime. On a warm cache, CI on `ebd4696` took 2m54s, against 2m28s
   to 2m47s before. The two cold-cache runs took 5m06s and 5m29s.
@@ -1728,24 +1745,25 @@ after failure. A file's existence is not a successful test result.
 
 ## last benchmark summary
 
-No new compiler, browser, memory, or application performance benchmark was run in
-this review. Existing numbers retain their original revisions, machines, and
-scope. In particular, earlier frame-level reads of forced-layout attribution
+2026-10-02, at `bff437c`, Apple M2 Pro (`docs/evidence/E10/close-bench.txt`):
+the store's components are 3,037-4,221 bytes, against 5,276 for a
+hand-written Rust `no_std` guest; `add_to_cart` costs 18.8 µs a call through
+the host against 20.6 µs for the Rust guest and 0.30 µs natively; 19,000
+compiled calls leave resident memory unchanged (`load.txt`). E7 gate 8: 3 of
+8 runs saw a long frame. Older numbers retain their original revisions,
+machines, and scope. In particular, earlier frame-level reads of forced-layout attribution
 cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **The kiokun proof slice**, as the next forcing application: dictionary
-   entry lookup and search over one shard. It will exercise records, lists,
-   branches and field reads, which the component backend refuses today.
-2. **Widen the component backend by what that slice needs:**
-   - constructing records and variants in the region;
-   - field projection;
-   - branches;
-   - string constants via a data segment;
-   - calls between compiled declarations.
+1. **E14-A:** the canonical store in Next.js and in SvelteKit, at feature
+   parity with `examples/store`, and one Playwright suite all three stores
+   pass. Versions verified against primary sources and pinned.
+2. **E14-B:** the benchmark harness, offline: isolation, grading, result
+   records, and the four controls (baseline fails, reference passes, unsafe
+   patch fails, no-op agent scores 0).
+3. **E14-C:** tasks T01-T12 with prompts, hidden tests, reference and unsafe
+   patches, every control green on every stack.
 
-   Each lands with a mutation-controlled test, in the style of E10-I.
-3. **Compile resumable handler bodies**, so the page's
-   `add_to_cart(item.id, PositiveInt(1))` is Pleris end to end. Then replace
-   `store:data/carts` with compiled Pleris over narrower primitives (step 10).
+Owner decisions before E14-E (agent runs): which models, the budget, and how
+Pleris is taught to an agent (`docs/milestones/E14.md`).

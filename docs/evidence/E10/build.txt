@@ -1,7 +1,7 @@
 E10 gate item 1 - the store builds from source, without Koka or Marko
 
 produced by: just e10-build
-commit: a610f9962106305e26be7cd6949e8da9381a2f7f
+commit: bff437c6ae641529461ca56410b1f0337e06557a
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the control: the ordinary PATH
@@ -17,8 +17,8 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
   pnpm  absent
 
 pw build: 1 template(s), 2 handler(s), 5 component(s), 10 contract(s) -> OUT
-  handler    e1ab9fca1f6fc15b  `add_to_cart` calls `store.page.add_to_cart`  281 bytes
-  handler    5e53c6a9aaee307a  `clear_cart` calls `store.page.clear_cart`  246 bytes
+  handler    e1ab9fca1f6fc15b  `add_to_cart` calls `store.page.add_to_cart`  692 bytes
+  handler    5e53c6a9aaee307a  `clear_cart` calls `store.page.clear_cart`  264 bytes
   todo       Resources.Cart  a placeholder body; nothing built depends on it
   todo       Resources.Menu  a placeholder body; nothing built depends on it
   todo       Resources.Order  a placeholder body; nothing built depends on it
@@ -37,9 +37,9 @@ pw build: 1 template(s), 2 handler(s), 5 component(s), 10 contract(s) -> OUT
      3037  components/store.page.Store.wasm
      4221  components/store.page.add_to_cart.wasm
      3797  components/store.page.clear_cart.wasm
-    16509  contracts.json
-      246  handlers/5e53c6a9aaee307a.mjs
-      281  handlers/e1ab9fca1f6fc15b.mjs
+    16725  contracts.json
+      264  handlers/5e53c6a9aaee307a.mjs
+      692  handlers/e1ab9fca1f6fc15b.mjs
      2928  templates.json
 
 == byte-identical to the separately recorded artifacts
@@ -54,7 +54,7 @@ pw build: 1 template(s), 2 handler(s), 5 component(s), 10 contract(s) -> OUT
 test a_placeholder_that_something_depends_on_is_a_refusal ... ok
 test a_program_that_does_not_check_builds_nothing ... ok
 test the_store_builds_every_artifact_from_source ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
 
 NOT CLAIMED: the queries run as components in the development server.
 They compile and are audited; the server still computes the page's

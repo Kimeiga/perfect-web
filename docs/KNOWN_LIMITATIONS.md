@@ -368,6 +368,18 @@ rollout test was run locally in the September 15 review. Prior observations keep
 their original scope. The false-green recipe defect does not prove old tests
 failed, but a recipe's zero exit status alone was insufficient evidence.
 
+**E7 gate 8 is unstable on this machine** (2026-10-02, E7-G8). About half
+of runs see one long animation frame of 52-63 ms, with no script attributed
+and 4-6 ms blocking, at HEAD and at `6545029` alike. `just e10-bench` stops at
+that gate; `just e10-close-bench` records every run instead. The detector
+counts a frame no page script made long, and whether it should is not decided
+([control](evidence/E10/gate8-control-2026-10-02.md)).
+
+**Ignored tests are not run by CI.** Benchmarks such as
+`runtime/pw-host/tests/bench.rs` are `#[ignore]`d and need artifacts `just ci`
+does not build. ADR-0115 broke one of them (world-level exports, fixed in
+`0ad72c7`), and only re-recording E10's gate found it.
+
 ## Historical measurement interpretation
 
 ADR-0027 supersedes the inference that an undefined frame-level
