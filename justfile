@@ -1512,6 +1512,21 @@ e14-shared-cache:
      } > docs/evidence/E14/shared-cache.txt
     @grep -E "^test result|mutants killed|generality" docs/evidence/E14/shared-cache.txt
 
+# ADR-0129: a value's label follows it through calls, bodies, branches and
+# assignments, and a public log takes only a public value. The regression
+# tests and a mutant per piece of the decision.
+e14-value-labels:
+    @{ echo "ADR-0129 - a value's label follows it through calls, bodies, branches and assignments"; echo; \
+       echo "produced by: just e14-value-labels"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== regression tests (compiler/pw-core/tests/labels_follow_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test labels_follow_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/value_labels_mutations.py)"; echo; \
+       python3 scripts/value_labels_mutations.py; \
+     } > docs/evidence/E14/value-labels.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/value-labels.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -199,6 +199,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     let reads = Reads::of(&hirs, &sigs, &inference);
     let labels = reads.labels();
     let resources = reads.of_resources(&hirs);
+    // And what calling each declaration makes from its body (ADR-0129): the
+    // value labels a sink reads follow a call into its callee.
+    let summaries = summaries(&hirs, &sigs);
     units
         .iter()
         .enumerate()
@@ -208,6 +211,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
                 &env,
                 &labels,
                 &reads,
+                &summaries,
                 &sigs,
                 &inference,
                 &manifest,
@@ -2716,6 +2720,9 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         env,
         &BTreeMap::new(),
         &Reads::default(),
+        // No program-wide pass over one unit: each callee is read by its
+        // signature, as before ADR-0129.
+        &BTreeMap::new(),
         &sigs,
         &inference,
         &manifest,
@@ -2738,6 +2745,8 @@ fn check_unit_with(
     labels: &BTreeMap<crate::resolve::DefId, Label>,
     // What each declaration reads through what it calls (ADR-0118).
     reads: &Reads,
+    // What calling each declaration makes from its body (ADR-0129).
+    summaries: &BTreeMap<crate::resolve::DefId, Label>,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
     manifest: &crate::boundary::TypeFacts,
@@ -2791,7 +2800,7 @@ fn check_unit_with(
     crate::affine::check(&unit.hir, sigs, &mut out);
 
     // Charter §8.5: the resume manifest ships with the document.
-    crate::resume::check(&unit.hir, sigs, manifest, &mut out);
+    crate::resume::check(&unit.hir, sigs, summaries, manifest, &mut out);
 
     // E7 generator: the resume manifest and the handler artifact, derived by
     // two different walks and compared. A disagreement within one build is a
@@ -2836,9 +2845,11 @@ fn check_unit_with(
             &mut out,
         );
         privacy_flow(
-            &unit.hir, sigs, labels, reads, inference, at, id, decl, &mut out,
+            &unit.hir, sigs, labels, reads, summaries, inference, at, id, decl, &mut out,
         );
-        privacy_sinks(&unit.hir, sigs, inference, at, id, decl, &mut out);
+        privacy_sinks(
+            &unit.hir, sigs, summaries, inference, at, id, decl, &mut out,
+        );
         effect_rows(
             &unit.hir, sigs, inference, ontology, ws, at, id, decl, &mut out,
         );
@@ -4680,6 +4691,67 @@ fn observed_from(
     None
 }
 
+/// **What calling each declaration makes, from its body** (ADR-0129).
+///
+/// The label of its body's value, and of each failure a `?` in it may
+/// return, with what each call in it makes, to a fixed point. Joins only add,
+/// so recursion terminates. A declaration with no body, a host binding, has
+/// none: its signature is its contract, and the platform answers for it, as
+/// for `Payments.capture`'s receipt.
+///
+/// Until 2026-10-02 a call's value was labelled by its callee's signature
+/// alone, so a helper returning a secret it read, in a `String`, returned a
+/// public value. ADR-0118 followed reads for the coarse label the cache rules
+/// read; this follows them for the value a sink reads.
+pub(crate) fn summaries(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+) -> BTreeMap<crate::resolve::DefId, Label> {
+    let imports: Vec<Vec<String>> = hirs
+        .iter()
+        .map(|h| crate::labels::imported_modules(h))
+        .collect();
+    let mut bodies = Vec::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            let callable = matches!(
+                decl.kind,
+                DeclKind::Fn
+                    | DeclKind::Query
+                    | DeclKind::Command
+                    | DeclKind::Subscription
+                    | DeclKind::Resource
+            );
+            if callable && decl.body.is_some() {
+                bodies.push((unit, id));
+            }
+        }
+    }
+    let mut out: BTreeMap<crate::resolve::DefId, Label> = BTreeMap::new();
+    loop {
+        let mut next = out.clone();
+        for &(unit, id) in &bodies {
+            let hir = hirs[unit];
+            let Some(b) = hir.decl(id).body else {
+                continue;
+            };
+            let body = hir.body(b);
+            let value =
+                crate::labels::Labels::of_decl(sigs, hir, id, body, &imports[unit], Some(&out))
+                    .value_of_body(body);
+            if !value.is_public() {
+                let def = crate::resolve::DefId { unit, decl: id.0 };
+                let held = next.entry(def).or_default();
+                *held = held.join(&value);
+            }
+        }
+        if next == out {
+            return out;
+        }
+        out = next;
+    }
+}
+
 /// The labels a declaration's parameters state, a secret left out, with the
 /// first parameter stating one (ADR-0128). A secret a parameter states is a
 /// key the declaration uses, not a value it holds (ADR-0118 §5).
@@ -4792,9 +4864,11 @@ pub(crate) fn declared_cache(hir: &Hir, decl: &Decl) -> Option<(String, crate::h
 /// declaration's own label is public. R-006's `trace_capture` returns `()`, so
 /// its body label IS public; the defect is in what it passes along, not in what
 /// it returns.
+#[allow(clippy::too_many_arguments)]
 fn privacy_sinks(
     hir: &Hir,
     sigs: &Signatures,
+    summaries: &BTreeMap<crate::resolve::DefId, Label>,
     inference: &crate::effects::Inference<'_>,
     at: usize,
     id: crate::hir::DeclId,
@@ -4806,7 +4880,7 @@ fn privacy_sinks(
     let imports = crate::labels::imported_modules(hir);
     // Labels belong to VALUES. `labels.rs` explains why this is not a map from
     // binding name to restriction any more.
-    let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports);
+    let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports, Some(summaries));
 
     for id in body.walk() {
         let Expr::Call { callee, args } = body.expr(id) else {
@@ -4821,6 +4895,11 @@ fn privacy_sinks(
         if level.0 != "Public" {
             continue;
         }
+        // **A public log takes only a public value** (ADR-0129): a public
+        // log's contents "may be read by anyone" (`log.pw`), so a session's
+        // or a user's value is as much a leak there as a secret. Until
+        // 2026-10-02 only a secret was refused.
+        let mut refused = false;
         for arg in args {
             // The argument's own label, whatever it is spelled as: a name, a
             // field of one, a branch that returns one, a string with one in a
@@ -4829,50 +4908,99 @@ fn privacy_sinks(
             if label.is_public() {
                 continue;
             }
-            for r in label.restrictions() {
-                let (name, span, origin) = blame(body, &labels, arg.value);
-                let Restriction::Secret(cap) = r else {
-                    continue;
-                };
-                let origin = origin.unwrap_or_else(|| span.clone());
-                out.push(Diagnostic {
-                    code: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.id,
-                    invariant: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.invariant,
-                    reason: "value_exceeds_sink_privacy_level",
-                    detector: Detector::PatternMatrix,
-                    severity: Severity::Error,
-                    message: format!(
-                        "cannot log a `Secret<{cap}>` value at privacy level `Public`"
-                    ),
-                    primary_span: span,
-                    related: vec![
-                        Related {
-                            span: origin.clone(),
-                            label: format!("`{name}` becomes Secret<{cap}> here"),
-                        },
-                        Related {
-                            span: level.1.clone(),
-                            label: format!("`{}` is declared here", level.0),
-                        },
-                    ],
-                    explanation: Some(format!(
-                        "`log<Public>` accepts only `Public` values, and a \
-                         `Secret<{cap}>` is not one. Logging is an effect \
-                         parameterized by privacy level precisely so that this is a \
-                         compile error rather than an incident found in a log \
-                         archive months later. The row already says \
-                         `secret<{cap}>`, which permits the value to EXIST here — \
-                         it does not permit it to leave."
-                    )),
-                    repairs: vec![Repair {
-                        description: "log a non-secret correlate — an identifier or a \
-                                      hash — or use a sink whose level admits the value"
-                            .to_string(),
-                        replacement: None,
-                    }],
-                });
-            }
+            refused = true;
+            let (name, span, origin) = blame(body, &labels, arg.value);
+            let origin = origin.unwrap_or_else(|| span.clone());
+            let explanation = match label.secret_capabilities().next() {
+                Some(cap) => format!(
+                    "`log<Public>` accepts only `Public` values, and a \
+                     `Secret<{cap}>` is not one. Logging is an effect \
+                     parameterized by privacy level precisely so that this is a \
+                     compile error rather than an incident found in a log \
+                     archive months later. The row already says \
+                     `secret<{cap}>`, which permits the value to EXIST here — \
+                     it does not permit it to leave."
+                ),
+                None => format!(
+                    "`log<Public>` accepts only `Public` values: its contents may \
+                     be read by anyone. A value labelled `{label}` belongs to \
+                     one reader, and reading it from a log is reading it as \
+                     someone else (ADR-0129)."
+                ),
+            };
+            out.push(Diagnostic {
+                code: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.id,
+                invariant: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.invariant,
+                reason: "value_exceeds_sink_privacy_level",
+                detector: Detector::PatternMatrix,
+                severity: Severity::Error,
+                message: format!("cannot log a `{label}` value at privacy level `Public`"),
+                primary_span: span,
+                related: vec![
+                    Related {
+                        span: origin,
+                        label: format!("`{name}` becomes {label} here"),
+                    },
+                    Related {
+                        span: level.1.clone(),
+                        label: format!("`{}` is declared here", level.0),
+                    },
+                ],
+                explanation: Some(explanation),
+                repairs: vec![Repair {
+                    description: "log a non-secret correlate — an identifier or a \
+                                  hash — or use a sink whose level admits the value"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
         }
+        // **Reaching a public log tells what decided it was reached**
+        // (ADR-0129): `if secret { log.public("yes") }` logs the secret's
+        // answer. One defect, one diagnostic: an argument already refused
+        // is not asked again about its branch.
+        if refused {
+            continue;
+        }
+        let Some((condition, cause)) = labels.condition(id) else {
+            continue;
+        };
+        out.push(Diagnostic {
+            code: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.id,
+            invariant: crate::codes::VALUE_EXCEEDS_SINK_LEVEL.invariant,
+            reason: "value_exceeds_sink_privacy_level",
+            detector: Detector::PatternMatrix,
+            severity: Severity::Error,
+            message: format!(
+                "cannot log at privacy level `Public` where a `{condition}` value decides it"
+            ),
+            primary_span: body.expr_span(*callee),
+            related: vec![
+                Related {
+                    span: body.expr_span(*cause),
+                    label: format!(
+                        "this is {condition}, and whether the line is logged depends on it"
+                    ),
+                },
+                Related {
+                    span: level.1.clone(),
+                    label: format!("`{}` is declared here", level.0),
+                },
+            ],
+            explanation: Some(format!(
+                "A public log's contents may be read by anyone, and so may the \
+                 fact that a line was logged. This one is reached only where a \
+                 value labelled `{condition}` says so: a branch on it, a loop \
+                 over it, or a `?` on it that did not fail. Its reader learns \
+                 what that value was (ADR-0129)."
+            )),
+            repairs: vec![Repair {
+                description: "log at a level that admits the condition, or decide \
+                              on a public value"
+                    .to_string(),
+                replacement: None,
+            }],
+        });
     }
 }
 
@@ -4919,6 +5047,7 @@ fn privacy_flow(
     sigs: &Signatures,
     declared_labels: &BTreeMap<crate::resolve::DefId, Label>,
     reads: &Reads,
+    summaries: &BTreeMap<crate::resolve::DefId, Label>,
     inference: &crate::effects::Inference<'_>,
     at: usize,
     id: crate::hir::DeclId,
@@ -4933,9 +5062,6 @@ fn privacy_flow(
         unit: at,
         decl: id.0,
     };
-    if label.is_public() && reads.observed(def).is_public() {
-        return;
-    }
 
     // 1. A secret reaching markup. Markup renders in the browser, and a secret
     //    never leaves the origin (charter §7.8, corpus R-003).
@@ -4944,21 +5070,40 @@ fn privacy_flow(
     // name to restriction, so `let shown = if dry_run { "none" } else { key }`
     // rendered a secret that the rule could not see — the same narrowness the
     // sink rule had, in the one place that had not been migrated with it.
-    let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports);
+    //
+    // Every restriction, not the first (ADR-0129): a value that is a
+    // session's and a secret is ordered `Session` first, and until
+    // 2026-10-02 only that one was read, so it rendered with nothing
+    // reported. Run whenever there is markup: a parameter can bring a secret
+    // that nothing the body calls declares.
+    let has_markup = body
+        .walk()
+        .into_iter()
+        .any(|e| matches!(body.expr(e), Expr::Template { .. }));
+    let labels = has_markup
+        .then(|| crate::labels::Labels::of_decl(sigs, hir, id, body, &imports, Some(summaries)));
     for id in body.walk() {
+        let Some(labels) = labels.as_ref() else {
+            break;
+        };
         let Expr::Template { parts, .. } = body.expr(id) else {
             continue;
         };
         for part in parts {
             let value_label = labels.label(body, *part);
-            let Some(Restriction::Secret(cap)) = value_label.restrictions().next() else {
+            let Some(cap) = value_label.secret_capabilities().next() else {
                 continue;
             };
+            // The name that brings the secret, not the first labelled one: in
+            // `"{s}{key}"` a session's value comes first.
             let (name, origin) = body
                 .walk_from(*part)
                 .into_iter()
                 .find_map(|e| match body.expr(e) {
-                    Expr::Name(n) => labels.origin(e).map(|(_, o)| (n.clone(), o.clone())),
+                    Expr::Name(n) => labels
+                        .origin(e)
+                        .filter(|(l, _)| l.secret_capabilities().any(|c| c == cap))
+                        .map(|(_, o)| (n.clone(), o.clone())),
                     _ => None,
                 })
                 .unwrap_or_else(|| ("this value".to_string(), body.expr_span(*part)));
@@ -4996,7 +5141,7 @@ fn privacy_flow(
     let shared = decl
         .policy("cache")
         .is_some_and(|c| c.value.trim() == "shared");
-    if !shared {
+    if !shared || (label.is_public() && reads.observed(def).is_public()) {
         return;
     }
     // One defect, one diagnostic (ADR-0112). A value PW5001 already refuses

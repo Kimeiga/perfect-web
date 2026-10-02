@@ -954,3 +954,17 @@ reader. A declaration now observes what it is given, every cache rule reads
 that whole label, and no key makes a session's, user's or device's value
 shareable; a tenant's, keyed by its organization, is the one a shared cache
 may hold. Closes generality's last known gap (31 / 31).
+
+## 2026-10-02: a value's label follows it (E14-L)
+
+[ADR-0129](DECISIONS/ADR-0129-a-values-label-follows-it.md): the sinks read a
+value's label, and it was lost in seven ways: through a parameter that states
+a label (ADR-0085's contract), through a helper's body, through a branch's
+condition, at a sink a branch decides, into an assigned binding, at a public
+log taking a session's value, and at PW5003 reading one restriction. An
+argument now comes out of a call less a secret its parameter states (a key
+the call uses), a call carries what its callee's body makes, a branch carries
+its condition to its value and to every sink it decides, an assignment
+labels its binding, and a public log takes only a public value. Settles
+ADR-0085's open ruling: inference over bodies, keys only for stated secrets,
+and declassification only at a host binding until a program needs more.

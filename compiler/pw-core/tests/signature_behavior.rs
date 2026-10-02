@@ -114,7 +114,13 @@ fn capture_codes(sources: &[&str]) -> Vec<&'static str> {
     let refs: Vec<_> = hirs.iter().collect();
     let facts = pw_core::boundary::TypeFacts::build(&refs, &sigs);
     let mut ds = vec![];
-    pw_core::resume::check(hirs.last().unwrap(), &sigs, &facts, &mut ds);
+    pw_core::resume::check(
+        hirs.last().unwrap(),
+        &sigs,
+        &std::collections::BTreeMap::new(),
+        &facts,
+        &mut ds,
+    );
     ds.iter().map(|d| d.code).collect()
 }
 

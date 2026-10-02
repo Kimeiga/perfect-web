@@ -13,6 +13,19 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0129, 2026-10-02: a value's label follows it through calls, bodies,
+branches and assignments** (E14-L,
+[ADR-0129](DECISIONS/ADR-0129-a-values-label-follows-it.md)). Seven ways a
+value's label was lost, each a probe that checked clean, are refused now: a
+session id through a parameter that states its label, a secret returned by a
+body or a helper, `if secret { "a" } else { "b" }` and a public log inside
+such a branch, a mutable binding assigned a secret, a session id logged
+publicly, and a session's value beside a secret in markup. No accepted,
+store or kiokun program gains a diagnostic. ADR-0085's open ruling is
+settled: labels are inferred over bodies, a secret a parameter states is a
+key, and a label is lowered only at a host binding until a program needs an
+audited `declassify`.
+
 **Correction to ADR-0127, 2026-10-02: a concurrency defect shipped in the
 second E14-Q slice.** `concurrent_commands_on_one_session_all_commit` failed
 in about one CI run in three. The server kept query values in a side table

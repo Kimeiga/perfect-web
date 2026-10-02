@@ -23,8 +23,10 @@ MUTANTS = [
     (
         "a declared call carries nothing it is given",
         LABELS,
-        "                            if !states_a_label {",
-        "                            if false && !states_a_label {",
+        # Re-anchored by ADR-0129: an argument carries into the result,
+        # less a secret its parameter states.
+        "                            l = l.join(&self.label(body, value).given_to(&stated));",
+        "                            let _ = (value, stated);",
     ),
     (
         "a pipe joins what it pipes beside its call",
@@ -32,12 +34,10 @@ MUTANTS = [
         "            } if matches!(body.expr(*rhs), Expr::Call { .. }) => self.label(body, *rhs),",
         "            } if false && matches!(body.expr(*rhs), Expr::Call { .. }) => self.label(body, *rhs),",
     ),
-    (
-        "a parameter that states a label carries its argument too",
-        LABELS,
-        "                                .is_some_and(|t| !self.sigs.label(t).is_public());",
-        "                                .is_some_and(|t| false && !self.sigs.label(t).is_public());",
-    ),
+    # Retired by ADR-0129: "a parameter that states a label carries its
+    # argument too". A stated partition carries by rule now; that a stated
+    # secret does not is `value_labels_mutations.py`'s "a key a parameter
+    # states comes out".
 ]
 
 TESTS = [

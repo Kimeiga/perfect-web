@@ -34,7 +34,9 @@ MUTANTS = [
     (
         "a module's function named as a value is public",
         LABELS,
-        "                    return sig.label.clone();",
+        # Re-anchored by ADR-0129: a declaration named as a value carries
+        # its signature and what its body makes.
+        "                    return sig.label.join(&self.summary(sig.definition));",
         "                    let _ = sig;",
     ),
     (

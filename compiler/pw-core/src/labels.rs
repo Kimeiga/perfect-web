@@ -57,23 +57,30 @@
 //!
 //! # Through a call
 //!
-//! A declared call's result is the declaration's label, joined with the
-//! label of each argument whose declared type mentions a type parameter the
-//! result mentions (ADR-0064): `List.get(xs, 0)` over a list of secrets is
-//! secret, and `List.length(xs)` is what `length` declares. A lambda is
-//! labelled by what it computes, and a call no declaration answers by all
-//! that goes into it, its receiver included.
+//! A declared call's result is the declaration's label, joined with what
+//! its body makes (ADR-0129, `check::summaries`) and with each argument's
+//! label, less a secret the argument's parameter states: that is a key the
+//! call uses (ADR-0129, replacing ADR-0085's contract for every stated
+//! label). A host binding has no body, and its signature is its contract. A
+//! lambda is labelled by what it computes, and a call no declaration answers
+//! by all that goes into it, its receiver included.
 //!
-//! # What it does not do
+//! # Through a branch, and into an assignment
 //!
-//! Track an implicit flow: an element chosen by a secret index is its list's
-//! label, not the index's. A label is a value's (charter §7.8).
+//! An `if` or `match` value carries its condition, and every expression
+//! carries the conditions it runs under (`condition`), which is what a sink
+//! is told by being reached: the conditions of the branches, loops and
+//! short-circuits around it, a lambda's driving arguments, and each earlier
+//! `?` that could have returned instead. An assigned binding carries every
+//! value assigned to it, under the conditions of the assignment (ADR-0129).
+//! Until 2026-10-02 none of these was tracked: "a label is a value's".
 
 use std::collections::BTreeMap;
 
-use crate::hir::{Body, Decl, Expr, ExprId, Node, Pattern as HPat, PatternId, Span};
+use crate::hir::{BinOp, Body, Decl, Expr, ExprId, Node, Pattern as HPat, PatternId, Span};
 use crate::lexical::Binder;
 use crate::privacy::Label;
+use crate::resolve::DefId;
 use crate::signatures::Signatures;
 
 /// Labels for the values in one body.
@@ -89,6 +96,16 @@ pub struct Labels<'a> {
     /// The value each `|>` feeds, keyed by the call on its right: that
     /// call's first argument.
     piped: BTreeMap<ExprId, ExprId>,
+    /// **What calling each declaration makes from its body** (ADR-0129):
+    /// `check::summaries`. A call's value carries its callee's, so a helper
+    /// cannot return a secret it read in a plain `String`. `None` where no
+    /// program-wide pass ran, which reads each callee by its signature alone.
+    summaries: Option<&'a BTreeMap<DefId, Label>>,
+    /// **The conditions each expression runs under** (ADR-0129): the join of
+    /// the labels of the `if` conditions, `match` subjects, loop collections,
+    /// short-circuited operands and failed `?`s it depends on, with the first
+    /// condition that contributed. What a sink is told by being reached.
+    conditions: BTreeMap<ExprId, (Label, ExprId)>,
 }
 
 impl<'a> Labels<'a> {
@@ -104,7 +121,16 @@ impl<'a> Labels<'a> {
         imports: &'a [String],
     ) -> Labels<'a> {
         let types = crate::infer::Types::of_body(sigs, decl, body, module);
-        Labels::with(sigs, decl, body, module, imports, types, BTreeMap::new())
+        Labels::with(
+            sigs,
+            decl,
+            body,
+            module,
+            imports,
+            types,
+            BTreeMap::new(),
+            None,
+        )
     }
 
     /// **The same, for the declaration `id` of `hir`, where it may be nested
@@ -113,19 +139,30 @@ impl<'a> Labels<'a> {
     /// body holds is a secret where the nested function reads it. Until
     /// 2026-09-26 it was unlabelled there, and a nested function logged it
     /// publicly with nothing reported.
+    ///
+    /// `summaries` is what calling each declaration makes from its body
+    /// (ADR-0129), where a program-wide pass computed it.
     pub fn of_decl(
         sigs: &'a Signatures,
         hir: &'a crate::hir::Hir,
         id: crate::hir::DeclId,
         body: &Body,
         imports: &'a [String],
+        summaries: Option<&'a BTreeMap<DefId, Label>>,
     ) -> Labels<'a> {
         let decl = hir.decl(id);
         let module = hir.module_of(id);
         let types = crate::infer::Types::of_decl(sigs, hir, id, body);
         let parent = crate::lexical::enclosing(hir, id).and_then(|p| {
             let b = hir.decl(p).body?;
-            Some(Labels::of_decl(sigs, hir, p, hir.body(b), imports))
+            Some(Labels::of_decl(
+                sigs,
+                hir,
+                p,
+                hir.body(b),
+                imports,
+                summaries,
+            ))
         });
         let mut outer = BTreeMap::new();
         for (i, (_, b)) in types.lexical().outer_bindings().enumerate() {
@@ -133,9 +170,10 @@ impl<'a> Labels<'a> {
                 outer.insert(Binder::Outer(i as u32), found.clone());
             }
         }
-        Labels::with(sigs, decl, body, module, imports, types, outer)
+        Labels::with(sigs, decl, body, module, imports, types, outer, summaries)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn with(
         sigs: &'a Signatures,
         decl: &Decl,
@@ -144,6 +182,7 @@ impl<'a> Labels<'a> {
         _imports: &'a [String],
         types: crate::infer::Types<'a>,
         outer: BTreeMap<Binder, (Label, Span)>,
+        summaries: Option<&'a BTreeMap<DefId, Label>>,
     ) -> Labels<'a> {
         let mut me = Labels {
             sigs,
@@ -151,6 +190,8 @@ impl<'a> Labels<'a> {
             types,
             bindings: outer,
             piped: BTreeMap::new(),
+            summaries,
+            conditions: BTreeMap::new(),
         };
 
         // A label comes from the resolved annotation in its real lexical
@@ -184,8 +225,12 @@ impl<'a> Labels<'a> {
         // initialiser, and an initialiser may mention an earlier binding, so
         // one pass in source order is not enough for every shape — a `use`
         // block or a nested block can bind out of order.
-        for _ in 0..6 {
-            let before = me.bindings.len();
+        for _ in 0..8 {
+            let before: Vec<(Binder, Label)> = me
+                .bindings
+                .iter()
+                .map(|(b, (l, _))| (*b, l.clone()))
+                .collect();
             for id in body.walk() {
                 let (binder, init, span) = match body.expr(id) {
                     Expr::Let {
@@ -343,11 +388,193 @@ impl<'a> Labels<'a> {
                 }
             }
 
-            if me.bindings.len() == before {
+            // **An assigned binding carries what it is assigned** (ADR-0129),
+            // and the conditions the assignment runs under: `if secret { x =
+            // "a" }` makes `x` depend on `secret`. Until 2026-10-02 a binding
+            // was labelled by its `let` alone, and `shown = "{token}"` left
+            // `shown` public.
+            me.conditions = me.conditions_of(body);
+            for id in body.walk() {
+                let Expr::Binary {
+                    op: BinOp::Assign,
+                    lhs,
+                    rhs,
+                } = body.expr(id)
+                else {
+                    continue;
+                };
+                let mut target = *lhs;
+                while let Expr::Field { base, .. } = body.expr(target) {
+                    target = *base;
+                }
+                let Some(b) = me.types.lexical().binder(target) else {
+                    continue;
+                };
+                let l = me.label(body, *rhs).join(
+                    &me.conditions
+                        .get(&id)
+                        .map(|(l, _)| l.clone())
+                        .unwrap_or_default(),
+                );
+                if l.is_public() {
+                    continue;
+                }
+                me.bindings
+                    .entry(b)
+                    .and_modify(|(old, _)| *old = old.join(&l))
+                    .or_insert((l, body.expr_span(id)));
+            }
+
+            let after: Vec<(Binder, Label)> = me
+                .bindings
+                .iter()
+                .map(|(b, (l, _))| (*b, l.clone()))
+                .collect();
+            if after == before {
                 break;
             }
         }
+        me.conditions = me.conditions_of(body);
         me
+    }
+
+    /// **The label of what a body makes** (ADR-0129): its value, and the
+    /// failure each `?` in it may return early. What calling its declaration
+    /// carries.
+    pub fn value_of_body(&self, body: &Body) -> Label {
+        body.walk()
+            .into_iter()
+            .filter_map(|id| match body.expr(id) {
+                Expr::Try { value } => Some(self.label(body, *value)),
+                _ => None,
+            })
+            .fold(self.label(body, body.root), |acc, l| acc.join(&l))
+    }
+
+    /// The conditions `id` runs under, and the first that contributed.
+    pub fn condition(&self, id: ExprId) -> Option<&(Label, ExprId)> {
+        self.conditions.get(&id).filter(|(l, _)| !l.is_public())
+    }
+
+    /// What calling the declaration `def` makes from its body, where a
+    /// program-wide pass computed it.
+    fn summary(&self, def: DefId) -> Label {
+        self.summaries
+            .and_then(|s| s.get(&def))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Each expression's conditions, from the root down.
+    fn conditions_of(&self, body: &Body) -> BTreeMap<ExprId, (Label, ExprId)> {
+        let mut out = BTreeMap::new();
+        self.under(body, body.root, &(Label::public(), body.root), &mut out);
+        out
+    }
+
+    fn under(
+        &self,
+        body: &Body,
+        id: ExprId,
+        pc: &(Label, ExprId),
+        out: &mut BTreeMap<ExprId, (Label, ExprId)>,
+    ) {
+        out.insert(id, pc.clone());
+        // `pc` joined with the label of the condition `c`.
+        let deeper = |c: ExprId| {
+            let l = self.label(body, c);
+            if pc.0.is_public() {
+                (l, c)
+            } else {
+                (pc.0.join(&l), pc.1)
+            }
+        };
+        match body.expr(id) {
+            Expr::If { cond, then, els } => {
+                self.under(body, *cond, pc, out);
+                let inner = deeper(*cond);
+                self.under(body, *then, &inner, out);
+                if let Some(e) = els {
+                    self.under(body, *e, &inner, out);
+                }
+            }
+            Expr::Match { scrutinee, arms } => {
+                self.under(body, *scrutinee, pc, out);
+                let inner = deeper(*scrutinee);
+                for a in arms {
+                    self.under(body, a.body, &inner, out);
+                }
+            }
+            Expr::For {
+                iterable, body: b, ..
+            } => {
+                self.under(body, *iterable, pc, out);
+                let inner = deeper(*iterable);
+                self.under(body, *b, &inner, out);
+            }
+            Expr::Binary {
+                op: BinOp::And | BinOp::Or,
+                lhs,
+                rhs,
+            } => {
+                self.under(body, *lhs, pc, out);
+                let inner = deeper(*lhs);
+                self.under(body, *rhs, &inner, out);
+            }
+            // A statement after one whose `?` may fail runs only if it did
+            // not: the rest of the block depends on what was tried.
+            Expr::Block { stmts } => {
+                let mut cur = pc.clone();
+                for s in stmts {
+                    self.under(body, *s, &cur, out);
+                    for t in tried(body, *s) {
+                        let l = self.label(body, t);
+                        if !l.is_public() {
+                            cur = if cur.0.is_public() {
+                                (l, t)
+                            } else {
+                                (cur.0.join(&l), cur.1)
+                            };
+                        }
+                    }
+                }
+            }
+            // A lambda given to a call runs as often as, and when, the call's
+            // other arguments say: its body depends on them, as its
+            // parameters do (ADR-0063).
+            Expr::Call { callee, args } => {
+                self.under(body, *callee, pc, out);
+                for (i, a) in args.iter().enumerate() {
+                    if !matches!(body.expr(a.value), Expr::Lambda { .. }) {
+                        self.under(body, a.value, pc, out);
+                        continue;
+                    }
+                    let mut inner = pc.clone();
+                    for o in args
+                        .iter()
+                        .enumerate()
+                        .filter(|(j, _)| *j != i)
+                        .map(|(_, o)| o.value)
+                        .chain(self.piped.get(&id).copied())
+                    {
+                        let l = self.label(body, o);
+                        if !l.is_public() {
+                            inner = if inner.0.is_public() {
+                                (l, o)
+                            } else {
+                                (inner.0.join(&l), inner.1)
+                            };
+                        }
+                    }
+                    self.under(body, a.value, &inner, out);
+                }
+            }
+            _ => {
+                for c in body.children(id) {
+                    self.under(body, c, pc, out);
+                }
+            }
+        }
     }
 
     /// A declaration by its bare name, WITHIN THIS MODULE AND ITS IMPORTS.
@@ -420,7 +647,7 @@ impl<'a> Labels<'a> {
                     .unwrap_or_else(Label::public),
                 None => self
                     .declaration_named(n)
-                    .map(|s| s.label.clone())
+                    .map(|s| s.label.join(&self.summary(s.definition)))
                     .unwrap_or_else(Label::public),
             },
 
@@ -430,15 +657,17 @@ impl<'a> Labels<'a> {
                 // `secrets.payments` named as a value: a declaration, as a
                 // name is (ADR-0079).
                 if let Some(sig) = self.declaration_named(&crate::infer::path_of(body, id)) {
-                    return sig.label.clone();
+                    return sig.label.join(&self.summary(sig.definition));
                 }
                 let mut l = self.label(body, *base);
+                // A member function read as a field is a call (ADR-0048), and
+                // carries what its body makes (ADR-0129).
                 if let Some(sig) = self
                     .types
                     .of(body, *base)
                     .and_then(|t| self.sigs.member_of(&t, name))
                 {
-                    l = l.join(&sig.label);
+                    l = l.join(&sig.label).join(&self.summary(sig.definition));
                 }
                 l
             }
@@ -457,7 +686,10 @@ impl<'a> Labels<'a> {
                     // carried (ADR-0064), so `String.trim` over a secret
                     // string made a public one.
                     Some(sig) => {
-                        let mut l = sig.label.clone();
+                        // What its body makes, beside what its signature
+                        // says (ADR-0129): a helper returning a secret it read
+                        // in a `String` returns a secret.
+                        let mut l = sig.label.join(&self.summary(sig.definition));
                         // What each parameter is given: a piped value, or a
                         // method call's receiver, first.
                         let first = self.piped.get(&id).copied().or(match body.expr(*callee) {
@@ -494,15 +726,23 @@ impl<'a> Labels<'a> {
                                 *slot = Some(a.value);
                             }
                         }
+                        // Each argument carries its label into the result,
+                        // whatever its parameter states, less a secret the
+                        // parameter states (ADR-0129). A partition says whose
+                        // a value is, and what is made from a session's id is
+                        // that session's; a secret a parameter states is a
+                        // key the call uses. Until 2026-10-02 any parameter
+                        // stating a label kept it out (ADR-0085), so
+                        // `Carts.current(s)` was public, and a body could
+                        // return the secret it was given.
                         for (param, value) in sig.params.iter().zip(given) {
                             let Some(value) = value else { continue };
-                            let states_a_label = param
+                            let stated = param
                                 .as_ref()
                                 .and_then(crate::resolved::TypeResolution::resolved)
-                                .is_some_and(|t| !self.sigs.label(t).is_public());
-                            if !states_a_label {
-                                l = l.join(&self.label(body, value));
-                            }
+                                .map(|t| self.sigs.label(t))
+                                .unwrap_or_default();
+                            l = l.join(&self.label(body, value).given_to(&stated));
                         }
                         l
                     }
@@ -524,17 +764,21 @@ impl<'a> Labels<'a> {
                 }
             }
 
-            // Branch join, per charter §7.8: union, not max.
-            Expr::If { then, els, .. } => {
-                let l = self.label(body, *then);
+            // Branch join, per charter §7.8: union, not max. And the
+            // condition (ADR-0129): which branch was taken is in the value,
+            // so `if secret { "a" } else { "b" }` tells what `secret` is.
+            Expr::If { cond, then, els } => {
+                let l = self.label(body, *then).join(&self.label(body, *cond));
                 match els {
                     Some(e) => l.join(&self.label(body, *e)),
                     None => l,
                 }
             }
-            Expr::Match { arms, .. } => arms.iter().fold(Label::public(), |acc, a| {
-                acc.join(&self.label(body, a.body))
-            }),
+            Expr::Match { scrutinee, arms } => {
+                arms.iter().fold(self.label(body, *scrutinee), |acc, a| {
+                    acc.join(&self.label(body, a.body))
+                })
+            }
 
             // `x |> f(..)` is the call, with `x` its first argument: labelled
             // as the call labels what it is given (ADR-0085), so a secret
@@ -582,17 +826,58 @@ impl<'a> Labels<'a> {
             // result is this body's value, so its LABEL is. Splitting those
             // two is the whole point of the declaration: a page may depend on
             // a session-scoped query without itself reaching the database.
+            //
+            // Read as a call (ADR-0129): what the declaration's body makes,
+            // and what each argument carries in.
             Expr::Keyword {
-                keyword, modifiers, ..
-            } if matches!(keyword.as_str(), "query" | "command" | "subscription") => modifiers
-                .first()
-                .and_then(|name| self.declaration_named(name))
-                .map(|s| s.label.clone())
-                .unwrap_or_else(Label::public),
+                keyword,
+                modifiers,
+                args,
+                ..
+            } if matches!(
+                keyword.as_str(),
+                "query" | "command" | "subscription" | "subscribe"
+            ) =>
+            {
+                let Some(sig) = modifiers
+                    .first()
+                    .and_then(|name| self.declaration_named(name))
+                else {
+                    return Label::public();
+                };
+                let mut l = sig.label.join(&self.summary(sig.definition));
+                for (i, value) in args.iter().enumerate() {
+                    let stated = sig
+                        .params
+                        .get(i)
+                        .and_then(|p| p.as_ref())
+                        .and_then(crate::resolved::TypeResolution::resolved)
+                        .map(|t| self.sigs.label(t))
+                        .unwrap_or_default();
+                    l = l.join(&self.label(body, *value).given_to(&stated));
+                }
+                l
+            }
 
             _ => Label::public(),
         }
     }
+}
+
+/// The operands of each `?` in `stmt` that would return from this body: not
+/// one inside a lambda, which returns from the lambda.
+fn tried(body: &Body, stmt: ExprId) -> Vec<ExprId> {
+    let mut out = Vec::new();
+    let mut stack = vec![stmt];
+    while let Some(id) = stack.pop() {
+        match body.expr(id) {
+            Expr::Lambda { .. } => continue,
+            Expr::Try { value } => out.push(*value),
+            _ => {}
+        }
+        stack.extend(body.children(id));
+    }
+    out
 }
 
 /// Where a pattern binds each of its names, with their spans.

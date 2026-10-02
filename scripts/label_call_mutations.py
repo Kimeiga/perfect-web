@@ -33,8 +33,10 @@ MUTANTS = [
     (
         "a declared call's result keeps its contract alone",
         LABELS,
-        "                            if !states_a_label {",
-        "                            if false && !states_a_label {",
+        # Re-anchored by ADR-0129: an argument carries into the result,
+        # less a secret its parameter states.
+        "                            l = l.join(&self.label(body, value).given_to(&stated));",
+        "                            let _ = (value, stated);",
     ),
     (
         "a piped value is not its call's first argument",

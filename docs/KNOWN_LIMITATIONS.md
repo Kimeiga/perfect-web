@@ -261,13 +261,9 @@ awaited in order. What remains:
   browser's arguments by the component's parameters: `PositiveInt` arrives as
   an `s64`, and any `s64` is accepted. `opaque type PositiveInt = Int` states
   no invariant that could be checked.
-- **A privacy label is a value's, not the control flow's** (ADR-0064). A
-  branch a secret chooses is not labelled by it. A declared call's result
-  carries what it is given through a parameter that states no label
-  (ADR-0085), so an element a secret index chose carries the index's label;
-  that stands in for signatures stating how a result's label is made
-  (ruling needed). A name bound over a labelled collection's elements
-  carries its label (ADR-0063).
+- **A privacy label follows the control flow since ADR-0129.** A branch a
+  secret chooses carries its label, and so does a sink inside it. A name
+  bound over a labelled collection's elements carries its label (ADR-0063).
 - **A call through an unannotated lambda is related to nothing**
   (ADR-0068). `let f = (x) => x + 1` then `f("a")`: the lambda's parameter
   takes its type from no use, so the call has no function type to check. A
@@ -377,22 +373,18 @@ within stated bounds (ADR-0120 found both unexecuted):
   cart line is priced zero until the server answers (ruling offered).
 E14's shared store contract still excludes both, for every stack.
 
-**A value's label is lost in five ways** (found 2026-10-02 writing
-ADR-0128; each a probe that checks clean). The cache rules read a
-declaration's whole label since ADR-0128, so a session's cart can no longer
-be cached shared by declaring its query `public`. A *value's* label, which
-the sinks read, is still lost:
-- through a parameter that states a label: `fn shown(key: Secret<Payments>)
-  -> String { "{key}" }` returns a public string (ADR-0085's contract);
-- through a helper's body: a call's value is labelled by the callee's
-  signature, so a helper returning a secret it read in a `String` launders it;
-- through a branch: `if secret { "a" } else { "b" }` is public, and a public
-  log inside such a branch is not refused;
-- at `log<Public>`, which refuses a secret and accepts a session's or a
-  user's value;
-- at PW5003, which reads only a label's first restriction, so a value that is
-  both a session's and a secret is not reported rendered into markup.
-The next ruling (ADR-0085's open half).
+**A label does not follow a value through storage, a later call of a
+function value, or time** (ADR-0129). A value's label follows it through
+calls, bodies, branches and assignments, and a public log takes only a public
+value. Not tracked:
+- a database write inside a secret branch: writes are not a sink the charter
+  names, and a stored value's label is not carried through storage;
+- a function value bound to a name and called elsewhere: it carries what it
+  computes (ADR-0079), not the conditions of where it is called;
+- how long a branch takes.
+No program lowers a label except a host binding, whose signature is its
+contract; an audited `declassify` waits for the first program that needs
+one.
 
 **The development server honours query policies except two** (ADR-0127):
 `on_key_change` (a served page never changes its key) and `consistency`

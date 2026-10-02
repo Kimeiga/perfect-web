@@ -160,6 +160,7 @@ fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::Label> {
 pub fn check(
     hir: &Hir,
     sigs: &Signatures,
+    summaries: &std::collections::BTreeMap<crate::resolve::DefId, crate::privacy::Label>,
     facts: &crate::boundary::TypeFacts,
     out: &mut Vec<Diagnostic>,
 ) {
@@ -185,7 +186,7 @@ pub fn check(
         // the same way as a bare parameter.
         let types = crate::infer::Types::of_decl(sigs, hir, id, body);
         let imports = crate::labels::imported_modules(hir);
-        let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports);
+        let labels = crate::labels::Labels::of_decl(sigs, hir, id, body, &imports, Some(summaries));
         // **Where the manifest lands.** A resume manifest ships with its
         // document, so what it may hold is what that document may hold.
         let destination = manifest_scope(hir, decl);

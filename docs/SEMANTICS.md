@@ -250,6 +250,28 @@ error: [PW0100] cannot materialize `cart` in a shared public cache
   = help: change this to `cache private`, or move the value into a private streamed slot
 ```
 
+**How a label travels (ADR-0128, ADR-0129).** A value carries the join of
+everything it was made from, and two derivations read it.
+
+- **What a declaration observes**, for decisions over a whole result: a
+  shared cache and a shared fragment. (Placement still reads the declared
+  label; ADR-0128.) It is the declaration's visibility, joined with:
+  - what it reads, through what each read reads (ADR-0118);
+  - its result type;
+  - its own parameters' labels.
+  A secret it uses as a key is left out. No keyword lowers it, and no key
+  makes a session's, user's or device's value shareable. A tenant's value,
+  keyed by its organization, is the one a shared cache may hold.
+- **A value's label**, for sinks: a public log, markup, a resume manifest.
+  - An argument comes out of a call, less a secret its parameter states,
+    which is a key the call uses.
+  - A call carries what its callee's body makes. A host binding has no
+    body; its signature is its contract.
+  - A branch carries its condition, and so does every sink it decides: an
+    `if` or a `match`, a loop, a short-circuit, a lambda's driving
+    arguments, and an earlier `?` that could have returned.
+  - An assigned binding carries every value assigned to it.
+
 Must fail (charter §7.8), all in the corpus: `SharedCache<Cart@Session>` (R-004),
 `BrowserValue<PaymentSecret>` (R-003), `PublicRender<CurrentUserEmail>` (R-030),
 `Log<Public>(PaymentToken@Secret)` (R-006). Plus R-005 (cache key missing tenant).

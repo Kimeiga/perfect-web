@@ -167,6 +167,28 @@ impl Label {
             .collect()
     }
 
+    /// **What an argument carries into a call's result** (ADR-0129): this
+    /// label, less each secret the parameter it is given to states. A secret
+    /// a parameter states is a key the call uses, not a value it holds;
+    /// every other restriction is the result's too.
+    pub fn given_to(&self, parameter: &Label) -> Label {
+        Label(
+            self.0
+                .iter()
+                .filter(|r| !(matches!(r, Restriction::Secret(_)) && parameter.0.contains(r)))
+                .cloned()
+                .collect(),
+        )
+    }
+
+    /// The secrets this label holds, by capability.
+    pub fn secret_capabilities(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().filter_map(|r| match r {
+            Restriction::Secret(c) => Some(c.as_str()),
+            _ => None,
+        })
+    }
+
     /// Secrets must never be logged, serialized to a client, or cached.
     pub fn holds_a_secret(&self) -> bool {
         self.0.iter().any(|r| matches!(r, Restriction::Secret(_)))

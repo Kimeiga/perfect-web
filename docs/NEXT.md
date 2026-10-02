@@ -28,13 +28,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
    Pleris cannot express (T06 forms, T11 dialogs, today) is recorded as such.
    T01, T08 and T12 are written. T12's Pleris wrong fix is refused since
    ADR-0128.
-   - **Next: E14-L, a value's label** (EVIDENCE_LEDGER). ADR-0128's probes
-     found five ways a value's label is still lost: a parameter that states
-     one, a helper's body, a branch's condition, `log<Public>` taking a
-     session's value, and PW5003 reading one restriction. Acceptance: each
-     probe is a test that fails at the commit before and passes after, with a
-     control; no accepted, store or kiokun program gains a diagnostic it
-     should not; a mutant per piece.
+   - ~~**E14-L, a value's label.**~~ Done 2026-10-02 (ADR-0129).
+   - **Next: UI state, view composition and typed events** (ADR-0126's,
+     ADR-0072's and ADR-0058's rulings). T06 and T11 need them, and so does
+     every DoorDash screen: a drawer, an item modal, a checkout form. First
+     the rulings, then local signals on a page: declared, read in text,
+     attributes, `{#if}` and `{#match}`, written by a handler that need call
+     no command, rendered in the browser and resumed.
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.
