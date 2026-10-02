@@ -1,0 +1,25 @@
+ADR-0134 - every handler is resumable, and what it captures is what it reads
+
+produced by: just e14-handlers-resumable
+commit: d137fd50c655cebc29b8ce61525ee48a3cc1ebb8
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the compiler (compiler/pw-core/tests/every_handler_is_resumable.rs)
+
+test a_listed_capture_is_still_held_to_what_the_handler_reads ... ok
+test a_handler_that_is_not_a_lambda_is_refused_at_build ... ok
+test a_handler_written_as_a_lambda_has_code ... ok
+test a_handler_captures_what_it_reads_of_the_page ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.56s
+
+== mutation controls (scripts/handlers_resumable_mutations.py)
+
+baseline: 4 passed, 0 failed
+an `on:` lambda is not a handler: KILLED (2 of 4 tests fail)
+an unlisted handler captures nothing: KILLED (1 of 4 tests fail)
+a signal is captured: KILLED (1 of 4 tests fail)
+what the handler binds itself is captured: KILLED (1 of 4 tests fail)
+the template does not carry what the manifest derived: KILLED (1 of 4 tests fail)
+`() =>` takes a parameter: KILLED (1 of 4 tests fail)
+an event part with no code is built: KILLED (1 of 4 tests fail)
+7 of 7 mutants killed
