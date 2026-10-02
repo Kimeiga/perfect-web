@@ -621,3 +621,46 @@ fn forgetting_a_command_keeps_what_must_not_run_twice() {
     );
     assert!(!rt.forget_command("never-run"));
 }
+
+/// **A host can keep a declaration uncached, drop one entry, and forget what
+/// it no longer needs** (ADR-0127).
+#[test]
+fn an_uncached_result_is_not_kept_and_one_entry_can_be_dropped() {
+    let rt = Resources::new(Clock::new());
+    let cached = Manifest::new("q").freshness(10_000);
+    let uncached = Manifest::new("u").freshness(10_000).uncached();
+    let (a, b) = (Key::new("q", "a"), Key::new("q", "b"));
+    let u = Key::new("u", "a");
+    assert_eq!(
+        rt.fetch(&cached, &a, |_| Ok("1".into())),
+        Fetched::Fresh("1".into())
+    );
+    assert_eq!(
+        rt.fetch(&cached, &b, |_| Ok("2".into())),
+        Fetched::Fresh("2".into())
+    );
+    assert_eq!(
+        rt.fetch(&uncached, &u, |_| Ok("3".into())),
+        Fetched::Fresh("3".into())
+    );
+    assert_eq!(rt.stored(), 2, "the uncached result is not kept");
+    assert_eq!(
+        rt.fetch(&uncached, &u, |_| Ok("4".into())),
+        Fetched::Fresh("4".into()),
+        "and is fetched again"
+    );
+
+    rt.invalidate_key(&a);
+    assert_eq!(
+        rt.fetch(&cached, &a, |_| Ok("5".into())),
+        Fetched::Fresh("5".into())
+    );
+    assert_eq!(
+        rt.fetch(&cached, &b, |_| panic!("still cached")),
+        Fetched::FromCache("2".into()),
+        "only the named entry was dropped"
+    );
+
+    rt.evict_where(|k| k.key == "b");
+    assert_eq!(rt.stored(), 1);
+}

@@ -9,21 +9,54 @@
       "resource": "store.page.Store",
       "args": [
         "id"
-      ]
+      ],
+      "policy": {
+        "cache": "shared",
+        "privacy": "public",
+        "freshness_ms": 30000,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ]
+      }
     },
     {
       "binding": "menu",
       "resource": "store.page.Menu",
       "args": [
         "id"
-      ]
+      ],
+      "policy": {
+        "cache": "shared",
+        "privacy": "public",
+        "freshness_ms": 300000,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ]
+      }
     },
     {
       "binding": "cart",
       "resource": "store.page.Cart",
       "args": [
         "current_session()"
-      ]
+      ],
+      "policy": {
+        "cache": "private",
+        "privacy": "session",
+        "freshness_ms": 0,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ]
+      }
     }
   ],
   "parts": [

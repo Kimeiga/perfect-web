@@ -258,6 +258,26 @@ struct Server {
     /// that binding's value. Until 2026-10-02 this server computed the page's
     /// values itself and ran none of the store's queries.
     plan: serde_json::Value,
+    /// **The store's queries, run by their declared policies** (ADR-0127):
+    /// freshness, cache partition, key, concurrency, timeout and retries are
+    /// `pw-resource`'s to decide, on its own clock, which this server keeps at
+    /// wall time. What it caches is a token; the value is in `held`.
+    queries: pw_resource::Resources,
+    query_clock: (
+        pw_resource::Clock,
+        std::time::Instant,
+        std::sync::atomic::AtomicU64,
+    ),
+    /// Each kept query value by its token, and each key's last few tokens.
+    /// Not one per key: a flight a commit invalidated can finish after the
+    /// flight that replaced it, and must not take the newer value away from
+    /// the reader it was fetched for. Bounded: `HELD_PER_KEY` per key, and
+    /// the keys `queries` holds.
+    held: Mutex<Held>,
+    tokens: std::sync::atomic::AtomicU64,
+    /// How many times each data-layer operation ran: what `/metrics` reports,
+    /// and what shows a policy saved a request.
+    calls: Arc<Mutex<BTreeMap<String, u64>>>,
     /// Frames waiting for each session's subscriber.
     pending: Mutex<BTreeMap<String, Subscriber>>,
     /// **The compiler's contracts, and the node this server is.**
@@ -367,6 +387,14 @@ fn components() -> BTreeMap<String, Loaded> {
         out.insert(id.to_string(), Loaded { prepared, imports });
     }
     out
+}
+
+/// Query values a server keeps (ADR-0127): each by its token, and each key's
+/// last few tokens, oldest first.
+#[derive(Default)]
+struct Held {
+    values: BTreeMap<String, Val>,
+    recent: BTreeMap<(String, String), std::collections::VecDeque<String>>,
 }
 
 /// **What one build gave the server** (ADR-0123, ADR-0125): where its
@@ -522,6 +550,7 @@ impl Server {
         }: Built,
     ) -> Server {
         let speculation = speculation_manifest(&artifacts);
+        let query_clock = pw_resource::Clock::new();
         let clock = Clock::new();
         let materializer = Materializer::new(clock.clone(), BUILD);
         materializer.declare("store.page.Cart", FragmentPolicy::default());
@@ -541,6 +570,15 @@ impl Server {
             topology,
             speculation,
             plan,
+            queries: pw_resource::Resources::new(query_clock.clone()),
+            query_clock: (
+                query_clock,
+                std::time::Instant::now(),
+                std::sync::atomic::AtomicU64::new(0),
+            ),
+            held: Mutex::new(Held::default()),
+            tokens: std::sync::atomic::AtomicU64::new(0),
+            calls: Arc::default(),
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
             interactions: Mutex::new(BTreeMap::new()),
         }
@@ -727,11 +765,13 @@ impl Server {
                 return Ok(());
             };
             let total: i64 = lines.iter().map(|(_, q)| q).sum();
+            let emitted = events.clone();
             self.materializer.command(|tx| {
                 Materializer::set_state(tx, &format!("cart:{session}"), &total.to_string());
                 Ok::<_, String>(events)
             })?;
             carts.insert(session.to_string(), lines);
+            self.invalidate_queries(component_id, session, &emitted);
         }
 
         // The materializer drains the committed event and regenerates the
@@ -917,6 +957,24 @@ impl Server {
         };
         for session in forgotten {
             self.materializer.evict(&self.cart_key(&session));
+            // And the query values kept for it alone (ADR-0127): a private
+            // entry's key begins with its session.
+            let own = format!("session={session}");
+            let mine = |k: &str| k == own || k.starts_with(&format!("{own}\u{1f}"));
+            self.queries.evict_where(|k| mine(&k.key));
+            let mut held = self.held.lock().expect("held");
+            let gone: Vec<(String, String)> = held
+                .recent
+                .keys()
+                .filter(|(_, k)| mine(k))
+                .cloned()
+                .collect();
+            for k in gone {
+                for token in held.recent.remove(&k).unwrap_or_default() {
+                    held.values.remove(&token);
+                }
+            }
+            drop(held);
             // And its interactions: a forgotten session's retry runs again,
             // which is the bound's stated cost (ADR-0121).
             let keys = self
@@ -981,6 +1039,166 @@ impl Server {
         ])
     }
 
+    /// `pw-resource`'s clock, brought to wall time (ADR-0127).
+    fn sync_query_clock(&self) {
+        let (clock, started, seen) = &self.query_clock;
+        let now = started.elapsed().as_millis() as u64;
+        let before = seen.swap(now, std::sync::atomic::Ordering::SeqCst);
+        if now > before {
+            clock.advance(now - before);
+        }
+    }
+
+    /// **A binding's query, run by its declared policies** (ADR-0127). The
+    /// key is the arguments its `key` names (all of them when it names none),
+    /// and a private entry's key is scoped by the session, as `pw-resource`
+    /// requires of its host.
+    fn fetch_binding(
+        &self,
+        session: &str,
+        binding: &serde_json::Value,
+        args: &[Val],
+    ) -> Result<Val, String> {
+        let resource = binding["resource"].as_str().unwrap_or_default();
+        let policy = &binding["policy"];
+        let manifest = runtime_manifest(resource, policy);
+        let mut key = entry_key(session, policy, args)
+            .ok_or_else(|| format!("`{resource}`'s key names an argument it was not given"))?;
+        if policy["parallel"] == true {
+            // `concurrency parallel`: no shared flight, so a key of its own.
+            let n = self
+                .tokens
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            key.push_str(&format!("\u{1f}#{n}"));
+        }
+        let key = pw_resource::Key::new(resource, &key);
+        // A flight a commit invalidated is not an error: its result was about
+        // to be stale, and a reader asks again (found 2026-10-02: two presses
+        // at once made one command's re-read fail on the other's commit).
+        let mut fetched = pw_resource::Fetched::Cancelled(pw_resource::StopReason::Invalidated);
+        for _ in 0..8 {
+            fetched = self.fetch_once(session, resource, &manifest, &key, args);
+            if !matches!(
+                fetched,
+                pw_resource::Fetched::Cancelled(pw_resource::StopReason::Invalidated)
+            ) {
+                break;
+            }
+        }
+        let token = match fetched {
+            pw_resource::Fetched::Fresh(t)
+            | pw_resource::Fetched::FromCache(t)
+            | pw_resource::Fetched::Deduplicated(t) => t,
+            pw_resource::Fetched::Failed(e) => return Err(format!("{resource}: {e}")),
+            pw_resource::Fetched::Cancelled(r) => {
+                return Err(format!("{resource}: stopped, {r:?}"));
+            }
+            pw_resource::Fetched::TimedOut => return Err(format!("{resource}: timed out")),
+        };
+        self.held
+            .lock()
+            .expect("held")
+            .values
+            .get(&token)
+            .cloned()
+            .ok_or_else(|| format!("{resource}: the value for its entry is gone"))
+    }
+
+    /// One fetch of a binding's query through `pw-resource`.
+    fn fetch_once(
+        &self,
+        session: &str,
+        resource: &str,
+        manifest: &pw_resource::Manifest,
+        key: &pw_resource::Key,
+        args: &[Val],
+    ) -> pw_resource::Fetched {
+        self.sync_query_clock();
+        self.queries.fetch(manifest, key, |_attempt| {
+            let value = self.query(resource, session, args)?;
+            let token = self
+                .tokens
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                .to_string();
+            let mut held = self.held.lock().expect("held");
+            let k = (key.resource.clone(), key.key.clone());
+            let recent = held.recent.entry(k).or_default();
+            recent.push_back(token.clone());
+            let old: Vec<String> = (recent.len() > HELD_PER_KEY)
+                .then(|| recent.pop_front())
+                .flatten()
+                .into_iter()
+                .collect();
+            for t in old {
+                held.values.remove(&t);
+            }
+            held.values.insert(token.clone(), value);
+            Ok(token)
+        })
+    }
+
+    /// **Drop what a commit made stale** (ADR-0127): each entry a command
+    /// names in `invalidates`, and each entry an emitted event reaches through
+    /// a query's `invalidates_on`. An event that leaves a key unbound (`_`,
+    /// ADR-0091) drops every entry of that query.
+    fn invalidate_queries(&self, command: &str, session: &str, events: &[pw_materialize::Event]) {
+        let policy_of = |resource: &str| {
+            self.plan["bindings"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|b| b["resource"] == resource)
+                .map(|b| b["policy"].clone())
+        };
+        let drop_key = |resource: &str, args: Option<Vec<Val>>| {
+            let Some(policy) = policy_of(resource) else {
+                // No binding reads it, so nothing of it is kept.
+                return;
+            };
+            match args.and_then(|a| entry_key(session, &policy, &a)) {
+                Some(k) => self
+                    .queries
+                    .invalidate_key(&pw_resource::Key::new(resource, &k)),
+                None => self.queries.invalidate(resource),
+            }
+        };
+        for e in &self.graph.edges {
+            if e.from == command && e.kind == pw_materialize::EdgeKind::Invalidates {
+                let args: Option<Vec<Val>> = e
+                    .key
+                    .iter()
+                    .map(|a| (a == "current_session()").then(|| Val::String(session.into())))
+                    .collect();
+                drop_key(&e.to, args);
+            }
+        }
+        for event in events {
+            for e in &self.graph.edges {
+                if e.kind != pw_materialize::EdgeKind::InvalidatedBy || e.to != event.name {
+                    continue;
+                }
+                // The query's parameters, bound from the event's arguments by
+                // the names its `invalidates_on` gives them.
+                let params = self
+                    .graph
+                    .nodes
+                    .iter()
+                    .find(|n| n.path == e.from)
+                    .map(|n| n.params.clone())
+                    .unwrap_or_default();
+                let mut args = vec![None; params.len()];
+                for (i, name) in e.key.iter().enumerate() {
+                    if let (Some(p), Some(v)) =
+                        (params.iter().position(|q| q == name), event.args.get(i))
+                    {
+                        args[p] = Some(Val::String(v.clone()));
+                    }
+                }
+                drop_key(&e.from, args.into_iter().collect());
+            }
+        }
+    }
+
     /// **Run a query's compiled component** (ADR-0125), with the data layer,
     /// the session and the catalogue, and return its `Ok` value. Nothing a
     /// query does is committed: it reads.
@@ -998,6 +1216,22 @@ impl Server {
             Self::session_operation(session),
         );
         host.extend(self.catalog());
+        let host = host
+            .into_iter()
+            .map(|(name, f)| {
+                let calls = self.calls.clone();
+                let counted_name = name.clone();
+                let counted: HostFn = Arc::new(move |args: &[Val]| {
+                    *calls
+                        .lock()
+                        .expect("calls")
+                        .entry(counted_name.clone())
+                        .or_default() += 1;
+                    f(args)
+                });
+                (name, counted)
+            })
+            .collect();
         let out = self.run(component_id, session, &host, args)?;
         match out.into_iter().next() {
             Some(Val::Result(Ok(Some(v)))) => Ok(*v),
@@ -1023,10 +1257,9 @@ impl Server {
                     other => Err(format!("an argument this server cannot compute: {other:?}")),
                 })
                 .collect::<Result<Vec<Val>, String>>()?;
-            let resource = b["resource"].as_str().unwrap_or_default();
             out.insert(
                 b["binding"].as_str().unwrap_or_default().to_string(),
-                self.query(resource, session, &args)?,
+                self.fetch_binding(session, b, &args)?,
             );
         }
         Ok(out)
@@ -1322,6 +1555,9 @@ impl Server {
             let mut items = self.menu.lock().expect("menu");
             op.apply(&mut items)?;
         }
+        // The deployment's menu changed: the `Menu` query's kept values are
+        // stale (ADR-0127), as `MenuChanged` says to the materializer.
+        self.queries.invalidate("store.page.Menu");
 
         // The fragment is re-materialized, in its own domain, once.
         let items = self.menu.lock().expect("menu").clone();
@@ -1330,6 +1566,11 @@ impl Server {
         let html = pw_render::render_part(template, part, &env, &self.templates)
             .map_err(|b| format!("{b:?}"))?;
         self.clock.advance(1);
+        // Invalidated first: `regenerate` leaves a current entry alone, so
+        // without this the fragment kept its first rendering and every
+        // document served after a change showed the old menu, while pages
+        // already open were patched (found 2026-10-02, ADR-0127).
+        self.materializer.invalidate(&self.menu_key(), 0);
         self.materializer
             .regenerate(&self.menu_key(), None, || Ok(html));
 
@@ -1741,6 +1982,41 @@ fn cart_value(lines: &[(String, i64)]) -> Val {
         ),
     )])
 }
+
+/// **A binding's policy, as `pw-resource`'s manifest** (ADR-0127).
+fn runtime_manifest(resource: &str, policy: &serde_json::Value) -> pw_resource::Manifest {
+    let mut m = pw_resource::Manifest::new(resource)
+        .freshness(policy["freshness_ms"].as_u64().unwrap_or(0))
+        .attempts(policy["attempts"].as_u64().unwrap_or(1) as u32);
+    if let Some(t) = policy["timeout_ms"].as_u64() {
+        m.timeout = t;
+    }
+    if policy["cache"] == "private" || policy["privacy"] != "public" {
+        m = m.private();
+    }
+    if policy["cache"] == "none" {
+        m = m.uncached();
+    }
+    m
+}
+
+/// **An entry's key** (ADR-0127): the arguments the policy's `key` names, by
+/// position, and for a private entry the session first. `None` when an
+/// argument the key names was not given.
+fn entry_key(session: &str, policy: &serde_json::Value, args: &[Val]) -> Option<String> {
+    let mut parts = Vec::new();
+    if policy["cache"] == "private" || policy["privacy"] != "public" {
+        parts.push(format!("session={session}"));
+    }
+    for i in policy["key"].as_array().into_iter().flatten() {
+        let v = args.get(i.as_u64()? as usize)?;
+        parts.push(val_to_json(v).to_string());
+    }
+    Some(parts.join("\u{1f}"))
+}
+
+/// How many recent values one query entry keeps (ADR-0127).
+const HELD_PER_KEY: usize = 4;
 
 /// The one store this server holds (ADR-0125): what `stores#get` answers.
 const STORE_ID: &str = "47";
@@ -2242,6 +2518,16 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 ),
             }
         }
+        // What the server did (ADR-0127, charter §10.5): how many times each
+        // data-layer operation ran, and how many query values are kept.
+        ("GET", "/metrics") => {
+            let calls = server.calls.lock().expect("calls").clone();
+            let body = serde_json::json!({
+                "calls": calls,
+                "kept": server.queries.stored(),
+            });
+            respond_json(&mut stream, 200, &session, fresh, &body.to_string());
+        }
         ("GET", "/menu") => {
             let items = server.menu.lock().expect("menu");
             let ids: Vec<String> = items.iter().map(|(k, _)| format!("\"{k}\"")).collect();
@@ -2272,6 +2558,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                         .collect();
                     drop(menu);
                     server.materializer.invalidate(&server.menu_key(), 0);
+                    server.queries.invalidate("store.page.Menu");
                 }
             }
             // Registering the subscriber HERE, when the document is served,
@@ -2934,6 +3221,139 @@ mod tests {
         assert_eq!(
             s.part_text("session-q", "cart.line_count").as_deref(),
             Ok("3")
+        );
+    }
+
+    fn calls(s: &Server, op: &str) -> u64 {
+        s.calls.lock().expect("calls").get(op).copied().unwrap_or(0)
+    }
+
+    /// **A shared query runs once for every reader, within its freshness**
+    /// (ADR-0127). `Store` is shared for 30 seconds and `Menu` for five
+    /// minutes; `Cart` is private and kept for no time, so each render runs it.
+    #[test]
+    fn a_shared_query_is_run_once_for_its_readers_and_a_private_one_for_each() {
+        let s = rendering_server();
+        s.render_store("reader-a");
+        s.render_store("reader-b");
+        assert_eq!(
+            calls(&s, "store:data/stores#get"),
+            1,
+            "one Store for both readers"
+        );
+        assert_eq!(
+            calls(&s, "store:data/menus#for-store"),
+            1,
+            "one Menu for both"
+        );
+        assert_eq!(
+            calls(&s, "store:data/carts#current"),
+            2,
+            "a Cart for each reader"
+        );
+
+        // Past Store's 30 seconds and inside Menu's five minutes.
+        s.query_clock.0.advance(30_001);
+        s.render_store("reader-a");
+        assert_eq!(calls(&s, "store:data/stores#get"), 2, "Store expired");
+        assert_eq!(calls(&s, "store:data/menus#for-store"), 1, "Menu did not");
+    }
+
+    /// **A command drops exactly the entry it invalidates** (ADR-0127): the
+    /// session's cart, and not another session's. Cart is kept for no time in
+    /// the store, so the test keeps it for a minute to see what is dropped.
+    #[test]
+    fn a_command_drops_the_entry_it_invalidates_and_no_other() {
+        let mut s = rendering_server();
+        for b in s.plan["bindings"].as_array_mut().expect("bindings") {
+            if b["binding"] == "cart" {
+                b["policy"]["freshness_ms"] = serde_json::json!(60_000);
+            }
+        }
+        s.render_store("one");
+        s.render_store("two");
+        assert_eq!(calls(&s, "store:data/carts#current"), 2);
+        s.render_store("one");
+        assert_eq!(calls(&s, "store:data/carts#current"), 2, "kept");
+
+        s.command(ADD, "one", &add("espresso", 1), false)
+            .expect("runs");
+        assert!(
+            s.render_store("one").contains(">1<"),
+            "one's own add is shown"
+        );
+        assert_eq!(
+            calls(&s, "store:data/carts#current"),
+            3,
+            "one's entry was dropped"
+        );
+        s.render_store("two");
+        assert_eq!(calls(&s, "store:data/carts#current"), 3, "two's was not");
+    }
+
+    /// **Commands that invalidate each other's reads all commit** (ADR-0127).
+    /// Each commit drops the session's cart entry while another command may
+    /// be re-reading it; an invalidated read is read again rather than failed.
+    /// Two presses at once failed both before this.
+    #[test]
+    fn concurrent_commands_on_one_session_all_commit() {
+        let s = std::sync::Arc::new(rendering_server());
+        let threads: Vec<_> = (0..8)
+            .map(|_| {
+                let s = s.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..5 {
+                        s.command(ADD, "busy", &add("espresso", 1), false)
+                            .expect("commits");
+                    }
+                })
+            })
+            .collect();
+        for t in threads {
+            t.join().expect("no command failed");
+        }
+        assert_eq!(s.cart_value("busy"), 40);
+        assert_eq!(s.part_text("busy", "cart.line_count").as_deref(), Ok("40"));
+    }
+
+    /// **A change to the menu drops the Menu query's values** (ADR-0127).
+    #[test]
+    fn a_menu_change_drops_the_menus_kept_values() {
+        let s = rendering_server();
+        s.render_store("reader");
+        s.broadcast_menu(MenuOp::Rename {
+            id: "espresso".into(),
+            name: "Ristretto".into(),
+        })
+        .expect("renamed");
+        let html = s.render_store("reader");
+        assert!(
+            html.contains("Ristretto"),
+            "the page shows the changed menu: {html}"
+        );
+        assert_eq!(calls(&s, "store:data/menus#for-store"), 2);
+    }
+
+    /// **A private entry is keyed by its session; a shared one by its
+    /// arguments alone** (ADR-0127).
+    #[test]
+    fn an_entry_key_is_scoped_by_session_only_when_private() {
+        let shared = serde_json::json!({ "cache": "shared", "privacy": "public", "key": [0] });
+        let private = serde_json::json!({ "cache": "private", "privacy": "session", "key": [0] });
+        let args = [Val::String("47".into())];
+        assert_eq!(
+            entry_key("a", &shared, &args),
+            entry_key("b", &shared, &args)
+        );
+        assert_ne!(
+            entry_key("a", &private, &args),
+            entry_key("b", &private, &args)
+        );
+        let none = serde_json::json!({ "cache": "shared", "privacy": "public", "key": [1] });
+        assert_eq!(
+            entry_key("a", &none, &args),
+            None,
+            "a key naming an argument not given"
         );
     }
 

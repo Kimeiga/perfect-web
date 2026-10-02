@@ -157,6 +157,10 @@ pub struct Manifest {
     pub retry_base: Millis,
     /// Whole-flight budget, including retries, measured by the injected clock.
     pub timeout: Millis,
+    /// Whether a result is kept at all (ADR-0127). A declaration with no
+    /// `cache` clause is not cached: concurrent requests still share one
+    /// flight, and nothing outlives it.
+    pub cacheable: bool,
 }
 
 impl Manifest {
@@ -168,7 +172,12 @@ impl Manifest {
             max_attempts: 1,
             retry_base: 100,
             timeout: 2_000,
+            cacheable: true,
         }
+    }
+    pub fn uncached(mut self) -> Self {
+        self.cacheable = false;
+        self
     }
     pub fn private(mut self) -> Self {
         self.privacy = Privacy::Private;
@@ -489,14 +498,16 @@ impl Resources {
             }
             match result {
                 Ok(value) => {
-                    st.cache.insert(
-                        key.clone(),
-                        Entry {
-                            value: value.clone(),
-                            stored_at: self.clock.now(),
-                            privacy: manifest.privacy,
-                        },
-                    );
+                    if manifest.cacheable {
+                        st.cache.insert(
+                            key.clone(),
+                            Entry {
+                                value: value.clone(),
+                                stored_at: self.clock.now(),
+                                privacy: manifest.privacy,
+                            },
+                        );
+                    }
                     st.trace.push(Trace::RequestSucceeded { key: key.clone() });
                     let outcome = Self::finish_locked(&mut st, key, &flight, Ok(value));
                     return Self::fetched(outcome, false);
@@ -710,6 +721,37 @@ impl Resources {
     /// How many command outcomes are held: what a host bounds.
     pub fn commands_held(&self) -> usize {
         self.state.lock().expect("state").applied.len()
+    }
+
+    /// **Invalidate one entry** (ADR-0127): what a command's `invalidates
+    /// Cart(current_session())` names, and not every session's cart. Its stored
+    /// value goes, and a flight for it loses the right to publish.
+    pub fn invalidate_key(&self, key: &Key) {
+        let mut st = self.state.lock().expect("state");
+        st.cache.remove(key);
+        if let Some(flight) = st.in_flight.get(key).cloned() {
+            let _ = Self::finish_locked(
+                &mut st,
+                key,
+                &flight,
+                Err(QueryError::Stopped(StopReason::Invalidated)),
+            );
+        }
+    }
+
+    /// **Forget stored values a host no longer needs** (ADR-0127): a forgotten
+    /// session's private entries. Flights are left to finish.
+    pub fn evict_where(&self, mut forget: impl FnMut(&Key) -> bool) {
+        self.state
+            .lock()
+            .expect("state")
+            .cache
+            .retain(|key, _| !forget(key));
+    }
+
+    /// How many values are stored: what a host bounds.
+    pub fn stored(&self) -> usize {
+        self.state.lock().expect("state").cache.len()
     }
 
     /// Invalidate both stored values and publication rights of outstanding work.

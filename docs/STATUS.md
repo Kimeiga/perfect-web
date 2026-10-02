@@ -13,6 +13,17 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-Q, second slice, 2026-10-02: queries run by their declared policies**
+([ADR-0127](DECISIONS/ADR-0127-queries-run-by-their-declared-policies.md)).
+`pw-resource` now applies each query's freshness, cache partition, key,
+retries and timeout in the running server, and a commit drops exactly the
+entries it invalidates. Found on the way, both fixed:
+- **a page served after a menu change showed the old menu**: the fragment was
+  regenerated without being invalidated, which `regenerate` treats as current;
+  open pages were patched, new ones were not;
+- **two presses at once rolled both back**: one commit invalidated the cart
+  read the other was making, and the invalidated read failed the command.
+
 **E14-Q, first slice, 2026-10-02: the page shows what its queries return**
 ([ADR-0125](DECISIONS/ADR-0125-a-page-shows-what-its-queries-return.md)). The
 server ran none of the store's queries; `store.name` was a literal and the

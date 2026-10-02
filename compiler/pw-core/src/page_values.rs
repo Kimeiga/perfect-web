@@ -41,6 +41,65 @@ pub struct Binding {
     /// Each argument as a host computes it: a page parameter's name, or an
     /// invocation-context call, `current_session()`.
     pub args: Vec<String>,
+    /// How a host runs the query: its declared policies (ADR-0127).
+    pub policy: Policy,
+}
+
+/// A query's policies, as a host applies them (ADR-0127).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Policy {
+    /// `shared`, `private`, or `none`: whether a value is kept, and for whom.
+    pub cache: String,
+    /// `public`, `session` or `private`: whose value it is.
+    pub privacy: String,
+    /// How long a kept value is served, in milliseconds. Absent is 0: a value
+    /// nobody said may be reused is not reused.
+    pub freshness_ms: u64,
+    /// The whole request's budget, retries included, in milliseconds.
+    pub timeout_ms: Option<u64>,
+    /// Attempts in all, 1 meaning no retry.
+    pub attempts: u32,
+    /// `concurrency parallel`: requests for one key do not share a flight.
+    pub parallel: bool,
+    /// The arguments the entry is keyed by, by position. A query with no
+    /// `key` clause is keyed by all of them, so two calls with different
+    /// arguments never share an entry.
+    pub key: Vec<usize>,
+}
+
+fn policy_of(decl: &crate::hir::Decl) -> Policy {
+    use crate::manifest::{CachePartition, Concurrency, Privacy, Retry};
+    let m = crate::manifest::of(decl);
+    let key = match decl.policy("key") {
+        Some(p) => p
+            .value
+            .split(',')
+            .filter_map(|name| decl.params.iter().position(|q| q.name == name.trim()))
+            .collect(),
+        None => (0..decl.params.len()).collect(),
+    };
+    Policy {
+        cache: match m.cache_partition {
+            CachePartition::Shared => "shared",
+            CachePartition::Private => "private",
+            CachePartition::None => "none",
+        }
+        .to_string(),
+        privacy: match m.privacy {
+            Privacy::Public => "public",
+            Privacy::Session => "session",
+            Privacy::Private => "private",
+        }
+        .to_string(),
+        freshness_ms: m.freshness.unwrap_or(0),
+        timeout_ms: m.timeout,
+        attempts: match m.retry {
+            Retry::Bounded { max, .. } => max.max(1),
+            Retry::None | Retry::Forever => 1,
+        },
+        parallel: m.concurrency == Some(Concurrency::Parallel),
+        key,
+    }
 }
 
 /// One step from a value to the next.
@@ -240,11 +299,14 @@ fn plan(
                 }
             });
         }
+        let decl = crate::resolve::declaration(hirs, *resource)
+            .ok_or_else(|| format!("`{name}`'s query is declared nowhere"))?;
         bindings.push(Binding {
             binding: name.clone(),
             resource: component_id_of(hirs, *resource)
                 .ok_or_else(|| format!("`{name}`'s query has no component"))?,
             args,
+            policy: policy_of(decl),
         });
     }
 

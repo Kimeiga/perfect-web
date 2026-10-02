@@ -164,6 +164,11 @@ fn kind_name(kind: DeclKind) -> &'static str {
     }
 }
 
+/// One declaration's manifest: what a host runs it by (ADR-0127).
+pub fn of(decl: &Decl) -> Manifest {
+    manifest_of(decl).0
+}
+
 fn manifest_of(decl: &Decl) -> (Manifest, Vec<Unparsed>) {
     let mut bad = Vec::new();
     let mut note = |policy: &str, value: &str, reason: &'static str| {

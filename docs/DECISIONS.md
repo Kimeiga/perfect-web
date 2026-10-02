@@ -933,3 +933,13 @@ its queries. The compiler now plans each page (its bindings' queries, each
 part's field and member reads), compiles each member function a plan names
 as a component, and the server follows the plan. Query policies are the next
 slice.
+
+## 2026-10-02: queries run by their declared policies (E14)
+
+[ADR-0127](DECISIONS/ADR-0127-queries-run-by-their-declared-policies.md): the
+development server ran every query on every render. Each binding's policy now
+travels in the page plan and `pw-resource` applies it: freshness, cache
+partition, key (every argument when no `key` is written), retries, timeout,
+one flight per key; a commit drops exactly the entries it invalidates. Found
+on the way: a page served after a menu change showed the old menu, and two
+presses at once rolled both back.

@@ -385,11 +385,11 @@ parameter that states its label, so by ADR-0085 the result carries none.
 `session query` with `cache shared` is refused (PW0100, PW5001); the guard is
 the modifier, and dropping it drops the guard. Ruling needed (ADR-0085).
 
-**E14's harness grades Pleris's query bodies and not their policies**
-(ADR-0123, ADR-0125, E14-Q): the development server runs the program's
-compiled commands and queries, and reads each part by the compiler's plan,
-but runs every query on every render: freshness, cache, key and concurrency
-are not honoured yet. **Its sandbox is checked, not
+**The development server honours query policies except two** (ADR-0127):
+`on_key_change` (a served page never changes its key) and `consistency`
+(nothing enforces a mode as such). Freshness, cache partition, key, retries,
+timeout and one-flight-per-key are `pw-resource`'s, and a commit drops exactly
+what it invalidates. **Its sandbox is checked, not
 enforced** (ADR-0124, E14-I): no hidden file is copied in, and a process in
 it can read the repository by absolute path.
 
