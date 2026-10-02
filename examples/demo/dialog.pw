@@ -1,0 +1,36 @@
+// @corpus: fixture
+// @id: DEMO-dialog
+// @category: UI state — a modal dialog a signal shows
+// @charter: §8, §9.1
+// @milestone: E14
+//
+// ADR-0141: a `<dialog>` a signal's block renders is the browser's modal
+// dialog. It takes focus, makes the page behind it inert, closes on Escape,
+// and gives focus back to what had it. Its `close` handler keeps the signal
+// that shows it true to what the page shows.
+
+module demo.dialog
+
+page DialogPage() {
+    cache private
+
+    signal confirming: Bool = false
+    signal cleared: Int = 0
+
+    view {
+        <main>
+            <button id="clear" type="button" on:press={() => confirming = true}>Clear</button>
+            <p id="cleared">{cleared}</p>
+            {#if confirming}
+                <dialog id="confirm" aria-labelledby="confirm-title" on:close={() => confirming = false}>
+                    <h2 id="confirm-title">Clear your cart?</h2>
+                    <button id="keep" type="button" autofocus on:press={() => confirming = false}>Keep items</button>
+                    <button id="yes" type="button" on:press={() => {
+                        cleared = cleared + 1
+                        confirming = false
+                    }}>Clear cart</button>
+                </dialog>
+            {/if}
+        </main>
+    }
+}

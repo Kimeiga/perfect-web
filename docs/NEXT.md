@@ -39,14 +39,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
      (ADR-0137), a correction to ADR-0133.
    - ~~**A handler is given its event.**~~ Done 2026-10-02 (ADR-0138):
      event records, typed parameters, `|prevent` and `|stop`.
-   - **Next: a page of queries holds signals.** The store's route renders
-     no signal, so T11's dialog cannot be written on the store. Acceptance:
-     the store page with a signal and a block it decides is served with the
-     signals' manifest, a press opens and closes the block, and the store's
-     suite passes unchanged.
-   - **Then:** `bind:value` and forms (ADR-0131, rulings 5 and 6), then
-     provided signals (ADR-0130's step 3). T11's dialog and T06's form
-     follow, on all three stacks.
+   - ~~**A page of queries holds signals; a modal dialog.**~~ Done 2026-10-02
+     (ADR-0140, ADR-0141).
+   - **Next: T11, an accessible dialog, on all three stacks.** A prompt,
+     hidden tests, a reference and an unsafe patch per stack, and all four
+     controls green: Clear asks for confirmation in a modal dialog named by
+     its title, focus moves into it and back, Escape and "Keep items" close
+     it without clearing, and "Clear cart" clears.
+   - **Then:** `bind:value` and forms (ADR-0131, rulings 5 and 6), toward
+     T06; provided signals (ADR-0130's step 3).
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

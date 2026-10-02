@@ -411,7 +411,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // form's own submission was stopped, now that the runtime reads each
     // event's record in the listener (ADR-0138). It was a `String` nothing
     // read or filled.
-    const EXPECTED: u64 = 0x317effa4860aa92b;
+    // 2026-10-02: `events` declares `close`, a dialog's, whose record is its
+    // return value (ADR-0141): a modal dialog's closing is heard by the
+    // signal that shows it.
+    const EXPECTED: u64 = 0xc17d9614372e049b;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

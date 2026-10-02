@@ -625,12 +625,81 @@ async function renderBlock(id) {
   return out;
 }
 
-/** Replace a block's range, its anchors included, with what was rendered. */
+/** The nodes from `start` to `end`, both included. */
+function between(start, end) {
+  const out = [];
+  for (let n = start; n; n = n.nextSibling) {
+    out.push(n);
+    if (n === end) break;
+  }
+  return out;
+}
+
+/** Each `<dialog>` among `nodes` and inside them, open or shut as asked. */
+function dialogsIn(nodes, open) {
+  const out = [];
+  for (const n of nodes) {
+    if (n.nodeType !== Node.ELEMENT_NODE) continue;
+    if (n.localName === "dialog" && n.open === open) out.push(n);
+    for (const d of n.querySelectorAll("dialog")) if (d.open === open) out.push(d);
+  }
+  return out;
+}
+
+/**
+ * **A `<dialog>` a signal's block renders is the browser's modal dialog**
+ * (ADR-0141): shown with `showModal`, which focuses its `autofocus` element
+ * and makes the page behind it inert. Escape closes it by itself, and the
+ * dialog's `close` handler tells the signal. A `<dialog open>` is HTML's
+ * dialog shown in place, and is left alone.
+ */
+function showDialogs(nodes) {
+  for (const d of dialogsIn(nodes, false)) {
+    if (!d.isConnected || d.hasAttribute("open")) continue;
+    // What opened it: what has focus, or else the element whose handler ran
+    // last. WebKit does not focus a button a pointer presses, and focus goes
+    // back to what invoked a dialog (WAI-ARIA's dialog pattern).
+    const focused = document.activeElement;
+    openedFrom.set(d, focused && focused !== document.body ? focused : lastActed);
+    d.addEventListener("close", () => giveFocusBack(d), { once: true });
+    d.showModal();
+  }
+}
+
+/** What had focus when each dialog was shown, or what invoked it. */
+const openedFrom = new WeakMap();
+
+/** The element whose handler ran last. */
+let lastActed = null;
+
+/**
+ * **Focus goes back to what had it** when a modal dialog closes, as the HTML
+ * standard says `close` does (ADR-0141). Some engines do not yet: WebKit
+ * leaves focus in the closed dialog, or on the body. Done only where focus
+ * was lost, so an engine that did it, or a handler that moved focus on
+ * purpose, is left alone.
+ */
+function giveFocusBack(d) {
+  const from = openedFrom.get(d);
+  openedFrom.delete(d);
+  const now = document.activeElement;
+  const lost = !now || now === document.body || d.contains(now) || !now.isConnected;
+  if (lost && from?.isConnected) from.focus();
+}
+
+/** Replace a block's range, its anchors included, with what was rendered,
+ * and say what was put in its place. */
 function replaceBlock(id, html) {
   const r = index.get(addressOf([], id));
-  if (!r?.start) return false;
+  if (!r?.start) return [];
   const parent = r.start.parentNode;
   const after = r.end.nextSibling;
+  // A modal dialog the block showed is closed before it goes, so the browser
+  // gives focus back to what had it before the dialog took it (ADR-0141).
+  for (const d of dialogsIn(between(r.start, r.end), true)) {
+    d.close();
+    giveFocusBack(d);
+  }
   for (let n = r.start; n; ) {
     const next = n.nextSibling;
     const last = n === r.end;
@@ -638,15 +707,18 @@ function replaceBlock(id, html) {
     if (last) break;
     n = next;
   }
-  for (const node of parseInstance(html)) parent.insertBefore(node, after);
-  return true;
+  const inserted = parseInstance(html);
+  for (const node of inserted) parent.insertBefore(node, after);
+  return inserted;
 }
 
 let dirty = new Set();
 let flushing = null;
 
-/** A handler changed `name`: held now, and rendered once per press. */
+/** A handler changed `name`: held now, and rendered once per press. A value
+ * the signal already holds changes nothing, and renders nothing. */
 function setSignal(name, value) {
+  if (JSON.stringify(signals.get(name)) === JSON.stringify(value)) return;
   signals.set(name, value);
   dirty.add(name);
   flushing ??= Promise.resolve().then(flushSignals);
@@ -657,13 +729,14 @@ async function flushSignals() {
   dirty = new Set();
   flushing = null;
   let rendered = false;
+  const inserted = [];
   for (const live of parts.live ?? []) {
     if (live.kind === "text") {
       if (!changed.has(live.signal)) continue;
       setRange(addressOf([], live.part), textOf(signalAt(live.path)));
       log.push(`signal ${live.signal} -> part ${live.part}`);
     } else if ((live.reads ?? [live.signal]).some((s) => changed.has(s))) {
-      replaceBlock(live.part, await renderBlock(live.part));
+      inserted.push(...replaceBlock(live.part, await renderBlock(live.part)));
       rendered = true;
       log.push(`signal ${[...changed].join(",")} -> block ${live.part}`);
     }
@@ -671,6 +744,8 @@ async function flushSignals() {
   if (rendered) {
     buildIndex();
     bindEvents();
+    // Shown once what is in it can be pressed (ADR-0141).
+    showDialogs(inserted);
   }
   window.__pw.signals = Object.fromEntries(signals);
 }
@@ -691,6 +766,7 @@ const DOM_EVENTS = {
   change: "change",
   keydown: "keydown",
   submit: "submit",
+  close: "close",
 };
 
 /**
@@ -709,6 +785,8 @@ function eventRecord(name, e) {
       return { key: String(e.key ?? "") };
     case "submit":
       return { prevented: e.defaultPrevented === true };
+    case "close":
+      return { value: String(e.target?.returnValue ?? "") };
     default:
       return {};
   }
@@ -781,6 +859,7 @@ function bindEvents() {
         // Declared, so done now, synchronously (ADR-0131).
         if (modifiers.includes("prevent")) e.preventDefault();
         if (modifiers.includes("stop")) e.stopPropagation();
+        lastActed = el;
         const record = eventRecord(event, e);
         try {
           // Authorised above; loaded here. The order is the point of E7-L:
@@ -865,6 +944,13 @@ async function attach() {
 
   bindEvents();
   booted = true;
+  // A dialog the server rendered at a signal's first value is shown as one
+  // the browser renders is (ADR-0141).
+  for (const live of parts.live ?? []) {
+    if (live.kind !== "conditional" && live.kind !== "match") continue;
+    const r = index.get(addressOf([], live.part));
+    if (r?.start) showDialogs(between(r.start, r.end));
+  }
 
   performance.mark("pw:activate:end");
   performance.measure("pw:activate", "pw:activate:start", "pw:activate:end");

@@ -13,6 +13,18 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0140 and ADR-0141, 2026-10-02: the store's page holds signals, and a
+dialog a signal shows is the browser's modal dialog**
+([ADR-0140](DECISIONS/ADR-0140-a-page-that-reads-queries-holds-signals-too.md),
+[ADR-0141](DECISIONS/ADR-0141-a-dialog-a-signal-shows-is-the-browsers-modal-dialog.md)).
+The store's route renders each signal's first value and ships the signals'
+manifest. A `<dialog>` a signal's block renders is shown with
+`showModal()`: it takes focus, makes the page behind it inert, and closes on
+Escape. Its `close` handler keeps the signal true to what the page shows
+(PW5303). Focus goes back to what invoked it, WebKit included, which neither
+restores focus on `close()` nor focuses a pressed button. Demonstrated by
+`examples/demo/dialog.pw` in Chromium, Firefox and WebKit. T11 is next.
+
 **Correction, ADR-0139, 2026-10-02: a change made within two seconds of a
 reload could be lost.** The stream adapter dropped each frame 25 ms after
 writing it, though its own comment said it waited for the page's next

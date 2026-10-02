@@ -1060,3 +1060,21 @@ that had been reloaded wrote the new page's frames into a socket nobody read
 and dropped them, so a change made within two seconds of a reload never
 arrived. Found as the keyed-list suite's intermittent failure. A frame is
 dropped now when a page says it applied it.
+
+## 2026-10-02: a page that reads queries holds signals too
+
+[ADR-0140](DECISIONS/ADR-0140-a-page-that-reads-queries-holds-signals-too.md):
+the store's route rendered its page from its queries and ignored its signals,
+so a store page with one did not render, and T11's dialog could not be
+written. It renders each signal's first value now, and its document carries
+the signals' manifest, as a page of signals alone does.
+
+## 2026-10-02: a dialog a signal shows is the browser's modal dialog
+
+[ADR-0141](DECISIONS/ADR-0141-a-dialog-a-signal-shows-is-the-browsers-modal-dialog.md):
+a `<dialog>` without `open`, in a block a signal decides, is shown with
+`showModal()` and closed with `close()`. The browser then focuses it, makes
+the page behind it inert and closes it on Escape. The dialog handles
+`close` (PW5303), so the signal that shows it hears of every closing,
+Escape's included. A dialog nothing shows is refused. Focus goes back to
+what invoked it in every engine, WebKit included.

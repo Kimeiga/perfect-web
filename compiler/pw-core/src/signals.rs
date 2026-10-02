@@ -63,7 +63,15 @@ fn check_body(
     out: &mut Vec<Diagnostic>,
 ) {
     let handlers = handlers(body);
-    if body.signals.is_empty() && handlers.is_empty() {
+    // A `<dialog>` is the dialog rule's, signals or none (ADR-0141).
+    let dialog = body.walk().into_iter().any(|id| match body.expr(id) {
+        Expr::Template { roots, .. } => body
+            .walk_markup(roots)
+            .into_iter()
+            .any(|n| matches!(body.node(n), Node::Element { tag, .. } if tag == "dialog")),
+        _ => false,
+    });
+    if body.signals.is_empty() && handlers.is_empty() && !dialog {
         return;
     }
     let places = places(body, &handlers);
@@ -93,6 +101,9 @@ fn check_body(
             signals.insert(Binder::Pattern(*p), (name.clone(), id));
         }
     }
+
+    // A `<dialog>` a signal shows (ADR-0141).
+    dialogs(body, &lexical, &signals, out);
 
     for id in body.walk() {
         match body.expr(id) {
@@ -145,6 +156,143 @@ fn check_body(
             }
             _ => {}
         }
+    }
+}
+
+/// **A modal dialog is shown by a signal's block, and says what closing it
+/// does** (ADR-0141). A `<dialog>` written without `open` is the browser's
+/// modal dialog while a block a signal decides renders it. Escape closes it
+/// by itself, and the standard lets a page stop that only sometimes, so it
+/// handles `close`, and the signal that shows it hears of it.
+fn dialogs(
+    body: &Body,
+    lexical: &Lexical,
+    signals: &BTreeMap<Binder, (String, ExprId)>,
+    out: &mut Vec<Diagnostic>,
+) {
+    // The signal a subject is read from: `open` in `{#if open}`.
+    let signal_of = |e: ExprId| {
+        let mut root = e;
+        while let Expr::Field { base, .. } = body.expr(root) {
+            root = *base;
+        }
+        lexical
+            .binder(root)
+            .and_then(|b| signals.get(&b))
+            .map(|(name, _)| name.clone())
+    };
+    fn walk(
+        body: &Body,
+        lexical: &Lexical,
+        signals: &BTreeMap<Binder, (String, ExprId)>,
+        signal_of: &dyn Fn(ExprId) -> Option<String>,
+        n: crate::hir::NodeId,
+        shown_by: Option<&str>,
+        out: &mut Vec<Diagnostic>,
+    ) {
+        match body.node(n) {
+            Node::Element {
+                tag,
+                attrs,
+                children,
+                ..
+            } => {
+                if tag == "dialog" && !attrs.iter().any(|a| a.name == "open") {
+                    let closes = attrs
+                        .iter()
+                        .any(|a| a.event().is_some_and(|(e, _)| e == "close"));
+                    match shown_by {
+                        None => out.push(dialog_shown_by_nothing(body, n)),
+                        Some(signal) if !closes => {
+                            out.push(dialog_close_unheard(body, n, signal));
+                        }
+                        Some(_) => {}
+                    }
+                }
+                for c in children {
+                    walk(body, lexical, signals, signal_of, *c, shown_by, out);
+                }
+            }
+            Node::Block {
+                subject, children, ..
+            } => {
+                let each = lexical
+                    .each_blocks()
+                    .find(|(node, ..)| *node == n)
+                    .and_then(|(_, _, head)| head)
+                    .and_then(|b| signals.get(&b))
+                    .map(|(name, _)| name.clone());
+                let decided = subject.and_then(signal_of).or(each);
+                let shown = shown_by.map(str::to_string).or(decided);
+                for c in children {
+                    walk(body, lexical, signals, signal_of, *c, shown.as_deref(), out);
+                }
+            }
+            _ => {}
+        }
+    }
+    for id in body.walk() {
+        let Expr::Template { roots, .. } = body.expr(id) else {
+            continue;
+        };
+        for r in roots {
+            walk(body, lexical, signals, &signal_of, *r, None, out);
+        }
+    }
+}
+
+fn dialog_shown_by_nothing(body: &Body, at: crate::hir::NodeId) -> Diagnostic {
+    let code = crate::codes::MODAL_DIALOG;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "dialog_shown_by_nothing",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: "this `<dialog>` is shown by nothing: a modal dialog is shown while a \
+                  signal's block renders it"
+            .to_string(),
+        primary_span: body.node_span(at),
+        related: Vec::new(),
+        explanation: Some(
+            "A `<dialog>` written without `open` is hidden, and nothing in a template \
+             shows one but a block a signal decides, which the browser renders as its \
+             modal dialog (ADR-0141)."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "render it in a block a signal decides, `{#if open}<dialog ..>..\
+                          </dialog>{/if}`, or write `open` for a dialog shown in place"
+                .to_string(),
+            replacement: None,
+        }],
+    }
+}
+
+fn dialog_close_unheard(body: &Body, at: crate::hir::NodeId, signal: &str) -> Diagnostic {
+    let code = crate::codes::MODAL_DIALOG;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "dialog_close_unheard",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!(
+            "this `<dialog>` is shown while `{signal}` renders it, and its closing is \
+             heard by nothing"
+        ),
+        primary_span: body.node_span(at),
+        related: Vec::new(),
+        explanation: Some(format!(
+            "Escape closes a modal dialog by itself, and the HTML standard lets a page \
+             stop that only sometimes. Without a `close` handler, `{signal}` would still \
+             say the dialog is shown after it closed, and the control that opens it could \
+             not open it again."
+        )),
+        repairs: vec![Repair {
+            description: format!("handle its closing: `on:close={{() => {signal} = ..}}`"),
+            replacement: None,
+        }],
     }
 }
 

@@ -1763,11 +1763,7 @@ impl Server {
                 .ok_or_else(|| format!("`{path}` is given no `{name}`"))?;
             env = env.set(name, Value::Text(given));
         }
-        for s in plan["signals"].as_array().into_iter().flatten() {
-            let name = s["name"].as_str().unwrap_or_default();
-            env = env.set(name, Value::from_wire(&s["initial"]));
-        }
-        let env = env.in_domain(
+        let env = with_signals(env, plan).in_domain(
             IdentityDomain::document(
                 path,
                 Partition::Session {
@@ -1832,7 +1828,8 @@ impl Server {
                 .unwrap_or_else(|e| panic!("part `{path}`: {e}"));
             env = env.set(path, val_to_value(&value));
         }
-        let env = env
+        // Its signals, at their first values (ADR-0140).
+        let env = with_signals(env, &self.plan)
             // A page, not a materialization: its domain is the route identity
             // and its partition. The generation is carried whatever the
             // partition is — the two are orthogonal.
@@ -2646,7 +2643,13 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .as_ref()
                 .and_then(|m| m["module"].as_str())
                 .map(|module| (format!("/speculation/{module}"), entries));
-            let body = document(&rendered, &server.templates, cursor, speculation);
+            let body = document(
+                &rendered,
+                &server.templates,
+                &server.plan,
+                cursor,
+                speculation,
+            );
             respond(
                 &mut stream,
                 200,
@@ -2896,12 +2899,17 @@ fn percent_decoded(v: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-fn signal_document(
-    body: &str,
-    template: &Template,
+/// **What a document says about its page's signals** (ADR-0130, ADR-0140):
+/// each signal's first value, the parts they decide, and each block's
+/// template, which the browser renders again. Empty for a page with none.
+fn signal_manifest(
     plan: &serde_json::Value,
-    templates: &[Template],
-) -> String {
+    template: &Template,
+) -> (
+    serde_json::Map<String, serde_json::Value>,
+    serde_json::Value,
+    serde_json::Map<String, serde_json::Value>,
+) {
     let signals: serde_json::Map<String, serde_json::Value> = plan["signals"]
         .as_array()
         .into_iter()
@@ -2926,6 +2934,26 @@ fn signal_document(
             );
         }
     }
+    let live = plan["live"].clone();
+    (signals, live, blocks)
+}
+
+/// Each signal's first value, set into a rendering environment (ADR-0130).
+fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
+    for s in plan["signals"].as_array().into_iter().flatten() {
+        let name = s["name"].as_str().unwrap_or_default();
+        env = env.set(name, Value::from_wire(&s["initial"]));
+    }
+    env
+}
+
+fn signal_document(
+    body: &str,
+    template: &Template,
+    plan: &serde_json::Value,
+    templates: &[Template],
+) -> String {
+    let (signals, _, blocks) = signal_manifest(plan, template);
     let manifest = serde_json::json!({
         "template": template.path,
         "schema": template.schema,
@@ -3037,6 +3065,7 @@ fn resume_manifest(templates: &[Template]) -> serde_json::Value {
 fn document(
     body: &str,
     templates: &[Template],
+    plan: &serde_json::Value,
     cursor: u64,
     speculation: Option<(String, serde_json::Value)>,
 ) -> String {
@@ -3064,6 +3093,15 @@ fn document(
     // The page's speculation module and the values it starts from (ADR-0122).
     // A private page's own session's values: this document is `cache private`.
     let mut manifest = manifest;
+    // And its signals (ADR-0140): a page that reads queries holds UI state
+    // too, and the browser renders what they decide, as on a page of
+    // signals alone.
+    let (signals, live, blocks) = signal_manifest(plan, template);
+    if !signals.is_empty() {
+        manifest["signals"] = serde_json::Value::Object(signals);
+        manifest["live"] = live;
+        manifest["blocks"] = serde_json::Value::Object(blocks);
+    }
     if let Some((module, entries)) = speculation {
         manifest["speculation"] = serde_json::Value::String(module);
         manifest["entries"] = entries;
@@ -4103,6 +4141,88 @@ mod tests {
                 "what the page applied is still queued"
             );
         });
+    }
+
+    /// The parts manifest a document carries.
+    fn manifest_of(html: &str) -> serde_json::Value {
+        let json = html
+            .split("<script type=\"application/json\" id=\"pw-parts\">")
+            .nth(1)
+            .and_then(|r| r.split("</script>").next())
+            .expect("a manifest");
+        serde_json::from_str(json).expect("JSON")
+    }
+
+    /// **A page that reads queries holds signals too** (ADR-0140). The
+    /// store's document said nothing of signals until 2026-10-02, so a
+    /// signal on the store's page rendered nowhere the browser could change
+    /// it: T11's dialog could not be written on the store.
+    #[test]
+    fn the_store_s_document_carries_its_signals() {
+        let template: Template = serde_json::from_value(serde_json::json!({
+            "path": "store.page.StorePage",
+            "name": "StorePage",
+            "params": [],
+            "schema": "s",
+            "chunks": [
+                { "chunk": "static", "value": "<main>" },
+                { "chunk": "dynamic", "value": {
+                    "part": "conditional", "id": 0, "value": "open",
+                    "then": [{ "chunk": "static", "value": "<p id=\"shown\">open</p>" }],
+                    "otherwise": []
+                } },
+                { "chunk": "static", "value": "</main>" }
+            ]
+        }))
+        .expect("a template");
+        let plan = serde_json::json!({
+            "signals": [{ "name": "open", "initial": true }],
+            "live": [{ "part": 0, "signal": "open", "path": "open", "kind": "conditional",
+                       "reads": ["open"] }]
+        });
+        // Rendered at its first value ...
+        let body =
+            pw_render::render(&template, &with_signals(Env::new(), &plan), &[]).expect("renders");
+        assert!(body.contains("<p id=\"shown\">open</p>"), "{body}");
+        // ... and the document says what the browser holds and renders again.
+        let templates = vec![template];
+        let manifest = manifest_of(&document(&body, &templates, &plan, 3, None));
+        assert_eq!(manifest["signals"], serde_json::json!({ "open": true }));
+        assert_eq!(manifest["live"][0]["part"], 0);
+        assert!(manifest["blocks"]["0"]["then"].is_array(), "{manifest}");
+        // Control: a page with no signals carries none of it.
+        let manifest = manifest_of(&document(
+            &body,
+            &templates,
+            &serde_json::json!({}),
+            3,
+            None,
+        ));
+        assert!(manifest.get("signals").is_none(), "{manifest}");
+    }
+
+    /// The store's page renders a block its signal decides at the signal's
+    /// first value (ADR-0140): until 2026-10-02 nothing gave the renderer a
+    /// signal's value on the store's route, and the page did not render.
+    #[test]
+    fn the_store_renders_its_signals_at_their_first_values() {
+        let mut templates: Vec<Template> =
+            serde_json::from_str(include_str!("../../store-ir.json")).expect("the template IR");
+        templates[0].chunks.push(
+            serde_json::from_value(serde_json::json!({ "chunk": "dynamic", "value": {
+                "part": "conditional", "id": 99, "value": "open",
+                "then": [{ "chunk": "static", "value": "<p id=\"shown\">open</p>" }],
+                "otherwise": []
+            } }))
+            .expect("a chunk"),
+        );
+        let mut s = Server::on(std::path::PathBuf::from("."), templates, dev_topology());
+        s.plan["signals"] = serde_json::json!([{ "name": "open", "initial": true }]);
+        let html = s.render_store("first-shown");
+        assert!(html.contains("<p id=\"shown\">open</p>"), "{html}");
+        // Control: shut at its first value, and not shown.
+        s.plan["signals"] = serde_json::json!([{ "name": "open", "initial": false }]);
+        assert!(!s.render_store("first-shut").contains("id=\"shown\""));
     }
 
     /// A page's parameter, as the address carries it (ADR-0136).

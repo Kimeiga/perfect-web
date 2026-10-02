@@ -500,6 +500,11 @@ codes! {
         "a signal is read only where the browser reads it again when it changes: a template part or a handler";
     UI_STATE_NOT_A_SIGNAL = "PW5302" / ui_state_not_a_signal / 1, UiState,
         "a handler changes a signal, not a binding of the body it is written in";
+    // ADR-0141: a `<dialog>` a signal shows is the browser's modal dialog,
+    // which Escape closes by itself. A dialog nothing shows, or one whose
+    // closing the signal never hears of, is a page that cannot open it again.
+    MODAL_DIALOG = "PW5303" / modal_dialog / 1, UiState,
+        "a modal dialog is shown by a signal's block, and says what closing it does";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must

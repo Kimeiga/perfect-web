@@ -25,6 +25,10 @@ type KeyEvent = KeyEvent { key: String }
 
 type ChangeEvent = ChangeEvent { value: String }
 
+// A dialog closed, by Escape or by the page (ADR-0141): its return value,
+// what a `<form method="dialog">`'s button gave it.
+type CloseEvent = CloseEvent { value: String }
+
 fn submit(event: SubmitEvent) -> () !{} { () }
 
 fn press(event: PressEvent) -> () !{} { () }
@@ -34,3 +38,5 @@ fn input(event: InputEvent) -> () !{} { () }
 fn keydown(event: KeyEvent) -> () !{} { () }
 
 fn change(event: ChangeEvent) -> () !{} { () }
+
+fn close(event: CloseEvent) -> () !{} { () }

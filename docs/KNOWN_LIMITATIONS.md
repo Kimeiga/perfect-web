@@ -392,6 +392,13 @@ listed here as refused, and built. A block renders again whenever any signal it 
 the arm shown does not read it. The browser's renderer is 90 KB gzipped,
 loaded on the first block a press renders.
 
+**A modal dialog is a `<dialog>` a signal's block renders** (ADR-0141), the
+browser's own, and it handles `close`. A dialog's return value from a
+`<form method="dialog">` waits for forms (ADR-0131), and a dialog in a view
+the page does not show waits for a view's signals (ADR-0130, step 3). A page
+that reads queries holds signals on the store's route only (ADR-0140); any
+other page with queries is not served yet (E14-Q).
+
 **A handler that is not a lambda is refused at build** (ADR-0134).
 `on:submit={save}` has no code to run until the event is passed to a
 handler (ADR-0131); `pw build` refuses it with the repair, and `pw check`

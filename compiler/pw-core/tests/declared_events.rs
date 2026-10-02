@@ -55,11 +55,11 @@ fn an_element_handles_an_event_the_platform_declares() {
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(
         found[0].starts_with(
-            "PW5022 `on:clik` names no event the platform declares: `change`, `input`, `keydown`, `press` or `submit`"
+            "PW5022 `on:clik` names no event the platform declares: `change`, `close`, `input`, `keydown`, `press` or `submit`"
         ),
         "{found:#?}"
     );
-    for event in ["press", "submit", "input", "keydown", "change"] {
+    for event in ["press", "submit", "input", "keydown", "change", "close"] {
         let found = reported(&button(event), true);
         assert!(found.is_empty(), "on:{event}: {found:#?}");
     }

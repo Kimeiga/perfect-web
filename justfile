@@ -1672,6 +1672,35 @@ e14-stream-ack:
      } > docs/evidence/E14/stream-ack.txt
     @grep -E "^test result|mutants killed|failed" docs/evidence/E14/stream-ack.txt || true
 
+# ADR-0140: a page that reads queries holds signals too. The server's tests
+# and the mutation controls.
+e14-store-signals:
+    @{ echo "ADR-0140 - a page that reads queries holds signals too"; echo; \
+       echo "produced by: just e14-store-signals"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the server (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server the_store 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/store_signals_mutations.py)"; echo; \
+       python3 scripts/store_signals_mutations.py; \
+     } > docs/evidence/E14/store-signals.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/store-signals.txt
+
+# ADR-0141: a dialog a signal shows is the browser's modal dialog. The
+# compiler's rule and the mutation controls; what the browser does with it
+# is `e2e/dialog.spec.mjs`, in the own-renderer suite.
+e14-dialogs:
+    @{ echo "ADR-0141 - a dialog a signal shows is the browser's modal dialog"; echo; \
+       echo "produced by: just e14-dialogs"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/dialogs.rs)"; echo; \
+       cargo test --locked -p pw-core --test dialogs 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/dialogs_mutations.py)"; echo; \
+       python3 scripts/dialogs_mutations.py; \
+     } > docs/evidence/E14/dialogs.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/dialogs.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation
