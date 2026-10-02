@@ -1050,3 +1050,13 @@ defects found building it, each checked or built clean:
 - a modifier parsed as two more attributes;
 - two handlers on one element wrote two capture attributes, and the second
   was never bound.
+
+## 2026-10-02: a frame is forgotten when the page says it applied it (a correction)
+
+[ADR-0139](DECISIONS/ADR-0139-a-frame-is-forgotten-when-the-page-says-it-applied-it.md):
+the stream adapter dropped each frame 25 ms after writing it, though its own
+comment said it waited for the page's next request. A stream held for a page
+that had been reloaded wrote the new page's frames into a socket nobody read
+and dropped them, so a change made within two seconds of a reload never
+arrived. Found as the keyed-list suite's intermittent failure. A frame is
+dropped now when a page says it applied it.

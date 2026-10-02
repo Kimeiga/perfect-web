@@ -1650,6 +1650,28 @@ e14-events:
      } > docs/evidence/E14/events.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/events.txt
 
+# ADR-0139: a frame is forgotten when the page says it applied it. The
+# server's tests, the mutation controls, and the keyed-list suite twenty
+# times in a row, which failed intermittently before. The last needs the
+# build `spikes/own-renderer/run.sh` stages.
+e14-stream-ack:
+    @{ echo "ADR-0139 - a frame is forgotten when the page says it applied it"; echo; \
+       echo "produced by: just e14-stream-ack"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the server (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server stream 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/stream_ack_mutations.py)"; echo; \
+       python3 scripts/stream_ack_mutations.py; \
+       echo; echo "== the keyed-list suite, twenty runs"; echo; \
+       cargo build --quiet --locked -p pw-dev-server; \
+       cd spikes/own-renderer && for i in $(seq 1 20); do \
+         npx playwright test e2e/keyed-list.spec.mjs --reporter=line 2>&1 \
+           | grep -E '[0-9]+ (passed|failed)' | tr -d '\033' | sed 's/\[1A\[2K//' | tr '\n' ' '; echo; \
+       done; \
+     } > docs/evidence/E14/stream-ack.txt
+    @grep -E "^test result|mutants killed|failed" docs/evidence/E14/stream-ack.txt || true
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

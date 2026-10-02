@@ -13,6 +13,17 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Correction, ADR-0139, 2026-10-02: a change made within two seconds of a
+reload could be lost.** The stream adapter dropped each frame 25 ms after
+writing it, though its own comment said it waited for the page's next
+request. A page that had been reloaded, or a second tab, left its stream
+held on the server. That stream wrote the new page's frames into a socket
+nobody read, and dropped them. The keyed-list suite's intermittent failure
+was this, failing 1 run in 10 at the commit before ADR-0138 and 4 in 10
+after it. A frame is dropped now when a page says it applied it, and 20 runs
+of 20 pass
+([ADR-0139](DECISIONS/ADR-0139-a-frame-is-forgotten-when-the-page-says-it-applied-it.md)).
+
 **ADR-0138, 2026-10-02: a handler is given its event**
 ([ADR-0138](DECISIONS/ADR-0138-a-handler-is-given-its-event.md), ADR-0131's
 first slice). `on:input={(e: InputEvent) => typed = e.value}`: the browser

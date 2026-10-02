@@ -2696,13 +2696,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
 /// oldest streaming mechanism HTTP has and needs no chunked framing to be
 /// written by hand — which matters here, because a bug in hand-rolled chunked
 /// encoding would look exactly like a transport that drops frames.
-fn stream_open(
-    server: &Server,
-    stream: &mut TcpStream,
-    session: &str,
-    fresh: bool,
-    mut since: u64,
-) {
+fn stream_open(server: &Server, stream: &mut TcpStream, session: &str, fresh: bool, since: u64) {
     let cookie = if fresh {
         format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
     } else {
@@ -2729,6 +2723,20 @@ fn stream_open(
         return;
     }
 
+    // What the page says it applied, once: a frame is forgotten when a page
+    // acknowledges it, never because it was written (ADR-0139). Until
+    // 2026-10-02 each pass below acknowledged what the pass before had
+    // written, so a stream held for a page that had gone, reloaded or closed,
+    // dropped what the page that replaced it was waiting for.
+    server
+        .pending
+        .lock()
+        .expect("pending")
+        .entry(session.to_string())
+        .or_default()
+        .acknowledge(since);
+    let mut written = since;
+
     // Bounded, like the long poll: a held connection is a held thread, and
     // three engine families times six workers is eighteen of them.
     for _ in 0..80 {
@@ -2736,8 +2744,7 @@ fn stream_open(
             let mut queue = server.pending.lock().expect("pending");
             let waiting = queue.entry(session.to_string()).or_default();
             waiting.seen = std::time::Instant::now();
-            waiting.acknowledge(since);
-            let (cursor, frames) = waiting.after(since);
+            let (cursor, frames) = waiting.after(written);
             if frames.is_empty() {
                 None
             } else {
@@ -2758,7 +2765,7 @@ fn stream_open(
             if stream.write_all(line.as_bytes()).is_err() || stream.flush().is_err() {
                 return;
             }
-            since = cursor;
+            written = cursor;
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
@@ -4016,6 +4023,86 @@ mod tests {
         // the refusal above is about the missing record and not about the
         // lookup being broken.
         assert!(s.authorise("store.page.add_to_cart").is_ok());
+    }
+
+    /// **A frame is forgotten when the page says it applied it** (ADR-0139).
+    ///
+    /// A page reloaded in a session leaves its stream held on the server for
+    /// up to two seconds, writing into a socket nobody reads. Until
+    /// 2026-10-02 that stream dropped each frame 25 ms after writing it, so a
+    /// change made in those seconds never reached the page that replaced it.
+    /// The keyed-list suite's intermittent failure, found building ADR-0138.
+    #[test]
+    fn a_frame_a_stream_wrote_to_a_page_that_is_gone_still_reaches_the_next() {
+        let s = rendering_server();
+        let session = "reloaded";
+        // The old page, and its stream: held, and read by nobody.
+        let (_, old) = s.serve_document(session);
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let mut old_page =
+            TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
+        let (mut held, _) = listener.accept().expect("accept");
+        std::thread::scope(|scope| {
+            scope.spawn(|| stream_open(&s, &mut held, session, false, old));
+            // The page that replaces it, served while the old stream is held,
+            // and a change after it.
+            let (_, new) = s.serve_document(session);
+            s.command(ADD, session, &add("espresso", 1), false)
+                .expect("runs");
+            std::thread::sleep(std::time::Duration::from_millis(300));
+
+            // The old stream wrote the change to the page that is gone ...
+            old_page
+                .set_read_timeout(Some(std::time::Duration::from_millis(500)))
+                .expect("timeout");
+            let mut written = vec![0; 1 << 16];
+            let n = old_page.read(&mut written).unwrap_or(0);
+            let written = String::from_utf8_lossy(&written[..n]).to_string();
+            assert!(written.contains("\"frames\""), "{written}");
+
+            // ... and the page that replaced it is still sent it.
+            let mut queue = s.pending.lock().expect("pending");
+            let waiting = queue.get_mut(session).expect("a subscriber");
+            let (cursor, frames) = waiting.after(new);
+            assert!(
+                !frames.is_empty(),
+                "the change was written to a page that is gone, and dropped"
+            );
+            // Control: what a page says it applied is dropped.
+            waiting.acknowledge(cursor);
+            assert!(waiting.after(new).1.is_empty());
+        });
+    }
+
+    /// The other half (ADR-0139): what a page's stream request says it
+    /// applied is dropped, so a live page's queue does not grow.
+    #[test]
+    fn a_stream_drops_what_its_page_says_it_applied() {
+        let s = rendering_server();
+        let session = "applied";
+        s.serve_document(session);
+        s.command(ADD, session, &add("espresso", 1), false)
+            .expect("runs");
+        let applied = s.pending.lock().expect("pending")[session].last_seq;
+        assert!(
+            s.pending.lock().expect("pending")[session]
+                .frames
+                .iter()
+                .any(|(n, _)| *n <= applied),
+            "the change queued frames"
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let _page = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
+        let (mut held, _) = listener.accept().expect("accept");
+        std::thread::scope(|scope| {
+            scope.spawn(|| stream_open(&s, &mut held, session, false, applied));
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let queue = s.pending.lock().expect("pending");
+            assert!(
+                !queue[session].frames.iter().any(|(n, _)| *n <= applied),
+                "what the page applied is still queued"
+            );
+        });
     }
 
     /// A page's parameter, as the address carries it (ADR-0136).
