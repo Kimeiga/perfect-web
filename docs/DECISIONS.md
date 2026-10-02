@@ -1006,3 +1006,10 @@ says what it captures: what it lists, or else what it reads that the body
 around it binds, never a signal or its own binding. `() =>` takes no
 parameter. A handler that is not a lambda is refused at build until the
 event is passed (ADR-0131).
+
+## 2026-10-02: a handler's identity is its own file's
+
+[ADR-0135](DECISIONS/ADR-0135-a-handlers-identity-is-its-own-files.md): the
+build's map from a handler's place to its identity was keyed by indices
+counted within one file, so two pages of one shape in two files shared a key
+and one page's button ran the other's handler. Keyed by the file as well.

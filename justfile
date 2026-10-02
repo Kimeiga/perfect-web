@@ -1581,6 +1581,19 @@ e14-handlers-resumable:
      } > docs/evidence/E14/handlers-resumable.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/handlers-resumable.txt
 
+# ADR-0135: a handler's identity is its own file's.
+e14-handlers-by-file:
+    @{ echo "ADR-0135 - a handler's identity is its own file's"; echo; \
+       echo "produced by: just e14-handlers-by-file"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the regression (compiler/pw-core/tests/handlers_by_file.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers_by_file 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/handlers_by_file_mutations.py)"; echo; \
+       python3 scripts/handlers_by_file_mutations.py; \
+     } > docs/evidence/E14/handlers-by-file.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/handlers-by-file.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

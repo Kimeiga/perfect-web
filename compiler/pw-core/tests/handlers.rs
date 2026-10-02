@@ -74,14 +74,14 @@ fn event_parts(units: &[Unit]) -> Vec<(String, String, Vec<String>)> {
     let ws = Workspace::build(&hirs);
     let sigs = Signatures::build(&ws, &hirs);
     let mut handlers = pw_core::template_ir::Handlers::new();
-    for u in units {
+    for (unit, u) in units.iter().enumerate() {
         for (decl, lambda, m, _) in pw_core::resume_artifacts::located(
             &u.src,
             &u.hir,
             &sigs,
             pw_core::resume_artifacts::BUILD,
         ) {
-            handlers.insert((decl, lambda), (m.handler, m.capture_paths));
+            handlers.insert((unit, decl, lambda), (m.handler, m.capture_paths));
         }
     }
     let ir = serde_json::to_value(pw_core::template_ir::build_with(&hirs, &handlers))

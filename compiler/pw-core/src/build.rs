@@ -219,11 +219,11 @@ pub fn templates(
     sigs: &crate::signatures::Signatures,
 ) -> Vec<crate::template_ir::Template> {
     let mut identities = crate::template_ir::Handlers::new();
-    for (hir, src) in hirs.iter().zip(sources) {
+    for (unit, (hir, src)) in hirs.iter().zip(sources).enumerate() {
         for (decl, lambda, m, _) in
             crate::resume_artifacts::located(src, hir, sigs, crate::resume_artifacts::BUILD)
         {
-            identities.insert((decl, lambda), (m.handler, m.capture_paths));
+            identities.insert((unit, decl, lambda), (m.handler, m.capture_paths));
         }
     }
     crate::template_ir::build_with(hirs, &identities)

@@ -13,6 +13,12 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Correction, ADR-0135, 2026-10-02: in a program of several files, one
+page's button could run another page's handler.** The build keyed each
+handler's identity by indices counted within a file, so two pages of one
+shape in two files collided, silently. Keyed by the file too
+([ADR-0135](DECISIONS/ADR-0135-a-handlers-identity-is-its-own-files.md)).
+
 **ADR-0133, 2026-10-02: a page holds its own UI state** (signals, first
 slice; [ADR-0133](DECISIONS/ADR-0133-a-page-holds-its-own-ui-state.md), after
 the rulings of [ADR-0130](DECISIONS/ADR-0130-ui-state-is-a-signal-provided-where-it-lives.md)

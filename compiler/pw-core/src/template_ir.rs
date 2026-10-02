@@ -635,8 +635,14 @@ pub const BOOLEAN_ATTRIBUTES: &[&str] = &[
 ];
 
 /// Handler identities by where the lambda is, from `resume_artifacts::located`.
-pub type Handlers =
-    std::collections::BTreeMap<(crate::hir::DeclId, crate::hir::ExprId), (String, Vec<String>)>;
+///
+/// Keyed by the file too (ADR-0135): a declaration's and an expression's
+/// index are each counted within one file, so two pages of one shape in two
+/// files had one key, and one page's button ran the other's handler.
+pub type Handlers = std::collections::BTreeMap<
+    (usize, crate::hir::DeclId, crate::hir::ExprId),
+    (String, Vec<String>),
+>;
 
 /// Build the template IR for every renderable declaration in a program.
 ///
@@ -654,7 +660,7 @@ pub fn build(hirs: &[&Hir]) -> Vec<Template> {
 /// is in fact the right one, and the page would simply not respond.
 pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
     let mut out = Vec::new();
-    for hir in hirs {
+    for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             use crate::hir::DeclKind::*;
             if !matches!(decl.kind, View | Component | Page) {
@@ -665,7 +671,11 @@ pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
             let module = hir.module_of(id).unwrap_or_default();
             let mut chunks = Vec::new();
             let mut ix = Indexer::default();
-            let ctx = Lowering { handlers, decl: id };
+            let ctx = Lowering {
+                handlers,
+                unit,
+                decl: id,
+            };
             for root in roots_of(body) {
                 lower_node(body, root, &ctx, &mut ix, &mut chunks);
             }
@@ -696,8 +706,10 @@ pub fn text_holes(hir: &Hir, decl: crate::hir::DeclId) -> Vec<Hole> {
     };
     let body = hir.body(body_id);
     let handlers = Handlers::new();
+    // No identities are looked up here, so which file is immaterial.
     let ctx = Lowering {
         handlers: &handlers,
+        unit: 0,
         decl,
     };
     let mut ix = Indexer::default();
@@ -712,6 +724,8 @@ pub fn text_holes(hir: &Hir, decl: crate::hir::DeclId) -> Vec<Hole> {
 /// handler identities derived for it.
 struct Lowering<'a> {
     handlers: &'a Handlers,
+    /// Which file, by its index in the program, and which declaration in it.
+    unit: usize,
     decl: crate::hir::DeclId,
 }
 
@@ -934,7 +948,7 @@ fn lower_element(
             let (handler, captures) = match &a.value {
                 AttrValue::Expr(e) => ctx
                     .handlers
-                    .get(&(ctx.decl, *e))
+                    .get(&(ctx.unit, ctx.decl, *e))
                     .cloned()
                     .unwrap_or_default(),
                 _ => (String::new(), Vec::new()),

@@ -51,8 +51,8 @@ MUTANTS = [
     (
         "the template does not carry what the manifest derived",
         BUILD,
-        "            identities.insert((decl, lambda), (m.handler, m.capture_paths));\n",
-        "            identities.insert((decl, lambda), (m.handler, Vec::new()));\n",
+        "            identities.insert((unit, decl, lambda), (m.handler, m.capture_paths));\n",
+        "            identities.insert((unit, decl, lambda), (m.handler, Vec::new()));\n",
     ),
     (
         "`() =>` takes a parameter",
