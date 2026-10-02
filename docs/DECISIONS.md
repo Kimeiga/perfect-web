@@ -916,3 +916,11 @@ a sandbox per run, isolation checked, grading by checker, build, the shared
 contract and hidden tests against the sandbox's own server, and four controls
 per task and stack, each requiring tests that ran. T08 holds all four on
 three stacks; Pleris's unsafe patch is refused by `pw check`.
+
+## 2026-10-02: scoped signals (proposed)
+
+[ADR-0126](DECISIONS/ADR-0126-scoped-signals.md), **proposed, not accepted**:
+UI state as `signal`s declared in a scope, read by name and resolved by the
+compiler, written only by handlers, updating only what reads them, dropped
+with their scope, typed and resumable. Four rulings are needed before it is
+built.
