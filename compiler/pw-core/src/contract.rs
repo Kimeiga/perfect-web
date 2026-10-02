@@ -890,25 +890,13 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
         })
         .collect();
 
-    // Declaration identity → its privacy label, across every unit. Built with
-    // `check::label_of`, the same function the checker uses, so the two cannot
-    // drift. Keyed by RESOLVED IDENTITY: `Cart` in one module and `Cart` in
-    // another are two declarations with two labels.
-    let labels: BTreeMap<crate::resolve::DefId, Label> = hirs
-        .iter()
-        .enumerate()
-        .flat_map(|(unit, hir)| {
-            hir.all_decls()
-                .filter_map(|(id, d)| {
-                    let l = crate::check::label_of(d);
-                    if l.is_public() {
-                        return None;
-                    }
-                    Some((crate::resolve::DefId { unit, decl: id.0 }, l))
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
+    // Declaration identity → its privacy label, across every unit. Built by
+    // `check::Reads`, the derivation the checker uses, so the two cannot
+    // drift: a declaration's own label, joined with what it reads through
+    // what it calls (ADR-0118). Keyed by RESOLVED IDENTITY: `Cart` in one
+    // module and `Cart` in another are two declarations with two labels.
+    let labels: BTreeMap<crate::resolve::DefId, Label> =
+        crate::check::Reads::of(hirs, sigs, &inference).labels();
 
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {

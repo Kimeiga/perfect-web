@@ -1472,6 +1472,21 @@ e10-built-pages:
      } > docs/evidence/E10/built-pages.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/built-pages.txt
 
+# ADR-0118: what a declaration reads, it reads through what it calls. A
+# public query reading the session through a helper or another query, held
+# to PW5101, PW5004, PW5001 and the contract, and the mutation controls.
+e10-reads-through-calls:
+    @{ echo "ADR-0118 - what a declaration reads, it reads through what it calls"; echo; \
+       echo "produced by: just e10-reads-through-calls"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== reads through calls (compiler/pw-core/tests/reads_through_calls.rs)"; echo; \
+       cargo test --locked -p pw-core --test reads_through_calls 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/reads_through_calls_mutations.py)"; echo; \
+       python3 scripts/reads_through_calls_mutations.py; \
+     } > docs/evidence/E10/reads-through-calls.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E10/reads-through-calls.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

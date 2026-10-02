@@ -853,3 +853,12 @@ the Node advisory gate found three denial-of-service advisories in
 `brace-expansion 5.0.9` through Marko's glob dependency. The 5.x transitive
 dependency is pinned to 5.0.12 and the lockfile was regenerated; no advisory
 exception was added.
+
+## 2026-10-02: what a declaration reads, it reads through what it calls (E10)
+
+[ADR-0118](DECISIONS/ADR-0118-what-a-declaration-reads-it-reads-through-what-it-calls.md):
+the privacy rules read a declaration one call deep, so a public query reading
+the session through a helper or another query passed PW5101, PW5004 and
+PW5001, and its page's contract allowed `build`. Labels are joined through
+what each declaration reads, to a fixed point, and the checker and the
+contract share that derivation. A command's reads stay its own.

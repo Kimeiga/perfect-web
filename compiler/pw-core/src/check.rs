@@ -192,15 +192,13 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // a page look more private, never less — which is exactly why it never
     // produced a visibly wrong answer and stayed in place. It is still
     // `docs/RISK_QUEUE.md` 34's shape: meaning resolved from a spelling.
-    let mut labels: BTreeMap<crate::resolve::DefId, Label> = BTreeMap::new();
-    for (unit, u) in units.iter().enumerate() {
-        for (id, d) in u.hir.all_decls() {
-            let l = label_of(d);
-            if !l.is_public() {
-                labels.insert(crate::resolve::DefId { unit, decl: id.0 }, l);
-            }
-        }
-    }
+    //
+    // And a declaration's label is joined with what it reads through what it
+    // calls (ADR-0118): a `session query` read through a helper, or through a
+    // public query, is read.
+    let reads = Reads::of(&hirs, &sigs, &inference);
+    let labels = reads.labels();
+    let resources = reads.of_resources(&hirs);
     units
         .iter()
         .enumerate()
@@ -209,11 +207,13 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(check_unit_with(
                 &env,
                 &labels,
+                &reads,
                 &sigs,
                 &inference,
                 &manifest,
                 &routes,
                 &graph,
+                &resources,
                 &ontology,
                 &workspace,
                 i,
@@ -2715,11 +2715,13 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     check_unit_with(
         env,
         &BTreeMap::new(),
+        &Reads::default(),
         &sigs,
         &inference,
         &manifest,
         &routes,
         &graph,
+        &BTreeMap::new(),
         &crate::ontology::Ontology::build_with(&[&unit.hir], &ws),
         &ws,
         // This entry point builds a workspace from ONE unit, so the unit it
@@ -2734,11 +2736,16 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
 fn check_unit_with(
     env: &Env,
     labels: &BTreeMap<crate::resolve::DefId, Label>,
+    // What each declaration reads through what it calls (ADR-0118).
+    reads: &Reads,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
     manifest: &crate::boundary::TypeFacts,
     routes: &std::collections::BTreeSet<String>,
     graph: &crate::graph::Graph,
+    // Each resource's value label, by path, where it names a reader
+    // (ADR-0118).
+    resources: &BTreeMap<String, Label>,
     // What each effect DECLARES about itself, and the graph its arguments
     // resolve through. Phase legality reads an effect's semantic facets, which
     // only its declaration knows.
@@ -2800,7 +2807,7 @@ fn check_unit_with(
 
     // Charter §8.2: an internal link names a route the program declares.
     crate::routes::check(&unit.hir, routes, &mut out);
-    crate::graph::check(&unit.hir, graph, &mut out);
+    crate::graph::check(&unit.hir, graph, resources, &mut out);
 
     // E9-V: every place a value meets a declared type — call arity and
     // argument types, constructed fields, declared results, annotated
@@ -2827,7 +2834,9 @@ fn check_unit_with(
             inherited.get(&id.0).copied(),
             &mut out,
         );
-        privacy_flow(&unit.hir, sigs, labels, inference, at, id, decl, &mut out);
+        privacy_flow(
+            &unit.hir, sigs, labels, reads, inference, at, id, decl, &mut out,
+        );
         privacy_sinks(&unit.hir, sigs, inference, at, id, decl, &mut out);
         effect_rows(
             &unit.hir, sigs, inference, ontology, ws, at, id, decl, &mut out,
@@ -4434,15 +4443,174 @@ fn reads_label_with_source(
     (label, source)
 }
 
+/// **What a declaration reads, it reads through what it calls** (ADR-0118).
+///
+/// A declaration reads the calls in its body and the queries it names,
+/// resolved as its own unit resolves them. Two labels are joined over those
+/// reads to a fixed point:
+/// - `declared`: each declaration's own visibility (`label_of`), joined with
+///   what it reads. PW5001 and the contract's placement read a value by it;
+/// - `returned`: the labels the results of what it reads carry, by their
+///   declared types. PW5004 reads a value by it.
+///
+/// Each read one call deep until 2026-09-26. A query reading the session
+/// through a helper, or through another query, was public to both and to
+/// PW5101.
+///
+/// What a command reads is not its caller's: a call to one is a request, and
+/// the command is its own component (ADR-0113).
+#[derive(Default)]
+pub(crate) struct Reads {
+    declared: BTreeMap<crate::resolve::DefId, Label>,
+    returned: BTreeMap<crate::resolve::DefId, Label>,
+    /// The label each declaration's own result type carries.
+    results: BTreeMap<crate::resolve::DefId, Label>,
+}
+
+impl Reads {
+    pub(crate) fn of(
+        hirs: &[&Hir],
+        sigs: &Signatures,
+        inference: &crate::effects::Inference<'_>,
+    ) -> Reads {
+        let mut me = Reads::default();
+        let mut reading = Vec::new();
+        for (unit, hir) in hirs.iter().enumerate() {
+            for (id, decl) in hir.all_decls() {
+                let def = crate::resolve::DefId { unit, decl: id.0 };
+                me.declared.insert(def, label_of(decl));
+                if let Some(sig) = sigs.by_def(def) {
+                    me.results.insert(def, sig.label.clone());
+                }
+                if decl.kind == DeclKind::Command {
+                    continue;
+                }
+                if let Some(b) = decl.body {
+                    reading.push((def, reads_of(hir.body(b), inference, unit)));
+                }
+            }
+        }
+        // Joins only add, so this reaches a fixed point, recursion included.
+        loop {
+            let mut changed = false;
+            for (def, read) in &reading {
+                let mut declared = me.declared(*def);
+                let mut returned = me.returned.get(def).cloned().unwrap_or_default();
+                for r in read {
+                    declared = declared.join(&me.declared(*r));
+                    returned = returned.join(&me.through(*r));
+                }
+                if declared != me.declared(*def) {
+                    me.declared.insert(*def, declared);
+                    changed = true;
+                }
+                if me.returned.get(def) != Some(&returned) {
+                    me.returned.insert(*def, returned);
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        me
+    }
+
+    fn declared(&self, def: crate::resolve::DefId) -> Label {
+        self.declared.get(&def).cloned().unwrap_or_default()
+    }
+
+    /// What reading `def` gives: its result's label, and what it reads to
+    /// make it.
+    fn through(&self, def: crate::resolve::DefId) -> Label {
+        let result = self.results.get(&def).cloned().unwrap_or_default();
+        match self.returned.get(&def) {
+            Some(r) => result.join(r),
+            None => result,
+        }
+    }
+
+    /// Each declaration's `declared` label, where it is not public: what
+    /// `reads_label_with_source` reads a callee's label from.
+    pub(crate) fn labels(&self) -> BTreeMap<crate::resolve::DefId, Label> {
+        self.declared
+            .iter()
+            .filter(|(_, l)| !l.is_public())
+            .map(|(d, l)| (*d, l.clone()))
+            .collect()
+    }
+
+    /// Each resource's value label, by path, where it names a reader: its
+    /// declared visibility and result, and what it reads (PW5101). A secret
+    /// is left out: a query that uses one to fetch public data makes a public
+    /// value (ADR-0085), and none of what is left can hold one.
+    pub(crate) fn of_resources(&self, hirs: &[&Hir]) -> BTreeMap<String, Label> {
+        let mut out = BTreeMap::new();
+        for (unit, hir) in hirs.iter().enumerate() {
+            for (id, decl) in hir.all_decls() {
+                if !matches!(
+                    decl.kind,
+                    DeclKind::Query | DeclKind::Subscription | DeclKind::Resource
+                ) {
+                    continue;
+                }
+                let def = crate::resolve::DefId { unit, decl: id.0 };
+                let label = self
+                    .declared(def)
+                    .join(&self.through(def))
+                    .restrictions()
+                    .filter(|r| !matches!(r, Restriction::Secret(_)))
+                    .fold(Label::public(), |l, r| l.join(&Label::of(r.clone())));
+                if !label.is_public() {
+                    out.insert(crate::graph::path_of(hir, id), label);
+                }
+            }
+        }
+        out
+    }
+}
+
+/// The declarations a body reads: what it calls, and the queries it names.
+fn reads_of(
+    body: &Body,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
+) -> Vec<crate::resolve::DefId> {
+    let mut out = Vec::new();
+    for id in body.walk() {
+        let read = match body.expr(id) {
+            Expr::Call { callee, .. } => path_of(body, *callee),
+            Expr::Keyword {
+                keyword, modifiers, ..
+            } if keyword == "query" || keyword == "subscribe" => {
+                modifiers.first().cloned().unwrap_or_default()
+            }
+            _ => continue,
+        };
+        if read.is_empty() {
+            continue;
+        }
+        if let Some(def) = inference.called_from(at, &read) {
+            out.push(def);
+        }
+    }
+    out
+}
+
 /// Every restriction a body picks up by calling something.
 ///
 /// Reads the callee's **declared return label** from its signature. There is no
 /// table of accessor names here any more: a function carries a secret because
 /// it returns `Secret<C>`, not because it is spelled `secrets.something`
 /// (E2C, architect ruling 2026-08-06).
+///
+/// And what each declaration the body reads returns through what it reads in
+/// turn (ADR-0118): a helper returning a cart it read with `current_session()`
+/// is the session's.
 fn body_label(
     body: &Body,
     sigs: &Signatures,
+    reads: &Reads,
     inference: &crate::effects::Inference<'_>,
     at: usize,
 ) -> Label {
@@ -4454,6 +4622,9 @@ fn body_label(
         if let Some(sig) = callee_signature(sigs, inference, at, body, *callee) {
             label = label.join(&sig.label);
         }
+    }
+    for def in reads_of(body, inference, at) {
+        label = label.join(&reads.through(def));
     }
     label
 }
@@ -4635,6 +4806,7 @@ fn privacy_flow(
     hir: &Hir,
     sigs: &Signatures,
     declared_labels: &BTreeMap<crate::resolve::DefId, Label>,
+    reads: &Reads,
     inference: &crate::effects::Inference<'_>,
     at: usize,
     id: crate::hir::DeclId,
@@ -4644,7 +4816,7 @@ fn privacy_flow(
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
     let imports = crate::labels::imported_modules(hir);
-    let label = body_label(body, sigs, inference, at);
+    let label = body_label(body, sigs, reads, inference, at);
     if label.is_public() {
         return;
     }

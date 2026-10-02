@@ -203,6 +203,9 @@ page reading its parameter~~ (ADR-0114). Next, in order:
 8. ~~**a build-placed page reading its parameter**~~, done (ADR-0114):
    `placement build` with `<h1>{id}</h1>` checked, and the file it is built
    into exists before any request supplies `id`.
+9. ~~**a public query reading the session through what it calls**~~, done
+   2026-10-02 (ADR-0118): a shared fragment, a shared cache and a shared
+   page each took it for public, and its page's contract allowed `build`.
 
 Then, each needing a ruling first:
 - ~~**authorization**~~, done 2026-10-01 (ADR-0115): `requires` is an

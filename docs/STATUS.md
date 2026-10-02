@@ -78,6 +78,25 @@ must be consumed exactly once" was checked as "released before each
 ended twice all passed `pw check`, and a declaration promising to end a
 transaction parameter was never held to it. Every path is counted now.
 
+**Correction, 2026-10-02: a public query made one reader's value, and every
+rule took it for a public one**
+([ADR-0118](DECISIONS/ADR-0118-what-a-declaration-reads-it-reads-through-what-it-calls.md)).
+The privacy rules read a declaration one call deep. A query declared
+`public` that read the session itself, through a helper, or through another
+query passed each of these at `671931b`:
+- a `partition public` fragment depending on it (PW5101), so the first
+  reader's cart was served to every reader;
+- a `cache shared` query reading the session through a helper (PW5004);
+- a `cache shared` page reading it (PW5001);
+- that page's contract, which allowed `build`.
+
+A declaration's label is joined with what it reads through what it calls, to
+a fixed point, and the contract reads the same labels. A command's reads stay
+its own (ADR-0113). No fixture's diagnostics change.
+
+Evidence: [reads-through-calls.txt](evidence/E10/reads-through-calls.txt)
+(`just e10-reads-through-calls`).
+
 **Correction, 2026-09-26: a built page read a request's value**
 ([ADR-0114](DECISIONS/ADR-0114-what-is-built-before-any-request-reads-no-requests-value.md)).
 A `placement build` page rendering its `id` passed `pw check`. Its file is

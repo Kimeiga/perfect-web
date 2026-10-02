@@ -810,7 +810,14 @@ use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 /// serialized artifact spanning many files, so a byte offset in it would be a
 /// number with no file attached — and a diagnostic that points confidently at
 /// the wrong place is worse than one that points at the clause.
-pub fn check(hir: &Hir, g: &Graph, out: &mut Vec<Diagnostic>) {
+pub fn check(
+    hir: &Hir,
+    g: &Graph,
+    // Each resource's value label, by path, where it names a reader: what its
+    // body reads, through what it calls (ADR-0118).
+    resources: &std::collections::BTreeMap<String, crate::privacy::Label>,
+    out: &mut Vec<Diagnostic>,
+) {
     for (id, decl) in hir.all_decls() {
         if node_kind(decl).is_none() {
             continue;
@@ -988,14 +995,19 @@ pub fn check(hir: &Hir, g: &Graph, out: &mut Vec<Diagnostic>) {
             };
             let restricted = privacy.as_deref().is_some_and(|v| v != "public")
                 || rp.as_deref().is_some_and(|v| v.starts_with("private"));
-            if !restricted {
-                continue;
-            }
-            let why = privacy
-                .as_deref()
-                .filter(|v| *v != "public")
-                .map(|v| format!("declared `{v}`"))
-                .unwrap_or_else(|| "cached `private`".to_string());
+            // Or it reads a reader's value, through whatever it calls
+            // (ADR-0118). A query declared `public` that read the session made
+            // one reader's value, and its edge looked public until 2026-09-26.
+            let read = resources.get(&e.to);
+            let why = match (restricted, read) {
+                (false, None) => continue,
+                (false, Some(label)) => format!("reads {label}"),
+                (true, _) => privacy
+                    .as_deref()
+                    .filter(|v| *v != "public")
+                    .map(|v| format!("is declared `{v}`"))
+                    .unwrap_or_else(|| "is cached `private`".to_string()),
+            };
             out.push(Diagnostic {
                 code: codes::PRIVATE_IN_SHARED_MATERIALIZATION.id,
                 invariant: codes::PRIVATE_IN_SHARED_MATERIALIZATION.invariant,
@@ -1003,7 +1015,7 @@ pub fn check(hir: &Hir, g: &Graph, out: &mut Vec<Diagnostic>) {
                 detector: Detector::ResourceGraph,
                 severity: Severity::Error,
                 message: format!(
-                    "`{}` is materialized into a shared entry and depends on `{dep}`, which is {why}",
+                    "`{}` is materialized into a shared entry and depends on `{dep}`, which {why}",
                     decl.name
                 ),
                 primary_span: decl
@@ -1016,7 +1028,7 @@ pub fn check(hir: &Hir, g: &Graph, out: &mut Vec<Diagnostic>) {
                 }],
                 explanation: Some(format!(
                     "A shared materialization is computed for whoever asks first and served \
-                     to everyone after. `{dep}` is {why}, so the first reader's data would be \
+                     to everyone after. `{dep}` {why}, so the first reader's data would be \
                      written into storage the rest of them read. Charter §14 M6 gate item 4 \
                      states this as a property of the STORAGE; it is decided here, where the \
                      dependency is written."
