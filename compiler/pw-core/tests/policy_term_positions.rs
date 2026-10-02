@@ -147,8 +147,12 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         // `optimistic` left this list on 2026-08-11: its clauses are parsed
         // into two named roots with a binder and a context, so they are no
         // longer values nothing has looked at. What remains is what remains.
-        ("requires", "SignedIn"),
-        ("requires", "SignedIn, OwnsOrder(order)"),
+        // `requires` left this list on 2026-10-01: its predicates are the
+        // deployment's authorization vocabulary, their arguments are the
+        // command's parameters by index, and the host evaluates each before
+        // the body runs (ADR-0115). Classified as the repair of the gap STATUS
+        // recorded on 2026-09-26, not as a new risk: a clause read by nothing
+        // was the defect, and no measurement had claimed it held.
     ]
     .iter()
     .map(|(a, b)| (a.to_string(), b.to_string()))

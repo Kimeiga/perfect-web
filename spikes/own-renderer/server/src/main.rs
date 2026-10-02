@@ -2122,7 +2122,7 @@ mod tests {
         let body =
             &server_code[start..start + server_code[start..].find("\n    }\n").expect("its end")];
         assert!(
-            body.contains("self.run(component_id, &host, args)"),
+            body.contains("self.run(component_id, session, &host, args)"),
             "every command runs its compiled component"
         );
         assert!(
