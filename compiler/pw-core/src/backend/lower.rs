@@ -388,7 +388,7 @@ pub fn handler(
     decl_id: crate::hir::DeclId,
     lambda: ExprId,
     span: Span,
-) -> Lowering<(Function, Vec<String>)> {
+) -> Lowering<(Function, Vec<String>, bool)> {
     let hir = cx.hirs[unit];
     let decl = hir.decl(decl_id);
     let Some(def) = decl_def(cx, unit, decl) else {
@@ -415,13 +415,44 @@ pub fn handler(
             span,
         };
     };
-    if !params.is_empty() {
-        return Lowering::Unsupported {
-            construct: "a handler with parameters",
-            span,
-            reason: "the event is not passed to a compiled handler (ADR-0058)".to_string(),
-        };
-    }
+    // The event, read in the listener and given to the module (ADR-0138):
+    // an `on:` handler's one parameter, typed by its event.
+    let event = match crate::values::lambda_params(body, params).as_slice() {
+        [] => None,
+        [p] => {
+            let Some(ty) = crate::resume::handler_events(body)
+                .into_iter()
+                .find(|(_, e)| *e == lambda)
+                .and_then(|(event, _)| crate::annotations::event_type(cx.sigs, &event).cloned())
+            else {
+                return Lowering::Unsupported {
+                    construct: "a handler parameter that is not an event",
+                    span,
+                    reason: "only an `on:` attribute's handler is given anything: its event"
+                        .to_string(),
+                };
+            };
+            let name = match body.pat(*p) {
+                crate::hir::Pattern::Bind { name, .. } => Some(name.clone()),
+                crate::hir::Pattern::Wild => None,
+                _ => {
+                    return Lowering::Unsupported {
+                        construct: "an event taken apart in a handler's parameter",
+                        span,
+                        reason: "name the event, `(e) =>`, and read its fields".to_string(),
+                    };
+                }
+            };
+            Some((name, ty))
+        }
+        _ => {
+            return Lowering::Unsupported {
+                construct: "a handler with several parameters",
+                span,
+                reason: "an event gives its handler one record (ADR-0131)".to_string(),
+            };
+        }
+    };
     // What each captured path is: its root's type, then each field's. The
     // root is typed by the binding its name means where the descriptor
     // writes it (ADR-0063).
@@ -498,6 +529,21 @@ pub fn handler(
         captured.push((v, ty));
         paths.push(path);
     }
+    // The event, after the captures: the module decodes it from what the
+    // listener read (ADR-0138).
+    let takes_event = event.is_some();
+    if let Some((name, ty)) = event {
+        let ty = match ty_resolved(cx.sigs, &ty, &span) {
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        };
+        let v = f.fresh();
+        f.types.insert(v, ty.clone());
+        if let Some(name) = name {
+            f.locals.insert(name, v);
+        }
+        captured.push((v, ty));
+    }
     let result = match f.expr(body, *inner, None) {
         Lowering::Lowered(v) => v,
         other => return other.map(|_| unreachable!()),
@@ -525,7 +571,7 @@ pub fn handler(
             .map(|c| c.expect("every closure slot is filled when its code lowers"))
             .collect(),
     };
-    Lowering::Lowered((function, paths))
+    Lowering::Lowered((function, paths, takes_event))
 }
 
 /// **A handler's program** (ADR-0058): its function, and the nominal types

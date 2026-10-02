@@ -247,6 +247,31 @@ pub(crate) fn handler_lambdas(body: &crate::hir::Body) -> std::collections::BTre
     out
 }
 
+/// **Each `on:` attribute's lambda, with its event** (ADR-0138): `input` for
+/// `on:input|prevent={(e) => ..}`.
+pub(crate) fn handler_events(body: &crate::hir::Body) -> Vec<(String, ExprId)> {
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    let mut out = Vec::new();
+    for n in body.walk_markup(&roots) {
+        let Node::Element { attrs, .. } = body.node(n) else {
+            continue;
+        };
+        for a in attrs {
+            if let (Some((event, _)), AttrValue::Expr(e)) = (a.event(), &a.value)
+                && matches!(body.expr(*e), Expr::Lambda { .. })
+            {
+                out.push((event.to_string(), *e));
+            }
+        }
+    }
+    out
+}
+
 /// **Every handler in a body, in the order it is written** (ADR-0134): each
 /// `on:` lambda, and each lambda written `resumable(..)`. Until 2026-10-02 only
 /// the second was a handler, and an `on:press={() => ..}` built into a button

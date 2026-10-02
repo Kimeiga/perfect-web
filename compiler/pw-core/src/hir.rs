@@ -619,6 +619,12 @@ pub struct Body {
     /// field on `Expr::Let`, so every rule about a binding reads a signal
     /// as the binding it is, and the rules about signals ask here.
     pub signals: std::collections::BTreeSet<ExprId>,
+    /// **A lambda parameter's written type**, `e: InputEvent` in `(e:
+    /// InputEvent) => ..`, by the pattern it annotates (ADR-0138). A side
+    /// table, as `signals` is, so the many readers of a lambda's patterns are
+    /// unchanged. Until 2026-10-02 the annotation was dropped, and a written
+    /// type checked nothing.
+    pub param_types: std::collections::BTreeMap<PatternId, TypeRefId>,
 }
 
 impl Body {
@@ -991,7 +997,23 @@ impl Attr {
     pub fn namespace(&self) -> Option<(&str, &str)> {
         self.name.split_once(':')
     }
+
+    /// **An `on:` attribute's event and its modifiers** (ADR-0131):
+    /// `on:submit|prevent` -> `Some(("submit", ["prevent"]))`. `None` for
+    /// any other attribute.
+    pub fn event(&self) -> Option<(&str, Vec<&str>)> {
+        let rest = self.name.strip_prefix("on:")?;
+        let mut parts = rest.split('|');
+        let event = parts.next()?;
+        Some((event, parts.collect()))
+    }
 }
+
+/// **What an event's modifiers may say** (ADR-0131): what the runtime does
+/// before any code loads, in the listener. `prevent` stops the browser's own
+/// action, a form's submission or a link's navigation; `stop` keeps the event
+/// from reaching an enclosing element's handler.
+pub const EVENT_MODIFIERS: &[&str] = &["prevent", "stop"];
 
 #[derive(Debug, Clone)]
 pub enum Node {

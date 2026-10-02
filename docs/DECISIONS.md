@@ -1036,3 +1036,17 @@ browser could not render the second again. The plan now refuses every part a
 signal decides that the browser does not render again, and every part of a
 block it renders that reads what it does not hold: three more of the same
 kind, which ADR-0133 did not list, with them.
+
+## 2026-10-02: a handler is given its event
+
+[ADR-0138](DECISIONS/ADR-0138-a-handler-is-given-its-event.md): ADR-0131's
+first slice. A handler takes nothing, or its event's record, `(e:
+InputEvent) => ..` or `(e) => ..`, read in the browser's listener before any
+code loads. `on:submit|prevent` stops the form's submission there. Seven
+defects found building it, each checked or built clean:
+- every handler listened for a click;
+- a lambda's written parameter type was dropped, in any lambda;
+- `(e: T) =>` did not parse, and a handler with a parameter was refused;
+- a modifier parsed as two more attributes;
+- two handlers on one element wrote two capture attributes, and the second
+  was never bound.

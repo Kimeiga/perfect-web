@@ -167,6 +167,31 @@ impl<'a> Types<'a> {
             }
         }
 
+        // A lambda's written parameter type, `(e: InputEvent) => ..`, and an
+        // `on:` handler's event where none is written: the record its event
+        // gives it (ADR-0138).
+        for (pat, ty) in &body.param_types {
+            if let (crate::hir::Pattern::Bind { .. }, Some(t)) =
+                (body.pat(*pat), resolved::written_in_body(body, *ty))
+                && let Some(ty) = sigs.resolve_type(module, decl, &t, 0..0).resolved()
+            {
+                bindings.insert(Binder::Pattern(*pat), ty.clone());
+            }
+        }
+        for (event, lambda) in crate::resume::handler_events(body) {
+            let Expr::Lambda { params, .. } = body.expr(lambda) else {
+                continue;
+            };
+            if let [p] = crate::values::lambda_params(body, params).as_slice()
+                && let crate::hir::Pattern::Bind { .. } = body.pat(*p)
+                && let Some(t) = crate::annotations::event_type(sigs, &event)
+            {
+                bindings
+                    .entry(Binder::Pattern(*p))
+                    .or_insert_with(|| t.clone());
+            }
+        }
+
         let mut types = Types {
             sigs,
             lexical,

@@ -129,6 +129,10 @@ pub enum Part {
         /// given (ADR-0136). See `pw_core::template_ir::Part::Event`.
         #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
         renames: std::collections::BTreeMap<String, String>,
+        /// What the runtime does in the listener, before any code loads:
+        /// `prevent`, `stop` (ADR-0131). The renderer writes nothing for it.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        modifiers: Vec<String>,
     },
     /// A region rendered only when a condition holds.
     Conditional {
@@ -326,6 +330,12 @@ pub struct PartEntry {
     /// The handler's name, for an event part.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
+    /// The event, for an event part: what the runtime listens for (ADR-0138).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub event: String,
+    /// What the runtime does in the listener, for an event part (ADR-0131).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<String>,
 }
 
 /// One renderable declaration.
@@ -396,6 +406,14 @@ impl Template {
                     name: match p {
                         Part::Event { name, .. } => name.clone(),
                         _ => String::new(),
+                    },
+                    event: match p {
+                        Part::Event { event, .. } => event.clone(),
+                        _ => String::new(),
+                    },
+                    modifiers: match p {
+                        Part::Event { modifiers, .. } => modifiers.clone(),
+                        _ => Vec::new(),
                     },
                 });
                 for inner in p.nested() {

@@ -31,6 +31,18 @@ use crate::signatures::Signatures;
 /// module name the compiler knows.
 const EVENTS_MODULE: &str = "events";
 
+/// **The record an event gives its handler** (ADR-0131): the parameter type
+/// of the platform's `events.<event>`, `InputEvent` for `input`.
+pub(crate) fn event_type<'s>(
+    sigs: &'s Signatures,
+    event: &str,
+) -> Option<&'s crate::resolved::ResolvedType> {
+    sigs.by_path(&format!("{EVENTS_MODULE}.{event}"))
+        .and_then(|s| s.params.first())
+        .and_then(Option::as_ref)
+        .and_then(crate::resolved::TypeResolution::resolved)
+}
+
 pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -367,9 +379,17 @@ fn handler_matches_event(
             continue;
         };
         for a in attrs {
-            let Some(event) = a.name.strip_prefix("on:") else {
+            let Some((event, modifiers)) = a.event() else {
                 continue;
             };
+            // What the runtime does before any code loads (ADR-0131): a
+            // modifier it does not know would be dropped.
+            for m in modifiers
+                .iter()
+                .filter(|m| !crate::hir::EVENT_MODIFIERS.contains(m))
+            {
+                out.push(unknown_modifier(decl, at, a, event, m));
+            }
             // The event an attribute delivers is a platform fact:
             // `events.submit(event: SubmitEvent)`. The MODULE is a language
             // binding, in the same way `measure` names a frame phase — `on:`
@@ -401,6 +421,39 @@ fn handler_matches_event(
             let AttrValue::Expr(e) = a.value else {
                 continue;
             };
+            // A lambda takes nothing, or the event (ADR-0138): its record,
+            // typed as written, or as the event gives it where nothing is.
+            if let Expr::Lambda { params, .. } = body.expr(e) {
+                let params = crate::values::lambda_params(body, params);
+                let wrong = match params.as_slice() {
+                    [] => None,
+                    [p] if !matches!(
+                        body.pat(*p),
+                        crate::hir::Pattern::Bind { .. } | crate::hir::Pattern::Wild
+                    ) =>
+                    {
+                        Some("one that takes its event apart".to_string())
+                    }
+                    [p] => body
+                        .param_types
+                        .get(p)
+                        .and_then(|t| crate::resolved::written_in_body(body, *t))
+                        .and_then(|t| {
+                            sigs.resolve_type(module, decl, &t, 0..0)
+                                .resolved()
+                                .cloned()
+                        })
+                        .filter(|t| !t.same_as(expected))
+                        .map(|t| format!("one taking `{t}`")),
+                    many => Some(format!("one taking {} parameters", many.len())),
+                };
+                if let Some(found) = wrong {
+                    out.push(lambda_takes_another_event(
+                        decl, at, body, e, event, expected, &found,
+                    ));
+                }
+                continue;
+            }
             let Expr::Name(handler) = body.expr(e) else {
                 continue;
             };
@@ -447,6 +500,84 @@ fn handler_matches_event(
         }
     }
     let _ = hir;
+}
+
+/// `on:input={(e: PressEvent) => ..}`: a handler written for another event,
+/// or for more than one (ADR-0138).
+fn lambda_takes_another_event(
+    decl: &Decl,
+    at: &Span,
+    body: &Body,
+    e: crate::hir::ExprId,
+    event: &str,
+    expected: &crate::resolved::ResolvedType,
+    found: &str,
+) -> Diagnostic {
+    Diagnostic {
+        code: codes::HANDLER_SIGNATURE_MISMATCH.id,
+        invariant: codes::HANDLER_SIGNATURE_MISMATCH.invariant,
+        reason: "handler_takes_the_wrong_event",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`on:{event}` expects a handler taking `{expected}`, or nothing, found {found}"
+        ),
+        primary_span: body.expr_span(e),
+        related: vec![Related {
+            span: at.clone(),
+            label: format!("`{}` binds the handler here", decl.name),
+        }],
+        explanation: Some(format!(
+            "An event gives its handler one record of plain data, `{expected}` for \
+             `on:{event}`, read in the browser when the event happens (ADR-0131). A \
+             handler written for another record would read fields this one does not \
+             have."
+        )),
+        repairs: vec![Repair {
+            description: format!(
+                "take `(e: {expected}) =>`, or `(e) =>`, which is typed by the event"
+            ),
+            replacement: None,
+        }],
+    }
+}
+
+/// `on:submit|prevnt`: a modifier the runtime does not apply (ADR-0138).
+fn unknown_modifier(
+    decl: &Decl,
+    at: &Span,
+    attr: &crate::hir::Attr,
+    event: &str,
+    modifier: &str,
+) -> Diagnostic {
+    Diagnostic {
+        code: codes::UNKNOWN_MODIFIER.id,
+        invariant: codes::UNKNOWN_MODIFIER.invariant,
+        reason: "unknown_modifier",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`on:{event}|{modifier}` names no modifier the runtime applies: {}",
+            crate::check::listed(crate::hir::EVENT_MODIFIERS)
+        ),
+        primary_span: attr.span.clone(),
+        related: vec![Related {
+            span: at.clone(),
+            label: format!("`{}` binds a handler to it here", decl.name),
+        }],
+        explanation: Some(
+            "A modifier is what the runtime does in the listener, before the handler's \
+             code has loaded: `prevent` stops the browser's own action, a form's \
+             submission or a link's navigation, and `stop` keeps the event from an \
+             enclosing element's handler. A modifier it does not apply would be \
+             dropped, and the browser's action taken."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "write `prevent` or `stop`".to_string(),
+            replacement: None,
+        }],
+    }
 }
 
 /// `on:clik={go}`: an event the platform does not declare (ADR-0093).

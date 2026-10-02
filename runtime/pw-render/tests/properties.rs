@@ -533,6 +533,7 @@ fn an_event_part_emits_nothing_because_behaviour_is_not_markup() {
             name: "add_to_cart".into(),
             captures: vec![],
             renames: BTreeMap::new(),
+            modifiers: vec![],
         }),
         Chunk::Static("Add</button>".into()),
     ]);
@@ -564,6 +565,7 @@ fn button_renaming(paths: &[&str], renames: &[(&str, &str)]) -> Template {
                 .iter()
                 .map(|(from, to)| (from.to_string(), to.to_string()))
                 .collect(),
+            modifiers: vec![],
         }),
         Chunk::Static(">Add</button>".into()),
     ])
@@ -663,6 +665,76 @@ fn a_capture_a_view_names_otherwise_is_read_where_it_is() {
         captures_of(&html),
         serde_json::json!({ "item": { "id": "decoy" } })
     );
+}
+
+/// An element with two handlers: `on:input` capturing `paths_a` and
+/// `on:keydown` capturing `paths_b`, adjacent in the IR, as the compiler
+/// lowers an element's handlers (ADR-0138).
+fn input_with_two_handlers(
+    paths_a: &[&str],
+    paths_b: &[&str],
+    rename_b: &[(&str, &str)],
+) -> Template {
+    let event = |id: u32, event: &str, paths: &[&str], renames: &[(&str, &str)]| {
+        Chunk::Dynamic(Part::Event {
+            id: PartId(id),
+            owner: ElementId(3),
+            event: event.into(),
+            handler: format!("h{id}"),
+            name: String::new(),
+            captures: paths.iter().map(|p| p.to_string()).collect(),
+            renames: renames
+                .iter()
+                .map(|(from, to)| (from.to_string(), to.to_string()))
+                .collect(),
+            modifiers: vec![],
+        })
+    };
+    t(vec![
+        Chunk::Static("<input data-pw=\"3\"".into()),
+        event(4, "input", paths_a, &[]),
+        event(5, "keydown", paths_b, rename_b),
+        Chunk::Static(">".into()),
+    ])
+}
+
+#[test]
+fn an_element_s_handlers_carry_one_attribute_between_them() {
+    // Two attributes of one name are one attribute to a browser, which keeps
+    // the first: the second handler would read the first's captures.
+    let env = Env::new().set("item", item("cortado", "Cortado"));
+    let html = render(
+        &input_with_two_handlers(&["item.id"], &["item.name"], &[]),
+        &env,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(html.matches("data-pw-captures").count(), 1, "{html}");
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "cortado", "name": "Cortado" } })
+    );
+    // One path both read is written once.
+    let html = render(
+        &input_with_two_handlers(&["item.id"], &["item.id"], &[]),
+        &env,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        captures_of(&html),
+        serde_json::json!({ "item": { "id": "cortado" } })
+    );
+    // One name read from two places is refused, not guessed between.
+    let env = env.set("other", item("decoy", "Decoy"));
+    assert!(matches!(
+        render(
+            &input_with_two_handlers(&["item.id"], &["item.id"], &[("item", "other")]),
+            &env,
+            &[],
+        ),
+        Err(Blocked::UnrepresentedConstruct { .. })
+    ));
 }
 
 #[test]

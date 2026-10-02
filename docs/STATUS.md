@@ -13,6 +13,21 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0138, 2026-10-02: a handler is given its event**
+([ADR-0138](DECISIONS/ADR-0138-a-handler-is-given-its-event.md), ADR-0131's
+first slice). `on:input={(e: InputEvent) => typed = e.value}`: the browser
+reads the event's record in the listener, before the handler's code loads,
+and `on:submit|prevent` stops a form's submission there. Demonstrated by
+`examples/demo/events.pw` in Chromium, Firefox and WebKit. Corrections found
+building it, each of which checked or built clean:
+- **every handler listened for a click**, whatever its event: `on:input` ran
+  when the input was clicked and never when it was typed in. It was recorded
+  in KNOWN_LIMITATIONS, and `pw build` accepted it;
+- **a lambda's written parameter type was dropped**, in every lambda:
+  `fn(y: Nada) 1` checked clean;
+- **two handlers on one element**: a browser kept only the first of their
+  two capture attributes, and the runtime bound only the first handler.
+
 **Correction, ADR-0137, 2026-10-02: ADR-0133's limits claimed two
 refusals the plan did not make.** A signal read inside an `{#each}` a query
 decides, and a query's `{#each}` inside a block a signal decides, each built.

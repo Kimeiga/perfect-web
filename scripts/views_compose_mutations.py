@@ -67,10 +67,10 @@ MUTANTS = [
     (
         "the renderer reads a capture at the handler's name",
         RENDER,
-        "                    Some((root, rest)) => renames.get(root).map(|to| format!(\"{to}.{rest}\")),\n"
-        "                    None => renames.get(path.as_str()).cloned(),\n",
-        "                    Some(_) => None::<String>,\n"
-        "                    None => None,\n",
+        "                Some((root, rest)) => renames.get(root).map(|to| format!(\"{to}.{rest}\")),\n"
+        "                None => renames.get(path.as_str()).cloned(),\n",
+        "                Some(_) => None::<String>,\n"
+        "                None => None,\n",
     ),
     (
         "what a view captures is not checked where it is given",

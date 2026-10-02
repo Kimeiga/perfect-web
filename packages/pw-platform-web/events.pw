@@ -12,7 +12,10 @@
 
 module events
 
-type SubmitEvent = SubmitEvent { prevented: String }
+// Each record is what the browser's runtime reads in the listener, before
+// any code loads, and gives the handler (ADR-0131, ADR-0138). `prevented`
+// says whether the form's own submission was stopped: `on:submit|prevent`.
+type SubmitEvent = SubmitEvent { prevented: Bool }
 
 type PressEvent = PressEvent { x: Int, y: Int }
 

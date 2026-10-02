@@ -677,8 +677,42 @@ async function flushSignals() {
 
 /** Each event part's decision, asked once (E7-L): before anything binds. */
 const verdicts = new Map();
-/** The elements a listener is bound to. */
-const bound = new WeakSet();
+/** Each element's parts a listener is bound for: an element may handle two
+ * events, `on:input` and `on:keydown`, each its own listener. */
+const bound = new WeakMap();
+
+/**
+ * **What the browser calls each event the platform declares** (ADR-0138).
+ * Until 2026-10-02 every handler listened for a click, whatever its event.
+ */
+const DOM_EVENTS = {
+  press: "click",
+  input: "input",
+  change: "change",
+  keydown: "keydown",
+  submit: "submit",
+};
+
+/**
+ * **An event's record** (ADR-0131), the plain data its handler is given, as
+ * `packages/pw-platform-web/events.pw` declares it. Read here, in the
+ * listener: the DOM event is spent by the time a handler's module has loaded.
+ */
+function eventRecord(name, e) {
+  switch (name) {
+    case "press":
+      return { x: Math.round(e.clientX ?? 0), y: Math.round(e.clientY ?? 0) };
+    case "input":
+    case "change":
+      return { value: String(e.target?.value ?? "") };
+    case "keydown":
+      return { key: String(e.key ?? "") };
+    case "submit":
+      return { prevented: e.defaultPrevented === true };
+    default:
+      return {};
+  }
+}
 let booted = false;
 
 /**
@@ -725,15 +759,29 @@ function bindEvents() {
     }
     if (!verdict.attach) continue;
 
+    // The event the part handles, and what to do before any code loads.
+    const event = part.event || "press";
+    const listens = DOM_EVENTS[event];
+    if (!listens) {
+      log.push(`no listener for event ${event} of part ${part.id}`);
+      continue;
+    }
+    const modifiers = part.modifiers ?? [];
+
     let fresh = 0;
     for (const el of owners) {
       // Bound once: a block a signal renders again binds what it made, and
       // leaves what was bound before alone (ADR-0130).
-      if (bound.has(el)) continue;
-      bound.add(el);
+      const parts = bound.get(el) ?? new Set();
+      if (parts.has(part.id)) continue;
+      parts.add(part.id);
+      bound.set(el, parts);
       fresh++;
-      el.addEventListener("click", async (e) => {
-        e.preventDefault();
+      el.addEventListener(listens, async (e) => {
+        // Declared, so done now, synchronously (ADR-0131).
+        if (modifiers.includes("prevent")) e.preventDefault();
+        if (modifiers.includes("stop")) e.stopPropagation();
+        const record = eventRecord(event, e);
         try {
           // Authorised above; loaded here. The order is the point of E7-L:
           // the bytes for this handler do not exist in this page until
@@ -760,6 +808,8 @@ function bindEvents() {
           let calls = 0;
           await module.run({
             captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
+            // What the event was, read in the listener (ADR-0138).
+            event: record,
             // The page's signals (ADR-0130), as JSON carries them.
             get: (name) => signals.get(name),
             set: setSignal,

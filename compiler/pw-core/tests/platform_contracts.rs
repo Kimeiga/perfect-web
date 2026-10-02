@@ -407,7 +407,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-02: `examples/domain.pw` declares `added`, `same_item` and
     // `unpriced`, the helpers `Carts.with_line` is written with now that an
     // optimistic transition runs (ADR-0122). Its body was `cart`, a stub.
-    const EXPECTED: u64 = 0xefd68d6f43cd0a62;
+    // 2026-10-02: `events.SubmitEvent`'s `prevented` is a `Bool`, whether the
+    // form's own submission was stopped, now that the runtime reads each
+    // event's record in the listener (ADR-0138). It was a `String` nothing
+    // read or filled.
+    const EXPECTED: u64 = 0x317effa4860aa92b;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

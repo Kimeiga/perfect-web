@@ -659,7 +659,16 @@ fn attr_text(body: &Body, a: &crate::hir::Attr, ctx: &Ctx<'_>) -> Result<String,
         // rather than passed through: `press` is a *semantic* event in `pw` and
         // `onClick` is a DOM one, and conflating them is how a language ends up
         // shaped like its renderer.
-        (AttrValue::Expr(e), Some(("on", event))) => {
+        (AttrValue::Expr(e), Some(("on", _))) => {
+            let Some((event, modifiers)) = a.event() else {
+                return Err("an `on:` attribute names no event".to_string());
+            };
+            if !modifiers.is_empty() {
+                return Err(format!(
+                    "the `|{}` modifier is not modelled by the Marko adapter",
+                    modifiers.join("|")
+                ));
+            }
             let dom = dom_event(event)?;
             // A handler may be written as a bare expression — `count = count + 1`
             // — or as a lambda, `() => add_to_cart(id)`. Both mean "do this when

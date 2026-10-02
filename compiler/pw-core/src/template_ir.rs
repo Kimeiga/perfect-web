@@ -252,6 +252,10 @@ pub enum Part {
         /// handler's module reads. Empty where every name is the handler's.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         renames: BTreeMap<String, String>,
+        /// **What the runtime does in the listener, before any code loads**
+        /// (ADR-0131): `prevent` and `stop`, from `on:submit|prevent`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        modifiers: Vec<String>,
     },
     /// A region rendered only when a condition holds.
     Conditional {
@@ -541,6 +545,14 @@ pub struct PartEntry {
     /// to which identity to authorise — see [`Part::Event`].
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
+    /// The event, for an event part: what the runtime listens for (ADR-0138).
+    /// Until 2026-10-02 the manifest did not say, and the runtime listened
+    /// for a click whatever the event.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub event: String,
+    /// What the runtime does in the listener, for an event part (ADR-0131).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<String>,
 }
 
 impl Template {
@@ -590,6 +602,14 @@ impl Template {
                     name: match p {
                         Part::Event { name, .. } => name.clone(),
                         _ => String::new(),
+                    },
+                    event: match p {
+                        Part::Event { event, .. } => event.clone(),
+                        _ => String::new(),
+                    },
+                    modifiers: match p {
+                        Part::Event { modifiers, .. } => modifiers.clone(),
+                        _ => Vec::new(),
                     },
                 });
                 for inner in p.nested() {
@@ -1093,16 +1113,22 @@ fn lower_element(
     // runs of the same compiler produce different bytes and content addressing
     // stops working. Source order is chosen because it is the one a reader can
     // predict from the file.
-    for a in attrs {
+    //
+    // Handlers come last, in their source order (ADR-0138): they write no
+    // markup but what they capture, and an element's handlers carry it in
+    // one `data-pw-captures` attribute, which the renderer writes once for
+    // the run of them. Two would be one attribute written twice, and a
+    // browser keeps the first.
+    let (handlers, markup): (Vec<&crate::hir::Attr>, Vec<&crate::hir::Attr>) =
+        attrs.iter().partition(|a| a.event().is_some());
+    for a in markup.into_iter().chain(handlers) {
         // An event handler is not markup. It is a behaviour the browser runtime
         // attaches, and E7-R owns it; emitting anything for it here would be
         // inventing an encoding the runtime does not yet have.
         // An event handler is behaviour, not markup: nothing is written into
         // the element for it. The part records which element, which event and
         // which handler, and the browser runtime attaches after `decide`.
-        if let Some((_, event)) = a.name.split_once(':')
-            && a.name.starts_with("on:")
-        {
+        if let Some((event, modifiers)) = a.event() {
             // The identity `resume_artifacts` derived for this exact lambda.
             // Empty when the handler is not resumable — an ordinary handler has
             // no resume manifest and nothing to compare against.
@@ -1138,6 +1164,7 @@ fn lower_element(
                 name,
                 captures,
                 renames,
+                modifiers: modifiers.iter().map(|m| m.to_string()).collect(),
             }));
             continue;
         }
@@ -1710,6 +1737,7 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                             event,
                             handler,
                             renames,
+                            modifiers,
                             ..
                         } => {
                             feed(h, event.as_bytes());
@@ -1717,6 +1745,10 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                             for (from, to) in renames {
                                 feed(h, from.as_bytes());
                                 feed(h, to.as_bytes());
+                            }
+                            for m in modifiers {
+                                feed(h, b"|");
+                                feed(h, m.as_bytes());
                             }
                         }
                         Part::Conditional {

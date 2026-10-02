@@ -247,10 +247,12 @@ module each, and the page's elements carry what the handlers read. A body
 computes (ADR-0058): it is lowered as a query's is, and its commands are
 awaited in order. What remains:
 
-- **The event is not a handler's parameter** (ADR-0058). No syntax binds one
-  to a resumable handler, and the runtime listens for a click only. A named
-  `fn` bound to `on:input` is checked against its event type (PW0602) and not
-  compiled.
+- **A handler is given its event's record, as the platform declares it**
+  (ADR-0138): `press`, `input`, `change`, `keydown`, `submit`. An element
+  does not refine its event: a checkbox's `change` gives `value`, not
+  `checked`. `bind:value` and forms wait for ADR-0131's later rulings. A
+  named `fn` bound to `on:input` is checked against its event type (PW0602)
+  and not compiled.
 - **A command's answer is not read by a handler**; its value is the unit
   value. A command called inside a function value, or a function value that
   reads what the handler captured, is refused, and so is a command parameter

@@ -823,6 +823,18 @@ impl<'a> P<'a> {
                 self.expr_lhs(inner);
                 self.finish();
             }
+            // `(e: InputEvent) => ..`: a lambda's parameters with their types
+            // (ADR-0138), the list `fn(e: InputEvent) ..` writes. Nothing
+            // else begins `( name :`.
+            Kind::LParen if self.nth_is(1, Kind::Ident) && self.nth_is(2, Kind::Colon) => {
+                self.param_list();
+                if !self.at(Kind::FatArrow) {
+                    self.error(
+                        "PW0009",
+                        "a typed parameter list is a lambda's, `(e: InputEvent) => ..`",
+                    );
+                }
+            }
             Kind::LParen => {
                 // `(a, b) => a + b` writes a lambda's parameters as a
                 // parenthesised list, which is a `TupleExpr` until `=>` makes
@@ -1206,6 +1218,12 @@ impl<'a> P<'a> {
         }
         // `aria-label` lexes as three tokens; the name is all of them.
         while self.at(Kind::Minus) && self.nth_is(1, Kind::Ident) {
+            self.bump();
+            self.bump();
+        }
+        // An event's modifiers, `on:submit|prevent` (ADR-0131): part of the
+        // name, so the attribute is one attribute and not three.
+        while self.at(Kind::Pipe) && self.nth_is(1, Kind::Ident) {
             self.bump();
             self.bump();
         }
@@ -2590,6 +2608,43 @@ mod tests {
             img.children().all(|c| c.kind() != K::Element),
             "a self-closing element must not swallow what follows it"
         );
+    }
+
+    #[test]
+    fn an_event_s_modifiers_are_part_of_its_attribute() {
+        // ADR-0138: until 2026-10-02 `on:submit|prevent={save}` was the
+        // attribute `on:submit`, a stray `|`, and an attribute `prevent`.
+        let src = "view V() !{} {\n    <form on:submit|prevent|stop={save}>x</form>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        assert_eq!(texts(&p, K::AttrName), ["on:submit|prevent|stop"]);
+        assert_eq!(texts(&p, K::AttrValue), ["{save}"]);
+    }
+
+    #[test]
+    fn an_arrow_lambda_s_parameters_may_be_typed() {
+        // ADR-0138: `(e: InputEvent) => ..` writes the list `fn(e: InputEvent)
+        // ..` does. It was an unclosed parenthesis.
+        let src = "fn f() -> Int !{} {\n    let g = (e: InputEvent, n: Int) => n\n    1\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let lambda = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::LambdaExpr)
+            .expect("a lambda");
+        let params = lambda
+            .children()
+            .find(|c| c.kind() == K::ParamList)
+            .expect("a parameter list");
+        assert_eq!(
+            params.children().filter(|c| c.kind() == K::Param).count(),
+            2
+        );
+        // Control: a parenthesised expression is still one.
+        let src = "fn f() -> Int !{} {\n    (1 + 2)\n}\n";
+        let p = parse_ok(src);
+        assert!(p.green.descendants().any(|n| n.kind() == K::ParenExpr));
     }
 
     #[test]

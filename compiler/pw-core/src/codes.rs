@@ -417,6 +417,11 @@ codes! {
     // accident, because the runtime listens for a click whatever the name.
     UNKNOWN_EVENT = "PW5022" / unknown_event / 1, Markup,
         "an element handles an event the platform declares";
+    // ADR-0138: `on:submit|prevent`. A modifier the runtime does not know
+    // would be dropped, and the browser's own action, a form's submission,
+    // taken.
+    UNKNOWN_MODIFIER = "PW5027" / unknown_modifier / 1, Markup,
+        "an event's modifier is one the runtime applies";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

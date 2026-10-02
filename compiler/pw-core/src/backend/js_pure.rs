@@ -118,6 +118,8 @@ pub(crate) fn handler_source(
     identity: &str,
     name: &str,
     paths: &[String],
+    // Whether the function's last parameter is the event (ADR-0138).
+    event: bool,
 ) -> Result<String, String> {
     let callees: BTreeMap<(DefId, Vec<Type>), usize> = function
         .callees
@@ -153,7 +155,7 @@ pub(crate) fn handler_source(
     }
     let mut e = Emitter::new(program, &callees, &function.closures);
     e.handler = true;
-    e.handler_function(function, paths)?;
+    e.handler_function(function, paths, event)?;
     e.helpers.extend(helpers);
     Ok(e.finish_handler(identity, name, &sources))
 }
@@ -614,7 +616,12 @@ impl<'p> Emitter<'p> {
 
     /// **A handler's body** (ADR-0058): each captured path read from the
     /// document and decoded by its type, then the body, its commands awaited.
-    fn handler_function(&mut self, f: &Function, paths: &[String]) -> Result<(), String> {
+    fn handler_function(
+        &mut self,
+        f: &Function,
+        paths: &[String],
+        event: bool,
+    ) -> Result<(), String> {
         let [entry] = f.blocks.as_slice() else {
             return Err(format!("{} blocks; a handler is one", f.blocks.len()));
         };
@@ -624,6 +631,15 @@ impl<'p> Emitter<'p> {
         for ((v, t), path) in f.params.iter().zip(paths) {
             let at: String = path.split('.').map(|s| format!("[{}]", json(s))).collect();
             let decoded = self.decode(&format!("context.captures{at}"), t)?;
+            self.line(&format!("const {} = {decoded};", val(*v)));
+            self.types.insert(*v, t.clone());
+        }
+        // The event the listener read, after the captures (ADR-0138).
+        if event {
+            let Some((v, t)) = f.params.get(paths.len()) else {
+                return Err("a handler given its event has no parameter for it".into());
+            };
+            let decoded = self.decode("context.event", t)?;
             self.line(&format!("const {} = {decoded};", val(*v)));
             self.types.insert(*v, t.clone());
         }

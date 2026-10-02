@@ -537,13 +537,75 @@ pub fn render(t: &Template, env: &Env, others: &[Template]) -> Result<String, Bl
 }
 
 fn emit(chunks: &[Chunk], env: &Env, others: &[Template], out: &mut String) -> Result<(), Blocked> {
-    for c in chunks {
-        match c {
+    let mut i = 0;
+    while i < chunks.len() {
+        match &chunks[i] {
             Chunk::Static(s) => out.push_str(s),
+            // An element's handlers, adjacent in the IR, write one attribute
+            // between them (ADR-0138).
+            Chunk::Dynamic(p @ Part::Event { owner, .. }) => {
+                let mut run = vec![p];
+                while let Some(Chunk::Dynamic(q @ Part::Event { owner: o, .. })) =
+                    chunks.get(i + run.len())
+                    && o == owner
+                {
+                    run.push(q);
+                }
+                i += run.len();
+                out.push_str(&captures_attribute(&run, env)?);
+                continue;
+            }
             Chunk::Dynamic(p) => emit_part(p, env, others, out)?,
         }
+        i += 1;
     }
     Ok(())
+}
+
+/// **What an element's handlers capture, as the one attribute it carries**
+/// (ADR-0136, ADR-0138). Each path is read where the template holds it and
+/// written where its handler reads it. In one element's scope a name is one
+/// value, so the handlers' captures are one object; the same name read from
+/// two places is refused, not guessed between. Empty where nothing is
+/// captured.
+fn captures_attribute(parts: &[&Part], env: &Env) -> Result<String, Blocked> {
+    let mut paths: BTreeMap<String, String> = BTreeMap::new();
+    for p in parts {
+        let Part::Event {
+            captures, renames, ..
+        } = p
+        else {
+            continue;
+        };
+        for path in captures {
+            // `item.id` of a view given `entry` is `entry.id` (ADR-0136).
+            let at = match path.split_once('.') {
+                Some((root, rest)) => renames.get(root).map(|to| format!("{to}.{rest}")),
+                None => renames.get(path.as_str()).cloned(),
+            }
+            .unwrap_or_else(|| path.clone());
+            if paths.get(path).is_some_and(|seen| *seen != at) {
+                return Err(Blocked::UnrepresentedConstruct {
+                    reason: "two handlers on one element capture one name from two places".into(),
+                    at: path.clone(),
+                });
+            }
+            paths.insert(path.clone(), at);
+        }
+    }
+    if paths.is_empty() {
+        return Ok(String::new());
+    }
+    let mut object = serde_json::Map::new();
+    for (path, at) in &paths {
+        let v = value_at(env, at).ok_or(Blocked::MissingValue { path: at.clone() })?;
+        insert_at(&mut object, path, capture_json(v, path)?)?;
+    }
+    let json = serde_json::Value::Object(object).to_string();
+    Ok(format!(
+        " data-pw-captures=\"{}\"",
+        escape::attribute(&json)
+    ))
 }
 
 fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Result<(), Blocked> {
@@ -631,29 +693,8 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
         // `pw_core::resume::capture_paths` derived, serialized onto the element
         // so the compiled handler reads them from the document rather than
         // asking the server what the button meant.
-        Part::Event {
-            captures, renames, ..
-        } => {
-            if captures.is_empty() {
-                return Ok(());
-            }
-            let mut object = serde_json::Map::new();
-            for path in captures {
-                // Read where the value is, written where the handler reads it
-                // (ADR-0136): `item.id` of a view given `entry` is `entry.id`.
-                let at = match path.split_once('.') {
-                    Some((root, rest)) => renames.get(root).map(|to| format!("{to}.{rest}")),
-                    None => renames.get(path.as_str()).cloned(),
-                }
-                .unwrap_or_else(|| path.clone());
-                let v = value_at(env, &at).ok_or(Blocked::MissingValue { path: at.clone() })?;
-                insert_at(&mut object, path, capture_json(v, path)?)?;
-            }
-            let json = serde_json::Value::Object(object).to_string();
-            out.push_str(&format!(
-                " data-pw-captures=\"{}\"",
-                escape::attribute(&json)
-            ));
+        Part::Event { .. } => {
+            out.push_str(&captures_attribute(&[p], env)?);
             Ok(())
         }
 

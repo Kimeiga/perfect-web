@@ -1630,6 +1630,26 @@ e14-signals-render-again:
      } > docs/evidence/E14/signals-render-again.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/signals-render-again.txt
 
+# ADR-0138: a handler is given its event. The compiler's checks and the
+# handler module run under Node, the grammar's, the renderer's one capture
+# attribute per element, and the mutation controls. The browser half is
+# `e2e/events.spec.mjs`, in the own-renderer suite.
+e14-events:
+    @{ echo "ADR-0138 - a handler is given its event"; echo; \
+       echo "produced by: just e14-events"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/events.rs)"; echo; \
+       cargo test --locked -p pw-core --test events 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the grammar (compiler/pw-syntax)"; echo; \
+       cargo test --locked -p pw-syntax --lib grammar::tests::an_ 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== one capture attribute per element (runtime/pw-render/tests/properties.rs)"; echo; \
+       cargo test --locked -p pw-render --test properties handlers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/events_mutations.py)"; echo; \
+       python3 scripts/events_mutations.py; \
+     } > docs/evidence/E14/events.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/events.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

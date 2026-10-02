@@ -1,0 +1,39 @@
+// @corpus: fixture
+// @id: DEMO-events
+// @category: events — each handler on its own event, given its record
+// @charter: §8.2
+// @milestone: E14
+//
+// ADR-0138: a handler listens for the event it is written for and is given
+// that event's record: what was typed, which key was pressed. A form's own
+// submission is stopped in the listener, before the handler's code loads.
+
+module demo.events
+
+import events.{ InputEvent, KeyEvent }
+
+page EventsPage() {
+    cache private
+
+    signal typed: String = ""
+    signal last: String = "none"
+    signal sent: Int = 0
+
+    view {
+        <main>
+            <input
+                id="q"
+                type="text"
+                aria-label="Search"
+                on:input={(e: InputEvent) => typed = e.value}
+                on:keydown={(e: KeyEvent) => last = e.key}
+            />
+            <p id="echo">{typed}</p>
+            <p id="last">{last}</p>
+            <form id="send" on:submit|prevent={() => sent = sent + 1}>
+                <button id="go" type="submit">Send</button>
+            </form>
+            <p id="sent">{sent}</p>
+        </main>
+    }
+}

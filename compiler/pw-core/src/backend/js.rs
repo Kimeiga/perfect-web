@@ -148,7 +148,7 @@ fn module(
     // the part cannot name different behaviours.
     let name = crate::template_ir::called_name(body, lambda);
     let span = body.expr_span(lambda);
-    let (function, paths) = match super::lower::handler(cx, unit, decl_id, lambda, span) {
+    let (function, paths, event) = match super::lower::handler(cx, unit, decl_id, lambda, span) {
         Lowering::Lowered(x) => x,
         Lowering::Unsupported {
             construct, reason, ..
@@ -179,7 +179,14 @@ fn module(
         };
     }
     let program = super::lower::handler_program(cx, function);
-    match super::js_pure::handler_source(&program.functions[0], &program, identity, &name, &paths) {
+    match super::js_pure::handler_source(
+        &program.functions[0],
+        &program,
+        identity,
+        &name,
+        &paths,
+        event,
+    ) {
         Ok(source) => Encoding::Encoded(HandlerModule {
             identity: identity.to_string(),
             name,

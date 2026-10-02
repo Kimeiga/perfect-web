@@ -37,15 +37,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
    - ~~**View composition.**~~ Done 2026-10-02 (ADR-0136), ADR-0130's step 2.
    - ~~**What the browser renders again, it can.**~~ Done 2026-10-02
      (ADR-0137), a correction to ADR-0133.
+   - ~~**A handler is given its event.**~~ Done 2026-10-02 (ADR-0138):
+     event records, typed parameters, `|prevent` and `|stop`.
    - **Next: a page of queries holds signals.** The store's route renders
      no signal, so T11's dialog cannot be written on the store. Acceptance:
      the store page with a signal and a block it decides is served with the
      signals' manifest, a press opens and closes the block, and the store's
      suite passes unchanged.
-   - **Then:** typed events (ADR-0131: event records, typed parameters,
-     modifiers), `bind:value`, forms; provided signals (ADR-0130's step 3).
-     T11's dialog needs Escape, so events come before it; T06's form needs
-     all three.
+   - **Then:** `bind:value` and forms (ADR-0131, rulings 5 and 6), then
+     provided signals (ADR-0130's step 3). T11's dialog and T06's form
+     follow, on all three stacks.
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

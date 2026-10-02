@@ -881,6 +881,30 @@ impl<'a> Typer<'a> {
                 locals.insert(Binder::Pattern(*pat), Ty::of(t));
             }
         }
+        // A lambda's written parameter type, `(e: InputEvent) => ..`, and an
+        // `on:` handler's event where none is written: the record its event
+        // gives it (ADR-0138).
+        for (pat, ty) in &body.param_types {
+            if let Pattern::Bind { .. } = body.pat(*pat)
+                && let Some(written) = crate::resolved::written_in_body(body, *ty)
+                && let Some(t) = sigs.resolve_type(module, decl, &written, 0..0).resolved()
+            {
+                locals.insert(Binder::Pattern(*pat), Ty::of(t));
+            }
+        }
+        for (event, lambda) in crate::resume::handler_events(body) {
+            let Expr::Lambda { params, .. } = body.expr(lambda) else {
+                continue;
+            };
+            if let [p] = lambda_params(body, params).as_slice()
+                && let Pattern::Bind { .. } = body.pat(*p)
+                && let Some(t) = crate::annotations::event_type(sigs, &event)
+            {
+                locals
+                    .entry(Binder::Pattern(*p))
+                    .or_insert_with(|| Ty::of(t));
+            }
+        }
 
         let mut used = BTreeSet::new();
         mark_used(body, body.root, false, &mut used);
@@ -3451,6 +3475,22 @@ pub(crate) fn lambda_names(body: &Body, params: &[crate::hir::PatternId]) -> Opt
 /// **Where a lambda binds each of its parameters**: `(t, w) => ..` is one
 /// parenthesised pattern holding two names. `None` where a parameter is not
 /// a name.
+/// **A lambda's parameters, one pattern each** (ADR-0138): `(a, b) => ..`
+/// lowers to one pattern with no path whose arguments are the parameters,
+/// and `x => ..` to the one parameter.
+pub(crate) fn lambda_params(
+    body: &Body,
+    params: &[crate::hir::PatternId],
+) -> Vec<crate::hir::PatternId> {
+    if let [only] = params
+        && let Pattern::Ctor { path, args } = body.pat(*only)
+        && path.is_empty()
+    {
+        return args.clone();
+    }
+    params.to_vec()
+}
+
 pub(crate) fn lambda_binders(
     body: &Body,
     params: &[crate::hir::PatternId],
@@ -3652,6 +3692,17 @@ fn annotations(
         };
         if let Some(written) = crate::resolved::written_in_body(body, ty) {
             check(&written, body.expr_span(e), what.to_string());
+        }
+    }
+    // A lambda's written parameter type (ADR-0138): kept since 2026-10-02,
+    // and as checked as a binding's.
+    for (pat, ty) in &body.param_types {
+        if let Some(written) = crate::resolved::written_in_body(body, *ty) {
+            let what = match body.pat(*pat) {
+                Pattern::Bind { name, .. } => format!("parameter `{name}`"),
+                _ => "a lambda's parameter".to_string(),
+            };
+            check(&written, body.pat_span(*pat), what);
         }
     }
 }

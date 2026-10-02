@@ -55,6 +55,7 @@ struct BodyBuilder {
     types: Arena<TypeRef>,
     nodes: Arena<Node>,
     signals: std::collections::BTreeSet<ExprId>,
+    param_types: std::collections::BTreeMap<PatternId, TypeRefId>,
 }
 
 impl BodyBuilder {
@@ -561,6 +562,7 @@ impl Lowerer<'_> {
             nodes: b.nodes,
             root,
             signals: b.signals,
+            param_types: b.param_types,
         };
         (
             Some(BodyId(self.hir.bodies.alloc(body, span_of(node)))),
@@ -1347,12 +1349,17 @@ impl Lowerer<'_> {
                 }
             }
             K::Param => {
-                // `el` or `el: T` — the binding is the first child; a written
-                // type annotation is a sibling this pattern does not carry.
-                match node.children().next() {
+                // `el` or `el: T` — the binding is the first child, and a
+                // written type a sibling, kept beside the pattern (ADR-0138).
+                let pat = match node.children().next() {
                     Some(c) => self.param_pattern(b, &c),
                     None => b.pat(Pattern::Error, span),
+                };
+                if let Some(t) = node.children().find(|c| c.kind() == K::TypeRef) {
+                    let ty = self.type_ref(b, &t);
+                    b.param_types.insert(pat, ty);
                 }
+                pat
             }
             // `(x) => ..`: one parameter in parentheses. It was read as a
             // descriptor, like `resumable(..)`, so `x` was bound to nothing
