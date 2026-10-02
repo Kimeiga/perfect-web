@@ -1,7 +1,7 @@
 ADR-0136 - a view is written where it is used
 
 produced by: just e14-views-compose
-commit: e3c3325e43ed32400fd723492ad641b17f0cc74d
+commit: 7c73b8e05ddd8cc078814c2e1264bc438fca83fa
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == composition (compiler/pw-core/tests/views_compose.rs)
@@ -17,7 +17,7 @@ test a_view_s_part_and_handler_are_the_page_s_to_speculate ... ok
 test a_view_is_written_where_it_is_used ... ok
 test a_handler_in_a_view_captures_what_the_page_gave_it ... ok
 test a_signal_a_view_shows_is_live_as_the_page_s_own ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.67s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.63s
 
 == a view's props (compiler/pw-core/tests/view_elements.rs)
 
@@ -25,7 +25,7 @@ test a_view_used_in_a_view_composes ... ok
 test a_view_imported_from_another_module_composes ... ok
 test a_capitalised_tag_names_a_view ... ok
 test a_view_is_given_each_of_its_props_once_of_its_type ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 == a capture read where the page holds it (runtime/pw-render/tests/properties.rs)
 
@@ -33,26 +33,26 @@ test a_capture_that_cannot_be_carried_blocks_the_render ... ok
 test a_captured_value_survives_the_attribute_exactly ... ok
 test carried_captures_serialize_deterministically ... ok
 test a_capture_a_view_names_otherwise_is_read_where_it_is ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.00s
 
 == mutation controls (scripts/views_compose_mutations.py)
 
-baseline: 43 passed, 0 failed
-a view is not found where it is used: KILLED (7 of 43 tests fail)
-a parameter reads as its own name, not as the path it was given: KILLED (5 of 43 tests fail)
-a name the view binds is never renamed: KILLED (1 of 43 tests fail)
-a name the view binds does not hide its parameter: KILLED (1 of 43 tests fail)
-a capture is carried under the page's name for it: KILLED (1 of 43 tests fail)
-the renderer reads a capture at the handler's name: KILLED (1 of 43 tests fail)
-what a view captures is not checked where it is given: KILLED (1 of 43 tests fail)
-a view's handler's capture is not traced to its parameter: KILLED (2 of 43 tests fail)
-a capture of the view's own loop is not traced to its list: KILLED (1 of 43 tests fail)
-a signal a view's handler captures is not refused: KILLED (1 of 43 tests fail)
-a view's props are not checked: KILLED (9 of 43 tests fail)
-a view is looked up among what is called: KILLED (9 of 43 tests fail)
-every view used in another is refused again: KILLED (14 of 43 tests fail)
-a computed prop composes: KILLED (1 of 43 tests fail)
-a view with values of its own composes: KILLED (2 of 43 tests fail)
-the plan skips what a view shows: KILLED (2 of 43 tests fail)
-a view's handler is not the page's to speculate for: KILLED (1 of 43 tests fail)
+baseline: 44 passed, 0 failed
+a view is not found where it is used: KILLED (7 of 44 tests fail)
+a parameter reads as its own name, not as the path it was given: KILLED (5 of 44 tests fail)
+a name the view binds is never renamed: KILLED (1 of 44 tests fail)
+a name the view binds does not hide its parameter: KILLED (1 of 44 tests fail)
+a capture is carried under the page's name for it: KILLED (1 of 44 tests fail)
+the renderer reads a capture at the handler's name: KILLED (2 of 44 tests fail)
+what a view captures is not checked where it is given: KILLED (1 of 44 tests fail)
+a view's handler's capture is not traced to its parameter: KILLED (2 of 44 tests fail)
+a capture of the view's own loop is not traced to its list: KILLED (1 of 44 tests fail)
+a signal a view's handler captures is not refused: KILLED (1 of 44 tests fail)
+a view's props are not checked: KILLED (9 of 44 tests fail)
+a view is looked up among what is called: KILLED (9 of 44 tests fail)
+every view used in another is refused again: KILLED (14 of 44 tests fail)
+a computed prop composes: KILLED (1 of 44 tests fail)
+a view with values of its own composes: KILLED (2 of 44 tests fail)
+the plan skips what a view shows: KILLED (2 of 44 tests fail)
+a view's handler is not the page's to speculate for: KILLED (1 of 44 tests fail)
 17 of 17 mutants killed
