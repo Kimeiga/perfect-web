@@ -1,0 +1,39 @@
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..00acf4a 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -3,6 +3,10 @@
+   import type { PageProps } from "./$types";
+ 
+   let { data }: PageProps = $props();
++
++  // Clear asks first, in the browser's modal dialog: it takes focus, makes
++  // the page behind it inert, closes on Escape, and gives focus back to Clear.
++  let confirm = $state<HTMLDialogElement>();
+ </script>
+ 
+ <main>
+@@ -24,8 +28,20 @@
+ 
+   <section aria-label="Cart">
+     <p id="cart-count">{data.cartCount}</p>
+-    <form method="POST" action="?/clear" use:enhance>
+-      <button id="clear-cart" type="submit">Clear</button>
+-    </form>
++    <button id="clear-cart" type="button" onclick={() => confirm?.showModal()}>Clear</button>
++    <dialog bind:this={confirm} aria-labelledby="clear-title">
++      <h2 id="clear-title">Clear your cart?</h2>
++      <button type="button" onclick={() => confirm?.close()}>Keep items</button>
++      <form
++        method="POST"
++        action="?/clear"
++        use:enhance={() => {
++          confirm?.close();
++          return async ({ update }) => update();
++        }}
++      >
++        <button type="submit">Clear cart</button>
++      </form>
++    </dialog>
+   </section>
+ </main>

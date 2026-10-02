@@ -1,0 +1,6 @@
+{
+  "id": "T11",
+  "title": "An accessible dialog: confirm before clearing the cart",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T11.spec.mjs"
+}

@@ -1,0 +1,43 @@
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..b6abdbc 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -134,6 +134,9 @@ page StorePage(id: StoreId) {
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
+ 
++    // Whether Clear's confirmation is open.
++    signal confirming: Bool = false
++
+     view {
+         <main>
+             <h1 id="store-name">{store.name}</h1>
+@@ -156,13 +159,23 @@ page StorePage(id: StoreId) {
+ 
+             <section aria-label="Cart">
+                 <p id="cart-count">{cart.line_count}</p>
+-                <button
+-                    id="clear-cart"
+-                    type="button"
+-                    on:press={resumable() => clear_cart()}
+-                >
++                <button id="clear-cart" type="button" on:press={() => confirming = true}>
+                     Clear
+                 </button>
++                {#if confirming}
++                    <dialog aria-labelledby="clear-title">
++                        <h2 id="clear-title">Clear your cart?</h2>
++                        <button type="button" autofocus on:press={() => confirming = false}>
++                            Keep items
++                        </button>
++                        <button type="button" on:press={() => {
++                            confirming = false
++                            clear_cart()
++                        }}>
++                            Clear cart
++                        </button>
++                    </dialog>
++                {/if}
+             </section>
+         </main>
+     }

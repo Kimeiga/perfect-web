@@ -1,0 +1,65 @@
+diff --git a/app/stores/[storeId]/ClearCart.tsx b/app/stores/[storeId]/ClearCart.tsx
+new file mode 100644
+index 0000000..af69422
+--- /dev/null
++++ b/app/stores/[storeId]/ClearCart.tsx
+@@ -0,0 +1,31 @@
++"use client";
++
++import { useEffect, useRef, useState } from "react";
++import { clearCartAction } from "./actions";
++
++// Clear asks first, in a modal dialog the `open` state shows.
++export function ClearCart({ store }: { store: string }) {
++  const [open, setOpen] = useState(false);
++  const dialog = useRef<HTMLDialogElement>(null);
++  useEffect(() => {
++    if (open) dialog.current?.showModal();
++    else dialog.current?.close();
++  }, [open]);
++  return (
++    <>
++      <button id="clear-cart" type="button" onClick={() => setOpen(true)}>
++        Clear
++      </button>
++      <dialog ref={dialog} aria-labelledby="clear-title">
++        <h2 id="clear-title">Clear your cart?</h2>
++        <button type="button" onClick={() => setOpen(false)}>
++          Keep items
++        </button>
++        <form action={clearCartAction} onSubmit={() => setOpen(false)}>
++          <input type="hidden" name="store" value={store} />
++          <button type="submit">Clear cart</button>
++        </form>
++      </dialog>
++    </>
++  );
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..5a1de5b 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,7 +1,8 @@
+ import { notFound } from "next/navigation";
+ import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+-import { addToCartAction, clearCartAction } from "./actions";
++import { addToCartAction } from "./actions";
++import { ClearCart } from "./ClearCart";
+ 
+ export default async function StorePage({
+   params,
+@@ -35,12 +36,7 @@ export default async function StorePage({
+ 
+       <section aria-label="Cart">
+         <p id="cart-count">{lineCount(cart)}</p>
+-        <form action={clearCartAction}>
+-          <input type="hidden" name="store" value={store.id} />
+-          <button id="clear-cart" type="submit">
+-            Clear
+-          </button>
+-        </form>
++        <ClearCart store={store.id} />
+       </section>
+     </main>
+   );

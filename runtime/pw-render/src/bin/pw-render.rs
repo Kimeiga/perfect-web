@@ -26,7 +26,7 @@ fn main() -> std::process::ExitCode {
     };
     let Some(out_dir) = flag("--out") else {
         eprintln!(
-            "usage: pw-render --out DIR [--values FILE] [--resume FILE] \
+            "usage: pw-render --out DIR [--values FILE] [--plan FILE] [--resume FILE] \
              [--runtime SRC] [--document KEY] [--partition P] \
              [--compatibility GEN] [--identity-key K] [--wrap TITLE] \
              < template-ir.json"
@@ -90,6 +90,34 @@ fn main() -> std::process::ExitCode {
             }
         },
         None => Env::new().in_domain(domain.clone()),
+    };
+
+    // The page's signals, at their first values (ADR-0140): what `pw build`'s
+    // plan for the page says, so a page that holds UI state renders here as
+    // the server renders it.
+    let env = match flag("--plan") {
+        Some(path) => {
+            let plan = std::fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .and_then(|s| {
+                    serde_json::from_str::<serde_json::Value>(&s).map_err(|e| e.to_string())
+                });
+            match plan {
+                Ok(plan) => {
+                    let mut env = env;
+                    for s in plan["signals"].as_array().into_iter().flatten() {
+                        let name = s["name"].as_str().unwrap_or_default();
+                        env = env.set(name, Value::from_wire(&s["initial"]));
+                    }
+                    env
+                }
+                Err(e) => {
+                    eprintln!("pw-render: {path}: {e}");
+                    return std::process::ExitCode::from(2);
+                }
+            }
+        }
+        None => env,
     };
 
     if let Err(e) = std::fs::create_dir_all(&out_dir) {

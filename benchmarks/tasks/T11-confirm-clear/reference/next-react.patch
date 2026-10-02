@@ -1,0 +1,61 @@
+diff --git a/app/stores/[storeId]/ClearCart.tsx b/app/stores/[storeId]/ClearCart.tsx
+new file mode 100644
+index 0000000..be11c92
+--- /dev/null
++++ b/app/stores/[storeId]/ClearCart.tsx
+@@ -0,0 +1,27 @@
++"use client";
++
++import { useRef } from "react";
++import { clearCartAction } from "./actions";
++
++// Clear asks first, in the browser's modal dialog: it takes focus, makes the
++// page behind it inert, closes on Escape, and gives focus back to Clear.
++export function ClearCart({ store }: { store: string }) {
++  const dialog = useRef<HTMLDialogElement>(null);
++  return (
++    <>
++      <button id="clear-cart" type="button" onClick={() => dialog.current?.showModal()}>
++        Clear
++      </button>
++      <dialog ref={dialog} aria-labelledby="clear-title">
++        <h2 id="clear-title">Clear your cart?</h2>
++        <button type="button" onClick={() => dialog.current?.close()}>
++          Keep items
++        </button>
++        <form action={clearCartAction} onSubmit={() => dialog.current?.close()}>
++          <input type="hidden" name="store" value={store} />
++          <button type="submit">Clear cart</button>
++        </form>
++      </dialog>
++    </>
++  );
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..5a1de5b 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,7 +1,8 @@
+ import { notFound } from "next/navigation";
+ import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+-import { addToCartAction, clearCartAction } from "./actions";
++import { addToCartAction } from "./actions";
++import { ClearCart } from "./ClearCart";
+ 
+ export default async function StorePage({
+   params,
+@@ -35,12 +36,7 @@ export default async function StorePage({
+ 
+       <section aria-label="Cart">
+         <p id="cart-count">{lineCount(cart)}</p>
+-        <form action={clearCartAction}>
+-          <input type="hidden" name="store" value={store.id} />
+-          <button id="clear-cart" type="submit">
+-            Clear
+-          </button>
+-        </form>
++        <ClearCart store={store.id} />
+       </section>
+     </main>
+   );

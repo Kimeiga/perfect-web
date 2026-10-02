@@ -70,22 +70,28 @@ cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-
   --out "$OUT" < "$SPIKE/template-ir.json"
 
 echo
-echo "== 3b. the store page, with its parts manifest and the E7V decision =="
+echo "== 3b. one build: the store's handlers compiled from their bodies (E10), its plan =="
+# One build (ADR-0123): the handlers, the components the server runs, their
+# contracts, the graph, the speculations and each page's plan, from the
+# sources just checked. First, because the store's page below is rendered at
+# its signals' first values, which the plan holds (ADR-0140).
+cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
+  build --out "$OUT/build" "${SERVED[@]}"
+
+echo
+echo "== 3c. the store page, with its parts manifest and the E7V decision =="
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
   emit-template "${STORE[@]}" > "$STORE_IR"
 cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
   --out "$OUT" --values "$SPIKE/store-values.json" --resume "$SPIKE/store-resume.json" \
+  --plan "$OUT/build/pages/store.page.StorePage.json" \
   --document "StorePage(47)" --partition public --compatibility B1 \
   --identity-key "own-renderer-spike-key" \
   --runtime /pw-runtime.mjs < "$STORE_IR"
 cp "$SPIKE/public/pw-runtime.mjs" "$OUT/"
 
 echo
-echo "== 3c. the store's resumable handlers, compiled from their bodies (E10) =="
-# One build (ADR-0123): the handlers, the components the server runs, their
-# contracts, the graph and the speculations, from the sources just checked.
-cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
-  build --out "$OUT/build" "${SERVED[@]}"
+echo "== 3d. the browser's WebAssembly =="
 # The browser's WebAssembly, built for size (`[profile.browser]`): the resume
 # decision, and the renderer a signal's block is rendered again by (ADR-0130).
 cargo build --quiet --manifest-path "$REPO_ROOT/Cargo.toml" \

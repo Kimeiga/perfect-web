@@ -13,6 +13,12 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-C, 2026-10-02: T11 is written, four tasks of twelve.** Clear asks
+first, in an accessible modal dialog; all four controls hold on all three
+stacks. The plausible wrong fix forgets that Escape closes the dialog by
+itself. Next.js and SvelteKit build it, and only a hidden test fails it.
+Pleris refuses it at `pw check` (PW5303).
+
 **ADR-0140 and ADR-0141, 2026-10-02: the store's page holds signals, and a
 dialog a signal shows is the browser's modal dialog**
 ([ADR-0140](DECISIONS/ADR-0140-a-page-that-reads-queries-holds-signals-too.md),

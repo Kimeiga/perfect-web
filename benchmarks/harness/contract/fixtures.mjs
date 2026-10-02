@@ -29,7 +29,23 @@ export const test = base.extend({
       // before the round trip (ADR-0122), so the count alone no longer says
       // the server has the change; every stack's mutation is a POST.
       add: (p = page, n = 0) => pressed(p, p.locator("#menu button").nth(n)),
-      clear: (p = page) => pressed(p, p.locator("#clear-cart")),
+      // A press of Clear, and its request's answer. A store that asks first
+      // (T11) is answered "Clear cart" in its dialog: the contract is that
+      // Clear empties the cart, not how many presses it takes.
+      clear: async (p = page) => {
+        const answered = p.waitForResponse((r) => r.request().method() === "POST");
+        await p.locator("#clear-cart").click();
+        const confirm = p.getByRole("dialog").getByRole("button", { name: "Clear cart" });
+        const asked = await Promise.race([
+          answered.then(() => false),
+          confirm.waitFor({ state: "visible", timeout: 5000 }).then(
+            () => true,
+            () => false,
+          ),
+        ]);
+        if (asked) await confirm.click();
+        await answered;
+      },
       count: (p = page) => p.locator("#cart-count"),
     });
   },

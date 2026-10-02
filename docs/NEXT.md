@@ -41,12 +41,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
      event records, typed parameters, `|prevent` and `|stop`.
    - ~~**A page of queries holds signals; a modal dialog.**~~ Done 2026-10-02
      (ADR-0140, ADR-0141).
-   - **Next: T11, an accessible dialog, on all three stacks.** A prompt,
-     hidden tests, a reference and an unsafe patch per stack, and all four
-     controls green: Clear asks for confirmation in a modal dialog named by
-     its title, focus moves into it and back, Escape and "Keep items" close
-     it without clearing, and "Clear cart" clears.
-   - **Then:** `bind:value` and forms (ADR-0131, rulings 5 and 6), toward
+   - ~~**T11, an accessible dialog.**~~ Written 2026-10-02: all four
+     controls hold on all three stacks (`just e14-harness T11`). Pleris's
+     unsafe patch is refused by `pw check` (PW5303).
+   - **Next:** `bind:value` and forms (ADR-0131, rulings 5 and 6), toward
      T06; provided signals (ADR-0130's step 3).
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
