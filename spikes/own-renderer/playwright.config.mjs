@@ -4,7 +4,7 @@
 ///
 // Not E8's production host: its deletion condition is that E8 replaces it with
 // the capability-constrained one while preserving the `pw-protocol` boundary.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.PORT ?? 3141);
@@ -76,7 +76,33 @@ export const KIOKUN_PORT = PORT + 40;
 // built into `dist-keyed` by `keyed-store.sh`. One per engine, because which
 // category is slow is one per server. Served only when it is built.
 export const KEYED_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 50 + i]));
-const KEYED_BUILT = existsSync(new URL("./dist-keyed/build", import.meta.url));
+// A build serves the runtime it was built with. One built before the runtime
+// changed runs the old runtime against the new server, and fails for a reason
+// that is no test's: `dist-keyed` did, once each page's subscription named
+// its document (ADR-0161).
+// - `dist` is refused: `run.sh` builds it before every suite, and every
+//   mutation control's run.
+// - A stale `dist-keyed` is not served, and the keyed suite not run, with a
+//   warning that says what to run. Refusing it would fail every mutation
+//   control that changes the runtime and runs another spec, for no test's
+//   reason; the recipes that run the keyed suite build it first.
+const RUNTIME = readFileSync(new URL("./public/pw-runtime.mjs", import.meta.url), "utf8");
+const builtWith = (dist) => {
+  const built = new URL(`./${dist}/pw-runtime.mjs`, import.meta.url);
+  return existsSync(built) ? readFileSync(built, "utf8") : null;
+};
+if (builtWith("dist") !== null && builtWith("dist") !== RUNTIME) {
+  throw new Error("dist was built with another pw-runtime.mjs: run run.sh again");
+}
+const KEYED_STALE =
+  existsSync(new URL("./dist-keyed/build", import.meta.url)) && builtWith("dist-keyed") !== RUNTIME;
+if (KEYED_STALE) {
+  console.warn(
+    "dist-keyed was built with another pw-runtime.mjs: e2e/keyed.spec.mjs is not run; " +
+      "run keyed-store.sh again",
+  );
+}
+const KEYED_BUILT = existsSync(new URL("./dist-keyed/build", import.meta.url)) && !KEYED_STALE;
 
 const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]

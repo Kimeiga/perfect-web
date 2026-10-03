@@ -6,8 +6,10 @@ Each mutant undoes one part:
 - the server: a part patched only when its text changed; a list's change as
   keyed operations (removed, inserted after the one before, moved, set in
   place); each change derived against what the document shows, recorded
-  when it is served and as each change is sent; a session's lists rendered,
-  and the shared menu none of them;
+  when it is served and as each change is sent; and the shared menu none of
+  a session's lists. (A session's lists rendered from what the document
+  shows was a mutant until ADR-0161 removed the loop: since ADR-0146 each
+  list is its binding's value, already rendered.)
 - the protocol: one change's patches as one `patch_set` frame;
 - `pw-render --plan`: a private list the values do not give is empty, and a
   shared one must be given;
@@ -81,14 +83,15 @@ MUTANTS = [
         "what was sent is not remembered",
         "server",
         SERVER,
-        "                        shown.insert(session.to_string(), now);\n                        patches\n",
-        "                        let _ = now;\n                        patches\n",
+        # Re-anchored by ADR-0161: what each document shows.
+        "                            shown.insert(doc.clone(), now);\n                            patches\n",
+        "                            let _ = now;\n                            patches\n",
     ),
     (
         "what a served document shows is not recorded",
         "server",
         SERVER,
-        "        self.shown\n            .lock()\n            .expect(\"shown\")\n            .insert(session.to_string(), shown);\n",
+        "        self.shown.lock().expect(\"shown\").insert(doc.clone(), shown);\n",
         "        let _ = shown;\n",
     ),
     (
@@ -97,13 +100,6 @@ MUTANTS = [
         SERVER,
         "                .any(|b| b[\"binding\"] == name && b[\"policy\"][\"cache\"] == \"shared\")\n",
         "                .any(|b| b[\"binding\"] == name && b[\"policy\"][\"cache\"] == \"never\")\n",
-    ),
-    (
-        "a session's list is not rendered",
-        "server",
-        SERVER,
-        "        for (list, items) in &shown.lists {\n            env = env.set(list, Value::List(items.clone()));\n        }\n",
-        "        let _ = &shown.lists;\n",
     ),
     (
         "a patch set is no frame of its own",

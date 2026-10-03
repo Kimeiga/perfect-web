@@ -30,10 +30,11 @@ MUTANTS = [
     (
         "a document is read inside the subscriber table",
         SERVER,
-        "            let read = self.render_store_document(session, settled)?;\n"
-        "            let mut queue = self.pending.lock().expect(\"pending\");\n",
-        "            let mut queue = self.pending.lock().expect(\"pending\");\n"
-        "            let read = self.render_store_document(session, settled)?;\n",
+        # Re-anchored by ADR-0161: each attempt reads one document's.
+        "                let read = self.render_store_document(session, settled)?;\n"
+        "                let mut queue = self.pending.lock().expect(\"pending\");\n",
+        "                let mut queue = self.pending.lock().expect(\"pending\");\n"
+        "                let read = self.render_store_document(session, settled)?;\n",
     ),
     (
         "a document is installed after a change reached its session",

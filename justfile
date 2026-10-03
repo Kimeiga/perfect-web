@@ -1861,6 +1861,29 @@ e14-routes:
      } > docs/evidence/E14/routes.txt
     @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/routes.txt
 
+# ADR-0161: each document is its own subscriber. The server's tests, two tabs
+# of one session in three engines, and the mutation controls.
+e14-documents:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/keyed-store.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0161 - each document is its own subscriber"; echo; \
+       echo "produced by: just e14-documents"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_change_waiting|a_change_reaches|a_session_is_forgotten|a_read_older)|^test result'; \
+       echo; echo "== two tabs of one session (e2e/tabs.spec.mjs), and the keyed reads (e2e/keyed.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/tabs.spec.mjs e2e/keyed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/documents_mutations.py)"; echo; \
+       python3 scripts/documents_mutations.py; \
+     } > docs/evidence/E14/documents.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/documents.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

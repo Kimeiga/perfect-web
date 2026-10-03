@@ -60,10 +60,14 @@ MUTANTS = [
         "            if seq < read.latest && false {\n",
     ),
     (
-        "a replaced page's read is applied",
+        # Re-anchored by ADR-0161: a document is never replaced, and a read
+        # for one the server does not hold must take nothing.
+        "a read for a document the server does not hold is taken",
         SERVER,
-        "        self.keyed.lock().expect(\"keyed\").insert(\n",
-        "        self.keyed.lock().expect(\"keyed\").entry(session.to_string()).or_default();\n        let _ = (\n",
+        "            let Some(page) = keyed.get_mut(&doc) else {\n"
+        "                return Ok(KeyOutcome::Superseded);\n"
+        "            };\n",
+        "            let page = keyed.entry(doc.clone()).or_default();\n",
     ),
     (
         "cancel lets go of nothing",

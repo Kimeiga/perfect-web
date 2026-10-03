@@ -52,8 +52,9 @@ MUTANTS = [
     (
         "the server sends no value to a page that speculates",
         SERVER,
-        "        if let Some(value) = value {\n            waiting.push(StreamFrame::EntryValue {\n",
-        "        if let Some(value) = value.filter(|_| false) {\n            waiting.push(StreamFrame::EntryValue {\n",
+        # Re-anchored by ADR-0161: a change reaches each document in turn.
+        "            if let Some(value) = value {\n                waiting.push(StreamFrame::EntryValue {\n",
+        "            if let Some(value) = value.filter(|_| false) {\n                waiting.push(StreamFrame::EntryValue {\n",
     ),
     (
         "a commit reports no newer version",

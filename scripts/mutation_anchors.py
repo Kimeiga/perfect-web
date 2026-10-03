@@ -11,6 +11,13 @@ reads the anchors and builds nothing, so `just ci` runs it on every change.
 A mutant is `(..., path, anchor, replacement)`. The check fails on an anchor
 that does not match exactly once, on a replacement equal to its anchor, and
 on a mutant of any other shape.
+
+It fails too on a mutant left applied that keeps its anchor: one whose
+replacement adds beside the anchor, found whole in the file. A script
+stopped from outside does not always restore its source, and such a mutant
+leaves the anchor matching once (2026-10-03, ADR-0161: a run killed while
+its mutant hung). A mutant that replaces its anchor, left applied, takes
+the anchor away, which the count above reports.
 """
 
 import importlib.util
@@ -47,10 +54,15 @@ def problems_in(script):
         if anchor == replacement:
             problems.append(f"{script.name}: {what}: the replacement is its anchor")
             continue
-        found = path.read_text().count(anchor)
+        text = path.read_text()
+        found = text.count(anchor)
         if found != 1:
             problems.append(
                 f"{script.name}: {what}: {found} matches in {path.relative_to(ROOT)}"
+            )
+        elif anchor in replacement and replacement in text:
+            problems.append(
+                f"{script.name}: {what}: applied in {path.relative_to(ROOT)}, and not restored"
             )
     return len(mutants), problems
 

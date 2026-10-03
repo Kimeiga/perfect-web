@@ -122,8 +122,16 @@ struct Subscriber {
 
 impl Default for Subscriber {
     fn default() -> Subscriber {
+        Subscriber::at(0)
+    }
+}
+
+impl Subscriber {
+    /// A document's subscriber, its sequence starting at the document's
+    /// cursor (ADR-0161): every frame for it comes after the document.
+    fn at(cursor: u64) -> Subscriber {
         Subscriber {
-            last_seq: 0,
+            last_seq: cursor,
             frames: Vec::new(),
             seen: std::time::Instant::now(),
             behind: false,
@@ -173,13 +181,10 @@ impl Answered {
     }
 }
 
-/// **A session's keyed reads** (ADR-0152): for the document it was last
-/// served, each binding a signal keys, by its name.
+/// **A document's keyed reads** (ADR-0152, ADR-0161): each binding a signal
+/// keys, by its name.
 #[derive(Default)]
 struct Keyed {
-    /// The document the reads are for, by its cursor. A read for another
-    /// document is one a page that was replaced asked for.
-    document: u64,
     reads: BTreeMap<String, KeyRead>,
 }
 
@@ -256,17 +261,41 @@ fn reload_batch(cursor: u64) -> String {
     )
 }
 
-/// Forget every subscriber that has not asked for [`IDLE`], and say which.
-fn forget_idle(queue: &mut BTreeMap<String, Subscriber>, now: std::time::Instant) -> Vec<String> {
-    let idle: Vec<String> = queue
+/// **A served document** (ADR-0161): its session, and its number, which is
+/// also the cursor it was served at. Each is its own subscriber: what it
+/// shows, its frames and its keyed reads are its own, so serving a session's
+/// second tab leaves what its first was waiting for. Until 2026-10-03 a
+/// session had one subscriber, and serving a document cleared it.
+type Doc = (String, u64);
+
+/// Each of `session`'s documents in `map`, in the order they were served.
+fn documents_of<V>(map: &BTreeMap<Doc, V>, session: &str) -> Vec<Doc> {
+    map.range((session.to_string(), 0)..=(session.to_string(), u64::MAX))
+        .map(|(doc, _)| doc.clone())
+        .collect()
+}
+
+/// Forget every document that has not asked for [`IDLE`]. Says which, and
+/// each session left with none, whose own state goes with it.
+fn forget_idle(
+    queue: &mut BTreeMap<Doc, Subscriber>,
+    now: std::time::Instant,
+) -> (Vec<Doc>, Vec<String>) {
+    let idle: Vec<Doc> = queue
         .iter()
         .filter(|(_, w)| now.saturating_duration_since(w.seen) >= IDLE)
-        .map(|(session, _)| session.clone())
+        .map(|(doc, _)| doc.clone())
         .collect();
-    for session in &idle {
-        queue.remove(session);
+    for doc in &idle {
+        queue.remove(doc);
     }
-    idle
+    let mut gone: Vec<String> = idle
+        .iter()
+        .map(|(session, _)| session.clone())
+        .filter(|session| documents_of(queue, session).is_empty())
+        .collect();
+    gone.dedup();
+    (idle, gone)
 }
 
 impl Subscriber {
@@ -458,12 +487,15 @@ struct Server {
     /// How many times each data-layer operation ran: what `/metrics` reports,
     /// and what shows a policy saved a request.
     calls: Arc<Mutex<BTreeMap<String, u64>>>,
-    /// Frames waiting for each session's subscriber.
-    pending: Mutex<BTreeMap<String, Subscriber>>,
-    /// **What each session's document shows** (ADR-0145), as it was served
+    /// **Frames waiting for each document** (ADR-0161).
+    pending: Mutex<BTreeMap<Doc, Subscriber>>,
+    /// **What each document shows** (ADR-0145, ADR-0161), as it was served
     /// and then patched: what a change is derived against. Locked after
-    /// `pending`, never before.
-    shown: Mutex<BTreeMap<String, Shown>>,
+    /// `pending` and `keyed`, never before.
+    shown: Mutex<BTreeMap<Doc, Shown>>,
+    /// **The next document's number** (ADR-0161), server-wide and from one,
+    /// so a document's cursor is never zero.
+    documents: std::sync::atomic::AtomicU64,
     /// **Each session's order, by its status's case** (E14, T04): what
     /// `store:data/orders#current` answers. The kitchen sets it through
     /// `/bench/order`; no order is `None`.
@@ -487,8 +519,8 @@ struct Server {
     /// that adds one. A test sells one out through `/bench/stock`, and the
     /// page that shows it is not told.
     sold_out: Mutex<std::collections::BTreeSet<String>>,
-    /// **Each session's keyed reads** (ADR-0152).
-    keyed: Mutex<BTreeMap<String, Keyed>>,
+    /// **Each document's keyed reads** (ADR-0152, ADR-0161).
+    keyed: Mutex<BTreeMap<Doc, Keyed>>,
     /// **The menu's categories** (E14, T07): which is slow, and how slow.
     categories: Mutex<Categories>,
     /// How many reads of a category saw they were stopped, and ended early
@@ -805,6 +837,7 @@ impl Server {
             artifacts,
             pending: Mutex::new(BTreeMap::new()),
             shown: Mutex::new(BTreeMap::new()),
+            documents: std::sync::atomic::AtomicU64::new(1),
             orders: Mutex::new(BTreeMap::new()),
             recommender: Mutex::new(Recommender::default()),
             estimators: Mutex::new(BTreeMap::new()),
@@ -1277,10 +1310,24 @@ impl Server {
     /// entry is evicted: `drain` takes the materializer and then the table,
     /// so evicting while holding the table would take them the other way.
     fn forget_idle_subscribers(&self) {
-        let forgotten = {
+        let (documents, forgotten) = {
             let mut queue = self.pending.lock().expect("pending");
             forget_idle(&mut queue, std::time::Instant::now())
         };
+        // What each forgotten document showed and read (ADR-0161), each in
+        // its own hold: `read_keyed` takes `keyed` before `shown`.
+        {
+            let mut keyed = self.keyed.lock().expect("keyed");
+            for doc in &documents {
+                keyed.remove(doc);
+            }
+        }
+        {
+            let mut shown = self.shown.lock().expect("shown");
+            for doc in &documents {
+                shown.remove(doc);
+            }
+        }
         for session in forgotten {
             self.materializer.evict(&self.cart_key(&session));
             // And the query values kept for it alone (ADR-0127): a private
@@ -1752,22 +1799,26 @@ impl Server {
     }
 
     /// **Each binding of the store page, by its query** (ADR-0125): the page
-    /// parameter `id` is the store this server holds, and `current_session()`
-    /// is the request's session.
-    fn bindings(&self, session: &str) -> Result<BTreeMap<String, Val>, String> {
-        self.bindings_where(session, |_| true, &Keys::Shown)
+    /// parameter `id` is the store this server holds, `current_session()` is
+    /// the request's session, and a signal's key is what `document` shows
+    /// (ADR-0161).
+    fn bindings(&self, session: &str, document: u64) -> Result<BTreeMap<String, Val>, String> {
+        self.bindings_where(session, Some(document), |_| true, &Keys::Shown)
     }
 
-    /// One binding's value, by its name, as [`Server::bindings`] reads it.
+    /// One binding's value, by its name, read for none of the session's
+    /// documents: a binding no signal keys is every document's.
     fn binding(&self, session: &str, name: &str) -> Result<BTreeMap<String, Val>, String> {
-        self.bindings_where(session, |b| b == name, &Keys::Shown)
+        self.bindings_where(session, None, |b| b == name, &Keys::Shown)
     }
 
     /// The bindings whose names `wanted` takes, each run by its policies, a
-    /// binding a signal keys read for the key `keys` says (ADR-0152).
+    /// binding a signal keys read for the key `keys` says (ADR-0152), and
+    /// what `document` shows (ADR-0161).
     fn bindings_where(
         &self,
         session: &str,
+        document: Option<u64>,
         wanted: impl Fn(&str) -> bool,
         keys: &Keys,
     ) -> Result<BTreeMap<String, Val>, String> {
@@ -1776,7 +1827,7 @@ impl Server {
             if !wanted(b["binding"].as_str().unwrap_or_default()) {
                 continue;
             }
-            let args = self.args_of(session, b, keys)?;
+            let args = self.args_of(session, document, b, keys)?;
             out.insert(
                 b["binding"].as_str().unwrap_or_default().to_string(),
                 self.fetch_binding(session, b, &args)?,
@@ -1787,10 +1838,12 @@ impl Server {
 
     /// **A binding's arguments**, as a host computes them: the page parameter
     /// `id` is the store this server holds, `current_session()` the request's
-    /// session, and a page signal the key `keys` says (ADR-0152).
+    /// session, and a page signal the key `keys` says (ADR-0152), as
+    /// `document` shows it (ADR-0161).
     fn args_of(
         &self,
         session: &str,
+        document: Option<u64>,
         b: &serde_json::Value,
         keys: &Keys,
     ) -> Result<Vec<Val>, String> {
@@ -1815,13 +1868,14 @@ impl Server {
                             key,
                         } if *asked == binding => key.get(signal).cloned(),
                         Keys::First => None,
-                        Keys::Shown | Keys::Asked { .. } => self
-                            .keyed
-                            .lock()
-                            .expect("keyed")
-                            .get(session)
-                            .and_then(|k| k.reads.get(binding))
-                            .and_then(|r| r.shown.get(signal).cloned()),
+                        Keys::Shown | Keys::Asked { .. } => document.and_then(|d| {
+                            self.keyed
+                                .lock()
+                                .expect("keyed")
+                                .get(&(session.to_string(), d))
+                                .and_then(|k| k.reads.get(binding))
+                                .and_then(|r| r.shown.get(signal).cloned())
+                        }),
                     }
                     .unwrap_or_else(|| self.first_value(signal));
                     key_val(&value).ok_or_else(|| format!("`{signal}` is no key: {value}"))
@@ -1908,7 +1962,7 @@ impl Server {
         // value, read through `domain.line_count` (ADR-0125).
         let value = match self.part_text(session, "cart.line_count") {
             Ok(value) => value,
-            Err(why) => return self.unshowable(session, &why),
+            Err(why) => return self.unshowable_session(session, &why),
         };
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!(
@@ -1942,15 +1996,20 @@ impl Server {
             return;
         }
 
-        // What the page shows now, from its queries (ADR-0145).
-        let bindings = match self.bindings(session) {
-            Ok(bindings) => bindings,
-            Err(why) => return self.unshowable(session, &why),
-        };
-        let now = match self.showing(session, &bindings) {
-            Ok(now) => now,
-            Err(why) => return self.unshowable(session, &why),
-        };
+        // What each of the session's pages shows now, from its queries
+        // (ADR-0145), each read for its own document (ADR-0161), outside the
+        // table.
+        let documents = documents_of(&self.pending.lock().expect("pending"), session);
+        let mut read = Vec::new();
+        for doc in documents {
+            let now = self
+                .bindings(session, doc.1)
+                .and_then(|bindings| Ok((self.showing(session, &bindings)?, bindings)));
+            match now {
+                Ok((now, bindings)) => read.push((doc, bindings, now)),
+                Err(why) => self.unshowable(&doc, &why),
+            }
+        }
 
         // Two frames per change: the entry advanced, and every place in the
         // document the server DERIVED from it, as one set (ADR-0145). A
@@ -1958,56 +2017,65 @@ impl Server {
         // derive a patch from a change rather than must.
         let entry = cart_entry(session);
         let version = self.version(session);
-        // And the value itself, to a page that speculates on it (ADR-0122),
-        // from the snapshot the patches are derived from. Until 2026-10-03
-        // it was read again after the table was let go, and pushed in a
-        // second hold: a page could be sent one change in two batches, and a
-        // command committed in between gave the frame a value later than its
-        // version.
-        let value = self
-            .speculates_on_cart()
-            .and_then(|binding| bindings.get(&binding))
-            .map(val_to_json);
+        let mut failed = Vec::new();
         let mut queue = self.pending.lock().expect("pending");
-        // Against what the document shows. With none served, none shows.
-        let patches = {
-            let mut shown = self.shown.lock().expect("shown");
-            match shown.get(session) {
-                Some(was) => match self.derive(session, &bindings, was, &now) {
-                    Ok(patches) => {
-                        shown.insert(session.to_string(), now);
-                        patches
-                    }
-                    Err(why) => {
-                        drop(shown);
-                        drop(queue);
-                        return self.unshowable(session, &why);
-                    }
-                },
-                None => Vec::new(),
-            }
-        };
-        let waiting = queue.entry(session.to_string()).or_default();
-        waiting.push(StreamFrame::ResourceChanged {
-            protocol: CURRENT,
-            entry: entry.clone(),
-            version,
-        });
-        // Sent with no patches too: the document reflects the new version
-        // when nothing it shows changed.
-        waiting.push(StreamFrame::PatchSet(PatchSet {
-            protocol: CURRENT,
-            basis: CausalBasis::of(entry.clone(), version),
-            patches,
-        }));
-        // In the same hold, so one change reaches a page whole.
-        if let Some(value) = value {
-            waiting.push(StreamFrame::EntryValue {
+        for (doc, bindings, now) in read {
+            // And the value itself, to a page that speculates on it
+            // (ADR-0122), from the snapshot the patches are derived from.
+            // Until 2026-10-03 it was read again after the table was let go,
+            // and pushed in a second hold: a page could be sent one change in
+            // two batches, and a command committed in between gave the frame
+            // a value later than its version.
+            let value = self
+                .speculates_on_cart()
+                .and_then(|binding| bindings.get(&binding))
+                .map(val_to_json);
+            // Against what the document shows. With none served, none shows.
+            let patches = {
+                let mut shown = self.shown.lock().expect("shown");
+                match shown.get(&doc) {
+                    Some(was) => match self.derive(session, &bindings, was, &now) {
+                        Ok(patches) => {
+                            shown.insert(doc.clone(), now);
+                            patches
+                        }
+                        Err(why) => {
+                            failed.push((doc, why));
+                            continue;
+                        }
+                    },
+                    None => Vec::new(),
+                }
+            };
+            // A document forgotten while it was read is told nothing.
+            let Some(waiting) = queue.get_mut(&doc) else {
+                continue;
+            };
+            waiting.push(StreamFrame::ResourceChanged {
                 protocol: CURRENT,
-                entry,
+                entry: entry.clone(),
                 version,
-                value,
             });
+            // Sent with no patches too: the document reflects the new version
+            // when nothing it shows changed.
+            waiting.push(StreamFrame::PatchSet(PatchSet {
+                protocol: CURRENT,
+                basis: CausalBasis::of(entry.clone(), version),
+                patches,
+            }));
+            // In the same hold, so one change reaches a page whole.
+            if let Some(value) = value {
+                waiting.push(StreamFrame::EntryValue {
+                    protocol: CURRENT,
+                    entry: entry.clone(),
+                    version,
+                    value,
+                });
+            }
+        }
+        drop(queue);
+        for (doc, why) in failed {
+            self.unshowable(&doc, &why);
         }
     }
 
@@ -2216,12 +2284,10 @@ impl Server {
             part,
         );
 
-        let sessions: Vec<String> = queue.keys().cloned().collect();
         if std::env::var("PW_TRACE").is_ok() {
-            eprintln!("broadcast {:?} to {sessions:?}", op);
+            eprintln!("broadcast {:?} to {} document(s)", op, queue.len());
         }
-        for session in sessions {
-            let waiting = queue.entry(session).or_default();
+        for waiting in queue.values_mut() {
             waiting.push(StreamFrame::ResourceChanged {
                 protocol: CURRENT,
                 entry: entry.clone(),
@@ -2288,31 +2354,49 @@ impl Server {
         // page waiting, and every command's frames; and two pages read at
         // once never shared a query's flight, whatever its `concurrency`
         // said. The table is held only to install the document.
-        for _ in 1..DOCUMENT_ATTEMPTS {
-            let pushed = self.subscribed(session);
-            let read = self.render_store_document(session, settled)?;
-            let mut queue = self.pending.lock().expect("pending");
-            if let Some(served) = self.installed(&mut queue, session, read, Some(pushed)) {
-                return Ok(served);
+        // The document's number first (ADR-0161), and its subscriber with
+        // it, so a change that reaches the session while it is read reaches
+        // it too.
+        let doc: Doc = (
+            session.to_string(),
+            self.documents
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        );
+        let served = (|| {
+            for _ in 1..DOCUMENT_ATTEMPTS {
+                let pushed = self.subscribed(&doc);
+                let read = self.render_store_document(session, settled)?;
+                let mut queue = self.pending.lock().expect("pending");
+                if let Some(served) = self.installed(&mut queue, &doc, read, Some(pushed)) {
+                    return Ok(served);
+                }
             }
+            // The last attempt is read inside the table, as every document
+            // was before: nothing can reach the session between the read and
+            // the install, so a page is always served.
+            let mut queue = self.pending.lock().expect("pending");
+            let read = self.render_store_document(session, settled)?;
+            Ok(self
+                .installed(&mut queue, &doc, read, None)
+                .expect("nothing reaches a session inside the table"))
+        })();
+        // A document that could not be read is no page, and waits for
+        // nothing.
+        if served.is_err() {
+            self.pending.lock().expect("pending").remove(&doc);
         }
-        // The last attempt is read inside the table, as every document was
-        // before: nothing can reach the session between the read and the
-        // install, so a page is always served.
-        let mut queue = self.pending.lock().expect("pending");
-        let read = self.render_store_document(session, settled)?;
-        Ok(self
-            .installed(&mut queue, session, read, None)
-            .expect("nothing reaches a session inside the table"))
+        served
     }
 
-    /// **The session's subscriber, before its document is read**
-    /// (ADR-0151), and how many frames have reached it. Registered first, so
-    /// a change that reaches the session while its document is read is
-    /// pushed to it and counted, even for a session's first page.
-    fn subscribed(&self, session: &str) -> u64 {
+    /// **The document's subscriber, before it is read** (ADR-0151,
+    /// ADR-0161), and how many frames have reached it. Registered first, so a
+    /// change that reaches the session while its document is read is pushed
+    /// to it and counted, even for a session's first page.
+    fn subscribed(&self, doc: &Doc) -> u64 {
         let mut queue = self.pending.lock().expect("pending");
-        let waiting = queue.entry(session.to_string()).or_default();
+        let waiting = queue
+            .entry(doc.clone())
+            .or_insert_with(|| Subscriber::at(doc.1));
         waiting.seen = std::time::Instant::now();
         waiting.pushed
     }
@@ -2325,35 +2409,30 @@ impl Server {
     /// the change's frames would lose it, so it is read again.
     fn installed(
         &self,
-        queue: &mut BTreeMap<String, Subscriber>,
-        session: &str,
+        queue: &mut BTreeMap<Doc, Subscriber>,
+        doc: &Doc,
         (html, shown, env): (String, Shown, Env),
         pushed: Option<u64>,
     ) -> Option<(String, u64, serde_json::Value, Env)> {
-        let waiting = queue.entry(session.to_string()).or_default();
+        let waiting = queue
+            .entry(doc.clone())
+            .or_insert_with(|| Subscriber::at(doc.1));
         if pushed.is_some_and(|pushed| waiting.pushed != pushed) {
             return None;
         }
+        // What reached it while an attempt before this one was read: this
+        // read includes it.
         waiting.frames.clear();
         waiting.behind = false;
         waiting.seen = std::time::Instant::now();
-        // The document takes a sequence number, so its cursor is never zero.
-        waiting.last_seq += 1;
-        let cursor = waiting.last_seq;
-        self.shown
+        self.shown.lock().expect("shown").insert(doc.clone(), shown);
+        // Its keyed reads start with it (ADR-0152).
+        self.keyed
             .lock()
-            .expect("shown")
-            .insert(session.to_string(), shown);
-        // Its keyed reads start with it: a read a page it replaced asked for
-        // is not applied to it (ADR-0152).
-        self.keyed.lock().expect("keyed").insert(
-            session.to_string(),
-            Keyed {
-                document: cursor,
-                reads: BTreeMap::new(),
-            },
-        );
-        Some((html, cursor, self.speculated_entries(session), env))
+            .expect("keyed")
+            .insert(doc.clone(), Keyed::default());
+        // Its cursor is its number, never zero.
+        Some((html, doc.1, self.speculated_entries(&doc.0), env))
     }
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
@@ -2552,12 +2631,12 @@ impl Server {
         // A new document's keys are its signals' first values, as the
         // browser holds them when it loads (ADR-0152).
         let bindings = self
-            .bindings_where(session, |_| true, &Keys::First)
+            .bindings_where(session, None, |_| true, &Keys::First)
             .map_err(|e| format!("the store page's queries: {e}"))?;
         let shown = self
             .showing(session, &bindings)
             .map_err(|e| format!("the store page's values: {e}"))?;
-        let mut env = self.document_env(session, &bindings, &shown);
+        let mut env = self.document_env(session, &bindings);
         for (part, outcome) in settled {
             env = env.settle(PartId(*part), outcome.clone());
         }
@@ -2610,7 +2689,8 @@ impl Server {
             ));
         }
         let asked = Keys::Asked { binding, key };
-        let args = self.args_of(session, b, &asked)?;
+        let args = self.args_of(session, Some(document), b, &asked)?;
+        let doc: Doc = (session.to_string(), document);
         let flight = self.answer_key(session, b, &args)?;
         let cancel = b["policy"]["on_key_change"] == "cancel";
         let keep = b["policy"]["on_key_change"] == "keep";
@@ -2620,7 +2700,7 @@ impl Server {
         let hold = self.queries.subscribe(&flight);
         let (hold, let_go, turn) = {
             let mut keyed = self.keyed.lock().expect("keyed");
-            let Some(page) = keyed.get_mut(session).filter(|k| k.document == document) else {
+            let Some(page) = keyed.get_mut(&doc) else {
                 return Ok(KeyOutcome::Superseded);
             };
             let read = page.reads.entry(binding.to_string()).or_default();
@@ -2650,13 +2730,14 @@ impl Server {
 
         // While it reads, a browser that leaves lets go of it too.
         let done = std::sync::atomic::AtomicBool::new(false);
+        let mine = &doc;
         let value = std::thread::scope(|scope| {
             if cancel {
                 let done = &done;
                 scope.spawn(move || {
                     while !done.load(std::sync::atomic::Ordering::SeqCst) {
                         if left() {
-                            self.let_go(session, binding, seq);
+                            self.let_go(mine, binding, seq);
                             return;
                         }
                         std::thread::sleep(std::time::Duration::from_millis(20));
@@ -2679,14 +2760,14 @@ impl Server {
 
         // What the page shows for the new key: this binding's value, and the
         // others as they are.
-        let mut bindings = self.bindings_where(session, |n| n != binding, &Keys::Shown)?;
+        let mut bindings =
+            self.bindings_where(session, Some(document), |n| n != binding, &Keys::Shown)?;
         bindings.insert(binding.to_string(), value);
         let now = self.showing(session, &bindings)?;
         let mut queue = self.pending.lock().expect("pending");
         let mut keyed = self.keyed.lock().expect("keyed");
         let Some(read) = keyed
-            .get_mut(session)
-            .filter(|k| k.document == document)
+            .get_mut(&doc)
             .and_then(|k| k.reads.get_mut(binding))
             .filter(|r| r.latest == seq)
         else {
@@ -2694,11 +2775,11 @@ impl Server {
         };
         let patches = {
             let mut shown = self.shown.lock().expect("shown");
-            let Some(was) = shown.get(session) else {
+            let Some(was) = shown.get(&doc) else {
                 return Ok(KeyOutcome::Superseded);
             };
             let patches = self.derive(session, &bindings, was, &now)?;
-            shown.insert(session.to_string(), now);
+            shown.insert(doc.clone(), now);
             patches
         };
         read.shown = key.clone();
@@ -2706,7 +2787,9 @@ impl Server {
             read.hold = None;
         }
         let entry = keyed_entry(session, binding);
-        let waiting = queue.entry(session.to_string()).or_default();
+        let Some(waiting) = queue.get_mut(&doc) else {
+            return Ok(KeyOutcome::Superseded);
+        };
         waiting.push(StreamFrame::ResourceChanged {
             protocol: CURRENT,
             entry: entry.clone(),
@@ -2722,11 +2805,11 @@ impl Server {
 
     /// **Let go of a `cancel` read's flight** (ADR-0152), if it is still the
     /// read holding it: a browser that left.
-    fn let_go(&self, session: &str, binding: &str, seq: u64) {
+    fn let_go(&self, doc: &Doc, binding: &str, seq: u64) {
         let hold = {
             let mut keyed = self.keyed.lock().expect("keyed");
             keyed
-                .get_mut(session)
+                .get_mut(doc)
                 .and_then(|k| k.reads.get_mut(binding))
                 .filter(|r| r.hold.as_ref().is_some_and(|(n, _)| *n == seq))
                 .and_then(|r| r.hold.take())
@@ -2745,7 +2828,7 @@ impl Server {
         cancel: bool,
     ) -> bool {
         let keyed = self.keyed.lock().expect("keyed");
-        match keyed.get(session).filter(|k| k.document == document) {
+        match keyed.get(&(session.to_string(), document)) {
             None => true,
             Some(k) => k.reads.get(binding).is_none_or(|r| {
                 r.latest != seq || (cancel && r.hold.as_ref().is_none_or(|(n, _)| *n != seq))
@@ -2757,19 +2840,27 @@ impl Server {
     /// document cannot be kept current, and is told to read itself again,
     /// which answers why. Never a panic: one failed query is one page that
     /// cannot be shown, not a server that stops for everyone.
-    fn unshowable(&self, session: &str, why: &str) {
+    fn unshowable(&self, doc: &Doc, why: &str) {
         if std::env::var("PW_TRACE").is_ok() {
-            eprintln!("unshowable session={session}: {why}");
+            eprintln!("unshowable document={doc:?}: {why}");
         }
         let mut queue = self.pending.lock().expect("pending");
-        if self.shown.lock().expect("shown").remove(session).is_some() {
-            queue
-                .entry(session.to_string())
-                .or_default()
-                .push(StreamFrame::Recovery {
-                    protocol: CURRENT,
-                    recovery: Recovery::Reload,
-                });
+        if self.shown.lock().expect("shown").remove(doc).is_some()
+            && let Some(waiting) = queue.get_mut(doc)
+        {
+            waiting.push(StreamFrame::Recovery {
+                protocol: CURRENT,
+                recovery: Recovery::Reload,
+            });
+        }
+    }
+
+    /// [`Server::unshowable`], for every document of a session: what none of
+    /// them can show.
+    fn unshowable_session(&self, session: &str, why: &str) {
+        let documents = documents_of(&self.pending.lock().expect("pending"), session);
+        for doc in documents {
+            self.unshowable(&doc, why);
         }
     }
 
@@ -2858,10 +2949,13 @@ impl Server {
             .expect("StorePage")
     }
 
-    /// **What the store's document renders from**: its parts' values, the
-    /// menu's public fragment, each list a session's queries fill, and its
-    /// signals at their first values, in the session's identity domain.
-    fn document_env(&self, session: &str, bindings: &BTreeMap<String, Val>, shown: &Shown) -> Env {
+    /// **What the store's document renders from**: each binding's whole
+    /// value, its parts' values, the menu's public fragment, and its signals
+    /// at their first values, in the session's identity domain. A list a
+    /// session's query fills is its binding's value: until 2026-10-03 it was
+    /// set a second time, from what the document shows, which since ADR-0146
+    /// is the same value under the same name.
+    fn document_env(&self, session: &str, bindings: &BTreeMap<String, Val>) -> Env {
         // Both bound BEFORE the chain. A `MutexGuard` produced inside a method
         // argument lives until the end of the whole STATEMENT, so locking the
         // menu inside the chain and locking it again inside `menu_fragment`
@@ -2887,10 +2981,6 @@ impl Server {
                 .read_part(bindings, part)
                 .unwrap_or_else(|e| panic!("part `{path}`: {e}"));
             env = env.set(path, val_to_value(&value));
-        }
-        // Each list a session's query fills (ADR-0145).
-        for (list, items) in &shown.lists {
-            env = env.set(list, Value::List(items.clone()));
         }
         // Its signals, at their first values (ADR-0140).
         with_signals(env, &self.plan)
@@ -2942,7 +3032,7 @@ impl Server {
             shown.lists.insert(list, items);
         }
         // Each block a query decides, as it renders now (ADR-0146).
-        let env = self.document_env(session, bindings, &shown);
+        let env = self.document_env(session, bindings);
         let template = self.store_template();
         for block in self.plan["blocks"].as_array().into_iter().flatten() {
             let id = block.as_u64().unwrap_or_default() as u32;
@@ -2974,7 +3064,7 @@ impl Server {
                 });
             }
         }
-        let env = self.document_env(session, bindings, now);
+        let env = self.document_env(session, bindings);
         for (list, items) in &now.lists {
             // A list at the top of the page only. One inside a block would
             // have no range while the block is not shown, and patching it
@@ -4281,17 +4371,18 @@ fn handle(server: &Server, mut stream: TcpStream) {
             let entry = ResourceEntryId::derive(&menu_identity(), &IDENTITY);
             let version = server.menu_version();
             let mut queue = server.pending.lock().expect("pending");
-            queue
-                .entry(session.clone())
-                .or_default()
-                .push(StreamFrame::Patch(Patch {
-                    protocol: CURRENT,
-                    basis: CausalBasis::of(entry, Version(version.0 + 1)),
-                    target: server.menu_address(),
-                    operation: PatchOp::RemoveInstance {
-                        instance: pw_document::InstanceToken::from_wire("nosuchinstance"),
-                    },
-                }));
+            for doc in documents_of(&queue, &session) {
+                if let Some(waiting) = queue.get_mut(&doc) {
+                    waiting.push(StreamFrame::Patch(Patch {
+                        protocol: CURRENT,
+                        basis: CausalBasis::of(entry.clone(), Version(version.0 + 1)),
+                        target: server.menu_address(),
+                        operation: PatchOp::RemoveInstance {
+                            instance: pw_document::InstanceToken::from_wire("nosuchinstance"),
+                        },
+                    }));
+                }
+            }
             drop(queue);
             respond_json(&mut stream, 202, &session, fresh, "{}");
         }
@@ -4601,7 +4692,15 @@ fn handle(server: &Server, mut stream: TcpStream) {
 /// oldest streaming mechanism HTTP has and needs no chunked framing to be
 /// written by hand — which matters here, because a bug in hand-rolled chunked
 /// encoding would look exactly like a transport that drops frames.
-fn stream_open(server: &Server, stream: &mut TcpStream, session: &str, fresh: bool, since: u64) {
+fn stream_open(
+    server: &Server,
+    stream: &mut TcpStream,
+    session: &str,
+    fresh: bool,
+    document: u64,
+    since: u64,
+) {
+    let doc: Doc = (session.to_string(), document);
     let cookie = if fresh {
         format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
     } else {
@@ -4617,13 +4716,8 @@ fn stream_open(server: &Server, stream: &mut TcpStream, session: &str, fresh: bo
 
     // A page with a cursor the server has no subscriber for was forgotten
     // while idle: what it missed cannot be said, so it is told to reload.
-    if since > 0
-        && !server
-            .pending
-            .lock()
-            .expect("pending")
-            .contains_key(session)
-    {
+    // So is a page that names no document (ADR-0161).
+    if since > 0 && !server.pending.lock().expect("pending").contains_key(&doc) {
         let _ = stream.write_all(format!("{}\n", reload_batch(since)).as_bytes());
         return;
     }
@@ -4637,8 +4731,8 @@ fn stream_open(server: &Server, stream: &mut TcpStream, session: &str, fresh: bo
         .pending
         .lock()
         .expect("pending")
-        .entry(session.to_string())
-        .or_default()
+        .entry(doc.clone())
+        .or_insert_with(|| Subscriber::at(document))
         .acknowledge(since);
     let mut written = since;
 
@@ -4647,7 +4741,11 @@ fn stream_open(server: &Server, stream: &mut TcpStream, session: &str, fresh: bo
     for _ in 0..80 {
         let batch = {
             let mut queue = server.pending.lock().expect("pending");
-            let waiting = queue.entry(session.to_string()).or_default();
+            let Some(waiting) = queue.get_mut(&doc) else {
+                // Forgotten while the stream was held: the next request
+                // is told to reload.
+                return;
+            };
             waiting.seen = std::time::Instant::now();
             let (cursor, frames) = waiting.after(written);
             if frames.is_empty() {
@@ -4688,27 +4786,27 @@ fn stream_frames(
     // eighteen pages each holding one — a longer hold made the suite flaky
     // under parallelism while every test passed alone, which is a harness
     // failure that reads exactly like a runtime failure.
-    let since: u64 = _query
-        .split('&')
-        .find_map(|p| p.strip_prefix("since="))
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
+    let number = |name: &str| -> Option<u64> {
+        _query
+            .split('&')
+            .find_map(|p| p.strip_prefix(name)?.strip_prefix('='))
+            .and_then(|v| v.parse().ok())
+    };
+    let since = number("since").unwrap_or(0);
+    // The document the page is (ADR-0161): its number, which was its first
+    // cursor. A page that names none is no document this server served.
+    let document = number("doc").unwrap_or(0);
+    let doc: Doc = (session.to_string(), document);
 
     // One route, two adapters. The frames are the same either way — see
     // `e2e/transport.spec.mjs`, which runs the whole subscription twice.
     if _query.split('&').any(|p| p == "mode=stream") {
-        stream_open(server, stream, session, fresh, since);
+        stream_open(server, stream, session, fresh, document, since);
         return;
     }
 
     // Forgotten while idle: see `stream_open`.
-    if since > 0
-        && !server
-            .pending
-            .lock()
-            .expect("pending")
-            .contains_key(session)
-    {
+    if since > 0 && !server.pending.lock().expect("pending").contains_key(&doc) {
         respond_json(stream, 200, session, fresh, &reload_batch(since));
         return;
     }
@@ -4716,7 +4814,9 @@ fn stream_frames(
     for _ in 0..40 {
         {
             let mut queue = server.pending.lock().expect("pending");
-            let waiting = queue.entry(session.to_string()).or_default();
+            let waiting = queue
+                .entry(doc.clone())
+                .or_insert_with(|| Subscriber::at(document));
             waiting.seen = std::time::Instant::now();
             // This request is the client's acknowledgement of everything up to
             // `since`: it applied those frames and asked for what follows.
@@ -5332,15 +5432,18 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
             .expect("the command commits");
         let queue = s.pending.lock().expect("pending");
         assert!(
-            queue["a"].frames.iter().any(|(_, f)| matches!(
-                f,
-                StreamFrame::Recovery {
-                    recovery: Recovery::Reload,
-                    ..
-                }
-            )),
+            queue[&latest(&queue, "a")]
+                .frames
+                .iter()
+                .any(|(_, f)| matches!(
+                    f,
+                    StreamFrame::Recovery {
+                        recovery: Recovery::Reload,
+                        ..
+                    }
+                )),
             "{:?}",
-            queue["a"].frames
+            queue[&latest(&queue, "a")].frames
         );
     }
 
@@ -5742,7 +5845,14 @@ public query Store(",
 
     /// The names the page shows of the binding `browsing`, as recorded.
     fn browsed(s: &Server, session: &str) -> Vec<String> {
-        s.shown.lock().expect("shown")[session].lists["browsing"]
+        let document = latest(&s.shown.lock().expect("shown"), session).1;
+        browsed_in(s, session, document)
+    }
+
+    /// [`browsed`], for one document of the session (ADR-0161).
+    fn browsed_in(s: &Server, session: &str, document: u64) -> Vec<String> {
+        let shown = s.shown.lock().expect("shown");
+        shown[&(session.to_string(), document)].lists["browsing"]
             .iter()
             .filter_map(|item| match item {
                 Value::Record(fields) => match fields.get("name") {
@@ -5772,7 +5882,7 @@ public query Store(",
         assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
         // One patch set, in the session's frames, after the document.
         let queue = s.pending.lock().expect("pending");
-        let sets: Vec<&PatchSet> = queue["a"]
+        let sets: Vec<&PatchSet> = queue[&latest(&queue, "a")]
             .frames
             .iter()
             .filter_map(|(_, f)| match f {
@@ -5803,19 +5913,37 @@ public query Store(",
             Ok(KeyOutcome::Superseded)
         );
         assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
-        // And a read for a page the session replaced.
+        // A second page of the session, as a second tab: each document is its
+        // own (ADR-0161). Until 2026-10-03 it replaced the first, and a read
+        // the first asked for was dropped.
         let (_, newer) = s.serve_document("a");
+        // The new page shows the first key, as its browser holds it.
+        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado", "Cold Brew"]);
+        // A read the first page asks for is the first page's ...
         assert_eq!(
             s.read_keyed("a", "browsing", 3, cursor, &category("hot"), STAYED),
-            Ok(KeyOutcome::Superseded)
-        );
-        // The new page shows the first key again, as its browser holds it.
-        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado", "Cold Brew"]);
-        assert_eq!(
-            s.read_keyed("a", "browsing", 1, newer, &category("hot"), STAYED),
             Ok(KeyOutcome::Applied)
         );
-        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado"]);
+        assert_eq!(browsed_in(&s, "a", cursor), ["Espresso", "Cortado"]);
+        // ... and leaves the second as it was.
+        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado", "Cold Brew"]);
+        assert_eq!(
+            s.read_keyed("a", "browsing", 1, newer, &category("cold"), STAYED),
+            Ok(KeyOutcome::Applied)
+        );
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+        // A read for a document the server does not hold is no page's, and
+        // takes nothing: no reads kept for it, no flight held.
+        assert_eq!(
+            s.read_keyed("a", "browsing", 9, newer + 1_000, &category("hot"), STAYED),
+            Ok(KeyOutcome::Superseded)
+        );
+        assert!(
+            !s.keyed
+                .lock()
+                .expect("keyed")
+                .contains_key(&("a".to_string(), newer + 1_000))
+        );
     }
 
     /// How long a keyed read took, in milliseconds, and what came of it.
@@ -5925,7 +6053,7 @@ public query Store(",
         );
         let queue = s.pending.lock().expect("pending");
         assert!(
-            !queue["b"]
+            !queue[&latest(&queue, "b")]
                 .frames
                 .iter()
                 .any(|(_, f)| matches!(f, StreamFrame::Recovery { .. })),
@@ -6021,12 +6149,20 @@ public query Store(",
         // the session while it was read, is not installed; it is read again.
         let s = served_from_patches(|app| app.to_string(), &[]);
         s.serve_document("a");
-        let pushed = s.subscribed("a");
+        let doc: Doc = (
+            "a".to_string(),
+            s.documents
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        );
+        let pushed = s.subscribed(&doc);
         let before = s.render_store_document("a", &[]).expect("the page reads");
         s.command(ADD, "a", &add("espresso", 1), false)
             .expect("the command commits");
         let mut queue = s.pending.lock().expect("pending");
-        assert!(s.installed(&mut queue, "a", before, Some(pushed)).is_none());
+        assert!(
+            s.installed(&mut queue, &doc, before, Some(pushed))
+                .is_none()
+        );
         drop(queue);
         // Served whole, it shows the change.
         let (page, _) = s.serve_document("a");
@@ -6061,11 +6197,20 @@ public query Store(",
         assert!(!whole.contains("<?start"), "{whole}");
     }
 
-    /// Each patch set queued for a session, in order.
+    /// **A session's latest document** (ADR-0161): what a test that serves a
+    /// session one page means by its subscriber.
+    fn latest<V>(map: &BTreeMap<Doc, V>, session: &str) -> Doc {
+        documents_of(map, session)
+            .pop()
+            .unwrap_or_else(|| panic!("no document for `{session}`"))
+    }
+
+    /// Each patch set queued for a session's latest document, in order.
     fn patch_sets(s: &Server, session: &str) -> Vec<PatchSet> {
         let queue = s.pending.lock().expect("pending");
-        queue
-            .get(session)
+        documents_of(&queue, session)
+            .pop()
+            .and_then(|doc| queue.get(&doc))
             .map(|w| {
                 w.frames
                     .iter()
@@ -6632,7 +6777,7 @@ public query Store(",
         );
 
         let queue = s.pending.lock().expect("pending");
-        let values: Vec<&StreamFrame> = queue["session-v"]
+        let values: Vec<&StreamFrame> = queue[&latest(&queue, "session-v")]
             .frames
             .iter()
             .map(|(_, f)| f)
@@ -6672,7 +6817,7 @@ public query Store(",
             .expect("committed");
         let queue = plain.pending.lock().expect("pending");
         assert!(
-            !queue["session-w"]
+            !queue[&latest(&queue, "session-w")]
                 .frames
                 .iter()
                 .any(|(_, f)| matches!(f, StreamFrame::EntryValue { .. })),
@@ -7066,7 +7211,8 @@ public query Store(",
             s.command(ADD, "steady", &add("espresso", 1), false)
                 .expect("runs");
             let mut queue = s.pending.lock().unwrap();
-            let w = queue.get_mut("steady").unwrap();
+            let doc = latest(&queue, "steady");
+            let w = queue.get_mut(&doc).unwrap();
             let last = w.last_seq;
             w.acknowledge(last);
         }
@@ -7206,7 +7352,12 @@ public query Store(",
         // zero, is subscribed rather than told to reload.
         let reply = poll(0);
         assert!(!reply.contains("recovery"), "{reply}");
-        assert!(s.pending.lock().unwrap().contains_key("gone"));
+        assert!(
+            s.pending
+                .lock()
+                .unwrap()
+                .contains_key(&("gone".to_string(), 0))
+        );
     }
 
     #[test]
@@ -7275,51 +7426,121 @@ public query Store(",
 
     /// **A frame is forgotten when the page says it applied it** (ADR-0139).
     ///
-    /// A page reloaded in a session leaves its stream held on the server for
-    /// up to two seconds, writing into a socket nobody reads. Until
-    /// 2026-10-02 that stream dropped each frame 25 ms after writing it, so a
-    /// change made in those seconds never reached the page that replaced it.
-    /// The keyed-list suite's intermittent failure, found building ADR-0138.
+    /// A page's stream can be held on the server after its connection is
+    /// gone, by a reload or a network that dropped. Until 2026-10-02 the
+    /// stream dropped each frame 25 ms after writing it, so a change written
+    /// to a connection nobody read never reached the page's next request: the
+    /// keyed-list suite's intermittent failure, found building ADR-0138.
+    /// Since ADR-0161 a page that replaces another is another document, so
+    /// this is the same document asking again.
     #[test]
-    fn a_frame_a_stream_wrote_to_a_page_that_is_gone_still_reaches_the_next() {
+    fn a_frame_a_stream_wrote_to_a_dropped_connection_still_reaches_its_page() {
         let s = rendering_server();
-        let session = "reloaded";
-        // The old page, and its stream: held, and read by nobody.
-        let (_, old) = s.serve_document(session);
+        let session = "dropped";
+        let (_, document) = s.serve_document(session);
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-        let mut old_page =
-            TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
+        let mut gone = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
         let (mut held, _) = listener.accept().expect("accept");
         std::thread::scope(|scope| {
-            scope.spawn(|| stream_open(&s, &mut held, session, false, old));
-            // The page that replaces it, served while the old stream is held,
-            // and a change after it.
-            let (_, new) = s.serve_document(session);
+            scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
             s.command(ADD, session, &add("espresso", 1), false)
                 .expect("runs");
             std::thread::sleep(std::time::Duration::from_millis(300));
 
-            // The old stream wrote the change to the page that is gone ...
-            old_page
-                .set_read_timeout(Some(std::time::Duration::from_millis(500)))
+            // The stream wrote the change to the connection ...
+            gone.set_read_timeout(Some(std::time::Duration::from_millis(500)))
                 .expect("timeout");
             let mut written = vec![0; 1 << 16];
-            let n = old_page.read(&mut written).unwrap_or(0);
+            let n = gone.read(&mut written).unwrap_or(0);
             let written = String::from_utf8_lossy(&written[..n]).to_string();
             assert!(written.contains("\"frames\""), "{written}");
 
-            // ... and the page that replaced it is still sent it.
+            // ... which the page never read: its next request, from where it
+            // was, is still sent it.
             let mut queue = s.pending.lock().expect("pending");
-            let waiting = queue.get_mut(session).expect("a subscriber");
-            let (cursor, frames) = waiting.after(new);
+            let waiting = queue
+                .get_mut(&(session.to_string(), document))
+                .expect("its subscriber");
+            let (cursor, frames) = waiting.after(document);
             assert!(
                 !frames.is_empty(),
-                "the change was written to a page that is gone, and dropped"
+                "the change was written to a connection that dropped, and dropped"
             );
             // Control: what a page says it applied is dropped.
             waiting.acknowledge(cursor);
-            assert!(waiting.after(new).1.is_empty());
+            assert!(waiting.after(document).1.is_empty());
         });
+    }
+
+    /// **A document is its own subscriber** (ADR-0161). Two tabs in one
+    /// session: the first is served, a change reaches it, and before its page
+    /// asks for it the second is served. The first page is still sent the
+    /// change.
+    #[test]
+    fn a_change_waiting_for_one_tab_survives_another_tab_being_served() {
+        let s = rendering_server();
+        let session = "two-tabs";
+        let (_, first) = s.serve_document(session);
+        s.command(ADD, session, &add("espresso", 1), false)
+            .expect("runs");
+        let (_, _second) = s.serve_document(session);
+        let queue = s.pending.lock().expect("pending");
+        let (_, frames) = queue[&(session.to_string(), first)].after(first);
+        assert!(!frames.is_empty(), "the first tab was never sent the add");
+    }
+
+    /// A change to the session's cart reaches every document of the session
+    /// (ADR-0161), each patched against what it shows.
+    #[test]
+    fn a_change_reaches_every_document_of_its_session() {
+        let s = rendering_server();
+        let session = "both-tabs";
+        let (_, first) = s.serve_document(session);
+        let (_, second) = s.serve_document(session);
+        s.command(ADD, session, &add("espresso", 1), false)
+            .expect("runs");
+        let queue = s.pending.lock().expect("pending");
+        for document in [first, second] {
+            let frames = &queue[&(session.to_string(), document)].frames;
+            assert!(
+                frames.iter().any(
+                    |(_, f)| matches!(f, StreamFrame::PatchSet(set) if !set.patches.is_empty())
+                ),
+                "document {document} was not patched: {frames:?}"
+            );
+        }
+        // Control: another session's page hears nothing.
+        drop(queue);
+        let (_, other) = s.serve_document("elsewhere");
+        s.command(ADD, session, &add("espresso", 1), false)
+            .expect("runs");
+        assert!(
+            s.pending.lock().expect("pending")[&("elsewhere".to_string(), other)]
+                .frames
+                .is_empty()
+        );
+    }
+
+    /// **A session is forgotten with its last document** (ADR-0161): its cart
+    /// entry and its interactions stay while another of its pages is open.
+    #[test]
+    fn a_session_is_forgotten_with_its_last_document() {
+        let now = std::time::Instant::now();
+        let idle = Subscriber {
+            seen: now - IDLE - std::time::Duration::from_secs(1),
+            ..Subscriber::at(1)
+        };
+        let mut queue: BTreeMap<Doc, Subscriber> = BTreeMap::new();
+        queue.insert(("s".to_string(), 1), idle);
+        queue.insert(("s".to_string(), 2), Subscriber::at(2));
+        let (forgotten, gone) = forget_idle(&mut queue, now);
+        assert_eq!(forgotten, [("s".to_string(), 1)]);
+        assert!(gone.is_empty(), "{gone:?}");
+        // Its last page idle too, the session goes with it.
+        let later = now + IDLE + std::time::Duration::from_secs(1);
+        let (forgotten, gone) = forget_idle(&mut queue, later);
+        assert_eq!(forgotten, [("s".to_string(), 2)]);
+        assert_eq!(gone, ["s"]);
     }
 
     /// The other half (ADR-0139): what a page's stream request says it
@@ -7328,12 +7549,13 @@ public query Store(",
     fn a_stream_drops_what_its_page_says_it_applied() {
         let s = rendering_server();
         let session = "applied";
-        s.serve_document(session);
+        let (_, document) = s.serve_document(session);
+        let doc: Doc = (session.to_string(), document);
         s.command(ADD, session, &add("espresso", 1), false)
             .expect("runs");
-        let applied = s.pending.lock().expect("pending")[session].last_seq;
+        let applied = s.pending.lock().expect("pending")[&doc].last_seq;
         assert!(
-            s.pending.lock().expect("pending")[session]
+            s.pending.lock().expect("pending")[&doc]
                 .frames
                 .iter()
                 .any(|(n, _)| *n <= applied),
@@ -7343,11 +7565,11 @@ public query Store(",
         let _page = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
         let (mut held, _) = listener.accept().expect("accept");
         std::thread::scope(|scope| {
-            scope.spawn(|| stream_open(&s, &mut held, session, false, applied));
+            scope.spawn(|| stream_open(&s, &mut held, session, false, document, applied));
             std::thread::sleep(std::time::Duration::from_millis(100));
             let queue = s.pending.lock().expect("pending");
             assert!(
-                !queue[session].frames.iter().any(|(n, _)| *n <= applied),
+                !queue[&doc].frames.iter().any(|(n, _)| *n <= applied),
                 "what the page applied is still queued"
             );
         });

@@ -30,8 +30,9 @@ MUTANTS = [
     (
         "the stream does not acknowledge what the page sent",
         SERVER,
-        "        .or_default()\n        .acknowledge(since);\n    let mut written = since;\n",
-        "        .or_default();\n    let mut written = since;\n",
+        # Re-anchored by ADR-0161: the document's own subscriber.
+        "        .or_insert_with(|| Subscriber::at(document))\n        .acknowledge(since);\n    let mut written = since;\n",
+        "        .or_insert_with(|| Subscriber::at(document));\n    let mut written = since;\n",
     ),
 ]
 

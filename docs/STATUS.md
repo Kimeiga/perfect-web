@@ -13,6 +13,26 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Correction, ADR-0161, 2026-10-03: each document is its own subscriber**
+([ADR-0161](DECISIONS/ADR-0161-each-document-is-its-own-subscriber.md)).
+- **What was wrong.** The development server kept one subscriber per session,
+  and serving a document cleared it. A change waiting for one tab was lost
+  when the session's second tab was served: a server test failed with "the
+  first tab was never sent the add".
+- **Now each served document has its own subscriber**, record of what it
+  shows, and keyed reads. A change reaches every document of its session,
+  and two tabs each hear the other's add, in three engines.
+- **Found on the way:**
+  - the browser suite had served a build made with an older runtime;
+  - a mutation run stopped from outside could leave its mutant in the
+    source, unseen by the anchor check, which now reports it;
+  - two earlier mutants had survived: one since ADR-0146, whose loop was
+    redundant and is removed, and one whose test this change made moot,
+    rewritten.
+
+Six mutants, and every mutant of six earlier scripts killed again
+(`just e14-documents`).
+
 **ADR-0160, 2026-10-03: a page's route**
 ([ADR-0160](DECISIONS/ADR-0160-a-page-s-route.md)). The compiler's half of the
 audit's route gap. A route was read only to check links: nothing tied its

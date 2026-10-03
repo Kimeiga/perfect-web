@@ -1298,3 +1298,19 @@ the audit's route gap.
 - PW0621: a route's parameter is text.
 - PW0341: one route is one page's.
 - The canonical store declares `/stores/{id}`.
+
+[ADR-0161](DECISIONS/ADR-0161-each-document-is-its-own-subscriber.md): the
+second step of the route gap.
+- The development server kept one subscriber per session, and serving a
+  document cleared it, so a change waiting for one tab was lost when
+  another was served (a server test failed before).
+- Each document is now numbered and has its own subscriber, record of what it
+  shows, and keyed reads.
+- A change reaches every document of its session, and the browser names its
+  document in its subscription.
+- This revises ADR-0152's "a page that is still the session's".
+
+Found on the way:
+- the browser suite served a build made with an older runtime;
+- a stopped mutation run could leave its mutant unseen;
+- two earlier mutants survived and are dealt with.

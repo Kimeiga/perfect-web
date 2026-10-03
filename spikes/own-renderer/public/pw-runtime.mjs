@@ -1547,7 +1547,8 @@ function applyBatch(batch) {
  * for the next ask.
  */
 async function pollOnce() {
-  const response = await fetch(`/stream?since=${cursor}`);
+  // Which document this page is (ADR-0161): each is its own subscriber.
+  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}`);
   applyBatch(await response.json());
 }
 
@@ -1559,7 +1560,7 @@ async function pollOnce() {
  * not an error, and parsing half of one would apply half a change.
  */
 async function streamOnce() {
-  const response = await fetch(`/stream?since=${cursor}&mode=stream`);
+  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}&mode=stream`);
   if (!response.body) throw new Error("no streaming body");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

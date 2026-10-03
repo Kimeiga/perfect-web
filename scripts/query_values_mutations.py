@@ -62,8 +62,9 @@ MUTANTS = [
         "a served page whose values fail is not told",
         "server",
         SERVER,
-        "        if self.shown.lock().expect(\"shown\").remove(session).is_some() {\n",
-        "        if self.shown.lock().expect(\"shown\").remove(session).is_some() && false {\n",
+        # Re-anchored by ADR-0161: a document that cannot be shown.
+        "        if self.shown.lock().expect(\"shown\").remove(doc).is_some()\n",
+        "        if self.shown.lock().expect(\"shown\").remove(doc).is_some() && false\n",
     ),
     (
         "the order interface answers no order",
