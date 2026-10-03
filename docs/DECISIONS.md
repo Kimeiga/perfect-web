@@ -1194,3 +1194,14 @@ development-server corrections.
   two holds, which an intermittent browser failure exposed.
 - A materialized fragment is kept while it shows its query's value, not
   until a command invalidates it.
+
+[ADR-0151](DECISIONS/ADR-0151-a-page-s-values-are-read-outside-the-subscriber-table.md):
+a development-server correction, found designing T02.
+- A document's values are read, and it is rendered, outside the subscriber
+  table. Pages are read at once, and pages asking while a query's flight is
+  under way share it, as `concurrency one_per_key` says. They had been read
+  one after another, server-wide.
+- A change that reaches a session while its page is read is not lost. The
+  page is read again, and the third attempt is read inside the table.
+- The cart's count is read from the cart's binding alone, where a command
+  asked every query on the page for it.

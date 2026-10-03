@@ -190,7 +190,9 @@ fn a_program_that_does_not_check_has_no_model() {
         task!("T05-stream-recommendations", "unsafe"),
     ]));
     let why = refused.expect_err("T05's unsafe patch does not check");
-    assert!(why.contains("PW5400"), "{why}");
+    // Its errors, each by the file it is in: what the build's own refusal
+    // does not say, which is why `pw diff` checks before it builds.
+    assert!(why.contains("store/app.pw: PW5400"), "{why}");
 }
 
 #[test]

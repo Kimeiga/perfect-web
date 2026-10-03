@@ -1,0 +1,104 @@
+diff --git a/app/bench/calls/route.ts b/app/bench/calls/route.ts
+new file mode 100644
+index 0000000..080ac54
+--- /dev/null
++++ b/app/bench/calls/route.ts
+@@ -0,0 +1,10 @@
++import { NextResponse } from "next/server";
++import { prepCalls } from "@/lib/store";
++
++export const dynamic = "force-dynamic";
++
++/** How many times the kitchen has been asked. A benchmark's hook, as every
++ * stack in it has one. */
++export async function GET() {
++  return NextResponse.json({ prep: prepCalls() });
++}
+diff --git a/app/bench/prep/route.ts b/app/bench/prep/route.ts
+new file mode 100644
+index 0000000..207b7b4
+--- /dev/null
++++ b/app/bench/prep/route.ts
+@@ -0,0 +1,13 @@
++import { NextResponse, type NextRequest } from "next/server";
++import { setPrepMinutes } from "@/lib/store";
++
++/** Change the kitchen's prep time: `?minutes=…`. Nothing is told that it
++ * changed. A benchmark's hook, as every stack in it has one. */
++export async function POST(request: NextRequest) {
++  const minutes = Number(request.nextUrl.searchParams.get("minutes"));
++  if (!Number.isInteger(minutes)) {
++    return NextResponse.json({ error: "minutes" }, { status: 400 });
++  }
++  setPrepMinutes(minutes);
++  return NextResponse.json({});
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..7030cba 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,5 +1,5 @@
+ import { notFound } from "next/navigation";
+-import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
++import { getCart, getMenu, getPrepTime, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
+ 
+@@ -13,10 +13,12 @@ export default async function StorePage({
+   const menu = getMenu(storeId);
+   if (!store || !menu) notFound();
+   const cart = getCart(await currentSession());
++  const prep = await getPrepTime(store.id);
+ 
+   return (
+     <main>
+       <h1 id="store-name">{store.name}</h1>
++      <p id="prep">Ready in {prep} min</p>
+ 
+       <section aria-label="Menu">
+         <ul id="menu">
+diff --git a/lib/store.ts b/lib/store.ts
+index 7291a61..9bf2bc0 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -46,6 +46,40 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++/** The kitchen: how long an order takes now, and how often it has been
++ * asked. Asking it is slow. A benchmark's hook changes the prep time. */
++const kitchen: { minutes: number; calls: number } =
++  ((globalThis as Record<string, unknown>).__pwBenchKitchen as {
++    minutes: number;
++    calls: number;
++  }) ?? { minutes: 12, calls: 0 };
++(globalThis as Record<string, unknown>).__pwBenchKitchen = kitchen;
++
++/** Ask the kitchen how long an order takes now. Slow: every call is counted. */
++async function askKitchen(store: StoreId): Promise<number> {
++  kitchen.calls += 1;
++  const minutes = kitchen.minutes;
++  await new Promise((resolve) => setTimeout(resolve, 300));
++  if (!STORES[store]) throw new Error(`no store ${store}`);
++  return minutes;
++}
++
++/** Change the kitchen's prep time, as a busy kitchen does. */
++export function setPrepMinutes(minutes: number): void {
++  kitchen.minutes = minutes;
++}
++
++/** How many times the kitchen has been asked. */
++export function prepCalls(): number {
++  return kitchen.calls;
++}
++
++/** The kitchen's prep time for the store. A prep time is a promise to the
++ * customer, so it is never kept: each page asks the kitchen. */
++export function getPrepTime(store: StoreId): Promise<number> {
++  return askKitchen(store);
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);

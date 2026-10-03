@@ -76,6 +76,17 @@ export const test = base.extend({
         if (!r.ok()) throw new Error(`/bench/calls: ${r.status()}`);
         return (await r.json()).notice;
       },
+      // The kitchen's prep time (T02): change it at the source, with no
+      // event, and read how often the kitchen was asked.
+      prep: async (minutes, p = page) => {
+        const r = await p.request.post(`/bench/prep?minutes=${minutes}`);
+        if (!r.ok()) throw new Error(`/bench/prep: ${r.status()}`);
+      },
+      prepCalls: async (p = page) => {
+        const r = await p.request.get("/bench/calls");
+        if (!r.ok()) throw new Error(`/bench/calls: ${r.status()}`);
+        return (await r.json()).prep;
+      },
       // The page takes a press, without waiting for it to finish loading: a
       // page still streaming has not loaded. The Pleris page attaches its
       // handlers after its resume decision (E7V). Both frameworks' forms

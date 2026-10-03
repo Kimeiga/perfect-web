@@ -180,6 +180,9 @@ refused by name:
   - **A query's budget bounds the region, not the query.** The query runs on
     after its region is given the host's failure, and what it answers is
     kept as its policy says.
+- **What a page shows is recorded per session** (ADR-0151, as before it).
+  Two pages of one session read at once are both served, and the later is
+  the one later changes are derived against.
 - **A fragment changed at its source reaches new documents only**
   (ADR-0150). When a shared fragment's query value changes with no event, a
   page already open keeps what it showed: nothing announced the change to

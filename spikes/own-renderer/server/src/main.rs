@@ -113,6 +113,11 @@ struct Subscriber {
     /// `Recovery::Reload`, and further frames are dropped until it is
     /// re-rendered.
     behind: bool,
+    /// **Every frame pushed to it, kept or dropped** (ADR-0151). A document
+    /// is read outside the table, and this says whether a change reached its
+    /// session meanwhile. Not `last_seq`, which a document's cursor moves
+    /// too: two documents read at once would each make the other read again.
+    pushed: u64,
 }
 
 impl Default for Subscriber {
@@ -122,12 +127,22 @@ impl Default for Subscriber {
             frames: Vec::new(),
             seen: std::time::Instant::now(),
             behind: false,
+            pushed: 0,
         }
     }
 }
 
+/// How long the kitchen takes to answer (E14, T02): long enough that pages
+/// opened together are asking at once.
+const KITCHEN_MS: u64 = 300;
+
 /// The most frames one subscriber may have waiting.
 const MAX_WAITING: usize = 256;
+
+/// How many times a document is read, at most (ADR-0151): each attempt but
+/// the last outside the subscriber table, and one is repeated only when a
+/// change reached its session while it was read.
+const DOCUMENT_ATTEMPTS: u32 = 3;
 
 /// How long a subscriber may go without asking before it is forgotten. The
 /// long poll holds for one second and the stream for two, so a live page asks
@@ -161,6 +176,7 @@ fn forget_idle(queue: &mut BTreeMap<String, Subscriber>, now: std::time::Instant
 
 impl Subscriber {
     fn push(&mut self, frame: StreamFrame) {
+        self.pushed += 1;
         if self.behind {
             return;
         }
@@ -367,6 +383,10 @@ struct Server {
     /// `store:data/notices#current` answers. A test posts a notice through
     /// `/bench/notice`, and nothing is told it changed.
     notice: Mutex<String>,
+    /// **How long the kitchen takes now, in minutes** (E14, T02): what
+    /// `store:data/kitchen#prep-minutes` answers, after [`KITCHEN_MS`]. A
+    /// test changes it through `/bench/prep`, and nothing is told.
+    prep_minutes: Mutex<i64>,
     /// **The items the menu's fragment was last rendered from**: a fragment
     /// is rendered again when the `Menu` query's value is not what it shows.
     menu_rendered_from: Mutex<Vec<(String, String)>>,
@@ -555,6 +575,8 @@ fn dev_topology() -> Topology {
                 "database.read<Estimates>",
                 // The store's notice board (E14, T09).
                 "database.read<Notices>",
+                // The kitchen's prep time (E14, T02).
+                "database.read<Kitchen>",
                 // 2026-08-10. The store gained the `import context.{
                 // current_session }` it had been missing since E4, so the page
                 // and both commands read the session. A dev origin that does
@@ -678,6 +700,7 @@ impl Server {
             recommender: Mutex::new(Recommender::default()),
             estimators: Mutex::new(BTreeMap::new()),
             notice: Mutex::new("Open until 7 pm".to_string()),
+            prep_minutes: Mutex::new(12),
             menu_rendered_from: Mutex::new(Vec::new()),
             contracts,
             topology,
@@ -1174,10 +1197,22 @@ impl Server {
             )))))]),
             other => Err(format!("notices#current received {other:?}")),
         });
+        // How long the kitchen takes now (E14, T02), after [`KITCHEN_MS`]:
+        // a slow source. The minutes are the ones it was asked with.
+        let minutes = *self.prep_minutes.lock().expect("prep minutes");
+        let prep: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] if id == STORE_ID => {
+                std::thread::sleep(std::time::Duration::from_millis(KITCHEN_MS));
+                Ok(vec![Val::Result(Ok(Some(Box::new(Val::S64(minutes)))))])
+            }
+            [Val::String(_)] => Ok(not_found()),
+            other => Err(format!("kitchen#prep-minutes received {other:?}")),
+        });
         BTreeMap::from([
             ("store:data/stores#get".to_string(), get),
             ("store:data/menus#for-store".to_string(), for_store),
             ("store:data/notices#current".to_string(), notice),
+            ("store:data/kitchen#prep-minutes".to_string(), prep),
             (
                 "store:data/recommendations#for-store".to_string(),
                 recommend,
@@ -1442,8 +1477,25 @@ impl Server {
     /// parameter `id` is the store this server holds, and `current_session()`
     /// is the request's session.
     fn bindings(&self, session: &str) -> Result<BTreeMap<String, Val>, String> {
+        self.bindings_where(session, |_| true)
+    }
+
+    /// One binding's value, by its name, as [`Server::bindings`] reads it.
+    fn binding(&self, session: &str, name: &str) -> Result<BTreeMap<String, Val>, String> {
+        self.bindings_where(session, |b| b == name)
+    }
+
+    /// The bindings whose names `wanted` takes, each run by its policies.
+    fn bindings_where(
+        &self,
+        session: &str,
+        wanted: impl Fn(&str) -> bool,
+    ) -> Result<BTreeMap<String, Val>, String> {
         let mut out = BTreeMap::new();
         for b in self.plan["bindings"].as_array().into_iter().flatten() {
+            if !wanted(b["binding"].as_str().unwrap_or_default()) {
+                continue;
+            }
             let args = b["args"]
                 .as_array()
                 .into_iter()
@@ -1506,7 +1558,10 @@ impl Server {
             .find(|p| p["path"] == path)
             .ok_or_else(|| format!("the plan has no part `{path}`"))?
             .clone();
-        let bindings = self.bindings(session)?;
+        // The part's own binding, and no other (ADR-0151): every binding
+        // was read here, so a command asked each of the page's queries for
+        // the cart's count, and a slow one held up every command.
+        let bindings = self.binding(session, part["binding"].as_str().unwrap_or_default())?;
         Ok(match val_to_value(&self.read_part(&bindings, &part)?) {
             Value::Text(t) => t,
             Value::Int(n) => n.to_string(),
@@ -1899,23 +1954,69 @@ impl Server {
     ) -> Result<(String, u64, serde_json::Value, Env), String> {
         self.drain(session);
         self.forget_idle_subscribers();
+        // The document's values are read, and it is rendered, OUTSIDE the
+        // subscriber table (ADR-0151). Until 2026-10-03 the table was held
+        // throughout, so a page waiting for a slow query kept every other
+        // page waiting, and every command's frames; and two pages read at
+        // once never shared a query's flight, whatever its `concurrency`
+        // said. The table is held only to install the document.
+        for _ in 1..DOCUMENT_ATTEMPTS {
+            let pushed = self.subscribed(session);
+            let read = self.render_store_document(session, settled)?;
+            let mut queue = self.pending.lock().expect("pending");
+            if let Some(served) = self.installed(&mut queue, session, read, Some(pushed)) {
+                return Ok(served);
+            }
+        }
+        // The last attempt is read inside the table, as every document was
+        // before: nothing can reach the session between the read and the
+        // install, so a page is always served.
+        let mut queue = self.pending.lock().expect("pending");
+        let read = self.render_store_document(session, settled)?;
+        Ok(self
+            .installed(&mut queue, session, read, None)
+            .expect("nothing reaches a session inside the table"))
+    }
+
+    /// **The session's subscriber, before its document is read**
+    /// (ADR-0151), and how many frames have reached it. Registered first, so
+    /// a change that reaches the session while its document is read is
+    /// pushed to it and counted, even for a session's first page.
+    fn subscribed(&self, session: &str) -> u64 {
         let mut queue = self.pending.lock().expect("pending");
         let waiting = queue.entry(session.to_string()).or_default();
+        waiting.seen = std::time::Instant::now();
+        waiting.pushed
+    }
+
+    /// **A document read, installed** in the table the caller holds: what
+    /// was waiting is cleared, the document takes its cursor, and what it
+    /// shows is recorded with it, so a change is sent as the difference
+    /// (ADR-0145). `None` when a frame reached the session after `pushed`:
+    /// the document may show a value from before that change, and clearing
+    /// the change's frames would lose it, so it is read again.
+    fn installed(
+        &self,
+        queue: &mut BTreeMap<String, Subscriber>,
+        session: &str,
+        (html, shown, env): (String, Shown, Env),
+        pushed: Option<u64>,
+    ) -> Option<(String, u64, serde_json::Value, Env)> {
+        let waiting = queue.entry(session.to_string()).or_default();
+        if pushed.is_some_and(|pushed| waiting.pushed != pushed) {
+            return None;
+        }
         waiting.frames.clear();
         waiting.behind = false;
         waiting.seen = std::time::Instant::now();
         // The document takes a sequence number, so its cursor is never zero.
         waiting.last_seq += 1;
         let cursor = waiting.last_seq;
-        // Rendered while the table is held, so a change cannot land between
-        // the clear and the render and be lost by it. And what it shows is
-        // recorded with it: a change is sent as the difference (ADR-0145).
-        let (html, shown, env) = self.render_store_document(session, settled)?;
         self.shown
             .lock()
             .expect("shown")
             .insert(session.to_string(), shown);
-        Ok((html, cursor, self.speculated_entries(session), env))
+        Some((html, cursor, self.speculated_entries(session), env))
     }
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
@@ -3383,12 +3484,29 @@ fn handle(server: &Server, mut stream: TcpStream) {
             *server.notice.lock().expect("notice") = text;
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
-        // How many times the notice board was asked (E14, T09), as every
-        // stack in the benchmark reports it.
+        // The kitchen's prep time changes (E14, T02): at the source, and
+        // nothing is told. A page reads it as its query's policies say.
+        ("POST", "/bench/prep") => {
+            match query
+                .split('&')
+                .find_map(|p| p.strip_prefix("minutes="))
+                .and_then(|m| m.parse::<i64>().ok())
+            {
+                Some(minutes) => {
+                    *server.prep_minutes.lock().expect("prep minutes") = minutes;
+                    respond_json(&mut stream, 200, &session, fresh, "{}");
+                }
+                None => respond_json(&mut stream, 400, &session, fresh, "{}"),
+            }
+        }
+        // How many times each slow source was asked (E14, T02 and T09), as
+        // every stack in the benchmark reports it.
         ("GET", "/bench/calls") => {
             let calls = server.calls.lock().expect("calls");
+            let count = |op: &str| calls.get(op).copied().unwrap_or(0);
             let body = serde_json::json!({
-                "notice": calls.get("store:data/notices#current").copied().unwrap_or(0),
+                "notice": count("store:data/notices#current"),
+                "prep": count("store:data/kitchen#prep-minutes"),
             });
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
@@ -4825,6 +4943,99 @@ public query Store(",
         let (fresh, _) = s.serve_document("c");
         assert!(visible(&fresh).contains("Closing early"), "{fresh}");
         assert_eq!(notice_calls(&s), 2);
+    }
+
+    /// T02's store: the kitchen's prep time, which every page asks for.
+    const PREP_SETUP: &str =
+        include_str!("../../../../benchmarks/tasks/T02-request-storm/setup/pleris.patch");
+    /// T02's reference: pages that ask while an ask is under way share it.
+    const PREP_SHARED: &str =
+        include_str!("../../../../benchmarks/tasks/T02-request-storm/reference/pleris.patch");
+
+    fn prep_calls(s: &Server) -> u64 {
+        s.calls
+            .lock()
+            .expect("calls")
+            .get("store:data/kitchen#prep-minutes")
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// Eight documents served at once, each to its own session: how long
+    /// the eight took, and how many times the kitchen was asked.
+    fn eight_at_once(s: &Server) -> (std::time::Duration, u64) {
+        let before = prep_calls(s);
+        let started = std::time::Instant::now();
+        std::thread::scope(|scope| {
+            for i in 0..8 {
+                scope.spawn(move || {
+                    let (page, _) = s.serve_document(&format!("burst-{i}"));
+                    assert!(visible(&page).contains("Ready in 12 min"), "{page}");
+                });
+            }
+        });
+        (started.elapsed(), prep_calls(s) - before)
+    }
+
+    #[test]
+    fn pages_read_at_once_share_an_ask_their_query_says_is_one_per_key() {
+        // ADR-0151: a document is read outside the subscriber table, so
+        // eight pages are read at once, and share the kitchen's answer.
+        let s = served_from_patches(|app| app.to_string(), &[PREP_SETUP, PREP_SHARED]);
+        let (took, asked) = eight_at_once(&s);
+        assert!(asked <= 2, "the kitchen was asked {asked} times");
+        // About one ask's time, where one after another took eight.
+        assert!(
+            took < std::time::Duration::from_millis(4 * KITCHEN_MS),
+            "{took:?}"
+        );
+    }
+
+    #[test]
+    fn pages_read_at_once_each_ask_when_their_query_says_parallel() {
+        let s = served_from_patches(|app| app.to_string(), &[PREP_SETUP]);
+        let (took, asked) = eight_at_once(&s);
+        assert_eq!(asked, 8);
+        // Asked at once, all the same.
+        assert!(
+            took < std::time::Duration::from_millis(4 * KITCHEN_MS),
+            "{took:?}"
+        );
+    }
+
+    #[test]
+    fn a_change_that_reaches_a_session_while_its_page_is_read_is_not_lost() {
+        // ADR-0151: a document read before a change, whose frames reached
+        // the session while it was read, is not installed; it is read again.
+        let s = served_from_patches(|app| app.to_string(), &[]);
+        s.serve_document("a");
+        let pushed = s.subscribed("a");
+        let before = s.render_store_document("a", &[]).expect("the page reads");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("the command commits");
+        let mut queue = s.pending.lock().expect("pending");
+        assert!(s.installed(&mut queue, "a", before, Some(pushed)).is_none());
+        drop(queue);
+        // Served whole, it shows the change.
+        let (page, _) = s.serve_document("a");
+        let at = page.find("id=\"cart-count\"").expect("the count");
+        let rest = &page[at..];
+        let count = visible(&rest[rest.find('>').expect("its tag") + 1..]);
+        assert!(count.starts_with('1'), "{page}");
+    }
+
+    #[test]
+    fn a_command_asks_only_the_queries_its_page_shows_once() {
+        // ADR-0151: the cart's count is read from the cart's binding alone.
+        // A command asked every query the page reads for it, and then again
+        // for the patches.
+        let s = served_from_patches(|app| app.to_string(), &[PREP_SETUP]);
+        s.serve_document("a");
+        assert_eq!(prep_calls(&s), 1);
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("the command commits");
+        // Once, for what the page shows after it.
+        assert_eq!(prep_calls(&s), 2);
     }
 
     #[test]

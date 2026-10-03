@@ -1,0 +1,29 @@
+diff --git a/lib/store.ts b/lib/store.ts
+index 9bf2bc0..55c3665 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -75,9 +75,22 @@ export function prepCalls(): number {
+ }
+ 
+ /** The kitchen's prep time for the store. A prep time is a promise to the
+- * customer, so it is never kept: each page asks the kitchen. */
++ * customer, so it is never kept. Pages that ask while an ask is under way
++ * share it, and the next page after it answers asks again. */
++const asking: Map<StoreId, Promise<number>> =
++  ((globalThis as Record<string, unknown>).__pwBenchAsking as Map<
++    StoreId,
++    Promise<number>
++  >) ?? new Map();
++(globalThis as Record<string, unknown>).__pwBenchAsking = asking;
++
+ export function getPrepTime(store: StoreId): Promise<number> {
+-  return askKitchen(store);
++  let ask = asking.get(store);
++  if (!ask) {
++    ask = askKitchen(store).finally(() => asking.delete(store));
++    asking.set(store, ask);
++  }
++  return ask;
+ }
+ 
+ /** How many items the cart holds: what the page shows. */

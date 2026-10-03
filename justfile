@@ -1737,6 +1737,36 @@ e14-query-values:
      } > docs/evidence/E14/query-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/query-values.txt
 
+# E14's gate item 5: where each task's plausible wrong fix is caught, per
+# stack, from the tasks' recorded controls, and the rules `pw check` refuses
+# Pleris's with. Record each task's controls first (`just e14-harness T..`).
+e14-unsafe-table:
+    @cargo build --quiet --locked -p pw-cli
+    @mkdir -p docs/evidence/E14
+    @{ echo "produced by: just e14-unsafe-table"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo; python3 scripts/unsafe_table.py; \
+     } > docs/evidence/E14/unsafe-table.txt
+    @tail -4 docs/evidence/E14/unsafe-table.txt
+
+# ADR-0151: a page's values are read outside the subscriber table, so pages
+# read at once share a query's flight, and a change that reaches a session
+# while its page is read is not lost. Every server test, and the mutation
+# controls.
+e14-document-reads:
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0151 - a page's values are read outside the subscriber table"; echo; \
+       echo "produced by: just e14-document-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the server's tests (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/document_reads_mutations.py)"; echo; \
+       python3 scripts/document_reads_mutations.py; \
+     } > docs/evidence/E14/document-reads.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/document-reads.txt
+
 # ADR-0149: `pw diff` over each benchmark task's Pleris reference and unsafe
 # patches, the report a reviewer of each would be shown, and the mutation
 # controls. E14's gate item 1.

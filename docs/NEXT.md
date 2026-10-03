@@ -25,9 +25,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
    readable from the sandbox.
 3. **E14-C, tasks T01-T12**, each with a prompt, hidden tests, a reference
    patch and an unsafe patch per stack, and all four controls green. A task
-   Pleris cannot express is recorded as such. Ten are written: T01, T03,
-   T04, T05, T06, T08, T09, T10, T11 and T12. T12's Pleris wrong fix is
-   refused since ADR-0128.
+   Pleris cannot express is recorded as such. Eleven are written: T01-T06
+   and T08-T12. T12's Pleris wrong fix is refused since ADR-0128.
    - ~~**E14-L, a value's label.**~~ Done 2026-10-02 (ADR-0129).
    - ~~**Rulings: UI state, view composition, typed events.**~~ Done
      2026-10-02 (ADR-0130, ADR-0131).
@@ -93,13 +92,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
        expires the `unstable_cache` entries the page read. And the
        development server kept a materialized fragment past its query's
        value (ADR-0150).
-   - **Next: T02, a duplicate request storm.** Start from the server: check
-     that concurrent first reads of one key under `concurrency one_per_key`
-     make one call to the source (ADR-0127 runs the policy). Then write the
-     task as T09 was: an expensive source with a call counter at `GET
-     /bench/calls`, a burst of simultaneous pages, and at most one call per
-     burst. Then T07, which needs a page that navigates
-     (`on_key_change cancel`).
+   - ~~**T02, a duplicate request storm.**~~ Written 2026-10-03: all four
+     controls hold on all three stacks, eleven tasks. In Pleris the fix is
+     `concurrency one_per_key`; in the frameworks, a map of asks under way.
+     Each stack's unsafe patch is caught by the hidden tests. Writing it
+     found that the development server read each page while holding its
+     subscriber table, so no two pages ever shared a flight (ADR-0151).
+   - **Next: gate item 5.** A recorded command, `just e14-unsafe-table`,
+     that reads each task's controls from its evidence and runs `pw check`
+     on its Pleris unsafe patch. It prints, per task, where each stack
+     caught the wrong fix, and the rule that refused it. Then E14.md states
+     the bug classes `pw check` refuses, with each rule's reach: what the
+     rule covers, and what a program could still write around it.
+   - **Then T07, a stale navigation request**, which needs a page that
+     navigates (`on_key_change cancel`).
 4. ~~**E14-D, `pw diff`** for the store (gate item 1).~~ Done 2026-10-03
    (ADR-0149, `just e14-diffs`). It reports each task's Pleris reference
    and unsafe patch in charter §19.2's sections. Its first use found that a

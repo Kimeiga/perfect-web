@@ -1,0 +1,13 @@
+diff --git a/store/app.pw b/store/app.pw
+index 92a24cd..1a12ce1 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -63,7 +63,7 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+ public query PrepTime(id: StoreId) -> Result<Int, StoreError>
+     freshness     0.seconds
+     consistency   snapshot
+-    concurrency   parallel
++    concurrency   one_per_key
+     on_key_change cancel
+     timeout       2.seconds
+ {

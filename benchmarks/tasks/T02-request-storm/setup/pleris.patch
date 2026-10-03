@@ -1,0 +1,67 @@
+diff --git a/lib/Kitchen.pw b/lib/Kitchen.pw
+new file mode 100644
+index 0000000..6f472e3
+--- /dev/null
++++ b/lib/Kitchen.pw
+@@ -0,0 +1,16 @@
++// @corpus: fixture
++// @id: E14-kitchen
++// @category: the store's data layer — the kitchen's prep time
++// @charter: §15
++// @milestone: E14
++//
++// How long the kitchen takes to prepare an order now (E14, T02), from the
++// host's data layer. Asking the kitchen is slow.
++
++module Kitchen
++
++import domain.{ StoreId, StoreError }
++
++// The kitchen's prep time now, in minutes.
++fn prep_minutes(store: StoreId) -> Result<Int, StoreError> !{ database.read<Kitchen> }
++    host "store:data/kitchen#prep-minutes"
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..92a24cd 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -26,6 +26,7 @@ module store.page
+ import Stores
+ import Carts
+ import Menus
++import Kitchen
+ // The invocation context. `current_session()` was called and never imported
+ // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
+ // dotted paths whose head looks like a module, and a bare call to nothing
+@@ -57,6 +58,18 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+     Menus.for_store(id)
+ }
+ 
++// **How long the kitchen takes now** (E14, T02). A prep time is a promise to
++// the customer, so it is never kept: each page asks the kitchen.
++public query PrepTime(id: StoreId) -> Result<Int, StoreError>
++    freshness     0.seconds
++    consistency   snapshot
++    concurrency   parallel
++    on_key_change cancel
++    timeout       2.seconds
++{
++    Kitchen.prep_minutes(id)
++}
++
+ public query Store(id: StoreId) -> Result<Store, StoreError>
+     freshness     30.seconds
+     consistency   snapshot
+@@ -132,11 +145,13 @@ page StorePage(id: StoreId) {
+ 
+     let store = query Store(id)
+     let menu = query Menu(id)
++    let prep = query PrepTime(id)
+     let cart = query Cart(current_session())
+ 
+     view {
+         <main>
+             <h1 id="store-name">{store.name}</h1>
++            <p id="prep">Ready in {prep} min</p>
+ 
+             <section aria-label="Menu">
+                 <ul id="menu">

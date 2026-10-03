@@ -7,7 +7,8 @@ task's setup patch when it has one) is compared with the same store after
 the task's reference patch, and after its unsafe patch. The report is what a
 reviewer of that change would be shown. A side that does not check has no
 model, and `pw diff` says so: for most unsafe patches that refusal is the
-point.
+point. A task that starts from a store that does not check (T12) is also
+compared with the canonical store.
 
 Run from the repository root after `cargo build -p pw-cli`;
 `just e14-diffs` records the output.
@@ -48,6 +49,7 @@ def main() -> int:
         with tempfile.TemporaryDirectory() as tmp:
             work = pathlib.Path(tmp)
             store(work / "before", given)
+            store(work / "canonical", [])
             for change in ["reference", "unsafe"]:
                 patch = task / change / "pleris.patch"
                 if not patch.exists():
@@ -55,7 +57,17 @@ def main() -> int:
                 store(work / change, given + [patch])
                 print(f"=== {task.name}: {change}")
                 print()
-                print(diff(work / "before", work / change).rstrip())
+                said = diff(work / "before", work / change)
+                if said.startswith("pw diff: before: it does not check"):
+                    # A task that starts from a program the compiler refuses
+                    # (T12) has nothing before it to compare with. What the
+                    # change means is told against the canonical store.
+                    print(said.rstrip())
+                    print()
+                    print("Against the canonical store, which checks:")
+                    print()
+                    said = diff(work / "canonical", work / change)
+                print(said.rstrip())
                 print()
     return 0
 

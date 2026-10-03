@@ -1,0 +1,18 @@
+diff --git a/store/app.pw b/store/app.pw
+index 92a24cd..6a4ec3f 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -61,9 +61,11 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+ // **How long the kitchen takes now** (E14, T02). A prep time is a promise to
+ // the customer, so it is never kept: each page asks the kitchen.
+ public query PrepTime(id: StoreId) -> Result<Int, StoreError>
+-    freshness     0.seconds
++    freshness     30.seconds
+     consistency   snapshot
+-    concurrency   parallel
++    cache         shared
++    key           id
++    concurrency   one_per_key
+     on_key_change cancel
+     timeout       2.seconds
+ {

@@ -1,0 +1,6 @@
+{
+  "id": "T02",
+  "title": "Stop the kitchen's request storm",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T02.spec.mjs"
+}

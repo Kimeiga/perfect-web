@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `1d8f8b3`, with ADR-0150.
+**Reviewed:** 2026-10-03, against master `a66cc18`, with ADR-0151.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,49 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**E14-C, 2026-10-03: T02 is written, eleven tasks of twelve.** All four
+controls hold on all three stacks.
+- **The task.** The store shows the kitchen's current prep time. It is never
+  kept, and every page asks the slow kitchen. Pages opened while the kitchen
+  is being asked must share that ask, and the next page after it answers
+  must ask again.
+- **The fix.** In Pleris it is one word of policy: `concurrency parallel`
+  becomes `one_per_key`. In Next.js and SvelteKit it is a module-level map of
+  asks under way, since neither framework shares work between requests.
+- **The plausible wrong fix** in the frameworks keeps each ask in the map
+  forever. Pleris cannot express that, because the runtime ends a flight
+  however it ends. Its wrong fix keeps the answer for thirty seconds instead.
+
+  Each stack's wrong fix builds, and only the hidden test of a changed prep
+  time fails it.
+
+**Correction, ADR-0151, 2026-10-03: the development server read each page
+while it held its subscriber table**
+([ADR-0151](DECISIONS/ADR-0151-a-page-s-values-are-read-outside-the-subscriber-table.md)).
+Designing T02 found it.
+- **What was wrong.** Every query a page reads ran inside the hold, so page
+  loads ran one after another, server-wide. A slow query held up every
+  other page and every command's frames. `concurrency one_per_key` never
+  shared an ask between two pages, because two pages were never read at
+  once.
+- **Pages are read and rendered outside the table now.** The table is held
+  only to install a page. A change that reaches the session meanwhile makes
+  the page be read again, and the third attempt is read inside the table.
+- **Eight pages read at once share one ask** and take about one ask's time,
+  in the server's tests.
+- **A command asked every query on the page for the cart's count, and then
+  asked them all again.** It now reads the cart's binding alone.
+
+**Correction to ADR-0149's controls: one mutant survived at `013aaff`.**
+- The mutant skips `pw diff`'s own refusal of a program that does not
+  check. `pw build` refuses the same programs, and the test asked only for
+  the error's code.
+- The test now asks for what only `pw diff`'s refusal says: the file each
+  error is in.
+- And T12, which starts from a store the compiler refuses, is also compared
+  with the canonical store. Its reference changes nothing there: the fix
+  restores the store's meaning exactly.
 
 **E14-C and E14-D, 2026-10-03: T09 is written, ten tasks of twelve, and
 `pw diff` reports what a change means.** These are the instruments of gate
@@ -2232,16 +2275,16 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **T02, a duplicate request storm** (`docs/NEXT.md`): check that
-   `concurrency one_per_key` makes concurrent first reads of one key one
-   call, then write the task as T09 was, with the source's call counter.
+1. **Gate item 5**: state, with a recorded command, which bug classes
+   `pw check` refuses. On Pleris, nine of the eleven tasks' unsafe patches
+   are refused there; T02's and T09's are caught only by their hidden
+   tests. On Next.js and SvelteKit, every one is caught by tests: hidden
+   ones, or for T08 and T12 the contract's.
 2. **T07, a stale navigation request**: a page that navigates, so
    `on_key_change cancel` has a key to change.
-3. **Gate item 5**: from the ten tasks' unsafe controls, state with their
-   evidence which bug classes `pw check` makes unrepresentable. On Pleris,
-   nine of the ten unsafe patches are refused at `pw check`, and T09's is
-   caught only by its hidden tests. On Next.js and SvelteKit, every one is
-   caught by tests: hidden ones, or for T08 and T12 the contract's.
+3. **E14-E's design**, ready for the owner's choice of models and budget:
+   how the agent is run, and how a harness effect is told from capability
+   (gate item 4).
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).
