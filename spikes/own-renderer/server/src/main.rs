@@ -219,6 +219,8 @@ const IDENTITY: DevelopmentIdentityKey = DevelopmentIdentityKey;
 struct Shown {
     texts: BTreeMap<u32, String>,
     lists: BTreeMap<String, Vec<Value>>,
+    /// Each block a query decides, as rendered (ADR-0146).
+    blocks: BTreeMap<u32, String>,
 }
 
 struct Server {
@@ -1360,7 +1362,7 @@ impl Server {
             .bindings(session)
             .unwrap_or_else(|e| panic!("the store page's queries: {e}"));
         let now = self
-            .showing(&bindings)
+            .showing(session, &bindings)
             .unwrap_or_else(|e| panic!("the store page's values: {e}"));
 
         // Two frames per change: the entry advanced, and every place in the
@@ -1829,7 +1831,7 @@ impl Server {
             .bindings(session)
             .unwrap_or_else(|e| panic!("the store page's queries: {e}"));
         let shown = self
-            .showing(&bindings)
+            .showing(session, &bindings)
             .unwrap_or_else(|e| panic!("the store page's values: {e}"));
         let env = self.document_env(session, &bindings, &shown);
         let html =
@@ -1856,7 +1858,13 @@ impl Server {
         // request that simply never returned.
         let items = menu_items(&bindings["menu"]);
         let fragment = self.menu_fragment(&items);
-        let mut env = Env::new()
+        // Each binding's whole value, so a block a query decides, and what is
+        // inside it, reads any field of it (ADR-0146).
+        let mut env = Env::new();
+        for (name, value) in bindings {
+            env = env.set(name, val_to_value(value));
+        }
+        let mut env = env
             .set("menu", menu_value(&items))
             // The public fragment, EMITTED rather than rendered. Its instance
             // tokens are the fragment's own, so every reader's document
@@ -1905,7 +1913,7 @@ impl Server {
 
     /// **What a session's document shows, from its queries' values**
     /// (ADR-0145): each part's text, and each list a session's query fills.
-    fn showing(&self, bindings: &BTreeMap<String, Val>) -> Result<Shown, String> {
+    fn showing(&self, session: &str, bindings: &BTreeMap<String, Val>) -> Result<Shown, String> {
         let mut shown = Shown::default();
         for part in self.plan["parts"].as_array().into_iter().flatten() {
             let id = part["part"].as_u64().unwrap_or_default() as u32;
@@ -1921,6 +1929,15 @@ impl Server {
                 return Err(format!("`{list}` is not a list"));
             };
             shown.lists.insert(list, items);
+        }
+        // Each block a query decides, as it renders now (ADR-0146).
+        let env = self.document_env(session, bindings, &shown);
+        let template = self.store_template();
+        for block in self.plan["blocks"].as_array().into_iter().flatten() {
+            let id = block.as_u64().unwrap_or_default() as u32;
+            let html = pw_render::render_part(template, PartId(id), &env, &self.templates)
+                .map_err(|b| format!("block {id}: {b:?}"))?;
+            shown.blocks.insert(id, html);
         }
         Ok(shown)
     }
@@ -1970,6 +1987,16 @@ impl Server {
                 &env,
                 &self.templates,
             )?);
+        }
+        // Each block a query decides whose rendering changed, rendered again
+        // where it is (ADR-0146).
+        for (id, html) in &now.blocks {
+            if was.blocks.get(id) != Some(html) {
+                out.push(Targeted {
+                    target: PartAddress::new(&schema, LocalPartId(*id)),
+                    operation: PatchOp::ReplaceRange { html: html.clone() },
+                });
+            }
         }
         Ok(out)
     }
@@ -2204,6 +2231,32 @@ fn val_to_value(v: &Val) -> Value {
                 .map(|(n, v)| (n.replace('-', "_"), val_to_value(v)))
                 .collect(),
         ),
+        // A case, as a `{#match}` arm names it (ADR-0146): `Some`, `None`,
+        // `Ok` and `Err` as Pleris writes them, and a declared case by its
+        // WIT name (ADR-0061). A payload of several fields is a list.
+        Val::Variant(case, payload) => Value::Variant {
+            case: case.clone(),
+            payload: payload.as_deref().map(|v| Box::new(val_to_value(v))),
+        },
+        Val::Enum(case) => Value::Variant {
+            case: case.clone(),
+            payload: None,
+        },
+        Val::Option(v) => Value::Variant {
+            case: if v.is_some() { "Some" } else { "None" }.to_string(),
+            payload: v.as_deref().map(|v| Box::new(val_to_value(v))),
+        },
+        Val::Result(r) => {
+            let (case, v) = match r {
+                Ok(v) => ("Ok", v),
+                Err(v) => ("Err", v),
+            };
+            Value::Variant {
+                case: case.to_string(),
+                payload: v.as_deref().map(|v| Box::new(val_to_value(v))),
+            }
+        }
+        Val::Tuple(items) => Value::List(items.iter().map(val_to_value).collect()),
         other => Value::Text(format!("{other:?}")),
     }
 }
@@ -3638,6 +3691,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
             }
             PatchOp::RemoveInstance { .. } => "remove".to_string(),
             PatchOp::MoveInstance { after, .. } => format!("move after {}", after.is_some()),
+            PatchOp::ReplaceRange { html } => format!("range {:?}", visible(html)),
             other => format!("{other:?}"),
         };
         format!(
@@ -3769,6 +3823,84 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         assert!(
             got[1].starts_with("insert after true Cortado × 1"),
             "{got:?}"
+        );
+    }
+
+    /// The store, with a line its cart decides: a block a query decides
+    /// (ADR-0146).
+    fn with_block(app: &str) -> String {
+        let out = app.replacen(
+            "                <p id=\"cart-count\">{cart.line_count}</p>",
+            "                <p id=\"cart-count\">{cart.line_count}</p>\n                {#if cart.lines}<p id=\"ready\">Ready when you are.</p>{/if}",
+            1,
+        );
+        assert!(out.contains("{#if cart.lines}"));
+        out
+    }
+
+    #[test]
+    fn a_block_a_query_decides_is_rendered() {
+        let s = lines_server_with(with_block);
+        let (empty, _) = s.serve_document("a");
+        assert!(!visible(&empty).contains("Ready"), "{empty}");
+        s.command(ADD, "b", &add("espresso", 1), false)
+            .expect("runs");
+        let (held, _) = s.serve_document("b");
+        assert!(visible(&held).contains("Ready when you are."), "{held}");
+    }
+
+    #[test]
+    fn a_block_whose_rendering_changed_is_rendered_again() {
+        let s = lines_server_with(with_block);
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(CLEAR, "a", &[], false).expect("runs");
+        let sets: Vec<Vec<String>> = patch_sets(&s, "a")
+            .iter()
+            .map(|p| p.patches.iter().map(said).collect())
+            .collect();
+        assert_eq!(sets.len(), 3, "{sets:?}");
+        // Shown, with the first line: the count, and the block.
+        assert_eq!(sets[0].len(), 2, "{sets:?}");
+        assert!(
+            sets[0][1].starts_with("range \"Ready when you are.\""),
+            "{sets:?}"
+        );
+        // Still shown: the count alone.
+        assert_eq!(sets[1].len(), 1, "{sets:?}");
+        assert!(sets[1][0].starts_with("text \"2\""), "{sets:?}");
+        // Gone, with the last line.
+        assert_eq!(sets[2].len(), 2, "{sets:?}");
+        assert!(sets[2][1].starts_with("range \"\""), "{sets:?}");
+    }
+
+    #[test]
+    fn a_case_is_a_case() {
+        // As a `{#match}` arm names it (ADR-0146): `Some`, `None`, `Ok` and
+        // `Err` as Pleris writes them, and a declared case by its WIT name.
+        assert_eq!(
+            val_to_value(&Val::Enum("preparing".into())),
+            Value::Variant {
+                case: "preparing".into(),
+                payload: None
+            }
+        );
+        assert_eq!(
+            val_to_value(&Val::Option(Some(Box::new(Val::S64(3))))),
+            Value::Variant {
+                case: "Some".into(),
+                payload: Some(Box::new(Value::Int(3)))
+            }
+        );
+        assert_eq!(
+            val_to_value(&Val::Result(Err(Some(Box::new(Val::String("x".into())))))),
+            Value::Variant {
+                case: "Err".into(),
+                payload: Some(Box::new(Value::Text("x".into())))
+            }
         );
     }
 

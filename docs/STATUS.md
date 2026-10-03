@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-Q, fourth slice, ADR-0146, 2026-10-02: a block a query decides is
+rendered and kept current**
+([ADR-0146](DECISIONS/ADR-0146-a-block-a-query-decides-is-rendered-and-kept-current.md)).
+`{#if cart.lines}` and `{#match order.status}` on the store page now render,
+from each binding's whole value; a component's case reaches the renderer as
+a case. After a command the server sends a block again where its rendering
+changed, and not where it renders the same. What a loop's row reads of
+another query is refused, since a row is rendered again for its own item.
+T04 and T10 need this.
+
 **E14-Q, third slice, ADR-0145, 2026-10-02: a page keeps every part and list
 its queries decide current; T03 is written, six tasks of twelve**
 ([ADR-0145](DECISIONS/ADR-0145-a-page-keeps-what-its-queries-decide-current.md)).

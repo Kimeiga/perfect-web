@@ -1718,6 +1718,30 @@ e14-bind:
      } > docs/evidence/E14/bind.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/bind.txt
 
+# ADR-0146: a block a query decides is rendered and kept current. The plan's
+# tests, the server's, the browser's spec in three engines, and the mutation
+# controls, against one staged build.
+e14-query-blocks:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @{ echo "ADR-0146 - a block a query decides is rendered and kept current"; echo; \
+       echo "produced by: just e14-query-blocks"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the plan (compiler/pw-core/tests/page_blocks.rs)"; echo; \
+       cargo test --locked -p pw-core --test page_blocks 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser (e2e/resource-path.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/resource-path.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/query_blocks_mutations.py)"; echo; \
+       python3 scripts/query_blocks_mutations.py; \
+     } > docs/evidence/E14/query-blocks.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/query-blocks.txt
+
 # ADR-0145: a page keeps every part and list its queries decide current. The
 # server's tests, the protocol's, `pw-render --plan`'s, the browser's specs in
 # three engines, and the mutation controls, against one staged build.
@@ -1735,8 +1759,6 @@ e14-patch-set:
        cargo test --locked -p pw-protocol 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== pw-render --plan (runtime/pw-render/tests/plan_lists.rs)"; echo; \
        cargo test --locked -p pw-render --test plan_lists 2>&1 | grep -E '^(test |test result)'; \
-       echo; echo "== the plan (compiler/pw-core/tests/page_blocks.rs)"; echo; \
-       cargo test --locked -p pw-core --test page_blocks 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the browser (e2e/resource-path.spec.mjs, e2e/store.spec.mjs), three engines"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/resource-path.spec.mjs e2e/store.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \

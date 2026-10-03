@@ -717,8 +717,14 @@ function giveFocusBack(d) {
 /** Replace a block's range, its anchors included, with what was rendered,
  * and say what was put in its place. */
 function replaceBlock(id, html) {
-  const r = index.get(addressOf([], id));
-  if (!r?.start) return [];
+  return replaceRangeAt(addressOf([], id), html) ?? [];
+}
+
+/** The range at `key` replaced by `html`, or `null` where the document has
+ * no such range (ADR-0146). */
+function replaceRangeAt(key, html) {
+  const r = index.get(key);
+  if (!r?.start) return null;
   const parent = r.start.parentNode;
   const after = r.end.nextSibling;
   // A modal dialog the block showed is closed before it goes, so the browser
@@ -1177,7 +1183,11 @@ function applyFrame(frame) {
       for (const { target, operation: op } of frame.patches) {
         const key = addressKey(target);
         const applied =
-          op.op === "replace_text" ? setRange(key, op.text) : applyList(key, target.part, op);
+          op.op === "replace_text"
+            ? setRange(key, op.text)
+            : op.op === "replace_range"
+              ? replaceRangeAt(key, op.html) !== null
+              : applyList(key, target.part, op);
         if (!applied) {
           // The document is not what the server derived the change from, and
           // every later change would be derived from it too. Never "try

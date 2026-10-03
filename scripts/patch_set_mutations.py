@@ -11,15 +11,16 @@ Each mutant undoes one part:
 - the protocol: one change's patches as one `patch_set` frame;
 - `pw-render --plan`: a private list the values do not give is empty, and a
   shared one must be given;
-- the plan: a block a query decides is refused, until a host renders it;
 - the browser: a patch set applied, held once whole, and a document that
   cannot apply one read again.
 
 A server mutant must fail the server's tests, a protocol mutant
-`pw-protocol`'s, a renderer mutant `plan_lists.rs`, a plan mutant
-`page_blocks.rs`, and a browser mutant
+`pw-protocol`'s, a renderer mutant `plan_lists.rs`, and a browser mutant
 `e2e/resource-path.spec.mjs` or `e2e/store.spec.mjs` in Chromium, against
 the staged build: run `BUILD_ONLY=1 bash spikes/own-renderer/run.sh` first.
+
+ADR-0145's refusal of a block a query decides is ADR-0146's to plan, and
+its mutants are `query_blocks_mutations.py`'s.
 
 Run from the repository root; `just e14-patch-set` records the output. The
 source is restored after every mutant, whatever happens.
@@ -35,7 +36,6 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 PROTOCOL = ROOT / "runtime/pw-protocol/src/lib.rs"
 BIN = ROOT / "runtime/pw-render/src/bin/pw-render.rs"
-PLAN = ROOT / "compiler/pw-core/src/page_values.rs"
 SPIKE = ROOT / "spikes/own-renderer"
 RUNTIME = SPIKE / "public/pw-runtime.mjs"
 STAGED = SPIKE / "dist/pw-runtime.mjs"
@@ -127,13 +127,6 @@ MUTANTS = [
         "                            .any(|b| b[\"binding\"] == name);\n",
     ),
     (
-        "a block a query decides is planned as if it were not there",
-        "compiler",
-        PLAN,
-        "            && found.iter().any(|(n, ..)| n == root)\n        {\n            return Err(format!(\n",
-        "            && found.iter().any(|(n, ..)| n == root)\n            && false\n        {\n            return Err(format!(\n",
-    ),
-    (
         "the browser ignores a patch set",
         "browser",
         RUNTIME,
@@ -160,7 +153,6 @@ CARGO = {
     "server": ["cargo", "test", "--quiet", "-p", "pw-dev-server"],
     "protocol": ["cargo", "test", "--quiet", "--locked", "-p", "pw-protocol"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "plan_lists"],
-    "compiler": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "page_blocks"],
 }
 BROWSER = [
     "pnpm", "exec", "playwright", "test", "e2e/resource-path.spec.mjs", "e2e/store.spec.mjs",
@@ -191,7 +183,6 @@ def run_browser(_kind):
 
 
 RUNS = {
-    "compiler": run_cargo,
     "server": run_cargo,
     "protocol": run_cargo,
     "render": run_cargo,

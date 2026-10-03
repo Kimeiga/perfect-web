@@ -492,6 +492,62 @@ pub struct PageValues {
     /// The parts its signals decide.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub live: Vec<Live>,
+    /// **The blocks a query's value decides, at the top of the page**
+    /// (ADR-0146): a host renders each from the bindings' values, and again
+    /// when what it renders changed. A block inside one is rendered with it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blocks: Vec<u32>,
+}
+
+/// The names a page's queries are bound to.
+fn found_names<T, U>(found: &[(String, T, U)]) -> Vec<&str> {
+    found.iter().map(|(n, ..)| n.as_str()).collect()
+}
+
+/// **What a loop's row reads of a query besides its own item** (ADR-0146):
+/// refused, naming the part. A row is rendered again when its item changes
+/// (ADR-0145), and a value of another query read there would stay as it was
+/// when that query changed.
+fn in_rows(
+    chunks: &[crate::template_ir::Chunk],
+    queries: &[&str],
+    in_row: bool,
+) -> Result<(), String> {
+    use crate::template_ir::{Chunk, Part, Segment};
+    let root = |path: &str| path.split('.').next().unwrap_or_default().to_string();
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if in_row {
+            let read: Vec<String> = match p {
+                Part::Text { value, .. }
+                | Part::Attribute { value, .. }
+                | Part::BooleanAttribute { value, .. }
+                | Part::Conditional { value, .. }
+                | Part::Match { value, .. } => vec![root(value)],
+                Part::Each { collection, .. } => vec![root(collection)],
+                Part::InterpolatedAttribute { segments, .. } => segments
+                    .iter()
+                    .filter_map(|s| match s {
+                        Segment::Value(path) => Some(root(path)),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            };
+            if let Some(q) = read.iter().find(|r| queries.contains(&r.as_str())) {
+                return Err(format!(
+                    "part {} reads `{q}` inside a loop's row, and a row is rendered again for \
+                     its own item alone (ADR-0146)",
+                    p.id().map(|i| i.0).unwrap_or_default()
+                ));
+            }
+        }
+        let inner = in_row || matches!(p, Part::Each { .. });
+        for region in p.nested() {
+            in_rows(region, queries, inner)?;
+        }
+    }
+    Ok(())
 }
 
 /// **A body's signals, in order** (ADR-0130): each one's name and the
@@ -786,6 +842,11 @@ fn plan(
 
     // A block's collection, given whole: each binding the template iterates.
     let mut collections = Vec::new();
+    let mut blocks = Vec::new();
+    // What a loop's row reads of a query besides its own item is not
+    // rendered again when that query changes: the row is rendered again for
+    // its item (ADR-0145). Refused, until rows are (ADR-0146).
+    in_rows(&template.chunks, &found_names(&found), false)?;
     for entry in template.manifest() {
         if entry.kind == "each"
             && let Some(root) = entry.value.split('.').next()
@@ -794,19 +855,17 @@ fn plan(
         {
             collections.push(root.to_string());
         }
-        // A block a query's value decides is not planned yet: a host would
-        // render it without the value, and keep it current by nothing
-        // (ADR-0145). Refused here, so the build says so, where a server
-        // would have failed at the first render.
+        // A block a query's value decides (ADR-0146): a host renders it,
+        // and renders it again when what it renders changed. At the top of
+        // the page, or inside such a block, which renders it again with it.
         if matches!(entry.kind, "conditional" | "match")
             && let Some(root) = entry.value.split('.').next()
             && found.iter().any(|(n, ..)| n == root)
+            && template.chunks.iter().any(
+                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),
+            )
         {
-            return Err(format!(
-                "part {} is a block `{}` decides, a query's value, and a host renders \
-                 no block a query decides yet (E14-Q)",
-                entry.id.0, entry.value
-            ));
+            blocks.push(entry.id.0);
         }
         // A block a signal decides (ADR-0130). What the browser cannot
         // render again was refused above (ADR-0137).
@@ -839,6 +898,7 @@ fn plan(
             collections,
             signals: Vec::new(),
             live,
+            blocks,
         },
         members,
     ))

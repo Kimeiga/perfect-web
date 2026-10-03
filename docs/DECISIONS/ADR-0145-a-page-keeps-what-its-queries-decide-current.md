@@ -53,7 +53,8 @@ basis, and the second would be refused as advancing nothing.
    with no patches is still sent: the document reflects the new version when
    nothing it shows changed. The single `patch` frame stays, for the menu's
    broadcast.
-4. **A block a query decides is refused by the plan, for now.** Found while
+4. **A block a query decides is refused by the plan, for now** (planned
+   and kept current since ADR-0146). Found while
    building this: such a block was left out of the plan, so a host had no
    value for its subject. The store with `{#if cart.lines}` checked and
    built, and the server failed at its first render. `pw build` refuses the

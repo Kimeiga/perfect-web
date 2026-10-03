@@ -174,11 +174,12 @@ refused by name:
   handler that captures a restricted parameter is refused at the view, even
   where every page using it could hold the value. The Marko adapter composes
   no view that holds or names a signal.
-- **The server patches a page's text parts and its lists, by difference**
-  (ADR-0145). A block a query's value decides is refused by the plan, so
-  `pw build` refuses its page, until a host renders and patches one (E14-Q).
-  An interpolated attribute renders and is not patched, and neither is a
-  shared list other than the menu. kiokun's pages are static.
+- **The server patches a page's text parts, its lists and the blocks its
+  queries decide, by difference** (ADR-0145, ADR-0146). What a loop's row
+  reads of another query is refused by the plan. An interpolated attribute
+  renders and is not patched, and neither is a shared list other than the
+  menu. A query's error is the server's failure, not a value a page shows.
+  kiokun's pages are static.
 - **A clause's words are the clause's** (ADR-0047). Every name resolves in
   lexical scope, but `scope application`'s `application`, or `load`'s
   `on_first_interaction`, is a word of its clause and not a name. A word

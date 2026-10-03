@@ -274,3 +274,28 @@ test("a patch set the document cannot apply whole reloads it", async ({ page }) 
   expect(await page.evaluate(() => window.__t)).toBeUndefined();
   await expect(page.locator("#cart-count")).toHaveText("0");
 });
+
+// ADR-0146: a block a query decides is rendered again where it is.
+test("a patch set renders a range again where it is", async ({ page }) => {
+  await ready(page);
+  const parts = await page.evaluate(() => window.__pw.parts);
+  const menu = parts.parts.find((p) => p.kind === "each");
+  await page.evaluate(
+    ({ schema, part }) =>
+      window.__pwTestApply({
+        frame: "patch_set",
+        protocol: 1,
+        basis: { resources: [{ entry: "a-block's-entry", version: 1 }] },
+        patches: [
+          {
+            target: { template: schema, instances: [], part },
+            operation: { op: "replace_range", html: '<li id="swapped">Swapped</li>' },
+          },
+        ],
+      }),
+    { schema: parts.schema, part: menu.id },
+  );
+  await expect(page.locator("#menu #swapped")).toHaveText("Swapped");
+  await expect(page.locator("#menu li")).toHaveCount(1);
+  expect(await page.evaluate(() => window.__pwHeld()["a-block's-entry"])).toBe(1);
+});

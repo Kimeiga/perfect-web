@@ -64,9 +64,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
      fill, and keeps a page current by difference, in one frame per change.
      All four controls hold on all three stacks; Pleris's unsafe patch is
      refused by `pw check` (PW5001).
-   - **Next: a block a query decides**, rendered and patched by the host
-     (E14-Q): the plan refuses one today (ADR-0145). T10's loading and error
-     states need it.
+   - ~~**A block a query decides.**~~ Done 2026-10-02 (ADR-0146): planned,
+     rendered from each binding's whole value, and sent again where its
+     rendering changed.
    - **Then T04, an order-state variant**, which needs an order resource in
      all three stores. Then T02, T09 and T10, which need a data source that
      can be slow, fail and count its calls, in all three stacks; T07 needs a

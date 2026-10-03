@@ -1127,3 +1127,16 @@ and keeps a page current by difference.
 Until then the store patched its cart count and its menu by name, and a page
 listing a private query's values did not render. T03 is gradable on Pleris
 since.
+
+[ADR-0146](DECISIONS/ADR-0146-a-block-a-query-decides-is-rendered-and-kept-current.md):
+E14-Q's fourth slice.
+- The page plan names each block a query's value decides at the top of the
+  page.
+- The server gives the renderer each binding's whole value, and a
+  component's case as a case.
+- After a command, the server sends `ReplaceRange` for each block whose
+  rendering changed, and none for one that renders the same.
+- What a loop's row reads of another query is refused, since a row is
+  rendered again for its own item alone.
+
+This replaces ADR-0145's refusal of such a block.
