@@ -133,6 +133,8 @@ command clear_cart()
 }
 
 page StorePage(id: StoreId) {
+    // Charter §15.3: the store's address, which gives its id (ADR-0160).
+    route     "/stores/{id}"
     placement origin
     cache private
 

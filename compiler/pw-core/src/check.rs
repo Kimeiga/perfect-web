@@ -222,6 +222,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // ADR-0157: a command is one request a page's handler sends, and
             // what it answers is whether it committed.
             out.extend(called_outside_a_handler(&u.hir, i, &sigs));
+            // ADR-0160: a page is served at its route, which gives its
+            // parameters, and one route is one page's.
+            out.extend(crate::routes::parameters_agree(&u.hir, i, &sigs));
+            out.extend(crate::routes::declared_twice(&hirs, i));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             out.extend(check_unit_with(
                 &env,

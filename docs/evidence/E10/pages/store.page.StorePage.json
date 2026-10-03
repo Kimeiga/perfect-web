@@ -1,5 +1,6 @@
 {
   "page": "store.page.StorePage",
+  "route": "/stores/{id}",
   "params": [
     "id"
   ],

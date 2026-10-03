@@ -131,6 +131,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
      The benchmark's store discards by name, with T11 re-based.
    - **Next: the audit's remaining gaps, in its order.**
      1. The route `/stores/{id}`, and more than one store.
+        - ~~The compiler's half~~ (ADR-0160): the plan carries the route,
+          and PW0340, PW0621 and PW0341 hold it to its page.
+        - **Next: each document its own subscriber.** The server keeps one
+          subscriber per session. Serving a document clears the session's
+          undelivered frames, so a second tab can make the first miss a
+          change, and two stores in two tabs would be sent each other's
+          patches.
+        - Then the store served at its route, beside a second store, with
+          §15.6 test 11 end to end.
      2. The recommendation and estimate slots in the store itself, with T05
         and T10 re-based.
      3. Decrement, remove, and a per-line cart.

@@ -13,6 +13,21 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0160, 2026-10-03: a page's route**
+([ADR-0160](DECISIONS/ADR-0160-a-page-s-route.md)). The compiler's half of the
+audit's route gap. A route was read only to check links: nothing tied its
+`{id}` to the page's parameter, and the plan did not carry it.
+- The plan now carries the page's route.
+- A route names each of its page's parameters once (PW0340), each is text
+  (PW0621), and one route is one page's (PW0341).
+- The canonical store declares `route "/stores/{id}"`.
+
+The server still serves the store at `/StorePage.html`. Each document
+becomes its own subscriber first: the session-wide model clears a session's
+undelivered frames when another of its documents is served, so one of two
+tabs can miss a change. Then the store is served at its route, beside a
+second store. Nine mutants (`just e14-routes`).
+
 **ADR-0159, 2026-10-03: a handler handles what its command answers**
 ([ADR-0159](DECISIONS/ADR-0159-a-handler-handles-what-its-command-answers.md)).
 What ADR-0157 left open: a handler could read its command's answer, and

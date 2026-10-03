@@ -1843,6 +1843,24 @@ e14-handler-failures:
      } > docs/evidence/E14/handler-failures.txt
     @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/handler-failures.txt
 
+# ADR-0160: a page's route. The plan carries it, and the rules hold a route
+# to its page's parameters (PW0340, PW0621) and to one page (PW0341).
+e14-routes:
+    @cargo build --quiet --locked -p pw-cli
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0160 - a page's route"; echo; \
+       echo "produced by: just e14-routes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the tests (compiler/pw-core/tests/routes.rs)"; echo; \
+       cargo test --locked -p pw-core --test routes 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store declares its route, and checks"; echo; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/routes_mutations.py)"; echo; \
+       python3 scripts/routes_mutations.py; \
+     } > docs/evidence/E14/routes.txt
+    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/routes.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

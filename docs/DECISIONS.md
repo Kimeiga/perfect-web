@@ -1288,3 +1288,13 @@ command's answer, or discards it by name. A block ending in a binding
 compiles, so that discard can end a handler. The canonical store shows every
 refusal. The benchmark's store discards each answer by name, its behaviour
 unchanged, with T11's patches re-based.
+
+[ADR-0160](DECISIONS/ADR-0160-a-page-s-route.md): the compiler's half of
+the audit's route gap.
+- The page plan carries a page's route, read by one reader with the link
+  check.
+- PW0340: a route is `/` and segments, a word or a `{parameter}` each, and
+  names each of its page's parameters once.
+- PW0621: a route's parameter is text.
+- PW0341: one route is one page's.
+- The canonical store declares `/stores/{id}`.

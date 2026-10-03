@@ -178,6 +178,13 @@ codes! {
     // policies, and the checker and the backend typed the call differently.
     COMMAND_OUTSIDE_A_HANDLER = "PW0339" / command_outside_a_handler / 1, DeclarationRules,
         "a command is called only by a page's handler";
+    // ADR-0160: a page is served at its route, and the address gives its
+    // parameters. A route that named one the page lacks, or left one out,
+    // served a page with a parameter nothing gave.
+    ROUTE_NAMES_ITS_PARAMETERS = "PW0340" / route_names_its_parameters / 1, DeclarationRules,
+        "a route is `/` and segments, a word or a `{parameter}` each, and names each of its page's parameters once";
+    ROUTE_DECLARED_TWICE = "PW0341" / route_declared_twice / 1, DeclarationRules,
+        "one route is one page's: an address names the page it is for";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 
@@ -332,6 +339,10 @@ codes! {
     // ADR-0157: a command answers `Ok` without its value, which reaches the
     // page from a query. A handler that bound it read nothing, and was told
     // so only by the backend, in terms of the value's type.
+    // ADR-0160: an address carries text, and a route's parameter is given
+    // what its segment says.
+    ROUTE_PARAMETER_IS_TEXT = "PW0621" / route_parameter_is_text / 1, Types,
+        "a route's parameter is text: a `String`, or an opaque type over one";
     ANSWER_READ_FOR_A_VALUE = "PW0620" / answer_read_for_a_value / 1, Types,
         "what a command answers carries no value: a handler matches `Ok(_)`, and reads the value from a query";
 

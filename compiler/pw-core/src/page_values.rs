@@ -506,6 +506,11 @@ pub struct Stream {
 pub struct PageValues {
     /// The page's template path: `store.page.StorePage`.
     pub page: String,
+    /// **Where the page is served** (ADR-0160): its `route` clause, a
+    /// `{name}` segment for each parameter, which the address carries.
+    /// `None` for a page that declares no route.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route: Option<String>,
     pub params: Vec<String>,
     pub bindings: Vec<Binding>,
     /// Each text part outside a block.
@@ -1061,6 +1066,7 @@ fn plan(
     Ok((
         PageValues {
             page,
+            route: crate::routes::declared_route(hir, decl),
             params,
             bindings,
             parts,

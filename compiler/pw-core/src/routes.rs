@@ -20,40 +20,46 @@ pub fn table(hirs: &[&Hir]) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for hir in hirs {
         for (_, decl) in hir.all_decls() {
-            // **The policy first, the body scan second** — the same order
-            // `declared_world` and `declared_cache` use, and for the same
-            // reason. `route "/stores/{id}"` was a bare `Name` pair in a page's
-            // executable body until 2026-08-11, when UI declarations began
-            // parsing their policies inside their braces (architect ruling,
-            // policy values leave the executable body tree). This reader was
-            // the one that still looked only in the body, and `R-023` lost its
-            // catch: with no route table, every link is checked against
-            // nothing.
-            if let Some(p) = decl.policy("route") {
-                let v = p.value.trim();
-                if !v.is_empty() {
-                    out.insert(v.trim_matches('"').to_string());
-                    continue;
-                }
-            }
-            let Some(body_id) = decl.body else { continue };
-            let body = hir.body(body_id);
-            let Expr::Block { stmts } = body.expr(body.root) else {
-                continue;
-            };
-            let mut it = stmts.iter().peekable();
-            while let Some(s) = it.next() {
-                if !matches!(body.expr(*s), Expr::Name(n) if n == "route") {
-                    continue;
-                }
-                let Some(next) = it.peek() else { continue };
-                if let Some(path) = body.string_text(**next) {
-                    out.insert(path.trim_matches('"').to_string());
-                }
-            }
+            out.extend(declared_route(hir, decl));
         }
     }
     out
+}
+
+/// **The route a declaration declares**, as written: `/stores/{id}`. What
+/// the link check matches against, and where a host serves the page
+/// (ADR-0160), so the two cannot read a route two ways.
+///
+/// **The policy first, the body scan second** — the same order
+/// `declared_world` and `declared_cache` use, and for the same reason.
+/// `route "/stores/{id}"` was a bare `Name` pair in a page's executable body
+/// until 2026-08-11, when UI declarations began parsing their policies inside
+/// their braces (architect ruling, policy values leave the executable body
+/// tree). This reader was the one that still looked only in the body, and
+/// `R-023` lost its catch: with no route table, every link is checked
+/// against nothing.
+pub(crate) fn declared_route(hir: &Hir, decl: &crate::hir::Decl) -> Option<String> {
+    if let Some(p) = decl.policy("route") {
+        let v = p.value.trim();
+        if !v.is_empty() {
+            return Some(v.trim_matches('"').to_string());
+        }
+    }
+    let body = hir.body(decl.body?);
+    let Expr::Block { stmts } = body.expr(body.root) else {
+        return None;
+    };
+    let mut it = stmts.iter().peekable();
+    while let Some(s) = it.next() {
+        if !matches!(body.expr(*s), Expr::Name(n) if n == "route") {
+            continue;
+        }
+        let Some(next) = it.peek() else { continue };
+        if let Some(path) = body.string_text(**next) {
+            return Some(path.trim_matches('"').to_string());
+        }
+    }
+    None
 }
 
 pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
@@ -132,6 +138,235 @@ pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
             }
         }
     }
+}
+
+/// **A route and its page's parameters agree** (ADR-0160). A route is `/`
+/// and segments, each a word or a `{parameter}`; it names each of the page's
+/// parameters once and nothing else, so the address gives every one; and
+/// each is text, what a segment carries (PW0340, PW0621).
+pub fn parameters_agree(
+    hir: &Hir,
+    unit: usize,
+    sigs: &crate::signatures::Signatures,
+) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if decl.kind != crate::hir::DeclKind::Page {
+            continue;
+        }
+        let Some(route) = declared_route(hir, decl) else {
+            continue;
+        };
+        let at = hir.decl_span(id);
+        let refuse = |out: &mut Vec<Diagnostic>, message: String, repair: String| {
+            let code = codes::ROUTE_NAMES_ITS_PARAMETERS;
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "route_names_its_parameters",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: at.clone(),
+                related: Vec::new(),
+                explanation: Some(
+                    "A page is served at its route, and the address gives its parameters, \
+                     one segment each (ADR-0160). A parameter the route does not name \
+                     would be given nothing, and a name that is no parameter would be \
+                     given to nothing."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: repair,
+                    replacement: None,
+                }],
+            });
+        };
+        let segments: Vec<&str> = match route.as_str() {
+            "/" => Vec::new(),
+            r => r.strip_prefix('/').unwrap_or(r).split('/').collect(),
+        };
+        let word = |s: &str| {
+            !s.is_empty()
+                && s.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~'))
+        };
+        let mut named: Vec<&str> = Vec::new();
+        let mut malformed = !route.starts_with('/');
+        for s in &segments {
+            match s.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
+                Some(name) if word(name) => named.push(name),
+                _ if word(s) => {}
+                _ => malformed = true,
+            }
+        }
+        if malformed {
+            refuse(
+                &mut out,
+                format!(
+                    "`{route}` is not a route: it is `/` and segments, a word or a \
+                     `{{parameter}}` each"
+                ),
+                "write the route as `/` and segments, `/stores/{id}`".to_string(),
+            );
+            continue;
+        }
+        let params: Vec<&str> = decl.params.iter().map(|p| p.name.as_str()).collect();
+        for (i, name) in named.iter().enumerate() {
+            if !params.contains(name) {
+                refuse(
+                    &mut out,
+                    format!(
+                        "`{route}` names `{name}`, which is not a parameter of `{}`",
+                        decl.name
+                    ),
+                    format!("name a parameter of `{}`, or declare `{name}`", decl.name),
+                );
+            } else if named[..i].contains(name) {
+                refuse(
+                    &mut out,
+                    format!("`{route}` names `{name}` twice"),
+                    format!("name `{name}` once"),
+                );
+            }
+        }
+        for p in &params {
+            if !named.contains(p) {
+                refuse(
+                    &mut out,
+                    format!(
+                        "`{route}` does not name `{p}`, a parameter of `{}`: the address \
+                         would not give it",
+                        decl.name
+                    ),
+                    format!("add a `{{{p}}}` segment"),
+                );
+            }
+        }
+        // Each parameter the route gives is text (PW0621).
+        let def = crate::resolve::DefId { unit, decl: id.0 };
+        let Some(sig) = sigs.by_def(def) else {
+            continue;
+        };
+        for (i, p) in decl.params.iter().enumerate() {
+            let Some(ty) = sig
+                .params
+                .get(i)
+                .and_then(Option::as_ref)
+                .and_then(crate::resolved::TypeResolution::resolved)
+            else {
+                continue;
+            };
+            if !named.contains(&p.name.as_str()) || is_text(sigs, ty) {
+                continue;
+            }
+            let code = codes::ROUTE_PARAMETER_IS_TEXT;
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "route_parameter_is_text",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!(
+                    "`{}`'s parameter `{}` is of type `{}`, and an address gives it text",
+                    decl.name,
+                    p.name,
+                    ty.display_name()
+                ),
+                primary_span: at.clone(),
+                related: Vec::new(),
+                explanation: Some(
+                    "A route's segment is text, and its parameter is given what the segment \
+                     says, decoded (ADR-0160). A `String`, or an opaque type over one such as \
+                     an id, takes it whole; a number or a flag would need decoding the \
+                     route does not declare."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "declare the parameter a `String`, or an opaque type over one"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// A `String`, or an opaque type whose representation is one.
+fn is_text(sigs: &crate::signatures::Signatures, ty: &crate::resolved::ResolvedType) -> bool {
+    use crate::resolved::Primitive;
+    if ty.as_primitive() == Some(Primitive::Str) {
+        return true;
+    }
+    ty.def_id()
+        .and_then(|d| sigs.type_decl(d))
+        .and_then(|t| t.representation.as_ref())
+        .and_then(crate::resolved::TypeResolution::resolved)
+        .is_some_and(|r| r.as_primitive() == Some(Primitive::Str))
+}
+
+/// **One route is one page's** (ADR-0160, PW0341): two pages at one route,
+/// its parameters' names aside, leave an address naming two pages. Reported
+/// on each page of `unit` that shares its route with a page before it.
+pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
+    let shape = |route: &str| -> String {
+        route
+            .split('/')
+            .map(|s| match s.starts_with('{') && s.ends_with('}') {
+                true => "{}",
+                false => s,
+            })
+            .collect::<Vec<_>>()
+            .join("/")
+    };
+    let mut first: std::collections::BTreeMap<String, (usize, String)> =
+        std::collections::BTreeMap::new();
+    let mut out = Vec::new();
+    for (u, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != crate::hir::DeclKind::Page {
+                continue;
+            }
+            let Some(route) = declared_route(hir, decl) else {
+                continue;
+            };
+            match first.get(&shape(&route)) {
+                None => {
+                    first.insert(shape(&route), (u, decl.name.clone()));
+                }
+                Some((_, other)) if u == unit => {
+                    let code = codes::ROUTE_DECLARED_TWICE;
+                    out.push(Diagnostic {
+                        code: code.id,
+                        invariant: code.invariant,
+                        reason: "route_declared_twice",
+                        detector: Detector::DeclarationRule,
+                        severity: Severity::Error,
+                        message: format!(
+                            "`{}` is served at `{route}`, and so is `{other}`",
+                            decl.name
+                        ),
+                        primary_span: hir.decl_span(id),
+                        related: Vec::new(),
+                        explanation: Some(
+                            "A page is served at its route (ADR-0160), and an address must \
+                             say which page it is for: two pages at one route, whatever \
+                             their parameters are called, leave it to whichever is found \
+                             first."
+                                .to_string(),
+                        ),
+                        repairs: vec![Repair {
+                            description: "give each page a route of its own".to_string(),
+                            replacement: None,
+                        }],
+                    });
+                }
+                Some(_) => {}
+            }
+        }
+    }
+    out
 }
 
 /// Does this program own the target?
