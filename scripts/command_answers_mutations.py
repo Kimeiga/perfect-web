@@ -88,8 +88,10 @@ MUTANTS = [
         "a handler that matches on its call is named nothing",
         "cargo",
         TEMPLATE,
-        "        Expr::Match { scrutinee, .. } => *scrutinee,\n",
-        "        Expr::Match { .. } => *inner,\n",
+        # Re-anchored by ADR-0159: one walk names a match, a binding and a
+        # block's call.
+        "        Expr::Match { scrutinee, .. } => named_call(body, *scrutinee),\n",
+        "        Expr::Match { .. } => None,\n",
     ),
     (
         "PW0339: a command may be called from anywhere",

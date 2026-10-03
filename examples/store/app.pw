@@ -139,7 +139,7 @@ page StorePage(id: StoreId) {
     let store = query Store(id)
     let menu = query Menu(id)
     let cart = query Cart(current_session())
-    // What the cart last had to say: an item sold out as it was added.
+    // What the cart last had to say: a refusal of an add or a clear.
     signal notice: String = ""
 
     view {
@@ -154,8 +154,9 @@ page StorePage(id: StoreId) {
                             <button
                                 type="button"
                                 on:press={resumable(captures = { item }) => match add_to_cart(item.id, PositiveInt(1)) {
+                                    Ok(_) => notice = "",
                                     Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
-                                    _ => notice = "",
+                                    Err(_) => notice = "That item could not be added.",
                                 }}
                             >
                                 Add
@@ -171,7 +172,10 @@ page StorePage(id: StoreId) {
                 <button
                     id="clear-cart"
                     type="button"
-                    on:press={resumable() => clear_cart()}
+                    on:press={resumable() => match clear_cart() {
+                        Ok(_) => notice = "",
+                        Err(_) => notice = "The cart could not be cleared.",
+                    }}
                 >
                     Clear
                 </button>

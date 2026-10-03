@@ -1818,6 +1818,31 @@ e14-command-answers:
      } > docs/evidence/E14/command-answers.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/command-answers.txt
 
+# ADR-0159: a handler handles what its command answers. The rule, the
+# discard by name compiled, the stores and the demos checked, and the mutation
+# controls; every task's Pleris controls are `just e14-pleris-controls`.
+e14-handler-failures:
+    @cargo build --quiet --locked -p pw-cli
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0159 - a handler handles what its command answers"; echo; \
+       echo "produced by: just e14-handler-failures"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/results_handled.rs)"; echo; \
+       cargo test --locked -p pw-core --test results_handled 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the compiled handlers, a discard by name among them (compiler/pw-core/tests/handlers.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the canonical store with its demos, the benchmark's store, kiokun"; echo; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw benchmarks/baselines/pleris/domain.pw benchmarks/baselines/pleris/lib/*.pw benchmarks/baselines/pleris/store/*.pw 2>&1 | tail -1; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/handler_failures_mutations.py)"; echo; \
+       python3 scripts/handler_failures_mutations.py; \
+       echo; echo "== ADR-0099's, against the walk ADR-0159 rewrote (scripts/results_handled_mutations.py)"; echo; \
+       python3 scripts/results_handled_mutations.py; \
+     } > docs/evidence/E14/handler-failures.txt
+    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/handler-failures.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

@@ -60,8 +60,9 @@ MUTANTS = [
         "pleris",
         "Add adds two",
         STORE_PW,
-        "add_to_cart(item.id, PositiveInt(1))}",
-        "add_to_cart(item.id, PositiveInt(2))}",
+        # Re-anchored by ADR-0159: the store discards the answer by name.
+        "add_to_cart(item.id, PositiveInt(1)) }",
+        "add_to_cart(item.id, PositiveInt(2)) }",
     ),
 ]
 

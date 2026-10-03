@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `a6ed637`, with ADR-0157.
+**Reviewed:** 2026-10-03, against master `231eb51`, with ADR-0159.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,29 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0159, 2026-10-03: a handler handles what its command answers**
+([ADR-0159](DECISIONS/ADR-0159-a-handler-handles-what-its-command-answers.md)).
+What ADR-0157 left open: a handler could read its command's answer, and
+nothing made it.
+- **The same dropped failure had been judged three ways.**
+  - As a statement in a handler, it was refused.
+  - As the handler's last value, `=> clear_cart()`, it compiled, and the
+    press looked as though it worked.
+  - Handed on by `?` or `return`, it checked, and only the backend refused
+    it.
+- **Now PW0618 refuses all three.** A handler matches the answer, or
+  discards it by name, `let _ignored = ..`.
+- **Correction: that discard could not end a handler.** The backend refused
+  a block ending in a binding. It compiles now.
+- **The canonical store shows every refusal.** Its Add handler's catch-all
+  had hidden all but "sold out", and its Clear handler dropped its answer.
+- **The benchmark's store discards each answer by name**, its behaviour
+  unchanged, with T11's patches re-based. Every task's Pleris patches check
+  as before.
+
+Six mutants for the rule, and ADR-0099's seven re-anchored
+(`just e14-handler-failures`).
 
 **ADR-0158, 2026-10-03: a test leaves nothing behind**
 ([ADR-0158](DECISIONS/ADR-0158-a-test-leaves-nothing-behind.md)). The tests

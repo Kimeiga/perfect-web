@@ -1079,24 +1079,31 @@ pub(crate) fn module_signal(
 ///
 /// `on:press={resumable(..) => add_to_cart(..)}` is `add_to_cart`, and so is
 /// a handler that matches on what the call answered, `=> match add_to_cart(..)
-/// { .. }` (ADR-0157): what it does with the answer is how it reacts, and the
-/// behaviour is still the call's. Empty when the handler is not a lambda that
-/// calls a named thing — in which case there is no separately loadable
+/// { .. }` (ADR-0157), or discards it by name, `=> { let _added =
+/// add_to_cart(..) }` (ADR-0159): what it does with the answer is how it
+/// reacts, and the behaviour is still the call's. In a block, the first
+/// statement of one of those forms. Empty when the handler is not a lambda
+/// that calls a named thing — in which case there is no separately loadable
 /// behaviour to name, and the runtime says so rather than guessing.
 pub(crate) fn called_name(body: &Body, expr: crate::hir::ExprId) -> String {
     let Expr::Lambda { body: inner, .. } = body.expr(expr) else {
         return String::new();
     };
-    let call = match body.expr(*inner) {
-        Expr::Match { scrutinee, .. } => *scrutinee,
-        _ => *inner,
-    };
-    let Expr::Call { callee, .. } = body.expr(call) else {
-        return String::new();
-    };
-    match body.expr(*callee) {
-        Expr::Name(n) => n.clone(),
-        _ => String::new(),
+    named_call(body, *inner).unwrap_or_default()
+}
+
+/// The name a call is made by, where `e` is the call, a `match` on it, a
+/// binding of it, or a block with one of those as a statement: the first.
+fn named_call(body: &Body, e: crate::hir::ExprId) -> Option<String> {
+    match body.expr(e) {
+        Expr::Call { callee, .. } => match body.expr(*callee) {
+            Expr::Name(n) => Some(n.clone()),
+            _ => None,
+        },
+        Expr::Match { scrutinee, .. } => named_call(body, *scrutinee),
+        Expr::Let { init: Some(i), .. } => named_call(body, *i),
+        Expr::Block { stmts } => stmts.iter().find_map(|s| named_call(body, *s)),
+        _ => None,
     }
 }
 

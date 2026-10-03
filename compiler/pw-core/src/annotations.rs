@@ -67,8 +67,10 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
 ///
 /// Which values are used: a statement's is not, nor a `for` body's, nor a
 /// body declared `-> ()`'s last. A lambda's body is its result, used by
-/// whoever calls it: a handler's command answer is the runtime's to drop
-/// (KNOWN_LIMITATIONS).
+/// whoever calls it, except a handler's: the runtime calls it, and drops what
+/// it gives back, its last value, a value it `return`s and the failure a `?`
+/// returns (ADR-0159). Until 2026-10-03 a handler's command answer was the
+/// runtime's to drop, since a handler could not read it (ADR-0157).
 fn results_are_handled(
     types: &crate::infer::Types<'_>,
     body: &Body,
@@ -80,44 +82,87 @@ fn results_are_handled(
         .ret
         .as_ref()
         .is_none_or(|t| matches!(t.written().as_str(), "()" | ""));
+    let handlers: std::collections::BTreeSet<crate::hir::ExprId> =
+        crate::resume::handlers_in(body).into_iter().collect();
     let mut dropped = Vec::new();
-    unused(body, body.root, !returns_unit, &mut dropped);
-    for e in dropped {
+    let fate = match returns_unit {
+        true => Fate::Dropped,
+        false => Fate::Used,
+    };
+    unused(body, body.root, fate, false, &handlers, &mut dropped);
+    for (e, fate) in dropped {
         let Some(ty) = types.of(body, e) else {
             continue;
         };
         if ty.as_builtin() != Some(crate::resolved::Builtin::Result) {
             continue;
         }
+        let ty = ty.display_name();
+        let (reason, message, explanation, repair) = match fate {
+            Fate::ToTheRuntime => (
+                "handler_result_dropped",
+                format!(
+                    "this handler gives the runtime its `{ty}`, which the runtime drops, and its failure with it"
+                ),
+                "A handler's value goes to the runtime that called it, which does \
+                 nothing with it: a failure the handler does not take apart goes \
+                 unshown, and the press looks as though it worked (ADR-0159). That is \
+                 its last value, a value it returns, and the failure a `?` returns.",
+                "take it apart with `match` and show its failure, or discard it by \
+                 name, `let _ignored = ..`",
+            ),
+            Fate::FailureToTheRuntime => (
+                "handler_failure_dropped",
+                format!("`?` gives the runtime this `{ty}`'s failure, which the runtime drops"),
+                "A handler's `?` returns its failure to the runtime that called the \
+                 handler, which does nothing with it: the failure goes unshown, and the \
+                 press looks as though it worked (ADR-0159).",
+                "take it apart with `match` and show its failure, or discard it by \
+                 name, `let _ignored = ..`",
+            ),
+            _ => (
+                "result_dropped",
+                format!("this `{ty}` is dropped, and its failure with it"),
+                "A `Result` carries a failure, and a value nothing uses handles neither \
+                 of its cases: the program goes on as though it had succeeded. Until \
+                 2026-09-26 a statement's `Result` was dropped without a word.",
+                "pass the failure on with `?`, handle it with `match`, or discard it \
+                 by name, `let _ignored = ..`",
+            ),
+        };
         out.push(Diagnostic {
             code: codes::RESULT_DROPPED.id,
             invariant: codes::RESULT_DROPPED.invariant,
-            reason: "result_dropped",
+            reason,
             detector: Detector::PatternMatrix,
             severity: Severity::Error,
-            message: format!(
-                "this `{}` is dropped, and its failure with it",
-                ty.display_name()
-            ),
+            message,
             primary_span: body.expr_span(e),
             related: vec![Related {
                 span: at.clone(),
                 label: format!("inside `{}`", decl.name),
             }],
-            explanation: Some(
-                "A `Result` carries a failure, and a value nothing uses handles neither \
-                 of its cases: the program goes on as though it had succeeded. Until \
-                 2026-09-26 a statement's `Result` was dropped without a word."
-                    .to_string(),
-            ),
+            explanation: Some(explanation.to_string()),
             repairs: vec![Repair {
-                description: "pass the failure on with `?`, handle it with `match`, or \
-                              discard it by name, `let _ignored = ..`"
-                    .to_string(),
+                description: repair.to_string(),
                 replacement: None,
             }],
         });
     }
+}
+
+/// **What becomes of a value** (ADR-0099, ADR-0159).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Fate {
+    /// Something reads it.
+    Used,
+    /// Nothing does: a statement's value.
+    Dropped,
+    /// A handler gives it to the runtime that called it, which drops it.
+    ToTheRuntime,
+    /// A handler's `?` gives the runtime its failure, which the runtime
+    /// drops.
+    FailureToTheRuntime,
 }
 
 /// Is `id` the head of a clause whose value is executable code, written as a
@@ -134,10 +179,23 @@ fn executable_head(body: &Body, id: crate::hir::ExprId) -> bool {
     crate::policy::domain_of(name) == Some(crate::policy::Domain::Body)
 }
 
-/// The expressions under `id` whose value nothing uses, where `used` says
-/// whether `id`'s own is. A block, an `if` and a `match` pass their value
-/// on; everything else uses what it contains.
-fn unused(body: &Body, id: crate::hir::ExprId, used: bool, out: &mut Vec<crate::hir::ExprId>) {
+/// The expressions under `id` whose value nothing uses, each with what
+/// becomes of it, where `fate` is what becomes of `id`'s own. A block, an
+/// `if` and a `match` pass their value on; everything else uses what it
+/// contains. `handler` says whether `id` is in a handler's own body, where a
+/// value returned, and a failure `?` returns, go to the runtime.
+fn unused(
+    body: &Body,
+    id: crate::hir::ExprId,
+    fate: Fate,
+    handler: bool,
+    handlers: &std::collections::BTreeSet<crate::hir::ExprId>,
+    out: &mut Vec<(crate::hir::ExprId, Fate)>,
+) {
+    let returned_to = match handler {
+        true => Fate::ToTheRuntime,
+        false => Fate::Used,
+    };
     match body.expr(id) {
         Expr::Block { stmts } => {
             let last = stmts.len().saturating_sub(1);
@@ -149,36 +207,57 @@ fn unused(body: &Body, id: crate::hir::ExprId, used: bool, out: &mut Vec<crate::
                 // `return x` is two statements, and `x` is the value returned.
                 let returned =
                     i > 0 && matches!(body.expr(stmts[i - 1]), Expr::Name(n) if n == "return");
-                unused(body, *s, clause || returned || (used && i == last), out);
+                let fate = if clause {
+                    Fate::Used
+                } else if returned {
+                    returned_to
+                } else if i == last {
+                    fate
+                } else {
+                    Fate::Dropped
+                };
+                unused(body, *s, fate, handler, handlers, out);
             }
         }
         Expr::If { cond, then, els } => {
-            unused(body, *cond, true, out);
-            unused(body, *then, used, out);
+            unused(body, *cond, Fate::Used, handler, handlers, out);
+            unused(body, *then, fate, handler, handlers, out);
             if let Some(e) = els {
-                unused(body, *e, used, out);
+                unused(body, *e, fate, handler, handlers, out);
             }
         }
         Expr::Match { scrutinee, arms } => {
-            unused(body, *scrutinee, true, out);
+            unused(body, *scrutinee, Fate::Used, handler, handlers, out);
             for a in arms {
-                unused(body, a.body, used, out);
+                unused(body, a.body, fate, handler, handlers, out);
             }
         }
         Expr::For {
             iterable, body: b, ..
         } => {
-            unused(body, *iterable, true, out);
-            unused(body, *b, false, out);
+            unused(body, *iterable, Fate::Used, handler, handlers, out);
+            unused(body, *b, Fate::Dropped, handler, handlers, out);
         }
-        Expr::Lambda { body: b, .. } => unused(body, *b, true, out),
+        // A handler's body is the runtime's to drop; any other lambda's is
+        // its caller's to use, a lambda inside a handler included.
+        Expr::Lambda { body: b, .. } => match handlers.contains(&id) {
+            true => unused(body, *b, Fate::ToTheRuntime, true, handlers, out),
+            false => unused(body, *b, Fate::Used, false, handlers, out),
+        },
+        // `e?` in a handler returns `e`'s failure to the runtime.
+        Expr::Try { value } if handler => {
+            out.push((*value, Fate::FailureToTheRuntime));
+            for c in body.children(*value) {
+                unused(body, c, Fate::Used, handler, handlers, out);
+            }
+        }
         other => {
             let _ = other;
-            if !used {
-                out.push(id);
+            if fate != Fate::Used {
+                out.push((id, fate));
             }
             for c in body.children(id) {
-                unused(body, c, true, out);
+                unused(body, c, Fate::Used, handler, handlers, out);
             }
         }
     }

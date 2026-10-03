@@ -74,7 +74,7 @@ fn page_with(extra: &str, handler: &str) -> String {
 fn a_handler_performs_only_what_the_browser_may() {
     assert_eq!(
         reported(&page(
-            "resumable(captures = { item }) => Carts.add(current_session(), item.id, PositiveInt(1))",
+            "resumable(captures = { item }) => { let _added = Carts.add(current_session(), item.id, PositiveInt(1)) }",
         )),
         [
             "PW5005 `ShopPage`'s handler performs `database.write<Carts>`, which the browser \
@@ -84,12 +84,12 @@ fn a_handler_performs_only_what_the_browser_may() {
     // The controls: the command performs the write, and a function that
     // performs nothing is the browser's to run.
     let found = reported(&page(
-        "resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))",
+        "resumable(captures = { item }) => { let _added = add_to_cart(item.id, PositiveInt(1)) }",
     ));
     assert!(found.is_empty(), "{found:#?}");
     let found = reported(&page_with(
         "fn one() -> PositiveInt !{} {\n    PositiveInt(1)\n}\n\n",
-        "resumable(captures = { item }) => add_to_cart(item.id, one())",
+        "resumable(captures = { item }) => { let _added = add_to_cart(item.id, one()) }",
     ));
     assert!(found.is_empty(), "{found:#?}");
 }

@@ -165,6 +165,6 @@ Charter §15.4 and §15.6 test 10.
   - PW0618 refuses a `Result` dropped as a statement, but not one returned
     as a handler's value.
   - Ruling on it changes the language for every handler a benchmark task's
-    patch writes, so it is the next decision.
+    patch writes, so it is the next decision. *Settled by ADR-0159.*
 - **The page does not show availability before the press.** `MenuItem` has
   no `available` field, and nothing emits `InventoryChanged` (§15.1, §15.2).

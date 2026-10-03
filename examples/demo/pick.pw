@@ -27,9 +27,10 @@ command pick(item: MenuItemId) -> Result<MenuItemId, CartError>
     Ok(item)
 }
 
-// One button, for one item.
+// One button, for one item. What the press is answered is discarded by
+// name (ADR-0159): `pick` never refuses, and this demo is about the view.
 view PickOne(item: MenuItemId) !{} {
-    <button type="button" on:press={() => pick(item)}>Pick</button>
+    <button type="button" on:press={() => { let _picked = pick(item) }}>Pick</button>
 }
 
 page PickPage(first: MenuItemId, second: MenuItemId) {

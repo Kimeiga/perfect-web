@@ -33,6 +33,8 @@ Which values are used:
   value, two statements);
 - a lambda's body is: it is the lambda's result, its caller's to use. A
   handler's command answer is the runtime's to drop (KNOWN_LIMITATIONS);
+  *revised by ADR-0159, 2026-10-03: a handler's body is the runtime's, which
+  drops it, so a `Result` a handler gives the runtime is refused;*
 - a block after a clause whose value is code (`acquire`, `release(h)`,
   `draw(ctx)`) is that clause's value: the handle `acquire` produces.
 

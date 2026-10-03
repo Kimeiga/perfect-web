@@ -124,17 +124,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
      answered what its command did, `Ok` or the declared error, never the
      value. The store refuses an item sold out since the page was rendered,
      and says so (§15.6 test 10). PW0339 and PW0620.
-   - **Next: a handler that drops its command's declared error.**
-     `=> clear_cart()` returns its answer to a runtime that discards it, so
-     a refusal goes unshown. PW0618 refuses a `Result` dropped as a
-     statement, and not one returned as a handler's value.
-     - To decide: refuse it as PW0618 refuses a statement, and with what
-       severity.
-     - The cost: every handler a benchmark task's patch writes. The
-       benchmark's store is frozen (ADR-0156) and is checked by the current
-       compiler, so a new refusal there re-bases the tasks, as ADR-0154's
-       did for T08.
-   - **Then the audit's remaining gaps, in its order.**
+   - ~~**A handler that drops its command's declared error.**~~ Done
+     2026-10-03 (ADR-0159, `just e14-handler-failures`). PW0618 refuses a
+     `Result` a handler gives the runtime, whether as its last value, by
+     `return` or by `?`. A handler matches the answer, or discards it by name.
+     The benchmark's store discards by name, with T11 re-based.
+   - **Next: the audit's remaining gaps, in its order.**
      1. The route `/stores/{id}`, and more than one store.
      2. The recommendation and estimate slots in the store itself, with T05
         and T10 re-based.

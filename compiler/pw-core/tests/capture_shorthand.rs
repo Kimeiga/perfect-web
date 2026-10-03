@@ -82,12 +82,12 @@ fn a_capture_read_through_a_shorthand_field_is_read() {
                 fn chosen(p: Pick) -> MenuItemId !{} {\n    p.item.id\n}\n\n";
     let found = reported(&page_with(
         pick,
-        "resumable(captures = { item }) => add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1))",
+        "resumable(captures = { item }) => { let _added = add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1)) }",
     ));
     assert!(found.is_empty(), "{found:#?}");
     // The control: a capture read through a field, as the store reads it.
     let found = reported(&page(
-        "resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))",
+        "resumable(captures = { item }) => { let _added = add_to_cart(item.id, PositiveInt(1)) }",
     ));
     assert!(found.is_empty(), "{found:#?}");
 }
@@ -118,7 +118,7 @@ fn a_handler_builds_a_record_from_a_capture() {
                 fn chosen(p: Pick) -> MenuItemId !{} {\n    p.item.id\n}\n\n";
     let source = compiled(
         pick,
-        "resumable(captures = { item }) => add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1))",
+        "resumable(captures = { item }) => { let _added = add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1)) }",
     )
     .unwrap_or_else(|e| panic!("the handler compiles: {e}"));
     // It reads the whole item from what the document carries.

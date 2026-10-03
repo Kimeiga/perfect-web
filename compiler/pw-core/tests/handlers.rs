@@ -185,8 +185,9 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
     );
 
     // on:press={resumable(captures = { item }) => match add_to_cart(item.id, PositiveInt(1)) {
+    //     Ok(_) => notice = "",
     //     Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
-    //     _ => notice = "",
+    //     Err(_) => notice = "That item could not be added.",
     // }}
     let add = &modules["add_to_cart"];
     println!("{}", add.source);
@@ -225,6 +226,17 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
         serde_json::json!([["notice", "That item just sold out."]])
     );
     assert!(refused.get("trap").is_none(), "{refused}");
+    // Any other refusal is shown too (ADR-0159).
+    let expired = run_answered(
+        add,
+        item,
+        "",
+        r#"{"$case":"err","value":{"$case":"cart-expired"}}"#,
+    );
+    assert_eq!(
+        expired["set"],
+        serde_json::json!([["notice", "That item could not be added."]])
+    );
     // Control: an answer that is no declared case traps, rather than being
     // read as one of them.
     let wrong = run_answered(
@@ -236,13 +248,28 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
     assert_eq!(wrong["trap"], "trap: no such case sold-out");
     assert_eq!(wrong["set"], serde_json::json!([]));
 
-    // on:press={resumable() => clear_cart()}
+    // on:press={resumable() => match clear_cart() {
+    //     Ok(_) => notice = "",
+    //     Err(_) => notice = "The cart could not be cleared.",
+    // }}
     let clear = &modules["clear_cart"];
     println!("{}", clear.source);
     assert_eq!(clear.commands, ["store.page.clear_cart"]);
+    let cleared = run(clear, "{}");
     assert_eq!(
-        sent(&run(clear, "{}")),
+        sent(&cleared),
         &serde_json::json!([["store.page.clear_cart", []]])
+    );
+    assert_eq!(cleared["set"], serde_json::json!([["notice", ""]]));
+    let refused = run_answered(
+        clear,
+        "{}",
+        "",
+        r#"{"$case":"err","value":{"$case":"cart-expired"}}"#,
+    );
+    assert_eq!(
+        refused["set"],
+        serde_json::json!([["notice", "The cart could not be cleared."]])
     );
 }
 
@@ -579,4 +606,31 @@ fn a_refused_command_stops_the_handler_before_the_next() {
     let out = run_refusing(&m, ITEM, "shop.ui.Buy");
     assert_eq!(sent(&out), &serde_json::json!([["shop.ui.Buy", ["a", 1]]]));
     assert_eq!(out["trap"], "refused");
+}
+
+/// **A handler that discards its command's answer by name compiles**
+/// (ADR-0159): `let _ignored = ..`, ADR-0099's discard, as its last
+/// statement. The block is the unit value. Until 2026-10-03 the backend
+/// refused a block ending in a binding, so the one discard the checker
+/// accepts could not be built. And it is named for its call, as a `match`
+/// on it is.
+#[test]
+fn a_handler_that_discards_its_answer_by_name_sends_it() {
+    let m = compiled("{ let _bought = Buy(item.id, Qty(2)) }");
+    assert!(
+        m.source.contains("export const name = \"Buy\";"),
+        "{}",
+        m.source
+    );
+    assert_eq!(
+        sent(&run(&m, ITEM)),
+        &serde_json::json!([["shop.ui.Buy", ["a", 2]]])
+    );
+    // Control: where a value is wanted, a block ending in a binding has
+    // none to give.
+    refused(
+        "Buy(item.id, Qty(helper({ let y = 1 })))",
+        "a block ending in a binding",
+        "the unit value",
+    );
 }

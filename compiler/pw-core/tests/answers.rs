@@ -81,7 +81,7 @@ fn a_command_called_from_another_command_is_refused() {
     let reported = reported(&program(
         "command both(n: Int) -> Int\n    requires      SignedIn\n    \
          idempotent_by InteractionId\n{\n    count(n)\n}",
-        "add(1)",
+        "{ let _added = add(1) }",
     ));
     assert_eq!(
         with("PW0339", &reported),
@@ -94,7 +94,7 @@ fn a_command_called_from_another_command_is_refused() {
 fn a_command_called_from_a_function_is_refused() {
     let reported = reported(&program(
         "fn twice(n: Int) -> Int {\n    count(n)\n}",
-        "add(1)",
+        "{ let _added = add(1) }",
     ));
     assert_eq!(
         with("PW0339", &reported),
@@ -113,7 +113,7 @@ fn a_command_a_handler_sends_and_a_function_a_command_calls_are_the_controls() {
         "fn plus(n: Int) -> Int {\n    n + 1\n}\n\n\
          command bump(n: Int) -> Int\n    requires      SignedIn\n    \
          idempotent_by InteractionId\n{\n    plus(n)\n}",
-        "add(1)",
+        "{ let _added = add(1) }",
     ));
     // Clean, so the control is not passing on a program that never checked.
     assert!(reported.is_empty(), "{reported:?}");

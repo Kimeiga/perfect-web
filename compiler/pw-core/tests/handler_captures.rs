@@ -73,19 +73,21 @@ fn page_with(extra: &str, handler: &str) -> String {
 #[test]
 fn a_handler_reads_what_it_captures() {
     assert_eq!(
-        reported(&page("resumable() => add_to_cart(item.id, PositiveInt(1))")),
+        reported(&page(
+            "resumable() => { let _added = add_to_cart(item.id, PositiveInt(1)) }"
+        )),
         ["PW5025 `ShopPage`'s handler reads `item`, which it does not capture"],
     );
     // The controls: the store's own handler, and one binding its own value
     // beside the program's declarations, which are not captures.
     let found = reported(&page(
-        "resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))",
+        "resumable(captures = { item }) => { let _added = add_to_cart(item.id, PositiveInt(1)) }",
     ));
     assert!(found.is_empty(), "{found:#?}");
     let found = reported(&page(
         "resumable(captures = { item }) => {\n                        \
          let quantity = PositiveInt(1)\n                        \
-         add_to_cart(item.id, quantity)\n                    }",
+         let _added = add_to_cart(item.id, quantity)\n                    }",
     ));
     assert!(found.is_empty(), "{found:#?}");
 }
@@ -98,7 +100,7 @@ fn a_page_parameter_is_captured_too() {
             "resumable(captures = { item }) => {\n                        \
              let _store = id\n                        \
              let _again = id\n                        \
-             add_to_cart(item.id, PositiveInt(1))\n                    }",
+             let _added = add_to_cart(item.id, PositiveInt(1))\n                    }",
         )),
         ["PW5025 `ShopPage`'s handler reads `id`, which it does not capture"],
     );
@@ -113,7 +115,7 @@ fn a_shorthand_field_reads_its_name() {
     assert_eq!(
         reported(&page_with(
             pick,
-            "resumable() => add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1))",
+            "resumable() => { let _added = add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1)) }",
         )),
         ["PW5025 `ShopPage`'s handler reads `item`, which it does not capture"],
     );
@@ -121,7 +123,7 @@ fn a_shorthand_field_reads_its_name() {
     // it (ADR-0111).
     let found = reported(&page_with(
         pick,
-        "resumable(captures = { item }) => add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1))",
+        "resumable(captures = { item }) => { let _added = add_to_cart(chosen(Pick { n: 1, item }), PositiveInt(1)) }",
     ));
     assert!(found.is_empty(), "{found:#?}");
 }

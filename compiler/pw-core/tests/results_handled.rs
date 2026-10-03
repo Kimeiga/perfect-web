@@ -74,3 +74,51 @@ fn a_returned_result_is_used() {
          view { <section aria-label=\"w\" /> }\n}",
     );
 }
+
+/// A page whose one button's handler is `handler`.
+fn page(handler: &str) -> String {
+    format!(
+        "page P() {{\n    cache private\n\n    signal note: String = \"\"\n\n    view {{\n        \
+         <main>\n            <button type=\"button\" on:press={{() => {handler}}}>Go</button>\n        \
+         </main>\n    }}\n}}"
+    )
+}
+
+/// **A handler's value goes to the runtime, which drops it** (ADR-0159): its
+/// last value, a value it returns, and the failure a `?` returns. Until
+/// 2026-10-03 the first checked and compiled, and the backend refused the
+/// other two, saying the checker did.
+#[test]
+fn a_handler_gives_the_runtime_no_failure_to_drop() {
+    one(
+        &page("save(1)"),
+        "PW0618 this handler gives the runtime its `Result<Int, String>`, which the runtime \
+         drops, and its failure with it",
+    );
+    one(
+        &page("{\n                note = \"saved\"\n                return save(1)\n            }"),
+        "PW0618 this handler gives the runtime its `Result<Int, String>`",
+    );
+    one(
+        &page("{\n                save(1)?\n                note = \"saved\"\n            }"),
+        "PW0618 `?` gives the runtime this `Result<Int, String>`'s failure, which the runtime drops",
+    );
+}
+
+/// Handled, or discarded by a name that says so; a handler that gives the
+/// runtime nothing; and a lambda inside a handler, whose value, and whose
+/// `?`, are its caller's.
+#[test]
+fn a_handler_that_handles_its_failure_is_the_control() {
+    clean(&page(
+        "match save(1) {\n                Ok(_) => note = \"saved\",\n                \
+         Err(e) => note = e,\n            }",
+    ));
+    clean(&page("{ let _ignored = save(1) }"));
+    clean(&page("note = \"pressed\""));
+    clean(&page(
+        "{\n                let g = fn(n: Int) {\n                    let m = save(n)?\n                    \
+         Ok(m + 1)\n                }\n                match g(1) {\n                    \
+         Ok(_) => note = \"\",\n                    Err(e) => note = e,\n                }\n            }",
+    ));
+}

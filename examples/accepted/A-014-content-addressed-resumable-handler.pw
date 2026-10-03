@@ -28,7 +28,7 @@ view AddToCartButton(item: MenuItemId, available: Bool) !{} {
     // No DOM node, no connection, no closure over server state.
     <button
         disabled={!available}
-        on:press={resumable(captures = { item }) => add_to_cart(item, PositiveInt(1))}
+        on:press={resumable(captures = { item }) => { let _added = add_to_cart(item, PositiveInt(1)) }}
     >
         Add
     </button>

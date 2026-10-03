@@ -129,7 +129,7 @@ fn a_handler_captures_what_it_reads_of_the_page() {
     // A loop's item, read by a field: what the listed form would carry.
     let inferred = page(
         "            {#each menu as item (item.id)}\n                \
-         <button type=\"button\" on:press={() => add_to_cart(item.id, PositiveInt(1))}>Add</button>\n\
+         <button type=\"button\" on:press={() => { let _added = add_to_cart(item.id, PositiveInt(1)) }}>Add</button>\n\
          \x20           {/each}",
     );
     let listed = inferred.replace(
@@ -173,7 +173,7 @@ fn a_listed_capture_is_still_held_to_what_the_handler_reads() {
     // binding of the page is the defect it was.
     let src = page(
         "            {#each menu as item (item.id)}\n                \
-         <button type=\"button\" on:press={resumable() => add_to_cart(item.id, PositiveInt(1))}>Add</button>\n\
+         <button type=\"button\" on:press={resumable() => { let _added = add_to_cart(item.id, PositiveInt(1)) }}>Add</button>\n\
          \x20           {/each}",
     );
     let found = reported(&src);

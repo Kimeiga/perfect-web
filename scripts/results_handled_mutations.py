@@ -26,41 +26,43 @@ MUTANTS = [
         "        results_are_handled(&types, body, decl, &at, out);\n",
         "",
     ),
+    # Re-anchored by ADR-0159, which gave each value a fate rather than a
+    # flag: what becomes of it, the runtime's drop among them.
     (
         "a unit body's last value is used",
         ANNOTATIONS,
-        "    unused(body, body.root, !returns_unit, &mut dropped);",
-        "    unused(body, body.root, true, &mut dropped);",
+        "    unused(body, body.root, fate, false, &handlers, &mut dropped);",
+        "    unused(body, body.root, Fate::Used, false, &handlers, &mut dropped);",
     ),
     (
         "a statement's value is used",
         ANNOTATIONS,
-        "                unused(body, *s, clause || returned || (used && i == last), out);",
-        "                unused(body, *s, clause || returned || used, out);",
+        "                } else {\n                    Fate::Dropped\n                };\n",
+        "                } else {\n                    fate\n                };\n",
     ),
     (
         "a returned value is dropped",
         ANNOTATIONS,
-        "                unused(body, *s, clause || returned || (used && i == last), out);",
-        "                unused(body, *s, clause || (used && i == last), out);",
+        "                } else if returned {\n",
+        "                } else if returned && false {\n",
     ),
     (
         "a code clause's block is dropped",
         ANNOTATIONS,
-        "                unused(body, *s, clause || returned || (used && i == last), out);",
-        "                unused(body, *s, returned || (used && i == last), out);",
+        "                let fate = if clause {\n",
+        "                let fate = if clause && false {\n",
     ),
     (
         "a loop's body is used",
         ANNOTATIONS,
-        "            unused(body, *b, false, out);",
-        "            unused(body, *b, true, out);",
+        "            unused(body, *b, Fate::Dropped, handler, handlers, out);",
+        "            unused(body, *b, Fate::Used, handler, handlers, out);",
     ),
     (
         "a lambda's body is dropped",
         ANNOTATIONS,
-        "        Expr::Lambda { body: b, .. } => unused(body, *b, true, out),",
-        "        Expr::Lambda { body: b, .. } => unused(body, *b, false, out),",
+        "            false => unused(body, *b, Fate::Used, false, handlers, out),",
+        "            false => unused(body, *b, Fate::Dropped, false, handlers, out),",
     ),
 ]
 

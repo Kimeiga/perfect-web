@@ -1560,7 +1560,12 @@ impl<'a> Lower<'a> {
                         return self.early_return(body, stmts.get(i + 1).copied(), expected, span);
                     }
                     if let Expr::Let { pat, init, ty } = body.expr(*s) {
-                        if tail {
+                        // A block ending in a binding is the unit value
+                        // (ADR-0159): `{ let _ignored = .. }` discards by
+                        // name, as ADR-0099 has it, and a handler may end so.
+                        // Where a value of another type is wanted, it cannot
+                        // be given.
+                        if tail && !matches!(expected, None | Some(Type::Unit)) {
                             return Lowering::Unsupported {
                                 construct: "a block ending in a binding",
                                 span,
@@ -1569,6 +1574,9 @@ impl<'a> Lower<'a> {
                         }
                         let annotated = ty.and_then(|t| self.annotation(body, t, &span));
                         match self.bind(body, *pat, *init, annotated, span.clone()) {
+                            Lowering::Lowered(()) if tail => {
+                                return Lowering::Lowered(self.unit());
+                            }
                             Lowering::Lowered(()) => continue,
                             other => return other.map(|_| unreachable!()),
                         }

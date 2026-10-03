@@ -1279,3 +1279,12 @@ directory, and made about 500 more each `just ci`. A Rust test's directory is
 a `tempfile::TempDir` now, removed when the test is done with it. The
 development server's test store keeps its directory as long as its server.
 The harness removes its sandboxes and copied specs however a step ends.
+
+[ADR-0159](DECISIONS/ADR-0159-a-handler-handles-what-its-command-answers.md):
+what ADR-0157 left open. A handler's value goes to the runtime, which drops
+it. So PW0618 refuses a `Result` a handler gives the runtime: its last value,
+a value it returns, or the failure a `?` returns. A handler matches its
+command's answer, or discards it by name. A block ending in a binding
+compiles, so that discard can end a handler. The canonical store shows every
+refusal. The benchmark's store discards each answer by name, its behaviour
+unchanged, with T11's patches re-based.

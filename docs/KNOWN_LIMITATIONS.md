@@ -308,13 +308,13 @@ awaited in order. What remains:
   and not compiled.
 - **A handler reads what its command answered, never the value**
   (ADR-0157): `Result<(), E>`, whether it committed and its declared error
-  if not. A handler that drops the answer is not refused: `=> clear_cart()`
-  returns it to a runtime that discards it, so a declared error goes
-  unshown (the next ruling, `docs/NEXT.md`). A command called inside a
-  function value, or a function value that reads what the handler captured,
-  is refused, and so is a command parameter that is not a primitive or an
-  opaque type over one. A command is called by a page's handler only
-  (PW0339).
+  if not. A handler takes it apart or discards it by name; one that gives it
+  to the runtime is refused (ADR-0159, PW0618). A named function bound as a
+  handler, `on:submit={save}`, is not yet held to that. A command called
+  inside a function value, or a function value that reads what the handler
+  captured, is refused, and so is a command parameter that is not a
+  primitive or an opaque type over one. A command is called by a page's
+  handler only (PW0339).
 - **The development server hosts the store's two commands only.** A handler
   that calls another command compiles, and is tested under Node.
 - **Captures are not a patched part.** An element carries the capture paths
