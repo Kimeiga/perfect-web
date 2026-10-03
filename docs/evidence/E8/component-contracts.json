@@ -129,6 +129,35 @@
     ]
   },
   {
+    "component_id": "domain.display",
+    "capability_mapping": 1,
+    "abi_schema": "8d1fd3f0102ea01e",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "display",
+        "kind": "function",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/domain-display-api@0.1.0",
+          "function": "display"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "domain.line_count",
     "capability_mapping": 1,
     "abi_schema": "79995784a8451fc2",

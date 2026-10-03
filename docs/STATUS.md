@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `904844c`, with ADR-0168.
+**Reviewed:** 2026-10-03, against master `901bdae`, with ADR-0169.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,32 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0169, 2026-10-03: a page could build and then fail to
+render** ([ADR-0169](DECISIONS/ADR-0169-a-member-read-is-computed-or-refused.md)).
+- **What was wrong.**
+  - A template value read through a member function, as
+    `{item.price.display}` reads `display`, was planned in one place only
+    (ADR-0125). Elsewhere it was neither planned nor refused: in a loop's
+    row, in an attribute, in what a block decides by, or in a loop's list.
+    The page built, and failed when it was rendered. The plan's comment said
+    such a read was refused; nothing refused it.
+  - The renderer read one field after a name, so `item.price.display`
+    named nothing.
+  - The data layer priced every cart line at $4.50, whatever its item.
+- **Now**
+  - a loop's row reads members of its item: for a loop over a query's
+    list, a host computes each one for each row;
+  - every other member read no host computes is a build refusal, naming
+    the part and the path;
+  - the renderer reads a path field by field;
+  - the store shows each item's price, `$3.50`, as en-US writes dollars,
+    exact for every amount, and the data layer prices a line at its item's
+    price.
+- **Also** a transport test assumed the cart's frame came before the
+  menu's, and read one entry under load. It waits for both now.
+
+23 mutants (`just e14-row-reads`).
 
 **Correction, ADR-0168, 2026-10-03: a change did not reach an attribute, and
 E7-P could scramble its list**
@@ -2656,12 +2682,14 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **Item availability, end to end** (charter §15.4, §15.6 test 10, the
-   audit's first gap): an item's availability checked before commit, a
-   stale-item hook, and a command's typed error returned to the page.
-2. **The route and more than one store** (§15.3): `/stores/{id}`, the
-   server reading the store from the address.
-3. **E14-E's design**, ready for the owner's choice of models and budget.
+1. **Decrement, remove, and a per-line cart** (§15.3, the audit's fourth
+   gap): each line's item, price, quantity and total, the cart's total, and
+   controls to decrement and remove, idempotent and optimistic as
+   `add_to_cart` is.
+2. **A command retried on a transport failure** (§15.4, the audit's fifth
+   gap), with its interaction, so a retry is the same mutation.
+3. **§15.5's missing controls** (the audit's sixth gap): store and cart
+   delays, and a one-shot error for the next real command or read.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

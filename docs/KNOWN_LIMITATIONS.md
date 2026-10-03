@@ -413,6 +413,15 @@ awaited in order. What remains:
   set that does is refused and the page read again, but a lone
   `ReplaceText` or `SetAttribute` is not. It hid E7-P's scrambled list until
   2026-10-03.
+- **A member read is computed for a page in two places only** (ADR-0169):
+  text at the top of a page, from a query's value (ADR-0125), and a row of a
+  loop over a query's list, from its item. Anywhere else it is a build
+  refusal:
+  - an attribute, or what a block decides by, at the top of a page;
+  - a loop over a field of a row's item, or over a stream's answer;
+  - a signal's member, which the browser reads by field.
+- **`display` writes US dollars as en-US does** (ADR-0169). Other locales
+  and currencies have no `display`.
 - **A comment in markup is `<!-- -->`** (ADR-0167), and no page renders it.
   HTML's other bogus comments, `<!x>` and `<?x>`, are read as elements. A
   line of markup text that begins with `//` or `/*` is refused (PW5028),

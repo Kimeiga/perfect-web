@@ -417,7 +417,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-03: `examples/domain.pw`'s `Store` and `MenuItem` declare a
     // `description`, charter §15.1's, which the store's page shows
     // (ADR-0166).
-    const EXPECTED: u64 = 0xcb9af1a07ab585cf;
+    // 2026-10-03: `examples/domain.pw`'s `MenuItem` declares a `price`, a
+    // `Money<USD>`, charter §15.1's, and `display` and `grouped` write one
+    // as a menu's row shows it, as en-US writes dollars (ADR-0169).
+    const EXPECTED: u64 = 0xb529f8ced9a4446a;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

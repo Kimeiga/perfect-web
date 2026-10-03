@@ -5,7 +5,7 @@
     "params": [
       "id"
     ],
-    "schema": "4f2ac0c47c53ee7d",
+    "schema": "d047e954d3b97bd3",
     "chunks": [
       {
         "chunk": "static",
@@ -126,13 +126,26 @@
             },
             {
               "chunk": "static",
+              "value": "</p>\n                            <p>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 7,
+                "value": "item.price.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
               "value": "</p>\n                            <button data-pw=\"0\" type=\"button\" "
             },
             {
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 7,
+                "id": 8,
                 "owner": 0,
                 "name": "aria-label",
                 "segments": [
@@ -152,7 +165,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 8,
+                "id": 9,
                 "owner": 0,
                 "event": "press",
                 "handler": "0e75dbe9268fceb8",
@@ -177,7 +190,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 9,
+          "id": 10,
           "value": "cart.line_count",
           "context": "text"
         }
@@ -190,7 +203,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 10,
+          "id": 11,
           "value": "notice",
           "context": "text"
         }
@@ -203,7 +216,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 11,
+          "id": 12,
           "owner": 1,
           "event": "press",
           "handler": "b5c3e56ff370a6a8",
@@ -218,7 +231,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 12,
+          "id": 13,
           "query": "store.page.Recommendations",
           "args": [
             "id"
@@ -241,7 +254,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "each",
-                  "id": 13,
+                  "id": 14,
                   "collection": "items",
                   "binding": "item",
                   "key": "id",
@@ -254,7 +267,7 @@
                       "chunk": "dynamic",
                       "value": {
                         "part": "text",
-                        "id": 14,
+                        "id": 15,
                         "value": "item.name",
                         "context": "text"
                       }

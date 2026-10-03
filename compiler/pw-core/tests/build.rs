@@ -63,8 +63,10 @@ fn the_store_builds_every_artifact_from_source() {
     assert_eq!(
         components,
         [
-            // The member function the page's count is read through, a
-            // component of its own since ADR-0125.
+            // The member function a menu row's price is read through
+            // (ADR-0169), and the one the page's count is: each a component
+            // of its own since ADR-0125.
+            "domain.display",
             "domain.line_count",
             "store.page.Cart",
             // The store's slots, since ADR-0165: each stream's query.

@@ -32,6 +32,11 @@ interface resources-store-api {
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
 }
 
+interface domain-display-api {
+    use pw:types/types.{domain-money};
+    display: func(arg0: domain-money) -> string;
+}
+
 interface domain-line-count-api {
     use pw:types/types.{domain-cart};
     line-count: func(arg0: domain-cart) -> s64;
@@ -91,6 +96,10 @@ world resources-order {
 
 world resources-store {
     export resources-store-api;
+}
+
+world domain-display {
+    export domain-display-api;
 }
 
 world domain-line-count {
@@ -157,6 +166,7 @@ package pw:types {
             id: domain-menu-item-id,
             name: string,
             description: string,
+            price: domain-money,
         }
         type domain-positive-int = s64;
         record domain-money {

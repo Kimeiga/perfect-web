@@ -42,9 +42,12 @@ are fixed (ADR-0155):
 | field | status |
 |---|---|
 | Store.id, name, hours | met (`domain.pw`; the server fills `hours`) |
-| Store.description, menu_version | missing (the materializer's entry version stands in for the second) |
+| Store.description | met since ADR-0166 |
+| Store.menu_version | missing (the materializer's entry version stands in) |
 | MenuItem.id, name | met |
-| MenuItem.store_id, description, price, available, category | missing; price exists only on `CartLine`, and the server prices every line at 450; a category exists only in T07's setup |
+| MenuItem.description | met since ADR-0166 |
+| MenuItem.price | met since ADR-0169: `Money<USD>`, shown in each row as `item.price.display`, and the price the data layer gives a cart's line (it gave every line 450 until then) |
+| MenuItem.store_id, available, category | missing; a category exists only in T07's setup |
 | Cart.id, consumer_id, version | missing as fields: a cart is keyed by its session, and its version is the runtime's entry version |
 | Cart.items | partial: `lines: List<CartLine>` |
 | CartLine.item_id, unit_price | met (`Money<USD>`) |
@@ -138,8 +141,8 @@ are fixed (ADR-0155):
 7. **Last-known-good** (test 18): a rule limiting it to public data, and
    the server serving it.
 8. **§15.1's fields**, and `PositiveInt` checked at the boundary. The
-   descriptions are met by ADR-0166. Still missing: `price`, which needs
-   money shown as text; `available`, `category` and `menu_version`; and
+   descriptions are met by ADR-0166, and the price by ADR-0169. Still
+   missing: `available`, `category` and `menu_version`; and
    `DeliveryEstimate`'s range.
 9. **Accessibility** (test 14): an automated audit. Each Add named by its
    item, and a live region for the count, are met by ADR-0168.

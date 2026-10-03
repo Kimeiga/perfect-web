@@ -44,11 +44,13 @@ opaque type InteractionId = String
 // capture schema.
 //
 // Its description since ADR-0166, charter §15.1's: what the item is, which a
-// menu's row shows under its name.
+// menu's row shows under its name. Its price since ADR-0169, which the row
+// shows as `price.display`.
 type MenuItem = MenuItem {
     id: MenuItemId,
     name: String,
     description: String,
+    price: Money<USD>,
 }
 
 // --- quantities -----------------------------------------------------------
@@ -65,6 +67,36 @@ fn added(a: PositiveInt, b: PositiveInt) -> PositiveInt !{} { PositiveInt(a.valu
 type USD = USD { code: String }
 
 type Money<C> = Money { minor_units: Int }
+
+// **A price as a person reads it** (ADR-0169): US dollars as en-US writes
+// them, `$3.50`, `$1,234.50`, and `-$3.50` for an amount owed back. A member
+// of `Money<USD>`, which a page reads as `price.display`.
+fn display(price: Money<USD>) -> String !{} {
+    // `/` and `%` are Euclidean (ADR-0039): `n % 100` is in `[0, 100)` and
+    // `n == 100 * (n / 100) + n % 100`, whatever `n`'s sign. An amount owed
+    // back is written from those parts, since `-n` does not fit for the
+    // least `Int`.
+    let n = price.minor_units
+    let q = n / 100
+    let r = n % 100
+    let dollars = if n >= 0 { q } else if r == 0 { 0 - q } else { 0 - q - 1 }
+    let cents = if n >= 0 | r == 0 { r } else { 100 - r }
+    let sign = if n < 0 { "-" } else { "" }
+    let pad = if cents < 10 { "0" } else { "" }
+    "{sign}${grouped(dollars)}.{pad}{cents}"
+}
+
+// `1234567` as `1,234,567`: a comma before each three digits, from the
+// right, of a count that is not negative.
+fn grouped(n: Int) -> String !{} {
+    if n < 1000 {
+        "{n}"
+    } else {
+        let rest = n % 1000
+        let pad = if rest < 10 { "00" } else if rest < 100 { "0" } else { "" }
+        "{grouped(n / 1000)},{pad}{rest}"
+    }
+}
 
 // A geographic point. A-007, A-019 and A-024 wrote `center: LatLng` for two
 // years of corpus history while no module declared it — an annotation naming

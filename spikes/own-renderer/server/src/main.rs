@@ -543,7 +543,7 @@ struct Server {
     /// **The items each store's menu fragment was last rendered from**: a
     /// fragment is rendered again when the `Menu` query's value is not what
     /// it shows.
-    menu_rendered_from: Mutex<BTreeMap<String, Vec<(String, String)>>>,
+    menu_rendered_from: Mutex<BTreeMap<String, Value>>,
     /// **The compiler's contracts, and the node this server is.**
     ///
     /// E8's last gate item asks for the command path to go through the host
@@ -644,6 +644,8 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.page.Menu",
         "store.page.Cart",
         "domain.line_count",
+        // What a menu's row reads its price through (ADR-0169).
+        "domain.display",
     ] {
         let path = dir.join(format!("{id}.wasm"));
         let bytes = std::fs::read(&path).unwrap_or_else(|e| {
@@ -1439,6 +1441,14 @@ impl Server {
                                     "description".into(),
                                     Val::String(item_description(id).into()),
                                 ),
+                                // Its price, in cents (ADR-0169).
+                                (
+                                    "price".into(),
+                                    Val::Record(vec![(
+                                        "minor-units".into(),
+                                        Val::S64(item_price(id)),
+                                    )]),
+                                ),
                             ])
                         })
                         .collect(),
@@ -1994,11 +2004,17 @@ impl Server {
         part: &serde_json::Value,
     ) -> Result<Val, String> {
         let binding = part["binding"].as_str().unwrap_or_default();
-        let mut value = bindings
+        let value = bindings
             .get(binding)
             .cloned()
             .ok_or_else(|| format!("no binding `{binding}`"))?;
-        for step in part["steps"].as_array().into_iter().flatten() {
+        self.follow(value, &part["steps"])
+    }
+
+    /// **The value a part's steps lead to from `value`**: each a record field,
+    /// or a member function run as its own component (ADR-0125).
+    fn follow(&self, mut value: Val, steps: &serde_json::Value) -> Result<Val, String> {
+        for step in steps.as_array().into_iter().flatten() {
             value = if let Some(field) = step["field"].as_str() {
                 let wit = field.replace('_', "-");
                 match &value {
@@ -2019,6 +2035,36 @@ impl Server {
             };
         }
         Ok(value)
+    }
+
+    /// **A binding's value as the renderer reads it** (ADR-0169): each row
+    /// of a list with what it reads of its item through a member, which the
+    /// member's component computes. The renderer reads the rest by field.
+    fn rendered_value(&self, binding: &str, value: &Val) -> Result<Value, String> {
+        let mut out = val_to_value(value);
+        let reads: Vec<&serde_json::Value> = self.plan["rows"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|r| r["collection"] == binding)
+            .collect();
+        if reads.is_empty() {
+            return Ok(out);
+        }
+        let (Val::List(items), Value::List(rows)) = (value, &mut out) else {
+            return Err(format!("`{binding}`'s rows are read, and it is no list"));
+        };
+        for (item, row) in items.iter().zip(rows.iter_mut()) {
+            for read in &reads {
+                let read_value = self.follow(item.clone(), &read["steps"])?;
+                // From the item's name: `item.price.display` is
+                // `price.display` in the row.
+                let path = read["path"].as_str().unwrap_or_default();
+                let within = path.split_once('.').map_or("", |(_, rest)| rest);
+                set_at(row, within, val_to_value(&read_value));
+            }
+        }
+        Ok(out)
     }
 
     /// The text a part shows, found by its template path.
@@ -2248,10 +2294,28 @@ impl Server {
     /// splices in, and putting it here made `menu_env` call `menu_fragment`
     /// call `menu_env` — unbounded recursion that presented as a server which
     /// accepted connections and answered none.
-    fn menu_env(&self, store: &str, items: &[(String, String)]) -> Env {
+    fn menu_env(&self, store: &str, rows: &Value) -> Env {
         Env::new()
-            .set("menu", menu_value(items))
+            .set("menu", rows.clone())
             .in_domain(self.fragment_domain(store))
+    }
+
+    /// **A store's menu rows, as its page renders them** (ADR-0169): the
+    /// `Menu` query's value, run through its component, each row with what it
+    /// reads through a member. Until 2026-10-03 E7-P built each row from an
+    /// id and a name, and a row read nothing else of its item.
+    fn menu_rows(&self, store: &str) -> Result<Value, String> {
+        // Read as the page reads it, through the query's kept answer: what
+        // a page shows is what it holds.
+        let binding = self.plan["bindings"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|b| b["binding"] == "menu")
+            .cloned()
+            .ok_or_else(|| "the store's page binds no menu".to_string())?;
+        let menu = self.fetch_binding("", &binding, &[Val::String(store.to_string())])?;
+        self.rendered_value("menu", &menu)
     }
 
     /// The menu fragment's bytes, materialized once and reused.
@@ -2261,7 +2325,7 @@ impl Server {
     /// because they are the same bytes — the entry is read, not re-rendered —
     /// and that is what makes `cache shared` a fact about the system rather
     /// than a claim about two renders agreeing.
-    fn menu_fragment(&self, store: &str, items: &[(String, String)]) -> String {
+    fn menu_fragment(&self, store: &str, rows: &Value) -> String {
         let key = self.menu_key(store);
         // Kept while it shows the `Menu` query's value. Until 2026-10-03 it
         // was kept until a command invalidated it, so a value that changed at
@@ -2270,19 +2334,19 @@ impl Server {
         let mut rendered_from = self.menu_rendered_from.lock().expect("rendered from");
         if let Some(entry) = self.materializer.entry(&key)
             && !entry.stale
-            && rendered_from.get(store).is_some_and(|was| *was == items)
+            && rendered_from.get(store).is_some_and(|was| was == rows)
         {
             return entry.body;
         }
         let (template, part) = self.menu_part();
-        let env = self.menu_env(store, items);
+        let env = self.menu_env(store, rows);
         let html = pw_render::render_part(template, part, &env, &self.templates)
             .expect("the menu fragment renders");
         self.clock.advance(1);
         self.materializer.invalidate(&key, 0);
         self.materializer
             .regenerate(&key, None, || Ok(html.clone()));
-        rendered_from.insert(store.to_string(), items.to_vec());
+        rendered_from.insert(store.to_string(), rows.clone());
         html
     }
 
@@ -2321,16 +2385,26 @@ impl Server {
         // Without the interlock both orders are possible and the second one
         // applies a change twice — an item inserted, then inserted again.
         let mut queue = self.pending.lock().expect("pending");
-        // The menu before the change: what a renamed item was (ADR-0168).
-        let before = {
+        // The menu's rows before the change, as the open pages show them:
+        // what the fragment was rendered from (ADR-0169), so what a renamed
+        // item was (ADR-0168). With no fragment yet, as the query holds them.
+        let shown = self
+            .menu_rendered_from
+            .lock()
+            .expect("rendered from")
+            .get(STORE_ID)
+            .cloned();
+        let before = match shown {
+            Some(rows) => rows,
+            None => self.menu_rows(STORE_ID)?,
+        };
+        {
             // Refusals happen before anything is regenerated: a rejected
             // operation must leave no version behind, or the page would be
             // told to catch up to a change that did not happen.
             let mut items = self.menu.lock().expect("menu");
-            let before = items.clone();
             op.apply(&mut items)?;
-            before
-        };
+        }
         // The deployment's menu changed, which is `MenuChanged(47)`: it drops
         // what the program says depends on it, the entries of each query
         // that declares `invalidates_on MenuChanged(id)` for this store, and
@@ -2347,7 +2421,7 @@ impl Server {
 
         // The fragment is re-materialized, in its own domain, once.
         // The menu E7-P changes is store 47's (ADR-0162).
-        let items = self.menu.lock().expect("menu").clone();
+        let items = self.menu_rows(STORE_ID)?;
         let (template, part) = self.menu_part();
         let env = self.menu_env(STORE_ID, &items);
         let html = pw_render::render_part(template, part, &env, &self.templates)
@@ -2382,12 +2456,8 @@ impl Server {
         // button kept the name of the item it was before.
         let patches: Vec<Targeted> = match &op {
             MenuOp::Rename { id, .. } => {
-                let row = |items: &[(String, String)]| {
-                    items
-                        .iter()
-                        .find(|(i, _)| i == id)
-                        .map(|(i, n)| item(i, n))
-                        .ok_or_else(|| format!("no item {id} to rename"))
+                let row = |rows: &Value| {
+                    row_of(rows, id).ok_or_else(|| format!("no item {id} to rename"))
                 };
                 let (was, now) = (row(&before)?, row(&items)?);
                 let token = pw_render::instance_token_of(part, &now, "id", &env);
@@ -2590,8 +2660,8 @@ impl Server {
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
     /// the WIT `domain-cart` record by its Pleris field names, as
-    /// `cart_value` builds it for a component. Every line is priced 450, as
-    /// the data layer prices it.
+    /// `cart_value` builds it for a component. Each line is priced at its
+    /// item's price, as the data layer prices it (ADR-0169).
     fn cart_json(&self, session: &str) -> serde_json::Value {
         // The cart query's value, by its Pleris field names (ADR-0125).
         let cart = self
@@ -3155,16 +3225,22 @@ impl Server {
         // menu inside the chain and locking it again inside `menu_fragment`
         // deadlocked a non-reentrant mutex against itself — presenting as a
         // request that simply never returned.
-        let items = menu_items(&bindings["menu"]);
-        let fragment = self.menu_fragment(store, &items);
+        let rows = self
+            .rendered_value("menu", &bindings["menu"])
+            .unwrap_or_else(|e| panic!("the menu's rows: {e}"));
+        let fragment = self.menu_fragment(store, &rows);
         // Each binding's whole value, so a block a query decides, and what is
-        // inside it, reads any field of it (ADR-0146).
+        // inside it, reads any field of it (ADR-0146), and each row what it
+        // reads through a member (ADR-0169).
         let mut env = Env::new();
         for (name, value) in bindings {
-            env = env.set(name, val_to_value(value));
+            let rendered = self
+                .rendered_value(name, value)
+                .unwrap_or_else(|e| panic!("`{name}`: {e}"));
+            env = env.set(name, rendered);
         }
         let mut env = env
-            .set("menu", menu_value(&items))
+            .set("menu", rows)
             // The public fragment, EMITTED rather than rendered. Its instance
             // tokens are the fragment's own, so every reader's document
             // contains the same bytes and one patch addresses all of them.
@@ -3225,7 +3301,7 @@ impl Server {
             let value = bindings
                 .get(&list)
                 .ok_or_else(|| format!("no binding `{list}`"))?;
-            let Value::List(items) = val_to_value(value) else {
+            let Value::List(items) = self.rendered_value(&list, value)? else {
                 return Err(format!("`{list}` is not a list"));
             };
             shown.lists.insert(list, items);
@@ -3558,21 +3634,20 @@ impl MenuOp {
         &self,
         template: &Template,
         part: LocalPartId,
-        items: &[(String, String)],
+        rows: &Value,
         env: &Env,
         others: &[Template],
     ) -> Result<PatchOp, pw_render::Blocked> {
         let each = part;
-        let token = |id: &str| pw_render::instance_token_of(each, &item(id, ""), "id", env);
+        let token = |id: &str| pw_render::instance_token_of(each, &key_row(id), "id", env);
         Ok(match self {
-            MenuOp::Insert {
-                id,
-                name,
-                at,
-                before,
-            } => {
-                let html =
-                    pw_render::render_instance(template, each, &item(id, name), env, others)?;
+            MenuOp::Insert { id, at, before, .. } => {
+                // The row the page renders for it, as its `Menu` query read
+                // it (ADR-0169).
+                let row = row_of(rows, id).ok_or_else(|| pw_render::Blocked::MissingValue {
+                    path: format!("menu[{id}]"),
+                })?;
+                let html = pw_render::render_instance(template, each, &row, env, others)?;
                 let instance = at.as_deref().map(token);
                 if *before {
                     PatchOp::InsertBefore { instance, html }
@@ -3592,7 +3667,6 @@ impl MenuOp {
             // reinserting the item would also work visually, and destroy the
             // node, which is the distinction E7-P exists to make.
             MenuOp::Rename { .. } => {
-                let _ = items;
                 return Err(pw_render::Blocked::UnrepresentedConstruct {
                     reason: "a rename's patches are its instance's parts".into(),
                     at: template.path.clone(),
@@ -3614,9 +3688,12 @@ fn cart_value(lines: &[(String, i64)]) -> Val {
                     Val::Record(vec![
                         ("item-id".into(), Val::String(item.clone())),
                         ("quantity".into(), Val::S64(*quantity)),
+                        // The item's price, as its menu row shows it
+                        // (ADR-0169). Until 2026-10-03 every line was
+                        // priced 450, whatever its item.
                         (
                             "unit-price".into(),
-                            Val::Record(vec![("minor-units".into(), Val::S64(450))]),
+                            Val::Record(vec![("minor-units".into(), Val::S64(item_price(item)))]),
                         ),
                     ])
                 })
@@ -3792,6 +3869,24 @@ fn store_named(id: &str) -> Option<&'static str> {
         STORE_ID => Some(STORE_NAME),
         _ if id == SECOND_STORE.0 => Some(SECOND_STORE.1),
         _ => None,
+    }
+}
+
+/// **A value set at a dotted path inside a row** (ADR-0169), each record on
+/// the way made if it is not there: `price.display` beside `price`'s
+/// `minor_units`.
+fn set_at(row: &mut Value, path: &str, value: Value) {
+    let Some((first, rest)) = path.split_once('.') else {
+        if let Value::Record(fields) = row {
+            fields.insert(path.to_string(), value);
+        }
+        return;
+    };
+    if let Value::Record(fields) = row {
+        let next = fields
+            .entry(first.to_string())
+            .or_insert_with(|| Value::Record(BTreeMap::new()));
+        set_at(next, rest, value);
     }
 }
 
@@ -4058,31 +4153,6 @@ fn case_json(name: &str, payload: Option<&Val>) -> serde_json::Value {
     }
 }
 
-/// The menu's `(id, name)` items, from the `Menu` query's value.
-fn menu_items(menu: &Val) -> Vec<(String, String)> {
-    let Val::List(items) = menu else {
-        return Vec::new();
-    };
-    items
-        .iter()
-        .filter_map(|item| {
-            let Val::Record(fields) = item else {
-                return None;
-            };
-            let field = |name: &str| {
-                fields
-                    .iter()
-                    .find(|(n, _)| n == name)
-                    .and_then(|(_, v)| match v {
-                        Val::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
-            };
-            Some((field("id")?, field("name")?))
-        })
-        .collect()
-}
-
 fn default_menu() -> Vec<(String, String)> {
     [
         ("espresso", "Espresso"),
@@ -4094,15 +4164,19 @@ fn default_menu() -> Vec<(String, String)> {
     .collect()
 }
 
-fn item(id: &str, name: &str) -> Value {
-    let mut f = BTreeMap::new();
-    f.insert("id".to_string(), Value::Text(id.into()));
-    f.insert("name".to_string(), Value::Text(name.into()));
-    f.insert(
-        "description".to_string(),
-        Value::Text(item_description(id).into()),
-    );
-    Value::Record(f)
+/// **The row of `rows` whose item is `id`** (ADR-0169).
+fn row_of(rows: &Value, id: &str) -> Option<Value> {
+    let Value::List(rows) = rows else {
+        return None;
+    };
+    rows.iter()
+        .find(|r| matches!(r, Value::Record(f) if f.get("id") == Some(&Value::Text(id.into()))))
+        .cloned()
+}
+
+/// A row with its key alone: what an instance's token is derived from.
+fn key_row(id: &str) -> Value {
+    Value::Record([("id".to_string(), Value::Text(id.into()))].into())
 }
 
 /// **What each item is** (ADR-0166, charter §15.1), by its id: what the data
@@ -4121,6 +4195,20 @@ fn item_description(id: &str) -> &'static str {
     }
 }
 
+/// **What each item costs, in cents** (ADR-0169, charter §15.1), by its id.
+/// An item the table does not know, such as one E7-P inserts, costs $4.00.
+fn item_price(id: &str) -> i64 {
+    match id {
+        "espresso" => 350,
+        "cortado" => 425,
+        "cold-brew" => 475,
+        "drip" => 300,
+        "matcha" => 525,
+        "scone" => 375,
+        _ => 400,
+    }
+}
+
 /// **What each store says of itself** (ADR-0166, charter §15.1), by its id.
 fn store_description(id: &str) -> &'static str {
     match id {
@@ -4134,10 +4222,6 @@ fn store_description(id: &str) -> &'static str {
         }
         _ => "",
     }
-}
-
-fn menu_value(items: &[(String, String)]) -> Value {
-    Value::List(items.iter().map(|(id, name)| item(id, name)).collect())
 }
 
 /// The containment the large-menu case relies on.
@@ -7215,7 +7299,7 @@ public query Store(",
         assert_eq!(
             *value,
             serde_json::json!({ "lines": [
-                { "item_id": "cortado", "quantity": 2, "unit_price": { "minor_units": 450 } }
+                { "item_id": "cortado", "quantity": 2, "unit_price": { "minor_units": 425 } }
             ] })
         );
         drop(queue);
@@ -8070,12 +8154,19 @@ public query Store(",
             name: "Espresso Doppio".to_string(),
         })
         .expect("the menu changes");
+        // Store 47's menu is read again, once, with the change: its fragment
+        // is rendered from the query's answer, as a page's is (ADR-0169).
+        assert_eq!(reads(), read + 1, "store 47's menu was not read again");
         // Store 48's menu is still kept ...
         s.serve_store_document("c", "48").expect("served");
-        assert_eq!(reads(), read, "store 47's change dropped store 48's menu");
-        // ... and store 47's is read again, with the change.
+        assert_eq!(
+            reads(),
+            read + 1,
+            "store 47's change dropped store 48's menu"
+        );
+        // ... and so is store 47's new one, which shows the change.
         let (blue, _) = s.serve_store_document("c", STORE_ID).expect("served");
-        assert_eq!(reads(), read + 1, "store 47's menu was not read again");
+        assert_eq!(reads(), read + 1, "store 47's new menu was not kept");
         assert!(visible(&blue).contains("Espresso Doppio"), "{blue}");
     }
 
@@ -8116,6 +8207,69 @@ public query Store(",
         );
         // Each inside the espresso's own instance, which keeps its nodes.
         assert!(set.patches.iter().all(|p| p.target.instances.len() == 1));
+    }
+
+    /// **Each menu row shows its price** (ADR-0169, charter §15.1): what the
+    /// row reads of its item through `display`, which the member's own
+    /// component computes for each row, each store's menu its own. Until
+    /// 2026-10-03 a row could read no member of its item.
+    #[test]
+    fn each_menu_row_shows_its_price() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = |id: &str| {
+            let (html, _) = s.serve_store_document("a", id).expect("served");
+            visible(&html)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let blue = page(STORE_ID);
+        for said in [
+            "Espresso A double shot, pulled short. $3.50",
+            "Cortado Espresso cut with an equal part of warm milk. $4.25",
+            "Cold Brew Steeped for eighteen hours and served over ice. $4.75",
+        ] {
+            assert!(blue.contains(said), "{said}: {blue}");
+        }
+        let harbor = page("48");
+        assert!(
+            harbor.contains("Drip Coffee Brewed to order, one cup at a time. $3.00"),
+            "{harbor}"
+        );
+    }
+
+    /// **An item E7-P inserts arrives with its price** (ADR-0169): its row
+    /// is the `Menu` query's, read again after the change, with what the row
+    /// reads through `display` computed for it.
+    #[test]
+    fn an_inserted_item_arrives_with_its_price() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
+        s.broadcast_menu(MenuOp::Insert {
+            id: "flat-white".to_string(),
+            name: "Flat White".to_string(),
+            at: None,
+            before: false,
+        })
+        .expect("inserted");
+        let queue = s.pending.lock().expect("pending");
+        let html = queue[&("a".to_string(), document)]
+            .frames
+            .iter()
+            .find_map(|(_, f)| match f {
+                StreamFrame::Patch(p) => match &p.operation {
+                    PatchOp::InsertAfter { html, .. } => Some(html.clone()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .expect("one insert");
+        let shown = visible(&html)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(shown.starts_with("Flat White"), "{shown}");
+        assert!(shown.contains("$4.00"), "{shown}");
     }
 
     /// **The store and each item say what they are** (ADR-0166, charter

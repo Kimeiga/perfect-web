@@ -163,9 +163,14 @@ fn a_list_s_rows_and_a_declared_error_are_read_through_their_types() {
                 "description".to_string(),
                 Val::String(format!("{id}, described")),
             ),
+            // A record in the row: read through its own type (ADR-0169).
+            (
+                "price".to_string(),
+                Val::Record(vec![("minor-units".into(), Val::S64(450))]),
+            ),
         ];
         if extra {
-            fields.push(("price".into(), Val::S64(450)));
+            fields.push(("calories".into(), Val::S64(5)));
         }
         Val::Record(fields)
     };

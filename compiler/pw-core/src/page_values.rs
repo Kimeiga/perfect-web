@@ -25,7 +25,7 @@
 //! - a path that reads through something that is neither a field nor a
 //!   member of the type it reads.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{Body, DeclId, DeclKind, Expr, ExprId, Hir, Pattern};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
@@ -540,6 +540,159 @@ pub struct PageValues {
     /// its query, and renders the arm it settled to.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub streams: Vec<Stream>,
+    /// **What a loop's row reads of its item through a member** (ADR-0169),
+    /// which a host computes for each row before the row is rendered. A
+    /// field the renderer reads from the item itself, and is not here.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rows: Vec<RowRead>,
+}
+
+/// **A row's read through a member function** (ADR-0169): `{item.price.display}`
+/// inside `{#each menu as item (item.id)}`. One for each path, however many
+/// parts read it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RowRead {
+    /// The query binding the loop iterates: `menu`.
+    pub collection: String,
+    /// The name each item is bound to: `item`.
+    pub binding: String,
+    /// The template's path for it, from the item's name: `item.price.display`.
+    pub path: String,
+    /// The steps from the item: fields, and member functions by component.
+    pub steps: Vec<Step>,
+}
+
+/// **Whether the value read at `at` calls a member function** anywhere along
+/// its path (ADR-0169), as the value typer resolves each read in `origin`'s
+/// body. Typed once for each body.
+fn calls_a_member(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    sigs: &Signatures,
+    typed: &mut BTreeMap<(usize, DeclId), crate::values::MemberReads>,
+    origin: (usize, DeclId),
+    at: crate::template_ir::ReadAt,
+) -> bool {
+    let (unit, decl) = origin;
+    let hir = hirs[unit];
+    let reads = typed
+        .entry(origin)
+        .or_insert_with(|| crate::values::member_reads(hir, sigs, ws, unit, decl));
+    match at {
+        crate::template_ir::ReadAt::List(node) => reads.lists.contains(&node),
+        crate::template_ir::ReadAt::Expr(mut e) => {
+            let Some(body) = hir.decl(decl).body.map(|b| hir.body(b)) else {
+                return false;
+            };
+            loop {
+                if reads.exprs.contains(&e) {
+                    return true;
+                }
+                match body.expr(e) {
+                    Expr::Field { base, .. } => e = *base,
+                    _ => return false,
+                }
+            }
+        }
+    }
+}
+
+/// **A row's read of its item through a member** (ADR-0169), for the read
+/// of `path` in `part`: its loop's, where the loop iterates a query's list.
+/// `None` where it is not one.
+#[allow(clippy::too_many_arguments)]
+fn row_read(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    chunks: &[crate::template_ir::Chunk],
+    found: &[(String, DefId, Vec<ExprId>)],
+    part: u32,
+    path: &str,
+    members: &mut BTreeSet<DefId>,
+) -> Result<Option<RowRead>, String> {
+    let mut segments = path.split('.');
+    let root = segments.next().unwrap_or_default();
+    let reads: Vec<&str> = segments.collect();
+    let Some((_, collection)) = enclosing_loop(chunks, part, root, &mut Vec::new()).flatten()
+    else {
+        return Ok(None);
+    };
+    let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == collection) else {
+        return Ok(None);
+    };
+    let Some(element) = value_of(sigs, *resource)
+        .filter(|t| t.as_builtin() == Some(crate::resolved::Builtin::List))
+        .and_then(|t| t.args().first().cloned())
+    else {
+        return Ok(None);
+    };
+    let mut out = Vec::new();
+    for (step, def) in steps(sigs, element, &reads)? {
+        out.push(match (step, def) {
+            (Step::Member(_), Some(def)) => {
+                members.insert(def);
+                Step::Member(
+                    component_id_of(hirs, def)
+                        .ok_or_else(|| "a member function with no identity".to_string())?,
+                )
+            }
+            (step, _) => step,
+        });
+    }
+    Ok(Some(RowRead {
+        collection,
+        binding: root.to_string(),
+        path: path.to_string(),
+        steps: out,
+    }))
+}
+
+/// A read through a member function that no host computes where it is
+/// (ADR-0169): refused, so the page is not built to fail when rendered.
+fn unplanned(part: u32, path: &str, what: &str) -> String {
+    format!(
+        "part {part} reads `{path}` through a member function in {what}, which no host \
+         computes there: one computes it from a query's value in text at the top of the page \
+         (ADR-0125), or from the item of a loop over a query's list (ADR-0169)"
+    )
+}
+
+/// **The loop whose items `root` names, around the part `part`**: the
+/// innermost one enclosing it that binds that name, with the collection it
+/// iterates. Two loops may bind one name, as the store's menu and its
+/// recommendations both bind `item`.
+fn enclosing_loop(
+    chunks: &[crate::template_ir::Chunk],
+    part: u32,
+    root: &str,
+    around: &mut Vec<(String, String)>,
+) -> Option<Option<(String, String)>> {
+    use crate::template_ir::{Chunk, Part};
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if p.id().is_some_and(|id| id.0 == part) {
+            return Some(around.iter().rev().find(|(b, _)| b == root).cloned());
+        }
+        let bound = match p {
+            Part::Each {
+                binding,
+                collection,
+                ..
+            } => Some((binding.clone(), collection.clone())),
+            _ => None,
+        };
+        let pushed = bound.is_some();
+        around.extend(bound);
+        for region in p.nested() {
+            if let Some(found) = enclosing_loop(region, part, root, around) {
+                return Some(found);
+            }
+        }
+        if pushed {
+            around.pop();
+        }
+    }
+    None
 }
 
 /// Every `<stream>` in `chunks`, in document order.
@@ -920,6 +1073,7 @@ fn plan(
     let crate::template_ir::Lowered {
         template,
         holes,
+        reads: others,
         instances,
         ..
     } = crate::template_ir::lowered(hirs, ws, captures, unit, id)
@@ -936,6 +1090,8 @@ fn plan(
     };
     // What a signal decides, the browser renders again (ADR-0137).
     rendered_again(&template.chunks, &signals, &Reach::Top)?;
+    let mut rows: Vec<RowRead> = Vec::new();
+    let mut typed = BTreeMap::new();
     for hole in holes {
         // The path as the template reads it, through each view around it.
         let mut segments = hole.path.split('.').map(str::to_string);
@@ -949,6 +1105,17 @@ fn plan(
         // browser does not compute, and its block renders it again
         // (ADR-0137).
         if signals.contains(&root) {
+            // The browser reads a signal's value by field (ADR-0169).
+            if calls_a_member(
+                hirs,
+                ws,
+                sigs,
+                &mut typed,
+                hole.origin,
+                crate::template_ir::ReadAt::Expr(hole.expr),
+            ) {
+                return Err(unplanned(hole.part.0, &hole.path, "a text part"));
+            }
             if hole.framed {
                 continue;
             }
@@ -968,12 +1135,41 @@ fn plan(
         }
         let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == root) else {
             // A loop's or an arm's name: the renderer reads it from the
-            // collection, by field. A member read there is refused below.
+            // collection, by field.
             if !hole.nested {
                 return Err(format!(
                     "part {} reads `{root}`, which no query binds",
                     hole.part.0
                 ));
+            }
+            // **A row reads a member of its item** (ADR-0169): for a loop
+            // over a query's list, a host computes it for each row. Until
+            // 2026-10-03 the plan said nothing of it, and the row failed to
+            // render.
+            if calls_a_member(
+                hirs,
+                ws,
+                sigs,
+                &mut typed,
+                hole.origin,
+                crate::template_ir::ReadAt::Expr(hole.expr),
+            ) {
+                let read = row_read(
+                    hirs,
+                    sigs,
+                    &template.chunks,
+                    &found,
+                    hole.part.0,
+                    &hole.path,
+                    &mut members,
+                )?
+                .ok_or_else(|| unplanned(hole.part.0, &hole.path, "a text part"))?;
+                if !rows
+                    .iter()
+                    .any(|r| r.collection == read.collection && r.path == read.path)
+                {
+                    rows.push(read);
+                }
             }
             continue;
         };
@@ -1014,6 +1210,38 @@ fn plan(
             binding: root,
             steps: out,
         });
+    }
+
+    // **Each value read outside a text part** (ADR-0169): an attribute's, a
+    // block's subject, a loop's list. The renderer reads each by field;
+    // through a member function, a host computes one for a row of a query's
+    // list. Until 2026-10-03 none was planned or refused, and a page that
+    // read one built, then failed to render.
+    for read in &others {
+        if !calls_a_member(hirs, ws, sigs, &mut typed, read.origin, read.at) {
+            continue;
+        }
+        let what = match read.kind {
+            crate::template_ir::ReadKind::Attribute => "an attribute",
+            crate::template_ir::ReadKind::Subject => "what a block decides by",
+            crate::template_ir::ReadKind::List => "a loop's list",
+        };
+        let row = row_read(
+            hirs,
+            sigs,
+            &template.chunks,
+            &found,
+            read.part.0,
+            &read.path,
+            &mut members,
+        )?
+        .ok_or_else(|| unplanned(read.part.0, &read.path, what))?;
+        if !rows
+            .iter()
+            .any(|r| r.collection == row.collection && r.path == row.path)
+        {
+            rows.push(row);
+        }
     }
 
     // A block's collection, given whole: each binding the template iterates.
@@ -1092,6 +1320,7 @@ fn plan(
             live,
             blocks,
             streams,
+            rows,
         },
         members,
     ))

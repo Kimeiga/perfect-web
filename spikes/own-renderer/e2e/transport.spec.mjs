@@ -144,10 +144,20 @@ test("one subscription carries two different resources", async ({ page }) => {
   await page.request.post("/command/menu?op=rename&id=cortado&name=Gibraltar");
   await expect(page.locator("#menu li").nth(1).locator("span")).toHaveText("Gibraltar");
 
-  const held = await page.evaluate(() => window.__pwHeld());
-  const known = await page.evaluate(() => window.__pwKnown());
-  const entries = new Set([...Object.keys(held), ...Object.keys(known)]);
-  expect(entries.size, "two resources, one subscription").toBeGreaterThanOrEqual(2);
+  // Both entries, once both frames have come. The count shows the press's
+  // speculation before the cart's frame does (ADR-0122), so that frame can
+  // come after the menu's: read once, the entries were one in a full run
+  // under load (found 2026-10-03).
+  await expect
+    .poll(
+      async () => {
+        const held = await page.evaluate(() => window.__pwHeld());
+        const known = await page.evaluate(() => window.__pwKnown());
+        return new Set([...Object.keys(held), ...Object.keys(known)]).size;
+      },
+      { message: "two resources, one subscription" },
+    )
+    .toBeGreaterThanOrEqual(2);
 
   await page.request.post("/command/menu?op=rename&id=cortado&name=Cortado");
 });

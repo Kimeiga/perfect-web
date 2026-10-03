@@ -502,6 +502,8 @@ struct Indexer {
     depth: u32,
     /// Each text part, with the expression its hole holds (ADR-0122).
     holes: Vec<Hole>,
+    /// Each value read outside a text part (ADR-0169).
+    reads: Vec<Read>,
     /// How many names composition has renamed (ADR-0136), so each new name
     /// is one no other has.
     renamed: u32,
@@ -564,6 +566,59 @@ pub struct Hole {
     /// Inside an `{#each}`: an instance's, whose address carries a frame the
     /// browser does not compute (ADR-0142).
     pub framed: bool,
+}
+
+/// **A value the template reads outside a text part** (ADR-0169): an
+/// attribute's, what a block decides by, or the list a loop iterates. Each is
+/// read by path, as a text part's is, so what it reads through a member
+/// function a host computes, or the page's plan refuses it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Read {
+    /// The part that reads it: the attribute's, or the block's.
+    pub part: PartId,
+    /// As the template reads it, through each view around it (ADR-0136).
+    pub path: String,
+    pub kind: ReadKind,
+    /// Where it is written: an expression, or for a loop's list its block,
+    /// whose directive writes the list as a path.
+    pub at: ReadAt,
+    /// The file and the declaration whose body it is written in.
+    pub origin: (usize, DeclId),
+    /// Inside a block.
+    pub nested: bool,
+}
+
+/// What reads a [`Read`]'s value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadKind {
+    /// An attribute's value, or a value written in one.
+    Attribute,
+    /// What an `{#if}`, an `{:else if}` or a `{#match}` decides by.
+    Subject,
+    /// The list an `{#each}` iterates.
+    List,
+}
+
+/// Where a [`Read`] is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadAt {
+    Expr(ExprId),
+    /// An `{#each}` block.
+    List(NodeId),
+}
+
+impl Indexer {
+    /// A value read outside a text part, where it is being lowered.
+    fn read(&mut self, part: PartId, path: &str, kind: ReadKind, at: ReadAt, ctx: &Lowering<'_>) {
+        self.reads.push(Read {
+            part,
+            path: path.to_string(),
+            kind,
+            at,
+            origin: (ctx.unit, ctx.decl),
+            nested: self.depth > 0,
+        });
+    }
 }
 
 impl Indexer {
@@ -815,6 +870,8 @@ pub struct Lowered {
     pub template: Template,
     /// Each text part and the expression it shows (ADR-0122).
     pub holes: Vec<Hole>,
+    /// **Each value it reads outside a text part** (ADR-0169).
+    pub reads: Vec<Read>,
     /// **Each view composed into it**, through the views it uses (ADR-0136):
     /// whose handlers are in its document.
     pub views: Vec<DefId>,
@@ -895,6 +952,7 @@ pub fn lowered(
     Some(Lowered {
         template,
         holes: ix.holes,
+        reads: ix.reads,
         views: ix.views,
         instances: ix.instances,
     })
@@ -1216,7 +1274,7 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
             children,
             subject,
             ..
-        } => lower_block(body, directive, children, *subject, ctx, ix, out),
+        } => lower_block(body, id, directive, children, *subject, ctx, ix, out),
         // A marker outside any block. The markup rules refuse it (PW5019).
         Node::Branch { marker, .. } => out.push(Chunk::Dynamic(Part::Blocked {
             reason: format!("`{marker}` stands outside any block"),
@@ -1457,16 +1515,18 @@ fn lower_element(
                 };
                 out.push(Chunk::Static(" ".to_string()));
                 let owner = owner.expect("an element with a dynamic attribute owns an identity");
+                let id = ix.part();
+                ix.read(id, &value, ReadKind::Attribute, ReadAt::Expr(*e), ctx);
                 if BOOLEAN_ATTRIBUTES.contains(&a.name.as_str()) {
                     out.push(Chunk::Dynamic(Part::BooleanAttribute {
-                        id: ix.part(),
+                        id,
                         owner,
                         name: a.name.clone(),
                         value,
                     }));
                 } else {
                     out.push(Chunk::Dynamic(Part::Attribute {
-                        id: ix.part(),
+                        id,
                         owner,
                         name: a.name.clone(),
                         value,
@@ -1755,8 +1815,10 @@ fn lower_stream(
     }));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_block(
     body: &Body,
+    node: NodeId,
     directive: &str,
     children: &[NodeId],
     subject: Option<ExprId>,
@@ -1770,13 +1832,14 @@ fn lower_block(
     let id = ix.part();
     // What a signal instance inside it belongs to (ADR-0144).
     ix.blocks.push(id);
-    lower_block_at(body, id, directive, children, subject, ctx, ix, out);
+    lower_block_at(body, node, id, directive, children, subject, ctx, ix, out);
     ix.blocks.pop();
 }
 
 #[allow(clippy::too_many_arguments)]
 fn lower_block_at(
     body: &Body,
+    node: NodeId,
     id: PartId,
     directive: &str,
     children: &[NodeId],
@@ -1833,6 +1896,7 @@ fn lower_block_at(
             return;
         }
         let collection = ctx.read(collection);
+        ix.read(id, &collection, ReadKind::List, ReadAt::List(node), ctx);
         let (scope, mut written) = ctx.binding(std::slice::from_ref(&binding), ix);
         ix.frames += 1;
         let inner = lower_run(body, &lead, &scope, ix);
@@ -1847,22 +1911,24 @@ fn lower_block_at(
         return;
     }
     if opens(d, "{#if") {
-        let Some(value) = subject_path else {
+        let (Some(value), Some(e)) = (subject_path, subject) else {
             out.push(blocked(
                 "an `{#if}` condition must be a value path".to_string(),
             ));
             return;
         };
+        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);
         out.push(conditional(body, id, value, &lead, &branches, ctx, ix));
         return;
     }
     if opens(d, "{#match") {
-        let Some(value) = subject_path else {
+        let (Some(value), Some(e)) = (subject_path, subject) else {
             out.push(blocked(
                 "a `{#match}` subject must be a value path".to_string(),
             ));
             return;
         };
+        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);
         let stray = lead.iter().any(|n| match body.node(*n) {
             Node::Text(t) => !t.trim().is_empty(),
             _ => true,
@@ -1953,6 +2019,7 @@ fn interpolated_attribute(
         return blocked("escaping inside a CSS declaration is not decided (ADR-0042)");
     }
     let mut segments = Vec::new();
+    let mut values = Vec::new();
     let mut holes = parts.iter();
     let mut rest = unquote(text);
     while let Some(open) = rest.find('{') {
@@ -1972,7 +2039,9 @@ fn interpolated_attribute(
                 "a hole in an attribute must be a value path, as `{..}` between tags is",
             );
         };
-        segments.push(Segment::Value(ctx.read(path)));
+        let path = ctx.read(path);
+        values.push((path.clone(), *hole));
+        segments.push(Segment::Value(path));
         rest = &after[close + 1..];
     }
     if !rest.is_empty() {
@@ -1986,8 +2055,12 @@ fn interpolated_attribute(
              that is wholly a value is written `name={value}`",
         );
     }
+    let id = ix.part();
+    for (path, e) in values {
+        ix.read(id, &path, ReadKind::Attribute, ReadAt::Expr(e), ctx);
+    }
     Part::InterpolatedAttribute {
-        id: ix.part(),
+        id,
         owner,
         name: name.to_string(),
         segments,
@@ -2077,6 +2150,7 @@ fn conditional(
                 let nested = ix.part();
                 match value_path(body, c).map(|v| ctx.read(v)) {
                     Some(v) => {
+                        ix.read(nested, &v, ReadKind::Subject, ReadAt::Expr(c), ctx);
                         // A block of its own: what its arms hold ends when
                         // it shows another (ADR-0144).
                         ix.blocks.push(nested);

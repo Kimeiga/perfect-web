@@ -161,10 +161,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
           (ADR-0168, `just e14-instance-changes`): a change now reaches every
           part that reads it, attributes included. Found on the way: E7-P
           scrambled its list on a move to where an item already was.
-        - **Next: money shown as text**, for §15.1's `price`, and a member
-          read inside a block, which ADR-0125 refuses: a menu row's price is
-          one.
-     4. Decrement, remove, and a per-line cart.
+        - ~~Money shown as text~~ (ADR-0169, `just e14-row-reads`): each
+          menu row shows its item's price, which a host computes for the row
+          through `display`. Every other member read no host computes is a
+          build refusal. Until 2026-10-03 the plan neither planned nor
+          refused one, and a page that made one built, then failed to render.
+     4. **Next: decrement, remove, and a per-line cart.** Each line shows its
+        item's name, price and quantity, the line's total, and the cart's
+        total, with controls to decrement and remove. Acceptance: the
+        commands are idempotent and optimistic, as `add_to_cart` is; the
+        totals are the items' prices, which the data layer now prices lines
+        at (ADR-0169); three engines.
      5. A command retried on a transport failure.
      6. §15.5's missing controls.
      7. Availability on the page before the press: `MenuItem.available`, and

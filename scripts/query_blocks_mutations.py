@@ -67,8 +67,8 @@ MUTANTS = [
         "a binding's whole value is not given",
         "server",
         SERVER,
-        "        for (name, value) in bindings {\n            env = env.set(name, val_to_value(value));\n        }\n",
-        "        let _ = bindings;\n",
+        "            env = env.set(name, rendered);\n",
+        "            let _ = (name, rendered);\n",
     ),
     (
         "a case is text",

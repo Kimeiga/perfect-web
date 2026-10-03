@@ -91,7 +91,7 @@
       ]
     },
     {
-      "part": 9,
+      "part": 10,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -112,7 +112,7 @@
   ],
   "live": [
     {
-      "part": 10,
+      "part": 11,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
@@ -140,7 +140,7 @@
       "streamed": true
     },
     {
-      "part": 12,
+      "part": 13,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -158,6 +158,21 @@
         "on_key_change": "cancel"
       },
       "streamed": true
+    }
+  ],
+  "rows": [
+    {
+      "collection": "menu",
+      "binding": "item",
+      "path": "item.price.display",
+      "steps": [
+        {
+          "field": "price"
+        },
+        {
+          "member": "domain.display"
+        }
+      ]
     }
   ]
 }

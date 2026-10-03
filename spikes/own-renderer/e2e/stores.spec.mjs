@@ -66,6 +66,34 @@ test("each Add is named by its item, and a rename renames it", async ({ page, re
   }
 });
 
+test("each item shows its price, and an item inserted arrives with its own", async ({
+  page,
+  request,
+}) => {
+  // Charter §15.1's price (ADR-0169): each row reads `item.price.display`,
+  // which the member's own component computes for the row. Until 2026-10-03
+  // a row could read no member of its item, and no price was shown.
+  await ready(page, "/stores/48");
+  await expect(page.locator("#menu li")).toContainText(["$3.00", "$5.25", "$3.75"]);
+  await ready(page, "/stores/47");
+  await expect(page.locator("#menu li")).toContainText(["$3.50", "$4.25", "$4.75"]);
+  try {
+    const inserted = await request.post(
+      "/command/menu?op=insert_after&id=flat-white&name=Flat%20White&at=cortado",
+    );
+    expect(inserted.ok()).toBe(true);
+    await expect(page.locator("#menu li")).toContainText([
+      "$3.50",
+      "$4.25",
+      "Flat White",
+      "$4.75",
+    ]);
+    await expect(page.locator("#menu li").nth(2)).toContainText("$4.00");
+  } finally {
+    await request.post("/command/menu?op=remove&id=flat-white");
+  }
+});
+
 test("the second store's Add adds to the session's cart", async ({ page }) => {
   await ready(page, "/stores/48");
   await expect(page.locator("#cart-count")).toHaveText("0");

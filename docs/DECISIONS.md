@@ -1387,3 +1387,19 @@ change reaches every part that reads it.
 
 Found on the way: E7-P moved an instance already in place, which scrambled
 the list's anchors; a single patch that addressed nothing hid it.
+
+[ADR-0169](DECISIONS/ADR-0169-a-member-read-is-computed-or-refused.md): what a
+template reads through a member function, a host computes or the build
+refuses.
+- A menu row's `{item.price.display}` was neither planned nor refused. The
+  store built, then failed at its first render. Values outside text
+  (attributes, block subjects, loop lists) were not looked at by the plan at
+  all.
+- A loop's row now reads members of its item. A host computes each one for
+  each row of a query's list. Every other member read no host computes is a
+  build refusal, wherever it is.
+- The store shows each price, `$3.50`, written as en-US writes dollars, and
+  exact for every amount.
+
+Found on the way: a transport test assumed the cart's frame came before the
+menu's, and read one entry under load.

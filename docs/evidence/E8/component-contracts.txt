@@ -30,6 +30,10 @@ Resources.Store  abi 67b9938482d95947
   runs at   build, browser, edge, origin
   exports   query Store
 
+domain.display  abi 8d1fd3f0102ea01e
+  runs at   build, browser, edge, origin
+  exports   function display
+
 domain.line_count  abi 79995784a8451fc2
   runs at   build, browser, edge, origin
   exports   function line_count

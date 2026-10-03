@@ -210,6 +210,7 @@ page StorePage(id: StoreId) {
                         <li>
                             <span>{item.name}</span>
                             <p>{item.description}</p>
+                            <p>{item.price.display}</p>
                             <button
                                 type="button"
                                 aria-label="Add {item.name}"

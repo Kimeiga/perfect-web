@@ -61,8 +61,9 @@ test.describe("the document the server produced", () => {
     // estimate's range 2 and its minutes 2; the recommendations' range 2,
     // their loop's 2, two instances 4 and two names 4 = 16. And what the store
     // and each item say of themselves (ADR-0166): 2, and 2 in each of three
-    // instances = 8. 44 in all.
-    expect(shape.anchors).toBe(44);
+    // instances = 8. And each item's price (ADR-0169): 2 in each of three
+    // instances = 6. 50 in all.
+    expect(shape.anchors).toBe(50);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`.
     expect(shape.anchoredElements, "the Add buttons and Clear").toBe(4);
@@ -77,6 +78,8 @@ test.describe("the document the server produced", () => {
     await page.goto("/StorePage.html");
     await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
     await expect(page.locator("#menu li")).toHaveCount(3);
+    // Each with its price (ADR-0169).
+    await expect(page.locator("#menu li")).toContainText(["$3.50", "$4.25", "$4.75"]);
     await expect(page.locator("#cart-count")).toHaveText("0");
     await context.close();
   });

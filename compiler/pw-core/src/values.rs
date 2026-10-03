@@ -59,7 +59,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::diagnostics::{Detector, Diagnostic};
 use crate::hir::{
-    BinOp, Body, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Literal, Pattern, Span, UnOp,
+    BinOp, Body, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Literal, NodeId, Pattern, Span, UnOp,
 };
 use crate::lexical::{Binder, Lexical};
 use crate::resolve::{DefId, Namespace, Resolution, UnitId, Workspace};
@@ -1473,6 +1473,37 @@ impl<'a> Typer<'a> {
         Some(Target::Member(sig, *base))
     }
 
+    /// `name` read from a value of type `receiver` calls a function declared
+    /// on its type, read as a property: `cart.line_count` (ADR-0125).
+    fn calls_a_member(&self, receiver: &Ty, name: &str) -> bool {
+        receiver
+            .receiver()
+            .and_then(|r| self.sigs.member_by(r, name))
+            .is_some_and(|sig| self.sigs.by_def(sig.definition).is_some())
+    }
+
+    /// [`MemberReads`] in this body (ADR-0169).
+    fn member_reads(&self) -> MemberReads {
+        let exprs = self
+            .body
+            .exprs()
+            .filter_map(|(id, e, _)| match e {
+                Expr::Field { base, name } if self.calls_a_member(&self.of(*base), name) => {
+                    Some(id)
+                }
+                _ => None,
+            })
+            .collect();
+        // A loop's list, read as it is typed.
+        let lists = self
+            .lexical
+            .each_blocks()
+            .filter(|(_, collection, head)| self.each_list(collection, *head).1)
+            .map(|(n, ..)| n)
+            .collect();
+        MemberReads { exprs, lists }
+    }
+
     /// `r.f`, where `f` is a field of `r`'s type rather than a declaration
     /// that takes it (ADR-0077).
     fn calls_a_field(&self, callee: ExprId) -> bool {
@@ -2309,22 +2340,30 @@ impl<'a> Typer<'a> {
     /// the fields read from it. `Unknown` where the directive writes anything
     /// else.
     fn each_collection(&self, collection: &str, head: Option<Binder>) -> Ty {
+        self.each_list(collection, head).0
+    }
+
+    /// [`Typer::each_collection`], and whether a read on the way calls a
+    /// member function (ADR-0169).
+    fn each_list(&self, collection: &str, head: Option<Binder>) -> (Ty, bool) {
         let mut segments = collection.split('.').map(str::trim);
         let first = segments.next().unwrap_or_default();
         if !is_ident(first) {
-            return Ty::Unknown;
+            return (Ty::Unknown, false);
         }
         let mut t = match head {
             Some(b) => self.local(b),
             None => self.global(first),
         };
+        let mut calls = false;
         for segment in segments {
             if !is_ident(segment) {
-                return Ty::Unknown;
+                return (Ty::Unknown, calls);
             }
+            calls |= self.calls_a_member(&t, segment);
             t = self.member_type(&t, segment);
         }
-        t
+        (t, calls)
     }
 
     /// **Record the type a binding holds.** A binding keeps the first type
@@ -3578,6 +3617,76 @@ pub fn relations(hir: &Hir, sigs: &Signatures, ws: &Workspace, at: UnitId) -> Ve
         typed.insert(id, typer.locals.borrow().clone());
     }
     out
+}
+
+/// **What a template reads through a member function** (ADR-0169): each
+/// `.name` that names a function declared on its value's type, and each
+/// `{#each}` whose list is read through one. A template's value is a path,
+/// so each such name in one is read as a property and calls the function.
+/// The renderer reads fields alone, so a host computes each of these for a
+/// page, or the page's plan refuses it.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct MemberReads {
+    /// The field expression that names it: `item.price.display`'s
+    /// `.display`.
+    pub exprs: BTreeSet<ExprId>,
+    /// The `{#each}` block, by its node: its list is a path the directive
+    /// writes, not an expression.
+    pub lists: BTreeSet<NodeId>,
+}
+
+/// [`MemberReads`] in `id`'s body, typed as [`relations`] types it: each
+/// declaration around it first, for the names it binds (ADR-0066).
+pub fn member_reads(
+    hir: &Hir,
+    sigs: &Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    id: DeclId,
+) -> MemberReads {
+    let lexical_of = |d: DeclId, decl: &Decl, body: &Body| {
+        Lexical::build_in(sigs, Some(at), hir, d)
+            .unwrap_or_else(|| Lexical::build(sigs, Some(at), decl, body))
+    };
+    // `id`, and each declaration whose bindings it reads.
+    let mut needed = BTreeSet::from([id]);
+    let mut around = vec![id];
+    while let Some(d) = around.pop() {
+        let decl = hir.decl(d);
+        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+            continue;
+        };
+        for (o, _) in lexical_of(d, decl, body).outer_bindings() {
+            if needed.insert(o) {
+                around.push(o);
+            }
+        }
+    }
+    let mut typed: BTreeMap<DeclId, BTreeMap<Binder, Ty>> = BTreeMap::new();
+    for (d, decl) in hir.all_decls() {
+        if !needed.contains(&d) {
+            continue;
+        }
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let lexical = lexical_of(d, decl, body);
+        let outer: Vec<Ty> = lexical
+            .outer_bindings()
+            .map(|(o, b)| {
+                typed
+                    .get(&o)
+                    .and_then(|l| l.get(&b))
+                    .cloned()
+                    .unwrap_or(Ty::Unknown)
+            })
+            .collect();
+        let typer = Typer::new(sigs, ws, at, hir.module_of(d), decl, body, lexical, outer);
+        if d == id {
+            return typer.member_reads();
+        }
+        typed.insert(d, typer.locals.borrow().clone());
+    }
+    MemberReads::default()
 }
 
 /// The declared result against every value the body returns.

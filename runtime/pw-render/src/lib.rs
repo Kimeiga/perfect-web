@@ -300,16 +300,28 @@ impl Env {
         self
     }
 
-    /// `item.name` where `item` is a record, or a whole path set directly.
+    /// The value at `path`: a whole path set directly, or the longest name
+    /// bound and each field after it. `item.price.display` is `item`'s
+    /// `price`'s `display` (ADR-0169). Until 2026-10-03 one field was read
+    /// after the name, and a path two fields deep named nothing.
     fn get(&self, path: &str) -> Option<&Value> {
         if let Some(v) = self.values.get(path) {
             return Some(v);
         }
-        let (base, field) = path.split_once('.')?;
-        match self.values.get(base)? {
-            Value::Record(fields) => fields.get(field),
-            _ => None,
+        let segments: Vec<&str> = path.split('.').collect();
+        for cut in (1..segments.len()).rev() {
+            let Some(mut value) = self.values.get(&segments[..cut].join(".")) else {
+                continue;
+            };
+            for field in &segments[cut..] {
+                value = match value {
+                    Value::Record(fields) => fields.get(*field)?,
+                    _ => return None,
+                };
+            }
+            return Some(value);
         }
+        None
     }
 
     fn with(&self, name: &str, value: Value) -> Env {
