@@ -65,6 +65,17 @@ export const test = base.extend({
         const r = await p.request.post(`/bench/estimate?${query}`);
         if (!r.ok()) throw new Error(`/bench/estimate?${query}: ${r.status()}`);
       },
+      // The store's notice board (T09): post a notice at the source, with
+      // no event, and read how often the board was asked.
+      notice: async (text, p = page) => {
+        const r = await p.request.post(`/bench/notice?text=${encodeURIComponent(text)}`);
+        if (!r.ok()) throw new Error(`/bench/notice: ${r.status()}`);
+      },
+      noticeCalls: async (p = page) => {
+        const r = await p.request.get("/bench/calls");
+        if (!r.ok()) throw new Error(`/bench/calls: ${r.status()}`);
+        return (await r.json()).notice;
+      },
       // The page takes a press, without waiting for it to finish loading: a
       // page still streaming has not loaded. The Pleris page attaches its
       // handlers after its resume decision (E7V). Both frameworks' forms

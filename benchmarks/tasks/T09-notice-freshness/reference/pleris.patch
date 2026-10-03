@@ -1,0 +1,13 @@
+diff --git a/store/app.pw b/store/app.pw
+index 49b16a9..2939b66 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -61,7 +61,7 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+ // **What the store has posted for its customers** (E14, T09). Asking the
+ // notice board is expensive, so its answer is kept.
+ public query Notice(id: StoreId) -> Result<String, StoreError>
+-    freshness     5.minutes
++    freshness     5.seconds
+     consistency   eventual
+     cache         shared
+     key           id

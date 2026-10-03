@@ -363,6 +363,13 @@ struct Server {
     /// **Each session's estimator** (E14, T10), as a test set it; the default
     /// for a session no test has.
     estimators: Mutex<BTreeMap<String, Estimator>>,
+    /// **What the store has posted on its notice board** (E14, T09): what
+    /// `store:data/notices#current` answers. A test posts a notice through
+    /// `/bench/notice`, and nothing is told it changed.
+    notice: Mutex<String>,
+    /// **The items the menu's fragment was last rendered from**: a fragment
+    /// is rendered again when the `Menu` query's value is not what it shows.
+    menu_rendered_from: Mutex<Vec<(String, String)>>,
     /// **The compiler's contracts, and the node this server is.**
     ///
     /// E8's last gate item asks for the command path to go through the host
@@ -546,6 +553,8 @@ fn dev_topology() -> Topology {
                 "network.fetch",
                 // A session's delivery estimate (E14, T10).
                 "database.read<Estimates>",
+                // The store's notice board (E14, T09).
+                "database.read<Notices>",
                 // 2026-08-10. The store gained the `import context.{
                 // current_session }` it had been missing since E4, so the page
                 // and both commands read the session. A dev origin that does
@@ -668,6 +677,8 @@ impl Server {
             orders: Mutex::new(BTreeMap::new()),
             recommender: Mutex::new(Recommender::default()),
             estimators: Mutex::new(BTreeMap::new()),
+            notice: Mutex::new("Open until 7 pm".to_string()),
+            menu_rendered_from: Mutex::new(Vec::new()),
             contracts,
             topology,
             speculation,
@@ -1150,9 +1161,23 @@ impl Server {
                 )))))]),
             }
         });
+        // What the store has posted (E14, T09). Every call is counted, as
+        // every data-layer call is: what `/bench/calls` reports.
+        let posted = self.notice.lock().expect("notice").clone();
+        let notice: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] if id == STORE_ID => Ok(vec![Val::Result(Ok(Some(Box::new(
+                Val::String(posted.clone()),
+            ))))]),
+            [Val::String(_)] => Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                "not-found".into(),
+                None,
+            )))))]),
+            other => Err(format!("notices#current received {other:?}")),
+        });
         BTreeMap::from([
             ("store:data/stores#get".to_string(), get),
             ("store:data/menus#for-store".to_string(), for_store),
+            ("store:data/notices#current".to_string(), notice),
             (
                 "store:data/recommendations#for-store".to_string(),
                 recommend,
@@ -1550,6 +1575,16 @@ impl Server {
         // derive a patch from a change rather than must.
         let entry = cart_entry(session);
         let version = self.version(session);
+        // And the value itself, to a page that speculates on it (ADR-0122),
+        // from the snapshot the patches are derived from. Until 2026-10-03
+        // it was read again after the table was let go, and pushed in a
+        // second hold: a page could be sent one change in two batches, and a
+        // command committed in between gave the frame a value later than its
+        // version.
+        let value = self
+            .speculates_on_cart()
+            .and_then(|binding| bindings.get(&binding))
+            .map(val_to_json);
         let mut queue = self.pending.lock().expect("pending");
         // Against what the document shows. With none served, none shows.
         let patches = {
@@ -1579,23 +1614,17 @@ impl Server {
         // when nothing it shows changed.
         waiting.push(StreamFrame::PatchSet(PatchSet {
             protocol: CURRENT,
-            basis: CausalBasis::of(entry, version),
+            basis: CausalBasis::of(entry.clone(), version),
             patches,
         }));
-        // And the value itself, to a page that speculates on it (ADR-0122).
-        if self.speculates_on_cart().is_some() {
-            drop(queue);
-            let cart = self.cart_json(session);
-            let mut queue = self.pending.lock().expect("pending");
-            queue
-                .entry(session.to_string())
-                .or_default()
-                .push(StreamFrame::EntryValue {
-                    protocol: CURRENT,
-                    entry: cart_entry(session),
-                    version,
-                    value: cart,
-                });
+        // In the same hold, so one change reaches a page whole.
+        if let Some(value) = value {
+            waiting.push(StreamFrame::EntryValue {
+                protocol: CURRENT,
+                entry,
+                version,
+                value,
+            });
         }
     }
 
@@ -1699,8 +1728,14 @@ impl Server {
     /// than a claim about two renders agreeing.
     fn menu_fragment(&self, items: &[(String, String)]) -> String {
         let key = self.menu_key();
+        // Kept while it shows the `Menu` query's value. Until 2026-10-03 it
+        // was kept until a command invalidated it, so a value that changed at
+        // its source, read again once its freshness was spent, was not what
+        // a new document showed.
+        let mut rendered_from = self.menu_rendered_from.lock().expect("rendered from");
         if let Some(entry) = self.materializer.entry(&key)
             && !entry.stale
+            && *rendered_from == items
         {
             return entry.body;
         }
@@ -1709,8 +1744,10 @@ impl Server {
         let html = pw_render::render_part(template, part, &env, &self.templates)
             .expect("the menu fragment renders");
         self.clock.advance(1);
+        self.materializer.invalidate(&key, 0);
         self.materializer
             .regenerate(&key, None, || Ok(html.clone()));
+        *rendered_from = items.to_vec();
         html
     }
 
@@ -1773,6 +1810,7 @@ impl Server {
         self.materializer.invalidate(&self.menu_key(), 0);
         self.materializer
             .regenerate(&self.menu_key(), None, || Ok(html));
+        *self.menu_rendered_from.lock().expect("rendered from") = items.clone();
 
         let entry = ResourceEntryId::derive(&menu_identity(), &IDENTITY);
         let version = self.menu_version();
@@ -3333,6 +3371,27 @@ fn handle(server: &Server, mut stream: TcpStream) {
             }
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
+        // The store's staff post a notice (E14, T09): at the source, and
+        // nothing is told. What a page shows of it is the `Notice` query's
+        // to keep, for as long as its freshness says.
+        ("POST", "/bench/notice") => {
+            let text = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("text="))
+                .and_then(percent_decoded)
+                .unwrap_or_default();
+            *server.notice.lock().expect("notice") = text;
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // How many times the notice board was asked (E14, T09), as every
+        // stack in the benchmark reports it.
+        ("GET", "/bench/calls") => {
+            let calls = server.calls.lock().expect("calls");
+            let body = serde_json::json!({
+                "notice": calls.get("store:data/notices#current").copied().unwrap_or(0),
+            });
+            respond_json(&mut stream, 200, &session, fresh, &body.to_string());
+        }
         // How the estimator behaves for the request's session (E14, T10): how
         // long it takes, how it fails, and what it estimates. What was kept
         // for the session is not served after.
@@ -4504,6 +4563,9 @@ public query Store(",
             loop {
                 let n = client.read(&mut buf).expect("read");
                 if n == 0 {
+                    // The close, which is what tells a browser the document
+                    // is complete: the last chunk, empty, when it came.
+                    chunks.push((started.elapsed(), String::new()));
                     break;
                 }
                 chunks.push((
@@ -4536,6 +4598,21 @@ public query Store(",
             fail: fail.map(str::to_string),
             ..Recommender::default()
         };
+    }
+
+    /// What the recommendations' region shows: the arm the document carries
+    /// for it, in place or as its patch. Not the page: the menu has a Cold
+    /// Brew too, so a page holds it whatever the region shows.
+    fn region(page: &str) -> String {
+        let at = page
+            .find("aria-label=\"Recommendations\"")
+            .expect("the region");
+        let rest = &page[at..];
+        match rest.find("<?start") {
+            // Pending: the patch, after the document.
+            Some(_) => page[page.find("<template for=").expect("the patch")..].to_string(),
+            None => rest[..rest.find("</section>").expect("its end")].to_string(),
+        }
     }
 
     #[test]
@@ -4613,26 +4690,28 @@ public query Store(",
     fn a_declared_error_is_given_and_not_kept() {
         let s = served_from(with_kept_recommendations, None);
         recommend(&s, 0, Some("declared"));
-        let declined: String = fetched(&s, "/StorePage.html")
-            .into_iter()
-            .map(|(_, c)| c)
-            .collect();
-        assert!(declined.contains("<p>Declined</p>"), "{declined}");
+        let page = |s: &Server| -> String {
+            fetched(s, "/StorePage.html")
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        assert!(region(&page(&s)).contains("<p>Declined</p>"));
         // The recommender answers again, and the next page asks it: what it
         // declined is not served for five minutes.
         recommend(&s, 0, None);
-        let answered: String = fetched(&s, "/StorePage.html")
-            .into_iter()
-            .map(|(_, c)| c)
-            .collect();
-        assert!(answered.contains("Cold Brew"), "{answered}");
+        let answered = region(&page(&s));
+        assert!(
+            answered.contains("Cortado") && !answered.contains("Declined"),
+            "{answered}"
+        );
         // An answer is kept, as its policy says.
         recommend(&s, 0, Some("declared"));
-        let kept: String = fetched(&s, "/StorePage.html")
-            .into_iter()
-            .map(|(_, c)| c)
-            .collect();
-        assert!(kept.contains("Cold Brew"), "{kept}");
+        let kept = region(&page(&s));
+        assert!(
+            kept.contains("Cortado") && !kept.contains("Declined"),
+            "{kept}"
+        );
     }
 
     /// T10's store: a session's delivery estimate, which the page waits for.
@@ -4694,6 +4773,58 @@ public query Store(",
         );
         estimate(&s, "c", None, 35);
         assert!(visible(&page_as(&s, "c")).contains("Delivery in 35 min"));
+    }
+
+    #[test]
+    fn a_menu_changed_at_its_source_shows_once_its_value_is_read_again() {
+        // A materialized fragment is kept while it shows the `Menu` query's
+        // value. Until 2026-10-03 it was kept until a command invalidated it,
+        // so a menu changed at its source, read again once its freshness was
+        // spent, was not what a new document showed.
+        let s = served_from(|app| app.to_string(), None);
+        let (before, _) = s.serve_document("a");
+        assert!(visible(&before).contains("Cortado"), "{before}");
+        s.menu
+            .lock()
+            .expect("menu")
+            .retain(|(id, _)| id != "cortado");
+        // The query's freshness spent: its value is read again.
+        s.queries.invalidate("store.page.Menu");
+        let (after, _) = s.serve_document("b");
+        assert!(!visible(&after).contains("Cortado"), "{after}");
+        assert!(visible(&after).contains("Espresso"), "{after}");
+    }
+
+    /// T09's store: a notice board the page reads, kept five minutes.
+    const NOTICE_SETUP: &str =
+        include_str!("../../../../benchmarks/tasks/T09-notice-freshness/setup/pleris.patch");
+
+    fn notice_calls(s: &Server) -> u64 {
+        s.calls
+            .lock()
+            .expect("calls")
+            .get("store:data/notices#current")
+            .copied()
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn a_notice_is_kept_as_its_freshness_says_and_each_ask_is_counted() {
+        let s = served_from_patches(|app| app.to_string(), &[NOTICE_SETUP]);
+        let (first, _) = s.serve_document("a");
+        assert!(visible(&first).contains("Open until 7 pm"), "{first}");
+        assert_eq!(notice_calls(&s), 1);
+        // Posted at the source, and nothing is told: the kept answer is
+        // served, and the board is not asked again.
+        *s.notice.lock().expect("notice") = "Closing early".to_string();
+        let (kept, _) = s.serve_document("b");
+        assert!(visible(&kept).contains("Open until 7 pm"), "{kept}");
+        assert_eq!(notice_calls(&s), 1);
+        // Once its freshness is spent, the board is asked, once.
+        s.queries.invalidate("store.page.Notice");
+        let (fresh, _) = s.serve_document("c");
+        assert!(visible(&fresh).contains("Closing early"), "{fresh}");
+        assert_eq!(notice_calls(&s), 2);
     }
 
     #[test]

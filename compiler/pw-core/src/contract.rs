@@ -960,7 +960,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                     // read, typed and serialized then. Excluding it would let a
                     // page perform an effect at render time and attribute it to
                     // a button nobody has pressed.
-                    let lambdas: Vec<_> = body
+                    let mut deferred: Vec<_> = body
                         .walk()
                         .into_iter()
                         .filter_map(|e| match body.expr(e) {
@@ -968,7 +968,25 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                             _ => None,
                         })
                         .collect();
-                    inference.effective_effects_excluding(unit, hir, id, &lambdas)
+                    // And a `<stream>`'s query (ADR-0148), for the same reason:
+                    // the host runs it as its own component, under its own
+                    // contract, as it runs a query a `let` reads. Until
+                    // 2026-10-03 a page that streamed `Recommendations` was
+                    // asked `network.fetch` to render, which `pw diff` showed.
+                    for e in body.walk() {
+                        let Expr::Template { roots, .. } = body.expr(e) else {
+                            continue;
+                        };
+                        for n in body.walk_markup(roots) {
+                            if let crate::hir::Node::Element { tag, attrs, .. } = body.node(n)
+                                && tag == "stream"
+                                && let Some(query) = crate::streams::query_attr(attrs)
+                            {
+                                deferred.push(query);
+                            }
+                        }
+                    }
+                    inference.effective_effects_excluding(unit, hir, id, &deferred)
                 }
                 // No body: an interface, or platform-external code. One
                 // operation decides, for both branches.

@@ -52,8 +52,8 @@ MUTANTS = [
     (
         "the server sends no value to a page that speculates",
         SERVER,
-        "        if self.speculates_on_cart().is_some() {\n",
-        "        if self.speculates_on_cart().is_some() && false {\n",
+        "        if let Some(value) = value {\n            waiting.push(StreamFrame::EntryValue {\n",
+        "        if let Some(value) = value.filter(|_| false) {\n            waiting.push(StreamFrame::EntryValue {\n",
     ),
     (
         "a commit reports no newer version",

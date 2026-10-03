@@ -1,0 +1,6 @@
+{
+  "id": "T09",
+  "title": "Keep the store's notice fresh",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T09.spec.mjs"
+}

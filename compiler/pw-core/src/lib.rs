@@ -62,6 +62,7 @@ pub mod resume_artifacts;
 pub mod routes;
 pub mod rules;
 pub mod scope;
+pub mod semantic;
 pub mod signals;
 pub mod signatures;
 pub mod streams;

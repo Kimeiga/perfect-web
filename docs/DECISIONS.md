@@ -1173,3 +1173,24 @@ what T05 and T10 needed.
 Found on the way: the server's handler table missed a handler inside a
 stream, and WebKit paints nothing until a page holds about 200 characters of
 text.
+
+[ADR-0149](DECISIONS/ADR-0149-pw-diff-what-a-change-means.md): E14-D, gate
+item 1.
+- `pw diff OLD NEW` checks and builds two programs, and reports what the
+  change means in charter §19.2's sections: domain, effects, capabilities,
+  privacy, placement, cache, invalidation, pages, client bytes, server
+  components, obligations, unsafe and diagnostics.
+- A side that does not check is refused, naming its errors.
+- A policy no section names is reported, never dropped.
+
+Its first use found that a page streaming a query was charged the query's
+capability. The stream's query is now excluded from the page's authority, as
+a handler's body is.
+
+[ADR-0150](DECISIONS/ADR-0150-one-change-reaches-a-page-whole.md): two
+development-server corrections.
+- One change's frames reach a page in one hold of the subscriber table, the
+  entry's value from the snapshot the patches came from. They had gone in
+  two holds, which an intermittent browser failure exposed.
+- A materialized fragment is kept while it shows its query's value, not
+  until a command invalidates it.

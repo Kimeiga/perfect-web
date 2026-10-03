@@ -82,12 +82,20 @@ echo
 echo "== 3c. the store page, with its parts manifest and the E7V decision =="
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
   emit-template "${STORE[@]}" > "$STORE_IR"
-cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
-  --out "$OUT" --values "$SPIKE/store-values.json" --resume "$SPIKE/store-resume.json" \
-  --plan "$OUT/build/pages/store.page.StorePage.json" \
-  --document "StorePage(47)" --partition public --compatibility B1 \
-  --identity-key "own-renderer-spike-key" \
-  --runtime /pw-runtime.mjs < "$STORE_IR"
+# The store's static render is the canonical store's, from its values file.
+# A benchmark sandbox's store is served, never rendered statically, and the
+# values file does not describe it: a task that shows a new value would fail
+# here for a reason that is not the task's (E14, T09).
+if [ "$SOURCES" = "$REPO_ROOT/examples" ]; then
+  cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
+    --out "$OUT" --values "$SPIKE/store-values.json" --resume "$SPIKE/store-resume.json" \
+    --plan "$OUT/build/pages/store.page.StorePage.json" \
+    --document "StorePage(47)" --partition public --compatibility B1 \
+    --identity-key "own-renderer-spike-key" \
+    --runtime /pw-runtime.mjs < "$STORE_IR"
+else
+  echo "   a sandbox's store: served, not rendered statically"
+fi
 cp "$SPIKE/public/pw-runtime.mjs" "$OUT/"
 
 echo
@@ -109,8 +117,10 @@ for page in HelloStatic Tricky; do
   fi
 done
 echo "   0 script tags in HelloStatic and Tricky"
-echo "   StorePage carries $(grep -c "<script" "$OUT/StorePage.html") script element(s):"
-echo "     the parts manifest, and the runtime that reads it"
+if [ -f "$OUT/StorePage.html" ]; then
+  echo "   StorePage carries $(grep -c "<script" "$OUT/StorePage.html") script element(s):"
+  echo "     the parts manifest, and the runtime that reads it"
+fi
 
 echo
 echo "== 5. determinism: the same IR renders to the same bytes =="

@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `48c4148`, with ADR-0148.
+**Reviewed:** 2026-10-03, against master `1d8f8b3`, with ADR-0150.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,70 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**E14-C and E14-D, 2026-10-03: T09 is written, ten tasks of twelve, and
+`pw diff` reports what a change means.** These are the instruments of gate
+items 2 and 1. Their evidence is recorded at the commit after this one.
+- **T09** keeps the store's notice fresh. The notice board is expensive, and
+  the setup keeps its answer five minutes. The task: a new notice shows
+  within ten seconds, and the board is still asked at most once in ten
+  seconds. All four controls hold on all three stacks.
+
+  The plausible wrong fix stops keeping the notice. Every stack builds it,
+  Pleris's included, since `freshness 0.seconds` is legal. Only the hidden
+  test that counts the board's calls fails it: how long a value may be kept
+  is a product decision, which no checker can know. `pw diff` reports
+  Pleris's reference as one line, the old freshness beside the new.
+- **`pw diff OLD NEW`**
+  ([ADR-0149](DECISIONS/ADR-0149-pw-diff-what-a-change-means.md)) checks
+  and builds two programs. It reports the change in charter §19.2's
+  sections, each change on one line with its old value:
+  - domain, effects, capabilities, privacy, placement;
+  - cache and freshness, invalidation, pages;
+  - client impact, server components, obligations, unsafe, diagnostics.
+
+  A side that does not check is refused, naming its errors. For most of the
+  benchmark's unsafe patches, that refusal is the review.
+
+**Correction, found by `pw diff`'s first use: a page that streams a query
+was charged the query's capability.** Diffing T05's reference reported that
+the store page now needed `network.fetch`. The host runs a stream's query as
+its own component, as it runs a handler. The page's contract now leaves it
+out, as it leaves out a handler's body.
+
+**Correction, found by T09: a Next.js cache's freshness is not its own.**
+T09's first Next.js setup kept the notice with `unstable_cache`, and the
+unchanged store passed the hidden tests. The cart's server actions call
+`revalidatePath` for the store's page. In Next.js 16.3.8 that expires every
+`unstable_cache` entry the page read, so each press of Add refreshed the
+notice. The setup keeps the notice in a module-level map now, as SvelteKit's
+does.
+
+**Corrections, ADR-0150, 2026-10-03: one change reaches a page whole, and a
+fragment shows its query's value**
+([ADR-0150](DECISIONS/ADR-0150-one-change-reaches-a-page-whole.md)).
+- After a command the server pushed one change's frames in two holds of its
+  subscriber table, reading the cart again between them. A page could be
+  sent one change in two batches. It could also get a value under a version
+  the value is not from.
+  - Eight more runs of the whole suite caught Chromium's "only cart-related
+    part ids update" failing this way.
+  - Firefox's "two fast presses are one fetch" failed once in three runs at
+    `da0fcff`. It likely failed this way too, but that is not proven.
+
+  One change's frames now go in one hold, and the value comes from the
+  snapshot the patches came from.
+- The store's menu fragment was kept until a command invalidated it. A menu
+  changed at its source kept its old fragment past its freshness. It is
+  rendered again now when the value it would show differs.
+- The browser suite's evidence now records a failure's expected and received
+  values.
+
+The two stream mutants that survived at `da0fcff` have tests that kill them.
+- "a declared error is kept": the test's assertion held under the mutant,
+  so it now reads the region.
+- "the response is not ended with its last region": the test timed the last
+  data chunk, not the close.
 
 **E14-C, 2026-10-03: T05 and T10 are written, nine tasks of twelve.** All
 four controls hold on all three stacks for each.
@@ -2147,15 +2211,16 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **E14-Q**: the store's queries as components in the server. It unblocks
-   T02, T03, T04, T07, T09 and T10 on Pleris, and T12's runtime half.
-2. **E14-C, continued:** the framework halves of the blocked tasks, and each
-   task's Pleris half as its blocker closes.
-3. **Rulings**: a value's label (E14-L, ADR-0085's open half: ADR-0128
-   settled the cache half); the event parameter (ADR-0058, T06); view
-   composition (ADR-0072, T11); streams (ADR-0075, T05); design comments in
-   task baselines (ADR-0124); an unpriced optimistic line and `entry_value`
-   (ADR-0122).
+1. **T02, a duplicate request storm** (`docs/NEXT.md`): check that
+   `concurrency one_per_key` makes concurrent first reads of one key one
+   call, then write the task as T09 was, with the source's call counter.
+2. **T07, a stale navigation request**: a page that navigates, so
+   `on_key_change cancel` has a key to change.
+3. **Gate item 5**: from the ten tasks' unsafe controls, state with their
+   evidence which bug classes `pw check` makes unrepresentable. On Pleris,
+   nine of the ten unsafe patches are refused at `pw check`, and T09's is
+   caught only by its hidden tests. On Next.js and SvelteKit, every one is
+   caught by tests: hidden ones, or for T08 and T12 the contract's.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

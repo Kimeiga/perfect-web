@@ -1737,6 +1737,24 @@ e14-query-values:
      } > docs/evidence/E14/query-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/query-values.txt
 
+# ADR-0149: `pw diff` over each benchmark task's Pleris reference and unsafe
+# patches, the report a reviewer of each would be shown, and the mutation
+# controls. E14's gate item 1.
+e14-diffs:
+    @cargo build --quiet --locked -p pw-cli
+    @{ echo "ADR-0149 - pw diff, what a change means, for review"; echo; \
+       echo "produced by: just e14-diffs"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the tests (compiler/pw-core/tests/semantic_diff.rs)"; echo; \
+       cargo test --locked -p pw-core --test semantic_diff 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== each task's Pleris patches (scripts/semantic_diffs.py)"; echo; \
+       python3 scripts/semantic_diffs.py; \
+       echo; echo "== mutation controls (scripts/semantic_mutations.py)"; echo; \
+       python3 scripts/semantic_mutations.py; \
+     } > docs/evidence/E14/semantic-diffs.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/semantic-diffs.txt
+
 # ADR-0148: a stream region shows its query's state, and its settled arm comes
 # in the same response. The rules, the IR and the plan, the renderer, the
 # server's streamed response, the browser's spec in three engines and in the
@@ -2575,7 +2593,7 @@ e10-browser engines="chromium firefox webkit" out="docs/evidence/E10/browser-sui
          (cd spikes/own-renderer && pnpm exec playwright test --reporter=line \
            $(for e in {{engines}}; do printf -- '--project=%s ' "$e"; done) 2>&1) \
            | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-           | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+           | grep -E "^ +[0-9]+\) |Error:|^ +(Expected|Received)|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
        done; \
      } > {{out}}
     @cat {{out}}

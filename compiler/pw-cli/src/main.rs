@@ -1353,6 +1353,84 @@ fn emit_component_command(paths: &[&String], component_id: &str, out: &str) -> E
     }
 }
 
+/// Every `.pw` file under `dir`, recursively, in order.
+fn pw_files_under(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) -> std::io::Result<()> {
+    let mut entries: Vec<std::fs::DirEntry> = std::fs::read_dir(dir)?.collect::<Result<_, _>>()?;
+    entries.sort_by_key(|e| e.path());
+    for e in entries {
+        let p = e.path();
+        if p.is_dir() {
+            pw_files_under(&p, out)?;
+        } else if p.extension().is_some_and(|x| x == "pw") {
+            out.push(p);
+        }
+    }
+    Ok(())
+}
+
+/// **A directory's program** (ADR-0149): every `.pw` file under it, and the
+/// standard packages.
+fn program_in(dir: &str) -> Result<Vec<pw_core::check::Unit>, String> {
+    let packages = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages");
+    let mut paths = Vec::new();
+    for p in ["pw-std", "pw-platform-web"] {
+        pw_files_under(&packages.join(p), &mut paths).map_err(|e| format!("{p}: {e}"))?;
+    }
+    let packaged = paths.len();
+    pw_files_under(std::path::Path::new(dir), &mut paths).map_err(|e| format!("{dir}: {e}"))?;
+    if paths.len() == packaged {
+        return Err(format!("{dir} holds no .pw file"));
+    }
+    // Named as the program names them, relative to where it is: a report
+    // reads the same wherever the two programs were put.
+    let root = packages
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_default();
+    paths
+        .into_iter()
+        .map(|p| {
+            let src = std::fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))?;
+            let named = p
+                .strip_prefix(dir)
+                .or_else(|_| p.strip_prefix(&root))
+                .unwrap_or(&p);
+            Ok(pw_core::check::Unit {
+                hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
+                path: named.display().to_string(),
+                src,
+            })
+        })
+        .collect()
+}
+
+/// `pw diff OLD NEW`: what the change from one program to the other means,
+/// for review, in charter §19.2's sections (ADR-0149).
+fn diff_command(old: &str, new: &str, json: bool) -> ExitCode {
+    let model = |dir: &str| program_in(dir).and_then(|units| pw_core::semantic::Model::of(&units));
+    let (a, b) = match (model(old), model(new)) {
+        (Ok(a), Ok(b)) => (a, b),
+        (Err(e), _) => {
+            eprintln!("pw diff: {old}: {e}");
+            return ExitCode::from(1);
+        }
+        (_, Err(e)) => {
+            eprintln!("pw diff: {new}: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    let report = pw_core::semantic::diff(&a, &b);
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).unwrap_or_default()
+        );
+    } else {
+        print!("{}", report.text());
+    }
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -1382,6 +1460,20 @@ fn run() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let plain = args.iter().any(|a| a == "--plain");
     let cmd = args.first().map(|s| s.as_str()).unwrap_or("");
+    // `pw diff OLD NEW [--json]` (ADR-0149): two directories, each a whole
+    // program, with the standard packages added to both.
+    if cmd == "diff" {
+        let dirs: Vec<&String> = args
+            .iter()
+            .skip(1)
+            .filter(|a| !a.starts_with("--"))
+            .collect();
+        let [old, new] = dirs.as_slice() else {
+            eprintln!("usage: pw diff OLD_DIR NEW_DIR [--json]");
+            return ExitCode::from(2);
+        };
+        return diff_command(old, new, args.iter().any(|a| a == "--json"));
+    }
     // `--out DIR` takes a value, so DIR must not also be read as a source
     // path. Without this the output directory is opened as a `.pw` file and the
     // command fails after already having written its files.

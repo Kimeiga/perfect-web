@@ -25,8 +25,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
    readable from the sandbox.
 3. **E14-C, tasks T01-T12**, each with a prompt, hidden tests, a reference
    patch and an unsafe patch per stack, and all four controls green. A task
-   Pleris cannot express is recorded as such. T01, T03, T04, T06, T08, T11
-   and T12 are written. T12's Pleris wrong fix is refused since ADR-0128.
+   Pleris cannot express is recorded as such. Ten are written: T01, T03,
+   T04, T05, T06, T08, T09, T10, T11 and T12. T12's Pleris wrong fix is
+   refused since ADR-0128.
    - ~~**E14-L, a value's label.**~~ Done 2026-10-02 (ADR-0129).
    - ~~**Rulings: UI state, view composition, typed events.**~~ Done
      2026-10-02 (ADR-0130, ADR-0131).
@@ -80,16 +81,29 @@ E14 comes before E11-E13. Its plan, controls and task list are
      state.**~~ Written 2026-10-03: all four controls hold on all three
      stacks for each. Pleris's unsafe patches are refused by `pw check`:
      T05's by PW5400, T10's by PW5401.
-   - **Next: T09, a cache's freshness**, the tenth task, which the gate
-     needs. Each stack's setup keeps the menu five minutes, counts the menu
-     source's calls (`GET /bench/calls`), and lets the kitchen mark an item
-     sold out at the source with no event (`POST /bench/menu`). The task:
-     a sold-out item leaves the menu within ten seconds, and the source is
-     still asked at most once in ten seconds. The plausible wrong fix drops
-     the cache, which the call count fails on every stack, Pleris's
-     included: `freshness 0.seconds` is legal. Then T02, which needs the
-     same counter, and T07, which needs a page that navigates.
-4. **E14-D, `pw diff`** for the store (gate item 1).
+   - ~~**T09, a cache's freshness.**~~ Written 2026-10-03: all four
+     controls hold on all three stacks. That makes ten tasks, which gate
+     item 2 asks for.
+     - The store's notice is kept five minutes, from an expensive board. A
+       new notice must show within ten seconds, while the board is still
+       asked at most once in ten seconds.
+     - Every stack's unsafe patch stops keeping the notice, and the hidden
+       tests catch it, Pleris's included.
+     - Writing it found two things. Any `revalidatePath` of a Next.js page
+       expires the `unstable_cache` entries the page read. And the
+       development server kept a materialized fragment past its query's
+       value (ADR-0150).
+   - **Next: T02, a duplicate request storm.** Start from the server: check
+     that concurrent first reads of one key under `concurrency one_per_key`
+     make one call to the source (ADR-0127 runs the policy). Then write the
+     task as T09 was: an expensive source with a call counter at `GET
+     /bench/calls`, a burst of simultaneous pages, and at most one call per
+     burst. Then T07, which needs a page that navigates
+     (`on_key_change cancel`).
+4. ~~**E14-D, `pw diff`** for the store (gate item 1).~~ Done 2026-10-03
+   (ADR-0149, `just e14-diffs`). It reports each task's Pleris reference
+   and unsafe patch in charter §19.2's sections. Its first use found that a
+   page streaming a query was charged the query's capability.
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.
 

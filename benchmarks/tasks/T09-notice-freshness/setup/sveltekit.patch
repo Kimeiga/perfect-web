@@ -1,0 +1,130 @@
+diff --git a/src/lib/server/store.ts b/src/lib/server/store.ts
+index 7291a61..7cf80c5 100644
+--- a/src/lib/server/store.ts
++++ b/src/lib/server/store.ts
+@@ -46,6 +46,53 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++/** The store's notice board: what it has posted, and how often it has been
++ * asked. Asking it is expensive. A benchmark's hook posts a notice. */
++const board: { text: string; calls: number } =
++  ((globalThis as Record<string, unknown>).__pwBenchNotices as {
++    text: string;
++    calls: number;
++  }) ?? { text: "Open until 7 pm", calls: 0 };
++(globalThis as Record<string, unknown>).__pwBenchNotices = board;
++
++/** Ask the board for the store's notice. Expensive: every call is counted. */
++async function askBoard(store: StoreId): Promise<string> {
++  board.calls += 1;
++  await new Promise((resolve) => setTimeout(resolve, 50));
++  if (!STORES[store]) throw new Error(`no store ${store}`);
++  return board.text;
++}
++
++/** Post a notice on the board, as the store's staff do. */
++export function postNotice(text: string): void {
++  board.text = text;
++}
++
++/** How many times the board has been asked. */
++export function noticeCalls(): number {
++  return board.calls;
++}
++
++/** How long a notice is kept: five minutes. */
++const NOTICE_KEPT_MS = 5 * 60 * 1000;
++
++const kept: Map<StoreId, { text: string; at: number }> =
++  ((globalThis as Record<string, unknown>).__pwBenchNoticeKept as Map<
++    StoreId,
++    { text: string; at: number }
++  >) ?? new Map();
++(globalThis as Record<string, unknown>).__pwBenchNoticeKept = kept;
++
++/** The store's notice, kept five minutes, so the board is asked at most once
++ * in that time. */
++export async function getNotice(store: StoreId): Promise<string> {
++  const hit = kept.get(store);
++  if (hit && Date.now() - hit.at < NOTICE_KEPT_MS) return hit.text;
++  const text = await askBoard(store);
++  kept.set(store, { text, at: Date.now() });
++  return text;
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);
+diff --git a/src/routes/bench/calls/+server.ts b/src/routes/bench/calls/+server.ts
+new file mode 100644
+index 0000000..08fcca0
+--- /dev/null
++++ b/src/routes/bench/calls/+server.ts
+@@ -0,0 +1,6 @@
++import { json, type RequestHandler } from "@sveltejs/kit";
++import { noticeCalls } from "$lib/server/store";
++
++/** How many times the notice board has been asked. A benchmark's hook, as
++ * every stack in it has one. */
++export const GET: RequestHandler = () => json({ notice: noticeCalls() });
+diff --git a/src/routes/bench/notice/+server.ts b/src/routes/bench/notice/+server.ts
+new file mode 100644
+index 0000000..f7868ff
+--- /dev/null
++++ b/src/routes/bench/notice/+server.ts
+@@ -0,0 +1,9 @@
++import { json, type RequestHandler } from "@sveltejs/kit";
++import { postNotice } from "$lib/server/store";
++
++/** Post the store's notice at the board: `?text=…`. Nothing is told that it
++ * changed. A benchmark's hook, as every stack in it has one. */
++export const POST: RequestHandler = ({ url }) => {
++  postNotice(url.searchParams.get("text") ?? "");
++  return json({});
++};
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 1cebba6..a4e7818 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,9 +1,18 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import {
++  addToCart,
++  clearCart,
++  getCart,
++  getMenu,
++  getNotice,
++  getStore,
++  isMenuItem,
++  lineCount,
++} from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+-export const load: PageServerLoad = ({ params, cookies }) => {
++export const load: PageServerLoad = async ({ params, cookies }) => {
+   const store = getStore(params.storeId);
+   const menu = getMenu(params.storeId);
+   if (!store || !menu) error(404, "no such store");
+@@ -11,6 +20,7 @@ export const load: PageServerLoad = ({ params, cookies }) => {
+     store,
+     menu,
+     cartCount: lineCount(getCart(currentSession(cookies))),
++    notice: await getNotice(params.storeId),
+   };
+ };
+ 
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..483bebd 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -7,6 +7,7 @@
+ 
+ <main>
+   <h1 id="store-name">{data.store.name}</h1>
++  <p id="notice">{data.notice}</p>
+ 
+   <section aria-label="Menu">
+     <ul id="menu">

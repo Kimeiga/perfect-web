@@ -232,3 +232,34 @@ fn a_signal_shown_in_a_stream_is_refused_by_the_plan() {
     let refused = plan_of(build(signal)).expect_err("refused");
     assert!(refused.contains("shows the signal `note`"), "{refused}");
 }
+
+#[test]
+fn a_page_that_streams_a_query_does_not_take_its_authority() {
+    // The host runs a stream's query as its own component, under its own
+    // contract, as it runs a query a `let` reads. Until 2026-10-03 the page
+    // was asked the query's `network.fetch` to render, which `pw diff`
+    // showed on T05's reference.
+    let b = build(|app| with_stream(app, &same, &same));
+    let needs = |id: &str| -> Vec<String> {
+        b.contracts
+            .iter()
+            .find(|c| c.component_id == id)
+            .unwrap_or_else(|| panic!("no contract `{id}`"))
+            .required_capabilities
+            .iter()
+            .map(|c| format!("{}.{}", c.family, c.operation))
+            .collect()
+    };
+    assert!(
+        !needs("store.page.StorePage")
+            .iter()
+            .any(|c| c == "network.fetch"),
+        "{:?}",
+        needs("store.page.StorePage")
+    );
+    assert!(
+        needs("store.page.Recommendations")
+            .iter()
+            .any(|c| c == "network.fetch")
+    );
+}

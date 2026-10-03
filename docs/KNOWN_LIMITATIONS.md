@@ -180,6 +180,17 @@ refused by name:
   - **A query's budget bounds the region, not the query.** The query runs on
     after its region is given the host's failure, and what it answers is
     kept as its policy says.
+- **A fragment changed at its source reaches new documents only**
+  (ADR-0150). When a shared fragment's query value changes with no event, a
+  page already open keeps what it showed: nothing announced the change to
+  patch it with.
+- **`pw diff`'s limits** (ADR-0149):
+  - **Effects are the declared rows.** A query's inferred effects appear as
+    its component's capabilities.
+  - **Client bytes** are the compiled handlers and speculations; the runtime
+    is not counted.
+  - **No state machines**, since the language has none; a sum type's cases
+    are domain changes.
 - **A view composes when its body is its markup, its signals and its
   `provide`s** (ADR-0136, ADR-0144). Refused by name (PW5020):
   - a view with other bindings of its own;
