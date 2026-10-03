@@ -1946,9 +1946,11 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`0c608dc` (2026-10-03): `just ci` passes locally, and E14's gate items 1, 2
-and 5 are recorded at it, over all twelve tasks. GitHub CI is the authority
-for each pushed head.
+`4f75868` (2026-10-03): `just ci` passes locally. E14's gate items 1, 2 and
+5 are recorded over all twelve tasks at `0c608dc`, and again at `4f75868` for
+what it changed: T08's controls, ADR-0153's and ADR-0154's rules, keyed
+reads in three engines, the diffs, the browser suite and the unsafe table.
+GitHub CI is the authority for each pushed head.
 
 ## completed gate items
 

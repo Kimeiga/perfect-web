@@ -1,5 +1,5 @@
 produced by: just e14-unsafe-table
-commit: 0c608dc31ac093aa86b59773ec4e86b0bbe2c08c
+commit: 4f75868b3ec91d162fb6dd366e7d0abc7619c2f4
 
 E14 gate item 5 - where each task's plausible wrong fix is caught
 
@@ -36,9 +36,9 @@ T07  a read the customer moved past left running        controls at 0c608dc
       pleris      hidden
       next-react  hidden
       sveltekit   hidden
-T08  a command delivered twice and applied twice        controls at 0c608dc
-      pleris      check (PW0312)
-      next-react  contract
+T08  a command delivered twice and applied twice        controls at 4f75868
+      pleris      check (PW0312, PW0338)
+      next-react  hidden
       sveltekit   contract
 T09  a value kept longer than the product allows        controls at 0c608dc
       pleris      hidden

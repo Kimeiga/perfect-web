@@ -1,0 +1,30 @@
+ADR-0153, ADR-0154 - a case tested with {#match}, a command a page sends declared idempotent
+
+produced by: just e14-case-and-delivery
+commit: 4f75868b3ec91d162fb6dd366e7d0abc7619c2f4
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the tests (compiler/pw-core/tests/case_and_delivery.rs)
+
+test an_idempotent_command_and_one_no_handler_calls_are_the_controls ... ok
+test every_case_named_by_a_match_is_the_control ... ok
+test a_value_compared_with_a_computed_one_is_not_a_case_test ... ok
+test a_command_a_page_handler_calls_declares_idempotent_by ... ok
+test a_case_of_another_type_spelled_alike_is_not_this_ones ... ok
+test a_template_tests_a_case_with_match ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+== the store, the accepted corpus and the demos check as before
+
+pw check: 74 file(s), no diagnostics
+
+== mutation controls (scripts/case_and_delivery_mutations.py)
+
+baseline: 6 passed, 0 failed
+an {#if} that tests a case is not refused: KILLED (1 of 6 tests fail)
+an {:else if} condition is not read: KILLED (1 of 6 tests fail)
+a case written on the left is not seen: KILLED (1 of 6 tests fail)
+a qualified case's qualifier is not checked: KILLED (1 of 6 tests fail)
+a command a handler calls is not found: KILLED (1 of 6 tests fail)
+a sent command is not asked for idempotent_by: KILLED (2 of 6 tests fail)
+6 of 6 mutants killed
