@@ -56,9 +56,12 @@ The server's tests:
 
 Also:
 - `scripts/document_reads_mutations.py`: each of four pieces undone fails a
-  test (`just e14-document-reads`).
-- T02's controls on all three stacks.
-- The browser suite.
+  test (`just e14-document-reads`). At `f68f723` all four are killed, among
+  58 server tests.
+- T02's controls on all three stacks, and every other task's, all holding at
+  `f68f723`.
+- The browser suite: 457 of 457 in each of three runs, in Chromium, Firefox
+  and WebKit, at `f68f723`.
 
 ## Not claimed
 

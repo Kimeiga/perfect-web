@@ -13,6 +13,36 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14 gate item 5, 2026-10-03: which bug classes `pw check` refuses, stated
+with evidence** ([E14.md](milestones/E14.md), `just e14-unsafe-table`).
+For each task, the table reads where each stack's plausible wrong fix was
+caught, from its recorded controls. It also runs `pw check` on Pleris's.
+- **The count, at `f68f723`.** Pleris's checker refuses nine of the eleven
+  wrong fixes. `tsc --noEmit` and `svelte-check` refuse none, and tests
+  catch every one.
+- **A refusal is narrower than "unrepresentable".** So the statement is made
+  rule by rule: what each refuses, and what a program can still write around
+  it.
+- **Four classes are refused whole within the language**, a host binding's
+  signature being the one thing trusted:
+  - an optimistic update that cannot be rolled back (T01);
+  - one session's data in a cache other sessions read (T03, T12);
+  - a form field with no accessible name (T06);
+  - a loading state with no failed state (T10).
+- **Four are refused in part**, each with what it leaves open:
+  - T04's `{#match}`: an `{#if status == ..}` chain that forgets a state
+    still checks;
+  - T05's streamed query: a slow query not declared streamed still holds a
+    page;
+  - T08's `retry`: a command with no `idempotent_by` still runs on each
+    delivery;
+  - T11's dialog: a close handler that leaves the state open is still
+    accepted.
+- **Two are refused on no stack:** T02's and T09's value kept past what the
+  product allows.
+- **One cannot be written in Pleris at all:** T02's framework wrong fix, a
+  shared ask held forever.
+
 **E14-C, 2026-10-03: T02 is written, eleven tasks of twelve.** All four
 controls hold on all three stacks.
 - **The task.** The store shows the kitchen's current prep time. It is never
@@ -1854,11 +1884,26 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`013aaff` (2026-10-03): `just ci` passes locally, and E14's gate items 1 and
-2 are recorded at it. GitHub CI is the authority for each pushed head.
+`f68f723` (2026-10-03): `just ci` passes locally, and E14's gate items 1, 2
+and 5 are recorded at it. GitHub CI is the authority for each pushed head.
 
 ## completed gate items
 
+- **2026-10-03: E14 gate item 5, and items 1 and 2 again, at `f68f723`.**
+  - Item 5, which bug classes became unrepresentable: stated rule by rule in
+    `docs/milestones/E14.md`, from `docs/evidence/E14/unsafe-table.txt`
+    (`just e14-unsafe-table`). Pleris's checker refuses nine of eleven
+    wrong fixes, and the frameworks' checkers refuse none.
+  - Items 1 and 2: eleven tasks now. All four controls hold on all three
+    stacks for each, and `pw diff` reports every one.
+
+  Recorded at the same commit, every mutant killed:
+  - the stream controls, 26 of 26;
+  - ADR-0151's, 4 of 4;
+  - the diff controls, 6 of 6;
+  - the optimistic controls, 6 of 6.
+
+  The browser suite passes 457 of 457 in each of three runs.
 - **2026-10-03: E14 gate items 1 and 2, at `013aaff`.**
   - Item 1, semantic diffs for the store: `pw diff` (ADR-0149) over every
     task's Pleris reference and unsafe patch,
@@ -2170,10 +2215,9 @@ these compiler changes do not independently re-establish those milestones.
 - **E7 gate 8 is unstable on this machine** (E7-G8): about half of runs see one
   long frame no page script made long. `just e10-close-bench` records every
   run. Ruling needed on the instrument.
-- **E14's gate items 3, 4 and 5 are open.** Items 1 and 2 are met at
-  `013aaff`. Items 3 and 4 need agent runs (E14-E), which wait on the
-  owner's choice of models and budget. Item 5 needs the unsafe controls
-  written up as the bug classes `pw check` refuses. Its plan is
+- **E14's gate items 3 and 4 are open.** Items 1, 2 and 5 are met at
+  `f68f723`. Items 3 and 4 need agent runs (E14-E), which wait on the
+  owner's choice of models and budget. Its plan is
   `docs/milestones/E14.md`.
 - **CI cost of the engine, measured:** since E10-I every workspace build
   compiles Wasmtime. On a warm cache, CI on `ebd4696` took 2m54s, against 2m28s
@@ -2275,13 +2319,14 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **Gate item 5**: state, with a recorded command, which bug classes
-   `pw check` refuses. On Pleris, nine of the eleven tasks' unsafe patches
-   are refused there; T02's and T09's are caught only by their hidden
-   tests. On Next.js and SvelteKit, every one is caught by tests: hidden
-   ones, or for T08 and T12 the contract's.
-2. **T07, a stale navigation request**: a page that navigates, so
-   `on_key_change cancel` has a key to change.
+1. **T07, and the charter's §15.6 tests 6-8.** These need a key a page
+   changes, such as a query keyed by a signal, and a ruling on what
+   `on_key_change cancel`, `supersede` and `keep` do at run time. ADR-0089
+   left that open, and nothing reads the policy yet.
+2. **The two rules gate item 5 points at**, each to be researched and ruled:
+   - an `{#if}` chain over one sum value's cases, held to cover them (T04);
+   - every command a browser sends declaring how a second delivery is
+     answered (T08).
 3. **E14-E's design**, ready for the owner's choice of models and budget:
    how the agent is run, and how a harness effect is told from capability
    (gate item 4).

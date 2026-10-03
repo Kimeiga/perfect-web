@@ -1,7 +1,7 @@
 ADR-0149 - pw diff, what a change means, for review
 
 produced by: just e14-diffs
-commit: 013aaff15ef4af8afa3d79d25d41f19066dcf359
+commit: f68f723b2ee74a7b9804240e422d9edc93762e00
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/semantic_diff.rs)
@@ -13,7 +13,7 @@ test a_new_query_brings_its_effects_capabilities_and_policies ... ok
 test a_freshness_change_is_a_cache_change ... ok
 test a_streamed_region_is_a_page_change ... ok
 test a_new_case_is_a_domain_change ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.74s
 
 == each task's Pleris patches (scripts/semantic_diffs.py)
 
@@ -65,6 +65,97 @@ Other policies
 === T01-optimistic-cart: unsafe
 
 pw diff: unsafe: it does not check: store/app.pw: PW0330 `add_to_cart`'s optimistic transition performs database.write<Carts>, session.read; store/app.pw: PW0331 `add_to_cart`'s optimistic transition produces `Result<Cart, CartError>`, but it targets a resource whose value is `Cart`
+
+=== T02-request-storm: reference
+
+Domain changes
+- none
+
+Effects
+- none
+
+Capabilities
+- none
+
+Privacy changes
+- none
+
+Placement
+- none
+
+Cache and freshness
+- `store.page.PrepTime`: `concurrency` is `one_per_key`, was `parallel`
+
+Invalidation
+- none
+
+Pages
+- none
+
+Client impact
+- none
+
+Server components
+- none
+
+Obligations
+- none
+
+Unsafe changes
+- none
+
+Diagnostics
+- none
+
+Other policies
+- none
+
+=== T02-request-storm: unsafe
+
+Domain changes
+- none
+
+Effects
+- none
+
+Capabilities
+- none
+
+Privacy changes
+- none
+
+Placement
+- none
+
+Cache and freshness
+- `store.page.PrepTime` now declares `cache shared`
+- `store.page.PrepTime`: `concurrency` is `one_per_key`, was `parallel`
+- `store.page.PrepTime`: `freshness` is `30.seconds`, was `0.seconds`
+- `store.page.PrepTime` now declares `key id`
+
+Invalidation
+- none
+
+Pages
+- none
+
+Client impact
+- none
+
+Server components
+- none
+
+Obligations
+- none
+
+Unsafe changes
+- none
+
+Diagnostics
+- none
+
+Other policies
+- none
 
 === T03-private-cart-lines: reference
 
@@ -514,9 +605,57 @@ pw diff: unsafe: it does not check: store/app.pw: PW5303 this `<dialog>` is show
 
 pw diff: before: it does not check: store/app.pw: PW0100 cannot materialize `Cart` in a shared public cache; store/app.pw: PW5001 `Cart` is Session<SessionId> and declares a shared cache
 
+Against the canonical store, which checks:
+
+Domain changes
+- none
+
+Effects
+- none
+
+Capabilities
+- none
+
+Privacy changes
+- none
+
+Placement
+- none
+
+Cache and freshness
+- none
+
+Invalidation
+- none
+
+Pages
+- none
+
+Client impact
+- none
+
+Server components
+- none
+
+Obligations
+- none
+
+Unsafe changes
+- none
+
+Diagnostics
+- none
+
+Other policies
+- none
+
 === T12-repair-cart-cache: unsafe
 
 pw diff: before: it does not check: store/app.pw: PW0100 cannot materialize `Cart` in a shared public cache; store/app.pw: PW5001 `Cart` is Session<SessionId> and declares a shared cache
+
+Against the canonical store, which checks:
+
+pw diff: unsafe: it does not check: store/app.pw: PW5001 `Cart` is Session<SessionId> and declares a shared cache
 
 
 == mutation controls (scripts/semantic_mutations.py)
@@ -526,6 +665,6 @@ a new case is not a domain change: KILLED (1 of 14 tests fail)
 a changed policy is not reported: KILLED (1 of 14 tests fail)
 a capability gained is not reported: KILLED (1 of 14 tests fail)
 a stream a page gained is not reported: KILLED (1 of 14 tests fail)
-a program that does not check is compared: SURVIVED
+a program that does not check is compared: KILLED (1 of 14 tests fail)
 a stream's query is its page's authority: KILLED (1 of 14 tests fail)
-5 of 6 mutants killed
+6 of 6 mutants killed

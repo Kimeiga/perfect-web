@@ -1,15 +1,15 @@
 E10 - the store page, compiled commands and handlers, in browser engines: chromium firefox webkit
 
 produced by: just e10-browser "chromium firefox webkit" docs/evidence/E14/browser-suite.txt
-commit: 013aaff15ef4af8afa3d79d25d41f19066dcf359
+commit: f68f723b2ee74a7b9804240e422d9edc93762e00
 playwright: Version 1.58.0
 
 == full run 1
   2 skipped
-  457 passed (53.2s)
+  457 passed (52.1s)
 == full run 2
   2 skipped
-  457 passed (49.8s)
+  457 passed (50.4s)
 == full run 3
   2 skipped
-  457 passed (44.8s)
+  457 passed (46.3s)

@@ -98,14 +98,25 @@ E14 comes before E11-E13. Its plan, controls and task list are
      Each stack's unsafe patch is caught by the hidden tests. Writing it
      found that the development server read each page while holding its
      subscriber table, so no two pages ever shared a flight (ADR-0151).
-   - **Next: gate item 5.** A recorded command, `just e14-unsafe-table`,
-     that reads each task's controls from its evidence and runs `pw check`
-     on its Pleris unsafe patch. It prints, per task, where each stack
-     caught the wrong fix, and the rule that refused it. Then E14.md states
-     the bug classes `pw check` refuses, with each rule's reach: what the
-     rule covers, and what a program could still write around it.
-   - **Then T07, a stale navigation request**, which needs a page that
-     navigates (`on_key_change cancel`).
+   - ~~**Gate item 5.**~~ Done 2026-10-03 at `f68f723`
+     (`just e14-unsafe-table`, `docs/milestones/E14.md`). Pleris's checker
+     refuses nine of the eleven wrong fixes, and the frameworks' checkers
+     none. The statement is made rule by rule, with what each rule leaves
+     open.
+   - **Next: T07, a stale navigation request, with the charter's §15.6
+     tests 6-8.** The plan is in this order:
+     1. Rule what `on_key_change` does: `cancel` aborts the old key's work,
+        `supersede` lets it finish and drops its answer, and `keep` keeps
+        its answer under its own key. In all three, an old key's answer is
+        never shown for a new key. ADR-0089 left this open.
+     2. Make a key a page changes: a `let` query given a page signal, read
+        again by the browser when the signal changes, the server rendering
+        what the page shows of it for the new key.
+     3. Write T07 on the three stacks: a menu search whose answer for an
+        earlier term arrives after the later one's.
+   - **Then the two rules gate item 5 points at**: an `{#if}` chain over
+     one sum value's cases (T04), and every browser-sent command declaring
+     how a second delivery is answered (T08).
 4. ~~**E14-D, `pw diff`** for the store (gate item 1).~~ Done 2026-10-03
    (ADR-0149, `just e14-diffs`). It reports each task's Pleris reference
    and unsafe patch in charter §19.2's sections. Its first use found that a
