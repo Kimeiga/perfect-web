@@ -1766,6 +1766,26 @@ e14-keyed-reads:
      } > docs/evidence/E14/keyed-reads.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/keyed-reads.txt
 
+# ADR-0155: the page keeps its subscription through a dropped connection, and
+# a press on a handler from another build reads the page again, once. The
+# browser tests in three engines, and the mutation controls.
+e14-runtime-recovery:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0155 - the page keeps its subscription, and recovers a refused handler"; echo; \
+       echo "produced by: just e14-runtime-recovery"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the browser (e2e/transport.spec.mjs, e2e/recovery.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/transport.spec.mjs e2e/recovery.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/runtime_recovery_mutations.py)"; echo; \
+       python3 scripts/runtime_recovery_mutations.py; \
+     } > docs/evidence/E14/runtime-recovery.txt
+    @grep -E "passed|mutants killed" docs/evidence/E14/runtime-recovery.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

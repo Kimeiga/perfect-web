@@ -13,6 +13,26 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Corrections, ADR-0155, 2026-10-03: the page keeps its subscription, and
+recovers a refused handler**
+([ADR-0155](DECISIONS/ADR-0155-the-page-keeps-its-subscription-and-recovers-a-refused-handler.md)).
+An audit of the store against charter §15, requirement by requirement
+(`docs/research/charter-15-store-audit.md`), found three runtime defects:
+- **One failed request ended a page's subscription for good.** A dropped
+  connection, a restart or a blink of the network left the page showing what
+  it last heard, without a word. The request is asked again now, from the
+  page's cursor, with a growing pause.
+- **A press on a handler from another build did nothing** (§15.6 test 16).
+  It reads the page again now, once, and never replays the press.
+- **Every recovery was read one place off** from `pw-resume-wasm`'s codes.
+
+Browser tests in three engines, and three mutants, each killed.
+
+The audit also counts §15.6's tests: 18, not 17. At the audit, 7 were met,
+3 met on T07's store, 7 partial and 1 missing; ADR-0155 meets test 16. The
+missing one is test 10, an unavailable item's typed error. The audit's gaps,
+in order, lead `docs/NEXT.md`.
+
 **Keyed reads in three engines, 2026-10-03.** The charter's store tests 6-8
 (§15.6) run in Chromium, Firefox and WebKit, on a store with T07's category
 tabs built into `dist-keyed`:
@@ -2398,14 +2418,12 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **E14-E's design**, ready for the owner's choice of models and budget:
-   how the agent is run, and how a harness effect is told from capability
-   (gate item 4).
-2. **The DoorDash store's next features**, each as a benchmark task would
-   be written: a cart's lines with quantities, a checkout, an order tracked.
-3. **The runtime retries a keyed command** (ADR-0154): with every command a
-   page sends keyed by its interaction, a failed request can be sent again
-   safely, as RFC 9110 then allows.
+1. **Item availability, end to end** (charter §15.4, §15.6 test 10, the
+   audit's first gap): an item's availability checked before commit, a
+   stale-item hook, and a command's typed error returned to the page.
+2. **The route and more than one store** (§15.3): `/stores/{id}`, the
+   server reading the store from the address.
+3. **E14-E's design**, ready for the owner's choice of models and budget.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

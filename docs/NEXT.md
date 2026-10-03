@@ -116,8 +116,22 @@ E14 comes before E11-E13. Its plan, controls and task list are
        (PW0338). T08's setup no longer checks.
    - ~~**Keyed reads in three engines.**~~ Done 2026-10-03: the charter's
      store tests 6-8 in Chromium, Firefox and WebKit (`e2e/keyed.spec.mjs`).
-   - **Next: E14-E's design**, ready for the owner's choice of models and
-     budget, and the DoorDash store's next features as tasks.
+   - ~~**The store against charter §15.**~~ Audited 2026-10-03
+     (`docs/research/charter-15-store-audit.md`). Its three runtime defects
+     are fixed (ADR-0155).
+   - **Next: the audit's gaps, in its order.**
+     1. Item availability end to end, with a command's typed error returned
+        to the page (§15.6 test 10).
+     2. The route `/stores/{id}`, and more than one store.
+     3. The recommendation and estimate slots in the store itself, with T05
+        and T10 re-based.
+     4. Decrement, remove, and a per-line cart.
+     5. A command retried on a transport failure.
+     6. §15.5's missing controls.
+
+     Changing the store's markup re-bases the tasks' patches, so 1-4 go
+     together. Then E14-E's design, ready for the owner's choice of models
+     and budget.
 4. ~~**E14-D, `pw diff`** for the store (gate item 1).~~ Done 2026-10-03
    (ADR-0149, `just e14-diffs`). It reports each task's Pleris reference
    and unsafe patch in charter §19.2's sections. Its first use found that a

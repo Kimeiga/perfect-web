@@ -72,6 +72,31 @@ for (const transport of ["poll", "stream"]) {
   });
 }
 
+for (const transport of ["poll", "stream"]) {
+  test(`${transport}: a page whose connection drops hears changes again`, async ({ page }) => {
+    // Charter §15.5's forced reconnect. The page's first subscription
+    // request fails, as a dropped connection does. Until 2026-10-03 that
+    // ended its subscription for good, and it heard no change after.
+    let dropped = 0;
+    await page.route("**/stream?**", async (route) => {
+      if (dropped === 0) {
+        dropped += 1;
+        return route.abort("connectionreset");
+      }
+      return route.continue();
+    });
+    await ready(page, transport);
+    await expect.poll(() => dropped).toBe(1);
+    // A change it hears only through its subscription: the menu, renamed
+    // at the server.
+    await page.request.post("/command/menu?op=rename&id=cortado&name=Gibraltar");
+    await expect(page.locator("#menu")).toContainText("Gibraltar");
+    await page.request.post("/command/menu?op=rename&id=cortado&name=Cortado");
+    await expect(page.locator("#menu")).toContainText("Cortado");
+    expect(await page.evaluate(() => window.__pw.reconnects)).toBeGreaterThan(0);
+  });
+}
+
 test("both adapters deliver the same frames", async ({ browser }) => {
   // The comparison the whole file exists for. Two pages, two adapters, one
   // sequence of commands, and the applied frames must match.

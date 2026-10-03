@@ -305,8 +305,13 @@ async function bootDecision() {
   // Worth recording: fail-closed did its job. A bug in the code that READS the
   // decision produced a page that does nothing, not a page that attaches
   // anyway. That is the difference the design was for.
+  //
+  // In `pw-resume-wasm`'s order, from 0: `RefetchRegion` is 0 there. Until
+  // 2026-10-03 this list began with a "none" the ABI does not have, so every
+  // recovery was read one place off. A region to refetch read as "none", a
+  // document to reload as "rerender-private-slot". Nothing acted on a
+  // recovery then, so only the log was wrong (ADR-0155).
   const RECOVERY = [
-    "none",
     "refetch-region",
     "rerender-private-slot",
     "reload",
@@ -1013,6 +1018,61 @@ addEventListener("pagehide", () => {
 
 /** Each event part's decision, asked once (E7-L): before anything binds. */
 const verdicts = new Map();
+
+/** The recoveries a press performs by reading the document again: each is
+ * the region, the slot or the interaction as the build serving the page
+ * renders it now. A reload never replays the press: a mutation the user did
+ * not ask for again is how a version mismatch becomes a double charge. */
+const RELOADING = new Set(["reload", "refetch-region", "rerender-private-slot", "retry-interaction"]);
+
+/**
+ * **A refused handler recovers when pressed** (charter §15.6 test 16). The
+ * resume decision refused it, and said how to recover. A document from another
+ * build is read again, once, and the press is not replayed. Until 2026-10-03 a
+ * press on it did nothing and said nothing.
+ *
+ * A reload asked for again within ten seconds, for the same address, is not
+ * made. Otherwise a server still sending the stale document would reload the
+ * page for ever. The button then stays inert, and says so.
+ */
+function recoverOnPress(part, owners, verdict) {
+  const listens = DOM_EVENTS[part.event || "press"];
+  if (!listens) return;
+  for (const el of owners) {
+    const parts = bound.get(el) ?? new Set();
+    if (parts.has(part.id)) continue;
+    parts.add(part.id);
+    bound.set(el, parts);
+    el.addEventListener(listens, (e) => {
+      const asks = verdict.recovery === "require-user-confirmation";
+      if (!RELOADING.has(verdict.recovery) && !asks) {
+        el.dataset.pwHandlerError = verdict.recovery;
+        log.push(`press on refused ${part.id}: ${verdict.recovery}, nothing to do`);
+        return;
+      }
+      e.preventDefault();
+      if (asks && !confirm("This page is out of date. Load it again? What you typed is not kept.")) {
+        return;
+      }
+      const key = `pw-recovered:${location.pathname}`;
+      let last = 0;
+      try {
+        last = Number(sessionStorage.getItem(key) ?? 0);
+      } catch {}
+      if (Date.now() - last < 10_000) {
+        el.dataset.pwHandlerError = "reload-loop";
+        log.push(`press on refused ${part.id}: read again already; not again`);
+        return;
+      }
+      try {
+        sessionStorage.setItem(key, String(Date.now()));
+      } catch {}
+      log.push(`press on refused ${part.id}: ${verdict.recovery}, reading the page again`);
+      window.__pw.reloading = true;
+      location.reload();
+    });
+  }
+}
 /** When the latest press's handler started (ADR-0152): the next press's
  * starts after it, so presses run in the order they were made. */
 let lastPressStarted = Promise.resolve();
@@ -1099,7 +1159,10 @@ function bindEvents() {
         log.push(`refused ${part.id}: code ${verdict.code} recovery ${verdict.recovery}`);
       }
     }
-    if (!verdict.attach) continue;
+    if (!verdict.attach) {
+      recoverOnPress(part, owners, verdict);
+      continue;
+    }
 
     // The event the part handles, and what to do before any code loads.
     const event = part.event || "press";
@@ -1522,24 +1585,48 @@ function chosenTransport() {
   return typeof ReadableStream === "function" ? "stream" : "poll";
 }
 
+/** The page is going away: its requests fail because it is, and nothing is
+ * asked again. */
+let leaving = false;
+addEventListener("pagehide", () => {
+  leaving = true;
+});
+
+/**
+ * **The subscription, kept** (charter §15.5's forced reconnect). A failed
+ * request is a dropped connection, a server restarting or a network that
+ * blinked, and it is asked again, from the cursor this page holds, after a
+ * pause that grows to five seconds. Until 2026-10-03 a failure ended the
+ * subscription for good: its fallback to the long poll waited on
+ * `chosenTransport()` answering differently, which it never does, and the page
+ * stopped hearing changes without a word.
+ */
 async function subscribe() {
   let transport = chosenTransport();
+  const pinned = new URLSearchParams(location.search).has("transport");
   window.__pw.transport = transport;
+  let failures = 0;
   for (;;) {
     try {
       if (transport === "stream") await streamOnce();
       else await pollOnce();
+      failures = 0;
     } catch {
-      if (transport === "stream" && chosenTransport() !== "stream") {
-        // Fall back once, and say so. A silent fallback would make the
-        // streaming adapter untestable: every run would look like whichever
-        // one happened to work.
+      if (leaving) return;
+      failures += 1;
+      // A stream that fails twice in a row falls back to the long poll, and
+      // says so: a silent fallback would make the streaming adapter
+      // untestable. A test that pins the adapter keeps it.
+      if (transport === "stream" && failures >= 2 && !pinned) {
         transport = "poll";
         window.__pw.transport = "poll (fell back)";
         log.push("transport fell back to long poll");
-        continue;
       }
-      return; // the page is going away
+      const pause = Math.min(250 * 2 ** (failures - 1), 5000);
+      window.__pw.reconnects = (window.__pw.reconnects ?? 0) + 1;
+      log.push(`subscription failed; asking again in ${pause} ms`);
+      await new Promise((resolve) => setTimeout(resolve, pause));
+      if (leaving) return;
     }
   }
 }

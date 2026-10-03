@@ -66,3 +66,59 @@ test("a page the server has forgotten is told to reload", async ({ browser }) =>
   expect((await fresh.json()).frames).toEqual([]);
   await context.close();
 });
+
+test("a press on a handler from another build reads the page again, once (charter §15.6 test 16)", async ({
+  page,
+}) => {
+  // The document as a cache kept it from an earlier build: its Add names a
+  // handler this build does not have, and the resume decision refuses it.
+  // Until 2026-10-03 the press did nothing and said nothing.
+  let stale = true;
+  await page.route("**/StorePage.html", async (route) => {
+    const response = await route.fetch();
+    let body = await response.text();
+    if (stale) {
+      stale = false;
+      const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
+      const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+      body = body.replaceAll(add, "ffffffffffffffff");
+    }
+    await route.fulfill({ response, body });
+  });
+  await ready(page);
+  await expect(page.locator("#cart-count")).toHaveText("0");
+  // The press reads the page again, from this build, and is not replayed.
+  const reloaded = page.waitForEvent("load");
+  await page.locator("#menu button").first().click();
+  await reloaded;
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady);
+  await expect(page.locator("#cart-count")).toHaveText("0");
+  // The page from this build presses as any does.
+  await page.locator("#menu button").first().click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+});
+
+test("a page still stale after being read again is not read again", async ({ page }) => {
+  // A server that keeps sending the stale document must not reload the page
+  // for ever: the second press finds the first reload, and the button stays
+  // inert, saying why.
+  await page.route("**/StorePage.html", async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
+    const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+    await route.fulfill({ response, body: body.replaceAll(add, "ffffffffffffffff") });
+  });
+  await ready(page);
+  const reloaded = page.waitForEvent("load");
+  await page.locator("#menu button").first().click();
+  await reloaded;
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady);
+  await page.locator("#menu button").first().click();
+  await page.waitForTimeout(500);
+  await expect(page.locator("#menu button").first()).toHaveAttribute(
+    "data-pw-handler-error",
+    "reload-loop",
+  );
+  await expect(page.locator("#cart-count")).toHaveText("0");
+});

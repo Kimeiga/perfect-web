@@ -1238,3 +1238,11 @@ the second. A command a page's handler calls declares `idempotent_by`
 (PW0338): its request can be delivered twice whatever the program does, and
 each press carries an interaction. RFC 9110 lets a client retry only what it
 knows to be idempotent.
+
+[ADR-0155](DECISIONS/ADR-0155-the-page-keeps-its-subscription-and-recovers-a-refused-handler.md):
+three runtime defects an audit of the store against charter §15 found.
+- A failed subscription request ended the subscription: it is asked again,
+  with a growing pause, from the cursor the page holds.
+- A press on a handler from another build did nothing: it reads the page
+  again, once, and never replays the press (§15.6 test 16).
+- The recovery codes were read one place off.
