@@ -53,8 +53,9 @@ showed the old fragment: its source changed and its freshness was then spent.
   source shows once its value is read again. That test fails before.
 - ADR-0122's control on the speculating page's value now anchors on the
   one-hold push.
-- The browser suite, after the change: see `browser-suite.txt` at the
-  commit that records this ADR's evidence.
+- The browser suite, after the change: 457 of 457 in each of three runs,
+  in Chromium, Firefox and WebKit, at `013aaff`
+  (`docs/evidence/E14/browser-suite.txt`).
 
 ## Not claimed
 

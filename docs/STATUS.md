@@ -1811,11 +1811,28 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`bff437c` (2026-10-02): `just ci` passes locally, and E10's five gate items
-are recorded at it. GitHub CI is the authority for each pushed head.
+`013aaff` (2026-10-03): `just ci` passes locally, and E14's gate items 1 and
+2 are recorded at it. GitHub CI is the authority for each pushed head.
 
 ## completed gate items
 
+- **2026-10-03: E14 gate items 1 and 2, at `013aaff`.**
+  - Item 1, semantic diffs for the store: `pw diff` (ADR-0149) over every
+    task's Pleris reference and unsafe patch,
+    `docs/evidence/E14/semantic-diffs.txt` (`just e14-diffs`).
+  - Item 2, at least ten tasks across all three stacks: T01, T03, T04, T05,
+    T06, T08, T09, T10, T11 and T12. All four controls hold on each stack,
+    in `docs/evidence/E14/harness-T*.txt` (`just e14-harness T..`).
+
+  Recorded at the same commit:
+  - the stream controls, 26 of 26 mutants killed;
+  - the optimistic controls, 6 of 6;
+  - the browser suite, 457 of 457 in each of three runs in three engines.
+
+  The diff controls killed 5 of 6. The survivor bypasses `pw diff`'s own
+  refusal of a program that does not check, and `pw build` refuses the same
+  programs. Its test, which only asked for the error's code, is corrected
+  in the next commit.
 - **2026-09-25: E10 task 4, memory strategies evaluated (ADR-0046).** The host
   reports each call's instructions, peak linear memory and instantiation
   time. Every compiled kiokun query was measured on the whole shard. 98.9%
@@ -2110,7 +2127,11 @@ these compiler changes do not independently re-establish those milestones.
 - **E7 gate 8 is unstable on this machine** (E7-G8): about half of runs see one
   long frame no page script made long. `just e10-close-bench` records every
   run. Ruling needed on the instrument.
-- **E14 has no gate item met.** Its plan is `docs/milestones/E14.md`.
+- **E14's gate items 3, 4 and 5 are open.** Items 1 and 2 are met at
+  `013aaff`. Items 3 and 4 need agent runs (E14-E), which wait on the
+  owner's choice of models and budget. Item 5 needs the unsafe controls
+  written up as the bug classes `pw check` refuses. Its plan is
+  `docs/milestones/E14.md`.
 - **CI cost of the engine, measured:** since E10-I every workspace build
   compiles Wasmtime. On a warm cache, CI on `ebd4696` took 2m54s, against 2m28s
   to 2m47s before. The two cold-cache runs took 5m06s and 5m29s.
