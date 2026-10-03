@@ -1,0 +1,33 @@
+ADR-0160 - a page's route
+
+produced by: just e14-routes
+commit: 15f498dc4a8873c34ab2c51d5772de705ccfb72f
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the tests (compiler/pw-core/tests/routes.rs)
+
+test the_plan_carries_the_route ... ok
+test one_route_is_one_pages ... ok
+test a_route_names_each_parameter_once_and_nothing_else ... ok
+test a_routes_parameter_is_text ... ok
+test a_route_that_names_its_parameters_is_the_control ... ok
+test a_route_is_slash_and_segments ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+== the store declares its route, and checks
+
+pw check: 50 file(s), no diagnostics
+
+== mutation controls (scripts/routes_mutations.py)
+
+baseline: 6 passed, 0 failed
+the plan carries no route: KILLED (1 of 6 tests fail)
+a malformed route passes: KILLED (1 of 6 tests fail)
+a name that is no parameter passes: KILLED (1 of 6 tests fail)
+a name given twice passes: KILLED (1 of 6 tests fail)
+a parameter the route leaves out passes: KILLED (1 of 6 tests fail)
+a parameter of any type passes: KILLED (1 of 6 tests fail)
+an opaque type over text is not text: KILLED (4 of 6 tests fail)
+two pages at one route pass: KILLED (1 of 6 tests fail)
+parameters' names tell two routes apart: KILLED (1 of 6 tests fail)
+9 of 9 mutants killed
