@@ -2440,7 +2440,7 @@ e10-browser engines="chromium firefox webkit" out="docs/evidence/E10/browser-sui
          (cd spikes/own-renderer && pnpm exec playwright test --reporter=line \
            $(for e in {{engines}}; do printf -- '--project=%s ' "$e"; done) 2>&1) \
            | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-           | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky|did not run" || true; \
+           | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
        done; \
      } > {{out}}
     @cat {{out}}
