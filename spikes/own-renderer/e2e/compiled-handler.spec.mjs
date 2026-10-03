@@ -69,8 +69,12 @@ test("a press sends that button's item, computed in the browser", async ({ page 
   // The SECOND button, so a handler that always sent the first item fails.
   const button = page.locator("#menu button").nth(1);
   const item = JSON.parse(await button.getAttribute("data-pw-captures")).item.id;
+  // The count moves before the request is sent (ADR-0122), so it does not
+  // say the request was made; the command's answer does.
+  const answered = page.waitForResponse((r) => r.url().includes("/command/"));
   await button.click();
   await expect(page.locator("#cart-count")).toHaveText("1");
+  await answered;
 
   expect(sent).toEqual([
     { path: "/command/store.page.add_to_cart", body: JSON.stringify([item, 1]) },
