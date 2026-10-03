@@ -458,6 +458,36 @@ mod resolved_type {
             ResolvedType::builtin(Builtin::Option, vec![of], span, written)
         }
 
+        /// **What a command's caller is answered** (ADR-0157): its declared
+        /// `Result<T, E>` as `Result<Unit, E>`. A handler learns whether the
+        /// command committed, and its declared error if not. It never learns
+        /// the value, which reaches the page from the resource, so the page
+        /// has one source for what it shows. A result that is not a
+        /// `Result` answers `Unit`.
+        pub(crate) fn answered(declared: &ResolvedType) -> ResolvedType {
+            let span = declared.origin.span.clone();
+            let unit_written = DeclaredType::new("Unit", Vec::new());
+            let unit = ResolvedType::primitive(Primitive::Unit, span.clone(), unit_written.clone());
+            match &declared.what {
+                What::Builtin {
+                    ctor: Builtin::Result,
+                    args,
+                } if args.len() == 2 => {
+                    let written = DeclaredType::new(
+                        "Result",
+                        vec![unit_written, args[1].origin.written.clone()],
+                    );
+                    ResolvedType::builtin(
+                        Builtin::Result,
+                        vec![unit, args[1].clone()],
+                        span,
+                        written,
+                    )
+                }
+                _ => unit,
+            }
+        }
+
         /// The language-provided constructor this is, if it is one.
         pub fn as_builtin(&self) -> Option<Builtin> {
             match &self.what {

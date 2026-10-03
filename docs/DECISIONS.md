@@ -1251,3 +1251,24 @@ three runtime defects an audit of the store against charter §15 found.
 the benchmark's Pleris store is `benchmarks/baselines/pleris`, frozen as the
 other two stacks' are. The canonical `examples/store` can then grow toward
 charter §15 without moving the 108 patches the tasks are anchored on.
+
+[ADR-0157](DECISIONS/ADR-0157-a-handler-is-answered-what-its-command-did.md):
+the first gap the charter §15 audit found, item availability, end to end.
+- A handler's call to a command is typed `Result<(), E>`. It learns whether
+  the command committed, and the error it declares if not, never the value,
+  which reaches the page from the query the command invalidates.
+- The server answers `Ok` without its value, or the declared `Err` whole.
+- PW0339: a command is called only by a page's handler.
+- PW0620: a handler that binds a command's value is refused where it is
+  written.
+- The canonical store revalidates availability inside `add_to_cart`, and its
+  page says when an item sold out (§15.6 test 10).
+
+Found on the way:
+- a compiled handler dropped a command whose answer decodes as `()`;
+- a kept answer lost `null`;
+- a handler matching on its command's answer had no name;
+- ADR-0154 named its rule PW0339 for PW0338;
+- E14-A's contract ran against the canonical store;
+- the value relations behind PW0605 typed a command's call by its declared
+  result.

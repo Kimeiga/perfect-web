@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `d68d563`, with ADR-0152.
+**Reviewed:** 2026-10-03, against master `a6ed637`, with ADR-0157.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,44 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0157, 2026-10-03: a handler is answered what its command did, never
+its value**
+([ADR-0157](DECISIONS/ADR-0157-a-handler-is-answered-what-its-command-did.md)).
+The audit's first gap, item availability, end to end (charter §15.4, §15.6
+test 10).
+- **The store refuses an item sold out since the page was rendered.**
+  `add_to_cart` asks whether the item can be ordered before it writes, and
+  refuses with `CartError.ItemUnavailable`. The page says "That item just
+  sold out." in a live region, and the count goes back. In three engines.
+- **The refusal reaches the handler.** A handler's call to a command is
+  typed `Result<(), E>`: whether it committed, and its declared error if not.
+  It never carries the value, which the page reads from the query the
+  command invalidates, so the page has one source for what it shows. The
+  server answers `Ok` without the cart, or the error whole.
+- **PW0339:** a command is called only by a page's handler. Called from a
+  declaration, its body ran without its own policies, so what it invalidates
+  stayed stale.
+- **PW0620:** a handler that binds a command's value is refused where it is
+  written, in the handler's terms.
+
+**Corrections found on the way:**
+- **A compiled handler dropped a command whose answer decodes as `()`.** The
+  decoder for `()` never read its argument, which was the call itself, so a
+  command declaring no `Result` was never sent. `handlers.rs` caught it
+  before it was committed.
+- **A kept answer lost `null`.** A retry of such a command would have been
+  answered nothing.
+- **ADR-0154 named its rule PW0339.** It is PW0338 everywhere else.
+- **E14-A's contract ran against the canonical store.** ADR-0156 says its
+  parity is with the benchmark's store, and it runs against that store now
+  (`baseline-store.sh`).
+- **The value relations behind PW0605 typed a command's call by its
+  declared result.** A surviving mutant found it: `describe(add(1))`
+  checked, and only the backend refused it. All three typers agree now.
+
+Tests in the compiler, the oracle, the host, the server and the browser, and
+16 mutants (`just e14-command-answers`).
 
 **ADR-0156, 2026-10-03: the benchmark's Pleris store is its own copy**
 ([ADR-0156](DECISIONS/ADR-0156-the-benchmark-s-pleris-store-is-its-own-copy.md)).
@@ -37,9 +75,9 @@ An audit of the store against charter §15, requirement by requirement
 Browser tests in three engines, and three mutants, each killed.
 
 The audit also counts §15.6's tests: 18, not 17. At the audit, 7 were met,
-3 met on T07's store, 7 partial and 1 missing; ADR-0155 meets test 16. The
-missing one is test 10, an unavailable item's typed error. The audit's gaps,
-in order, lead `docs/NEXT.md`.
+3 met on T07's store, 7 partial and 1 missing. ADR-0155 meets test 16, and
+ADR-0157 test 10, the missing one. The audit's remaining gaps, in order,
+lead `docs/NEXT.md`.
 
 **Keyed reads in three engines, 2026-10-03.** The charter's store tests 6-8
 (§15.6) run in Chromium, Firefox and WebKit, on a store with T07's category

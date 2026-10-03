@@ -96,17 +96,23 @@ session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
     Carts.current(session)
 }
 
-// The mutation. Idempotent by interaction id, so a double-tap is one add, and
-// optimistic with a declared rollback so the count moves before the round trip
-// and moves back if it fails.
+// The mutation, as charter §15.4 asks. Idempotent by interaction id, so a
+// double-tap is one add. Transactional. Optimistic, so the count moves before
+// the round trip, and moves back if the add is refused. And the item's
+// availability is read again inside it: an item sold out since the page was
+// rendered is refused by name, and the page is told which (ADR-0157).
 command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
+    transaction   serializable
     optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
     invalidates   Cart(current_session())
     emits         CartChanged(current_session())
 {
+    if !Menus.is_available(item) {
+        return Err(CartError.ItemUnavailable(item))
+    }
     Carts.add(current_session(), item, quantity)
 }
 
@@ -133,6 +139,8 @@ page StorePage(id: StoreId) {
     let store = query Store(id)
     let menu = query Menu(id)
     let cart = query Cart(current_session())
+    // What the cart last had to say: an item sold out as it was added.
+    signal notice: String = ""
 
     view {
         <main>
@@ -145,7 +153,10 @@ page StorePage(id: StoreId) {
                             <span>{item.name}</span>
                             <button
                                 type="button"
-                                on:press={resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))}
+                                on:press={resumable(captures = { item }) => match add_to_cart(item.id, PositiveInt(1)) {
+                                    Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+                                    _ => notice = "",
+                                }}
                             >
                                 Add
                             </button>
@@ -156,6 +167,7 @@ page StorePage(id: StoreId) {
 
             <section aria-label="Cart">
                 <p id="cart-count">{cart.line_count}</p>
+                <p id="cart-notice" role="status">{notice}</p>
                 <button
                     id="clear-cart"
                     type="button"

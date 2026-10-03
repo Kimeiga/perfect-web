@@ -1077,15 +1077,21 @@ pub(crate) fn module_signal(
 
 /// The name of the thing a handler lambda calls.
 ///
-/// `on:press={resumable(..) => add_to_cart(..)}` is `add_to_cart`. Empty when
-/// the handler is not a lambda that calls a named thing — in which case there
-/// is no separately loadable behaviour to name, and the runtime says so rather
-/// than guessing.
+/// `on:press={resumable(..) => add_to_cart(..)}` is `add_to_cart`, and so is
+/// a handler that matches on what the call answered, `=> match add_to_cart(..)
+/// { .. }` (ADR-0157): what it does with the answer is how it reacts, and the
+/// behaviour is still the call's. Empty when the handler is not a lambda that
+/// calls a named thing — in which case there is no separately loadable
+/// behaviour to name, and the runtime says so rather than guessing.
 pub(crate) fn called_name(body: &Body, expr: crate::hir::ExprId) -> String {
     let Expr::Lambda { body: inner, .. } = body.expr(expr) else {
         return String::new();
     };
-    let Expr::Call { callee, .. } = body.expr(*inner) else {
+    let call = match body.expr(*inner) {
+        Expr::Match { scrutinee, .. } => *scrutinee,
+        _ => *inner,
+    };
+    let Expr::Call { callee, .. } = body.expr(call) else {
         return String::new();
     };
     match body.expr(*callee) {

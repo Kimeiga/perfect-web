@@ -139,6 +139,40 @@ const KITCHEN_MS: u64 = 300;
 /// The most frames one subscriber may have waiting.
 const MAX_WAITING: usize = 256;
 
+/// **What a command answered** (ADR-0157): whether it committed, and its
+/// value in the wire form a handler's compiled code decodes, `Ok` or a
+/// declared `Err`. A command that trapped or was refused answered no value,
+/// and `why` says what happened instead.
+#[derive(Debug, Clone, PartialEq)]
+struct Answered {
+    committed: bool,
+    result: Option<serde_json::Value>,
+    why: Option<String>,
+}
+
+impl Answered {
+    /// The answer as an interaction keeps it, so a retried request is given
+    /// the first one's (ADR-0121). `result` is written only when there is
+    /// one: a command declaring no `Result` answers `null`, which is an
+    /// answer, and a command that trapped answers none.
+    fn kept(&self) -> String {
+        let mut kept = serde_json::json!({ "committed": self.committed, "why": self.why });
+        if let Some(result) = &self.result {
+            kept["result"] = result.clone();
+        }
+        kept.to_string()
+    }
+
+    fn from_kept(kept: &str) -> Answered {
+        let v: serde_json::Value = serde_json::from_str(kept).unwrap_or_default();
+        Answered {
+            committed: v["committed"] == true,
+            result: v.get("result").cloned(),
+            why: v["why"].as_str().map(str::to_string),
+        }
+    }
+}
+
 /// **A session's keyed reads** (ADR-0152): for the document it was last
 /// served, each binding a signal keys, by its name.
 #[derive(Default)]
@@ -448,6 +482,11 @@ struct Server {
     /// `store:data/kitchen#prep-minutes` answers, after [`KITCHEN_MS`]. A
     /// test changes it through `/bench/prep`, and nothing is told.
     prep_minutes: Mutex<i64>,
+    /// **The items sold out** (charter §15.4, §15.5's forced stale item): what
+    /// `store:data/menus#is-available` answers no for, inside the command
+    /// that adds one. A test sells one out through `/bench/stock`, and the
+    /// page that shows it is not told.
+    sold_out: Mutex<std::collections::BTreeSet<String>>,
     /// **Each session's keyed reads** (ADR-0152).
     keyed: Mutex<BTreeMap<String, Keyed>>,
     /// **The menu's categories** (E14, T07): which is slow, and how slow.
@@ -771,6 +810,7 @@ impl Server {
             estimators: Mutex::new(BTreeMap::new()),
             notice: Mutex::new("Open until 7 pm".to_string()),
             prep_minutes: Mutex::new(12),
+            sold_out: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
             categories: Mutex::new(Categories::default()),
             category_stopped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
@@ -948,6 +988,27 @@ impl Server {
         args: &[Val],
         fail: bool,
     ) -> Result<(), String> {
+        let answered = self.command_answered(component_id, session, args, fail)?;
+        if answered.committed {
+            return Ok(());
+        }
+        Err(format!(
+            "{component_id} failed: {}",
+            answered.result.unwrap_or_default()
+        ))
+    }
+
+    /// [`Server::command`], and what the command answered (ADR-0157): its
+    /// value, `Ok` or a declared `Err`, for the handler that called it. The
+    /// outer error is a command that trapped or was refused, which answered
+    /// no value.
+    fn command_answered(
+        &self,
+        component_id: &str,
+        session: &str,
+        args: &[Val],
+        fail: bool,
+    ) -> Result<Answered, String> {
         // One lock across the call and the commit: two presses in the same
         // instant both read the lines, and one of them would be lost —
         // `lazy-handler.spec.mjs` clicks twice concurrently to find exactly that.
@@ -960,18 +1021,39 @@ impl Server {
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
             );
+            // Whether an item can be ordered now (charter §15.4), read inside
+            // the command that adds it.
+            let sold_out = self.sold_out.lock().expect("sold out").clone();
+            host.insert(
+                "store:data/menus#is-available".to_string(),
+                Arc::new(move |args: &[Val]| match args {
+                    [Val::String(item)] => Ok(vec![Val::Bool(!sold_out.contains(item))]),
+                    other => Err(format!("menus#is-available received {other:?}")),
+                }),
+            );
 
             // What the command declares it emits (ADR-0104), computed before
             // it runs: a value this server cannot compute is refused, and a
             // refused command has written nothing.
             let events = declared_events(&self.graph, component_id, session)?;
             let out = self.run(component_id, session, &host, args)?;
-            if let [Val::Result(Err(e))] = out.as_slice() {
-                return Err(format!("{component_id} failed: {e:?}"));
+            let result = out.first().map(answer_json);
+            if let [Val::Result(Err(_))] = out.as_slice() {
+                // A declared error: nothing commits, and the handler is told
+                // which (ADR-0157).
+                return Ok(Answered {
+                    committed: false,
+                    result,
+                    why: None,
+                });
             }
             let Some(lines) = staged.lock().expect("staged").take() else {
                 // Nothing was written, so there is nothing to commit.
-                return Ok(());
+                return Ok(Answered {
+                    committed: true,
+                    result,
+                    why: None,
+                });
             };
             let total: i64 = lines.iter().map(|(_, q)| q).sum();
             let emitted = events.clone();
@@ -981,12 +1063,17 @@ impl Server {
             })?;
             carts.insert(session.to_string(), lines);
             self.invalidate_queries(component_id, session, &emitted);
+            // The materializer drains the committed event and regenerates the
+            // entry it invalidates. The version moves because the RESOURCE
+            // moved.
+            drop(carts);
+            self.drain(session);
+            Ok(Answered {
+                committed: true,
+                result,
+                why: None,
+            })
         }
-
-        // The materializer drains the committed event and regenerates the
-        // entry it invalidates. The version moves because the RESOURCE moved.
-        self.drain(session);
-        Ok(())
     }
 
     /// **A command whose arguments arrived from a browser, as JSON.**
@@ -1002,6 +1089,7 @@ impl Server {
     /// request's outcome, and nothing runs again. Without an interaction it is
     /// refused before anything runs, and so is an interaction sent again with
     /// other arguments.
+    #[cfg(test)]
     fn command_json(
         &self,
         component_id: &str,
@@ -1009,6 +1097,28 @@ impl Server {
         json: &[serde_json::Value],
         interaction: Option<&str>,
     ) -> Result<Result<(), String>, String> {
+        let answered = self.command_answer(component_id, session, json, interaction)?;
+        Ok(match answered.committed {
+            true => Ok(()),
+            false => Err(answered.why.unwrap_or_else(|| {
+                format!(
+                    "{component_id} failed: {}",
+                    answered.result.unwrap_or_default()
+                )
+            })),
+        })
+    }
+
+    /// [`Server::command_json`], and what the command answered (ADR-0157).
+    /// A retried interaction is given the first request's answer, its value
+    /// included.
+    fn command_answer(
+        &self,
+        component_id: &str,
+        session: &str,
+        json: &[serde_json::Value],
+        interaction: Option<&str>,
+    ) -> Result<Answered, String> {
         let loaded = self
             .components
             .get(component_id)
@@ -1023,8 +1133,21 @@ impl Server {
         let args = loaded
             .prepared
             .arguments(&[&export.interface, &export.function], json)?;
+        let answered = |run: Result<Answered, String>| match run {
+            Ok(answered) => answered,
+            Err(why) => Answered {
+                committed: false,
+                result: None,
+                why: Some(why),
+            },
+        };
         let Some(key_type) = &export.idempotent_by else {
-            return Ok(self.command(component_id, session, &args, false));
+            return Ok(answered(self.command_answered(
+                component_id,
+                session,
+                &args,
+                false,
+            )));
         };
         let id = interaction.ok_or_else(|| {
             format!(
@@ -1064,16 +1187,10 @@ impl Server {
         let outcome = self
             .commands
             .try_command(&key, || {
-                match self.command(component_id, session, &args, false) {
-                    Ok(()) => "committed".to_string(),
-                    Err(e) => format!("failed:{e}"),
-                }
+                answered(self.command_answered(component_id, session, &args, false)).kept()
             })
             .map_err(|e| format!("interaction `{id}`'s outcome is unknown: {e:?}"))?;
-        Ok(match outcome.strip_prefix("failed:") {
-            Some(e) => Err(e.to_string()),
-            None => Ok(()),
-        })
+        Ok(Answered::from_kept(&outcome))
     }
 
     /// **The deployment's data layer: `store:data/carts`, whole.**
@@ -3564,7 +3681,44 @@ fn val_to_json(v: &Val) -> serde_json::Value {
                 .map(|(n, v)| (n.replace('-', "_"), val_to_json(v)))
                 .collect(),
         ),
+        // A case as a handler's compiled code reads one (ADR-0157, `js_pure`'s
+        // `decode`): its name as the WIT spells it, and its payload, several
+        // fields as an array.
+        Val::Result(r) => {
+            let (case, payload) = match r {
+                Ok(v) => ("ok", v),
+                Err(v) => ("err", v),
+            };
+            case_json(case, payload.as_deref())
+        }
+        Val::Option(o) => match o {
+            Some(v) => case_json("some", Some(v)),
+            None => case_json("none", None),
+        },
+        Val::Variant(name, payload) => case_json(name, payload.as_deref()),
+        Val::Enum(name) => case_json(name, None),
+        Val::Tuple(items) => serde_json::Value::Array(items.iter().map(val_to_json).collect()),
         other => serde_json::json!(format!("{other:?}")),
+    }
+}
+
+/// **A command's answer, for the handler that called it** (ADR-0157): `Ok`
+/// without its value, which reaches the page from the resource, so the page
+/// has one source for what it shows; or the declared `Err`, whole. A result
+/// that is not a `Result` answers nothing.
+fn answer_json(v: &Val) -> serde_json::Value {
+    match v {
+        Val::Result(Ok(_)) => serde_json::json!({ "$case": "ok" }),
+        Val::Result(Err(e)) => case_json("err", e.as_deref()),
+        _ => serde_json::Value::Null,
+    }
+}
+
+/// A case on the wire: `{ "$case": name }`, and its payload as `value`.
+fn case_json(name: &str, payload: Option<&Val>) -> serde_json::Value {
+    match payload {
+        Some(v) => serde_json::json!({ "$case": name, "value": val_to_json(v) }),
+        None => serde_json::json!({ "$case": name }),
     }
 }
 
@@ -3800,7 +3954,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     .eq_ignore_ascii_case("pw-interaction")
                     .then(|| v.trim().to_string())
             });
-            match server.command_json(id, &session, &args, interaction.as_deref()) {
+            match server.command_answer(id, &session, &args, interaction.as_deref()) {
                 // A malformed request: nothing ran.
                 Err(e) => {
                     let why = serde_json::Value::String(e);
@@ -3812,23 +3966,26 @@ fn handle(server: &Server, mut stream: TcpStream) {
                         &format!("{{\"committed\":false,\"error\":{why}}}"),
                     );
                 }
-                Ok(result) => {
-                    if let Err(e) = &result
+                Ok(answered) => {
+                    if let Some(why) = &answered.why
                         && std::env::var("PW_TRACE").is_ok()
                     {
-                        eprintln!("{id}: {e}");
+                        eprintln!("{id}: {why}");
                     }
                     // A commit says which versions it produced (ADR-0122), so a
                     // page can tell when the value it is sent includes it. A
                     // version, not a value: the value reaches the page from the
                     // resource, as every change does.
-                    let body = match result {
-                        Ok(()) => serde_json::json!({
-                            "committed": true,
-                            "basis": server.committed_basis(&session),
-                        }),
-                        Err(_) => serde_json::json!({ "committed": false }),
-                    };
+                    let mut body = serde_json::json!({ "committed": answered.committed });
+                    if answered.committed {
+                        body["basis"] = server.committed_basis(&session);
+                    }
+                    // And what the command answered, for the handler that
+                    // called it (ADR-0157): `Ok`, or the declared `Err` it can
+                    // tell the customer about.
+                    if let Some(result) = answered.result {
+                        body["result"] = result;
+                    }
                     respond_json(&mut stream, 202, &session, fresh, &body.to_string());
                 }
             }
@@ -3976,6 +4133,28 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     respond_json(&mut stream, 400, &session, fresh, "{}");
                 }
             }
+        }
+        // An item sold out at the source, or back in stock (charter §15.5's
+        // forced stale item): `?item=cortado&available=false`. A page that
+        // shows it is not told; the next add is refused by name.
+        ("POST", "/bench/stock") => {
+            let param = |name: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{name}=") as &str))
+                    .and_then(percent_decoded)
+            };
+            let Some(item) = param("item") else {
+                return respond_json(&mut stream, 400, &session, fresh, "{}");
+            };
+            let mut sold_out = server.sold_out.lock().expect("sold out");
+            if param("available").as_deref() == Some("false") {
+                sold_out.insert(item);
+            } else {
+                sold_out.remove(&item);
+            }
+            drop(sold_out);
+            respond_json(&mut stream, 200, &session, fresh, "{}");
         }
         // Which of the menu's categories is slow, and how slow (E14, T07):
         // `?slow=hot&delay=1500`. Nothing is told.
@@ -5485,6 +5664,52 @@ public query Store(",
         assert_eq!(notice_calls(&s), 2);
     }
 
+    #[test]
+    fn an_item_sold_out_since_the_page_is_refused_by_name() {
+        // Charter §15.4 and §15.6 test 10, on the canonical store: the add
+        // reads the item's availability inside the command, and a sold-out
+        // item is refused with its typed error, which the handler is
+        // answered (ADR-0157). Nothing commits, and a retried interaction is
+        // given the same answer.
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_document("a");
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("cortado".to_string());
+        let cortado = [serde_json::json!("cortado"), serde_json::json!(1)];
+        let refused = s
+            .command_answer(ADD, "a", &cortado, Some("press-1"))
+            .expect("a well-formed request");
+        assert!(!refused.committed);
+        assert_eq!(
+            refused.result,
+            Some(serde_json::json!({
+                "$case": "err",
+                "value": { "$case": "item-unavailable", "value": "cortado" }
+            }))
+        );
+        assert_eq!(
+            s.cart_value("a"),
+            0,
+            "the refused add left the cart as it was"
+        );
+        let again = s
+            .command_answer(ADD, "a", &cortado, Some("press-1"))
+            .expect("a well-formed request");
+        assert_eq!(again, refused, "a retry is given the first answer");
+        // Back in stock, the next press adds.
+        s.sold_out.lock().expect("sold out").clear();
+        let added = s
+            .command_answer(ADD, "a", &cortado, Some("press-2"))
+            .expect("a well-formed request");
+        assert!(added.committed);
+        // Answered `Ok`, without the cart: the page learns that from the
+        // resource.
+        assert_eq!(added.result, Some(serde_json::json!({ "$case": "ok" })));
+        assert_eq!(s.cart_value("a"), 1);
+    }
+
     /// T07's store: the menu by category, a binding a signal keys, its
     /// stale work `keep` (ADR-0152).
     const BROWSE_SETUP: &str =
@@ -6257,7 +6482,11 @@ public query Store(",
         let server_code = &src[..src
             .find(&["#[cfg(test)]\nmod ", "tests"].concat())
             .expect("the tests")];
-        let start = server_code.find("fn command(").expect("the command path");
+        // Where a command's component runs: `command_answered`, which
+        // `command` answers through since ADR-0157.
+        let start = server_code
+            .find("fn command_answered(")
+            .expect("the command path");
         let body =
             &server_code[start..start + server_code[start..].find("\n    }\n").expect("its end")];
         assert!(
@@ -7178,12 +7407,55 @@ public query Store(",
             .expect("a chunk"),
         );
         let mut s = Server::on(std::path::PathBuf::from("."), templates, dev_topology());
-        s.plan["signals"] = serde_json::json!([{ "name": "open", "initial": true }]);
+        // The store's own signals, and one more the added part reads.
+        let with_open = |s: &mut Server, initial: bool| {
+            let mut signals = s.plan["signals"].as_array().cloned().unwrap_or_default();
+            signals.retain(|signal| signal["name"] != "open");
+            signals.push(serde_json::json!({ "name": "open", "initial": initial }));
+            s.plan["signals"] = serde_json::Value::Array(signals);
+        };
+        with_open(&mut s, true);
         let html = s.render_store("first-shown");
         assert!(html.contains("<p id=\"shown\">open</p>"), "{html}");
         // Control: shut at its first value, and not shown.
-        s.plan["signals"] = serde_json::json!([{ "name": "open", "initial": false }]);
+        with_open(&mut s, false);
         assert!(!s.render_store("first-shut").contains("id=\"shown\""));
+    }
+
+    /// **A kept answer is the answer** (ADR-0121, ADR-0157): a retried
+    /// request is given exactly what the first was, including the
+    /// difference between answering nothing, `null`, and answering no value.
+    #[test]
+    fn a_kept_answer_is_the_answer_it_kept() {
+        for answered in [
+            Answered {
+                committed: true,
+                result: Some(serde_json::json!({ "$case": "ok" })),
+                why: None,
+            },
+            Answered {
+                committed: false,
+                result: Some(serde_json::json!({
+                    "$case": "err",
+                    "value": { "$case": "item-unavailable", "value": "cortado" }
+                })),
+                why: None,
+            },
+            // A command declaring no `Result`: answered, with nothing.
+            Answered {
+                committed: true,
+                result: Some(serde_json::Value::Null),
+                why: None,
+            },
+            // A command that trapped: no answer at all.
+            Answered {
+                committed: false,
+                result: None,
+                why: Some("trapped".to_string()),
+            },
+        ] {
+            assert_eq!(Answered::from_kept(&answered.kept()), answered);
+        }
     }
 
     /// A page's parameter, as the address carries it (ADR-0136).

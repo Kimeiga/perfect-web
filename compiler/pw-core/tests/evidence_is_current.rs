@@ -194,11 +194,13 @@ fn the_committed_page_plan_is_what_the_compiler_plans_now() {
             src,
         })
         .collect();
-    let hirs: Vec<&pw_core::hir::Hir> = units.iter().map(|u| &u.hir).collect();
-    let ws = pw_core::resolve::Workspace::build(&hirs);
-    let sigs = pw_core::signatures::Signatures::build(&ws, &hirs);
-    let plans = pw_core::page_values::pages(&hirs, &ws, &sigs);
-    let store = plans
+    // As `pw build` plans it, which `just e10-component` commits: the plan,
+    // and each signal's first value, which the build computes (ADR-0130).
+    // `page_values::pages` alone leaves the first values out, and agreed with
+    // the build only while the store held no signal.
+    let built = pw_core::build::build(&units).expect("the store builds");
+    let store = built
+        .pages
         .iter()
         .find(|p| p.page == "store.page.StorePage")
         .expect("the store page is planned");

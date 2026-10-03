@@ -618,7 +618,14 @@ impl<'a> Types<'a> {
                     .and_then(|s| s.result().cloned())
             }
             Expr::Call { callee, .. } => {
-                self.callee(body, *callee).and_then(|s| s.result().cloned())
+                let sig = self.callee(body, *callee)?;
+                let result = sig.result()?;
+                // A command answers its caller whether it committed, and its
+                // declared error if not: never the value (ADR-0157).
+                if self.sigs.kind_of(sig.definition) == Some(DeclKind::Command) {
+                    return Some(ResolvedType::answered(result));
+                }
+                Some(result.clone())
             }
             _ => None,
         }

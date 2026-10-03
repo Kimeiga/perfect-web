@@ -1255,7 +1255,14 @@ function bindEvents() {
                 throw error;
               }
               await resolveSpeculation(ids, answer.committed === true, answer.basis);
-              return answer;
+              // What the command answered, as its handler's code reads it
+              // (ADR-0157): `Ok`, or a declared `Err` the handler can show.
+              // A command that trapped or was refused answered no value, and
+              // the press fails visibly.
+              if (!("result" in answer)) {
+                throw new Error(`${component} answered no value`);
+              }
+              return answer.result;
             },
           });
         } catch (error) {

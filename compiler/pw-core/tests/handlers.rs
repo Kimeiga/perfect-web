@@ -114,15 +114,28 @@ fn event_parts(units: &[Unit]) -> Vec<(String, String, Vec<String>)> {
 
 /// **What a module sends.** It runs under Node with `captures` as the
 /// document would give them, and a context that records each command and
-/// answers `{"committed": true}`. `sent` is each command, in order; `trap` is
-/// the message it stopped with, if it stopped.
+/// each signal set, and answers each command `Ok`, as the runtime's context
+/// does for a commit (ADR-0157). `sent` is each command, in order; `set` is
+/// each signal written, with its value as JSON carries it; `trap` is the
+/// message it stopped with, if it stopped.
 fn run(m: &HandlerModule, captures: &str) -> serde_json::Value {
-    run_refusing(m, captures, "")
+    run_answered(m, captures, "", r#"{"$case":"ok"}"#)
 }
 
 /// [`run`], with the context refusing the command `refuse`, as the browser
 /// runtime's does on a non-2xx answer: its promise rejects.
 fn run_refusing(m: &HandlerModule, captures: &str, refuse: &str) -> serde_json::Value {
+    run_answered(m, captures, refuse, r#"{"$case":"ok"}"#)
+}
+
+/// [`run`], each command answered `answer`, the server's `result` as the
+/// runtime's context hands it over (ADR-0157).
+fn run_answered(
+    m: &HandlerModule,
+    captures: &str,
+    refuse: &str,
+    answer: &str,
+) -> serde_json::Value {
     let dir =
         std::env::temp_dir().join(format!("pw-handler-{}-{}", std::process::id(), m.identity));
     std::fs::create_dir_all(&dir).expect("temp");
@@ -131,19 +144,22 @@ fn run_refusing(m: &HandlerModule, captures: &str, refuse: &str) -> serde_json::
         dir.join("run.mjs"),
         "import { run } from \"./handler.mjs\";\n\
          const sent = [];\n\
+         const set = [];\n\
          const context = {\n  captures: JSON.parse(process.argv[2]),\n  \
          command: async (id, args) => {\n    sent.push([id, args]);\n    \
          await new Promise((r) => setTimeout(r, 1));\n    \
          if (id === process.argv[3]) throw new Error(\"refused\");\n    \
-         return { committed: true };\n  },\n};\n\
-         try {\n  await run(context);\n  console.log(JSON.stringify({ sent }));\n} catch (e) {\n  \
-         console.log(JSON.stringify({ sent, trap: String(e.message) }));\n}\n",
+         return JSON.parse(process.argv[4]);\n  },\n  \
+         set: (name, value) => set.push([name, value]),\n};\n\
+         try {\n  await run(context);\n  console.log(JSON.stringify({ sent, set }));\n} catch (e) {\n  \
+         console.log(JSON.stringify({ sent, set, trap: String(e.message) }));\n}\n",
     )
     .expect("write");
     let out = std::process::Command::new("node")
         .arg("run.mjs")
         .arg(captures)
         .arg(refuse)
+        .arg(answer)
         .current_dir(&dir)
         .output()
         .expect("node runs: a handler's module is tested under Node");
@@ -168,29 +184,57 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
         ["add_to_cart", "clear_cart"]
     );
 
-    // on:press={resumable(captures = { item }) => add_to_cart(item.id, PositiveInt(1))}
+    // on:press={resumable(captures = { item }) => match add_to_cart(item.id, PositiveInt(1)) {
+    //     Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+    //     _ => notice = "",
+    // }}
     let add = &modules["add_to_cart"];
     println!("{}", add.source);
     assert_eq!(add.commands, ["store.page.add_to_cart"]);
     assert!(
-        add.source.ends_with(&format!(
+        add.source.contains(&format!(
             "export const name = \"add_to_cart\";\n\
              export const handler = \"{id}\";\n\
              export async function run(context) {{\n\
              \x20 const v0 = context.captures[\"item\"][\"id\"];\n\
              \x20 const v1 = 1n;\n\
              \x20 const v2 = v1;\n\
-             \x20 const v3 = await context.command(\"store.page.add_to_cart\", [v0, exact(v2)]);\n\
-             \x20 return v3;\n\
-             }}\n",
+             \x20 const v3_answer = await context.command(\"store.page.add_to_cart\", [v0, exact(v2)]);\n",
             id = add.identity
         )),
-        "the captured item's id, and PositiveInt(1) as its representation"
+        "the captured item's id, and PositiveInt(1) as its representation, sent \
+         before its answer is read"
     );
+    let item = r#"{"item":{"id":"espresso"}}"#;
+    // Answered `Ok`, without the cart (ADR-0157): the notice is cleared.
+    let ok = run(add, item);
     assert_eq!(
-        sent(&run(add, r#"{"item":{"id":"espresso"}}"#)),
+        sent(&ok),
         &serde_json::json!([["store.page.add_to_cart", ["espresso", 1]]])
     );
+    assert_eq!(ok["set"], serde_json::json!([["notice", ""]]));
+    // Refused by name: the handler reads the declared error, and says so.
+    let refused = run_answered(
+        add,
+        item,
+        "",
+        r#"{"$case":"err","value":{"$case":"item-unavailable","value":"espresso"}}"#,
+    );
+    assert_eq!(
+        refused["set"],
+        serde_json::json!([["notice", "That item just sold out."]])
+    );
+    assert!(refused.get("trap").is_none(), "{refused}");
+    // Control: an answer that is no declared case traps, rather than being
+    // read as one of them.
+    let wrong = run_answered(
+        add,
+        item,
+        "",
+        r#"{"$case":"err","value":{"$case":"sold-out"}}"#,
+    );
+    assert_eq!(wrong["trap"], "trap: no such case sold-out");
+    assert_eq!(wrong["set"], serde_json::json!([]));
 
     // on:press={resumable() => clear_cart()}
     let clear = &modules["clear_cart"];

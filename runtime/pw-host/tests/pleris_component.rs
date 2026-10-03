@@ -13,9 +13,15 @@
 //! ```text
 //! command add_to_cart(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
 //! {
+//!     if !Menus.is_available(item) {
+//!         return Err(CartError.ItemUnavailable(item))
+//!     }
 //!     Carts.add(current_session(), item, quantity)
 //! }
 //! ```
+//!
+//! The availability read is ADR-0157's: an item sold out since the page was
+//! rendered is refused by name, before anything is written.
 //!
 //! and nothing else: no Rust closure computes its result.
 
@@ -90,8 +96,22 @@ fn cart(item: &str, quantity: i64) -> Val {
 /// What the host saw of each call, so a test can assert the COMPONENT made it.
 type Calls = Arc<Mutex<Vec<(String, Vec<Val>)>>>;
 
-/// The deployment's operations: the platform's session, and a data layer.
+/// The deployment's operations: the platform's session, and a data layer in
+/// which every item can be ordered.
 fn host(calls: &Calls, add_result: Val) -> BTreeMap<String, HostFn> {
+    stocked(calls, add_result, true)
+}
+
+/// [`host`], with whether an item can be ordered answered `available`.
+fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, HostFn> {
+    let stock_calls = calls.clone();
+    let stock: HostFn = Arc::new(move |args: &[Val]| {
+        stock_calls
+            .lock()
+            .unwrap()
+            .push(("store:data/menus#is-available".into(), args.to_vec()));
+        Ok(vec![Val::Bool(available)])
+    });
     let session_calls = calls.clone();
     let read: HostFn = Arc::new(move |args: &[Val]| {
         session_calls
@@ -109,6 +129,7 @@ fn host(calls: &Calls, add_result: Val) -> BTreeMap<String, HostFn> {
         Ok(vec![add_result.clone()])
     });
     BTreeMap::from([
+        ("store:data/menus#is-available".to_string(), stock),
         ("pw:host/session#read".to_string(), read),
         ("store:data/carts#add".to_string(), add),
     ])
@@ -120,7 +141,13 @@ fn admitted(c: &ComponentContract, bytes: &[u8], grants: &[&str]) -> Result<Gran
     Granted::from(&admission, &BTreeMap::new()).ok_or_else(|| format!("{admission:?}"))
 }
 
-const BOTH: [&str; 2] = ["database.write<Carts>", "session.read"];
+/// What the command needs granted: the menu read, the cart write and the
+/// session.
+const ALL: [&str; 3] = [
+    "database.read<Menus>",
+    "database.write<Carts>",
+    "session.read",
+];
 
 fn limits() -> Limits {
     Limits {
@@ -162,11 +189,18 @@ fn authorized_call(
 fn the_artifact_imports_exactly_what_its_contract_allows() {
     let actual = engine::imports_of(&component()).expect("the component reads");
     println!("compiled add_to_cart imports: {actual:?}");
-    assert_eq!(actual, ["pw:host/session#read", "store:data/carts#add"]);
+    assert_eq!(
+        actual,
+        [
+            "pw:host/session#read",
+            "store:data/carts#add",
+            "store:data/menus#is-available"
+        ]
+    );
     let c = contract();
     assert!(
         matches!(
-            admit(&c, &origin(&BOTH), "origin-1", &actual),
+            admit(&c, &origin(&ALL), "origin-1", &actual),
             Admission::Admit { .. }
         ),
         "the host admits the compiled artifact against the compiler's contract"
@@ -177,7 +211,7 @@ fn the_artifact_imports_exactly_what_its_contract_allows() {
 fn an_export_not_declared_by_the_contract_cannot_be_invoked() {
     let c = contract();
     let bytes = component();
-    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
     let err = engine::call_authorized_within(
         &bytes,
@@ -198,7 +232,7 @@ fn an_export_not_declared_by_the_contract_cannot_be_invoked() {
 fn requires_cannot_be_bypassed_by_the_raw_call_api() {
     let c = contract();
     let bytes = component();
-    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
     let [interface, function] = export(&c);
     let err = engine::call_within(
@@ -256,7 +290,7 @@ fn a_world_level_export_is_found_by_its_declaration() {
 fn the_compiled_command_runs_through_the_host() {
     let c = contract();
     let bytes = component();
-    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
     let returned = Val::Result(Ok(Some(Box::new(cart("cortado", 2)))));
     let [interface, function] = export(&c);
@@ -276,12 +310,20 @@ fn the_compiled_command_runs_through_the_host() {
     println!("the host saw: {seen:?}");
     println!("the command returned: {out:?}");
 
-    // The COMPONENT read the session, then called the data layer with it and
-    // with its own arguments, in that order.
-    assert_eq!(seen.len(), 2, "{seen:?}");
-    assert_eq!(seen[0], ("pw:host/session#read".to_string(), vec![]));
+    // The COMPONENT asked whether the item can be ordered, read the session,
+    // then called the data layer with it and with its own arguments, in that
+    // order.
+    assert_eq!(seen.len(), 3, "{seen:?}");
     assert_eq!(
-        seen[1],
+        seen[0],
+        (
+            "store:data/menus#is-available".to_string(),
+            vec![Val::String("cortado".into())]
+        )
+    );
+    assert_eq!(seen[1], ("pw:host/session#read".to_string(), vec![]));
+    assert_eq!(
+        seen[2],
         (
             "store:data/carts#add".to_string(),
             vec![
@@ -297,11 +339,53 @@ fn the_compiled_command_runs_through_the_host() {
     assert_eq!(out, vec![returned]);
 }
 
+/// **An item that cannot be ordered is refused by name** (ADR-0157), and
+/// nothing is written: the session is not read and the data layer's `add`
+/// is not called.
+#[test]
+fn an_item_that_cannot_be_ordered_is_refused_before_anything_is_written() {
+    let c = contract();
+    let bytes = component();
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
+    let calls: Calls = Arc::default();
+    let [interface, function] = export(&c);
+    let out = authorized_call(
+        &bytes,
+        &c,
+        &granted,
+        &limits(),
+        &stocked(
+            &calls,
+            Val::Result(Ok(Some(Box::new(cart("cortado", 1))))),
+            false,
+        ),
+        &[&interface, &function],
+        &[Val::String("cortado".into()), Val::S64(1)],
+    )
+    .expect("the call completes; the command's result is the refusal");
+    println!("sold out: {out:?}");
+    assert_eq!(
+        out,
+        vec![Val::Result(Err(Some(Box::new(Val::Variant(
+            "item-unavailable".into(),
+            Some(Box::new(Val::String("cortado".into()))),
+        )))))]
+    );
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [(
+            "store:data/menus#is-available".to_string(),
+            vec![Val::String("cortado".into())]
+        )],
+        "only the availability was read"
+    );
+}
+
 #[test]
 fn a_data_layer_failure_is_the_commands_failure() {
     let c = contract();
     let bytes = component();
-    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
     let failed = Val::Result(Err(Some(Box::new(Val::Variant(
         "cart-expired".into(),
@@ -326,7 +410,8 @@ fn a_data_layer_failure_is_the_commands_failure() {
 fn a_node_without_the_write_capability_does_not_admit_it() {
     let c = contract();
     let bytes = component();
-    let err = admitted(&c, &bytes, &["session.read"]).expect_err("refused");
+    // Everything else granted, so the refusal is the write's alone.
+    let err = admitted(&c, &bytes, &["database.read<Menus>", "session.read"]).expect_err("refused");
     println!("refused without database.write<Carts>: {err}");
     assert!(err.contains("database.write<Carts>"), "{err}");
 }
@@ -340,7 +425,7 @@ fn an_ungranted_operation_is_refused_by_the_engine() {
     c.required_capabilities
         .retain(|cap| cap.name() != "database.write<Carts>");
     let bytes = component();
-    let admission = admit(&c, &origin(&BOTH), "origin-1", &[]);
+    let admission = admit(&c, &origin(&ALL), "origin-1", &[]);
     let granted = Granted::from(&admission, &BTreeMap::new()).expect("admitted as edited");
     let calls: Calls = Arc::default();
     let [interface, function] = export(&c);
@@ -363,7 +448,7 @@ fn an_ungranted_operation_is_refused_by_the_engine() {
 fn a_granted_operation_the_host_does_not_implement_is_refused() {
     let c = contract();
     let bytes = component();
-    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
     let mut ops = host(&calls, Val::Bool(false));
     ops.remove("store:data/carts#add");
@@ -385,7 +470,7 @@ fn a_granted_operation_the_host_does_not_implement_is_refused() {
 fn the_instance_runs_within_its_fuel() {
     let c = contract();
     let bytes = component();
-    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
     let [interface, function] = export(&c);
     let starved = Limits {
@@ -517,7 +602,7 @@ fn sustained_calls_leave_memory_flat() {
     let c = contract();
     let bytes = component();
     let prepared = engine::Prepared::compile(&bytes).expect("compiles");
-    let granted = admitted(&c, &bytes, &BOTH).expect("admitted");
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let [interface, function] = export(&c);
     let returned = Val::Result(Ok(Some(Box::new(cart("cortado", 2)))));
     let calls: Calls = Arc::default();

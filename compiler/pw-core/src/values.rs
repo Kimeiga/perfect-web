@@ -1590,8 +1590,16 @@ impl<'a> Typer<'a> {
                             .map(|t| (sig.definition.unit, t.span()))
                     })
                     .collect(),
-                // No annotation: the call's value is not stated.
+                // No annotation: the call's value is not stated. A command
+                // answers its caller whether it committed, and its declared
+                // error if not, never the value (ADR-0157), as the checker's
+                // typer and the backend type it.
                 result: sig.returns.as_ref().map(|r| match r {
+                    TypeResolution::Resolved(t)
+                        if self.sigs.kind_of(sig.definition) == Some(DeclKind::Command) =>
+                    {
+                        Ty::of(&ResolvedType::answered(t))
+                    }
                     TypeResolution::Resolved(t) => Ty::of(t),
                     _ => Ty::Unknown,
                 }),

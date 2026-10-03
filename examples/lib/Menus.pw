@@ -49,6 +49,12 @@ import browser.{ Element, MapHandle, MapError }
 fn for_store(store: StoreId) -> Result<List<MenuItem>, StoreError> !{ database.read<Menus> }
     host "store:data/menus#for-store"
 
+// **Whether an item can be ordered now** (charter §15.4): asked inside the
+// command that adds it, so an item sold out since the page was rendered is
+// refused by name.
+fn is_available(item: MenuItemId) -> Bool !{ database.read<Menus> }
+    host "store:data/menus#is-available"
+
 // Partitioned by user rather than by organization. Declared so a challenge
 // witness can vary the PARTITION without varying anything else.
 fn for_user(store: StoreId, limit: Int, user: User<UserId>) -> Result<List<MenuItem>, StoreError>

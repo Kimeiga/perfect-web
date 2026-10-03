@@ -294,20 +294,43 @@ fn kiokun() -> Vec<pw_core::check::Unit> {
     units(&borrowed)
 }
 
+/// [`fixed`], with whether an item can be ordered answered `available`.
+fn stocked(available: bool) -> impl FnMut(&mut Rng, &Types) -> Box<Answer> {
+    move |rng, t| {
+        let rest = fixed(rng, t);
+        Box::new(move |op, args| match op {
+            "store:data/menus#is-available" => Val::Bool(available),
+            _ => rest(op, args),
+        })
+    }
+}
+
 #[test]
 fn the_stores_commands_agree_with_their_reference() {
     let u = store();
+    // Whether the item can be ordered is read again inside the command, and
+    // an item that cannot is refused by name, before anything is written
+    // (ADR-0157). Run with each answer, so each branch is compared.
+    let add: Reference = |args, host| {
+        if host("store:data/menus#is-available", vec![args[0].clone()]) != Val::Bool(true) {
+            return Val::Result(Err(Some(Box::new(Val::Variant(
+                "item-unavailable".to_string(),
+                Some(Box::new(args[0].clone())),
+            )))));
+        }
+        let session = host("pw:host/session#read", vec![]);
+        host(
+            "store:data/carts#add",
+            vec![session, args[0].clone(), args[1].clone()],
+        )
+    };
+    let runnable = Runnable::new(compile(&u, "store.page.add_to_cart"));
+    differential("store.page.add_to_cart", &runnable, add, stocked(true));
     differential(
-        "store.page.add_to_cart",
-        &Runnable::new(compile(&u, "store.page.add_to_cart")),
-        |args, host| {
-            let session = host("pw:host/session#read", vec![]);
-            host(
-                "store:data/carts#add",
-                vec![session, args[0].clone(), args[1].clone()],
-            )
-        },
-        fixed,
+        "store.page.add_to_cart, sold out",
+        &runnable,
+        add,
+        stocked(false),
     );
     differential(
         "store.page.clear_cart",
@@ -685,10 +708,11 @@ fn the_kiokun_shard_rule_agrees_with_its_reference() {
     );
 }
 
-/// **The oracle can disagree.** Three references, each wrong in one detail a
+/// **The oracle can disagree.** Four references, each wrong in one detail a
 /// miscompilation could share: how many hits the search keeps, whether the
-/// redirect is followed, and whether the session is read first. Each must be
-/// caught, or the agreement above measures nothing.
+/// redirect is followed, whether the session is read first, and whether the
+/// item's availability is (ADR-0157). Each must be caught, or the agreement
+/// above measures nothing.
 #[test]
 fn the_oracle_notices_a_reference_that_is_wrong() {
     let quiet = std::panic::take_hook();
@@ -715,10 +739,18 @@ fn the_oracle_notices_a_reference_that_is_wrong() {
                 vec![Val::String(String::new()), args[0].clone(), args[1].clone()],
             )
         }),
+        // The command as it was before ADR-0157: whatever the item, added.
+        caught("add_to_cart, availability not read", &add, |args, host| {
+            let session = host("pw:host/session#read", vec![]);
+            host(
+                "store:data/carts#add",
+                vec![session, args[0].clone(), args[1].clone()],
+            )
+        }),
     ];
     std::panic::set_hook(quiet);
     println!("oracle: wrong references caught: {results:?}");
-    assert_eq!(results, [true, true, true]);
+    assert_eq!(results, [true, true, true, true]);
 }
 
 /// The data layer the mutation controls run against: a table for `Lookup`,

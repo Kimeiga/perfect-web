@@ -23,7 +23,7 @@ Primary sources:
 
 ## Decision
 
-**A command a page's handler calls declares `idempotent_by`** (PW0339).
+**A command a page's handler calls declares `idempotent_by`** (PW0338).
 - The browser's request can be delivered twice whatever the program does, and
   the platform already gives each press its interaction.
 - A command called only by other server code is exempt.

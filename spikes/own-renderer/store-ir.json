@@ -5,7 +5,7 @@
     "params": [
       "id"
     ],
-    "schema": "8495cfb5e17666ae",
+    "schema": "0970362bbd4d1629",
     "chunks": [
       {
         "chunk": "static",
@@ -57,7 +57,7 @@
                 "id": 3,
                 "owner": 0,
                 "event": "press",
-                "handler": "e1ab9fca1f6fc15b",
+                "handler": "060884c66a4c0eaf",
                 "name": "add_to_cart",
                 "captures": [
                   "item.id"
@@ -86,13 +86,26 @@
       },
       {
         "chunk": "static",
+        "value": "</p>\n                <p id=\"cart-notice\" role=\"status\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 5,
+          "value": "notice",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
         "value": "</p>\n                <button data-pw=\"1\" id=\"clear-cart\" type=\"button\""
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 5,
+          "id": 6,
           "owner": 1,
           "event": "press",
           "handler": "5e53c6a9aaee307a",

@@ -219,6 +219,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
             out.extend(sent_without_idempotency(&u.hir, i, &sent));
+            // ADR-0157: a command is one request a page's handler sends, and
+            // what it answers is whether it committed.
+            out.extend(called_outside_a_handler(&u.hir, i, &sigs));
+            out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             out.extend(check_unit_with(
                 &env,
                 &labels,
@@ -296,6 +300,201 @@ fn sent_without_idempotency(
         });
     }
     out
+}
+
+/// The command `e` calls, if it is a call to one: its name as written, and
+/// its definition.
+fn command_called(
+    body: &Body,
+    sigs: &Signatures,
+    unit: usize,
+    e: ExprId,
+) -> Option<(String, crate::resolve::DefId)> {
+    let Expr::Call { callee, .. } = body.expr(e) else {
+        return None;
+    };
+    let path = crate::infer::path_of(body, *callee);
+    let def = crate::page_values::resolve_term(sigs.workspace(), unit, &path)?;
+    (sigs.kind_of(def) == Some(DeclKind::Command)).then_some((path, def))
+}
+
+/// **A command is called only by a page's handler** (ADR-0157). It is one
+/// request: its `requires`, `idempotent_by`, `transaction`, `invalidates` and
+/// `emits` describe that request. Called from another declaration, its body
+/// would run without them, so what it invalidates would stay stale and what
+/// it emits would go unheard; and its caller is answered whether it
+/// committed, which only a request is.
+fn called_outside_a_handler(hir: &Hir, unit: usize, sigs: &Signatures) -> Vec<Diagnostic> {
+    let code = crate::codes::COMMAND_OUTSIDE_A_HANDLER;
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(b) = decl.body else { continue };
+        let body = hir.body(b);
+        let sent: BTreeSet<ExprId> = crate::resume::handlers_in(body)
+            .into_iter()
+            .flat_map(|h| body.walk_from(h))
+            .collect();
+        for e in body.walk() {
+            if sent.contains(&e) {
+                continue;
+            }
+            let Some((command, _)) = command_called(body, sigs, unit, e) else {
+                continue;
+            };
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "command_outside_a_handler",
+                detector: Detector::Signature,
+                severity: Severity::Error,
+                message: format!(
+                    "`{command}` is a command, and `{}` calls it: only a page's handler \
+                     sends a command",
+                    decl.name
+                ),
+                primary_span: body.expr_span(e),
+                related: Vec::new(),
+                explanation: Some(
+                    "A command is one request a page's handler sends: its `requires`, \
+                     `idempotent_by`, `transaction`, `invalidates` and `emits` describe that \
+                     request. Called from another declaration, its body would run without \
+                     them: what it invalidates would stay stale, and what it emits would go \
+                     unheard. And its caller is answered whether it committed, which only a \
+                     request is (ADR-0157)."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: format!(
+                        "move what `{}` shares with `{command}` into a `fn`, and call that",
+                        decl.name
+                    ),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// **What a command answers carries no value** (ADR-0157): `Ok`, or the
+/// error it declares. A handler that binds the value binds nothing: it
+/// reaches the page from the query the command invalidates, so the page has
+/// one source for what it shows. Refused where it is written, in the
+/// handler's terms, rather than by the backend, in the value's.
+fn answer_read_for_a_value(hir: &Hir, unit: usize, sigs: &Signatures) -> Vec<Diagnostic> {
+    use crate::lexical::{Binder, Lexical};
+    let code = crate::codes::ANSWER_READ_FOR_A_VALUE;
+    let declares_result = |def| {
+        sigs.by_def(def)
+            .and_then(|s| s.result())
+            .and_then(|r| r.as_builtin())
+            == Some(crate::resolved::Builtin::Result)
+    };
+    let refused = |message: String, at: hir::Span, repair: String| Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "answer_read_for_a_value",
+        detector: Detector::Signature,
+        severity: Severity::Error,
+        message,
+        primary_span: at,
+        related: Vec::new(),
+        explanation: Some(
+            "A command's caller is answered `Ok`, or an error the command declares \
+             (ADR-0157). The value it produced reaches the page from the query it \
+             invalidates, so the page has one source for what it shows: a value read \
+             from the answer would be a second, which the query's next change would \
+             contradict."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: repair,
+            replacement: None,
+        }],
+    };
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(b) = decl.body else { continue };
+        let body = hir.body(b);
+        let handlers = crate::resume::handlers_in(body);
+        if handlers.is_empty() {
+            continue;
+        }
+        let within: Vec<ExprId> = handlers.iter().flat_map(|h| body.walk_from(*h)).collect();
+        // Each name a `let` binds to a command's answer, by its pattern.
+        let mut bound: BTreeMap<hir::PatternId, String> = BTreeMap::new();
+        for e in &within {
+            if let Expr::Let {
+                pat: Some(p),
+                init: Some(i),
+                ..
+            } = body.expr(*e)
+                && let HPat::Bind { name, .. } = body.pat(*p)
+                && let Some((command, def)) = command_called(body, sigs, unit, *i)
+            {
+                // A command declared without a `Result` answers nothing at
+                // all.
+                if !declares_result(def) {
+                    out.push(refused(
+                        format!(
+                            "`{name}` is bound to what `{command}` answered, which is \
+                             nothing: `{command}` declares no `Result`"
+                        ),
+                        body.pat_span(*p),
+                        format!(
+                            "call `{command}` without binding its answer, and read the \
+                             value from the page's query"
+                        ),
+                    ));
+                }
+                bound.insert(*p, command);
+            }
+        }
+        let lexical = Lexical::build(sigs, Some(unit), decl, body);
+        for e in &within {
+            let Expr::Match { scrutinee, arms } = body.expr(*e) else {
+                continue;
+            };
+            let answered = match command_called(body, sigs, unit, *scrutinee) {
+                Some((command, def)) => declares_result(def).then_some(command),
+                None => match lexical.binder(*scrutinee) {
+                    Some(Binder::Pattern(p)) => bound.get(&p).cloned(),
+                    _ => None,
+                },
+            };
+            let Some(command) = answered else { continue };
+            for arm in arms {
+                for payload in ok_payloads(body, arm.pat) {
+                    let what = match body.pat(payload) {
+                        HPat::Bind { name, .. } => format!("`{name}` is bound to nothing"),
+                        _ => "its pattern matches nothing".to_string(),
+                    };
+                    out.push(refused(
+                        format!("`{command}` answers whether it committed, not its value: {what}"),
+                        body.pat_span(payload),
+                        "write `Ok(_)`, and read the value from the page's query".to_string(),
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// What an `Ok` in pattern `p` matches its payload with, through `|`, where
+/// that is more than `_`. Read off the spelling because the value matched
+/// is a command's answer, a `Result` (ADR-0157), whose cases are `Ok` and
+/// `Err`.
+fn ok_payloads(body: &Body, p: hir::PatternId) -> Vec<hir::PatternId> {
+    match body.pat(p) {
+        HPat::Ctor { path, args } if path == "Ok" || path == "Result.Ok" => args
+            .iter()
+            .copied()
+            .filter(|a| !matches!(body.pat(*a), HPat::Wild))
+            .collect(),
+        HPat::Or(ps) => ps.iter().flat_map(|q| ok_payloads(body, *q)).collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// Uses of a name nothing declares.

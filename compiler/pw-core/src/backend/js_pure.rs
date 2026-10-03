@@ -664,11 +664,17 @@ impl<'p> Emitter<'p> {
     /// `Int` is a JavaScript number there, exact within ±2^53 (ADR-0033 §7),
     /// and a `BigInt` here (ADR-0044); a record is an object by field name in
     /// both.
+    ///
+    /// `expr` is read as often as the type needs, and not at all for `Unit`:
+    /// it names a value, and never does anything.
     fn decode(&self, expr: &str, ty: &Type) -> Result<String, String> {
         let refused = || format!("a captured {ty:?}, which the document does not carry");
         Ok(match ty {
             Type::Int => format!("BigInt({expr})"),
             Type::Float | Type::Str | Type::Bool => expr.to_string(),
+            // Nothing, whatever the wire holds: a command's `Ok` is answered
+            // without its value (ADR-0157).
+            Type::Unit => "undefined".to_string(),
             Type::List(t) => format!("{expr}.map((x) => {})", self.decode("x", t)?),
             Type::Nominal(def, args) => match self.shape(*def, args) {
                 Some(Shape::Alias(of)) => self.decode(expr, of)?,
@@ -981,8 +987,12 @@ impl<'p> Emitter<'p> {
                 ));
             }
             // A command a handler calls (ADR-0058): awaited through its
-            // context, each argument as JSON can carry it.
-            Instr::Command { command, args, .. } => {
+            // context, each argument as JSON can carry it, and its answer
+            // decoded as its declared result (ADR-0157): `Ok`, or the
+            // declared `Err` the handler can show.
+            Instr::Command {
+                command, args, ty, ..
+            } => {
                 if !self.handler {
                     return Err(format!(
                         "a call to `{command}`, which only a handler's own body makes"
@@ -993,11 +1003,19 @@ impl<'p> Emitter<'p> {
                     let t = self.type_of(*a)?.clone();
                     sent.push(self.wire(&val(*a), &t)?);
                 }
+                // Sent first, on a line of its own: a decoder may not read
+                // what it is given at all (`Unit`), and the command is sent
+                // whatever its answer's type.
+                let answered = format!("{r}_answer");
                 self.line(&format!(
-                    "const {r} = await context.command({}, [{}]);",
+                    "const {answered} = await context.command({}, [{}]);",
                     json(command),
                     sent.join(", ")
                 ));
+                let decoded = self.decode(&answered, ty).map_err(|why| {
+                    format!("`{command}`'s answer cannot be read by the page: {why}")
+                })?;
+                self.line(&format!("const {r} = {decoded};"));
             }
             // A page's signal (ADR-0130), through the handler's context, as
             // JSON carries it.

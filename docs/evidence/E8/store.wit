@@ -115,6 +115,7 @@ world store-page-store-page {
 world store-page-add-to-cart {
     import pw:host/session;
     import store:data/carts;
+    import store:data/menus;
     export store-page-add-to-cart-api;
 }
 
@@ -189,8 +190,9 @@ package store:data {
         current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
     }
     interface menus {
-        use pw:types/types.{domain-menu-item, domain-store-error, domain-store-id};
+        use pw:types/types.{domain-menu-item, domain-menu-item-id, domain-store-error, domain-store-id};
         for-store: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
+        is-available: func(arg0: domain-menu-item-id) -> bool;
     }
     interface stores {
         use pw:types/types.{domain-store, domain-store-error, domain-store-id};

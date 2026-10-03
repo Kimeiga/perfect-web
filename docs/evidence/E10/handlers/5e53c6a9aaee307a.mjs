@@ -3,6 +3,7 @@
 export const name = "clear_cart";
 export const handler = "5e53c6a9aaee307a";
 export async function run(context) {
-  const v0 = await context.command("store.page.clear_cart", []);
+  const v0_answer = await context.command("store.page.clear_cart", []);
+  const v0 = ((c) => { switch (c.$case) { case "ok": return { $case: "ok", value: undefined }; case "err": return { $case: "err", value: ((c) => { switch (c.$case) { case "item-unavailable": return { $case: "item-unavailable", value: c.value }; case "quantity-too-large": return { $case: "quantity-too-large" }; case "cart-expired": return { $case: "cart-expired" }; default: throw new Error("trap: no such case " + c.$case); } })(c.value) }; default: throw new Error("trap: no such case " + c.$case); } })(v0_answer);
   return v0;
 }

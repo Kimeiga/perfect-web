@@ -5180,12 +5180,30 @@ impl<'a> Lower<'a> {
             }
             let command =
                 crate::contract::component_id(self.cx.hirs[d.unit], crate::hir::DeclId(d.decl));
+            // What the handler is answered (ADR-0157): whether the command
+            // committed, and its declared error if not, `Result<Unit, E>`. It
+            // was `Unit` until 2026-10-03, so a handler could not tell a
+            // refusal from a commit. Never the value, which reaches the page
+            // from the resource.
+            let ty = match self
+                .cx
+                .sigs
+                .by_def(d)
+                .and_then(|s| s.result())
+                .map(crate::resolved::ResolvedType::answered)
+            {
+                Some(t) => match ty_resolved(self.cx.sigs, &t, &span) {
+                    Lowering::Lowered(t) => t,
+                    other => return other.map(|_| unreachable!()),
+                },
+                None => Type::Unit,
+            };
             let result = self.fresh();
             return Lowering::Lowered(self.push(Instr::Command {
                 result,
                 command,
                 args: lowered,
-                ty: Type::Unit,
+                ty,
             }));
         }
 

@@ -41,7 +41,18 @@ const ENGINES = ["chromium", "firefox", "webkit"];
 ///
 /// `stream` since 2026-10-03 (ADR-0148): its recommender is one per server,
 /// and a test that makes it fail would fail another engine's page.
-const MUTATING = ["keyed-list", "transport", "performance", "public-fragment", "stream"];
+///
+/// `availability` since 2026-10-03 (ADR-0157): an item sold out is sold out
+/// for every page on the host.
+const MUTATING = [
+  "keyed-list",
+  "transport",
+  "performance",
+  "public-fragment",
+  "stream",
+  // ADR-0157: an item sold out is one per server.
+  "availability",
+];
 
 export const MUTABLE_PORTS = Object.fromEntries(
   MUTATING.map((suite, s) => [

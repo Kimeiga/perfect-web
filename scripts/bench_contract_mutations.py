@@ -19,7 +19,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 NEXT = ROOT / "benchmarks/baselines/next-react"
 SVELTE = ROOT / "benchmarks/baselines/sveltekit"
 HARNESS = ROOT / "benchmarks/harness"
-STORE_PW = ROOT / "examples/store/app.pw"
+# The benchmark's Pleris store (ADR-0156), which the other two baselines
+# match; the canonical store, `examples`, grows past them.
+STORE_PW = ROOT / "benchmarks/baselines/pleris/store/app.pw"
 
 COUNT = "  return cart.lines.reduce((n, line) => n + line.quantity, 0);\n"
 SHARED = "  const lines = session ? carts.get(session) : undefined;\n"
@@ -67,8 +69,7 @@ MUTANTS = [
 def build(stack):
     """Rebuild one store from its source; True when it built."""
     if stack == "pleris":
-        cmd, cwd = ["bash", "spikes/own-renderer/run.sh"], ROOT
-        env = {"BUILD_ONLY": "1"}
+        cmd, cwd, env = ["bash", "spikes/own-renderer/baseline-store.sh"], ROOT, {}
     else:
         cmd, cwd, env = ["pnpm", "build"], NEXT if stack == "next-react" else SVELTE, {}
     import os

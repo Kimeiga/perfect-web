@@ -30,8 +30,9 @@ MUTANTS = [
     (
         "a command is sent without its arguments",
         LOWER,
-        "                command,\n                args: lowered,\n                ty: Type::Unit,",
-        "                command,\n                args: Vec::new(),\n                ty: Type::Unit,",
+        # Re-anchored by ADR-0157: the command's answer is typed.
+        "                command,\n                args: lowered,\n                ty,",
+        "                command,\n                args: Vec::new(),\n                ty,",
     ),
     (
         "a command inside a function value is let through",
@@ -72,8 +73,9 @@ MUTANTS = [
     (
         "a command is not awaited",
         JS_PURE,
-        '"const {r} = await context.command({}, [{}]);"',
-        '"const {r} = context.command({}, [{}]);"',
+        # Re-anchored by ADR-0157: the answer is bound, then decoded.
+        '"const {answered} = await context.command({}, [{}]);"',
+        '"const {answered} = context.command({}, [{}]);"',
     ),
     (
         "a handler that calls no command is compiled",

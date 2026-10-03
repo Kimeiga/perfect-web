@@ -3,3 +3,4 @@ node_modules/
 template-ir.json
 test-results/
 dist-keyed/
+dist-baseline/

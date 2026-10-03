@@ -1786,6 +1786,38 @@ e14-runtime-recovery:
      } > docs/evidence/E14/runtime-recovery.txt
     @grep -E "passed|mutants killed" docs/evidence/E14/runtime-recovery.txt
 
+# ADR-0157: a handler is answered what its command did, `Ok` or the error it
+# declares, never the value; and an item sold out since the page was rendered
+# is refused by name. The rules, the compiled handlers, the oracle, the host,
+# the server, the browser in three engines, and the mutation controls.
+e14-command-answers:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0157 - what a command answers its handler, and an item sold out since the page"; echo; \
+       echo "produced by: just e14-command-answers"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the rules, PW0339 and PW0620 (compiler/pw-core/tests/answers.rs)"; echo; \
+       cargo test --locked -p pw-core --test answers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the compiled handlers, run under Node against each answer (compiler/pw-core/tests/handlers.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the compiled command against its reference, each availability (compiler/pw-conformance/tests/oracle.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test oracle -- --nocapture 2>&1 | grep -E '^oracle: store|^test result'; \
+       echo; echo "== the compiled command in the host (runtime/pw-host/tests/pleris_component.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test pleris_component 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test (an_item_sold_out|a_kept_answer|tests::an_item_sold_out|tests::a_kept_answer)|^test result'; \
+       echo; echo "== the browser (e2e/availability.spec.mjs, e2e/resource-path.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/availability.spec.mjs e2e/resource-path.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/command_answers_mutations.py)"; echo; \
+       python3 scripts/command_answers_mutations.py; \
+     } > docs/evidence/E14/command-answers.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/command-answers.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.
@@ -2504,12 +2536,13 @@ e10-close-bench RUNS="8":
      } > docs/evidence/E10/close-bench.txt
     @cat docs/evidence/E10/close-bench.txt
 
-# E14-A (ADR-0120): the canonical store in three stacks, one behavioural
+# E14-A (ADR-0120): the benchmark's store in three stacks, one behavioural
 # contract. Each store builds and typechecks, the contract suite passes on all
-# three three times over, and each mutant store fails it.
+# three three times over, and each mutant store fails it. The Pleris one is
+# the benchmark's frozen copy (ADR-0156), as the other two are.
 e14-contract:
     @cargo build --quiet --locked -p pw-cli -p pw-dev-server
-    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/baseline-store.sh > /dev/null
     @mkdir -p docs/evidence/E14
     @{ echo "E14-A - one store contract, three stacks"; echo; \
        echo "produced by: just e14-contract"; \
@@ -2522,7 +2555,7 @@ e14-contract:
        echo "== builds and typechecks"; \
        (cd benchmarks/baselines/next-react && pnpm --silent build > /dev/null && echo "  next-react: built" && pnpm --silent typecheck && echo "  next-react: tsc clean"); \
        (cd benchmarks/baselines/sveltekit && pnpm --silent build > /dev/null 2>&1 && echo "  sveltekit: built" && pnpm --silent typecheck 2>&1 | grep -oE "[0-9]+ ERRORS [0-9]+ WARNINGS" | sed 's/^/  sveltekit: svelte-check /'); \
-       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw | sed 's/^/  pleris: /'; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw benchmarks/baselines/pleris/domain.pw benchmarks/baselines/pleris/lib/*.pw benchmarks/baselines/pleris/store/*.pw | sed 's/^/  pleris: /'; \
        echo; echo "== the contract, every stack, three times (benchmarks/harness/contract)"; echo; \
        (cd benchmarks/harness && pnpm exec playwright test --repeat-each=3 --reporter=list 2>&1 \
          | sed 's/\x1b\[[0-9;]*m//g' | grep -E "^ +[0-9]+ (passed|failed|flaky)|✘" ); \

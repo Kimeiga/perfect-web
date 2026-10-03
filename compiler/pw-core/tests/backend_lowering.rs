@@ -168,7 +168,7 @@ fn lowered(
 /// `Carts.add` and `Carts.clear` share `database.write<Carts>` and have
 /// different ABIs.
 #[test]
-fn the_real_add_to_cart_lowers_to_two_import_calls() {
+fn the_real_add_to_cart_lowers_to_three_import_calls() {
     let built = Built::new(&store());
     let (p, refusals) = lowered(&built);
 
@@ -194,17 +194,29 @@ fn the_real_add_to_cart_lowers_to_two_import_calls() {
     host.sort();
     assert_eq!(
         host,
-        ["pw:host/session#read", "store:data/carts#add"],
-        "the two callables it invokes, by the identity the ARTIFACT will carry"
+        [
+            "pw:host/session#read",
+            "store:data/carts#add",
+            "store:data/menus#is-available"
+        ],
+        "the three callables it invokes, by the identity the ARTIFACT will carry: \
+         since ADR-0157 it asks whether the item can be ordered"
     );
 
-    // And the authority, which is a separate fact: two callables, and one of
-    // them shares its capability with `Carts.clear`. Architect ruling,
-    // 2026-08-20: a capability authorizes an operation and does not identify
-    // one.
+    // And the authority, which is a separate fact: three callables, two of
+    // which share their capabilities with `Carts.clear` and `Menus.for_store`.
+    // Architect ruling, 2026-08-20: a capability authorizes an operation and
+    // does not identify one.
     let mut declared: Vec<String> = f.capabilities.iter().map(|c| c.name()).collect();
     declared.sort();
-    assert_eq!(declared, ["database.write<Carts>", "session.read"]);
+    assert_eq!(
+        declared,
+        [
+            "database.read<Menus>",
+            "database.write<Carts>",
+            "session.read"
+        ]
+    );
 }
 
 /// **The lowering itself works**, on a program that does import what it calls.

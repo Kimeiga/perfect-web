@@ -21,8 +21,11 @@ export const STACKS = {
 const only = process.env.BENCH_STACK;
 const stacks = Object.entries(STACKS).filter(([name]) => !only || name === only);
 
+// The benchmark's Pleris store (ADR-0156), built by `baseline-store.sh`: the
+// frozen copy the other two baselines match, not the canonical store, which
+// grows toward charter §15.
 const command = {
-  pleris: "../../target/debug/pw-dev-server dist",
+  pleris: "../../target/debug/pw-dev-server dist-baseline",
   "next-react": "pnpm start",
   sveltekit: "pnpm start",
 };

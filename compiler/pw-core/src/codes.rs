@@ -173,6 +173,11 @@ codes! {
     // command a page's handler calls says how a second delivery is answered.
     SENT_WITHOUT_IDEMPOTENCY = "PW0338" / sent_without_idempotency / 1, DeclarationRules,
         "a command a page's handler calls declares `idempotent_by`";
+    // ADR-0157: a command is one request, and its caller is answered whether
+    // it committed. Called from a declaration, its body ran without its
+    // policies, and the checker and the backend typed the call differently.
+    COMMAND_OUTSIDE_A_HANDLER = "PW0339" / command_outside_a_handler / 1, DeclarationRules,
+        "a command is called only by a page's handler";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 
@@ -324,6 +329,11 @@ codes! {
     // it, until 2026-09-26.
     RESULT_DROPPED = "PW0618" / result_dropped / 1, Types,
         "a failure is handled: a `Result` is taken apart, returned with `?`, or discarded by name";
+    // ADR-0157: a command answers `Ok` without its value, which reaches the
+    // page from a query. A handler that bound it read nothing, and was told
+    // so only by the backend, in terms of the value's type.
+    ANSWER_READ_FOR_A_VALUE = "PW0620" / answer_read_for_a_value / 1, Types,
+        "what a command answers carries no value: a handler matches `Ok(_)`, and reads the value from a query";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

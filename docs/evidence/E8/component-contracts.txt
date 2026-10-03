@@ -63,12 +63,14 @@ store.page.StorePage  abi d803b26130c7cf49
   host      pw:host/session#read  (session.read)
   exports   page StorePage
 
-store.page.add_to_cart  abi 2e3fe857e299d45a
+store.page.add_to_cart  abi e10d07d4e3509ab3
   runs at   origin
+  needs     database.read<Menus>
   needs     database.write<Carts>
   needs     session.read
   host      pw:host/session#read  (session.read)
   host      store:data/carts#add  (database.write<Carts>)
+  host      store:data/menus#is-available  (database.read<Menus>)
   exports   command add_to_cart
   requires  SignedIn
 

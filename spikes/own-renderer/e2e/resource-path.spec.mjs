@@ -34,9 +34,11 @@ test("the command's response carries no cart value", async ({ page, request }) =
   });
   const body = await response.json();
   // A commit names the versions it produced (ADR-0122), so a page can tell
-  // when the value it is sent includes it. Versions, and nothing else.
-  expect(Object.keys(body).sort()).toEqual(["basis", "committed"]);
+  // when the value it is sent includes it; and the command's answer, which
+  // is `Ok` without its value (ADR-0157). Nothing else.
+  expect(Object.keys(body).sort()).toEqual(["basis", "committed", "result"]);
   expect(body.committed).toBe(true);
+  expect(body.result).toEqual({ $case: "ok" });
   for (const b of body.basis) expect(Object.keys(b).sort()).toEqual(["entry", "version"]);
   expect(JSON.stringify(body)).not.toMatch(/line_count|lines|quantity/);
 });

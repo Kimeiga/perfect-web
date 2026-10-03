@@ -505,8 +505,13 @@
   {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "2e3fe857e299d45a",
+    "abi_schema": "e10d07d4e3509ab3",
     "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Menus"
+      },
       {
         "family": "database",
         "operation": "write",
@@ -601,6 +606,32 @@
                 }
               ]
             }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/menus",
+        "name": "is-available",
+        "capability": "database.read<Menus>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Menus"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
           }
         },
         "owner": "external",

@@ -119,15 +119,30 @@ E14 comes before E11-E13. Its plan, controls and task list are
    - ~~**The store against charter §15.**~~ Audited 2026-10-03
      (`docs/research/charter-15-store-audit.md`). Its three runtime defects
      are fixed (ADR-0155).
-   - **Next: the audit's gaps, in its order.**
-     1. Item availability end to end, with a command's typed error returned
-        to the page (§15.6 test 10).
-     2. The route `/stores/{id}`, and more than one store.
-     3. The recommendation and estimate slots in the store itself, with T05
+   - ~~**Item availability, end to end.**~~ Done 2026-10-03 (ADR-0157,
+     `just e14-command-answers`), the audit's first gap. A handler is
+     answered what its command did, `Ok` or the declared error, never the
+     value. The store refuses an item sold out since the page was rendered,
+     and says so (§15.6 test 10). PW0339 and PW0620.
+   - **Next: a handler that drops its command's declared error.**
+     `=> clear_cart()` returns its answer to a runtime that discards it, so
+     a refusal goes unshown. PW0618 refuses a `Result` dropped as a
+     statement, and not one returned as a handler's value.
+     - To decide: refuse it as PW0618 refuses a statement, and with what
+       severity.
+     - The cost: every handler a benchmark task's patch writes. The
+       benchmark's store is frozen (ADR-0156) and is checked by the current
+       compiler, so a new refusal there re-bases the tasks, as ADR-0154's
+       did for T08.
+   - **Then the audit's remaining gaps, in its order.**
+     1. The route `/stores/{id}`, and more than one store.
+     2. The recommendation and estimate slots in the store itself, with T05
         and T10 re-based.
-     4. Decrement, remove, and a per-line cart.
-     5. A command retried on a transport failure.
-     6. §15.5's missing controls.
+     3. Decrement, remove, and a per-line cart.
+     4. A command retried on a transport failure.
+     5. §15.5's missing controls.
+     6. Availability on the page before the press: `MenuItem.available`, and
+        an `InventoryChanged` the menu hears.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for
