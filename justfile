@@ -1731,8 +1731,8 @@ e14-labels:
        echo; echo "== each witness (examples/generality/control_without_label)"; echo; \
        cargo build --quiet --locked -p pw-cli; \
        for f in examples/generality/control_without_label/*.pw; do \
-         printf '%s: %s\n' "$(basename $f)" "$(grep -m1 '@status' $f | sed 's/.*@status: //')"; \
-         ./target/debug/pw check "$f" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E '^error|^pw check' | sed 's/^/    /'; \
+         printf '%-24s %-10s %s\n' "$(basename $f)" "$(grep -m1 '@status:' $f | sed 's#// @status: ##')" \
+           "$(./target/debug/pw check $f 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[PW5014\][^[]*|no diagnostics' | head -1)"; \
        done; \
        echo; echo "== the generality suite (compiler/pw-core/tests/generality.rs)"; echo; \
        cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
