@@ -1,12 +1,14 @@
-//! **A stream and a mounted resource do not build** (ADR-0075).
+//! **A mounted resource does not build** (ADR-0075); **a stream does**
+//! (ADR-0148).
 //!
-//! Neither is compiled by this renderer. Until 2026-09-26 each lowered as a
-//! literal element. A-008's `<stream query={Recommendations(id)}>` was refused
-//! for its `query` attribute, as a computed value (ADR-0073), where it is a
-//! stream. A-007's `<map-container resource={StoreMap} center={center} />`
-//! built: an element named `map-container` with two attributes, a resource
-//! nothing mounts, and a page that fails when rendered, since `center` is a
-//! record. Both are valid Pleris, and check.
+//! Until 2026-09-26 each lowered as a literal element. A-008's `<stream
+//! query={Recommendations(id)}>` was refused for its `query` attribute, as a
+//! computed value (ADR-0073), where it is a stream. A-007's `<map-container
+//! resource={StoreMap} center={center} />` built: an element named
+//! `map-container` with two attributes, a resource nothing mounts, and a page
+//! that fails when rendered, since `center` is a record. Both are valid
+//! Pleris, and check. ADR-0075 refused both at build. ADR-0148 compiles the
+//! stream: its query's state, as a part.
 
 use pw_core::check::{Unit, check_sources};
 
@@ -72,10 +74,21 @@ fn refused(extra: &str, why: &str) {
 }
 
 #[test]
-fn a_stream_does_not_build() {
-    refused(
-        "examples/accepted/A-008-streamed-public-recommendations.pw",
-        "a `<stream>` is not compiled by this renderer",
+fn a_stream_builds_as_a_part() {
+    let all = files(&["examples/accepted/A-008-streamed-public-recommendations.pw"]);
+    checks_clean(&all);
+    let built = pw_core::build::build(&units(all)).unwrap_or_else(|e| panic!("{e}"));
+    let view = built
+        .templates
+        .iter()
+        .find(|t| t.path == "store.recommendations.Recommendations")
+        .expect("A-008's view");
+    assert!(
+        view.manifest()
+            .iter()
+            .any(|e| e.kind == "stream" && e.value == "store.recommendations.Recommendations"),
+        "{:?}",
+        view.manifest()
     );
 }
 

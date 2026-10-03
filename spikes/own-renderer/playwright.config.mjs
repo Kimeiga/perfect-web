@@ -1,7 +1,7 @@
 // The own renderer's pages come from a Rust development server that owns
 // `pw-materialize`, `pw-resource`, `pw-render` and `pw-protocol`. The browser
 // sees only the protocol.
-//
+///
 // Not E8's production host: its deletion condition is that E8 replaces it with
 // the capability-constrained one while preserving the `pw-protocol` boundary.
 import { defineConfig, devices } from "@playwright/test";
@@ -9,12 +9,12 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.PORT ?? 3141);
 
 // One host per engine, for the tests that MUTATE the shared menu.
-//
+///
 // The menu is public data: one list, broadcast to every subscriber, which is
 // the property `keyed-list.spec.mjs` exists to prove. That makes it hostile to
 // a parallel suite — a reorder committed by one run is visible to every other,
 // and `store.spec.mjs` reasonably assumes three items in a known order.
-//
+///
 // Isolation in the HARNESS rather than in the server: a per-session menu would
 // delete the property under test. One host per engine rather than one shared
 // mutable host, because the three engine projects run concurrently and a
@@ -37,7 +37,10 @@ const ENGINES = ["chromium", "firefox", "webkit"];
 /// cart-related part ids update" read the rename. That happened once in fifteen
 /// three-engine runs, and was then reproduced on demand by renaming from a
 /// second context. Appended, so the other suites keep their ports.
-const MUTATING = ["keyed-list", "transport", "performance", "public-fragment"];
+///
+/// `stream` since 2026-10-03 (ADR-0148): its recommender is one per server,
+/// and a test that makes it fail would fail another engine's page.
+const MUTATING = ["keyed-list", "transport", "performance", "public-fragment", "stream"];
 
 export const MUTABLE_PORTS = Object.fromEntries(
   MUTATING.map((suite, s) => [
@@ -47,7 +50,7 @@ export const MUTABLE_PORTS = Object.fromEntries(
 );
 
 // The performance run needs ONE host, not eleven.
-//
+///
 // Playwright starts every declared `webServer` before the first test, and
 // eleven processes coming up while the first navigation happens is itself the
 // load a long-animation-frame measurement is trying not to see. It failed

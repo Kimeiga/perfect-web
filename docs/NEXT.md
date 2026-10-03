@@ -70,12 +70,25 @@ E14 comes before E11-E13. Its plan, controls and task list are
    - ~~**T04, an order-state variant.**~~ Written 2026-10-02, with ADR-0147:
      all four controls hold on all three stacks. Pleris's unsafe patch is
      refused by `pw check` (PW0305).
-   - **Next: T10, an error state**: a ruling on how a page shows a query's
-     failure (the charter's `Failed` state and `fallback`), and a data source
-     that can fail, in all three stacks. Then T09 and T02, which need it to
-     count its calls too. Then T02, T09 and T10, which need a data source that
-     can be slow, fail and count its calls, in all three stacks; T07 needs a
-     page that navigates, and T05 `<stream>` (ADR-0075).
+   - ~~**A stream region.**~~ Done 2026-10-03 (ADR-0148): `<stream>` is
+     compiled, and a query declared `delivery streamed` fills its region in
+     the same response as the document, with the WHATWG's `<template for>`
+     patch. PW5400-PW5402. The failed arm is given `Option` of the declared
+     error. Demonstrated by `examples/demo/streamed.pw` in three engines, and
+     natively in Chrome 154.
+   - **Next: T05, streaming recommendations, and T10, a loading and an error
+     state**, each with its four controls on all three stacks:
+     - T05 shows the store's recommendations, which take over a second,
+       without holding up the menu. Its plausible wrong fix waits for them.
+       Pleris refuses that (PW5400); the hidden tests catch it elsewhere.
+     - T10 shows the session's delivery estimate, which sometimes fails,
+       without failing the page. Its plausible wrong fix adds the loading
+       state and forgets the failure. Pleris refuses that (PW5401).
+     - The recommender and the estimator, slow and failing on a test's
+       word, go in each stack's setup. Pleris's development server has the
+       recommender (ADR-0148); the estimator is T10's.
+   - Then T09 and T02, which need a data source that counts its calls in all
+     three stacks, and T07, which needs a page that navigates.
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-02, against master `bff437c`, closing E10.
+**Reviewed:** 2026-10-03, against master `48c4148`, with ADR-0148.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,39 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0148, 2026-10-03: a stream region shows its query's state, and its
+settled arm comes in the same response**
+([ADR-0148](DECISIONS/ADR-0148-a-stream-region-shows-its-query-s-state.md)).
+A `<stream query={Q(..)}>` was refused at build since ADR-0075. It is
+compiled now: T05 and T10 are expressible on Pleris.
+- A page is sent before a query declared `delivery streamed` answers, with
+  the region's placeholder in a `<?start>`/`<?end>` range. The server writes
+  the arm the query settled to later in the same response, as the WHATWG's
+  `<template for>` patch. Chrome 150 and later applies it itself, JavaScript
+  off too; the runtime applies it in every other browser.
+- The runtime now starts while a response is still open, from an inline
+  `import()`. A deferred module, as it was loaded, starts only once the whole
+  response has arrived, in every engine; measured by `just
+  e14-stream-probes`.
+- The failed arm is given `Option` of the declared error: `None` is the
+  host's failure, a spent budget or a trap, which declares nothing.
+
+What is refused:
+- a `let` of a streamed query (PW5400);
+- a stream missing an arm for a state its query reaches, or holding one for
+  a state it cannot reach (PW5401);
+- a streamed query with no `timeout` (PW5402).
+
+Two findings on the way:
+- The server's handler table walked three kinds of block by name, so a
+  button inside a stream was refused.
+- WebKit paints nothing until a page holds about 200 characters of text, or
+  has loaded. A small streamed shell is blank in Safari until its regions
+  settle, whatever renders it.
+
+Demonstrated by `examples/demo/streamed.pw` in Chromium, Firefox and WebKit,
+and natively in the host's Chrome 154.
 
 **Corrections, ADR-0147, 2026-10-02: a page's query binding had no type,
 and a failed query stopped the development server; T04 is written, seven

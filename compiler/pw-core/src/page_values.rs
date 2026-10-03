@@ -158,22 +158,15 @@ pub struct Live {
 
 /// The part numbered `id`, wherever it is in `chunks`.
 fn find_part(chunks: &[crate::template_ir::Chunk], id: u32) -> Option<&crate::template_ir::Part> {
-    use crate::template_ir::{Chunk, Part};
+    use crate::template_ir::Chunk;
     for c in chunks {
         let Chunk::Dynamic(p) = c else { continue };
         if p.id().is_some_and(|i| i.0 == id) {
             return Some(p);
         }
-        let inner = match p {
-            Part::Conditional {
-                then, otherwise, ..
-            } => find_part(then, id).or_else(|| find_part(otherwise, id)),
-            Part::Match { arms, .. } => arms.iter().find_map(|a| find_part(&a.body, id)),
-            Part::Each { body, .. } => find_part(body, id),
-            _ => None,
-        };
-        if inner.is_some() {
-            return inner;
+        // Through every region a part has, a stream's arms too (ADR-0148).
+        if let Some(inner) = p.nested().into_iter().find_map(|r| find_part(r, id)) {
+            return Some(inner);
         }
     }
     None
@@ -227,6 +220,11 @@ fn rendered_again(
                 })
                 .collect(),
             Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
+            // A stream's query's arguments, each a value's path or an
+            // invocation-context call (ADR-0148).
+            Part::Stream { args, .. } => {
+                args.iter().filter(|a| !a.ends_with(')')).cloned().collect()
+            }
             // What the document carries for a handler, read where the
             // template holds it (ADR-0136).
             Part::Event {
@@ -368,6 +366,7 @@ fn own_reads(p: &crate::template_ir::Part) -> Vec<String> {
             })
             .collect(),
         Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
+        Part::Stream { args, .. } => args.iter().filter(|a| !a.ends_with(')')).cloned().collect(),
         Part::Event { .. } | Part::Blocked { .. } => Vec::new(),
     }
 }
@@ -473,6 +472,23 @@ fn live_attributes(
     }
 }
 
+/// **A region that shows a query's state** (ADR-0148): the query a host
+/// runs for it, and whether the document waits for it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Stream {
+    pub part: u32,
+    /// The query, as a component id.
+    pub resource: String,
+    /// Each argument as a host computes it: a page parameter's name, or an
+    /// invocation-context call, `current_session()`.
+    pub args: Vec<String>,
+    /// How a host runs the query: its declared policies (ADR-0127).
+    pub policy: Policy,
+    /// `delivery streamed`: the document is sent first, and the region is
+    /// filled when the query settles, in the same response.
+    pub streamed: bool,
+}
+
 /// A page's plan.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PageValues {
@@ -497,6 +513,112 @@ pub struct PageValues {
     /// when what it renders changed. A block inside one is rendered with it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<u32>,
+    /// **Each region that shows a query's state** (ADR-0148): a host runs
+    /// its query, and renders the arm it settled to.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub streams: Vec<Stream>,
+}
+
+/// Every `<stream>` in `chunks`, in document order.
+fn streams_in(chunks: &[crate::template_ir::Chunk]) -> Vec<&crate::template_ir::Part> {
+    use crate::template_ir::{Chunk, Part};
+    let mut out = Vec::new();
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if matches!(p, Part::Stream { .. }) {
+            out.push(p);
+        }
+        for region in p.nested() {
+            out.extend(streams_in(region));
+        }
+    }
+    out
+}
+
+/// **What a host runs for each `<stream>`** (ADR-0148), or why it cannot: a
+/// query given what a page has, whose `fallback` no host executes yet, and a
+/// region that reads no signal. The server renders a region once, so a
+/// signal read in it would show its first value forever.
+fn planned_streams(
+    hirs: &[&Hir],
+    chunks: &[crate::template_ir::Chunk],
+    params: &[String],
+    signals: &[String],
+) -> Result<Vec<Stream>, String> {
+    use crate::template_ir::Part;
+    let mut out = Vec::new();
+    for p in streams_in(chunks) {
+        let Part::Stream {
+            id,
+            query,
+            args,
+            streamed,
+            ..
+        } = p
+        else {
+            continue;
+        };
+        let decl = hirs
+            .iter()
+            .flat_map(|hir| {
+                hir.all_decls()
+                    .filter(|(_, d)| d.kind == DeclKind::Query)
+                    .filter(move |(i, _)| crate::contract::component_id(hir, *i) == *query)
+                    .map(|(_, d)| d)
+            })
+            .next()
+            .ok_or_else(|| format!("stream {id}'s query `{query}` is declared nowhere"))?;
+        for a in args {
+            let given = params.contains(a) || (a.ends_with("()") && !a.contains('.'));
+            if !given {
+                return Err(format!(
+                    "stream {id}'s query is given `{a}`, which is neither a page parameter nor \
+                     an invocation-context call"
+                ));
+            }
+        }
+        if let Some(f) = decl.policy("fallback") {
+            return Err(format!(
+                "stream {id}'s query declares `fallback {}`, which no host executes for a stream \
+                 yet: its region would show the failure the declaration replaces (ADR-0148)",
+                f.value
+            ));
+        }
+        let root = |path: &str| path.split('.').next().unwrap_or_default().to_string();
+        for region in p.nested() {
+            for read in streams_reads(region) {
+                if signals.contains(&root(&read)) {
+                    return Err(format!(
+                        "stream {id} shows the signal `{}`, and the server renders a stream's \
+                         region once (ADR-0148)",
+                        root(&read)
+                    ));
+                }
+            }
+        }
+        out.push(Stream {
+            part: id.0,
+            resource: query.clone(),
+            args: args.clone(),
+            policy: policy_of(decl),
+            streamed: *streamed,
+        });
+    }
+    Ok(out)
+}
+
+/// Every path the parts in `chunks` read, inside their regions too.
+fn streams_reads(chunks: &[crate::template_ir::Chunk]) -> Vec<String> {
+    use crate::template_ir::Chunk;
+    let mut out = Vec::new();
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        out.extend(own_reads(p));
+        for region in p.nested() {
+            out.extend(streams_reads(region));
+        }
+    }
+    out
 }
 
 /// The names a page's queries are bound to.
@@ -888,6 +1010,21 @@ fn plan(
     // An attribute a signal decides, set in place (ADR-0142).
     live_attributes(&template.chunks, &signals, false, &mut live);
     live.sort_by_key(|l| l.part);
+    // Each region that shows a query's state (ADR-0148), and a view's
+    // signal held inside one, which nothing would render again.
+    let streams = planned_streams(hirs, &template.chunks, &params, &signals)?;
+    for s in &streams {
+        if let Some(i) = instances
+            .iter()
+            .find(|i| i.within.iter().any(|b| b.0 == s.part))
+        {
+            return Err(format!(
+                "stream {} holds a view's signal `{}`, and the server renders a stream's region \
+                 once (ADR-0148)",
+                s.part, i.name
+            ));
+        }
+    }
 
     Ok((
         PageValues {
@@ -899,6 +1036,7 @@ fn plan(
             signals: Vec::new(),
             live,
             blocks,
+            streams,
         },
         members,
     ))

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0075: a stream and a mounted resource do not
-build.
+"""Mutation controls for ADR-0075: a mounted resource does not build; and,
+since ADR-0148, a stream builds as a part.
 
-Each mutant undoes one piece of how the template IR refuses what this
-renderer does not compile: a `<stream>`, an element that mounts a resource,
-and the line between a mounted resource and RDFa's static `resource`
-attribute. The stream-and-resource tests must then fail.
+Each mutant undoes one piece of how the template IR treats what is not an
+element: a `<stream>`, compiled as the region its query decides (ADR-0148);
+an element that mounts a resource, refused; and the line between a mounted
+resource and RDFa's static `resource` attribute. The stream-and-resource
+tests must then fail.
 
 Run from the repository root; `just e10-streams` records the output.
 The source is restored after every mutant, whatever happens.

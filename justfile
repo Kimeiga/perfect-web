@@ -905,10 +905,10 @@ e10-template-text:
      } > docs/evidence/E10/template-text.txt
     @grep -E "^test result|mutants killed" docs/evidence/E10/template-text.txt
 
-# ADR-0075: a stream and a mounted resource do not build. Its tests, and the
-# mutation controls.
+# ADR-0075: a mounted resource does not build; since ADR-0148 a stream builds
+# as a part. Its tests, and the mutation controls.
 e10-streams:
-    @{ echo "ADR-0075 - a stream and a mounted resource do not build"; echo; \
+    @{ echo "ADR-0075 - a mounted resource does not build; ADR-0148 - a stream builds as a part"; echo; \
        echo "produced by: just e10-streams"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \
@@ -1736,6 +1736,50 @@ e14-query-values:
        python3 scripts/query_values_mutations.py; \
      } > docs/evidence/E14/query-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/query-values.txt
+
+# ADR-0148: a stream region shows its query's state, and its settled arm comes
+# in the same response. The rules, the IR and the plan, the renderer, the
+# server's streamed response, the browser's spec in three engines and in the
+# host's Chrome, and the mutation controls, against one staged build.
+e14-streams:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @{ echo "ADR-0148 - a stream region shows its query's state, and its settled arm comes in the same response"; echo; \
+       echo "produced by: just e14-streams"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the rules and the typer (compiler/pw-core/tests/streams.rs)"; echo; \
+       cargo test --locked -p pw-core --test streams 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the IR and the plan (compiler/pw-core/tests/stream_plan.rs)"; echo; \
+       cargo test --locked -p pw-core --test stream_plan 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer (runtime/pw-render/tests/streams.rs)"; echo; \
+       cargo test --locked -p pw-render --test streams 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server's streamed response (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server stream 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the accepted corpus, A-008 among it, checks as one program"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       echo; echo "== the browser (e2e/stream.spec.mjs), three engines and the host's Chrome"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/stream.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/streams_mutations.py)"; echo; \
+       python3 scripts/streams_mutations.py; \
+     } > docs/evidence/E14/streams.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/streams.txt
+
+# ADR-0148's measurements: how each engine treats an out-of-order streamed
+# patch, when each way of loading a script runs while a response is open, and
+# when each first paints. Chrome is the host's, where one is installed.
+e14-stream-probes:
+    @{ echo "ADR-0148 - out-of-order streaming, script start and first paint, per engine"; echo; \
+       echo "produced by: just e14-stream-probes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       (cd spikes/own-renderer && node probes/streaming.mjs 2>&1); \
+     } > docs/evidence/E14/stream-probes.txt
+    @grep -E "^[a-z]+ \(" docs/evidence/E14/stream-probes.txt
 
 # ADR-0146: a block a query decides is rendered and kept current. The plan's
 # tests, the server's, the browser's spec in three engines, and the mutation

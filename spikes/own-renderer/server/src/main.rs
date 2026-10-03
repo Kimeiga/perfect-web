@@ -63,7 +63,7 @@ use pw_protocol::{
     CURRENT, CausalBasis, Patch, PatchOp, PatchSet, Recovery, ResourceEntryId, StreamFrame,
     Targeted, Version,
 };
-use pw_render::{Env, PartId, Template, Value};
+use pw_render::{Env, PartId, Settled, Template, Value};
 use pw_resource::{DevelopmentIdentityKey, EntryIdentity};
 
 /// One subscriber's undelivered frames, and where its cursor is.
@@ -224,6 +224,33 @@ struct Shown {
     blocks: BTreeMap<u32, String>,
 }
 
+/// **The recommender the store's data layer reaches** (ADR-0148): what
+/// `store:data/recommendations#for-store` answers, after how long, and how it
+/// fails. A test sets it through `/bench/recommendations`.
+#[derive(Debug, Clone)]
+struct Recommender {
+    /// How long an answer takes. Charter §15.5: 1200 ms.
+    delay_ms: u64,
+    /// `declared`: the query's declared error, `NoneAvailable`. `host`: the
+    /// call itself fails, as a source that is down does.
+    fail: Option<String>,
+    /// What it recommends, `(id, name)`.
+    items: Vec<(String, String)>,
+}
+
+impl Default for Recommender {
+    fn default() -> Recommender {
+        Recommender {
+            delay_ms: 1200,
+            fail: None,
+            items: vec![
+                ("cortado".to_string(), "Cortado".to_string()),
+                ("cold-brew".to_string(), "Cold Brew".to_string()),
+            ],
+        }
+    }
+}
+
 struct Server {
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
@@ -307,6 +334,9 @@ struct Server {
     /// `store:data/orders#current` answers. The kitchen sets it through
     /// `/bench/order`; no order is `None`.
     orders: Mutex<BTreeMap<String, String>>,
+    /// **The recommender** (ADR-0148): what a streamed region's query reads,
+    /// with the delay and failure a test sets.
+    recommender: Mutex<Recommender>,
     /// **The compiler's contracts, and the node this server is.**
     ///
     /// E8's last gate item asks for the command path to go through the host
@@ -486,6 +516,8 @@ fn dev_topology() -> Topology {
                 "database.read<Orders>",
                 "database.read<Stores>",
                 "database.write<Carts>",
+                // The recommender (ADR-0148), a source reached over the network.
+                "network.fetch",
                 // 2026-08-10. The store gained the `import context.{
                 // current_session }` it had been missing since E4, so the page
                 // and both commands read the session. A dev origin that does
@@ -606,6 +638,7 @@ impl Server {
             pending: Mutex::new(BTreeMap::new()),
             shown: Mutex::new(BTreeMap::new()),
             orders: Mutex::new(BTreeMap::new()),
+            recommender: Mutex::new(Recommender::default()),
             contracts,
             topology,
             speculation,
@@ -1060,9 +1093,41 @@ impl Server {
             [Val::String(_)] => Ok(not_found()),
             other => Err(format!("menus#for-store received {other:?}")),
         });
+        // What the recommender answers (ADR-0148), after its delay: a slow
+        // source, which a streamed region does not wait for.
+        let recommender = self.recommender.lock().expect("recommender").clone();
+        let recommend: HostFn = Arc::new(move |args: &[Val]| {
+            let [Val::String(_)] = args else {
+                return Err(format!("recommendations#for-store received {args:?}"));
+            };
+            std::thread::sleep(std::time::Duration::from_millis(recommender.delay_ms));
+            match recommender.fail.as_deref() {
+                Some("host") => Err("the recommender is down".to_string()),
+                Some(_) => Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                    "none-available".into(),
+                    None,
+                )))))]),
+                None => Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
+                    recommender
+                        .items
+                        .iter()
+                        .map(|(id, name)| {
+                            Val::Record(vec![
+                                ("id".into(), Val::String(id.clone())),
+                                ("name".into(), Val::String(name.clone())),
+                            ])
+                        })
+                        .collect(),
+                )))))]),
+            }
+        });
         BTreeMap::from([
             ("store:data/stores#get".to_string(), get),
             ("store:data/menus#for-store".to_string(), for_store),
+            (
+                "store:data/recommendations#for-store".to_string(),
+                recommend,
+            ),
         ])
     }
 
@@ -1081,6 +1146,21 @@ impl Server {
     /// and a private entry's key is scoped by the session, as `pw-resource`
     /// requires of its host.
     fn fetch_binding(
+        &self,
+        session: &str,
+        binding: &serde_json::Value,
+        args: &[Val],
+    ) -> Result<Val, String> {
+        let resource = binding["resource"].as_str().unwrap_or_default();
+        unwrapped(resource, self.fetch_answer(session, binding, args)?)
+    }
+
+    /// **A query's answer, run by its declared policies** (ADR-0127): its
+    /// whole result, `Ok` or `Err`, as a stream shows it (ADR-0148). A
+    /// declared error is given to each reader waiting on the flight that
+    /// answered it, and is not kept, as a host's failure is not: the next
+    /// reader asks again.
+    fn fetch_answer(
         &self,
         session: &str,
         binding: &serde_json::Value,
@@ -1115,7 +1195,12 @@ impl Server {
                 pw_resource::Fetched::Cancelled(pw_resource::StopReason::Invalidated) => continue,
                 pw_resource::Fetched::Fresh(v)
                 | pw_resource::Fetched::FromCache(v)
-                | pw_resource::Fetched::Deduplicated(v) => return Ok(Val::clone(&v)),
+                | pw_resource::Fetched::Deduplicated(v) => {
+                    if matches!(*v, Val::Result(Err(_))) {
+                        self.queries.invalidate_key(&key);
+                    }
+                    return Ok(Val::clone(&v));
+                }
                 pw_resource::Fetched::Failed(e) => return Err(format!("{resource}: {e}")),
                 pw_resource::Fetched::Cancelled(r) => {
                     return Err(format!("{resource}: stopped, {r:?}"));
@@ -1123,7 +1208,7 @@ impl Server {
                 pw_resource::Fetched::TimedOut => return Err(format!("{resource}: timed out")),
             }
         }
-        self.query(resource, session, args)
+        self.answer(resource, session, args)
     }
 
     /// One fetch of a binding's query through `pw-resource`.
@@ -1137,7 +1222,7 @@ impl Server {
     ) -> pw_resource::Fetched<Arc<Val>> {
         self.sync_query_clock();
         self.queries.fetch(manifest, key, |_attempt| {
-            self.query(resource, session, args).map(Arc::new)
+            self.answer(resource, session, args).map(Arc::new)
         })
     }
 
@@ -1204,9 +1289,9 @@ impl Server {
     }
 
     /// **Run a query's compiled component** (ADR-0125), with the data layer,
-    /// the session and the catalogue, and return its `Ok` value. Nothing a
-    /// query does is committed: it reads.
-    fn query(&self, component_id: &str, session: &str, args: &[Val]) -> Result<Val, String> {
+    /// the session and the catalogue, and return its answer: its declared
+    /// result, `Ok` or `Err`. Nothing a query does is committed: it reads.
+    fn answer(&self, component_id: &str, session: &str, args: &[Val]) -> Result<Val, String> {
         let current = self
             .carts
             .lock()
@@ -1255,12 +1340,15 @@ impl Server {
             })
             .collect();
         let out = self.run(component_id, session, &host, args)?;
-        match out.into_iter().next() {
-            Some(Val::Result(Ok(Some(v)))) => Ok(*v),
-            Some(Val::Result(Err(e))) => Err(format!("{component_id} answered {e:?}")),
-            Some(v) => Ok(v),
-            None => Err(format!("{component_id} returned nothing")),
-        }
+        out.into_iter()
+            .next()
+            .ok_or_else(|| format!("{component_id} returned nothing"))
+    }
+
+    /// **A query's value**: its answer's `Ok` value. A declared error is a
+    /// failure to a reader that shows only a value (ADR-0147).
+    fn query(&self, component_id: &str, session: &str, args: &[Val]) -> Result<Val, String> {
+        unwrapped(component_id, self.answer(component_id, session, args)?)
     }
 
     /// **Each binding of the store page, by its query** (ADR-0125): the page
@@ -1691,10 +1779,24 @@ impl Server {
     /// The document, its cursor, and the values of the entries it speculates
     /// on (ADR-0122), all read under one hold of the subscriber table, so the
     /// values are the ones the rendered parts show.
+    #[cfg(test)]
     fn serve_document_with_entries(
         &self,
         session: &str,
     ) -> Result<(String, u64, serde_json::Value), String> {
+        self.serve_document_settled(session, &[])
+            .map(|(html, cursor, entries, _)| (html, cursor, entries))
+    }
+
+    /// The document as [`Server::serve_document_with_entries`] serves it,
+    /// with what its streams' queries settled to before it was written
+    /// (ADR-0148), and the environment it was rendered in, which renders
+    /// each streamed region's arm when its query settles.
+    fn serve_document_settled(
+        &self,
+        session: &str,
+        settled: &[(u32, Settled)],
+    ) -> Result<(String, u64, serde_json::Value, Env), String> {
         self.drain(session);
         self.forget_idle_subscribers();
         let mut queue = self.pending.lock().expect("pending");
@@ -1708,12 +1810,12 @@ impl Server {
         // Rendered while the table is held, so a change cannot land between
         // the clear and the render and be lost by it. And what it shows is
         // recorded with it: a change is sent as the difference (ADR-0145).
-        let (html, shown) = self.render_store_showing(session)?;
+        let (html, shown, env) = self.render_store_document(session, settled)?;
         self.shown
             .lock()
             .expect("shown")
             .insert(session.to_string(), shown);
-        Ok((html, cursor, self.speculated_entries(session)))
+        Ok((html, cursor, self.speculated_entries(session), env))
     }
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
@@ -1790,19 +1892,47 @@ impl Server {
         handler_table(&self.templates)
     }
 
-    /// **A page whose values are its signals and its parameters** (ADR-0130,
-    /// ADR-0136), rendered at each signal's first value, as `pw build`'s plan
-    /// states it, and each parameter as the address gives it: `?item=cortado`.
-    /// A page that reads a query is the store's route's: this one asks the
-    /// server for nothing, and neither does the page it serves.
-    fn render_signal_page(&self, path: &str, query: &str, session: &str) -> Result<String, String> {
+    /// **A page's parameters, as its address gives them** (ADR-0130): each
+    /// one text. A page whose parameter is not given is not rendered with a
+    /// guess.
+    fn page_params(&self, path: &str, query: &str) -> Result<BTreeMap<String, String>, String> {
+        let plan = self
+            .plans
+            .get(path)
+            .ok_or_else(|| format!("no page `{path}` in this build"))?;
+        let mut out = BTreeMap::new();
+        for p in plan["params"].as_array().into_iter().flatten() {
+            let name = p.as_str().unwrap_or_default();
+            let given = query
+                .split('&')
+                .find_map(|kv| kv.strip_prefix(name)?.strip_prefix('='))
+                .and_then(percent_decoded)
+                .ok_or_else(|| format!("`{path}` is given no `{name}`"))?;
+            out.insert(name.to_string(), given);
+        }
+        Ok(out)
+    }
+
+    /// **A page whose values are its signals, its parameters and its
+    /// streams** (ADR-0130, ADR-0136, ADR-0148): rendered at each signal's
+    /// first value, as `pw build`'s plan states it, each parameter as the
+    /// address gives it, `?item=cortado`, and each stream as its query settled
+    /// or pending. The document, and the environment it was rendered in. A
+    /// page that binds a query with `let` is the store's route's.
+    fn render_page(
+        &self,
+        path: &str,
+        params: &BTreeMap<String, String>,
+        session: &str,
+        settled: &[(u32, Settled)],
+    ) -> Result<(String, Env, &Template), String> {
         let plan = self
             .plans
             .get(path)
             .ok_or_else(|| format!("no page `{path}` in this build"))?;
         if plan["bindings"].as_array().is_some_and(|b| !b.is_empty()) {
             return Err(format!(
-                "`{path}` reads a query; this route renders a page's signals alone"
+                "`{path}` binds a query; this route renders a page's signals and streams"
             ));
         }
         let template = self
@@ -1811,16 +1941,11 @@ impl Server {
             .find(|t| t.path == path)
             .ok_or_else(|| format!("no template `{path}`"))?;
         let mut env = Env::new();
-        // A parameter is text, as the address carries it. A page whose
-        // parameter is not given is not rendered with a guess.
-        for p in plan["params"].as_array().into_iter().flatten() {
-            let name = p.as_str().unwrap_or_default();
-            let given = query
-                .split('&')
-                .find_map(|kv| kv.strip_prefix(name)?.strip_prefix('='))
-                .and_then(percent_decoded)
-                .ok_or_else(|| format!("`{path}` is given no `{name}`"))?;
-            env = env.set(name, Value::Text(given));
+        for (name, given) in params {
+            env = env.set(name, Value::Text(given.clone()));
+        }
+        for (part, outcome) in settled {
+            env = env.settle(PartId(*part), outcome.clone());
         }
         let env = with_signals(env, plan).in_domain(
             IdentityDomain::document(
@@ -1834,7 +1959,11 @@ impl Server {
         );
         let body = pw_render::render(template, &env, &self.templates)
             .map_err(|e| format!("`{path}` does not render: {e:?}"))?;
-        Ok(signal_document(&body, template, plan, &self.templates))
+        Ok((
+            signal_document(&body, template, plan, &self.templates),
+            env,
+            template,
+        ))
     }
 
     /// Where `pw emit-handlers` wrote the module for a handler identity.
@@ -1864,7 +1993,20 @@ impl Server {
     /// **The store's document, and what it shows** (ADR-0145), or why it
     /// cannot be rendered: a query that failed is a page that cannot be
     /// shown, answered as such, never a server that stops (E14, T04).
+    #[cfg(test)]
     fn render_store_showing(&self, session: &str) -> Result<(String, Shown), String> {
+        self.render_store_document(session, &[])
+            .map(|(html, shown, _)| (html, shown))
+    }
+
+    /// The store's document, what it shows, and the environment it was
+    /// rendered in, with what its streams' queries settled to (ADR-0148). A
+    /// streamed region not given is rendered pending, with its placeholder.
+    fn render_store_document(
+        &self,
+        session: &str,
+        settled: &[(u32, Settled)],
+    ) -> Result<(String, Shown, Env), String> {
         let template = self.store_template();
         // Every value is a query's (ADR-0125): each binding runs its compiled
         // component, and each part reads the binding's value by the steps the
@@ -1875,10 +2017,13 @@ impl Server {
         let shown = self
             .showing(session, &bindings)
             .map_err(|e| format!("the store page's values: {e}"))?;
-        let env = self.document_env(session, &bindings, &shown);
+        let mut env = self.document_env(session, &bindings, &shown);
+        for (part, outcome) in settled {
+            env = env.settle(PartId(*part), outcome.clone());
+        }
         let html = pw_render::render(template, &env, &self.templates)
             .map_err(|b| format!("the store page does not render: {b:?}"))?;
-        Ok((html, shown))
+        Ok((html, shown, env))
     }
 
     /// **A session's page whose values cannot be read** (E14, T04): its
@@ -1899,6 +2044,83 @@ impl Server {
                     recovery: Recovery::Reload,
                 });
         }
+    }
+
+    /// **A document, and each streamed region's arm as its query settles**
+    /// (ADR-0148). With nothing left to settle it is one response of known
+    /// length, as every document was. Otherwise all but the document's end is
+    /// written at once; each region's patch follows, in the order the queries
+    /// settle; and the response ends with the last, closing the connection,
+    /// which is what tells the browser the document is complete.
+    #[allow(clippy::too_many_arguments)]
+    fn respond_streaming(
+        &self,
+        stream: &mut TcpStream,
+        session: &str,
+        fresh: bool,
+        page: &str,
+        template: &Template,
+        env: &Env,
+        settling: &mut Settling,
+    ) {
+        if settling.waiting.is_empty() && settling.settled.is_empty() {
+            respond(
+                stream,
+                200,
+                "text/html; charset=utf-8",
+                session,
+                fresh,
+                page.as_bytes(),
+            );
+            return;
+        }
+        let cookie = if fresh {
+            format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
+        } else {
+            String::new()
+        };
+        let head = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{cookie}\
+             connection: close\r\n\r\n"
+        );
+        let shell = page.strip_suffix(DOCUMENT_END).unwrap_or(page);
+        if stream
+            .write_all(head.as_bytes())
+            .and_then(|_| stream.write_all(shell.as_bytes()))
+            .and_then(|_| stream.flush())
+            .is_err()
+        {
+            return;
+        }
+        while let Some((part, outcome)) = settling.next() {
+            let patch = |outcome: Settled| {
+                pw_render::settled_patch(
+                    template,
+                    PartId(part),
+                    &env.clone().settle(PartId(part), outcome),
+                    &self.templates,
+                )
+            };
+            // An arm that does not render is a region whose query failed, as
+            // far as the page can say: never a placeholder forever.
+            let written = patch(outcome).or_else(|why| {
+                if std::env::var("PW_TRACE").is_ok() {
+                    eprintln!("stream {part} did not render: {why:?}");
+                }
+                patch(Settled::Failed(None))
+            });
+            let Ok(written) = written else { continue };
+            if stream
+                .write_all(written.as_bytes())
+                .and_then(|_| stream.flush())
+                .is_err()
+            {
+                return;
+            }
+        }
+        let _ = stream.write_all(DOCUMENT_END.as_bytes());
+        let _ = stream.flush();
+        let _ = stream.shutdown(std::net::Shutdown::Write);
     }
 
     /// The store page's template.
@@ -2063,6 +2285,165 @@ impl Server {
         Ok(out)
     }
 }
+
+/// **A region a document leaves for its query to fill** (ADR-0148): which
+/// part, the plan's entry for it (its query's component and policies), and
+/// what this request gives the query.
+struct StreamRun {
+    part: u32,
+    stream: serde_json::Value,
+    args: Vec<Val>,
+    streamed: bool,
+}
+
+/// **Each stream a plan names, with what this request gives its query**
+/// (ADR-0148): a page parameter as `params` holds it, and
+/// `current_session()` as the request's session.
+fn stream_runs(
+    plan: &serde_json::Value,
+    session: &str,
+    params: &BTreeMap<String, String>,
+) -> Result<Vec<StreamRun>, String> {
+    let mut out = Vec::new();
+    for s in plan["streams"].as_array().into_iter().flatten() {
+        let args = s["args"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|a| match a.as_str() {
+                Some("current_session()") => Ok(Val::String(session.into())),
+                Some(name) => params
+                    .get(name)
+                    .map(|v| Val::String(v.clone()))
+                    .ok_or_else(|| {
+                        format!("a stream's query is given `{name}`, which is not given")
+                    }),
+                None => Err(format!(
+                    "a stream's argument this server cannot compute: {a}"
+                )),
+            })
+            .collect::<Result<Vec<Val>, String>>()?;
+        out.push(StreamRun {
+            part: s["part"].as_u64().unwrap_or_default() as u32,
+            stream: s.clone(),
+            args,
+            streamed: s["streamed"] == true,
+        });
+    }
+    Ok(out)
+}
+
+/// **A document's streams, their queries running** (ADR-0148): each on a
+/// thread of its own, started before the document is rendered, and each
+/// given its `timeout` from when it started. A stream whose budget is spent
+/// is given the host's failure; its answer, when it comes, is kept as its
+/// policy says, for the next reader.
+struct Settling {
+    answers: std::sync::mpsc::Receiver<(u32, Result<Val, String>)>,
+    /// Each stream not settled yet: whether it is streamed, and when its
+    /// budget is spent.
+    waiting: BTreeMap<u32, (bool, Option<std::time::Instant>)>,
+    /// Settled and not taken yet, in the order they settled.
+    settled: std::collections::VecDeque<(u32, Settled)>,
+}
+
+impl Settling {
+    fn start<'scope, 'env>(
+        scope: &'scope std::thread::Scope<'scope, 'env>,
+        server: &'env Server,
+        session: &'env str,
+        runs: Vec<StreamRun>,
+    ) -> Settling {
+        let (tx, answers) = std::sync::mpsc::channel();
+        let mut waiting = BTreeMap::new();
+        let started = std::time::Instant::now();
+        for run in runs {
+            let budget = run.stream["policy"]["timeout_ms"]
+                .as_u64()
+                .map(|ms| started + std::time::Duration::from_millis(ms));
+            waiting.insert(run.part, (run.streamed, budget));
+            let tx = tx.clone();
+            scope.spawn(move || {
+                let answer = server.fetch_answer(session, &run.stream, &run.args);
+                let _ = tx.send((run.part, answer));
+            });
+        }
+        Settling {
+            answers,
+            waiting,
+            settled: std::collections::VecDeque::new(),
+        }
+    }
+
+    /// One answer, or each budget spent by now, or nothing left to come.
+    fn receive(&mut self) {
+        use std::sync::mpsc::RecvTimeoutError;
+        let next = self.waiting.values().filter_map(|(_, at)| *at).min();
+        let got = match next {
+            Some(at) => self
+                .answers
+                .recv_timeout(at.saturating_duration_since(std::time::Instant::now())),
+            None => self
+                .answers
+                .recv()
+                .map_err(|_| RecvTimeoutError::Disconnected),
+        };
+        match got {
+            Ok((part, answer)) => {
+                if self.waiting.remove(&part).is_some() {
+                    self.settled.push_back((part, settled_of(answer)));
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                let now = std::time::Instant::now();
+                let spent: Vec<u32> = self
+                    .waiting
+                    .iter()
+                    .filter(|(_, (_, at))| at.is_some_and(|at| at <= now))
+                    .map(|(part, _)| *part)
+                    .collect();
+                for part in spent {
+                    self.waiting.remove(&part);
+                    self.settled.push_back((part, Settled::Failed(None)));
+                }
+            }
+            // Every query answered or is gone: what still waits has nothing
+            // coming.
+            Err(RecvTimeoutError::Disconnected) => {
+                for part in std::mem::take(&mut self.waiting).into_keys() {
+                    self.settled.push_back((part, Settled::Failed(None)));
+                }
+            }
+        }
+    }
+
+    /// **What the document is rendered with**: each stream the page waits
+    /// for, settled, and each streamed one that has settled already, which
+    /// the document shows at once rather than as a placeholder.
+    fn for_document(&mut self) -> Vec<(u32, Settled)> {
+        while self.waiting.values().any(|(streamed, _)| !streamed) {
+            self.receive();
+        }
+        while let Ok((part, answer)) = self.answers.try_recv() {
+            if self.waiting.remove(&part).is_some() {
+                self.settled.push_back((part, settled_of(answer)));
+            }
+        }
+        self.settled.drain(..).collect()
+    }
+
+    /// The next streamed region to settle, as it does; `None` when all have.
+    fn next(&mut self) -> Option<(u32, Settled)> {
+        while self.settled.is_empty() && !self.waiting.is_empty() {
+            self.receive();
+        }
+        self.settled.pop_front()
+    }
+}
+
+/// What every document ends with, written last: after each streamed
+/// region's patch, when there are any (ADR-0148).
+const DOCUMENT_END: &str = "</body>\n</html>\n";
 
 /// A structural change to a keyed collection.
 ///
@@ -2243,6 +2624,30 @@ fn cart_value(lines: &[(String, i64)]) -> Val {
 }
 
 /// **A binding's policy, as `pw-resource`'s manifest** (ADR-0127).
+/// **A query's value, from its answer** (ADR-0147): the `Ok` value, and a
+/// declared error as a failure.
+fn unwrapped(component_id: &str, answer: Val) -> Result<Val, String> {
+    match answer {
+        Val::Result(Ok(Some(v))) => Ok(*v),
+        Val::Result(Err(e)) => Err(format!("{component_id} answered {e:?}")),
+        v => Ok(v),
+    }
+}
+
+/// **What a stream's query settled to, from its answer** (ADR-0148): its
+/// `Ok` value; `Some` of its declared error; or `None`, for the host's
+/// failure, a spent budget or a trap.
+fn settled_of(answer: Result<Val, String>) -> Settled {
+    match answer {
+        Ok(Val::Result(Ok(Some(v)))) => Settled::Ready(val_to_value(&v)),
+        Ok(Val::Result(Ok(None))) => Settled::Ready(Value::Record(BTreeMap::new())),
+        Ok(Val::Result(Err(Some(e)))) => Settled::Failed(Some(val_to_value(&e))),
+        Ok(Val::Result(Err(None))) => Settled::Failed(Some(Value::Record(BTreeMap::new()))),
+        Ok(v) => Settled::Ready(val_to_value(&v)),
+        Err(_) => Settled::Failed(None),
+    }
+}
+
 fn runtime_manifest(resource: &str, policy: &serde_json::Value) -> pw_resource::Manifest {
     let mut m = pw_resource::Manifest::new(resource)
         .freshness(policy["freshness_ms"].as_u64().unwrap_or(0))
@@ -2822,6 +3227,50 @@ fn handle(server: &Server, mut stream: TcpStream) {
             drop(orders);
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
+        // The recommender a test sets (ADR-0148): how long it takes, how it
+        // fails (`declared` or `host`), and what it recommends, `id:Name`
+        // pairs. Nothing kept from before is served after: what a page reads
+        // next is what the recommender now says.
+        ("POST", "/bench/recommendations") => {
+            let q = |k: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{k}=")))
+                    .and_then(percent_decoded)
+            };
+            let mut set = Recommender::default();
+            if let Some(ms) = q("delay").and_then(|v| v.parse().ok()) {
+                set.delay_ms = ms;
+            }
+            set.fail = q("fail").filter(|f| !f.is_empty());
+            if let Some(items) = q("items") {
+                set.items = items
+                    .split(',')
+                    .filter_map(|pair| pair.split_once(':'))
+                    .map(|(id, name)| (id.to_string(), name.to_string()))
+                    .collect();
+            }
+            *server.recommender.lock().expect("recommender") = set;
+            // Every query a page of this build reads: what it kept, and what
+            // is still running with the recommender as it was.
+            let resources: std::collections::BTreeSet<String> = server
+                .plans
+                .values()
+                .flat_map(|plan| {
+                    ["bindings", "streams"].into_iter().flat_map(move |k| {
+                        plan[k]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|b| b["resource"].as_str().map(str::to_string))
+                    })
+                })
+                .collect();
+            for resource in resources {
+                server.queries.invalidate(&resource);
+            }
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
         // E7-P's structural commands. Each mutates the keyed collection and
         // broadcasts the patch that describes the mutation. A refusal returns
         // 409 and changes nothing — including the version.
@@ -2995,27 +3444,44 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 ),
             }
         }
-        // A page whose values are its signals alone (ADR-0130).
+        // A page whose values are its signals and its streams (ADR-0130,
+        // ADR-0148).
         ("GET", route) if route.starts_with("/page/") => {
             let path = route.trim_start_matches("/page/");
-            match server.render_signal_page(path, query, &session) {
-                Ok(body) => respond(
-                    &mut stream,
-                    200,
-                    "text/html; charset=utf-8",
-                    &session,
-                    fresh,
-                    body.as_bytes(),
-                ),
-                Err(why) => respond(
-                    &mut stream,
+            let not_found = |stream: &mut TcpStream, why: String| {
+                respond(
+                    stream,
                     404,
                     "text/plain; charset=utf-8",
                     &session,
                     fresh,
                     why.as_bytes(),
-                ),
-            }
+                );
+            };
+            let runs = server.page_params(path, query).and_then(|params| {
+                let plan = &server.plans[path];
+                stream_runs(plan, &session, &params).map(|runs| (params, runs))
+            });
+            let (params, runs) = match runs {
+                Ok(found) => found,
+                Err(why) => return not_found(&mut stream, why),
+            };
+            std::thread::scope(|scope| {
+                let mut settling = Settling::start(scope, server, &session, runs);
+                let settled = settling.for_document();
+                match server.render_page(path, &params, &session, &settled) {
+                    Ok((page, env, template)) => server.respond_streaming(
+                        &mut stream,
+                        &session,
+                        fresh,
+                        &page,
+                        template,
+                        &env,
+                        &mut settling,
+                    ),
+                    Err(why) => not_found(&mut stream, why),
+                }
+            });
         }
         // What this build compiled, for the browser's resume decision
         // (ADR-0132): one `identity|capture` line per handler. Served with
@@ -3079,47 +3545,62 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     server.queries.invalidate("store.page.Menu");
                 }
             }
-            // Registering the subscriber HERE, when the document is served,
-            // rather than when it first subscribes: the page holds instances
-            // from this moment on, so a structural change after this moment
-            // has an address in it. A registration deferred to the first poll
-            // would silently drop every change that raced it.
-            let (rendered, cursor, entries) = match server.serve_document_with_entries(&session) {
-                Ok(served) => served,
-                Err(why) => {
-                    // A page whose values could not be read is answered as
-                    // unavailable, and the server goes on (E14, T04).
-                    respond(
-                        &mut stream,
-                        503,
-                        "text/plain; charset=utf-8",
-                        &session,
-                        fresh,
-                        format!("the store page cannot be shown: {why}").as_bytes(),
-                    );
-                    return;
-                }
+            let unavailable = |stream: &mut TcpStream, why: String| {
+                // A page whose values could not be read is answered as
+                // unavailable, and the server goes on (E14, T04).
+                respond(
+                    stream,
+                    503,
+                    "text/plain; charset=utf-8",
+                    &session,
+                    fresh,
+                    format!("the store page cannot be shown: {why}").as_bytes(),
+                );
             };
-            let speculation = server
-                .speculation
-                .as_ref()
-                .and_then(|m| m["module"].as_str())
-                .map(|module| (format!("/speculation/{module}"), entries));
-            let body = document(
-                &rendered,
-                &server.templates,
-                &server.plan,
-                cursor,
-                speculation,
-            );
-            respond(
-                &mut stream,
-                200,
-                "text/html; charset=utf-8",
-                &session,
-                fresh,
-                body.as_bytes(),
-            );
+            // Each stream's query, started before the document is rendered
+            // (ADR-0148): the page waits for the ones it is declared to wait
+            // for, and the rest fill their regions in the same response.
+            let params = BTreeMap::from([("id".to_string(), STORE_ID.to_string())]);
+            let runs = match stream_runs(&server.plan, &session, &params) {
+                Ok(runs) => runs,
+                Err(why) => return unavailable(&mut stream, why),
+            };
+            std::thread::scope(|scope| {
+                let mut settling = Settling::start(scope, server, &session, runs);
+                let settled = settling.for_document();
+                // Registering the subscriber HERE, when the document is
+                // served, rather than when it first subscribes: the page
+                // holds instances from this moment on, so a structural change
+                // after this moment has an address in it. A registration
+                // deferred to the first poll would silently drop every change
+                // that raced it.
+                let (rendered, cursor, entries, env) =
+                    match server.serve_document_settled(&session, &settled) {
+                        Ok(served) => served,
+                        Err(why) => return unavailable(&mut stream, why),
+                    };
+                let speculation = server
+                    .speculation
+                    .as_ref()
+                    .and_then(|m| m["module"].as_str())
+                    .map(|module| (format!("/speculation/{module}"), entries));
+                let page = document(
+                    &rendered,
+                    &server.templates,
+                    &server.plan,
+                    cursor,
+                    speculation,
+                );
+                server.respond_streaming(
+                    &mut stream,
+                    &session,
+                    fresh,
+                    &page,
+                    server.store_template(),
+                    &env,
+                    &mut settling,
+                );
+            });
         }
         // A command this server does not host, including the address-resolving
         // `/command/add_to_cart?instance=..` route E10 deleted. Named, rather
@@ -3435,30 +3916,24 @@ fn signal_document(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <title>{}</title>\n</head>\n<body>\n{body}\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
-         <script type=\"module\" src=\"/pw-runtime.mjs\"></script>\n\
-         </body>\n</html>\n",
+         {RUNTIME}\n{DOCUMENT_END}",
         pw_render::escape::text(&template.name)
     )
 }
 
 /// The part numbered `id`, wherever it is in `chunks`.
 fn find_part(chunks: &[pw_render::ir::Chunk], id: u32) -> Option<&pw_render::ir::Part> {
-    use pw_render::ir::{Chunk, Part};
+    use pw_render::ir::Chunk;
     for c in chunks {
         let Chunk::Dynamic(p) = c else { continue };
         if p.id().is_some_and(|i| i.0 == id) {
             return Some(p);
         }
-        let inner = match p {
-            Part::Conditional {
-                then, otherwise, ..
-            } => find_part(then, id).or_else(|| find_part(otherwise, id)),
-            Part::Match { arms, .. } => arms.iter().find_map(|a| find_part(&a.body, id)),
-            Part::Each { body, .. } => find_part(body, id),
-            _ => None,
-        };
-        if inner.is_some() {
-            return inner;
+        // Through every region a part has, as the IR's own walks go: a walk
+        // that names the kinds it descends into misses the next one, as this
+        // missed a stream's arms (ADR-0148).
+        if let Some(inner) = p.nested().into_iter().find_map(|r| find_part(r, id)) {
+            return Some(inner);
         }
     }
     None
@@ -3472,25 +3947,18 @@ fn handler_table(templates: &[Template]) -> BTreeMap<String, String> {
             let pw_render::ir::Chunk::Dynamic(p) = c else {
                 continue;
             };
-            match p {
-                pw_render::ir::Part::Event {
-                    handler, captures, ..
-                } if !handler.is_empty() => {
-                    out.insert(handler.clone(), captures.join(","));
-                }
-                pw_render::ir::Part::Conditional {
-                    then, otherwise, ..
-                } => {
-                    walk(then, out);
-                    walk(otherwise, out);
-                }
-                pw_render::ir::Part::Each { body, .. } => walk(body, out),
-                pw_render::ir::Part::Match { arms, .. } => {
-                    for a in arms {
-                        walk(&a.body, out);
-                    }
-                }
-                _ => {}
+            if let pw_render::ir::Part::Event {
+                handler, captures, ..
+            } = p
+                && !handler.is_empty()
+            {
+                out.insert(handler.clone(), captures.join(","));
+            }
+            // Every region, as `find_part` walks them. Until 2026-10-03 this
+            // named the three block kinds, so a handler in a stream's arm was
+            // in no table, and its Pick refused (ADR-0148).
+            for region in p.nested() {
+                walk(region, out);
             }
         }
     }
@@ -3576,10 +4044,17 @@ fn document(
          <title>Store</title>\n</head>\n<body>\n{body}\n\
          <style>{STYLE}</style>\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
-         <script type=\"module\" src=\"/pw-runtime.mjs\"></script>\n\
-         </body>\n</html>\n"
+         {RUNTIME}\n{DOCUMENT_END}"
     )
 }
+
+/// **How a document starts its runtime** (ADR-0148): a classic script that
+/// imports it, which runs while the response is still open, so a page whose
+/// streamed regions have not settled is interactive. Measured on 2026-10-03
+/// (`spikes/own-renderer/probes/streaming.mjs`): a deferred module starts
+/// only once the whole response has arrived, in every engine, and an `async`
+/// one does in WebKit.
+const RUNTIME: &str = "<script>import(\"/pw-runtime.mjs\")</script>";
 
 /// The store page's speculation manifest, if the build wrote one (ADR-0122).
 fn speculation_manifest(dist: &std::path::Path) -> Option<serde_json::Value> {
@@ -3854,6 +4329,212 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
             "{:?}",
             queue["a"].frames
         );
+    }
+
+    /// **The store with recommendations streamed below its cart** (ADR-0148),
+    /// their failed arm telling a declared error from the host's.
+    fn with_recommendations(app: &str) -> String {
+        app.replacen("import Menus\n", "import Menus\nimport Recommender\n", 1)
+            .replacen(
+                "MenuItemId, PositiveInt }",
+                "MenuItemId, PositiveInt, Recommendation, RecommendationError }",
+                1,
+            )
+            .replacen(
+                "public query Store(",
+                "public query Recommendations(id: StoreId) -> Result<List<Recommendation>, RecommendationError>
+    freshness     0.seconds
+    consistency   eventual
+    cache         shared
+    key           id
+    concurrency   one_per_key
+    on_key_change cancel
+    delivery      streamed
+    timeout       1.seconds
+{
+    Recommender.for_store(id)
+}
+
+public query Store(",
+                1,
+            )
+            .replacen(
+                "\n        </main>",
+                "
+            <section aria-label=\"Recommendations\">
+                <stream query={Recommendations(id)}>
+                    <placeholder><p>Finding recommendations</p></placeholder>
+                    <ready as={items}>
+                        <ul>{#each items as item (item.id)}<li>{item.name}</li>{/each}</ul>
+                    </ready>
+                    <failed as={why}>{#match why}{:Some(e)}<p>Declined</p>{:None}<p>Unavailable</p>{/match}</failed>
+                </stream>
+            </section>
+        </main>",
+                1,
+            )
+    }
+
+    /// What one request to `s` answers, chunk by chunk, each with when it
+    /// arrived: the connection served by `handle`, as a browser's is.
+    fn fetched(s: &Server, path: &str) -> Vec<(std::time::Duration, String)> {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let at = listener.local_addr().expect("address");
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let (stream, _) = listener.accept().expect("accept");
+                handle(s, stream);
+            });
+            let mut client = TcpStream::connect(at).expect("connect");
+            client
+                .write_all(format!("GET {path} HTTP/1.1\r\nHost: t\r\n\r\n").as_bytes())
+                .expect("request");
+            let started = std::time::Instant::now();
+            let mut chunks = Vec::new();
+            let mut buf = [0u8; 65536];
+            loop {
+                let n = client.read(&mut buf).expect("read");
+                if n == 0 {
+                    break;
+                }
+                chunks.push((
+                    started.elapsed(),
+                    String::from_utf8_lossy(&buf[..n]).into_owned(),
+                ));
+            }
+            chunks
+        })
+    }
+
+    /// When the response had first carried `text`, and everything it carried.
+    fn arrived(
+        chunks: &[(std::time::Duration, String)],
+        text: &str,
+    ) -> Option<std::time::Duration> {
+        let mut so_far = String::new();
+        for (at, chunk) in chunks {
+            so_far.push_str(chunk);
+            if so_far.contains(text) {
+                return Some(*at);
+            }
+        }
+        None
+    }
+
+    fn recommend(s: &Server, delay_ms: u64, fail: Option<&str>) {
+        *s.recommender.lock().expect("recommender") = Recommender {
+            delay_ms,
+            fail: fail.map(str::to_string),
+            ..Recommender::default()
+        };
+    }
+
+    #[test]
+    fn a_streamed_region_follows_its_document_in_the_same_response() {
+        let s = served_from(with_recommendations, None);
+        recommend(&s, 400, None);
+        let chunks = fetched(&s, "/StorePage.html");
+        let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
+        // The document first, its region pending, and its runtime started.
+        let shell = arrived(&chunks, "<?start name=").expect("a pending region");
+        let runtime = arrived(&chunks, "import(\"/pw-runtime.mjs\")").expect("the runtime");
+        let filled = arrived(&chunks, "<template for=").expect("the region's arm");
+        assert!(shell < std::time::Duration::from_millis(300), "{shell:?}");
+        assert!(
+            runtime < std::time::Duration::from_millis(300),
+            "{runtime:?}"
+        );
+        assert!(
+            filled >= std::time::Duration::from_millis(350),
+            "{filled:?}"
+        );
+        assert!(
+            !whole.contains("content-length"),
+            "a streamed document's length is not known first"
+        );
+        // The arm, and then the document's end, and nothing after it.
+        let arm = &whole[whole.find("<template for=").expect("arm")..];
+        assert!(
+            arm.contains("Cortado") && arm.contains("Cold Brew"),
+            "{arm}"
+        );
+        assert!(whole.ends_with("</template></body>\n</html>\n"), "{whole}");
+    }
+
+    #[test]
+    fn a_region_past_its_budget_is_given_the_host_s_failure_when_its_budget_is_spent() {
+        let s = served_from(with_recommendations, None);
+        // Three seconds of a one-second budget.
+        recommend(&s, 3000, None);
+        let chunks = fetched(&s, "/StorePage.html");
+        let ended = chunks.last().expect("an answer").0;
+        let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
+        let arm = &whole[whole.find("<template for=").expect("arm")..];
+        assert!(arm.contains("Unavailable"), "{arm}");
+        assert!(ended < std::time::Duration::from_millis(2500), "{ended:?}");
+    }
+
+    #[test]
+    fn a_declared_error_and_a_host_s_failure_are_shown_apart() {
+        let s = served_from(with_recommendations, None);
+        recommend(&s, 0, Some("declared"));
+        let declared: String = fetched(&s, "/StorePage.html")
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert!(declared.contains("<p>Declined</p>"), "{declared}");
+        recommend(&s, 0, Some("host"));
+        let host: String = fetched(&s, "/StorePage.html")
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert!(host.contains("<p>Unavailable</p>"), "{host}");
+    }
+
+    /// The same, with the recommendations kept five minutes.
+    fn with_kept_recommendations(app: &str) -> String {
+        with_recommendations(app).replacen(
+            "    freshness     0.seconds\n    consistency   eventual",
+            "    freshness     5.minutes\n    consistency   eventual",
+            1,
+        )
+    }
+
+    #[test]
+    fn a_declared_error_is_given_and_not_kept() {
+        let s = served_from(with_kept_recommendations, None);
+        recommend(&s, 0, Some("declared"));
+        let declined: String = fetched(&s, "/StorePage.html")
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert!(declined.contains("<p>Declined</p>"), "{declined}");
+        // The recommender answers again, and the next page asks it: what it
+        // declined is not served for five minutes.
+        recommend(&s, 0, None);
+        let answered: String = fetched(&s, "/StorePage.html")
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert!(answered.contains("Cold Brew"), "{answered}");
+        // An answer is kept, as its policy says.
+        recommend(&s, 0, Some("declared"));
+        let kept: String = fetched(&s, "/StorePage.html")
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert!(kept.contains("Cold Brew"), "{kept}");
+    }
+
+    #[test]
+    fn a_page_with_nothing_streamed_is_one_response_of_known_length() {
+        let s = served_from(|app| app.to_string(), None);
+        let whole: String = fetched(&s, "/StorePage.html")
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert!(whole.contains("content-length:"), "{whole}");
+        assert!(!whole.contains("<?start"), "{whole}");
     }
 
     /// Each patch set queued for a session, in order.

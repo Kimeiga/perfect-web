@@ -64,6 +64,7 @@ pub mod rules;
 pub mod scope;
 pub mod signals;
 pub mod signatures;
+pub mod streams;
 pub mod template_ir;
 pub mod types;
 pub mod values;

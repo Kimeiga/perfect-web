@@ -287,6 +287,28 @@ pub enum Part {
         value: String,
         arms: Vec<Arm>,
     },
+    /// `<stream query={Q(args)}>` (ADR-0148): a region that shows its
+    /// query's state. While a streamed query is pending it shows its
+    /// placeholder, and then the arm the query settled to. A range part, as a
+    /// block is.
+    Stream {
+        id: PartId,
+        /// The query, as a component id: `store.page.Recommendations`.
+        query: String,
+        /// Each argument as a host computes it: a value's path, `id`, or an
+        /// invocation-context call, `current_session()`.
+        args: Vec<String>,
+        /// `delivery streamed`: the document is sent before the query answers.
+        streamed: bool,
+        /// What shows while a streamed query is pending. Empty for one the
+        /// page waits for.
+        placeholder: Vec<Chunk>,
+        /// `<ready as={items}>`: what the query answered.
+        ready: StreamArm,
+        /// `<failed as={why}>`: `Some(e)`, its declared error, or `None`, the
+        /// host's failure.
+        failed: StreamArm,
+    },
     /// `href="/stores/{id}"` (ADR-0042): static text and values, each value
     /// escaped for the attribute's context. In a URL, each value is a URI
     /// component, so it cannot add a segment, a query, a fragment or a scheme.
@@ -341,6 +363,15 @@ pub struct Arm {
     pub body: Vec<Chunk>,
 }
 
+/// One settled arm of a [`Part::Stream`] (ADR-0148): the name its value is
+/// bound to, and what it renders.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamArm {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
+    pub body: Vec<Chunk>,
+}
+
 /// A piece of an interpolated attribute: text as written, or a value's path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "segment", content = "value")]
@@ -361,6 +392,12 @@ impl Part {
             } => vec![then, otherwise],
             Part::Each { body, .. } => vec![body],
             Part::Match { arms, .. } => arms.iter().map(|a| a.body.as_slice()).collect(),
+            Part::Stream {
+                placeholder,
+                ready,
+                failed,
+                ..
+            } => vec![placeholder, &ready.body, &failed.body],
             _ => Vec::new(),
         }
     }
@@ -376,6 +413,7 @@ impl Part {
             | Part::Conditional { id, .. }
             | Part::Each { id, .. }
             | Part::Match { id, .. }
+            | Part::Stream { id, .. }
             | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
             | Part::RawHtml { id, .. } => *id,
@@ -405,6 +443,7 @@ impl Part {
             | Part::Conditional { .. }
             | Part::Each { .. }
             | Part::Match { .. }
+            | Part::Stream { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
             Part::Blocked { .. } => return None,
@@ -420,6 +459,7 @@ impl Part {
             Part::Conditional { .. } => "conditional",
             Part::Each { .. } => "each",
             Part::Match { .. } => "match",
+            Part::Stream { .. } => "stream",
             Part::InterpolatedAttribute { .. } => "interpolated_attribute",
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
@@ -636,6 +676,8 @@ impl Template {
                         Part::Each { collection, .. } => collection.clone(),
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
+                        // The query whose state the region shows.
+                        Part::Stream { query, .. } => query.clone(),
                         Part::Blocked { .. } => String::new(),
                     },
                     name: match p {
@@ -1203,20 +1245,15 @@ fn lower_element(
         children,
         self_closing,
     } = el;
-    // Not compiled by this renderer (ADR-0075): a streamed region, which the
-    // Marko adapter renders (ADR-0017), and an element that mounts a resource
-    // (A-007). Until 2026-09-26 each lowered as a literal element: a
-    // `<stream>` with a `query` attribute, and a `<map-container>` whose
-    // resource was never mounted.
+    // A region showing its query's state (ADR-0148). Until 2026-10-03 it
+    // was refused here, and only the Marko adapter rendered one (ADR-0075).
     if tag == "stream" {
-        out.push(Chunk::Dynamic(Part::Blocked {
-            reason: "a `<stream>` is not compiled by this renderer; the Marko adapter \
-                     renders one (ADR-0017)"
-                .to_string(),
-            at: "<stream>".to_string(),
-        }));
+        lower_stream(body, attrs, children, ctx, ix, out);
         return;
     }
+    // Not compiled by this renderer (ADR-0075): an element that mounts a
+    // resource (A-007). Until 2026-09-26 it lowered as a literal element, a
+    // `<map-container>` whose resource was never mounted.
     if attrs.iter().any(mounts) {
         out.push(Chunk::Dynamic(Part::Blocked {
             reason: "an element that mounts a resource is not compiled".to_string(),
@@ -1585,6 +1622,124 @@ fn compose(
     for root in roots_of(view) {
         lower_node(view, root, &inner, ix, out);
     }
+}
+
+/// **A `<stream>`** (ADR-0148): its query and arguments, and each of its
+/// parts, lowered as a block's arms are. At the top of the template, or in a
+/// view composed there: one inside a block or a loop's row is not rendered
+/// yet, since nothing would render it again when the block shows another arm.
+fn lower_stream(
+    body: &Body,
+    attrs: &[crate::hir::Attr],
+    children: &[NodeId],
+    ctx: &Lowering<'_>,
+    ix: &mut Indexer,
+    out: &mut Vec<Chunk>,
+) {
+    let blocked = |reason: &str| {
+        Chunk::Dynamic(Part::Blocked {
+            reason: reason.to_string(),
+            at: "<stream>".to_string(),
+        })
+    };
+    if ix.depth > 0 {
+        out.push(blocked(
+            "a `<stream>` inside a block or a loop's row is not rendered yet (ADR-0148)",
+        ));
+        return;
+    }
+    let Some(call) = crate::streams::query_attr(attrs) else {
+        out.push(blocked("a `<stream>` names its query: `query={Q(..)}`"));
+        return;
+    };
+    let Some((def, decl)) = crate::streams::stream_query(ctx.ws, ctx.hirs, ctx.unit, body, call)
+    else {
+        out.push(blocked("a `<stream>`'s `query` is a call of a query"));
+        return;
+    };
+    let Expr::Call { args: given, .. } = body.expr(call) else {
+        return;
+    };
+    let mut args = Vec::new();
+    for a in given.iter().map(|a| a.value) {
+        match (value_path(body, a), body.expr(a)) {
+            (Some(path), _) => args.push(ctx.read(path)),
+            // An invocation-context call: `current_session()`.
+            (None, Expr::Call { callee, args: none }) if none.is_empty() => {
+                args.push(format!("{}()", crate::infer::path_of(body, *callee)));
+            }
+            _ => {
+                out.push(blocked(
+                    "a stream's query is given values by path, or an invocation-context call",
+                ));
+                return;
+            }
+        }
+    }
+    let Some(query) = ctx.hirs.get(def.unit).and_then(|hir| {
+        hir.all_decls()
+            .find(|(id, _)| id.0 == def.decl)
+            .map(|(id, _)| crate::contract::component_id(hir, id))
+    }) else {
+        out.push(blocked("a stream's query has no component"));
+        return;
+    };
+    let id = ix.part();
+    // A signal instance inside it belongs to it (ADR-0144).
+    ix.blocks.push(id);
+    let mut placeholder = Vec::new();
+    let mut ready = StreamArm::default();
+    let mut failed = StreamArm::default();
+    for c in children {
+        let Node::Element {
+            tag,
+            attrs,
+            children,
+            ..
+        } = body.node(*c)
+        else {
+            continue;
+        };
+        let bound: Vec<String> = attrs
+            .iter()
+            .filter(|a| a.name == "as")
+            .filter_map(|a| match &a.value {
+                AttrValue::Expr(e) => match body.expr(*e) {
+                    Expr::Name(n) => Some(n.clone()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
+        let (scope, mut written) = ctx.binding(&bound, ix);
+        let lowered = lower_run(body, children, &scope, ix);
+        match tag.as_str() {
+            "placeholder" => placeholder = lowered,
+            "ready" => {
+                ready = StreamArm {
+                    binding: written.pop(),
+                    body: lowered,
+                }
+            }
+            "failed" => {
+                failed = StreamArm {
+                    binding: written.pop(),
+                    body: lowered,
+                }
+            }
+            _ => {}
+        }
+    }
+    ix.blocks.pop();
+    out.push(Chunk::Dynamic(Part::Stream {
+        id,
+        query,
+        args,
+        streamed: crate::streams::streamed(decl),
+        placeholder,
+        ready,
+        failed,
+    }));
 }
 
 fn lower_block(
@@ -2034,6 +2189,27 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                                 feed(h, a.case.as_bytes());
                                 feed(h, a.binding.as_deref().unwrap_or("-").as_bytes());
                                 walk(h, &a.body);
+                            }
+                        }
+                        Part::Stream {
+                            query,
+                            args,
+                            streamed,
+                            placeholder,
+                            ready,
+                            failed,
+                            ..
+                        } => {
+                            feed(h, query.as_bytes());
+                            for a in args {
+                                feed(h, a.as_bytes());
+                            }
+                            feed(h, if *streamed { b"streamed" } else { b"at-once" });
+                            walk(h, placeholder);
+                            for arm in [ready, failed] {
+                                feed(h, b"|");
+                                feed(h, arm.binding.as_deref().unwrap_or("-").as_bytes());
+                                walk(h, &arm.body);
                             }
                         }
                         Part::InterpolatedAttribute {

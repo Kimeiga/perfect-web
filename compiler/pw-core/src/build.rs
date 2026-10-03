@@ -128,10 +128,15 @@ impl Build {
                     format!("{text}\n").as_bytes(),
                 )?;
                 lines.push(format!(
-                    "  page       {}  {} binding(s), {} part(s)",
+                    "  page       {}  {} binding(s), {} part(s){}",
                     plan.page,
                     plan.bindings.len(),
-                    plan.parts.len()
+                    plan.parts.len(),
+                    // And what fills a region in the same response (ADR-0148).
+                    match plan.streams.len() {
+                        0 => String::new(),
+                        n => format!(", {n} stream(s)"),
+                    }
                 ));
             }
         }

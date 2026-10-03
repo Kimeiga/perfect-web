@@ -259,7 +259,8 @@ impl<'a> Types<'a> {
         // block is written.
         //
         // A stream's `<ready as={x}>` is its query's success, and
-        // `<failed as={e}>` its failure (ADR-0066).
+        // `<failed as={e}>` its failure (ADR-0066): `Some` of its declared
+        // error, or `None` for the host's (ADR-0148).
         // A `release(h) { .. }` clause's `h` is what its resource's
         // `acquire { .. }` produced, its success where it can fail.
         let released: Vec<_> = types.lexical.released().collect();
@@ -286,7 +287,9 @@ impl<'a> Types<'a> {
             };
             let part = match (t.as_builtin(), ok) {
                 (Some(Builtin::Result), true) => t.args().first().cloned(),
-                (Some(Builtin::Result), false) => t.args().get(1).cloned(),
+                (Some(Builtin::Result), false) => {
+                    t.args().get(1).cloned().map(ResolvedType::optional)
+                }
                 (_, true) => Some(t),
                 (_, false) => None,
             };

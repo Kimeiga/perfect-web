@@ -40,7 +40,7 @@ pub use identity::{
     Anchor, ElementId, IdentityDomain, InstanceFrame, InstancePath, InstanceToken, LocalPartId,
     PartAddress, Partition, TemplateSchemaId,
 };
-pub use ir::{Arm, Chunk, Context, Part, PartEntry, PartId, Segment, Template};
+pub use ir::{Arm, Chunk, Context, Part, PartEntry, PartId, Segment, StreamArm, Template};
 
 use std::collections::BTreeMap;
 
@@ -218,6 +218,14 @@ impl Value {
     }
 }
 
+/// **What a stream's query settled to** (ADR-0148): what it answered, or why
+/// it did not, `Some(e)` its declared error and `None` the host's failure.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Settled {
+    Ready(Value),
+    Failed(Option<Value>),
+}
+
 /// The values a render has, by path.
 #[derive(Debug, Clone, Default)]
 pub struct Env {
@@ -247,6 +255,10 @@ pub struct Env {
     /// same bytes because they are the same bytes, not because two renders
     /// happened to agree.
     materialized: BTreeMap<PartId, String>,
+    /// **What each stream's query settled to** (ADR-0148). A stream with no
+    /// entry is pending: a streamed one shows its placeholder, and one the
+    /// page waits for is refused, since nothing gave its answer.
+    settled: BTreeMap<PartId, Settled>,
 }
 
 impl Env {
@@ -279,6 +291,12 @@ impl Env {
     /// ones would be addressable at a name nothing else uses.
     pub fn materialized(mut self, part: PartId, html: &str) -> Env {
         self.materialized.insert(part, html.to_string());
+        self
+    }
+
+    /// Give a stream what its query settled to (ADR-0148).
+    pub fn settle(mut self, part: PartId, outcome: Settled) -> Env {
+        self.settled.insert(part, outcome);
         self
     }
 
@@ -334,6 +352,68 @@ pub fn render_part(
     let mut out = String::new();
     emit_part(p, env, others, &mut out)?;
     Ok(out)
+}
+
+/// **The name a streamed region's range has**, which the patch that fills it
+/// names (ADR-0148): `pw-7`.
+pub fn stream_name(part: PartId) -> String {
+    format!("pw-{part}")
+}
+
+/// The arm a stream's query settled to, rendered with its value bound.
+fn emit_settled(
+    p: &Part,
+    outcome: &Settled,
+    env: &Env,
+    others: &[Template],
+    out: &mut String,
+) -> Result<(), Blocked> {
+    let Part::Stream { ready, failed, .. } = p else {
+        return Ok(());
+    };
+    let (arm, value) = match outcome {
+        Settled::Ready(v) => (ready, v.clone()),
+        Settled::Failed(why) => (
+            failed,
+            Value::Variant {
+                case: if why.is_some() { "Some" } else { "None" }.to_string(),
+                payload: why.clone().map(Box::new),
+            },
+        ),
+    };
+    let scoped = match &arm.binding {
+        Some(name) => env.with(name, value),
+        None => env.clone(),
+    };
+    emit(&arm.body, &scoped, others, out)
+}
+
+/// **A streamed region's settled arm, as the patch that fills it**
+/// (ADR-0148): `<template for="pw-7">..</template>`. A browser with the
+/// platform's out-of-order streaming applies it as it parses; the runtime
+/// applies it in one without. `env` gives the stream what its query settled
+/// to, and the document's identity domain.
+pub fn settled_patch(
+    t: &Template,
+    part: PartId,
+    env: &Env,
+    others: &[Template],
+) -> Result<String, Blocked> {
+    let Some(p @ Part::Stream { .. }) = find_part(&t.chunks, part) else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("part {part} is not a stream in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    let outcome = env.settled.get(&part).ok_or(Blocked::MissingValue {
+        path: format!("the answer of stream {part}"),
+    })?;
+    let mut inner = String::new();
+    emit_settled(p, outcome, env, others, &mut inner)?;
+    Ok(format!(
+        "<template for=\"{}\">{inner}</template>",
+        stream_name(part)
+    ))
 }
 
 fn find_part(chunks: &[Chunk], want: PartId) -> Option<&Part> {
@@ -695,6 +775,34 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
         // asking the server what the button meant.
         Part::Event { .. } => {
             out.push_str(&captures_attribute(&[p], env)?);
+            Ok(())
+        }
+
+        // A region showing its query's state (ADR-0148). Pending, a streamed
+        // one shows its placeholder inside the range the platform's
+        // out-of-order patch replaces, `<?start name>` .. `<?end>`, which a
+        // browser without it reads as two comments.
+        Part::Stream {
+            id,
+            streamed,
+            placeholder,
+            ..
+        } => {
+            out.push_str(&format!("<!--pw:s{id}-->"));
+            match env.settled.get(id) {
+                Some(outcome) => emit_settled(p, outcome, env, others, out)?,
+                None if *streamed => {
+                    out.push_str(&format!("<?start name=\"{}\">", stream_name(*id)));
+                    emit(placeholder, env, others, out)?;
+                    out.push_str("<?end>");
+                }
+                None => {
+                    return Err(Blocked::MissingValue {
+                        path: format!("the answer of stream {id}"),
+                    });
+                }
+            }
+            out.push_str(&format!("<!--pw:e{id}-->"));
             Ok(())
         }
 

@@ -449,6 +449,15 @@ mod resolved_type {
             }
         }
 
+        /// **`Option<T>`, for a `T` already resolved**: what a stream's
+        /// `<failed>` arm is given, the query's declared error or nothing
+        /// (ADR-0148). Its provenance is `T`'s, as it was written.
+        pub(crate) fn optional(of: ResolvedType) -> ResolvedType {
+            let span = of.origin.span.clone();
+            let written = DeclaredType::new("Option", vec![of.origin.written.clone()]);
+            ResolvedType::builtin(Builtin::Option, vec![of], span, written)
+        }
+
         /// The language-provided constructor this is, if it is one.
         pub fn as_builtin(&self) -> Option<Builtin> {
             match &self.what {

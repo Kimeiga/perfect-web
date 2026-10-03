@@ -164,6 +164,21 @@ pub enum Part {
         value: String,
         arms: Vec<Arm>,
     },
+    /// `<stream query={Q(args)}>` (ADR-0148): a region that shows its
+    /// query's state. Pending, a streamed one shows its placeholder; then the
+    /// arm the query settled to, which the host gives as [`crate::Settled`].
+    Stream {
+        id: PartId,
+        /// The query, as a component id.
+        query: String,
+        /// Each argument as a host computes it.
+        args: Vec<String>,
+        /// `delivery streamed`: the document is sent before the query answers.
+        streamed: bool,
+        placeholder: Vec<Chunk>,
+        ready: StreamArm,
+        failed: StreamArm,
+    },
     /// `href="/stores/{id}"`: static text and values, each value escaped for
     /// the attribute's context (ADR-0042).
     InterpolatedAttribute {
@@ -216,6 +231,15 @@ pub struct Arm {
     pub body: Vec<Chunk>,
 }
 
+/// One settled arm of a [`Part::Stream`]: the name its value is bound to,
+/// and what it renders.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamArm {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
+    pub body: Vec<Chunk>,
+}
+
 /// A piece of an interpolated attribute: text escaped at build time, or a
 /// value's path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -235,6 +259,12 @@ impl Part {
             } => vec![then, otherwise],
             Part::Each { body, .. } => vec![body],
             Part::Match { arms, .. } => arms.iter().map(|a| a.body.as_slice()).collect(),
+            Part::Stream {
+                placeholder,
+                ready,
+                failed,
+                ..
+            } => vec![placeholder, &ready.body, &failed.body],
             _ => Vec::new(),
         }
     }
@@ -250,6 +280,7 @@ impl Part {
             | Part::Conditional { id, .. }
             | Part::Each { id, .. }
             | Part::Match { id, .. }
+            | Part::Stream { id, .. }
             | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
             | Part::RawHtml { id, .. } => *id,
@@ -279,6 +310,7 @@ impl Part {
             | Part::Conditional { .. }
             | Part::Each { .. }
             | Part::Match { .. }
+            | Part::Stream { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
             Part::Blocked { .. } => return None,
@@ -294,6 +326,7 @@ impl Part {
             Part::Conditional { .. } => "conditional",
             Part::Each { .. } => "each",
             Part::Match { .. } => "match",
+            Part::Stream { .. } => "stream",
             Part::InterpolatedAttribute { .. } => "interpolated_attribute",
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
@@ -401,6 +434,7 @@ impl Template {
                         Part::Each { collection, .. } => collection.clone(),
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
+                        Part::Stream { query, .. } => query.clone(),
                         Part::Blocked { .. } => String::new(),
                     },
                     name: match p {

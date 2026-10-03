@@ -2265,14 +2265,15 @@ impl<'a> Typer<'a> {
             added |= self.bind(Binder::Clause(clause, 0), t);
         }
         // `<ready as={x}>`: the stream's answer when it succeeds, and
-        // `<failed as={e}>` its failure.
+        // `<failed as={e}>` its failure: `Some` of its declared error, or
+        // `None` for the host's (ADR-0148).
         for (node, query, ok) in self.lexical.stream_parts() {
             let t = match (self.of(query), ok) {
                 (Ty::Builtin(Builtin::Result, mut args), true) if args.len() == 2 => {
                     args.swap_remove(0)
                 }
                 (Ty::Builtin(Builtin::Result, mut args), false) if args.len() == 2 => {
-                    args.swap_remove(1)
+                    Ty::Builtin(Builtin::Option, vec![args.swap_remove(1)])
                 }
                 (t, true) => t,
                 (_, false) => Ty::Unknown,

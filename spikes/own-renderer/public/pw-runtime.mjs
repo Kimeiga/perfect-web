@@ -339,6 +339,10 @@ window.__pw = {
   ready: false,
   address: (path, part) => addressOf(path, part),
   indexSize: () => index.size,
+  /** Each streamed region that settled after boot, and who filled it:
+   * `browser` where the platform applied its patch, `runtime` where this
+   * did (ADR-0148). */
+  settled: [],
 };
 
 // The manifest a handler presents, in the ABI `pw-resume-wasm` reads:
@@ -714,6 +718,92 @@ function giveFocusBack(d) {
   if (lost && from?.isConnected) from.focus();
 }
 
+// --- streamed regions (ADR-0148) ------------------------------------------
+//
+// A region whose query the page does not wait for is sent pending: its
+// placeholder inside `<?start name="pw-N">` .. `<?end>`, and later in the
+// same response its settled arm, as `<template for="pw-N">`. A browser with
+// the platform's out-of-order streaming (Chrome 150+) applies it as it
+// parses. One without reads the markers as comments and keeps the template,
+// inert, at the end of the body; this applies it there. Either way, once a
+// region has settled its parts are read again and their handlers bound.
+
+const STREAM_NAME = /^pw-(\d+)$/;
+
+/** The stream parts still showing their placeholder, as of boot and since. */
+const pendingStreams = new Set();
+
+/** Is the region of stream `id` still pending: does it hold its start
+ * marker, a processing instruction or, where the parser has none, the
+ * comment it reads one as? */
+function streamPending(id) {
+  const r = index.get(addressOf([], id));
+  if (!r?.start) return false;
+  for (let n = r.start.nextSibling; n && n !== r.end; n = n.nextSibling) {
+    if (n.nodeType === Node.PROCESSING_INSTRUCTION_NODE && n.target === "start") return true;
+    if (n.nodeType === Node.COMMENT_NODE && n.data.startsWith("?start ")) return true;
+  }
+  return false;
+}
+
+/** Apply each `<template for>` the browser left in the document: the
+ * region's contents, between its anchors, become the template's. Returns the
+ * parts it filled. */
+function applyStreamPatches() {
+  const applied = new Set();
+  for (const t of document.querySelectorAll("template[for]")) {
+    const m = STREAM_NAME.exec(t.getAttribute("for") ?? "");
+    const r = m && index.get(addressOf([], m[1]));
+    if (!r?.start) continue;
+    for (let n = r.start.nextSibling; n && n !== r.end; ) {
+      const next = n.nextSibling;
+      n.remove();
+      n = next;
+    }
+    r.end.parentNode.insertBefore(document.importNode(t.content, true), r.end);
+    t.remove();
+    applied.add(m[1]);
+  }
+  return applied;
+}
+
+/** Each region that settled since this last looked: read again, its
+ * handlers bound, and reported. */
+function settleStreams() {
+  const filled = applyStreamPatches();
+  if (filled.size > 0) buildIndex();
+  const settled = [...pendingStreams].filter((id) => !streamPending(id));
+  if (settled.length === 0) return;
+  for (const id of settled) {
+    pendingStreams.delete(id);
+    window.__pw.settled.push({ part: Number(id), by: filled.has(id) ? "runtime" : "browser" });
+  }
+  buildIndex();
+  bindEvents();
+}
+
+/** Watch the document for regions settling, while the response that carries
+ * them is still arriving. */
+function watchStreams() {
+  for (const p of parts.parts ?? []) {
+    if (p.kind === "stream" && streamPending(String(p.id))) pendingStreams.add(String(p.id));
+  }
+  if (pendingStreams.size === 0) return;
+  settleStreams();
+  if (document.readyState === "complete" || pendingStreams.size === 0) return;
+  const observer = new MutationObserver(settleStreams);
+  observer.observe(document.body, { childList: true, subtree: true });
+  // The response has ended: nothing more arrives for these regions.
+  window.addEventListener(
+    "load",
+    () => {
+      settleStreams();
+      observer.disconnect();
+    },
+    { once: true },
+  );
+}
+
 /** Replace a block's range, its anchors included, with what was rendered,
  * and say what was put in its place. */
 function replaceBlock(id, html) {
@@ -1047,6 +1137,9 @@ async function attach() {
 
   performance.mark("pw:activate:end");
   performance.measure("pw:activate", "pw:activate:start", "pw:activate:end");
+
+  // The regions still pending, filled as the response goes on (ADR-0148).
+  watchStreams();
 
   // A page whose values are its signals alone listens for nothing
   // (ADR-0130): no resource of its changes on the server.

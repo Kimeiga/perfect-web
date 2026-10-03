@@ -128,6 +128,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(unresolved_uses(&workspace, &sigs, &hirs, i, &u.hir));
         // ADR-0072: an element named with a capital letter is a view.
         per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
+        // ADR-0148: a streamed query is read by a `<stream>`, which shows
+        // each state its query can be in.
+        per_unit.extend(crate::streams::check(&workspace, &hirs, &sigs, i, &u.hir));
         // ADR-0094: a template writes no code.
         per_unit.extend(code_in_markup(&u.hir));
         // ADR-0089: a policy's value is one its domain has.

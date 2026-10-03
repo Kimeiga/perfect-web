@@ -154,6 +154,17 @@ fn main() -> std::process::ExitCode {
                                 unasked.push((page.to_string(), id));
                             }
                         }
+                        // A region whose query the page waits for, which this
+                        // render ran for no request: rendered as nothing, as a
+                        // block a session's query decides is. A streamed one
+                        // shows its placeholder, as a document does before its
+                        // query settles (ADR-0148).
+                        for s in plan["streams"].as_array().into_iter().flatten() {
+                            if s["streamed"] != true {
+                                let id = s["part"].as_u64().unwrap_or_default() as u32;
+                                unasked.push((page.to_string(), id));
+                            }
+                        }
                         env
                     }
                     Err(e) => {

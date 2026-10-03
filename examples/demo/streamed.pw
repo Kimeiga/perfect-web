@@ -1,0 +1,90 @@
+// @corpus: fixture
+// @id: DEMO-streamed
+// @category: a region showing a slow query's state, filled in the same
+//            response as the page it is sent without
+// @charter: §9.3, §15.5, §15.6
+// @milestone: E14
+//
+// ADR-0148: the page is sent without waiting for its recommendations, and is
+// usable at once: Press counts while the region still shows its placeholder.
+// When the recommender answers, the same response carries the region's arm:
+// what it recommended, each with a Pick button, or why it did not. A failure
+// the recommender declares and one of the host's are shown apart.
+//
+// Its paragraph is not decoration. WebKit paints a page only once it holds
+// about 200 characters of text, or has loaded (measured 2026-10-03,
+// `spikes/own-renderer/probes/streaming.mjs`): a shell with less is shown in
+// Safari only when its streams have settled.
+//
+// Outside the store on purpose, as the panel is: the benchmark's baseline is
+// the store's markup, and T05 asks for the store's recommendations.
+
+module demo.streamed
+
+import domain.{ StoreId, Recommendation, RecommendationError }
+import Recommender
+
+// Slow, and the same for every reader of a store.
+public query Picks(id: StoreId) -> Result<List<Recommendation>, RecommendationError>
+    freshness     0.seconds
+    consistency   eventual
+    cache         shared
+    key           id
+    concurrency   one_per_key
+    on_key_change cancel
+    delivery      streamed
+    timeout       3.seconds
+{
+    Recommender.for_store(id)
+}
+
+page StreamedPage(id: StoreId) {
+    cache private
+
+    signal presses: Int = 0
+    signal picked: String = "nothing"
+
+    view {
+        <main>
+            <h1>Blue Bottle</h1>
+            <p>
+                Small-batch coffee roasted in Oakland, served at the bar or carried out. The
+                espresso changes with the season; the drip is brewed to order, one cup at a time,
+                and the pastries come from the bakery down the street every morning at seven.
+            </p>
+            <button id="press" type="button" on:press={() => presses = presses + 1}>Press</button>
+            <p id="presses">{presses}</p>
+            <p id="picked">{picked}</p>
+            <section aria-label="Recommendations">
+                <stream query={Picks(id)}>
+                    <placeholder><p id="pending">Finding recommendations</p></placeholder>
+                    <ready as={items}>
+                        <ul id="picks">
+                            {#each items as item (item.id)}
+                                <li>
+                                    <span>{item.name}</span>
+                                    <button
+                                        type="button"
+                                        on:press={resumable(captures = { item }) => picked = item.name}
+                                    >
+                                        Pick
+                                    </button>
+                                </li>
+                            {/each}
+                        </ul>
+                    </ready>
+                    <failed as={why}>
+                        {#match why}
+                        {:Some(e)}
+                            {#match e}
+                            {:NoneAvailable}<p id="declared">No recommendations right now</p>
+                            {:Timeout}<p id="declared">The recommender took too long</p>
+                            {/match}
+                        {:None}<p id="unavailable">Recommendations are unavailable</p>
+                        {/match}
+                    </failed>
+                </stream>
+            </section>
+        </main>
+    }
+}

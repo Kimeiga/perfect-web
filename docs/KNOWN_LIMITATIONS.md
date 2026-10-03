@@ -158,10 +158,28 @@ refused by name:
 - **A `Float` is not written by a template** (ADR-0074). It has no format
   yet, so `{price}` over a `Float` is refused (PW0609); the host drops a
   `Float` it is given.
-- **A stream and a mounted resource do not build** (ADR-0075). The template
-  IR has no representation for `<stream query={..}>` or for an element that
-  mounts a resource (`resource={StoreMap}`, A-007), and refuses each by
-  name. The Marko adapter renders a stream (ADR-0017).
+- **A mounted resource does not build** (ADR-0075). The template IR has no
+  representation for an element that mounts a resource
+  (`resource={StoreMap}`, A-007), and refuses it by name.
+- **A stream region's limits** (ADR-0148):
+  - **Without JavaScript, outside Chrome 150 and later**, a streamed region
+    stays its placeholder. The settled arm is in the document, inert, in its
+    `<template for>`.
+  - **WebKit paints nothing until a page holds about 200 characters of
+    text**, or has loaded. A smaller shell is blank in Safari until its
+    regions settle, however it is rendered.
+  - **A region is rendered once per document.** A change to its query after
+    it settles is not sent.
+  - **A stream sits at the top of a page, or in a view composed there.** One
+    inside a block or a loop's row is refused at build, as is a signal shown
+    in one, or a view holding one.
+  - **`fallback` is not executed for a stream's query**: the plan refuses a
+    page with one.
+  - **The development server serves a page with a stream and a `let` only on
+    the store's route.** Any other page reads queries through streams alone.
+  - **A query's budget bounds the region, not the query.** The query runs on
+    after its region is given the host's failure, and what it answers is
+    kept as its policy says.
 - **A view composes when its body is its markup, its signals and its
   `provide`s** (ADR-0136, ADR-0144). Refused by name (PW5020):
   - a view with other bindings of its own;

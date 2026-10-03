@@ -79,6 +79,9 @@ pub enum Owner {
     /// ADR-0130: UI state. Where a signal may be read and written, and what
     /// may hold UI state at all.
     UiState,
+    /// ADR-0148: a streamed region. What reads a query declared `delivery
+    /// streamed`, and the states a `<stream>` shows.
+    Streaming,
 }
 
 impl fmt::Display for Code {
@@ -521,6 +524,20 @@ codes! {
     // and the browser holds one per use (ADR-0144).
     SIGNAL_IN_A_ROW = "PW5307" / signal_in_a_row / 1, UiState,
         "a view that holds a signal is not used in a loop's row yet";
+
+    // --- streamed regions (PW54xx, ADR-0148) -------------------------------
+    //
+    // A query declared `delivery streamed` is sent after its page, into a
+    // `<stream>` that shows a placeholder until it settles. A page that waits
+    // for one, a region with no arm for a state its query reaches, or a
+    // region that may wait forever, is a page whose loading or failure shows
+    // nothing.
+    STREAMED_READ_OUTSIDE_STREAM = "PW5400" / streamed_read_outside_stream / 1, Streaming,
+        "a query declared `delivery streamed` is read only by a `<stream>`";
+    STREAM_STATES = "PW5401" / stream_states / 1, Streaming,
+        "a `<stream>` shows each state its query can be in, and no other";
+    STREAMED_WITHOUT_TIMEOUT = "PW5402" / streamed_without_timeout / 1, Streaming,
+        "a query declared `delivery streamed` declares how long it may take";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
@@ -607,6 +624,7 @@ impl Owner {
             Owner::ResourceGraph => "PW51",
             Owner::Capability => "PW52",
             Owner::UiState => "PW53",
+            Owner::Streaming => "PW54",
             _ => "",
         }
     }

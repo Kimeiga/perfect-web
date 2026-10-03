@@ -1152,3 +1152,24 @@ T04 needed, and two corrections it found.
   failed every request after.
 - The development server holds a session's order, which the kitchen's
   benchmark hook sets.
+
+[ADR-0148](DECISIONS/ADR-0148-a-stream-region-shows-its-query-s-state.md):
+what T05 and T10 needed.
+- A `<stream>` is compiled where ADR-0075 refused it. Its query's delivery
+  says when its region is filled:
+  - `delivery streamed`: in the same response, after the document, as the
+    WHATWG's `<template for>` patch. Chrome 150+ applies it itself; the
+    runtime applies it elsewhere.
+  - otherwise: with the document, which waits for it.
+- PW5400: a streamed query is read only by a `<stream>`.
+- PW5401: a stream shows each state its query can be in, and no other.
+- PW5402: a streamed query declares a `timeout`.
+- The failed arm is given `Option` of the declared error; `None` is the
+  host's failure.
+- A declared error is given to the readers of its flight and not kept.
+- The runtime starts from an inline `import()`, since a deferred module waits
+  for the whole response.
+
+Found on the way: the server's handler table missed a handler inside a
+stream, and WebKit paints nothing until a page holds about 200 characters of
+text.
