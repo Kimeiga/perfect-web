@@ -1,0 +1,61 @@
+ADR-0144 - a view's own signals, and a signal a page provides
+
+produced by: just e14-provide
+commit: e01d4d1c4a7efbb8a1cc3865a2dce44ce4dceb33
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+playwright: Version 1.58.0
+
+== the compiler (compiler/pw-core/tests/provide.rs)
+
+test a_module_signal_is_a_name_and_a_type ... ok
+test the_marko_adapter_refuses_what_it_does_not_model ... ok
+test a_module_signal_is_read_and_changed_where_a_page_signal_is ... ok
+test a_body_provides_a_module_signal_once ... ok
+test binding_and_dialogs_read_a_module_signal ... ok
+test a_view_that_holds_a_signal_is_not_used_in_a_row ... ok
+test what_nothing_provides_is_refused ... ok
+test a_provided_signal_reaches_sibling_views ... ok
+test a_nearer_provide_keeps_what_it_contains_apart ... ok
+test a_provide_is_checked_against_the_signal_s_type ... ok
+test each_use_of_a_view_holds_its_own_signal ... ok
+test a_block_owns_the_signals_its_arms_hold ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+== the browser (spikes/own-renderer/e2e/provide.spec.mjs), three engines
+
+  18 passed (13.3s)
+
+== mutation controls (scripts/provide_mutations.py)
+
+baseline (compiler): 12 passed, 0 failed
+baseline (browser): 6 passed, 0 failed
+a module's `signal` is not a declaration [compiler]: KILLED (11 of 12 tests fail)
+a module's `signal` lowers as a `let` [compiler]: KILLED (11 of 12 tests fail)
+a `provide` is not marked [compiler]: KILLED (11 of 12 tests fail)
+an imported signal is not assigned [compiler]: KILLED (1 of 12 tests fail)
+each use of a view shares one instance [compiler]: KILLED (2 of 12 tests fail)
+a view's `provide` gives nothing to what it contains [compiler]: KILLED (1 of 12 tests fail)
+an element does not say which instance a handler's signal is [compiler]: KILLED (2 of 12 tests fail)
+a view's instance is inside no block [compiler]: KILLED (1 of 12 tests fail)
+an `{:else if}` arm is no block of its own [compiler]: KILLED (1 of 12 tests fail)
+a block owns nothing [compiler]: KILLED (1 of 12 tests fail)
+the plan holds the page's own signals alone [compiler]: KILLED (4 of 12 tests fail)
+a view's instance has no first value [compiler]: KILLED (3 of 12 tests fail)
+a handler does not reach a provided signal [compiler]: KILLED (3 of 12 tests fail)
+a module signal has no type [compiler]: KILLED (6 of 12 tests fail)
+a view's need reaches no page [compiler]: KILLED (1 of 12 tests fail)
+a need does not pass through a view [compiler]: KILLED (1 of 12 tests fail)
+a view in between that provides it is not heard [compiler]: KILLED (1 of 12 tests fail)
+a signal provided twice in one body is accepted [compiler]: KILLED (1 of 12 tests fail)
+a view holding a signal is used in a row [compiler]: KILLED (1 of 12 tests fail)
+a view holds what the views it composes hold [compiler]: KILLED (1 of 12 tests fail)
+a module signal is changed outside a handler [compiler]: KILLED (1 of 12 tests fail)
+a module signal is read where it cannot change [compiler]: KILLED (1 of 12 tests fail)
+a module signal of any type is bound [compiler]: KILLED (1 of 12 tests fail)
+a dialog a module signal shows is shown by nothing [compiler]: KILLED (1 of 12 tests fail)
+the Marko adapter drops a `provide` [compiler]: KILLED (1 of 12 tests fail)
+the Marko adapter renders a signal a page provides [compiler]: KILLED (1 of 12 tests fail)
+the browser reads and sets a handler's signal by its own name [browser]: KILLED (4 of 6 tests fail)
+a block's instances go on when it shows another arm [browser]: KILLED (1 of 6 tests fail)
+a block's instances start again at no value [browser]: KILLED (3 of 6 tests fail)
+29 of 29 mutants killed
