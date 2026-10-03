@@ -77,8 +77,8 @@ MUTANTS = [
     (
         "PW0611 reads a binding's assignment too",
         NAMES,
-        "            if body.bound.iter().any(|l| body.expr_span(*l) == span) {\n",
-        "            if false && body.bound.iter().any(|l| body.expr_span(*l) == span) {\n",
+        "            if body.bound.iter().any(|l| body.expr_span(*l) == span)\n                || body.provides",
+        "            if false && body.bound.iter().any(|l| body.expr_span(*l) == span)\n                || body.provides",
     ),
     (
         "a binding's handler captures what it sets",

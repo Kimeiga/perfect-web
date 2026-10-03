@@ -273,6 +273,16 @@ fn explain_with(
             DeclKind::Prelude => {
                 let _ = writeln!(s, "prelude      {name} namespace exported by this module");
             }
+            // A signal a page or view provides (ADR-0144).
+            DeclKind::Signal => {
+                let _ = writeln!(
+                    s,
+                    "signal       {name}: {}",
+                    d.ret
+                        .as_ref()
+                        .map_or_else(|| "?".to_string(), |t| t.written())
+                );
+            }
             DeclKind::Let | DeclKind::Other => {
                 let _ = writeln!(s, "declaration  {name}");
             }
@@ -551,6 +561,7 @@ fn emit_marko_command(paths: &[&String], out_dir: Option<String>) -> ExitCode {
 
     let mut written = 0usize;
     let mut skipped = 0usize;
+    let mut units = Vec::new();
     for path in paths {
         let src = match std::fs::read_to_string(path) {
             Ok(s) => s,
@@ -565,11 +576,35 @@ fn emit_marko_command(paths: &[&String], out_dir: Option<String>) -> ExitCode {
             return ExitCode::FAILURE;
         }
         let hir = pw_core::lower::lower_file(&src, &parsed.green);
+        units.push((path, hir));
+    }
+    // Each name a module declares a signal, as each file resolves it
+    // (ADR-0144): what the adapter refuses rather than drops.
+    let hirs: Vec<&pw_core::hir::Hir> = units.iter().map(|(_, h)| h).collect();
+    let ws = pw_core::resolve::Workspace::build(&hirs);
+    for (unit, (path, hir)) in units.iter().enumerate() {
+        let mut signals = std::collections::BTreeSet::new();
+        for (_, d) in hir.all_decls() {
+            let names: Vec<&String> = match d.kind {
+                pw_core::hir::DeclKind::Signal => vec![&d.name],
+                pw_core::hir::DeclKind::Import => d.imports.iter().collect(),
+                _ => Vec::new(),
+            };
+            for n in names {
+                if let pw_core::resolve::Resolution::Local(def)
+                | pw_core::resolve::Resolution::Imported { def, .. } = ws.resolve(unit, n)
+                    && pw_core::resolve::declaration(&hirs, def)
+                        .is_some_and(|x| x.kind == pw_core::hir::DeclKind::Signal)
+                {
+                    signals.insert(n.clone());
+                }
+            }
+        }
         let name = Path::new(path)
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| (*path).clone());
-        let out = pw_core::marko::render_module(&hir, &name);
+            .unwrap_or_else(|| (**path).clone());
+        let out = pw_core::marko::render_module(hir, &name, &signals);
 
         for (file, text) in &out.files {
             let dest = Path::new(&out_dir).join(file);

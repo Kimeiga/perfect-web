@@ -89,6 +89,7 @@ impl Namespace {
             DeclKind::Type | DeclKind::Opaque => Namespace::Type,
             DeclKind::Fn
             | DeclKind::Let
+            | DeclKind::Signal
             | DeclKind::Query
             | DeclKind::Command
             | DeclKind::Subscription

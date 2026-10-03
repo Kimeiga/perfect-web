@@ -1,0 +1,30 @@
+// @corpus: fixture
+// @id: DEMO-provide
+// @category: UI state — a signal a page provides to the views it composes
+// @charter: §8, §9.1
+// @milestone: E14
+//
+// ADR-0144. The header's button and the drawer are sibling views that share
+// one signal, which the page provides; neither is given it. The two counters
+// count apart. The panel provides its own drawer to what it contains. A
+// counter inside the drawer starts again when the drawer is opened again.
+
+module demo.provide
+
+import demo.drawer.{ drawer, CartButton, CartDrawer, Counter, Panel }
+
+page ProvidePage() {
+    cache private
+
+    provide drawer = false
+
+    view {
+        <main>
+            <header><CartButton /></header>
+            <div id="page-drawer"><CartDrawer /></div>
+            <section id="apples" aria-label="Apples"><Counter /></section>
+            <section id="pears" aria-label="Pears"><Counter /></section>
+            <Panel />
+        </main>
+    }
+}

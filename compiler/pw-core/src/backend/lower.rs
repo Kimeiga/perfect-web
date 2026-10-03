@@ -496,6 +496,26 @@ pub fn handler(
         };
         f.signals.insert(name, ty);
     }
+    // The module signals it names, provided to its body (ADR-0144), each by
+    // the type its declaration writes. The browser says which instance each
+    // is, where the handler is attached.
+    for (name, signal) in crate::template_ir::signals_named(cx.hirs, cx.ws, unit, body) {
+        if f.signals.contains_key(&name) {
+            continue;
+        }
+        let resolved = cx.sigs.signal_type(signal).and_then(|t| t.resolved());
+        let ty = match resolved.map(|t| backend_type(cx, t, &span)) {
+            Some(Lowering::Lowered(t)) => t,
+            _ => {
+                return Lowering::Unsupported {
+                    construct: "a signal whose type the backend cannot lower",
+                    span,
+                    reason: format!("`{name}`'s declared type"),
+                };
+            }
+        };
+        f.signals.insert(name, ty);
+    }
     let (mut captured, mut paths) = (Vec::new(), Vec::new());
     for path in crate::resume::capture_paths(body, types.lexical(), lambda) {
         let mut parts = path.split('.');

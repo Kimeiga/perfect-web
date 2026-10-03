@@ -115,6 +115,7 @@ fn noun_of(kind: DeclKind) -> &'static str {
         DeclKind::Fn => "fn",
         DeclKind::Type | DeclKind::Opaque => "type",
         DeclKind::Let => "let",
+        DeclKind::Signal => "signal",
         DeclKind::Import => "import",
         DeclKind::Other => "declaration",
     }

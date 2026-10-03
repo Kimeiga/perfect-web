@@ -75,17 +75,31 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
     }
     // An `import` is a declaration too, and binds nothing by its name: a
     // module path through it is resolved below, member by member.
-    let declared: BTreeSet<String> = hir
+    let mut declared: BTreeSet<String> = hir
         .all_decls()
         .filter(|(_, d)| d.kind != crate::hir::DeclKind::Import)
         .map(|(_, d)| d.name.clone())
         .collect();
-    // A module-level `let mut` may be assigned from a body (ADR-0051).
-    let module_mutable: BTreeSet<String> = hir
+    // A module-level `let mut` may be assigned from a body (ADR-0051). A
+    // module's signal is assigned by handlers, and given by `provide`, in any
+    // module that imports it (ADR-0144): an imported one is declared here
+    // for that, as this module's own are.
+    let mut module_mutable: BTreeSet<String> = hir
         .all_decls()
         .filter(|(_, d)| d.mutable)
         .map(|(_, d)| d.name.clone())
         .collect();
+    for (_, d) in hir.all_decls() {
+        for name in &d.imports {
+            if let Resolution::Imported { def, .. } = workspace.resolve(unit, name)
+                && crate::resolve::declaration(hirs, def)
+                    .is_some_and(|s| s.kind == crate::hir::DeclKind::Signal)
+            {
+                declared.insert(name.clone());
+                module_mutable.insert(name.clone());
+            }
+        }
+    }
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
@@ -121,8 +135,13 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             out.push(ambiguous_case(hir, id, decl, span, &name, &types));
         }
         for (span, name) in walk.immutable {
-            // What `bind:value` wrote is PW5304's to refuse (ADR-0142).
-            if body.bound.iter().any(|l| body.expr_span(*l) == span) {
+            // What `bind:value` wrote is PW5304's to refuse (ADR-0142), and
+            // what a `provide` names, PW5306's (ADR-0144).
+            if body.bound.iter().any(|l| body.expr_span(*l) == span)
+                || body.provides.iter().any(|p| {
+                    matches!(body.expr(*p), Expr::Binary { lhs, .. } if body.expr_span(*lhs) == span)
+                })
+            {
                 continue;
             }
             out.push(immutable_target(hir, id, decl, span, &name));

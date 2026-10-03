@@ -22,8 +22,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
-use crate::hir::{AttrValue, BinOp, Body, Decl, Expr, ExprId, Hir, Node, Pattern};
+use crate::hir::{
+    AttrValue, BinOp, Body, Decl, DeclKind, Expr, ExprId, Hir, Node, NodeId, Pattern,
+};
 use crate::lexical::{Binder, Lexical};
+use crate::resolve::{DefId, Resolution};
+use crate::resolved::Primitive;
 use crate::signatures::Signatures;
 
 /// Where an expression runs.
@@ -38,18 +42,21 @@ enum Place {
     Body,
 }
 
-/// The three rules over every declaration of one unit. `captured` is which
-/// parameters each view's handlers capture (ADR-0136).
+/// The rules over every declaration of one unit. `captured` is which
+/// parameters each view's handlers capture (ADR-0136), and `provision` what
+/// each view needs provided and which views hold a signal (ADR-0144).
 pub fn check(
     hir: &Hir,
     sigs: &Signatures,
     at: usize,
     captured: &BTreeMap<crate::resolve::DefId, BTreeSet<String>>,
+    provision: &Provision,
     out: &mut Vec<Diagnostic>,
 ) {
     for (_, decl) in hir.all_decls() {
         let Some(b) = decl.body else { continue };
         let body = hir.body(b);
+        provided(decl, body, sigs, at, provision, out);
         check_body(decl, body, sigs, at, captured, out);
     }
 }
@@ -62,6 +69,9 @@ fn check_body(
     captured: &BTreeMap<crate::resolve::DefId, BTreeSet<String>>,
     out: &mut Vec<Diagnostic>,
 ) {
+    let lexical = Lexical::build(sigs, Some(at), decl, body);
+    // The module signals it names, provided to it (ADR-0144).
+    let named = module_signals_named(sigs, at, &lexical, body);
     let handlers = handlers(body);
     // A `<dialog>` is the dialog rule's, signals or none (ADR-0141).
     let dialog = body.walk().into_iter().any(|id| match body.expr(id) {
@@ -71,7 +81,7 @@ fn check_body(
             .any(|n| matches!(body.node(n), Node::Element { tag, .. } if tag == "dialog")),
         _ => false,
     });
-    if body.signals.is_empty() && handlers.is_empty() && !dialog {
+    if body.signals.is_empty() && named.is_empty() && handlers.is_empty() && !dialog {
         return;
     }
     let places = places(body, &handlers);
@@ -79,12 +89,11 @@ fn check_body(
     // reaches a signal through its context, and reads it as it is when the
     // handler runs; one given a signal as a prop would capture it as it was
     // rendered, and read that value however the signal changed after.
-    let given: Vec<(ExprId, String, String)> = if body.signals.is_empty() {
+    let given: Vec<(ExprId, String, String)> = if body.signals.is_empty() && named.is_empty() {
         Vec::new()
     } else {
         crate::resume::captured_props(body, sigs.workspace(), at, captured)
     };
-    let lexical = Lexical::build(sigs, Some(at), decl, body);
 
     // Each signal's binder, and each `let`'s, by its pattern: where it was
     // declared decides whose binding it is.
@@ -102,10 +111,12 @@ fn check_body(
         }
     }
 
+    // A module's signal, by where it is named (ADR-0144).
+    let module = |e: ExprId| named.iter().find(|(_, at)| *at == e).map(|(def, _)| *def);
     // A `<dialog>` a signal shows (ADR-0141).
-    dialogs(body, &lexical, &signals, out);
+    dialogs(body, &lexical, &signals, &|e| module(e).is_some(), out);
     // What an input binds its value to (ADR-0142).
-    bindings(body, &lexical, &signals, out);
+    bindings(body, &lexical, &signals, sigs, &module, out);
 
     for id in body.walk() {
         match body.expr(id) {
@@ -118,13 +129,22 @@ fn check_body(
                 while let Expr::Field { base, .. } = body.expr(target) {
                     target = *base;
                 }
+                let place = places.get(&id).copied().unwrap_or(Place::Body);
                 let Some(binder) = lexical.binder(target) else {
+                    // A module's signal: changed by a handler, and given its
+                    // value by a `provide`, which is PW5306's (ADR-0144).
+                    if !body.provides.contains(&id)
+                        && module(target).is_some()
+                        && !matches!(place, Place::Handler(_))
+                        && let Expr::Name(name) = body.expr(target)
+                    {
+                        out.push(written_outside(body, id, name, None));
+                    }
                     continue;
                 };
-                let place = places.get(&id).copied().unwrap_or(Place::Body);
                 if let Some((name, declared)) = signals.get(&binder) {
                     if !matches!(place, Place::Handler(_)) {
-                        out.push(written_outside(body, id, name, *declared));
+                        out.push(written_outside(body, id, name, Some(*declared)));
                     }
                     continue;
                 }
@@ -140,22 +160,25 @@ fn check_body(
                 }
             }
             Expr::Name(n) => {
-                let Some(binder) = lexical.binder(id) else {
-                    continue;
-                };
-                let Some((_, declared)) = signals.get(&binder) else {
-                    continue;
+                // A signal this body declares, or a module's (ADR-0144).
+                let declared = match lexical.binder(id) {
+                    Some(binder) => match signals.get(&binder) {
+                        Some((_, declared)) => Some(*declared),
+                        None => continue,
+                    },
+                    None if module(id).is_some() => None,
+                    None => continue,
                 };
                 // The assignment's own target is a write, not a read.
                 if is_assigned(body, id) {
                     continue;
                 }
                 if places.get(&id).copied().unwrap_or(Place::Body) == Place::Body {
-                    out.push(read_where_it_cannot_change(body, id, n, *declared));
+                    out.push(read_where_it_cannot_change(body, id, n, declared));
                 } else if let Some((_, tag, param)) =
                     given.iter().find(|(e, ..)| within(body, *e, id))
                 {
-                    out.push(captured_through_a_view(body, id, n, *declared, tag, param));
+                    out.push(captured_through_a_view(body, id, n, declared, tag, param));
                 }
             }
             _ => {}
@@ -172,18 +195,23 @@ fn dialogs(
     body: &Body,
     lexical: &Lexical,
     signals: &BTreeMap<Binder, (String, ExprId)>,
+    module: &dyn Fn(ExprId) -> bool,
     out: &mut Vec<Diagnostic>,
 ) {
-    // The signal a subject is read from: `open` in `{#if open}`.
+    // The signal a subject is read from: `open` in `{#if open}`, the body's
+    // own or a module's (ADR-0144).
     let signal_of = |e: ExprId| {
         let mut root = e;
         while let Expr::Field { base, .. } = body.expr(root) {
             root = *base;
         }
-        lexical
-            .binder(root)
-            .and_then(|b| signals.get(&b))
-            .map(|(name, _)| name.clone())
+        match lexical.binder(root) {
+            Some(b) => signals.get(&b).map(|(name, _)| name.clone()),
+            None => match body.expr(root) {
+                Expr::Name(n) if module(root) => Some(n.clone()),
+                _ => None,
+            },
+        }
     };
     fn walk(
         body: &Body,
@@ -308,6 +336,8 @@ fn bindings(
     body: &Body,
     lexical: &Lexical,
     signals: &BTreeMap<Binder, (String, ExprId)>,
+    sigs: &Signatures,
+    module: &dyn Fn(ExprId) -> Option<crate::resolve::DefId>,
     out: &mut Vec<Diagnostic>,
 ) {
     let mut roots = Vec::new();
@@ -355,6 +385,25 @@ fn bindings(
             let Expr::Name(name) = body.expr(*lhs) else {
                 continue;
             };
+            // A module's signal, declared `String` where it is declared
+            // (ADR-0144).
+            if lexical.binder(*lhs).is_none()
+                && let Some(def) = module(*lhs)
+            {
+                let declared = sigs.signal_type(def).and_then(|t| t.resolved());
+                if !declared.is_some_and(|t| t.as_primitive() == Some(Primitive::Str)) {
+                    let written = declared.map(|t| t.display_name()).unwrap_or_default();
+                    out.push(bound_value(
+                        a.span.clone(),
+                        format!(
+                            "`bind:value` binds `{name}`, a signal of `{written}`: a signal \
+                             of another type than `String` needs a codec, which is not built \
+                             (ADR-0131)"
+                        ),
+                    ));
+                }
+                continue;
+            }
             let signal = lexical.binder(*lhs).and_then(|b| signals.get(&b));
             let Some((_, declared)) = signal else {
                 out.push(bound_value(
@@ -483,7 +532,19 @@ fn is_assigned(body: &Body, name: ExprId) -> bool {
     })
 }
 
-fn written_outside(body: &Body, at: ExprId, name: &str, declared: ExprId) -> Diagnostic {
+/// Where a signal is declared, when it is in the same body: a module's is
+/// declared in its module (ADR-0144).
+fn declared_here(body: &Body, name: &str, declared: Option<ExprId>) -> Vec<Related> {
+    declared
+        .map(|d| Related {
+            span: body.expr_span(d),
+            label: format!("`{name}` is declared a signal here"),
+        })
+        .into_iter()
+        .collect()
+}
+
+fn written_outside(body: &Body, at: ExprId, name: &str, declared: Option<ExprId>) -> Diagnostic {
     let code = crate::codes::SIGNAL_WRITTEN_OUTSIDE_HANDLER;
     Diagnostic {
         code: code.id,
@@ -493,10 +554,7 @@ fn written_outside(body: &Body, at: ExprId, name: &str, declared: ExprId) -> Dia
         severity: Severity::Error,
         message: format!("`{name}` is a signal, and it is changed outside a handler"),
         primary_span: body.expr_span(at),
-        related: vec![Related {
-            span: body.expr_span(declared),
-            label: format!("`{name}` is declared a signal here"),
-        }],
+        related: declared_here(body, name, declared),
         explanation: Some(
             "A signal is UI state: it changes when a person acts, in the browser. \
              Outside a handler this runs on the server while the page is made, or \
@@ -516,7 +574,7 @@ fn read_where_it_cannot_change(
     body: &Body,
     at: ExprId,
     name: &str,
-    declared: ExprId,
+    declared: Option<ExprId>,
 ) -> Diagnostic {
     let code = crate::codes::SIGNAL_READ_WHERE_IT_CANNOT_CHANGE;
     Diagnostic {
@@ -530,10 +588,7 @@ fn read_where_it_cannot_change(
              never changes"
         ),
         primary_span: body.expr_span(at),
-        related: vec![Related {
-            span: body.expr_span(declared),
-            label: format!("`{name}` is declared a signal here"),
-        }],
+        related: declared_here(body, name, declared),
         explanation: Some(
             "The page's body runs on the server, before anyone has pressed \
              anything, so it would read the signal's first value and nothing \
@@ -553,7 +608,7 @@ fn captured_through_a_view(
     body: &Body,
     at: ExprId,
     name: &str,
-    declared: ExprId,
+    declared: Option<ExprId>,
     tag: &str,
     param: &str,
 ) -> Diagnostic {
@@ -569,23 +624,29 @@ fn captured_through_a_view(
              as it was rendered"
         ),
         primary_span: body.expr_span(at),
-        related: vec![Related {
-            span: body.expr_span(declared),
-            label: format!("`{name}` is declared a signal here"),
-        }],
+        related: declared_here(body, name, declared),
         explanation: Some(format!(
             "A handler reads a signal through its context, as it is when the handler \
              runs. A view's handler that captures `{param}` reads the value the \
              document was rendered with, and pressing it after `{name}` changed would \
-             act on the old value. A view is given a signal to change or to read in a \
-             handler when signals are provided to views (ADR-0130, step 3)."
+             act on the old value. A view that changes or reads a signal in a handler \
+             names it: its own, or one a module declares and a page provides (ADR-0144)."
         )),
-        repairs: vec![Repair {
-            description: format!(
-                "write `<{tag}>`'s handler in this page, where it reads `{name}` itself"
-            ),
-            replacement: None,
-        }],
+        repairs: vec![
+            Repair {
+                description: format!(
+                    "declare `{name}` in a module, `signal {name}: Type`, `provide` it in this \
+                     page, and name it in `<{tag}>`"
+                ),
+                replacement: None,
+            },
+            Repair {
+                description: format!(
+                    "or write `<{tag}>`'s handler in this page, where it reads `{name}` itself"
+                ),
+                replacement: None,
+            },
+        ],
     }
 }
 
@@ -612,6 +673,406 @@ fn not_a_signal(body: &Body, at: ExprId, name: &str, declared: ExprId) -> Diagno
         ),
         repairs: vec![Repair {
             description: format!("declare it `signal {name}: Type = ..`"),
+            replacement: None,
+        }],
+    }
+}
+
+// --- provided signals (ADR-0144) ---------------------------------------------
+
+/// **What each view needs provided, and which views hold a signal**
+/// (ADR-0144), across the program. A page checks its own needs against it,
+/// and every body checks the views it uses in a loop's row.
+#[derive(Debug, Default)]
+pub struct Provision {
+    /// Each module signal a view names, or a view it composes needs, that it
+    /// does not provide itself: with the views the need comes through,
+    /// nearest first.
+    pub needs: BTreeMap<DefId, BTreeMap<DefId, Vec<String>>>,
+    /// The views that hold a signal or provide one, themselves or through a
+    /// view they compose: each use of one is an instance of its own.
+    pub holds: BTreeSet<DefId>,
+    /// Each module signal's name, as it is declared, for a message.
+    pub names: BTreeMap<DefId, String>,
+}
+
+impl Provision {
+    pub fn of(hirs: &[&Hir], sigs: &Signatures) -> Provision {
+        let mut p = Provision::default();
+        for (unit, hir) in hirs.iter().enumerate() {
+            for (id, decl) in hir.all_decls() {
+                if decl.kind == DeclKind::Signal {
+                    p.names
+                        .insert(DefId { unit, decl: id.0 }, decl.name.clone());
+                }
+            }
+        }
+        for (unit, hir) in hirs.iter().enumerate() {
+            for (id, decl) in hir.all_decls() {
+                if decl.kind == DeclKind::View {
+                    let def = DefId { unit, decl: id.0 };
+                    needs_of(hirs, sigs, def, &mut p, &mut Vec::new());
+                }
+            }
+        }
+        p
+    }
+}
+
+fn needs_of(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    def: DefId,
+    p: &mut Provision,
+    within: &mut Vec<DefId>,
+) -> BTreeMap<DefId, Vec<String>> {
+    if let Some(found) = p.needs.get(&def) {
+        return found.clone();
+    }
+    // A view that contains itself is refused (PW5020), and not followed.
+    if within.contains(&def) {
+        return BTreeMap::new();
+    }
+    let Some(decl) = crate::resolve::declaration(hirs, def) else {
+        return BTreeMap::new();
+    };
+    let Some(body) = decl.body.map(|b| hirs[def.unit].body(b)) else {
+        return BTreeMap::new();
+    };
+    within.push(def);
+    let lexical = Lexical::build(sigs, Some(def.unit), decl, body);
+    let gives: BTreeSet<DefId> = provided_in(sigs, def.unit, body)
+        .into_iter()
+        .map(|(signal, _)| signal)
+        .collect();
+    let mut needs: BTreeMap<DefId, Vec<String>> = BTreeMap::new();
+    for (signal, _) in module_signals_named(sigs, def.unit, &lexical, body) {
+        if !gives.contains(&signal) {
+            needs.entry(signal).or_default();
+        }
+    }
+    let mut holds = !body.signals.is_empty() || !gives.is_empty();
+    for (_, view, tag, _) in composed(sigs, def.unit, body) {
+        let inner = needs_of(hirs, sigs, view, p, within);
+        holds |= p.holds.contains(&view);
+        for (signal, through) in inner {
+            if gives.contains(&signal) {
+                continue;
+            }
+            needs
+                .entry(signal)
+                .or_insert_with(|| std::iter::once(tag.clone()).chain(through).collect());
+        }
+    }
+    within.pop();
+    if holds {
+        p.holds.insert(def);
+    }
+    p.needs.insert(def, needs.clone());
+    needs
+}
+
+/// The module signal `name` resolves to, where it is written (ADR-0144).
+fn module_signal(sigs: &Signatures, unit: usize, name: &str) -> Option<DefId> {
+    match sigs.workspace().resolve(unit, name) {
+        Resolution::Local(d) | Resolution::Imported { def: d, .. }
+            if sigs.kind_of(d) == Some(DeclKind::Signal) =>
+        {
+            Some(d)
+        }
+        _ => None,
+    }
+}
+
+/// **The module signals a body names**, each where it is named, that no
+/// binding of the body hides.
+fn module_signals_named(
+    sigs: &Signatures,
+    unit: usize,
+    lexical: &Lexical,
+    body: &Body,
+) -> Vec<(DefId, ExprId)> {
+    let mut out = Vec::new();
+    for (id, e, _) in body.exprs() {
+        let Expr::Name(n) = e else { continue };
+        if lexical.binder(id).is_some() {
+            continue;
+        }
+        if let Some(def) = module_signal(sigs, unit, n) {
+            out.push((def, id));
+        }
+    }
+    out
+}
+
+/// What a body provides: each `provide` of a module signal, by the signal.
+fn provided_in(sigs: &Signatures, unit: usize, body: &Body) -> Vec<(DefId, ExprId)> {
+    body.provides
+        .iter()
+        .filter_map(|id| {
+            let Expr::Binary { lhs, .. } = body.expr(*id) else {
+                return None;
+            };
+            let Expr::Name(n) = body.expr(*lhs) else {
+                return None;
+            };
+            module_signal(sigs, unit, n).map(|def| (def, *id))
+        })
+        .collect()
+}
+
+/// **The views a body's markup uses**: each element naming one, the view,
+/// the tag as written, and whether it is inside a loop's row.
+fn composed(sigs: &Signatures, unit: usize, body: &Body) -> Vec<(NodeId, DefId, String, bool)> {
+    fn walk(
+        sigs: &Signatures,
+        unit: usize,
+        body: &Body,
+        n: NodeId,
+        rows: u32,
+        out: &mut Vec<(NodeId, DefId, String, bool)>,
+    ) {
+        match body.node(n) {
+            Node::Element { tag, children, .. } => {
+                if tag.starts_with(|c: char| c.is_ascii_uppercase())
+                    && let Resolution::Local(d) | Resolution::Imported { def: d, .. } =
+                        sigs.workspace().resolve(unit, tag)
+                    && sigs.kind_of(d) == Some(DeclKind::View)
+                {
+                    out.push((n, d, tag.clone(), rows > 0));
+                }
+                for c in children {
+                    walk(sigs, unit, body, *c, rows, out);
+                }
+            }
+            Node::Block {
+                directive,
+                children,
+                ..
+            } => {
+                let rows = rows + u32::from(directive.trim_start().starts_with("{#each"));
+                for c in children {
+                    walk(sigs, unit, body, *c, rows, out);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for id in body.walk() {
+        if let Expr::Template { roots, .. } = body.expr(id) {
+            for r in roots {
+                walk(sigs, unit, body, *r, 0, &mut out);
+            }
+        }
+    }
+    out
+}
+
+/// **The rules on provided signals** (ADR-0144), over one body:
+/// - PW5306: it provides a module signal, once, and only in a page's or
+///   view's body;
+/// - PW5307: a view it uses in a loop's row holds no signal;
+/// - PW5305: in a page, each signal it or a view it uses needs is provided.
+fn provided(
+    decl: &Decl,
+    body: &Body,
+    sigs: &Signatures,
+    at: usize,
+    provision: &Provision,
+    out: &mut Vec<Diagnostic>,
+) {
+    let ui = matches!(decl.kind, DeclKind::Page | DeclKind::View);
+    let mut given: BTreeMap<DefId, ExprId> = BTreeMap::new();
+    for id in &body.provides {
+        let Expr::Binary { lhs, .. } = body.expr(*id) else {
+            continue;
+        };
+        let Expr::Name(name) = body.expr(*lhs) else {
+            continue;
+        };
+        if !ui {
+            out.push(provide_problem(
+                body,
+                *id,
+                format!(
+                    "`{}` is not a page or a view, and a `provide` gives `{name}` to the markup \
+                     of the one it is written in",
+                    decl.name
+                ),
+            ));
+            continue;
+        }
+        let Some(signal) = module_signal(sigs, at, name) else {
+            // A name that resolves to nothing is the name rule's (PW0020).
+            if !matches!(sigs.workspace().resolve(at, name), Resolution::Unresolved) {
+                out.push(provide_problem(
+                    body,
+                    *id,
+                    format!(
+                        "`{name}` is not a signal a module declares: a `provide` gives one \
+                         its value, `signal {name}: Type` at module level"
+                    ),
+                ));
+            }
+            continue;
+        };
+        if let Some(first) = given.get(&signal) {
+            let mut d = provide_problem(
+                body,
+                *id,
+                format!("`{name}` is provided twice in `{}`", decl.name),
+            );
+            d.related.push(Related {
+                span: body.expr_span(*first),
+                label: "it is provided here first".to_string(),
+            });
+            out.push(d);
+            continue;
+        }
+        given.insert(signal, *id);
+    }
+    if !ui {
+        return;
+    }
+
+    let uses = composed(sigs, at, body);
+    // A view used in a loop's row holds no signal of its own yet.
+    for (node, view, tag, in_row) in &uses {
+        if *in_row && provision.holds.contains(view) {
+            out.push(signal_in_a_row(body, *node, tag));
+        }
+    }
+
+    // A page provides what it, and every view it uses, needs.
+    if decl.kind != DeclKind::Page {
+        return;
+    }
+    let name = |d: DefId| {
+        (
+            provision.names.get(&d).cloned().unwrap_or_default(),
+            sigs.path_of(d).unwrap_or_default().to_string(),
+        )
+    };
+    let lexical = Lexical::build(sigs, Some(at), decl, body);
+    let mut reported: BTreeSet<DefId> = BTreeSet::new();
+    for (signal, e) in module_signals_named(sigs, at, &lexical, body) {
+        if given.contains_key(&signal) || !reported.insert(signal) {
+            continue;
+        }
+        out.push(not_provided(
+            body.expr_span(e),
+            name(signal),
+            &decl.name,
+            &format!("`{}` reads it here", decl.name),
+        ));
+    }
+    for (node, view, tag, _) in &uses {
+        let Some(needs) = provision.needs.get(view) else {
+            continue;
+        };
+        for (signal, through) in needs {
+            if given.contains_key(signal) || !reported.insert(*signal) {
+                continue;
+            }
+            let chain: String = through
+                .iter()
+                .map(|t| format!(", through `<{t}>`"))
+                .collect();
+            out.push(not_provided(
+                body.node_span(*node),
+                name(*signal),
+                &decl.name,
+                &format!("`<{tag}>` needs it{chain}"),
+            ));
+        }
+    }
+}
+
+fn not_provided(
+    at: crate::hir::Span,
+    (name, path): (String, String),
+    page: &str,
+    why: &str,
+) -> Diagnostic {
+    let code = crate::codes::SIGNAL_NOT_PROVIDED;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "signal_not_provided",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!("nothing provides `{path}` to `{page}`, and {why}"),
+        primary_span: at,
+        related: Vec::new(),
+        explanation: Some(
+            "A signal declared in a module has no value of its own. A page or view gives it \
+             one with `provide`, for everything that body contains, and a view that names it \
+             reads the nearest one around it (ADR-0144). Without one, the view would read a \
+             value nobody gave; a default value would hide that."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: format!(
+                "write `provide {name} = ..` in `{page}`, or in a view around the one that \
+                 needs it"
+            ),
+            replacement: None,
+        }],
+    }
+}
+
+fn provide_problem(body: &Body, at: ExprId, message: String) -> Diagnostic {
+    let code = crate::codes::PROVIDE;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "provide",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message,
+        primary_span: body.expr_span(at),
+        related: Vec::new(),
+        explanation: Some(
+            "`provide name = value` gives a signal declared in a module, `signal name: Type`, \
+             its value for everything the page or view it is written in contains (ADR-0144). \
+             A nearer `provide` shadows it for what that one contains; two in one body would \
+             leave which one holds unsaid."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "declare the signal at module level, `signal name: Type`, and provide \
+                          it once, in the page or view whose markup uses it"
+                .to_string(),
+            replacement: None,
+        }],
+    }
+}
+
+fn signal_in_a_row(body: &Body, at: NodeId, tag: &str) -> Diagnostic {
+    let code = crate::codes::SIGNAL_IN_A_ROW;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "signal_in_a_row",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!(
+            "`<{tag}>` holds a signal, and a view used in a loop's row holds none yet: each row \
+             would need its own"
+        ),
+        primary_span: body.node_span(at),
+        related: Vec::new(),
+        explanation: Some(
+            "Each use of a view that holds a signal is an instance of its own (ADR-0144). In a \
+             loop's row, each row would need one, kept by the row's key as rows are added, \
+             removed and reordered, and the browser holds one instance per use."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "hold the state in a signal the page provides, keyed by the row: a \
+                          `signal open: Option<ItemId>` the rows read and set"
+                .to_string(),
             replacement: None,
         }],
     }

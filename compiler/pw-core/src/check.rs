@@ -205,6 +205,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // And what a view's handlers capture of what it is given (ADR-0136): a
     // page that uses the view writes it into its own document.
     let captured = crate::resume::captured_params(&hirs, &sigs);
+    // And what each view needs provided, and which hold signals (ADR-0144).
+    let provision = crate::signals::Provision::of(&hirs, &sigs);
     units
         .iter()
         .enumerate()
@@ -216,6 +218,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
                 &reads,
                 &summaries,
                 &captured,
+                &provision,
                 &sigs,
                 &inference,
                 &manifest,
@@ -1611,6 +1614,7 @@ fn described(kind: DeclKind) -> &'static str {
         DeclKind::Fn => "a function",
         DeclKind::Type | DeclKind::Opaque => "a type",
         DeclKind::Let => "a value",
+        DeclKind::Signal => "a signal",
         DeclKind::Import => "an import",
         DeclKind::Other => "a declaration",
     }
@@ -2216,10 +2220,10 @@ fn composes(
 ) -> Option<String> {
     let decl = crate::resolve::declaration(hirs, def)?;
     let body = hirs[def.unit].body(decl.body?);
-    if !crate::template_ir::markup_only(body) {
+    if !crate::template_ir::composable(body) {
         return Some(format!(
             "`<{}>` declares values of its own, and a view composed into another holds its \
-             markup alone in this slice",
+             markup and its signals alone",
             decl.name
         ));
     }
@@ -2850,6 +2854,7 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
         &BTreeMap::new(),
         // And no view is resolved across files, so none is composed.
         &BTreeMap::new(),
+        &crate::signals::Provision::default(),
         &sigs,
         &inference,
         &manifest,
@@ -2876,6 +2881,8 @@ fn check_unit_with(
     summaries: &BTreeMap<crate::resolve::DefId, Label>,
     // Which parameters each view's handlers capture (ADR-0136).
     captured: &BTreeMap<crate::resolve::DefId, std::collections::BTreeSet<String>>,
+    // What each view needs provided, and which hold signals (ADR-0144).
+    provision: &crate::signals::Provision,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
     manifest: &crate::boundary::TypeFacts,
@@ -2931,7 +2938,7 @@ fn check_unit_with(
     // Charter §8.5: the resume manifest ships with the document.
     crate::resume::check(&unit.hir, sigs, summaries, manifest, captured, at, &mut out);
     // Where UI state is read and written (ADR-0130).
-    crate::signals::check(&unit.hir, sigs, at, captured, &mut out);
+    crate::signals::check(&unit.hir, sigs, at, captured, provision, &mut out);
 
     // E7 generator: the resume manifest and the handler artifact, derived by
     // two different walks and compared. A disagreement within one build is a

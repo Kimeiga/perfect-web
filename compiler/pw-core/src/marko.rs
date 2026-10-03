@@ -33,8 +33,14 @@ pub struct Rendered {
     pub skipped: Vec<Skipped>,
 }
 
-/// Lower every renderable declaration in a module.
-pub fn render_module(hir: &Hir, source_name: &str) -> Rendered {
+/// Lower every renderable declaration in a module. `signals` is each name
+/// in it that a module declares a signal (ADR-0144), as the program resolves
+/// it: what a page provides, which the adapter does not model.
+pub fn render_module(
+    hir: &Hir,
+    source_name: &str,
+    signals: &std::collections::BTreeSet<String>,
+) -> Rendered {
     let mut out = Rendered::default();
     for (_, decl) in hir.all_decls() {
         if !matches!(
@@ -43,7 +49,7 @@ pub fn render_module(hir: &Hir, source_name: &str) -> Rendered {
         ) {
             continue;
         }
-        match render_decl(hir, decl, source_name) {
+        match render_decl(hir, decl, source_name, signals) {
             Ok(text) => out.files.push((format!("{}.marko", decl.name), text)),
             Err(reason) => out.skipped.push(Skipped {
                 name: decl.name.clone(),
@@ -54,9 +60,29 @@ pub fn render_module(hir: &Hir, source_name: &str) -> Rendered {
     out
 }
 
-fn render_decl(hir: &Hir, decl: &Decl, source_name: &str) -> Result<String, String> {
+fn render_decl(
+    hir: &Hir,
+    decl: &Decl,
+    source_name: &str,
+    signals: &std::collections::BTreeSet<String>,
+) -> Result<String, String> {
     let body_id = decl.body.ok_or_else(|| "no body".to_string())?;
     let body = hir.body(body_id);
+
+    // A signal a page provides, and a `provide` (ADR-0144), are not
+    // modelled: a template rendered without them would set a name nothing
+    // holds, or drop what its body provides to the views it contains.
+    if !body.provides.is_empty() {
+        return Err("a `provide` (ADR-0144) is not modelled yet".to_string());
+    }
+    if let Some(n) = body.exprs().find_map(|(_, e, _)| match e {
+        Expr::Name(n) if signals.contains(n) => Some(n.clone()),
+        _ => None,
+    }) {
+        return Err(format!(
+            "`{n}` is a signal a page provides (ADR-0144), which is not modelled yet"
+        ));
+    }
 
     // The markup is whatever template regions the body contains. A view with
     // none renders nothing, which is a bug in the source, not in the adapter.

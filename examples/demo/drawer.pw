@@ -1,0 +1,48 @@
+// @corpus: fixture
+// @id: DEMO-drawer
+// @category: UI state — a view's own signals, and a signal a page provides
+// @charter: §8, §9.1
+// @milestone: E14
+//
+// ADR-0144: views that share UI state with no value passed by hand. `drawer`
+// is declared here, a name and a type with no value: the page or view that
+// uses these views provides it, and each view names it as it names anything
+// it imports. A counter holds its own count, and each use counts apart.
+
+module demo.drawer
+
+// Whether the cart drawer is open, as the page or view around provides it.
+signal drawer: Bool
+
+view CartButton() !{} {
+    <button class="open-cart" type="button" on:press={() => drawer = true}>Cart</button>
+}
+
+view CartDrawer() !{} {
+    <div class="drawer-host">
+        {#if drawer}
+            <aside class="drawer" aria-label="Your cart">
+                <p>Your cart is empty.</p>
+                <Counter />
+                <button class="close-cart" type="button" on:press={() => drawer = false}>Close</button>
+            </aside>
+        {/if}
+    </div>
+}
+
+view Counter() !{} {
+    signal count: Int = 0
+
+    <p class="counter"><button class="add" type="button" on:press={() => count = count + 1}>Add one</button> <span class="count">{count}</span></p>
+}
+
+// A panel with a drawer of its own: what it contains reads its `drawer`,
+// not the page's.
+view Panel() !{} {
+    provide drawer = false
+
+    <section class="panel" aria-label="Panel">
+        <CartButton />
+        <CartDrawer />
+    </section>
+}

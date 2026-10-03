@@ -57,6 +57,7 @@ struct BodyBuilder {
     signals: std::collections::BTreeSet<ExprId>,
     param_types: std::collections::BTreeMap<PatternId, TypeRefId>,
     bound: std::collections::BTreeSet<ExprId>,
+    provides: std::collections::BTreeSet<ExprId>,
 }
 
 impl BodyBuilder {
@@ -117,6 +118,15 @@ fn own_tokens(n: &SyntaxNode) -> Vec<pw_syntax::SyntaxToken> {
 fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
     match node.kind() {
         K::FnDecl => DeclKind::Fn,
+        // `signal drawer: Bool` at module level (ADR-0144) is a `let`'s node,
+        // told apart by its first word, as a body's `signal` is.
+        K::LetDecl
+            if own_tokens(node)
+                .first()
+                .is_some_and(|t| t.text() == "signal") =>
+        {
+            DeclKind::Signal
+        }
         K::LetDecl => DeclKind::Let,
         K::ImportDecl => DeclKind::Import,
         K::OpaqueDecl => DeclKind::Opaque,
@@ -282,7 +292,10 @@ impl Lowerer<'_> {
         }
 
         let kind = decl_kind_of(node, self.src);
-        let mutable = kind == DeclKind::Let && own_tokens(node).iter().any(|t| t.text() == "mut");
+        // A module's signal is assigned by the handlers of what it is
+        // provided to (ADR-0144).
+        let mutable = kind == DeclKind::Signal
+            || kind == DeclKind::Let && own_tokens(node).iter().any(|t| t.text() == "mut");
         let name = first_name(node).unwrap_or_default();
         let name_span = first_name_span(node).unwrap_or_else(|| span_of(node));
         let declared_effects = node
@@ -565,6 +578,7 @@ impl Lowerer<'_> {
             signals: b.signals,
             param_types: b.param_types,
             bound: b.bound,
+            provides: b.provides,
         };
         (
             Some(BodyId(self.hir.bodies.alloc(body, span_of(node)))),
@@ -1181,6 +1195,34 @@ impl Lowerer<'_> {
             if head == "signal" {
                 b.signals.insert(id);
             }
+            return id;
+        }
+
+        // `provide drawer = e` (ADR-0144): the assignment of the signal the
+        // module declares, so its name resolves and its value is checked as
+        // any assignment's is, marked as the `provide` it is.
+        if head == "provide" {
+            let target = node
+                .children()
+                .find(|c| c.kind() == K::Name)
+                .map(|n| b.expr(Expr::Name(n.text().to_string()), span_of(&n)));
+            let value = node
+                .children()
+                .find(|c| is_expr(c.kind()))
+                .map(|e| self.expr(b, &e));
+            let (Some(lhs), Some(rhs)) = (target, value) else {
+                // The parser reported what is missing.
+                return b.expr(Expr::Error, span);
+            };
+            let id = b.expr(
+                Expr::Binary {
+                    op: BinOp::Assign,
+                    lhs,
+                    rhs,
+                },
+                span,
+            );
+            b.provides.insert(id);
             return id;
         }
 

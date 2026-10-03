@@ -72,7 +72,8 @@ pub fn lower_module(hir: &Hir, module_name: &str) -> Lowered {
 
 fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
     match decl.kind {
-        DeclKind::Import | DeclKind::Let => Ok(None),
+        // A module's signal is a name and a type (ADR-0144): nothing runs.
+        DeclKind::Import | DeclKind::Let | DeclKind::Signal => Ok(None),
 
         // An effect DECLARATION is not a computation: it says how an effect
         // lowers to authority, which is E8's question and not Koka's.

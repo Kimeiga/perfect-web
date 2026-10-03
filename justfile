@@ -1718,6 +1718,28 @@ e14-bind:
      } > docs/evidence/E14/bind.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/bind.txt
 
+# ADR-0144: a view's own signals, and a signal a page provides. The
+# compiler's tests, the browser's spec in three engines, and the mutation
+# controls, compiler and browser, against one staged build.
+e14-provide:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @{ echo "ADR-0144 - a view's own signals, and a signal a page provides"; echo; \
+       echo "produced by: just e14-provide"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/provide.rs)"; echo; \
+       cargo test --locked -p pw-core --test provide 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser (spikes/own-renderer/e2e/provide.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/provide.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/provide_mutations.py)"; echo; \
+       python3 scripts/provide_mutations.py; \
+     } > docs/evidence/E14/provide.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/provide.txt
+
 # ADR-0143: what names a form control. The rule's tests, its generality
 # witnesses, each witness checked by `pw check`, and the mutation controls;
 # the browser's half is `e2e/parsed-tree.spec.mjs`, in the own-renderer suite.

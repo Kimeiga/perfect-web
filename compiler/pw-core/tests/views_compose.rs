@@ -462,7 +462,7 @@ fn a_view_that_cannot_compose_is_reported_where_it_is_used() {
         found,
         [
             "PW5020 `<Inner>` declares values of its own, and a view composed into another holds \
-          its markup alone in this slice"
+          its markup and its signals alone"
         ],
         "{found:#?}"
     );

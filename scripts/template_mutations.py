@@ -56,8 +56,8 @@ MUTANTS = [
     (
         "`{:else if}` loses its branch",
         IR,
-        "Some(v) => vec![conditional(body, nested, v, run, more, ctx, ix)],",
-        "Some(v) => vec![conditional(body, nested, v, &[], more, ctx, ix)],",
+        "let chunk = conditional(body, nested, v, run, more, ctx, ix);",
+        "let chunk = conditional(body, nested, v, &[], more, ctx, ix);",
     ),
     (
         "a URL may begin with a value",

@@ -510,6 +510,17 @@ codes! {
     // changes nothing, or changes it to a value of another type.
     BOUND_VALUE = "PW5304" / bound_value / 1, UiState,
         "an input binds its value to a signal of `String`, by its name";
+    // ADR-0144: a signal declared in a module is given its value by a page or
+    // view, for everything that body contains. A view that needs one where
+    // nothing provides it would read a value no one gave.
+    SIGNAL_NOT_PROVIDED = "PW5305" / signal_not_provided / 1, UiState,
+        "a provided signal is read only where a page or view around it provides it";
+    PROVIDE = "PW5306" / provide / 1, UiState,
+        "a body provides a signal declared in a module, once";
+    // Each row of a loop would need its own instance, kept by the row's key,
+    // and the browser holds one per use (ADR-0144).
+    SIGNAL_IN_A_ROW = "PW5307" / signal_in_a_row / 1, UiState,
+        "a view that holds a signal is not used in a loop's row yet";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must

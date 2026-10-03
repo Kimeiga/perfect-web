@@ -162,16 +162,18 @@ refused by name:
   IR has no representation for `<stream query={..}>` or for an element that
   mounts a resource (`resource={StoreMap}`, A-007), and refuses each by
   name. The Marko adapter renders a stream (ADR-0017).
-- **A view composes when its body is its markup** (ADR-0136). Refused by
-  name (PW5020):
-  - a view with bindings or signals of its own;
+- **A view composes when its body is its markup, its signals and its
+  `provide`s** (ADR-0136, ADR-0144). Refused by name (PW5020):
+  - a view with other bindings of its own;
   - a view that contains itself, which ADR-0130 rules a run-time instance;
   - a prop that is not a value path, a literal included (`label="Add"`).
-  A signal given to a view is shown, not changed: a view's handler that
-  would capture one is refused (PW5301) until signals are provided to views
-  (ADR-0130, step 3). A view's handler that captures a restricted parameter
-  is refused at the view, even where every page using it could hold the
-  value. The Marko adapter is unchanged.
+
+  A signal given to a view as a prop is shown, not changed: a view's
+  handler that would capture one is refused (PW5301). A view changes a
+  signal it names, its own or one provided to it (ADR-0144). A view's
+  handler that captures a restricted parameter is refused at the view, even
+  where every page using it could hold the value. The Marko adapter composes
+  no view that holds or names a signal.
 - **Nothing emits patches for the new template parts.** A `{#match}` region
   or an interpolated attribute renders on the server; the dev server's patch
   generator is written per operation, and the store uses neither. kiokun's
@@ -380,9 +382,10 @@ within stated bounds (ADR-0120 found both unexecuted):
   cart line is priced zero until the server answers (ruling offered).
 E14's shared store contract still excludes both, for every stack.
 
-**A page's signals are its own** (ADR-0133). Only a page declares one;
-a view's signals and a signal provided to views wait for ADR-0130's step 3.
-A first value is data, not a computation. The browser sets a text part or an
+**A signal lives in a page, a use of a view, or a `provide`** (ADR-0133,
+ADR-0144). Each use of a view holds its own instance. A view used in a
+loop's row holds none yet (PW5307): each row would need its own, kept by the
+row's key. A first value is data, not a computation. The browser sets a text part or an
 attribute in place outside any loop, at top level or in a block a signal
 decides, and renders such a block again for the rest (ADR-0142). The plan
 refuses a signal read anywhere else, and a block it renders that reads
@@ -396,8 +399,8 @@ loaded on the first block a press renders.
 
 **A modal dialog is a `<dialog>` a signal's block renders** (ADR-0141), the
 browser's own, and it handles `close`. A dialog's return value from a
-`<form method="dialog">` waits for forms (ADR-0131), and a dialog in a view
-the page does not show waits for a view's signals (ADR-0130, step 3). A page
+`<form method="dialog">` waits for forms (ADR-0131). A dialog in a view is
+shown by the view's own signal or one provided to it (ADR-0144). A page
 that reads queries holds signals on the store's route only (ADR-0140); any
 other page with queries is not served yet (E14-Q).
 

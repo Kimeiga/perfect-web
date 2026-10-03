@@ -11,7 +11,8 @@ use pw_syntax::parse_tree;
 fn render(src: &str) -> pw_core::marko::Rendered {
     let p = parse_tree(src);
     assert!(p.ok(), "fixture must parse: {:?}", p.errors);
-    render_module(&lower_file(src, &p.green), "test.pw")
+    // A program of one file, with no signal a page provides (ADR-0144).
+    render_module(&lower_file(src, &p.green), "test.pw", &Default::default())
 }
 
 fn example(name: &str) -> String {

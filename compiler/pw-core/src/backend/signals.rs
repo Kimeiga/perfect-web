@@ -8,7 +8,7 @@
 //! is data. A first value that computes is refused, by name: the build writes
 //! data, and running a program at build time is not this slice.
 
-use crate::hir::{DeclKind, Expr, Hir};
+use crate::hir::{DeclKind, Hir};
 use crate::page_values::Signal;
 use crate::resolve::Workspace;
 use crate::signatures::Signatures;
@@ -54,62 +54,35 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
-            let Some(b) = decl.body else { continue };
-            let body = hir.body(b);
-            let declared = crate::page_values::signals_of(body);
-            if declared.is_empty() {
+            if decl.kind != DeclKind::Page {
+                continue;
+            }
+            // Its own signals, and each one the views composed into it hold
+            // or are provided, at each use (ADR-0144): what its template
+            // holds, as the template names them.
+            let Some(lowered) = crate::template_ir::lowered(
+                &hirs,
+                &ws,
+                &crate::template_ir::Handlers::new(),
+                unit,
+                id,
+            ) else {
+                continue;
+            };
+            if lowered.instances.is_empty() {
                 continue;
             }
             let page = crate::contract::component_id(hir, id);
-            if decl.kind != DeclKind::Page {
-                out.push(Compiled {
-                    page,
-                    signals: Err(format!(
-                        "a signal in a {:?}: this slice holds a page's signals, and a view's \
-                         wait for views to compose (ADR-0130)",
-                        decl.kind
-                    )),
-                });
-                continue;
-            }
-            let module = hir.module_of(id);
             let mut signals = Vec::new();
             let mut refused = None;
-            for (name, init, let_id) in declared {
-                let span = body.expr_span(init);
-                let written = match body.expr(let_id) {
-                    Expr::Let { ty: Some(t), .. } => crate::resolved::written_in_body(body, *t),
-                    _ => None,
-                };
-                let Some(ty) = written.and_then(|w| {
-                    sigs.resolve_type(module, decl, &w, span.clone())
-                        .resolved()
-                        .cloned()
-                }) else {
-                    refused = Some(format!("`{name}`'s type resolves to nothing"));
-                    break;
-                };
-                let ty = match lower::backend_type(&cx, &ty, &span) {
-                    Lowering::Lowered(t) => t,
-                    other => {
-                        refused = Some(format!("`{name}`'s type: {}", describe(&other)));
-                        break;
-                    }
-                };
-                let export = format!("{page}.signal.{name}");
-                let function =
-                    match lower::pure_expr_as(&cx, unit, id, init, &[], Some(&ty), &export, span) {
-                        Lowering::Lowered(f) => f,
-                        other => {
-                            refused = Some(format!("`{name}`'s first value: {}", describe(&other)));
-                            break;
-                        }
-                    };
-                let program = lower::program_of(&cx, vec![function]);
-                match super::js_pure::constant(&program, &program.functions[0]) {
-                    Ok(initial) => signals.push(Signal { name, initial }),
+            for instance in lowered.instances {
+                match first_value(&cx, &sigs, &page, &instance) {
+                    Ok(initial) => signals.push(Signal {
+                        name: instance.name,
+                        initial,
+                    }),
                     Err(why) => {
-                        refused = Some(format!("`{name}`'s first value: {why}"));
+                        refused = Some(why);
                         break;
                     }
                 }
@@ -124,6 +97,60 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
         }
     }
     Ok(out)
+}
+
+/// **One instance's first value**, as the browser's compiled modules read a
+/// value: its expression lowered as a function of nothing, of the type the
+/// signal declares, and encoded.
+fn first_value(
+    cx: &Context<'_>,
+    sigs: &Signatures,
+    page: &str,
+    instance: &crate::template_ir::Instance,
+) -> Result<serde_json::Value, String> {
+    use crate::template_ir::InstanceType;
+    let (unit, decl_id) = instance.origin;
+    let hir = cx.hirs[unit];
+    let decl = hir.decl(decl_id);
+    let name = &instance.name;
+    let body = hir.body(
+        decl.body
+            .ok_or_else(|| format!("`{name}` is held by no body"))?,
+    );
+    let span = body.expr_span(instance.init);
+    // The type as written: the `let`'s, or the module signal's declaration's.
+    let resolved = match instance.ty {
+        InstanceType::Written(t) => crate::resolved::written_in_body(body, t).and_then(|w| {
+            sigs.resolve_type(hir.module_of(decl_id), decl, &w, span.clone())
+                .resolved()
+                .cloned()
+        }),
+        InstanceType::Declared(signal) => {
+            sigs.signal_type(signal).and_then(|t| t.resolved()).cloned()
+        }
+    };
+    let ty = resolved.ok_or_else(|| format!("`{name}`'s type resolves to nothing"))?;
+    let ty = match lower::backend_type(cx, &ty, &span) {
+        Lowering::Lowered(t) => t,
+        other => return Err(format!("`{name}`'s type: {}", describe(&other))),
+    };
+    let export = format!("{page}.signal.{name}");
+    let function = match lower::pure_expr_as(
+        cx,
+        unit,
+        decl_id,
+        instance.init,
+        &[],
+        Some(&ty),
+        &export,
+        span,
+    ) {
+        Lowering::Lowered(f) => f,
+        other => return Err(format!("`{name}`'s first value: {}", describe(&other))),
+    };
+    let program = lower::program_of(cx, vec![function]);
+    super::js_pure::constant(&program, &program.functions[0])
+        .map_err(|why| format!("`{name}`'s first value: {why}"))
 }
 
 fn describe<T>(l: &Lowering<T>) -> String {

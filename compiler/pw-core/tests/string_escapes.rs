@@ -115,7 +115,8 @@ fn marko_is_given_the_value_and_an_interpolation_joined() {
     let src = "module m\n\nview V(name: String) !{} {\n    <p>{\"hi {name}\\n\"}</p>\n}\n";
     let p = parse_tree(src);
     assert!(p.errors.is_empty(), "{:?}", p.errors);
-    let out = pw_core::marko::render_module(&lower_file(src, &p.green), "t.pw");
+    let out =
+        pw_core::marko::render_module(&lower_file(src, &p.green), "t.pw", &Default::default());
     assert!(out.skipped.is_empty(), "{:?}", out.skipped);
     let (_, text) = &out.files[0];
     assert!(

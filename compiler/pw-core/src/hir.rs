@@ -161,6 +161,9 @@ pub enum DeclKind {
     Type,
     Opaque,
     Let,
+    /// `signal drawer: Bool` at module level (ADR-0144): a signal a page or
+    /// view provides to what its body contains. Its type is `ret`.
+    Signal,
     Import,
     /// A declaration form the lowering does not model yet. Recorded rather
     /// than dropped, so a checker can see that something was there.
@@ -629,6 +632,12 @@ pub struct Body {
     /// lowered to `value={s}` and an `on:input` handler setting `s`, and this
     /// says which handlers are those, for the rule on what a binding binds.
     pub bound: std::collections::BTreeSet<ExprId>,
+    /// **The assignments that are `provide`s** (ADR-0144): `provide drawer =
+    /// false` lowers to the assignment `drawer = false` of the signal its
+    /// module declares, and this says which. So the name resolves, and the
+    /// value is checked against the signal's type, as any assignment's is;
+    /// the rules about signals ask here.
+    pub provides: std::collections::BTreeSet<ExprId>,
 }
 
 /// The name a `bind:value` handler gives its event (ADR-0142): one no source

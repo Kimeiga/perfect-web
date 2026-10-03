@@ -170,8 +170,9 @@ fn is_decl_kind(k: K) -> bool {
 const EXPR_KEYWORDS: &[&str] = &[
     "if", "elif", "else", "match", "let", "for", "fn", "return", "true", "false",
     // A page's `signal open: Bool = false` (ADR-0130) is a statement, not a
-    // policy clause named `signal`.
-    "signal",
+    // policy clause named `signal`; nor is `provide drawer = false`
+    // (ADR-0144).
+    "signal", "provide",
 ];
 
 pub const STMT_CLAUSE_KEYWORDS: &[&str] =
@@ -921,6 +922,13 @@ impl<'a> P<'a> {
                 if self.at_kw("signal") && self.nth_is(1, Kind::Ident) && !self.nth_starts_line(1) {
                     return self.signal_stmt();
                 }
+                // **`provide drawer = false`: a module's signal, given its
+                // value for what this body contains** (ADR-0144). A keyword
+                // only before a name on its line, as `signal` is.
+                if self.at_kw("provide") && self.nth_is(1, Kind::Ident) && !self.nth_starts_line(1)
+                {
+                    return self.provide_stmt();
+                }
                 // **`derived e`: a pure value computed from other values**
                 // (charter §7.5). A bare name until 2026-09-25, so `let total =
                 // derived widths |> List.sum()` parsed as `let total = derived`
@@ -1560,6 +1568,21 @@ impl<'a> P<'a> {
         self.finish();
     }
 
+    /// `provide name = e` (ADR-0144): an assignment of the signal a module
+    /// declares, for everything the body it is written in contains.
+    fn provide_stmt(&mut self) {
+        self.start(K::LetStmt);
+        self.bump(); // provide
+        self.name("the name of the signal provided");
+        if self.expect(
+            Kind::Eq,
+            "and the value it is provided with: `provide name = value`",
+        ) {
+            self.expr(0);
+        }
+        self.finish();
+    }
+
     fn let_stmt(&mut self) {
         self.start(K::LetStmt);
         self.bump(); // let
@@ -2127,6 +2150,31 @@ impl<'a> P<'a> {
                     }
                     self.finish();
                 }
+            }
+            self.finish();
+            return true;
+        }
+
+        // **`signal drawer: Bool`: a signal a page or view provides**
+        // (ADR-0144). A name and a type: a `provide` in a body gives it its
+        // value, for what that body contains. A value written here is
+        // refused, and kept in the tree.
+        if self.at_kw("signal") && self.nth_is(1, Kind::Ident) {
+            self.start(K::LetDecl);
+            self.bump(); // signal
+            self.not_a_statement_keyword("a signal");
+            self.name("a signal's name");
+            if self.expect(Kind::Colon, "and the signal's type: `signal name: Type`") {
+                self.type_ref();
+            }
+            if self.at(Kind::Eq) {
+                self.error_help(
+                    "PW5306",
+                    "a signal declared in a module has no value of its own",
+                    "a page or view gives it one, for what it contains: `provide name = value`",
+                );
+                self.bump();
+                self.expr(0);
             }
             self.finish();
             return true;

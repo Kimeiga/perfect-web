@@ -593,6 +593,33 @@ async function reapplySpeculations() {
 
 /** name → its value, as JSON carries it (`js_pure`'s wire form). */
 const signals = new Map(Object.entries(parts.signals ?? {}));
+
+/** Each signal's first value, as the document gave it: what an instance
+ * starts again at when its block shows another arm (ADR-0144). */
+const firstValues = new Map(Object.entries(parts.signals ?? {}));
+
+/** What `{#if}` reads as true, as the renderer reads it (`Value::truthy`). */
+function truthy(v) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") return v !== "";
+  if (Array.isArray(v)) return v.length > 0;
+  return v !== null && v !== undefined;
+}
+
+/** The arm a block a signal decides shows: whether an `{#if}`'s value
+ * holds, or a `{#match}`'s case. */
+function armOf(live) {
+  const v = signalAt(live.path);
+  if (live.kind === "conditional") return truthy(v);
+  return v !== null && typeof v === "object" && "$case" in v ? v.$case : JSON.stringify(v);
+}
+
+/** The arm each block that holds signals last showed (ADR-0144). */
+const arms = new Map();
+for (const live of parts.live ?? []) {
+  if (live.owns?.length) arms.set(live.part, armOf(live));
+}
 let renderer = null;
 
 /** The renderer, loaded with the first block a signal renders again. */
@@ -778,6 +805,16 @@ async function flushSignals() {
       setAttributePart(live, from.get(live.signal));
       log.push(`signal ${live.signal} -> attribute ${live.attribute} of part ${live.part}`);
     } else if ((live.reads ?? [live.signal]).some((s) => changed.has(s))) {
+      // **A signal ends with its instance** (ADR-0130, R6; ADR-0144): when a
+      // block shows another arm, what its arms held starts again, before the
+      // block renders. Everything that reads them is inside it.
+      if (live.owns?.length) {
+        const arm = armOf(live);
+        if (arm !== arms.get(live.part)) {
+          for (const s of live.owns) signals.set(s, firstValues.get(s));
+          arms.set(live.part, arm);
+        }
+      }
       inserted.push(...replaceBlock(live.part, await renderBlock(live.part)));
       rendered = true;
       log.push(`signal ${[...changed].join(",")} -> block ${live.part}`);
@@ -903,6 +940,11 @@ function bindEvents() {
         if (modifiers.includes("stop")) e.stopPropagation();
         lastActed = el;
         const record = eventRecord(event, e);
+        // Which instance each signal the handler names is, for this use of
+        // its view (ADR-0144). Read at the press: the element is the one the
+        // block rendered last.
+        const instances = JSON.parse(el.dataset.pwSignals ?? "{}");
+        const instance = (name) => instances[name] ?? name;
         try {
           // Authorised above; loaded here. The order is the point of E7-L:
           // the bytes for this handler do not exist in this page until
@@ -933,8 +975,10 @@ function bindEvents() {
             event: record,
             // The page's signals (ADR-0130), as JSON carries them, and where
             // a change came from (ADR-0142).
-            get: (name) => signals.get(name),
-            set: (name, value) => setSignal(name, value, { el, event }),
+            // Through the instance this element's use of a view holds each
+            // signal as, where the compiler wrote one (ADR-0144).
+            get: (name) => signals.get(instance(name)),
+            set: (name, value) => setSignal(instance(name), value, { el, event }),
             // Each command speculates before its request (ADR-0122), and its
             // speculation is resolved by the answer, whatever it is.
             command: async (component, args) => {

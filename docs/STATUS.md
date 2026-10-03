@@ -13,6 +13,28 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0144, 2026-10-02: a view holds its own signals, and a page provides
+signals to the views it composes**
+([ADR-0144](DECISIONS/ADR-0144-a-view-holds-signals-and-a-page-provides-them.md),
+ADR-0130's third step). A header's cart button and the drawer it opens can
+be two views now, sharing one signal with nothing passed by hand.
+- `signal drawer: Bool` at module level is a name and a type.
+- A page or view gives it a value with `provide drawer = false`, for
+  everything it contains.
+- A view names it as it names anything it imports.
+- A view's own `signal count: Int = 0` is held once per use.
+- One compiled handler serves every use, and the element says which
+  instance it changes.
+- An instance in a block starts again when the block shows another arm.
+
+What is refused:
+- a page whose views need a signal nothing provides (PW5305, the message
+  naming the views it comes through);
+- two `provide`s of one signal in a body (PW5306);
+- a view holding a signal in a loop's row (PW5307).
+
+Demonstrated by `examples/demo/provide.pw` in Chromium, Firefox and WebKit.
+
 **Correction, ADR-0143, 2026-10-02: PW5014 accepted unlabelled fields and
 refused labelled ones**
 ([ADR-0143](DECISIONS/ADR-0143-what-names-a-form-control.md)). The rule

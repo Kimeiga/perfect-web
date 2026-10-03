@@ -47,7 +47,7 @@
 //! `""` for a region it did not understand would turn "an earlier analysis
 //! failed" into apparently valid HTML, and the page would look fine.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -470,6 +470,39 @@ struct Indexer {
     frames: u32,
     /// Each view composed into the template, in the order first written.
     views: Vec<DefId>,
+    /// The blocks around the node being lowered, outermost first (ADR-0144).
+    blocks: Vec<PartId>,
+    /// Each signal instance the template holds, in the order written
+    /// (ADR-0144).
+    instances: Vec<Instance>,
+}
+
+/// **A signal the template holds** (ADR-0144): a page's own, a composed
+/// view's own at each use, and each `provide`'s. The browser holds one value
+/// for each, by its name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Instance {
+    /// As the template reads it: `open` in the page's own markup, a fresh
+    /// name no source can write at each use of a view, `open~2`.
+    pub name: String,
+    /// The file and the declaration whose body writes its first value.
+    pub origin: (usize, DeclId),
+    /// Its first value: a `signal`'s initializer, or a `provide`'s value.
+    pub init: ExprId,
+    /// Its type, as written.
+    pub ty: InstanceType,
+    /// The blocks it is inside, outermost first. Its value ends when one of
+    /// them shows another arm (ADR-0130, R6).
+    pub within: Vec<PartId>,
+}
+
+/// Where an instance's type is written (ADR-0144).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstanceType {
+    /// A `signal x: T = e`'s `T`, in the origin's body.
+    Written(crate::hir::TypeRefId),
+    /// A module's `signal drawer: T`, which a `provide` gives.
+    Declared(DefId),
 }
 
 /// **A text part and the expression it shows** (ADR-0122): what an optimistic
@@ -743,6 +776,8 @@ pub struct Lowered {
     /// **Each view composed into it**, through the views it uses (ADR-0136):
     /// whose handlers are in its document.
     pub views: Vec<DefId>,
+    /// **Each signal it holds** (ADR-0144).
+    pub instances: Vec<Instance>,
 }
 
 /// **One renderable declaration's template, and its text holes** (ADR-0122),
@@ -761,6 +796,33 @@ pub fn lowered(
     let module = hir.module_of(id).unwrap_or_default();
     let mut chunks = Vec::new();
     let mut ix = Indexer::default();
+    // Its own signals, and the signals it provides, by the names it writes:
+    // the outermost body's names are its own (ADR-0144).
+    let mut provided = BTreeMap::new();
+    let mut signals = BTreeSet::new();
+    for (name, init, declared) in crate::page_values::signals_of(body) {
+        if let Expr::Let { ty: Some(t), .. } = body.expr(declared) {
+            ix.instances.push(Instance {
+                name: name.clone(),
+                origin: (unit, id),
+                init,
+                ty: InstanceType::Written(*t),
+                within: Vec::new(),
+            });
+        }
+        signals.insert(name);
+    }
+    for (name, signal, value) in provides_of(hirs, ws, unit, body) {
+        ix.instances.push(Instance {
+            name: name.clone(),
+            origin: (unit, id),
+            init: value,
+            ty: InstanceType::Declared(signal),
+            within: Vec::new(),
+        });
+        provided.insert(signal, name.clone());
+        signals.insert(name);
+    }
     let ctx = Lowering {
         handlers,
         hirs,
@@ -769,6 +831,8 @@ pub fn lowered(
         decl: id,
         names: BTreeMap::new(),
         within: Vec::new(),
+        provided,
+        signals,
     };
     for root in roots_of(body) {
         lower_node(body, root, &ctx, &mut ix, &mut chunks);
@@ -790,6 +854,7 @@ pub fn lowered(
         template,
         holes: ix.holes,
         views: ix.views,
+        instances: ix.instances,
     })
 }
 
@@ -820,6 +885,13 @@ struct Lowering<'a> {
     /// The views composed around this one. A view that contains itself is
     /// refused, not followed.
     within: Vec<DefId>,
+    /// **The instance each provided signal is, here** (ADR-0144): the
+    /// nearest `provide` around this body, by the signal's declaration.
+    provided: BTreeMap<DefId, String>,
+    /// The names this body writes that are signals: its own, the ones it
+    /// provides, and the ones provided around it. A handler's module names
+    /// each as the body writes it, and the element says which instance it is.
+    signals: BTreeSet<String>,
 }
 
 impl<'a> Lowering<'a> {
@@ -883,16 +955,81 @@ impl<'a> Lowering<'a> {
     }
 }
 
-/// **Is a view's body its markup alone?** What composition writes in place
-/// (ADR-0136): a view that binds values of its own would need them where it
-/// is used, and they are not there.
-pub(crate) fn markup_only(body: &Body) -> bool {
+/// **Is a view's body what composition writes in place?** Its markup
+/// (ADR-0136), and the signals it holds and provides, of which each use holds
+/// its own (ADR-0144). A view that binds other values of its own would need
+/// them where it is used, and they are not there.
+pub(crate) fn composable(body: &Body) -> bool {
     match body.expr(body.root) {
-        Expr::Block { stmts } => stmts
-            .iter()
-            .all(|s| matches!(body.expr(*s), Expr::Template { .. })),
+        Expr::Block { stmts } => stmts.iter().all(|s| {
+            matches!(body.expr(*s), Expr::Template { .. })
+                || body.signals.contains(s)
+                || body.provides.contains(s)
+        }),
         Expr::Template { .. } => true,
         _ => false,
+    }
+}
+
+/// **What a body provides** (ADR-0144): each `provide`'s name as written,
+/// the module signal it names, and its value. A `provide` of anything else
+/// is PW5306's to refuse, and is left out.
+pub(crate) fn provides_of(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    unit: usize,
+    body: &Body,
+) -> Vec<(String, DefId, ExprId)> {
+    let mut out = Vec::new();
+    for id in &body.provides {
+        let Expr::Binary { lhs, rhs, .. } = body.expr(*id) else {
+            continue;
+        };
+        let Expr::Name(name) = body.expr(*lhs) else {
+            continue;
+        };
+        if let Some(signal) = module_signal(hirs, ws, unit, name) {
+            out.push((name.clone(), signal, *rhs));
+        }
+    }
+    out
+}
+
+/// **The module signals a body names**, each once, by the name it writes
+/// (ADR-0144).
+pub(crate) fn signals_named(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    unit: usize,
+    body: &Body,
+) -> Vec<(String, DefId)> {
+    let mut out: Vec<(String, DefId)> = Vec::new();
+    for (_, e, _) in body.exprs() {
+        let Expr::Name(name) = e else { continue };
+        if out.iter().any(|(n, _)| n == name) {
+            continue;
+        }
+        if let Some(signal) = module_signal(hirs, ws, unit, name) {
+            out.push((name.clone(), signal));
+        }
+    }
+    out
+}
+
+/// The signal a module declares that `name` resolves to, where it is written.
+pub(crate) fn module_signal(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    unit: usize,
+    name: &str,
+) -> Option<DefId> {
+    match ws.resolve(unit, name) {
+        Resolution::Local(def) | Resolution::Imported { def, .. } => {
+            crate::resolve::declaration(hirs, def)
+                .is_some_and(|d| d.kind == crate::hir::DeclKind::Signal)
+                .then_some(def)
+        }
+        _ => None,
     }
 }
 
@@ -1113,6 +1250,33 @@ fn lower_element(
     if let Some(o) = owner {
         out.push(Chunk::Static(format!(" data-pw=\"{o}\"")));
     }
+    // **Which instance each signal its handlers name is** (ADR-0144). A
+    // handler's module is compiled once and names a signal as its body
+    // writes it; where this use of a view holds the signal under another
+    // name, the element says so, and the browser reads and sets that one.
+    // Written here, at compile time, so no handler reaches another instance.
+    let mut instances: BTreeMap<&str, &str> = BTreeMap::new();
+    for a in attrs.iter().filter(|a| a.event().is_some()) {
+        let AttrValue::Expr(handler) = &a.value else {
+            continue;
+        };
+        for e in body.walk_from(*handler) {
+            if let Expr::Name(n) = body.expr(e)
+                && ctx.signals.contains(n)
+                && let Some(to) = ctx.names.get(n)
+                && to != n
+            {
+                instances.insert(n, to);
+            }
+        }
+    }
+    if !instances.is_empty() {
+        let json = serde_json::to_string(&instances).expect("names serialize");
+        out.push(Chunk::Static(format!(
+            " data-pw-signals=\"{}\"",
+            escape_static_attribute(&json)
+        )));
+    }
 
     // Attribute order is the SOURCE order, and it is preserved rather than
     // sorted. HTML gives attribute order no meaning, so either would be
@@ -1317,9 +1481,10 @@ fn compose(
         out.push(blocked(format!("`<{tag}>` contains itself")));
         return;
     }
-    if !markup_only(view) {
+    if !composable(view) {
         out.push(blocked(format!(
-            "`{tag}` declares values of its own, and a composed view holds its markup alone"
+            "`{tag}` declares values of its own, and a composed view holds its markup and its \
+             signals alone"
         )));
         return;
     }
@@ -1348,6 +1513,59 @@ fn compose(
         };
         names.insert(p.name.clone(), path);
     }
+    // Its own signals, and the signals it provides: each use holds its own,
+    // named so no source can write it (ADR-0144). Each row of a loop would
+    // need one of its own, which the browser does not hold yet (PW5307).
+    let own = crate::page_values::signals_of(view);
+    let gives = provides_of(ctx.hirs, ctx.ws, def.unit, view);
+    if ix.frames > 0 && !(own.is_empty() && gives.is_empty()) {
+        out.push(blocked(format!(
+            "`<{tag}>` holds a signal, and a view used in a loop's row holds none yet"
+        )));
+        return;
+    }
+    let origin = (def.unit, DeclId(def.decl));
+    let mut provided = ctx.provided.clone();
+    let mut signals = BTreeSet::new();
+    for (name, init, declared) in own {
+        let Expr::Let { ty: Some(t), .. } = view.expr(declared) else {
+            continue;
+        };
+        let fresh = ix.rename(&name);
+        ix.instances.push(Instance {
+            name: fresh.clone(),
+            origin,
+            init,
+            ty: InstanceType::Written(*t),
+            within: ix.blocks.clone(),
+        });
+        names.insert(name.clone(), fresh);
+        signals.insert(name);
+    }
+    for (name, signal, value) in gives {
+        let fresh = ix.rename(&name);
+        ix.instances.push(Instance {
+            name: fresh.clone(),
+            origin,
+            init: value,
+            ty: InstanceType::Declared(signal),
+            within: ix.blocks.clone(),
+        });
+        names.insert(name.clone(), fresh.clone());
+        provided.insert(signal, fresh);
+        signals.insert(name);
+    }
+    // A signal provided around it is the nearest `provide`'s instance. With
+    // none, as in a view's own template, it is read by its name: a page that
+    // provides nothing a view it uses needs is refused (PW5305).
+    for (name, signal) in signals_named(ctx.hirs, ctx.ws, def.unit, view) {
+        if signals.contains(&name) {
+            continue;
+        }
+        let instance = ctx.provided.get(&signal).cloned().unwrap_or(name.clone());
+        names.insert(name.clone(), instance);
+        signals.insert(name);
+    }
     if !ix.views.contains(&def) {
         ix.views.push(def);
     }
@@ -1361,6 +1579,8 @@ fn compose(
         decl: DeclId(def.decl),
         names,
         within,
+        provided,
+        signals,
     };
     for root in roots_of(view) {
         lower_node(view, root, &inner, ix, out);
@@ -1376,11 +1596,28 @@ fn lower_block(
     ix: &mut Indexer,
     out: &mut Vec<Chunk>,
 ) {
-    let d = directive.trim();
     // The block's own id comes BEFORE its children's, so document order and id
     // order agree — a patch stream that arrives in id order arrives in a order
     // the runtime can apply without buffering.
     let id = ix.part();
+    // What a signal instance inside it belongs to (ADR-0144).
+    ix.blocks.push(id);
+    lower_block_at(body, id, directive, children, subject, ctx, ix, out);
+    ix.blocks.pop();
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_block_at(
+    body: &Body,
+    id: PartId,
+    directive: &str,
+    children: &[NodeId],
+    subject: Option<ExprId>,
+    ctx: &Lowering<'_>,
+    ix: &mut Indexer,
+    out: &mut Vec<Chunk>,
+) {
+    let d = directive.trim();
     let (lead, branches) = split_branches(body, children);
     let blocked = |reason: String| {
         Chunk::Dynamic(Part::Blocked {
@@ -1671,7 +1908,14 @@ fn conditional(
             Some(c) => {
                 let nested = ix.part();
                 match value_path(body, c).map(|v| ctx.read(v)) {
-                    Some(v) => vec![conditional(body, nested, v, run, more, ctx, ix)],
+                    Some(v) => {
+                        // A block of its own: what its arms hold ends when
+                        // it shows another (ADR-0144).
+                        ix.blocks.push(nested);
+                        let chunk = conditional(body, nested, v, run, more, ctx, ix);
+                        ix.blocks.pop();
+                        vec![chunk]
+                    }
                     None => blocked(
                         "an `{:else if}` condition must be a value path",
                         marker.written,

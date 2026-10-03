@@ -52,9 +52,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
    - ~~**Correction: what names a form control.**~~ Done 2026-10-02
      (ADR-0143). Writing T06 found that PW5014 took any `id` as a name, and
      refused a control wrapped in its label.
-   - **Next: provided signals** (ADR-0130's step 3): a view's own signals,
-     and a signal a page provides to the views it composes.
-   - **Then E14-Q**, the server's generality for queries, which T02, T03,
+   - ~~**Provided signals.**~~ Done 2026-10-02 (ADR-0144), ADR-0130's step
+     3:
+     - a view's own signals, an instance per use;
+     - a signal a page provides to the views it composes;
+     - PW5305, PW5306 and PW5307.
+
+     Demonstrated by `examples/demo/provide.pw` in three engines.
+   - **Next: E14-Q**, the server's generality for queries, which T02, T03,
      T04, T07, T09 and T10 wait on; T05 waits on `<stream>` (ADR-0075).
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how

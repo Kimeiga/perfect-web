@@ -152,6 +152,9 @@ pub struct Signatures {
     /// What each declaration is: a clause names a declaration of its kind
     /// (ADR-0088).
     kinds: BTreeMap<DefId, DeclKind>,
+    /// **Each module signal's type** (ADR-0144), resolved where it is
+    /// declared: what a body it is provided to reads and writes.
+    signal_types: BTreeMap<DefId, TypeResolution>,
 }
 
 impl Signatures {
@@ -176,6 +179,21 @@ impl Signatures {
                 };
                 out.paths.insert(def, path);
                 out.kinds.insert(def, decl.kind);
+                if decl.kind == DeclKind::Signal
+                    && let Some(written) = &decl.ret
+                {
+                    out.signal_types.insert(
+                        def,
+                        resolved::resolve(
+                            workspace,
+                            m.unit,
+                            Some(def),
+                            &[],
+                            written,
+                            decl.name_span.clone(),
+                        ),
+                    );
+                }
             }
         }
         for m in &workspace.modules {
@@ -450,6 +468,11 @@ impl Signatures {
     /// What kind of declaration `def` is.
     pub fn kind_of(&self, def: DefId) -> Option<DeclKind> {
         self.kinds.get(&def).copied()
+    }
+
+    /// **The type a module signal declares** (ADR-0144), by its identity.
+    pub fn signal_type(&self, def: DefId) -> Option<&TypeResolution> {
+        self.signal_types.get(&def)
     }
 
     pub fn in_module(&self, module: Option<&str>, path: &str) -> Option<&Signature> {

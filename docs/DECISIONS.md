@@ -1099,3 +1099,18 @@ that reaches it, as the HTML standard and accname 1.2 define:
 
 Until then any `id` counted as a name, unchecked, so T06's unsafe store and
 `tricky.pw`'s field passed with no label, and a wrapping label was refused.
+
+[ADR-0144](DECISIONS/ADR-0144-a-view-holds-signals-and-a-page-provides-them.md):
+ADR-0130's third step.
+- A view holds its own signals, and each use of it holds its own instance.
+- A signal a module declares, `signal drawer: Bool`, has no value: a page
+  or view gives it one with `provide`, for everything that body contains.
+- A view names it as it names anything it imports, so sibling views share
+  UI state with nothing passed by hand.
+- A page that needs a signal nothing provides is refused (PW5305). So is a
+  second `provide` of one signal in a body, or a `provide` of anything but a
+  module's signal (PW5306), and a view holding a signal in a loop's row
+  (PW5307).
+- One compiled handler serves every instance: the element says which
+  instance each signal it names is.
+- An instance in a block starts again when the block shows another arm.

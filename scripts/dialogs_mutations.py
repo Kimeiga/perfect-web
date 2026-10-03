@@ -42,8 +42,8 @@ MUTANTS = [
     (
         "a body with a dialog alone is not read",
         SIGNALS,
-        "    if body.signals.is_empty() && handlers.is_empty() && !dialog {\n",
-        "    if body.signals.is_empty() && handlers.is_empty() {\n",
+        "    if body.signals.is_empty() && named.is_empty() && handlers.is_empty() && !dialog {\n",
+        "    if body.signals.is_empty() && named.is_empty() && handlers.is_empty() {\n",
     ),
     (
         "an open dialog is read as a modal one",

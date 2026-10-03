@@ -1096,6 +1096,16 @@ impl<'a> Typer<'a> {
         {
             return function_type(sig);
         }
+        // A module's signal, provided to this body: a value of the type it
+        // declares (ADR-0144).
+        if let Resolution::Local(d) | Resolution::Imported { def: d, .. } = term
+            && let Some(declared) = self.sigs.signal_type(d)
+        {
+            return match declared {
+                TypeResolution::Resolved(t) => Ty::of(t),
+                _ => Ty::Unknown,
+            };
+        }
         // The language's own values, only where the program has not declared
         // something of that name; then a sum type's case (ADR-0059).
         let own = matches!(term, Resolution::Unresolved);
@@ -3188,6 +3198,18 @@ impl<'a> Typer<'a> {
             .bound
             .iter()
             .any(|l| matches!(self.body.expr(*l), Expr::Lambda { body, .. } if *body == id))
+        {
+            return Vec::new();
+        }
+        // A `provide` of what is not a module's signal is PW5306's
+        // (ADR-0144); one of a signal is checked as any assignment is.
+        if self.body.provides.contains(&id)
+            && let Expr::Name(x) = self.body.expr(lhs)
+            && !matches!(
+                self.ws.resolve_in(self.at, Namespace::Term, x),
+                Resolution::Local(d) | Resolution::Imported { def: d, .. }
+                    if self.sigs.signal_type(d).is_some()
+            )
         {
             return Vec::new();
         }

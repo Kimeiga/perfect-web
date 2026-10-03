@@ -149,6 +149,11 @@ pub struct Live {
     /// The attribute, for an attribute part: `value`, `disabled` (ADR-0142).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub attribute: String,
+    /// **The signals a block's arms hold** (ADR-0144): each use of a view
+    /// inside it holds its own. When the block shows another arm, they end,
+    /// and start again at their first values (ADR-0130, R6).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub owns: Vec<String>,
 }
 
 /// The part numbered `id`, wherever it is in `chunks`.
@@ -458,6 +463,7 @@ fn live_attributes(
                 kind: p.kind().to_string(),
                 reads: Vec::new(),
                 attribute: name.clone(),
+                owns: Vec::new(),
             });
         }
         let inner = framed || matches!(p, Part::Each { .. });
@@ -674,16 +680,28 @@ fn plan(
         });
     }
 
-    let signals: Vec<String> = signals_of(body).into_iter().map(|(n, ..)| n).collect();
     let mut live = Vec::new();
     let mut parts = Vec::new();
     let mut members = BTreeSet::new();
     // The page's template, each view it uses composed in place (ADR-0136):
     // what the build renders, numbered as the build numbers it.
     let crate::template_ir::Lowered {
-        template, holes, ..
+        template,
+        holes,
+        instances,
+        ..
     } = crate::template_ir::lowered(hirs, ws, captures, unit, id)
         .ok_or_else(|| format!("`{}` has no template", decl.name))?;
+    // The signals the browser holds: the page's own, and each one the views
+    // composed in it hold and are provided (ADR-0144).
+    let signals: Vec<String> = instances.iter().map(|i| i.name.clone()).collect();
+    let owned = |part: u32| -> Vec<String> {
+        instances
+            .iter()
+            .filter(|i| i.within.iter().any(|b| b.0 == part))
+            .map(|i| i.name.clone())
+            .collect()
+    };
     // What a signal decides, the browser renders again (ADR-0137).
     rendered_again(&template.chunks, &signals, &Reach::Top)?;
     for hole in holes {
@@ -712,6 +730,7 @@ fn plan(
                 kind: "text".to_string(),
                 reads: Vec::new(),
                 attribute: String::new(),
+                owns: Vec::new(),
             });
             continue;
         }
@@ -789,6 +808,7 @@ fn plan(
                 kind: entry.kind.to_string(),
                 reads: block_reads(part, &signals),
                 attribute: String::new(),
+                owns: owned(entry.id.0),
             });
         }
     }

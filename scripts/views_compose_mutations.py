@@ -125,8 +125,8 @@ MUTANTS = [
     (
         "a view with values of its own composes",
         TEMPLATE,
-        "            .all(|s| matches!(body.expr(*s), Expr::Template { .. })),\n        Expr::Template { .. } => true,\n",
-        "            .any(|s| matches!(body.expr(*s), Expr::Template { .. })),\n        Expr::Template { .. } => true,\n",
+        "        Expr::Block { stmts } => stmts.iter().all(|s| {\n            matches!(body.expr(*s), Expr::Template { .. })\n",
+        "        Expr::Block { stmts } => stmts.iter().any(|s| {\n            matches!(body.expr(*s), Expr::Template { .. })\n",
     ),
     (
         "the plan skips what a view shows",
