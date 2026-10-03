@@ -423,12 +423,14 @@ export async function controls(id, stacks) {
     rows.push({
       stack,
       // The unchanged start passes the contract and fails the hidden tests;
-      // or, for a task that starts from a broken program (`"start":
-      // "broken"`, T12), fails somewhere real: a checker, a build, or a test
-      // that ran.
+      // or, for a task that starts from a broken program, fails somewhere
+      // real: a checker, a build, or a test that ran. A task starts broken
+      // on every stack (`"start": "broken"`, T12), or on the stacks it names
+      // (`"start": {"pleris": "broken"}`, T08 since ADR-0154, where a checker
+      // refuses what the frameworks build).
       negative:
         noop.score === 0 &&
-        (task.start === "broken"
+        (task.start === "broken" || task.start?.[stack] === "broken"
           ? ["check", "build"].includes(noop.failed_at) || (stage(noop, noop.failed_at)?.failed ?? 0) > 0
           : stage(noop, "contract")?.ok === true && (stage(noop, "hidden")?.failed ?? 0) > 0),
       positive: reference.score === 1 && ran(reference, "contract") > 0 && ran(reference, "hidden") > 0,

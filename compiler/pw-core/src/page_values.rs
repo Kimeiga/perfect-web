@@ -715,7 +715,7 @@ pub struct Planned {
 }
 
 /// A path written in `unit`, resolved as a term.
-fn resolve_term(ws: &Workspace, unit: usize, path: &str) -> Option<DefId> {
+pub(crate) fn resolve_term(ws: &Workspace, unit: usize, path: &str) -> Option<DefId> {
     let r = match path.contains('.') {
         true => ws.resolve_path(unit, path),
         false => ws.resolve_in(unit, Namespace::Term, path),

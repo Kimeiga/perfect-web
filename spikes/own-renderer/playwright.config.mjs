@@ -4,6 +4,7 @@
 ///
 // Not E8's production host: its deletion condition is that E8 replaces it with
 // the capability-constrained one while preserving the `pw-protocol` boundary.
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.PORT ?? 3141);
@@ -60,6 +61,12 @@ export const MUTABLE_PORTS = Object.fromEntries(
 // read-only, so every engine shares it.
 export const KIOKUN_PORT = PORT + 40;
 
+// The keyed store's hosts (ADR-0152): the store with T07's category tabs,
+// built into `dist-keyed` by `keyed-store.sh`. One per engine, because which
+// category is slow is one per server. Served only when it is built.
+export const KEYED_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 50 + i]));
+const KEYED_BUILT = existsSync(new URL("./dist-keyed/build", import.meta.url));
+
 const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]
   : [PORT, ...MUTATING.flatMap((suite) => Object.values(MUTABLE_PORTS[suite]))];
@@ -73,7 +80,11 @@ export default defineConfig({
   // the machine, and a long-animation-frame measurement taken under that load
   // measures the load. It failed exactly that way — the clean run reported a
   // long frame that the same page, alone, does not produce.
-  testIgnore: process.env.PW_PERFORMANCE ? [] : ["**/performance.spec.mjs"],
+  testIgnore: [
+    ...(process.env.PW_PERFORMANCE ? [] : ["**/performance.spec.mjs"]),
+    // The keyed store's suite needs its build (`keyed-store.sh`).
+    ...(KEYED_BUILT ? [] : ["**/keyed.spec.mjs"]),
+  ],
   fullyParallel: true,
   reporter: [["list"]],
   use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "off" },
@@ -90,6 +101,15 @@ export default defineConfig({
       reuseExistingServer: !!process.env.PW_REUSE,
       timeout: 60_000,
     })),
+    ...(KEYED_BUILT && !process.env.PW_PERFORMANCE
+      ? Object.values(KEYED_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist-keyed`,
+          env: { PORT: String(port) },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))
+      : []),
     ...(process.env.PW_PERFORMANCE
       ? []
       : [

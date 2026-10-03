@@ -124,6 +124,13 @@ the press after it.
 - T07's controls on all three stacks, which run the browser half: in
   Chromium, Cold's items show while Hot is read, and Hot's request is
   aborted.
+- The charter's store tests 6-8, in Chromium, Firefox and WebKit, on a store
+  with T07's setup and reference (`e2e/keyed.spec.mjs`, served from
+  `dist-keyed` by `keyed-store.sh`):
+  - a changed key's old read is aborted, stopped on the server, and never
+    shown;
+  - a key the page has is not asked for again;
+  - leaving the page stops its read on the server.
 - The mutation controls.
 
 ## Not claimed

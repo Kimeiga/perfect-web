@@ -168,6 +168,11 @@ codes! {
     // --- declaration rules (PW01xx-PW03xx) --------------------------------
     RETRY_NOT_IDEMPOTENT = "PW0312" / retry_not_idempotent / 1, DeclarationRules,
         "a command that retries must be idempotent";
+    // ADR-0154: a browser's request can be delivered twice, whatever the
+    // program does, and the platform gives each press an interaction. A
+    // command a page's handler calls says how a second delivery is answered.
+    SENT_WITHOUT_IDEMPOTENCY = "PW0338" / sent_without_idempotency / 1, DeclarationRules,
+        "a command a page's handler calls declares `idempotent_by`";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 
@@ -231,6 +236,11 @@ codes! {
     // 2026-09-26 nothing reported one.
     UNREACHABLE_ARM = "PW0333" / unreachable_arm / 1, Exhaustiveness,
         "every arm of a match must be reached by some value";
+    // ADR-0153: in a template a case is tested with `{#match}`, which PW0305
+    // holds to every case. An `{#if}` chain over a value's cases is held to
+    // none: one that forgets a case added later shows nothing for it.
+    CASE_TESTED_BY_IF = "PW0337" / case_tested_by_if / 1, Exhaustiveness,
+        "a template tests a value's case with `{#match}`, which names every case";
 
     // --- types (PW06xx) ---------------------------------------------------
     OPTION_USED_AS_VALUE = "PW0600" / option_used_as_value / 1, Types,

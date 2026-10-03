@@ -17,6 +17,9 @@ OUT="${PW_OUT:-$SPIKE/dist}"
 # platform packages and the toolchain are the repository's.
 SOURCES="${PW_SOURCES:-$REPO_ROOT/examples}"
 STORE_IR="${PW_STORE_IR:-$SPIKE/store-ir.json}"
+# The pages' template IR, which the render below reads. A build of another
+# store (`keyed-store.sh`) writes its own, so the canonical store's stays.
+TEMPLATE_IR="${PW_TEMPLATE_IR:-$SPIKE/template-ir.json}"
 EVIDENCE="$REPO_ROOT/docs/evidence/E7"
 PORT="${PORT:-3141}"
 
@@ -61,13 +64,13 @@ cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
 echo
 echo "== 2. checked template IR =="
 cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
-  emit-template "${PAGES[@]}" > "$SPIKE/template-ir.json"
-echo "   $(wc -c < "$SPIKE/template-ir.json" | tr -d ' ') bytes"
+  emit-template "${PAGES[@]}" > "$TEMPLATE_IR"
+echo "   $(wc -c < "$TEMPLATE_IR" | tr -d ' ') bytes"
 
 echo
 echo "== 3. HTML, by pw-render =="
 cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
-  --out "$OUT" < "$SPIKE/template-ir.json"
+  --out "$OUT" < "$TEMPLATE_IR"
 
 echo
 echo "== 3b. one build: the store's handlers compiled from their bodies (E10), its plan =="
@@ -125,7 +128,7 @@ fi
 echo
 echo "== 5. determinism: the same IR renders to the same bytes =="
 cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
-  --out "$OUT.again" < "$SPIKE/template-ir.json"
+  --out "$OUT.again" < "$TEMPLATE_IR"
 rm -f "$OUT.again/StorePage.html"
 if ! diff "$OUT/HelloStatic.html" "$OUT.again/HelloStatic.html" > /dev/null \
    || ! diff "$OUT/Tricky.html" "$OUT.again/Tricky.html" > /dev/null; then

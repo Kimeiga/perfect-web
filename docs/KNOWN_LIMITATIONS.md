@@ -180,6 +180,12 @@ refused by name:
   - **A query's budget bounds the region, not the query.** The query runs on
     after its region is given the host's failure, and what it answers is
     kept as its policy says.
+- **A template shows each case by name; a function need not** (ADR-0153).
+  A function a template calls can map a state to nothing with a catch-all,
+  and the template shows what it returns.
+- **A command a page sends is keyed by its interaction** (ADR-0154), and the
+  runtime still sends each request once: with every one keyed it could retry
+  safely, as RFC 9110 then allows, and does not yet.
 - **A key a page changes** (ADR-0152):
   - **Only a page's own `let` query is keyed by a signal.** A view's signal,
     and a `<stream>`'s query, are not.
@@ -187,9 +193,10 @@ refused by name:
     list would need a codec.
   - **The key a page shows is recorded per session**, as what it shows is.
     Two tabs of one session that choose different keys are patched as one.
-  - **Keyed reads are exercised in a browser in Chromium only**, through
-    T07's controls; the server's tests cover each policy. The press-order
-    fix runs in three engines.
+  - **Keyed reads run in a browser for `cancel` only**: the charter's store
+    tests 6-8 in Chromium, Firefox and WebKit (`e2e/keyed.spec.mjs`), and
+    T07's controls in Chromium for `keep` and `supersede`. The server's tests
+    cover each policy.
 - **What a page shows is recorded per session** (ADR-0151, as before it).
   Two pages of one session read at once are both served, and the later is
   the one later changes are derived against.

@@ -13,6 +13,33 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Keyed reads in three engines, 2026-10-03.** The charter's store tests 6-8
+(§15.6) run in Chromium, Firefox and WebKit, on a store with T07's category
+tabs built into `dist-keyed`:
+- a changed key's old read is aborted, stopped on the server, and never
+  shown;
+- a key the page has is not asked for again;
+- leaving the page stops its read on the server.
+
+Found on the way: `run.sh` wrote its template IR into the spike's directory
+whatever store it built. So a second store's build replaced the canonical
+store's `store-ir.json`, which the server's tests compile in, and they failed
+on a binding the canonical store does not have. Each IR's path can be given
+now.
+
+**ADR-0153 and ADR-0154, 2026-10-03: the two forms gate item 5 found open
+are ruled.**
+- **A template tests a case with `{#match}`** (ADR-0153, PW0337). An
+  `{#if status == Placed}` chain was held to no case. One that forgot a case
+  added later showed nothing for it, which is T04's wrong fix in another
+  form. A template's catch-all arm was refused already (PW5019). A
+  function's catch-all, outside the template, is what remains.
+- **A command a page's handler calls declares `idempotent_by`** (ADR-0154,
+  PW0338). Its request can be delivered twice whatever the program does,
+  and RFC 9110 lets a client retry only what it knows to be idempotent. Each
+  press carries an interaction. T08's setup, a command with none, no longer
+  checks, and T08's class is refused whole.
+
 **E14-C, 2026-10-03: T07 is written, all twelve tasks; ADR-0152, a key a
 page changes** ([ADR-0152](DECISIONS/ADR-0152-a-key-a-page-changes.md)).
 - **What was missing.** A page could not change a query's key. A signal
@@ -2369,16 +2396,14 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **The two rules gate item 5 points at**, each researched and ruled:
-   - an `{#if}` chain over one sum value's cases, held to cover them (T04);
-   - every command a browser sends declaring how a second delivery is
-     answered (T08).
-2. **Keyed reads in three engines**: serve a store with T07's setup in the
-   browser suite, so Firefox and WebKit run them as Chromium does in T07's
-   controls.
-3. **E14-E's design**, ready for the owner's choice of models and budget:
+1. **E14-E's design**, ready for the owner's choice of models and budget:
    how the agent is run, and how a harness effect is told from capability
    (gate item 4).
+2. **The DoorDash store's next features**, each as a benchmark task would
+   be written: a cart's lines with quantities, a checkout, an order tracked.
+3. **The runtime retries a keyed command** (ADR-0154): with every command a
+   page sends keyed by its interaction, a failed request can be sent again
+   safely, as RFC 9110 then allows.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

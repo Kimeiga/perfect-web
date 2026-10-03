@@ -272,6 +272,34 @@ pub(crate) fn handler_events(body: &crate::hir::Body) -> Vec<(String, ExprId)> {
     out
 }
 
+/// **Each command a page's or a view's handler calls** (ADR-0154), with
+/// where each call is written: what a browser sends, and can send twice.
+pub fn sent_commands(hirs: &[&Hir], sigs: &Signatures) -> BTreeMap<DefId, Vec<crate::hir::Span>> {
+    let mut out: BTreeMap<DefId, Vec<crate::hir::Span>> = BTreeMap::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (_, decl) in hir.all_decls() {
+            let Some(b) = decl.body else { continue };
+            let body = hir.body(b);
+            for handler in handlers_in(body) {
+                for e in body.walk_from(handler) {
+                    let Expr::Call { callee, .. } = body.expr(e) else {
+                        continue;
+                    };
+                    let path = crate::infer::path_of(body, *callee);
+                    let Some(def) = crate::page_values::resolve_term(sigs.workspace(), unit, &path)
+                    else {
+                        continue;
+                    };
+                    if sigs.kind_of(def) == Some(crate::hir::DeclKind::Command) {
+                        out.entry(def).or_default().push(body.expr_span(e));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 /// **Every handler in a body, in the order it is written** (ADR-0134): each
 /// `on:` lambda, and each lambda written `resumable(..)`. Until 2026-10-02 only
 /// the second was a handler, and an `on:press={() => ..}` built into a button

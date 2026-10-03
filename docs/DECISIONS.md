@@ -1226,3 +1226,15 @@ charter's §15.6 tests 6-8 needed. Settles ADR-0089's open ruling.
 
 Found on the way: the browser ran presses in the order their code arrived.
 Each handler now starts after the press before it.
+
+[ADR-0153](DECISIONS/ADR-0153-a-template-tests-a-case-with-match.md): the
+first form gate item 5 found open. In a template a case is tested with
+`{#match}`, which PW0305 holds to every case: an `{#if}` comparing a value
+with one of its cases is refused (PW0337). A template's catch-all arm was
+refused already (PW5019).
+
+[ADR-0154](DECISIONS/ADR-0154-a-command-a-page-sends-declares-idempotent-by.md):
+the second. A command a page's handler calls declares `idempotent_by`
+(PW0338): its request can be delivered twice whatever the program does, and
+each press carries an interaction. RFC 9110 lets a client retry only what it
+knows to be idempotent.

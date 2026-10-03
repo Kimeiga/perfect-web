@@ -210,11 +210,15 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     let captured = crate::resume::captured_params(&hirs, &sigs);
     // And what each view needs provided, and which hold signals (ADR-0144).
     let provision = crate::signals::Provision::of(&hirs, &sigs);
+    // And each command a page's handler calls (ADR-0154): what a browser
+    // sends, and can send twice.
+    let sent = crate::resume::sent_commands(&hirs, &sigs);
     units
         .iter()
         .enumerate()
         .map(|(i, u)| {
             let mut out = resolution.remove(&i).unwrap_or_default();
+            out.extend(sent_without_idempotency(&u.hir, i, &sent));
             out.extend(check_unit_with(
                 &env,
                 &labels,
@@ -238,6 +242,60 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             (u.path.clone(), out)
         })
         .collect()
+}
+
+/// **A command a page's handler calls declares `idempotent_by`**
+/// (ADR-0154): its request can be delivered twice, by a retrying proxy, a
+/// flaky network or a client's own retry, and the platform gives each press
+/// an interaction to tell the second from the first.
+fn sent_without_idempotency(
+    hir: &Hir,
+    unit: usize,
+    sent: &BTreeMap<crate::resolve::DefId, Vec<hir::Span>>,
+) -> Vec<Diagnostic> {
+    let code = crate::codes::SENT_WITHOUT_IDEMPOTENCY;
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if decl.kind != hir::DeclKind::Command || decl.policy("idempotent_by").is_some() {
+            continue;
+        }
+        let def = crate::resolve::DefId { unit, decl: id.0 };
+        let Some(calls) = sent.get(&def) else {
+            continue;
+        };
+        out.push(Diagnostic {
+            code: code.id,
+            invariant: code.invariant,
+            reason: "sent_without_idempotency",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!(
+                "`{}` is called by a page's handler, and declares no `idempotent_by`",
+                decl.name
+            ),
+            primary_span: hir.decl_span(id),
+            related: calls
+                .iter()
+                .map(|span| Related {
+                    span: span.clone(),
+                    label: "a press sends it from here".to_string(),
+                })
+                .collect(),
+            explanation: Some(
+                "A browser's request can reach the server twice: a retrying proxy, a \
+                 flaky network or a client's own retry sends it again after the first \
+                 arrived (RFC 9110 lets a client retry only a request it knows to be \
+                 idempotent). Each press carries an interaction, and `idempotent_by \
+                 InteractionId` runs the command once for it (ADR-0121)."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: "declare `idempotent_by InteractionId`".to_string(),
+                replacement: None,
+            }],
+        });
+    }
+    out
 }
 
 /// Uses of a name nothing declares.
@@ -5446,6 +5504,136 @@ fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagn
     }
 }
 
+/// **A condition that tests a value's case** (ADR-0153): `x == C` or
+/// `x != C`, either way round, where `C` is a case of `x`'s type, an
+/// `Option`'s, a `Result`'s or a declared sum type's. The value as written,
+/// and the case.
+fn case_test(
+    body: &hir::Body,
+    sigs: &Signatures,
+    types: &crate::infer::Types,
+    unit: Option<usize>,
+    c: hir::ExprId,
+) -> Option<(String, String)> {
+    use crate::resolved::Builtin;
+    let Expr::Binary {
+        op: hir::BinOp::Cmp(op),
+        lhs,
+        rhs,
+    } = body.expr(c)
+    else {
+        return None;
+    };
+    if op != "==" && op != "!=" {
+        return None;
+    }
+    let cases_of = |e: hir::ExprId| -> Vec<String> {
+        let Some(ty) = types.of(body, e) else {
+            return Vec::new();
+        };
+        match ty.as_builtin() {
+            Some(Builtin::Option) => vec!["Some".to_string(), "None".to_string()],
+            Some(Builtin::Result) => vec!["Ok".to_string(), "Err".to_string()],
+            _ => ty
+                .def_id()
+                .and_then(|d| sigs.type_decl(d)?.variants.as_ref().cloned())
+                .map(|vs| vs.into_iter().map(|(name, _)| name).collect())
+                .unwrap_or_default(),
+        }
+    };
+    // A case as written, read from the expression's shape: `Placed`, a
+    // qualified `Status.Placed`, or a case's call, `Some(x)`. Never from a
+    // path's spelling (RISK_QUEUE 34): a name spelled like a case of another
+    // type is that type's, which `same` below tells apart.
+    let case_named = |e: hir::ExprId| -> Option<String> {
+        let at = match body.expr(e) {
+            Expr::Call { callee, .. } => *callee,
+            _ => e,
+        };
+        match body.expr(at) {
+            Expr::Name(n) => Some(n.clone()),
+            Expr::Field { name, .. } => Some(name.clone()),
+            _ => None,
+        }
+    };
+    // The same type, by identity: the language's `Option` or `Result`, or the
+    // same declared sum type. A bare case the typer leaves untyped is looked
+    // up among the cases of the value's own type, a lookup scoped by that
+    // type's identity; a qualified one must be typed as the value's type.
+    let same = |a: hir::ExprId, b: hir::ExprId| match (types.of(body, a), types.of(body, b)) {
+        (Some(x), Some(y)) => match (x.as_builtin(), y.as_builtin()) {
+            (Some(p), Some(q)) => p == q,
+            (None, None) => x.def_id().is_some() && x.def_id() == y.def_id(),
+            _ => false,
+        },
+        (Some(x), None) => match body.expr(b) {
+            Expr::Name(_) => true,
+            // `Status.Placed`: its qualifier resolved, by identity, to the
+            // value's type, as a `{#match}` arm's is.
+            Expr::Field { base, .. } => {
+                use crate::resolve::{Namespace, Resolution};
+                let q = crate::infer::path_of(body, *base);
+                let named = unit.map(|u| match q.contains('.') {
+                    true => sigs.workspace().resolve_path_in(u, Namespace::Type, &q),
+                    false => sigs.workspace().resolve_in(u, Namespace::Type, &q),
+                });
+                matches!(
+                    named,
+                    Some(Resolution::Local(d) | Resolution::Imported { def: d, .. })
+                        if Some(d) == x.def_id()
+                )
+            }
+            _ => false,
+        },
+        _ => false,
+    };
+    for (value, other) in [(*lhs, *rhs), (*rhs, *lhs)] {
+        if same(value, other)
+            && let Some(case) = case_named(other)
+            && cases_of(value).contains(&case)
+        {
+            return Some((crate::infer::path_of(body, value), case));
+        }
+    }
+    None
+}
+
+fn case_tested_by_if(
+    body: &hir::Body,
+    at: hir::ExprId,
+    value: &str,
+    case: &str,
+    related: Vec<Related>,
+) -> Diagnostic {
+    let code = crate::codes::CASE_TESTED_BY_IF;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "case_tested_by_if",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`{{#if}}` tests whether `{value}` is `{case}`; `{{#match {value}}}` names each case"
+        ),
+        primary_span: body.expr_span(at),
+        related,
+        explanation: Some(
+            "A `{#match}` is held to cover every case of its value (PW0305), so a case \
+             added later is a page that does not check until it shows it. `{#if}` \
+             blocks testing cases are held to none: one that forgets a case shows \
+             nothing for it (ADR-0153)."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: format!(
+                "write `{{#match {value}}}` with an arm for each case, an empty one where \
+                 nothing shows"
+            ),
+            replacement: None,
+        }],
+    }
+}
+
 fn template_blocks(
     hir: &Hir,
     sigs: &Signatures,
@@ -5571,6 +5759,23 @@ fn template_blocks(
                 }
             }
             "if" => {
+                // **A case is tested with `{#match}`** (ADR-0153): each
+                // condition, the block's and each `{:else if}`'s.
+                let conditions =
+                    subject
+                        .iter()
+                        .copied()
+                        .chain(branches.iter().filter_map(|(b, ..)| match body.node(*b) {
+                            Node::Branch { condition, .. } => *condition,
+                            _ => None,
+                        }));
+                for c in conditions {
+                    if let Some((value, case)) =
+                        case_test(body, sigs, &types, sigs.unit_of(hir.module_of(id)), c)
+                    {
+                        out.push(case_tested_by_if(body, c, &value, &case, related()));
+                    }
+                }
                 for (i, (b, marker, else_if, _)) in branches.iter().enumerate() {
                     let last = i + 1 == branches.len();
                     if !(*else_if || (marker == "{:else}" && last)) {

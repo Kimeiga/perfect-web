@@ -110,16 +110,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
      the new key once it has finished. All four controls hold on all three
      stacks. All twelve tasks are written. Found on the way: presses ran in
      the order their code arrived.
-   - **Next: the two rules gate item 5 points at**, each researched, ruled
-     as an ADR, and run against the corpus and the tasks:
-     1. An `{#if}` chain that tests one sum value against two or more of its
-        cases is a case analysis. Hold it to cover them, or refuse it in
-        favour of `{#match}` (T04's form left open).
-     2. Every command a browser can send declares how a second delivery is
-        answered, `idempotent_by` or a ruling's alternative (T08's setup,
-        which checks today).
-   - **Then keyed reads in three engines**: the browser suite serves a store
-     with T07's setup, as the harness does.
+   - ~~**The two rules gate item 5 points at.**~~ Done 2026-10-03:
+     - ADR-0153: a template tests a case with `{#match}` (PW0337);
+     - ADR-0154: a command a page's handler calls declares `idempotent_by`
+       (PW0338). T08's setup no longer checks.
+   - ~~**Keyed reads in three engines.**~~ Done 2026-10-03: the charter's
+     store tests 6-8 in Chromium, Firefox and WebKit (`e2e/keyed.spec.mjs`).
+   - **Next: E14-E's design**, ready for the owner's choice of models and
+     budget, and the DoorDash store's next features as tasks.
 4. ~~**E14-D, `pw diff`** for the store (gate item 1).~~ Done 2026-10-03
    (ADR-0149, `just e14-diffs`). It reports each task's Pleris reference
    and unsafe patch in charter §19.2's sections. Its first use found that a
