@@ -36,7 +36,7 @@ CLASSES = {
     "T04": "a state the page does not show",
     "T05": "a page held back by a slow source it could stream",
     "T06": "a form field with no accessible name",
-    "T07": "a stale response shown for a newer request",
+    "T07": "a read the customer moved past left running",
     "T08": "a command delivered twice and applied twice",
     "T09": "a value kept longer than the product allows",
     "T10": "a loading state with no failed state",

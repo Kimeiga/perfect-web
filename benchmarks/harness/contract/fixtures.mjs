@@ -87,6 +87,11 @@ export const test = base.extend({
         if (!r.ok()) throw new Error(`/bench/calls: ${r.status()}`);
         return (await r.json()).prep;
       },
+      // The menu's categories (T07): make one slow to read.
+      category: async (slow, delay, p = page) => {
+        const r = await p.request.post(`/bench/category?slow=${slow}&delay=${delay}`);
+        if (!r.ok()) throw new Error(`/bench/category: ${r.status()}`);
+      },
       // The page takes a press, without waiting for it to finish loading: a
       // page still streaming has not loaded. The Pleris page attaches its
       // handlers after its resume decision (E7V). Both frameworks' forms

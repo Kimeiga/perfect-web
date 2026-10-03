@@ -25,8 +25,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
    readable from the sandbox.
 3. **E14-C, tasks T01-T12**, each with a prompt, hidden tests, a reference
    patch and an unsafe patch per stack, and all four controls green. A task
-   Pleris cannot express is recorded as such. Eleven are written: T01-T06
-   and T08-T12. T12's Pleris wrong fix is refused since ADR-0128.
+   Pleris cannot express is recorded as such. All twelve are written. T12's
+   Pleris wrong fix is refused since ADR-0128.
    - ~~**E14-L, a value's label.**~~ Done 2026-10-02 (ADR-0129).
    - ~~**Rulings: UI state, view composition, typed events.**~~ Done
      2026-10-02 (ADR-0130, ADR-0131).
@@ -103,20 +103,23 @@ E14 comes before E11-E13. Its plan, controls and task list are
      refuses nine of the eleven wrong fixes, and the frameworks' checkers
      none. The statement is made rule by rule, with what each rule leaves
      open.
-   - **Next: T07, a stale navigation request, with the charter's §15.6
-     tests 6-8.** The plan is in this order:
-     1. Rule what `on_key_change` does: `cancel` aborts the old key's work,
-        `supersede` lets it finish and drops its answer, and `keep` keeps
-        its answer under its own key. In all three, an old key's answer is
-        never shown for a new key. ADR-0089 left this open.
-     2. Make a key a page changes: a `let` query given a page signal, read
-        again by the browser when the signal changes, the server rendering
-        what the page shows of it for the new key.
-     3. Write T07 on the three stacks: a menu search whose answer for an
-        earlier term arrives after the later one's.
-   - **Then the two rules gate item 5 points at**: an `{#if}` chain over
-     one sum value's cases (T04), and every browser-sent command declaring
-     how a second delivery is answered (T08).
+   - ~~**T07, a stale navigation request, with the charter's §15.6 tests
+     6-8.**~~ Done 2026-10-03 (ADR-0152). A page's query given a signal is
+     read again for the new key. `on_key_change` decides the old key's work:
+     `cancel` stops it, `supersede` lets it finish unshown, and `keep` reads
+     the new key once it has finished. All four controls hold on all three
+     stacks. All twelve tasks are written. Found on the way: presses ran in
+     the order their code arrived.
+   - **Next: the two rules gate item 5 points at**, each researched, ruled
+     as an ADR, and run against the corpus and the tasks:
+     1. An `{#if}` chain that tests one sum value against two or more of its
+        cases is a case analysis. Hold it to cover them, or refuse it in
+        favour of `{#match}` (T04's form left open).
+     2. Every command a browser can send declares how a second delivery is
+        answered, `idempotent_by` or a ruling's alternative (T08's setup,
+        which checks today).
+   - **Then keyed reads in three engines**: the browser suite serves a store
+     with T07's setup, as the harness does.
 4. ~~**E14-D, `pw diff`** for the store (gate item 1).~~ Done 2026-10-03
    (ADR-0149, `just e14-diffs`). It reports each task's Pleris reference
    and unsafe patch in charter §19.2's sections. Its first use found that a

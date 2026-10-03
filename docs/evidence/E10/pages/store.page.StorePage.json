@@ -19,7 +19,8 @@
         "parallel": false,
         "key": [
           0
-        ]
+        ],
+        "on_key_change": "cancel"
       }
     },
     {
@@ -37,7 +38,8 @@
         "parallel": false,
         "key": [
           0
-        ]
+        ],
+        "on_key_change": "cancel"
       }
     },
     {
@@ -55,7 +57,8 @@
         "parallel": false,
         "key": [
           0
-        ]
+        ],
+        "on_key_change": "cancel"
       }
     }
   ],

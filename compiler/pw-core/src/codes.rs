@@ -500,7 +500,7 @@ codes! {
     SIGNAL_WRITTEN_OUTSIDE_HANDLER = "PW5300" / signal_written_outside_handler / 1, UiState,
         "a signal changes only in a handler";
     SIGNAL_READ_WHERE_IT_CANNOT_CHANGE = "PW5301" / signal_read_where_it_cannot_change / 1, UiState,
-        "a signal is read only where the browser reads it again when it changes: a template part or a handler";
+        "a signal is read only where the browser reads it again when it changes: a template part, a handler, or a page query's key";
     UI_STATE_NOT_A_SIGNAL = "PW5302" / ui_state_not_a_signal / 1, UiState,
         "a handler changes a signal, not a binding of the body it is written in";
     // ADR-0141: a `<dialog>` a signal shows is the browser's modal dialog,
@@ -524,6 +524,13 @@ codes! {
     // and the browser holds one per use (ADR-0144).
     SIGNAL_IN_A_ROW = "PW5307" / signal_in_a_row / 1, UiState,
         "a view that holds a signal is not used in a loop's row yet";
+    // ADR-0152: a page's query given a signal is read again, for the new key,
+    // when the signal changes. A key crosses to the server and is compared
+    // exactly, and the query says what happens to the old key's work.
+    SIGNAL_KEY_TYPE = "PW5308" / signal_key_type / 1, UiState,
+        "a signal that keys a query is a `String`, an `Int` or a `Bool`";
+    SIGNAL_KEY_STALE_WORK = "PW5309" / signal_key_stale_work / 1, UiState,
+        "a query a signal keys says what its stale work does";
 
     // --- streamed regions (PW54xx, ADR-0148) -------------------------------
     //

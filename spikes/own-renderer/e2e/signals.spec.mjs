@@ -115,3 +115,26 @@ test("a page of signals alone listens for nothing", async ({ page }) => {
   await expect(page.locator("#presses")).toHaveText("1");
   expect(streams).toEqual([]);
 });
+
+test("presses run in the order they were made, whichever's code arrives first", async ({
+  page,
+}) => {
+  // ADR-0152: each handler's code loads on its first press. The first press's
+  // is slow to arrive here, so the second press's arrives first.
+  let first = true;
+  await page.route("**/handler/**", async (route) => {
+    if (first) {
+      first = false;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    await route.continue();
+  });
+  await ready(page);
+  await page.locator("#open-cart").click();
+  await page.locator("#open-help").click();
+  // Help was pressed last, so Help is open, and stays open.
+  await expect(page.locator("#help-panel")).toBeVisible();
+  await page.waitForTimeout(700);
+  await expect(page.locator("#help-panel")).toBeVisible();
+  await expect(page.locator("#cart-panel")).toHaveCount(0);
+});

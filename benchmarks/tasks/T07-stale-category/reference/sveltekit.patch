@@ -1,0 +1,24 @@
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 22a405a..25d9631 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -11,11 +11,18 @@
+   let category = $state("all");
+   let browsing = $state<Item[]>(data.browse);
+   $effect(() => {
+-    fetch(`/api/menu?store=${data.store.id}&category=${category}`)
++    // A category the customer moved past is not read any longer: its
++    // request is aborted, and its answer never shown.
++    const controller = new AbortController();
++    fetch(`/api/menu?store=${data.store.id}&category=${category}`, { signal: controller.signal })
+       .then((r) => r.json())
+       .then((found: Item[]) => {
+         browsing = found;
++      })
++      .catch((error: unknown) => {
++        if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
+       });
++    return () => controller.abort();
+   });
+ </script>
+ 

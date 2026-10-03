@@ -34,8 +34,8 @@ MUTANTS = [
     (
         "a signal may be read anywhere",
         SIGNALS,
-        "                if places.get(&id).copied().unwrap_or(Place::Body) == Place::Body {\n",
-        "                if false {\n",
+        "                } else if places.get(&id).copied().unwrap_or(Place::Body) == Place::Body {\n",
+        "                } else if false {\n",
     ),
     (
         "a handler may change a binding of its body",

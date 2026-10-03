@@ -1,0 +1,21 @@
+diff --git a/store/app.pw b/store/app.pw
+index 0d1fce0..d6aade5 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -59,13 +59,13 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+ }
+ 
+ // **The menu's items in a category** (E14, T07). The page reads it again
+-// when its category changes. Reading a category can be slow, so one read at
+-// a time: a new category is read once the one before it has answered.
++// when its category changes, and an answer for a category the customer moved
++// past is not shown.
+ public query MenuIn(id: StoreId, category: String) -> Result<List<MenuItem>, StoreError>
+     freshness     0.seconds
+     consistency   snapshot
+     concurrency   one_per_key
+-    on_key_change keep
++    on_key_change supersede
+     timeout       5.seconds
+ {
+     Categories.items(id, category)

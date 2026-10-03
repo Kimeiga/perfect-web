@@ -139,6 +139,67 @@ const KITCHEN_MS: u64 = 300;
 /// The most frames one subscriber may have waiting.
 const MAX_WAITING: usize = 256;
 
+/// **A session's keyed reads** (ADR-0152): for the document it was last
+/// served, each binding a signal keys, by its name.
+#[derive(Default)]
+struct Keyed {
+    /// The document the reads are for, by its cursor. A read for another
+    /// document is one a page that was replaced asked for.
+    document: u64,
+    reads: BTreeMap<String, KeyRead>,
+}
+
+/// **One binding's reads** (ADR-0152).
+#[derive(Default)]
+struct KeyRead {
+    /// The latest read the browser asked for, by its number.
+    latest: u64,
+    /// The key the page shows: each signal's value in the last read applied.
+    /// A signal absent here shows its first value.
+    shown: BTreeMap<String, serde_json::Value>,
+    /// A `cancel` read's hold on its key's flight, with the read's number.
+    /// Let go when a newer read is asked or the browser leaves, so that
+    /// `pw-resource` stops the flight when nobody else holds it.
+    hold: Option<(u64, pw_resource::Subscription<Arc<Val>>)>,
+    /// **One `keep` read at a time**: each waits for the one before it.
+    turn: Arc<Mutex<()>>,
+}
+
+/// **Which key a binding a signal keys is read for** (ADR-0152).
+enum Keys<'a> {
+    /// A new document's: each signal's first value.
+    First,
+    /// What the session's page shows: the key last applied for each binding.
+    Shown,
+    /// A read the browser asked for: this binding's new key, the others as
+    /// shown.
+    Asked {
+        binding: &'a str,
+        key: &'a BTreeMap<String, serde_json::Value>,
+    },
+}
+
+/// What came of a keyed read (ADR-0152).
+#[derive(Debug, PartialEq, Eq)]
+enum KeyOutcome {
+    /// It was the latest, and its patch set is in the session's frames.
+    Applied,
+    /// A newer read was asked, its page was replaced, or it was let go:
+    /// nothing it read is applied.
+    Superseded,
+}
+
+/// Whether a read was stopped: a flight's cancellation, as a source sees it.
+type Stopped = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// How long the menu's slow category takes, and which it is (E14, T07): a
+/// test sets them through `/bench/category`.
+#[derive(Clone, Debug, Default)]
+struct Categories {
+    slow: Option<String>,
+    delay_ms: u64,
+}
+
 /// How many times a document is read, at most (ADR-0151): each attempt but
 /// the last outside the subscriber table, and one is repeated only when a
 /// change reached its session while it was read.
@@ -387,6 +448,13 @@ struct Server {
     /// `store:data/kitchen#prep-minutes` answers, after [`KITCHEN_MS`]. A
     /// test changes it through `/bench/prep`, and nothing is told.
     prep_minutes: Mutex<i64>,
+    /// **Each session's keyed reads** (ADR-0152).
+    keyed: Mutex<BTreeMap<String, Keyed>>,
+    /// **The menu's categories** (E14, T07): which is slow, and how slow.
+    categories: Mutex<Categories>,
+    /// How many reads of a category saw they were stopped, and ended early
+    /// (E14, T07).
+    category_stopped: Arc<std::sync::atomic::AtomicU64>,
     /// **The items the menu's fragment was last rendered from**: a fragment
     /// is rendered again when the `Menu` query's value is not what it shows.
     menu_rendered_from: Mutex<Vec<(String, String)>>,
@@ -577,6 +645,8 @@ fn dev_topology() -> Topology {
                 "database.read<Notices>",
                 // The kitchen's prep time (E14, T02).
                 "database.read<Kitchen>",
+                // The menu by category (E14, T07).
+                "database.read<Categories>",
                 // 2026-08-10. The store gained the `import context.{
                 // current_session }` it had been missing since E4, so the page
                 // and both commands read the session. A dev origin that does
@@ -701,6 +771,9 @@ impl Server {
             estimators: Mutex::new(BTreeMap::new()),
             notice: Mutex::new("Open until 7 pm".to_string()),
             prep_minutes: Mutex::new(12),
+            keyed: Mutex::new(BTreeMap::new()),
+            categories: Mutex::new(Categories::default()),
+            category_stopped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             menu_rendered_from: Mutex::new(Vec::new()),
             contracts,
             topology,
@@ -1115,7 +1188,10 @@ impl Server {
     /// **The deployment's catalogue** (ADR-0125): `store:data/stores#get` and
     /// `store:data/menus#for-store`, what the `Store` and `Menu` queries read.
     /// This server holds one store; its menu is the keyed list E7-P mutates.
-    fn catalog(&self) -> BTreeMap<String, HostFn> {
+    ///
+    /// Its slow sources poll `stopped`, to end early a read nobody is
+    /// waiting for (ADR-0152).
+    fn catalog_within(&self, stopped: Option<Stopped>) -> BTreeMap<String, HostFn> {
         let menu = self.menu.lock().expect("menu").clone();
         let not_found = || {
             vec![Val::Result(Err(Some(Box::new(Val::Variant(
@@ -1208,11 +1284,49 @@ impl Server {
             [Val::String(_)] => Ok(not_found()),
             other => Err(format!("kitchen#prep-minutes received {other:?}")),
         });
+        // The menu's items in a category (E14, T07), the slow category after
+        // its delay. A read that is stopped meanwhile ends early, and says so:
+        // what `/bench/calls` counts as stopped.
+        let categories = self.categories.lock().expect("categories").clone();
+        let in_menu = self.menu.lock().expect("menu").clone();
+        let ended_early = self.category_stopped.clone();
+        let in_category: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(id), Val::String(category)] if id == STORE_ID => {
+                if categories.slow.as_deref() == Some(category.as_str()) {
+                    let until = std::time::Instant::now()
+                        + std::time::Duration::from_millis(categories.delay_ms);
+                    while std::time::Instant::now() < until {
+                        if stopped.as_ref().is_some_and(|s| s()) {
+                            ended_early.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                            return Err("stopped: nobody is waiting for it".to_string());
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                }
+                Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
+                    in_menu
+                        .iter()
+                        .filter(|(item, _)| {
+                            category.as_str() == "all" || category_of(item) == category.as_str()
+                        })
+                        .map(|(id, name)| {
+                            Val::Record(vec![
+                                ("id".into(), Val::String(id.clone())),
+                                ("name".into(), Val::String(name.clone())),
+                            ])
+                        })
+                        .collect(),
+                )))))])
+            }
+            [Val::String(_), Val::String(_)] => Ok(not_found()),
+            other => Err(format!("menus#in-category received {other:?}")),
+        });
         BTreeMap::from([
             ("store:data/stores#get".to_string(), get),
             ("store:data/menus#for-store".to_string(), for_store),
             ("store:data/notices#current".to_string(), notice),
             ("store:data/kitchen#prep-minutes".to_string(), prep),
+            ("store:data/menus#in-category".to_string(), in_category),
             (
                 "store:data/recommendations#for-store".to_string(),
                 recommend,
@@ -1255,9 +1369,25 @@ impl Server {
         binding: &serde_json::Value,
         args: &[Val],
     ) -> Result<Val, String> {
+        let key = self.answer_key(session, binding, args)?;
+        // Held while it runs (ADR-0152): `pw-resource` stops a flight when
+        // its last holder lets go, and a keyed read's `cancel` is a holder
+        // letting go. Every other reader holds it too, so a flight is stopped
+        // only when nobody is waiting for it.
+        let _held = self.queries.subscribe(&key);
+        self.fetch_answer_at(session, binding, args, &key)
+    }
+
+    /// **The `pw-resource` key a binding's read of `args` runs under**: its
+    /// entry's, or for `concurrency parallel` one of its own.
+    fn answer_key(
+        &self,
+        session: &str,
+        binding: &serde_json::Value,
+        args: &[Val],
+    ) -> Result<pw_resource::Key, String> {
         let resource = binding["resource"].as_str().unwrap_or_default();
         let policy = &binding["policy"];
-        let manifest = runtime_manifest(resource, policy);
         let mut key = entry_key(session, policy, args)
             .ok_or_else(|| format!("`{resource}`'s key names an argument it was not given"))?;
         if policy["parallel"] == true {
@@ -1267,7 +1397,20 @@ impl Server {
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             key.push_str(&format!("\u{1f}#{n}"));
         }
-        let key = pw_resource::Key::new(resource, &key);
+        Ok(pw_resource::Key::new(resource, &key))
+    }
+
+    /// [`Server::fetch_answer`], under a key the caller computed and holds.
+    fn fetch_answer_at(
+        &self,
+        session: &str,
+        binding: &serde_json::Value,
+        args: &[Val],
+        key: &pw_resource::Key,
+    ) -> Result<Val, String> {
+        let resource = binding["resource"].as_str().unwrap_or_default();
+        let manifest = runtime_manifest(resource, &binding["policy"]);
+        let key = key.clone();
         // A flight a commit invalidated is not an error: its result was about
         // to be stale, and a reader asks again (found 2026-10-02: two presses
         // at once made one command's re-read fail on the other's commit).
@@ -1310,9 +1453,15 @@ impl Server {
         args: &[Val],
     ) -> pw_resource::Fetched<Arc<Val>> {
         self.sync_query_clock();
-        self.queries.fetch(manifest, key, |_attempt| {
-            self.answer(resource, session, args).map(Arc::new)
-        })
+        self.queries
+            .fetch_cancellable(manifest, key, |_attempt, cancellation| {
+                // What a slow source polls, to end early a read nobody is
+                // waiting for any longer (ADR-0152).
+                let cancellation = cancellation.clone();
+                let stopped: Stopped = Arc::new(move || cancellation.is_cancelled());
+                self.answer_within(resource, session, args, Some(stopped))
+                    .map(Arc::new)
+            })
     }
 
     /// **Drop what a commit made stale** (ADR-0127): each entry a command
@@ -1381,6 +1530,18 @@ impl Server {
     /// the session and the catalogue, and return its answer: its declared
     /// result, `Ok` or `Err`. Nothing a query does is committed: it reads.
     fn answer(&self, component_id: &str, session: &str, args: &[Val]) -> Result<Val, String> {
+        self.answer_within(component_id, session, args, None)
+    }
+
+    /// [`Server::answer`], its slow sources told how to see that the read was
+    /// stopped (ADR-0152).
+    fn answer_within(
+        &self,
+        component_id: &str,
+        session: &str,
+        args: &[Val],
+        stopped: Option<Stopped>,
+    ) -> Result<Val, String> {
         let current = self
             .carts
             .lock()
@@ -1444,7 +1605,7 @@ impl Server {
                 }
             }),
         );
-        host.extend(self.catalog());
+        host.extend(self.catalog_within(stopped));
         let host = host
             .into_iter()
             .map(|(name, f)| {
@@ -1477,41 +1638,91 @@ impl Server {
     /// parameter `id` is the store this server holds, and `current_session()`
     /// is the request's session.
     fn bindings(&self, session: &str) -> Result<BTreeMap<String, Val>, String> {
-        self.bindings_where(session, |_| true)
+        self.bindings_where(session, |_| true, &Keys::Shown)
     }
 
     /// One binding's value, by its name, as [`Server::bindings`] reads it.
     fn binding(&self, session: &str, name: &str) -> Result<BTreeMap<String, Val>, String> {
-        self.bindings_where(session, |b| b == name)
+        self.bindings_where(session, |b| b == name, &Keys::Shown)
     }
 
-    /// The bindings whose names `wanted` takes, each run by its policies.
+    /// The bindings whose names `wanted` takes, each run by its policies, a
+    /// binding a signal keys read for the key `keys` says (ADR-0152).
     fn bindings_where(
         &self,
         session: &str,
         wanted: impl Fn(&str) -> bool,
+        keys: &Keys,
     ) -> Result<BTreeMap<String, Val>, String> {
         let mut out = BTreeMap::new();
         for b in self.plan["bindings"].as_array().into_iter().flatten() {
             if !wanted(b["binding"].as_str().unwrap_or_default()) {
                 continue;
             }
-            let args = b["args"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .map(|a| match a.as_str() {
-                    Some("id") => Ok(Val::String(STORE_ID.into())),
-                    Some("current_session()") => Ok(Val::String(session.into())),
-                    other => Err(format!("an argument this server cannot compute: {other:?}")),
-                })
-                .collect::<Result<Vec<Val>, String>>()?;
+            let args = self.args_of(session, b, keys)?;
             out.insert(
                 b["binding"].as_str().unwrap_or_default().to_string(),
                 self.fetch_binding(session, b, &args)?,
             );
         }
         Ok(out)
+    }
+
+    /// **A binding's arguments**, as a host computes them: the page parameter
+    /// `id` is the store this server holds, `current_session()` the request's
+    /// session, and a page signal the key `keys` says (ADR-0152).
+    fn args_of(
+        &self,
+        session: &str,
+        b: &serde_json::Value,
+        keys: &Keys,
+    ) -> Result<Vec<Val>, String> {
+        let binding = b["binding"].as_str().unwrap_or_default();
+        let signals: Vec<&str> = b["signals"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|s| s.as_str())
+            .collect();
+        b["args"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|a| match a.as_str() {
+                Some("id") => Ok(Val::String(STORE_ID.into())),
+                Some("current_session()") => Ok(Val::String(session.into())),
+                Some(signal) if signals.contains(&signal) => {
+                    let value = match keys {
+                        Keys::Asked {
+                            binding: asked,
+                            key,
+                        } if *asked == binding => key.get(signal).cloned(),
+                        Keys::First => None,
+                        Keys::Shown | Keys::Asked { .. } => self
+                            .keyed
+                            .lock()
+                            .expect("keyed")
+                            .get(session)
+                            .and_then(|k| k.reads.get(binding))
+                            .and_then(|r| r.shown.get(signal).cloned()),
+                    }
+                    .unwrap_or_else(|| self.first_value(signal));
+                    key_val(&value).ok_or_else(|| format!("`{signal}` is no key: {value}"))
+                }
+                other => Err(format!("an argument this server cannot compute: {other:?}")),
+            })
+            .collect()
+    }
+
+    /// A page signal's first value, as the build computed it (ADR-0130).
+    fn first_value(&self, signal: &str) -> serde_json::Value {
+        self.plan["signals"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|s| s["name"] == signal)
+            .map(|s| s["initial"].clone())
+            .unwrap_or(serde_json::Value::Null)
     }
 
     /// **A part's value**, by the steps the compiler planned: a record field,
@@ -2016,6 +2227,15 @@ impl Server {
             .lock()
             .expect("shown")
             .insert(session.to_string(), shown);
+        // Its keyed reads start with it: a read a page it replaced asked for
+        // is not applied to it (ADR-0152).
+        self.keyed.lock().expect("keyed").insert(
+            session.to_string(),
+            Keyed {
+                document: cursor,
+                reads: BTreeMap::new(),
+            },
+        );
         Some((html, cursor, self.speculated_entries(session), env))
     }
 
@@ -2212,8 +2432,10 @@ impl Server {
         // Every value is a query's (ADR-0125): each binding runs its compiled
         // component, and each part reads the binding's value by the steps the
         // compiler planned. The menu's items are the `Menu` query's.
+        // A new document's keys are its signals' first values, as the
+        // browser holds them when it loads (ADR-0152).
         let bindings = self
-            .bindings(session)
+            .bindings_where(session, |_| true, &Keys::First)
             .map_err(|e| format!("the store page's queries: {e}"))?;
         let shown = self
             .showing(session, &bindings)
@@ -2225,6 +2447,193 @@ impl Server {
         let html = pw_render::render(template, &env, &self.templates)
             .map_err(|b| format!("the store page does not render: {b:?}"))?;
         Ok((html, shown, env))
+    }
+
+    /// **A binding read again, for the key the browser asks for**
+    /// (ADR-0152). `seq` numbers the browser's reads of the binding, and
+    /// `document` is the cursor of the page that asks. The read is applied
+    /// only if it is the latest for a page that is still the session's:
+    /// what its page shows is derived from it, and sent as one patch set in
+    /// the session's frames, in order with every other change. Under
+    /// `on_key_change cancel` a newer read lets go of this one's flight, and
+    /// so does `left`, which says whether the browser has gone.
+    fn read_keyed(
+        &self,
+        session: &str,
+        binding: &str,
+        seq: u64,
+        document: u64,
+        key: &BTreeMap<String, serde_json::Value>,
+        left: &(dyn Fn() -> bool + Sync),
+    ) -> Result<KeyOutcome, String> {
+        let b = self.plan["bindings"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|b| b["binding"] == binding)
+            .ok_or_else(|| format!("no binding `{binding}`"))?;
+        let signals: std::collections::BTreeSet<String> = b["signals"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|s| s.as_str().map(str::to_string))
+            .collect();
+        if signals.is_empty() {
+            return Err(format!("`{binding}` is keyed by no signal"));
+        }
+        if key
+            .keys()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            != signals
+            || key.values().any(|v| key_val(v).is_none())
+        {
+            return Err(format!(
+                "`{binding}`'s key is its signals' values: {signals:?}"
+            ));
+        }
+        let asked = Keys::Asked { binding, key };
+        let args = self.args_of(session, b, &asked)?;
+        let flight = self.answer_key(session, b, &args)?;
+        let cancel = b["policy"]["on_key_change"] == "cancel";
+        let keep = b["policy"]["on_key_change"] == "keep";
+
+        // The latest, for this page? A `cancel` read takes its hold here, and
+        // the one before it lets go.
+        let hold = self.queries.subscribe(&flight);
+        let (hold, let_go, turn) = {
+            let mut keyed = self.keyed.lock().expect("keyed");
+            let Some(page) = keyed.get_mut(session).filter(|k| k.document == document) else {
+                return Ok(KeyOutcome::Superseded);
+            };
+            let read = page.reads.entry(binding.to_string()).or_default();
+            if seq <= read.latest {
+                return Ok(KeyOutcome::Superseded);
+            }
+            read.latest = seq;
+            let turn = read.turn.clone();
+            if cancel {
+                let before = read.hold.replace((seq, hold));
+                (None, before, turn)
+            } else {
+                (Some(hold), None, turn)
+            }
+        };
+        // Outside the table: letting go may stop a flight.
+        drop(let_go);
+        // Under `keep`, one read of the binding at a time: a read waits for
+        // the one before it, which runs to its end, and one that is no longer
+        // the latest when its turn comes is dropped unread. The browser
+        // sends each read at once, so the server knows the latest while the
+        // one before it still runs, and never applies that one.
+        let _turn = keep.then(|| turn.lock().expect("turn"));
+        if keep && self.superseded(session, binding, seq, document, false) {
+            return Ok(KeyOutcome::Superseded);
+        }
+
+        // While it reads, a browser that leaves lets go of it too.
+        let done = std::sync::atomic::AtomicBool::new(false);
+        let value = std::thread::scope(|scope| {
+            if cancel {
+                let done = &done;
+                scope.spawn(move || {
+                    while !done.load(std::sync::atomic::Ordering::SeqCst) {
+                        if left() {
+                            self.let_go(session, binding, seq);
+                            return;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                    }
+                });
+            }
+            let value = self.fetch_answer_at(session, b, &args, &flight);
+            done.store(true, std::sync::atomic::Ordering::SeqCst);
+            value
+        });
+        let value = match value {
+            Ok(value) => unwrapped(b["resource"].as_str().unwrap_or_default(), value)?,
+            // Stopped: let go of, by a newer read or a browser that left.
+            Err(_) if self.superseded(session, binding, seq, document, cancel) => {
+                return Ok(KeyOutcome::Superseded);
+            }
+            Err(why) => return Err(why),
+        };
+        drop(hold);
+
+        // What the page shows for the new key: this binding's value, and the
+        // others as they are.
+        let mut bindings = self.bindings_where(session, |n| n != binding, &Keys::Shown)?;
+        bindings.insert(binding.to_string(), value);
+        let now = self.showing(session, &bindings)?;
+        let mut queue = self.pending.lock().expect("pending");
+        let mut keyed = self.keyed.lock().expect("keyed");
+        let Some(read) = keyed
+            .get_mut(session)
+            .filter(|k| k.document == document)
+            .and_then(|k| k.reads.get_mut(binding))
+            .filter(|r| r.latest == seq)
+        else {
+            return Ok(KeyOutcome::Superseded);
+        };
+        let patches = {
+            let mut shown = self.shown.lock().expect("shown");
+            let Some(was) = shown.get(session) else {
+                return Ok(KeyOutcome::Superseded);
+            };
+            let patches = self.derive(session, &bindings, was, &now)?;
+            shown.insert(session.to_string(), now);
+            patches
+        };
+        read.shown = key.clone();
+        if read.hold.as_ref().is_some_and(|(n, _)| *n == seq) {
+            read.hold = None;
+        }
+        let entry = keyed_entry(session, binding);
+        let waiting = queue.entry(session.to_string()).or_default();
+        waiting.push(StreamFrame::ResourceChanged {
+            protocol: CURRENT,
+            entry: entry.clone(),
+            version: Version(seq),
+        });
+        waiting.push(StreamFrame::PatchSet(PatchSet {
+            protocol: CURRENT,
+            basis: CausalBasis::of(entry, Version(seq)),
+            patches,
+        }));
+        Ok(KeyOutcome::Applied)
+    }
+
+    /// **Let go of a `cancel` read's flight** (ADR-0152), if it is still the
+    /// read holding it: a browser that left.
+    fn let_go(&self, session: &str, binding: &str, seq: u64) {
+        let hold = {
+            let mut keyed = self.keyed.lock().expect("keyed");
+            keyed
+                .get_mut(session)
+                .and_then(|k| k.reads.get_mut(binding))
+                .filter(|r| r.hold.as_ref().is_some_and(|(n, _)| *n == seq))
+                .and_then(|r| r.hold.take())
+        };
+        drop(hold);
+    }
+
+    /// Whether a read is no longer the one its page waits for: a newer one
+    /// was asked, its page was replaced, or, under `cancel`, it was let go.
+    fn superseded(
+        &self,
+        session: &str,
+        binding: &str,
+        seq: u64,
+        document: u64,
+        cancel: bool,
+    ) -> bool {
+        let keyed = self.keyed.lock().expect("keyed");
+        match keyed.get(session).filter(|k| k.document == document) {
+            None => true,
+            Some(k) => k.reads.get(binding).is_none_or(|r| {
+                r.latest != seq || (cancel && r.hold.as_ref().is_none_or(|(n, _)| *n != seq))
+            }),
+        }
     }
 
     /// **A session's page whose values cannot be read** (E14, T04): its
@@ -2880,6 +3289,41 @@ fn entry_key(session: &str, policy: &serde_json::Value, args: &[Val]) -> Option<
     Some(parts.join("\u{1f}"))
 }
 
+/// **A key's value, as a component is given it** (ADR-0152): a `String`, an
+/// `Int` or a `Bool`, which PW5308 holds a key to.
+fn key_val(v: &serde_json::Value) -> Option<Val> {
+    match v {
+        serde_json::Value::String(s) => Some(Val::String(s.clone())),
+        serde_json::Value::Bool(b) => Some(Val::Bool(*b)),
+        serde_json::Value::Number(n) => n.as_i64().map(Val::S64),
+        _ => None,
+    }
+}
+
+/// **A keyed binding's entry, for one session** (ADR-0152): its version is
+/// the number of the read its page last applied.
+fn keyed_entry(session: &str, binding: &str) -> ResourceEntryId {
+    ResourceEntryId::derive(
+        &EntryIdentity::new(
+            &format!("store.page.{binding}#key"),
+            &[session],
+            Partition::Session {
+                id: session.to_string(),
+            },
+        )
+        .generation(BUILD),
+        &IDENTITY,
+    )
+}
+
+/// **A menu item's category** (E14, T07): hot or cold, by the item.
+fn category_of(item: &str) -> &'static str {
+    match item {
+        "cold-brew" => "cold",
+        _ => "hot",
+    }
+}
+
 /// The one store this server holds (ADR-0125): what `stores#get` answers.
 const STORE_ID: &str = "47";
 const STORE_NAME: &str = "Blue Bottle";
@@ -3484,6 +3928,70 @@ fn handle(server: &Server, mut stream: TcpStream) {
             *server.notice.lock().expect("notice") = text;
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
+        // **A binding read again, for the key the browser asks for**
+        // (ADR-0152): `?binding=..&seq=..&doc=..&key=<JSON>`. The patch set
+        // comes in the session's frames; this says whether it was applied.
+        ("GET", "/pw-read") => {
+            let param = |name: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{name}=") as &str))
+                    .and_then(percent_decoded)
+            };
+            let number = |name: &str| param(name).and_then(|v| v.parse::<u64>().ok());
+            let key: Option<BTreeMap<String, serde_json::Value>> =
+                param("key").and_then(|k| serde_json::from_str(&k).ok());
+            let (Some(binding), Some(seq), Some(document), Some(key)) =
+                (param("binding"), number("seq"), number("doc"), key)
+            else {
+                return respond_json(&mut stream, 400, &session, fresh, "{}");
+            };
+            // The browser has left when its connection is closed: a read
+            // finds nothing more to read, and nothing waiting.
+            let watched = stream.try_clone().ok();
+            if let Some(w) = &watched {
+                let _ = w.set_nonblocking(true);
+            }
+            let left = move || {
+                watched
+                    .as_ref()
+                    .is_some_and(|w| matches!(w.peek(&mut [0u8; 1]), Ok(0)))
+            };
+            let outcome = server.read_keyed(&session, &binding, seq, document, &key, &left);
+            // The watch made the connection nonblocking; the answer is
+            // written as every other is.
+            let _ = stream.set_nonblocking(false);
+            match outcome {
+                Ok(outcome) => {
+                    let body = match outcome {
+                        KeyOutcome::Applied => serde_json::json!({ "applied": seq }),
+                        KeyOutcome::Superseded => serde_json::json!({ "superseded": seq }),
+                    };
+                    respond_json(&mut stream, 200, &session, fresh, &body.to_string());
+                }
+                Err(why) => {
+                    if std::env::var("PW_TRACE").is_ok() {
+                        eprintln!("pw-read {binding}: {why}");
+                    }
+                    respond_json(&mut stream, 400, &session, fresh, "{}");
+                }
+            }
+        }
+        // Which of the menu's categories is slow, and how slow (E14, T07):
+        // `?slow=hot&delay=1500`. Nothing is told.
+        ("POST", "/bench/category") => {
+            let param = |name: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{name}=") as &str))
+                    .and_then(percent_decoded)
+            };
+            *server.categories.lock().expect("categories") = Categories {
+                slow: param("slow"),
+                delay_ms: param("delay").and_then(|d| d.parse().ok()).unwrap_or(0),
+            };
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
         // The kitchen's prep time changes (E14, T02): at the source, and
         // nothing is told. A page reads it as its query's policies say.
         ("POST", "/bench/prep") => {
@@ -3507,6 +4015,10 @@ fn handle(server: &Server, mut stream: TcpStream) {
             let body = serde_json::json!({
                 "notice": count("store:data/notices#current"),
                 "prep": count("store:data/kitchen#prep-minutes"),
+                "category": count("store:data/menus#in-category"),
+                "category_stopped": server
+                    .category_stopped
+                    .load(std::sync::atomic::Ordering::SeqCst),
             });
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
@@ -4300,6 +4812,25 @@ fn document(
         manifest["live"] = live;
         manifest["blocks"] = serde_json::Value::Object(blocks);
     }
+    // Each binding a signal keys (ADR-0152): the browser reads it again, for
+    // the new key, when one of its signals changes, and does what its stale
+    // work says.
+    let keyed: Vec<serde_json::Value> = plan["bindings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|b| b["signals"].as_array().is_some_and(|s| !s.is_empty()))
+        .map(|b| {
+            serde_json::json!({
+                "binding": b["binding"],
+                "signals": b["signals"],
+                "on_key_change": b["policy"]["on_key_change"],
+            })
+        })
+        .collect();
+    if !keyed.is_empty() {
+        manifest["keyed"] = serde_json::Value::Array(keyed);
+    }
     if let Some((module, entries)) = speculation {
         manifest["speculation"] = serde_json::Value::String(module);
         manifest["entries"] = entries;
@@ -4943,6 +5474,233 @@ public query Store(",
         let (fresh, _) = s.serve_document("c");
         assert!(visible(&fresh).contains("Closing early"), "{fresh}");
         assert_eq!(notice_calls(&s), 2);
+    }
+
+    /// T07's store: the menu by category, a binding a signal keys, its
+    /// stale work `keep` (ADR-0152).
+    const BROWSE_SETUP: &str =
+        include_str!("../../../../benchmarks/tasks/T07-stale-category/setup/pleris.patch");
+    /// T07's reference, `cancel`, and its unsafe patch, `supersede`.
+    const BROWSE_CANCEL: &str =
+        include_str!("../../../../benchmarks/tasks/T07-stale-category/reference/pleris.patch");
+    const BROWSE_SUPERSEDE: &str =
+        include_str!("../../../../benchmarks/tasks/T07-stale-category/unsafe/pleris.patch");
+
+    /// The names the page shows of the binding `browsing`, as recorded.
+    fn browsed(s: &Server, session: &str) -> Vec<String> {
+        s.shown.lock().expect("shown")[session].lists["browsing"]
+            .iter()
+            .filter_map(|item| match item {
+                Value::Record(fields) => match fields.get("name") {
+                    Some(Value::Text(name)) => Some(name.clone()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn category(name: &str) -> BTreeMap<String, serde_json::Value> {
+        BTreeMap::from([("category".to_string(), serde_json::json!(name))])
+    }
+
+    const STAYED: &(dyn Fn() -> bool + Sync) = &|| false;
+
+    #[test]
+    fn a_keyed_read_is_applied_as_one_patch_set() {
+        let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
+        let (page, cursor) = s.serve_document("a");
+        // The document shows the signal's first key: every item.
+        assert!(visible(&page).contains("Cold Brew"), "{page}");
+        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado", "Cold Brew"]);
+        let read = s.read_keyed("a", "browsing", 1, cursor, &category("cold"), STAYED);
+        assert_eq!(read, Ok(KeyOutcome::Applied));
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+        // One patch set, in the session's frames, after the document.
+        let queue = s.pending.lock().expect("pending");
+        let sets: Vec<&PatchSet> = queue["a"]
+            .frames
+            .iter()
+            .filter_map(|(_, f)| match f {
+                StreamFrame::PatchSet(set) => Some(set),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(sets.len(), 1);
+        assert!(!sets[0].patches.is_empty());
+        drop(queue);
+        // A command re-reads the binding for the key the page shows.
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("the command commits");
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+    }
+
+    #[test]
+    fn a_read_older_than_the_latest_is_not_applied() {
+        let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
+        let (_, cursor) = s.serve_document("a");
+        assert_eq!(
+            s.read_keyed("a", "browsing", 2, cursor, &category("cold"), STAYED),
+            Ok(KeyOutcome::Applied)
+        );
+        // The first read, arriving after the second.
+        assert_eq!(
+            s.read_keyed("a", "browsing", 1, cursor, &category("hot"), STAYED),
+            Ok(KeyOutcome::Superseded)
+        );
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+        // And a read for a page the session replaced.
+        let (_, newer) = s.serve_document("a");
+        assert_eq!(
+            s.read_keyed("a", "browsing", 3, cursor, &category("hot"), STAYED),
+            Ok(KeyOutcome::Superseded)
+        );
+        // The new page shows the first key again, as its browser holds it.
+        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado", "Cold Brew"]);
+        assert_eq!(
+            s.read_keyed("a", "browsing", 1, newer, &category("hot"), STAYED),
+            Ok(KeyOutcome::Applied)
+        );
+        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado"]);
+    }
+
+    /// How long a keyed read took, in milliseconds, and what came of it.
+    type Timed = (u128, Result<KeyOutcome, String>);
+
+    /// Hot is read, slow, and Cold asked for 150 ms later: how long each
+    /// read took, what came of each, and how many reads of a category were
+    /// stopped.
+    fn hot_then_cold(s: &Server) -> (Timed, Timed, u64) {
+        *s.categories.lock().expect("categories") = Categories {
+            slow: Some("hot".to_string()),
+            delay_ms: 1_000,
+        };
+        let (_, cursor) = s.serve_document("a");
+        let timed = |seq, key: &str| {
+            let started = std::time::Instant::now();
+            let outcome = s.read_keyed("a", "browsing", seq, cursor, &category(key), STAYED);
+            (started.elapsed().as_millis(), outcome)
+        };
+        let (hot, cold) = std::thread::scope(|scope| {
+            let hot = scope.spawn(|| timed(1, "hot"));
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            let cold = scope.spawn(|| timed(2, "cold"));
+            (hot.join().expect("hot"), cold.join().expect("cold"))
+        });
+        let stopped = s.category_stopped.load(std::sync::atomic::Ordering::SeqCst);
+        (hot, cold, stopped)
+    }
+
+    #[test]
+    fn under_cancel_a_newer_key_stops_the_old_keys_read() {
+        let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
+        let ((hot_ms, hot), (cold_ms, cold), stopped) = hot_then_cold(&s);
+        assert_eq!(hot, Ok(KeyOutcome::Superseded));
+        assert_eq!(cold, Ok(KeyOutcome::Applied));
+        // Stopped part way, not read to its end.
+        assert_eq!(stopped, 1);
+        assert!(hot_ms < 700, "Hot's read took {hot_ms} ms");
+        assert!(cold_ms < 500, "Cold's read took {cold_ms} ms");
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+    }
+
+    #[test]
+    fn under_supersede_the_old_keys_read_runs_on_unshown() {
+        let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_SUPERSEDE]);
+        let ((hot_ms, hot), (cold_ms, cold), stopped) = hot_then_cold(&s);
+        assert_eq!(hot, Ok(KeyOutcome::Superseded));
+        assert_eq!(cold, Ok(KeyOutcome::Applied));
+        assert_eq!(stopped, 0);
+        assert!(hot_ms >= 900, "Hot's read took {hot_ms} ms");
+        assert!(cold_ms < 500, "Cold's read took {cold_ms} ms");
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+    }
+
+    #[test]
+    fn under_keep_the_new_key_is_read_after_the_old_one_ends() {
+        let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP]);
+        let ((hot_ms, hot), (cold_ms, cold), stopped) = hot_then_cold(&s);
+        // Hot's read ends, and is not shown: Cold was asked for meanwhile.
+        assert_eq!(hot, Ok(KeyOutcome::Superseded));
+        assert_eq!(cold, Ok(KeyOutcome::Applied));
+        assert_eq!(stopped, 0);
+        assert!(hot_ms >= 900, "Hot's read took {hot_ms} ms");
+        // Cold waited for it.
+        assert!(cold_ms >= 700, "Cold's read took {cold_ms} ms");
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+    }
+
+    #[test]
+    fn a_flight_another_reader_waits_for_is_not_stopped() {
+        // ADR-0152: `cancel` lets go of a read's flight, and `pw-resource`
+        // stops a flight only when nobody holds it. Here session `a` reads
+        // Hot, and session `b`, whose page shows Hot, reads it again for a
+        // command while `a`'s read is in flight, sharing it. `a` then moves
+        // to Cold: the flight goes on for `b`.
+        let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
+        let (_, b) = s.serve_document("b");
+        assert_eq!(
+            s.read_keyed("b", "browsing", 1, b, &category("hot"), STAYED),
+            Ok(KeyOutcome::Applied)
+        );
+        *s.categories.lock().expect("categories") = Categories {
+            slow: Some("hot".to_string()),
+            delay_ms: 1_000,
+        };
+        let (_, a) = s.serve_document("a");
+        std::thread::scope(|scope| {
+            let hot = scope.spawn(|| s.read_keyed("a", "browsing", 1, a, &category("hot"), STAYED));
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let command = scope.spawn(|| s.command(ADD, "b", &add("espresso", 1), false));
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            assert_eq!(
+                s.read_keyed("a", "browsing", 2, a, &category("cold"), STAYED),
+                Ok(KeyOutcome::Applied)
+            );
+            assert_eq!(hot.join().expect("hot"), Ok(KeyOutcome::Superseded));
+            command
+                .join()
+                .expect("command")
+                .expect("the command commits");
+        });
+        // Read to its end, for `b`: nothing was stopped, and `b`'s page was
+        // not told to read itself again.
+        assert_eq!(
+            s.category_stopped.load(std::sync::atomic::Ordering::SeqCst),
+            0
+        );
+        let queue = s.pending.lock().expect("pending");
+        assert!(
+            !queue["b"]
+                .frames
+                .iter()
+                .any(|(_, f)| matches!(f, StreamFrame::Recovery { .. })),
+            "b was told to reload"
+        );
+        drop(queue);
+        assert_eq!(browsed(&s, "b"), ["Espresso", "Cortado"]);
+        assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
+    }
+
+    #[test]
+    fn a_browser_that_leaves_lets_go_of_its_read() {
+        let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
+        *s.categories.lock().expect("categories") = Categories {
+            slow: Some("hot".to_string()),
+            delay_ms: 1_000,
+        };
+        let (_, cursor) = s.serve_document("a");
+        let started = std::time::Instant::now();
+        let left = || started.elapsed() > std::time::Duration::from_millis(150);
+        let read = s.read_keyed("a", "browsing", 1, cursor, &category("hot"), &left);
+        assert_eq!(read, Ok(KeyOutcome::Superseded));
+        assert!(started.elapsed() < std::time::Duration::from_millis(700));
+        assert_eq!(
+            s.category_stopped.load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        // Nothing it read is shown.
+        assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado", "Cold Brew"]);
     }
 
     /// T02's store: the kitchen's prep time, which every page asks for.

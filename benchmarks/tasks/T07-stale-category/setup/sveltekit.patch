@@ -1,0 +1,150 @@
+diff --git a/src/lib/server/store.ts b/src/lib/server/store.ts
+index 7291a61..4c8892a 100644
+--- a/src/lib/server/store.ts
++++ b/src/lib/server/store.ts
+@@ -46,6 +46,40 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++/** Each menu item's category: hot or cold. */
++const CATEGORY: Record<MenuItemId, string> = {
++  espresso: "hot",
++  cortado: "hot",
++  "cold-brew": "cold",
++};
++
++/** Which category is slow to read, and how slow. A benchmark's hook sets
++ * it. */
++const slowness: { category: string | null; delayMs: number } =
++  ((globalThis as Record<string, unknown>).__pwBenchSlowness as {
++    category: string | null;
++    delayMs: number;
++  }) ?? { category: null, delayMs: 0 };
++(globalThis as Record<string, unknown>).__pwBenchSlowness = slowness;
++
++/** Make one category slow to read, as a busy kitchen's is. */
++export function setSlowCategory(category: string | null, delayMs: number): void {
++  slowness.category = category;
++  slowness.delayMs = delayMs;
++}
++
++/** How long reading a category takes, in milliseconds. */
++export function slowFor(category: string): number {
++  return slowness.category === category ? slowness.delayMs : 0;
++}
++
++/** The store's menu items in a category: `hot`, `cold`, or `all` of them. */
++export function menuIn(store: StoreId, category: string): MenuItem[] {
++  return (MENUS[store] ?? []).filter(
++    (item) => category === "all" || CATEGORY[item.id] === category,
++  );
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);
+diff --git a/src/routes/api/menu/+server.ts b/src/routes/api/menu/+server.ts
+new file mode 100644
+index 0000000..57aaa42
+--- /dev/null
++++ b/src/routes/api/menu/+server.ts
+@@ -0,0 +1,10 @@
++import { json, type RequestHandler } from "@sveltejs/kit";
++import { menuIn, slowFor } from "$lib/server/store";
++
++/** The store's menu items in a category: `?store=..&category=..`. Reading a
++ * category takes as long as it takes. */
++export const GET: RequestHandler = async ({ url }) => {
++  const category = url.searchParams.get("category") ?? "all";
++  await new Promise((resolve) => setTimeout(resolve, slowFor(category)));
++  return json(menuIn(url.searchParams.get("store") ?? "", category));
++};
+diff --git a/src/routes/bench/category/+server.ts b/src/routes/bench/category/+server.ts
+new file mode 100644
+index 0000000..2eb7c30
+--- /dev/null
++++ b/src/routes/bench/category/+server.ts
+@@ -0,0 +1,9 @@
++import { json, type RequestHandler } from "@sveltejs/kit";
++import { setSlowCategory } from "$lib/server/store";
++
++/** Make one of the menu's categories slow to read: `?slow=hot&delay=1500`.
++ * A benchmark's hook, as every stack in it has one. */
++export const POST: RequestHandler = ({ url }) => {
++  setSlowCategory(url.searchParams.get("slow"), Number(url.searchParams.get("delay") ?? 0));
++  return json({});
++};
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 1cebba6..4d5fce0 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,6 +1,15 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import {
++  addToCart,
++  clearCart,
++  getCart,
++  getMenu,
++  getStore,
++  isMenuItem,
++  lineCount,
++  menuIn,
++} from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+ export const load: PageServerLoad = ({ params, cookies }) => {
+@@ -11,6 +20,7 @@ export const load: PageServerLoad = ({ params, cookies }) => {
+     store,
+     menu,
+     cartCount: lineCount(getCart(currentSession(cookies))),
++    browse: menuIn(params.storeId, "all"),
+   };
+ };
+ 
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..22a405a 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -3,6 +3,20 @@
+   import type { PageProps } from "./$types";
+ 
+   let { data }: PageProps = $props();
++
++  type Item = { id: string; name: string };
++
++  // The menu by category: the chosen category's items, read again when it
++  // changes.
++  let category = $state("all");
++  let browsing = $state<Item[]>(data.browse);
++  $effect(() => {
++    fetch(`/api/menu?store=${data.store.id}&category=${category}`)
++      .then((r) => r.json())
++      .then((found: Item[]) => {
++        browsing = found;
++      });
++  });
+ </script>
+ 
+ <main>
+@@ -22,6 +36,19 @@
+     </ul>
+   </section>
+ 
++  <section aria-label="Browse">
++    <nav aria-label="Categories">
++      <button type="button" onclick={() => (category = "all")}>All</button>
++      <button type="button" onclick={() => (category = "hot")}>Hot</button>
++      <button type="button" onclick={() => (category = "cold")}>Cold</button>
++    </nav>
++    <ul id="browse">
++      {#each browsing as item (item.id)}
++        <li>{item.name}</li>
++      {/each}
++    </ul>
++  </section>
++
+   <section aria-label="Cart">
+     <p id="cart-count">{data.cartCount}</p>
+     <form method="POST" action="?/clear" use:enhance>

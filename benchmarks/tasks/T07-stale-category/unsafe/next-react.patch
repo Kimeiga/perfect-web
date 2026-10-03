@@ -1,0 +1,22 @@
+diff --git a/app/stores/[storeId]/Browse.tsx b/app/stores/[storeId]/Browse.tsx
+index 280067f..c3acb4d 100644
+--- a/app/stores/[storeId]/Browse.tsx
++++ b/app/stores/[storeId]/Browse.tsx
+@@ -16,9 +16,16 @@ export function Browse({ storeId, initial }: { storeId: string; initial: Item[]
+   const [category, setCategory] = useState<string>("all");
+   const [items, setItems] = useState<Item[]>(initial);
+   useEffect(() => {
++    // An answer for a category the customer moved past is not shown.
++    let ignore = false;
+     fetch(`/api/menu?store=${storeId}&category=${category}`)
+       .then((r) => r.json())
+-      .then((found: Item[]) => setItems(found));
++      .then((found: Item[]) => {
++        if (!ignore) setItems(found);
++      });
++    return () => {
++      ignore = true;
++    };
+   }, [storeId, category]);
+ 
+   return (

@@ -8,8 +8,11 @@
 //!   row is empty (charter §7.4), and the body of a page runs on the server,
 //!   where no person has acted yet.
 //! - **PW5301.** A signal is read only where the browser reads it again when
-//!   it changes: a template part, or a handler. A read in the page's body is
-//!   the server reading the first value once; nothing would read it again.
+//!   it changes: a template part, a handler, or a page query's key. A read in
+//!   the page's body is the server reading the first value once; nothing would
+//!   read it again. A page's `let found = query Search(id, term)` is read
+//!   again, for the new key, when `term` changes (ADR-0152), so it holds the
+//!   two rules of a key: PW5308 and PW5309.
 //! - **PW5302.** A handler assigns a signal, not a binding of the body it is
 //!   written in. A body's `let mut` changed by a press is UI state written the
 //!   other way, and there is one way (ADR-0130's fourth ruling). A binding the
@@ -57,7 +60,7 @@ pub fn check(
         let Some(b) = decl.body else { continue };
         let body = hir.body(b);
         provided(decl, body, sigs, at, provision, out);
-        check_body(decl, body, sigs, at, captured, out);
+        check_body(decl, body, sigs, at, captured, provision, out);
     }
 }
 
@@ -67,6 +70,7 @@ fn check_body(
     sigs: &Signatures,
     at: usize,
     captured: &BTreeMap<crate::resolve::DefId, BTreeSet<String>>,
+    provision: &Provision,
     out: &mut Vec<Diagnostic>,
 ) {
     let lexical = Lexical::build(sigs, Some(at), decl, body);
@@ -108,6 +112,25 @@ fn check_body(
             && let Pattern::Bind { name, .. } = body.pat(*p)
         {
             signals.insert(Binder::Pattern(*p), (name.clone(), id));
+        }
+    }
+
+    // **Each signal a page's query is given** (ADR-0152): the argument, the
+    // binding, and the query. The browser reads the binding again, for the
+    // new key, when the signal changes.
+    let mut keys: BTreeMap<ExprId, (String, DefId)> = BTreeMap::new();
+    if decl.kind == DeclKind::Page {
+        for (binding, query, args) in crate::page_values::query_bindings(sigs.workspace(), at, body)
+        {
+            for arg in args {
+                if matches!(body.expr(arg), Expr::Name(_))
+                    && lexical
+                        .binder(arg)
+                        .is_some_and(|b| signals.contains_key(&b))
+                {
+                    keys.insert(arg, (binding.clone(), query));
+                }
+            }
         }
     }
 
@@ -173,7 +196,9 @@ fn check_body(
                 if is_assigned(body, id) {
                     continue;
                 }
-                if places.get(&id).copied().unwrap_or(Place::Body) == Place::Body {
+                if let Some((binding, query)) = keys.get(&id) {
+                    key_rules(body, id, n, declared, binding, *query, provision, sigs, out);
+                } else if places.get(&id).copied().unwrap_or(Place::Body) == Place::Body {
                     out.push(read_where_it_cannot_change(body, id, n, declared));
                 } else if let Some((_, tag, param)) =
                     given.iter().find(|(e, ..)| within(body, *e, id))
@@ -603,6 +628,96 @@ fn read_where_it_cannot_change(
     }
 }
 
+/// **The two rules of a key a signal gives a query** (ADR-0152). PW5308: the
+/// signal is a `String`, an `Int` or a `Bool`, since a key crosses to the
+/// server and is compared exactly. PW5309: the query says what its stale work
+/// does when the key changes while the old key's read is in flight.
+#[allow(clippy::too_many_arguments)]
+fn key_rules(
+    body: &Body,
+    at: ExprId,
+    name: &str,
+    declared: Option<ExprId>,
+    binding: &str,
+    query: DefId,
+    provision: &Provision,
+    sigs: &Signatures,
+    out: &mut Vec<Diagnostic>,
+) {
+    // As written where it is declared: `String`, `Int`, `List<String>`.
+    let written = declared
+        .and_then(|d| match body.expr(d) {
+            Expr::Let { ty: Some(t), .. } => {
+                body.types.get(t.index()).map(|r| match r.args.is_empty() {
+                    true => r.path.clone(),
+                    false => format!("{}<..>", r.path),
+                })
+            }
+            _ => None,
+        })
+        .unwrap_or_default();
+    if !matches!(written.as_str(), "String" | "Int" | "Bool") {
+        let code = crate::codes::SIGNAL_KEY_TYPE;
+        out.push(Diagnostic {
+            code: code.id,
+            invariant: code.invariant,
+            reason: "signal_key_type",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!(
+                "`{name}` keys `{binding}`, and is a signal of `{written}`: a key is a \
+                 `String`, an `Int` or a `Bool`"
+            ),
+            primary_span: body.expr_span(at),
+            related: declared_here(body, name, declared),
+            explanation: Some(
+                "The browser reads a query a signal keys again when the signal changes, \
+                 and sends the new key to the server, which compares it with the keys it \
+                 holds. A `String`, an `Int` and a `Bool` cross as they are and compare \
+                 exactly; a record or a list would need a codec, which is not built \
+                 (ADR-0131)."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: "key the query by a signal of `String`, `Int` or `Bool`".to_string(),
+                replacement: None,
+            }],
+        });
+    }
+    if provision
+        .stale_work
+        .get(&query)
+        .is_some_and(Option::is_none)
+    {
+        let code = crate::codes::SIGNAL_KEY_STALE_WORK;
+        let path = sigs.path_of(query).unwrap_or_default();
+        out.push(Diagnostic {
+            code: code.id,
+            invariant: code.invariant,
+            reason: "signal_key_stale_work",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!("`{name}` keys `{binding}`, and `{path}` declares no `on_key_change`"),
+            primary_span: body.expr_span(at),
+            related: declared_here(body, name, declared),
+            explanation: Some(
+                "When the signal changes while the old key's read is in flight, that \
+                 read is stale work. The query says what it does: `cancel` stops it, \
+                 `supersede` lets it finish and drops its answer, and `keep` lets it \
+                 finish and asks for the new key after it. In none is an old key's \
+                 answer shown for the new one (ADR-0152)."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: format!(
+                    "declare `on_key_change cancel | supersede | keep` on `{path}`"
+                ),
+                replacement: None,
+            }],
+        });
+    }
+}
+
 /// A signal given to a view whose handler captures it (ADR-0136).
 fn captured_through_a_view(
     body: &Body,
@@ -694,6 +809,9 @@ pub struct Provision {
     pub holds: BTreeSet<DefId>,
     /// Each module signal's name, as it is declared, for a message.
     pub names: BTreeMap<DefId, String>,
+    /// **Each query's `on_key_change`**, as declared, or `None` (ADR-0152): a
+    /// page that keys one by a signal reads it wherever it is declared.
+    pub stale_work: BTreeMap<DefId, Option<String>>,
 }
 
 impl Provision {
@@ -704,6 +822,13 @@ impl Provision {
                 if decl.kind == DeclKind::Signal {
                     p.names
                         .insert(DefId { unit, decl: id.0 }, decl.name.clone());
+                }
+                if decl.kind == DeclKind::Query {
+                    p.stale_work.insert(
+                        DefId { unit, decl: id.0 },
+                        decl.policy("on_key_change")
+                            .map(|policy| policy.value.trim().to_string()),
+                    );
                 }
             }
         }

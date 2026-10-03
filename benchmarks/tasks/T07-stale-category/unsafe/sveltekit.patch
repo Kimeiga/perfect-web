@@ -1,0 +1,22 @@
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 22a405a..fbeba9c 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -11,11 +11,16 @@
+   let category = $state("all");
+   let browsing = $state<Item[]>(data.browse);
+   $effect(() => {
++    // An answer for a category the customer moved past is not shown.
++    let ignore = false;
+     fetch(`/api/menu?store=${data.store.id}&category=${category}`)
+       .then((r) => r.json())
+       .then((found: Item[]) => {
+-        browsing = found;
++        if (!ignore) browsing = found;
+       });
++    return () => {
++      ignore = true;
++    };
+   });
+ </script>
+ 

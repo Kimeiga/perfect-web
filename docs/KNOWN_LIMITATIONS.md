@@ -180,6 +180,16 @@ refused by name:
   - **A query's budget bounds the region, not the query.** The query runs on
     after its region is given the host's failure, and what it answers is
     kept as its policy says.
+- **A key a page changes** (ADR-0152):
+  - **Only a page's own `let` query is keyed by a signal.** A view's signal,
+    and a `<stream>`'s query, are not.
+  - **A key is a `String`, an `Int` or a `Bool`** (PW5308). A record or a
+    list would need a codec.
+  - **The key a page shows is recorded per session**, as what it shows is.
+    Two tabs of one session that choose different keys are patched as one.
+  - **Keyed reads are exercised in a browser in Chromium only**, through
+    T07's controls; the server's tests cover each policy. The press-order
+    fix runs in three engines.
 - **What a page shows is recorded per session** (ADR-0151, as before it).
   Two pages of one session read at once are both served, and the later is
   the one later changes are derived against.
@@ -469,9 +479,9 @@ No program lowers a label except a host binding, whose signature is its
 contract; an audited `declassify` waits for the first program that needs
 one.
 
-**The development server honours query policies except two** (ADR-0127):
-`on_key_change` (a served page never changes its key) and `consistency`
-(nothing enforces a mode as such). Freshness, cache partition, key, retries,
+**The development server honours query policies except one** (ADR-0127,
+ADR-0152): `consistency` (nothing enforces a mode as such). `on_key_change`
+runs since ADR-0152, for a binding a page's signal keys. Freshness, cache partition, key, retries,
 timeout and one-flight-per-key are `pw-resource`'s, and a commit drops exactly
 what it invalidates. **Its sandbox is checked, not
 enforced** (ADR-0124, E14-I): no hidden file is copied in, and a process in

@@ -1737,6 +1737,34 @@ e14-query-values:
      } > docs/evidence/E14/query-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/query-values.txt
 
+# ADR-0152: a key a page changes. A page's query given a signal is read again,
+# for the new key, and its stale work is cancelled, superseded or kept as it
+# says. The compiler's rules and plan, the server's keyed reads, presses run
+# in the order they were made (three engines), and the mutation controls.
+e14-keyed-reads:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0152 - a key a page changes, and what its stale work does"; echo; \
+       echo "produced by: just e14-keyed-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the rules and the plan (compiler/pw-core/tests/keyed.rs)"; echo; \
+       cargo test --locked -p pw-core --test keyed 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server's keyed reads, among its tests (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== presses in order (e2e/signals.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/signals.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/keyed_reads_mutations.py)"; echo; \
+       python3 scripts/keyed_reads_mutations.py; \
+       echo; echo "== the press-order control (scripts/press_order_mutations.py)"; echo; \
+       python3 scripts/press_order_mutations.py; \
+     } > docs/evidence/E14/keyed-reads.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/keyed-reads.txt
+
 # E14's gate item 5: where each task's plausible wrong fix is caught, per
 # stack, from the tasks' recorded controls, and the rules `pw check` refuses
 # Pleris's with. Record each task's controls first (`just e14-harness T..`).

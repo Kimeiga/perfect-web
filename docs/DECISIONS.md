@@ -1205,3 +1205,24 @@ a development-server correction, found designing T02.
   page is read again, and the third attempt is read inside the table.
 - The cart's count is read from the cart's binding alone, where a command
   asked every query on the page for it.
+
+[ADR-0152](DECISIONS/ADR-0152-a-key-a-page-changes.md): what T07 and the
+charter's §15.6 tests 6-8 needed. Settles ADR-0089's open ruling.
+- A page's query may be given a page signal. The browser reads the binding
+  again, for the new key, when the signal changes. The server applies only
+  the latest read for a page that is still the session's, and sends what it
+  shows as one patch set in the session's frames.
+- PW5308: a signal that keys a query is a `String`, an `Int` or a `Bool`.
+- PW5309: a query a signal keys declares `on_key_change`.
+- `on_key_change`:
+  - `cancel` stops the old key's read: the browser aborts it, and the
+    server lets go of its flight, which `pw-resource` stops when nobody else
+    holds it;
+  - `supersede` lets the old read finish, and drops its answer;
+  - `keep` reads the new key once the old read has finished, dropping keys
+    passed over meanwhile.
+
+  In none is an old key's answer shown for a new key.
+
+Found on the way: the browser ran presses in the order their code arrived.
+Each handler now starts after the press before it.

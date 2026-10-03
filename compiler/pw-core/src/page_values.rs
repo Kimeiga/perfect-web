@@ -18,8 +18,8 @@
 //!
 //! # What is refused, by name
 //!
-//! - a binding whose key is neither a page parameter nor an
-//!   invocation-context call (`current_session()`);
+//! - a binding whose key is neither a page parameter, an invocation-context
+//!   call (`current_session()`), nor a page signal (ADR-0152);
 //! - a member read inside a block (`{#each}`, `{#match}`, `{#if}`): a host
 //!   would call it per instance, which this plan does not state;
 //! - a path that reads through something that is neither a field nor a
@@ -38,11 +38,16 @@ pub struct Binding {
     pub binding: String,
     /// The query, as a component id: `store.page.Cart`.
     pub resource: String,
-    /// Each argument as a host computes it: a page parameter's name, or an
-    /// invocation-context call, `current_session()`.
+    /// Each argument as a host computes it: a page parameter's name, an
+    /// invocation-context call, `current_session()`, or a page signal's name.
     pub args: Vec<String>,
     /// How a host runs the query: its declared policies (ADR-0127).
     pub policy: Policy,
+    /// **The page signals among its arguments** (ADR-0152): the browser
+    /// reads the binding again, for the new key, when one changes. Empty
+    /// for a binding whose key the page never changes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signals: Vec<String>,
 }
 
 /// A query's policies, as a host applies them (ADR-0127).
@@ -65,6 +70,10 @@ pub struct Policy {
     /// `key` clause is keyed by all of them, so two calls with different
     /// arguments never share an entry.
     pub key: Vec<usize>,
+    /// **What a key's stale work does** (ADR-0152): `cancel`, `supersede` or
+    /// `keep`, as declared. Absent where the query declares none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_key_change: Option<String>,
 }
 
 fn policy_of(decl: &crate::hir::Decl) -> Policy {
@@ -99,6 +108,9 @@ fn policy_of(decl: &crate::hir::Decl) -> Policy {
         },
         parallel: m.concurrency == Some(Concurrency::Parallel),
         key,
+        on_key_change: decl
+            .policy("on_key_change")
+            .map(|p| p.value.trim().to_string()),
     }
 }
 
@@ -830,19 +842,38 @@ fn plan(
         }
     };
 
+    // The page's own signals, by name: a query given one is read again, for
+    // the new key, when it changes (ADR-0152).
+    let page_signals: BTreeSet<String> = body
+        .signals
+        .iter()
+        .filter_map(|s| match body.expr(*s) {
+            Expr::Let { pat: Some(p), .. } => match body.pat(*p) {
+                Pattern::Bind { name, .. } => Some(name.clone()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect();
     let found = query_bindings(ws, unit, body);
     let mut bindings = Vec::new();
     for (name, resource, keys) in &found {
         let mut args = Vec::new();
+        let mut keyed_by = Vec::new();
         for k in keys {
             args.push(match body.expr(*k) {
                 Expr::Name(n) if params.contains(n) => n.clone(),
+                Expr::Name(n) if page_signals.contains(n) => {
+                    keyed_by.push(n.clone());
+                    n.clone()
+                }
                 Expr::Call { callee, args } if args.is_empty() => {
                     format!("{}()", crate::infer::path_of(body, *callee))
                 }
                 _ => {
                     return Err(format!(
-                        "`{name}`'s key is neither a page parameter nor an invocation-context call"
+                        "`{name}`'s key is neither a page parameter, an invocation-context \
+                         call, nor a page signal"
                     ));
                 }
             });
@@ -855,6 +886,7 @@ fn plan(
                 .ok_or_else(|| format!("`{name}`'s query has no component"))?,
             args,
             policy: policy_of(decl),
+            signals: keyed_by,
         });
     }
 

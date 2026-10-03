@@ -1,0 +1,6 @@
+{
+  "id": "T07",
+  "title": "Stop reading a category the customer moved past",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T07.spec.mjs"
+}

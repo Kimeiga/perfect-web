@@ -1,0 +1,83 @@
+diff --git a/lib/Categories.pw b/lib/Categories.pw
+new file mode 100644
+index 0000000..ea484ea
+--- /dev/null
++++ b/lib/Categories.pw
+@@ -0,0 +1,16 @@
++// @corpus: fixture
++// @id: E14-categories
++// @category: the store's data layer — the menu by category
++// @charter: §15
++// @milestone: E14
++//
++// The menu's items in one category (E14, T07), from the host's data layer.
++// One category can be slow to read.
++
++module Categories
++
++import domain.{ StoreId, StoreError, MenuItem }
++
++// The store's menu items in `category`: `hot`, `cold`, or `all` of them.
++fn items(store: StoreId, category: String) -> Result<List<MenuItem>, StoreError> !{ database.read<Categories> }
++    host "store:data/menus#in-category"
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..0d1fce0 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -26,6 +26,7 @@ module store.page
+ import Stores
+ import Carts
+ import Menus
++import Categories
+ // The invocation context. `current_session()` was called and never imported
+ // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
+ // dotted paths whose head looks like a module, and a bare call to nothing
+@@ -57,6 +58,19 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+     Menus.for_store(id)
+ }
+ 
++// **The menu's items in a category** (E14, T07). The page reads it again
++// when its category changes. Reading a category can be slow, so one read at
++// a time: a new category is read once the one before it has answered.
++public query MenuIn(id: StoreId, category: String) -> Result<List<MenuItem>, StoreError>
++    freshness     0.seconds
++    consistency   snapshot
++    concurrency   one_per_key
++    on_key_change keep
++    timeout       5.seconds
++{
++    Categories.items(id, category)
++}
++
+ public query Store(id: StoreId) -> Result<Store, StoreError>
+     freshness     30.seconds
+     consistency   snapshot
+@@ -133,6 +147,8 @@ page StorePage(id: StoreId) {
+     let store = query Store(id)
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
++    signal category: String = "all"
++    let browsing = query MenuIn(id, category)
+ 
+     view {
+         <main>
+@@ -154,6 +170,19 @@ page StorePage(id: StoreId) {
+                 </ul>
+             </section>
+ 
++            <section aria-label="Browse">
++                <nav aria-label="Categories">
++                    <button type="button" on:press={() => category = "all"}>All</button>
++                    <button type="button" on:press={() => category = "hot"}>Hot</button>
++                    <button type="button" on:press={() => category = "cold"}>Cold</button>
++                </nav>
++                <ul id="browse">
++                    {#each browsing as item (item.id)}
++                        <li>{item.name}</li>
++                    {/each}
++                </ul>
++            </section>
++
+             <section aria-label="Cart">
+                 <p id="cart-count">{cart.line_count}</p>
+                 <button

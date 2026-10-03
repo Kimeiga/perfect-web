@@ -922,11 +922,100 @@ async function flushSignals() {
     // Shown once what is in it can be pressed (ADR-0141).
     showDialogs(inserted);
   }
+  readAgain(changed);
   window.__pw.signals = Object.fromEntries(signals);
 }
 
+// --- ADR-0152: a key a page changes ---------------------------------------
+//
+// A page's query given a signal is read again, for the new key, when the
+// signal changes. The server answers in the session's frames, as one patch
+// set, and applies a read only if it is the latest for this page. So the
+// browser only says which key each binding asks for, and does what its stale
+// work says:
+//   cancel     the read in flight is aborted, and the new one sent;
+//   supersede  the read in flight runs to its end, and the new one is sent;
+//   keep       the new one is sent, and the server runs it after the one in
+//              flight, dropping any it has not started that a newer replaced.
+// In none is an old key's answer shown for the new key: the server applies
+// only the latest read.
+
+/** The document this page is: its first cursor, which each read names. */
+const documentCursor = parts.cursor ?? 0;
+
+/** Each binding a signal keys: its signals, its stale work, and its reads. */
+const keyedReads = new Map(
+  (parts.keyed ?? []).map((k) => [
+    k.binding,
+    { signals: k.signals, policy: k.on_key_change, seq: 0, current: null, inflight: null },
+  ]),
+);
+for (const read of keyedReads.values()) read.current = keyOf(read);
+
+/** A binding's key: each of its signals' values. */
+function keyOf(read) {
+  return JSON.stringify(Object.fromEntries(read.signals.map((s) => [s, signals.get(s)])));
+}
+
+/** The bindings whose keys `changed` changed, each asked for again. */
+function readAgain(changed) {
+  for (const [binding, read] of keyedReads) {
+    if (!read.signals.some((s) => changed.has(s))) continue;
+    const key = keyOf(read);
+    // A key this page has, or is asking for, is not asked for again
+    // (charter §15.6, test 6).
+    if (key === read.current) continue;
+    read.current = key;
+    if (read.inflight && read.policy === "cancel") read.inflight.abort();
+    ask(binding, read, key);
+  }
+}
+
+/** One read of `binding` for `key`, numbered. */
+function ask(binding, read, key) {
+  const seq = ++read.seq;
+  const controller = new AbortController();
+  read.inflight = controller;
+  busy(binding, true);
+  window.__pw.reads = (window.__pw.reads ?? 0) + 1;
+  const url =
+    `/pw-read?binding=${encodeURIComponent(binding)}&seq=${seq}` +
+    `&doc=${documentCursor}&key=${encodeURIComponent(key)}`;
+  fetch(url, { signal: controller.signal })
+    .then((r) => r.json())
+    .then((answer) => log.push(`read ${binding} #${seq}: ${JSON.stringify(answer)}`))
+    .catch((e) =>
+      log.push(`read ${binding} #${seq} ${e?.name === "AbortError" ? "aborted" : "failed"}`),
+    )
+    .finally(() => {
+      if (read.inflight !== controller) return;
+      read.inflight = null;
+      busy(binding, false);
+    });
+}
+
+/** Mark what `binding` shows as waiting for a new key's answer. */
+function busy(binding, waiting) {
+  for (const p of parts.parts ?? []) {
+    if (String(p.value ?? "").split(".")[0] !== binding) continue;
+    const at = index.get(addressOf([], p.id))?.start?.parentElement;
+    if (!at) continue;
+    if (waiting) at.setAttribute("aria-busy", "true");
+    else at.removeAttribute("aria-busy");
+  }
+}
+
+// Leaving the page stops its reads (charter §15.6, test 8): the server, finding
+// a read's request gone, lets go of a `cancel` read's flight.
+addEventListener("pagehide", () => {
+  for (const read of keyedReads.values()) read.inflight?.abort();
+});
+
 /** Each event part's decision, asked once (E7-L): before anything binds. */
 const verdicts = new Map();
+/** When the latest press's handler started (ADR-0152): the next press's
+ * starts after it, so presses run in the order they were made. */
+let lastPressStarted = Promise.resolve();
 /** Each element's parts a listener is bound for: an element may handle two
  * events, `on:input` and `on:keydown`, each its own listener. */
 const bound = new WeakMap();
@@ -1041,11 +1130,27 @@ function bindEvents() {
         // block rendered last.
         const instances = JSON.parse(el.dataset.pwSignals ?? "{}");
         const instance = (name) => instances[name] ?? name;
+        // **Presses run in the order they were made** (ADR-0152). Each
+        // handler's module loads on its own, so a second press's could arrive
+        // first; its handler waits for the press before it to start. Until
+        // 2026-10-03 it did not wait: Hot then Cold, pressed quickly, could
+        // leave Hot chosen.
+        const myTurn = lastPressStarted;
+        let started;
+        lastPressStarted = new Promise((resolve) => (started = resolve));
         try {
           // Authorised above; loaded here. The order is the point of E7-L:
           // the bytes for this handler do not exist in this page until
           // somebody presses this button.
-          const module = await loadHandler(part.value);
+          let module;
+          try {
+            module = await loadHandler(part.value);
+          } finally {
+            // Its turn, loaded or not: a press whose code failed to load
+            // must not hold up every press after it.
+            await myTurn;
+            started();
+          }
           // The command COMMITS and returns nothing about the cart. The
           // browser learns the new value from the RESOURCE, because that is
           // what the program declares the page depends on:

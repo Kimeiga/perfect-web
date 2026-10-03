@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `a66cc18`, with ADR-0151.
+**Reviewed:** 2026-10-03, against master `d68d563`, with ADR-0152.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,41 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**E14-C, 2026-10-03: T07 is written, all twelve tasks; ADR-0152, a key a
+page changes** ([ADR-0152](DECISIONS/ADR-0152-a-key-a-page-changes.md)).
+- **What was missing.** A page could not change a query's key. A signal
+  given to a page's query was refused (PW5301), and `on_key_change`, which
+  PW0325 requires, meant nothing at run time. ADR-0089 had left open whether
+  `supersede` and `keep` mean anything. So a menu search or a category
+  filter could not be written. The charter's store tests 6-8 (§15.6) could
+  not be either: one key is one request, a changed key cancels or
+  supersedes stale work, and leaving cancels unneeded requests.
+- **Now a page's query given a signal is read again for the new key.**
+  - The server applies only the latest read for a page that is still the
+    session's, as one patch set in the session's frames.
+  - `cancel` stops the old key's read: the browser aborts it, and the server
+    lets go of its flight. `supersede` lets it finish, unshown. `keep` reads
+    the new key once it has finished.
+  - In none is an old key's answer shown for a new key. A key is a
+    `String`, an `Int` or a `Bool` (PW5308), and its query declares its
+    stale work (PW5309).
+- **T07** lets a customer browse the menu by category, Hot slow to read.
+  All four controls hold on all three stacks.
+  - In the frameworks the setup lets Hot's late answer replace Cold's. The
+    plausible wrong fix is React's documented ignore flag: Cold stays, and
+    Hot's request runs on.
+  - In Pleris that bug cannot be written. The task is the stale work: the
+    setup's `keep`, the reference's `cancel`, the wrong fix's `supersede`.
+
+  Every wrong fix builds, and only the hidden test of the stopped request
+  fails it.
+
+**Correction, found by T07: the browser ran presses in the order their code
+arrived.** A handler's module loads on its first press. Hot then Cold, pressed
+quickly, could run Cold's handler first, and leave Hot chosen. Each handler
+now starts after the press before it. A browser test delays the first
+press's code and checks the second press's effect is the one left.
 
 **E14 gate item 5, 2026-10-03: which bug classes `pw check` refuses, stated
 with evidence** ([E14.md](milestones/E14.md), `just e14-unsafe-table`).
@@ -2319,14 +2354,13 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **T07, and the charter's §15.6 tests 6-8.** These need a key a page
-   changes, such as a query keyed by a signal, and a ruling on what
-   `on_key_change cancel`, `supersede` and `keep` do at run time. ADR-0089
-   left that open, and nothing reads the policy yet.
-2. **The two rules gate item 5 points at**, each to be researched and ruled:
+1. **The two rules gate item 5 points at**, each researched and ruled:
    - an `{#if}` chain over one sum value's cases, held to cover them (T04);
    - every command a browser sends declaring how a second delivery is
      answered (T08).
+2. **Keyed reads in three engines**: serve a store with T07's setup in the
+   browser suite, so Firefox and WebKit run them as Chromium does in T07's
+   controls.
 3. **E14-E's design**, ready for the owner's choice of models and budget:
    how the agent is run, and how a harness effect is told from capability
    (gate item 4).
