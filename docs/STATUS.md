@@ -13,6 +13,31 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Correction, ADR-0143, 2026-10-02: PW5014 accepted unlabelled fields and
+refused labelled ones**
+([ADR-0143](DECISIONS/ADR-0143-what-names-a-form-control.md)). The rule
+took any `id` as a field's name, and never checked that a `<label for>`
+pointed at it. It also never checked that an `aria-labelledby` reached
+anything, or that an `aria-label` had text. So T06's unsafe store passed
+`pw check` with a placeholder and no label. The render fixture `tricky.pw`
+had shipped such a field since E7. The rule also refused a field wrapped in
+its `<label>`, which the HTML standard defines as labelled. A field is now
+named only by what reaches it in the same declaration, as the HTML standard
+and accname 1.2 define:
+- a `<label for>` with text;
+- a wrapping `<label>` with text;
+- an `aria-labelledby` reaching text;
+- a non-blank `aria-label`.
+
+Each refusal's note names the case and its repair.
+
+**E14-C, 2026-10-02: T06 is written, five tasks of twelve.** A form asks
+the store for an item. Its field has a visible label; an empty request
+shows an error tied to the field and announced, and a request is thanked.
+All four controls hold on all three stacks. The plausible wrong form uses a
+placeholder for a label. Next.js and SvelteKit build it, and only the hidden
+tests fail it. Pleris refuses it at `pw check` (PW5014), since ADR-0143.
+
 **ADR-0142, 2026-10-02: an input bound to a signal**
 ([ADR-0142](DECISIONS/ADR-0142-an-input-bound-to-a-signal.md), ADR-0131's
 fifth ruling). `bind:value={name}` shows a signal in a field and sets it to

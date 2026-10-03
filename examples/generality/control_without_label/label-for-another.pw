@@ -1,0 +1,12 @@
+// @status: GENERAL
+// @invariant: control_without_label
+// @dimension: indirect invalid — a label, for a different `id`
+module generality.label_for_another
+
+view AddressForm() !{} {
+    <form>
+        <label for="country">Country</label>
+        <select id="region" name="region"><option>CA</option></select>
+        <button type="submit">Save</button>
+    </form>
+}

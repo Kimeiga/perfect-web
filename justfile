@@ -1718,6 +1718,29 @@ e14-bind:
      } > docs/evidence/E14/bind.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/bind.txt
 
+# ADR-0143: what names a form control. The rule's tests, its generality
+# witnesses, each witness checked by `pw check`, and the mutation controls;
+# the browser's half is `e2e/parsed-tree.spec.mjs`, in the own-renderer suite.
+e14-labels:
+    @{ echo "ADR-0143 - what names a form control"; echo; \
+       echo "produced by: just e14-labels"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/labels.rs)"; echo; \
+       cargo test --locked -p pw-core --test labels 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== each witness (examples/generality/control_without_label)"; echo; \
+       cargo build --quiet --locked -p pw-cli; \
+       for f in examples/generality/control_without_label/*.pw; do \
+         printf '%s: %s\n' "$(basename $f)" "$(grep -m1 '@status' $f | sed 's/.*@status: //')"; \
+         ./target/debug/pw check "$f" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E '^error|^pw check' | sed 's/^/    /'; \
+       done; \
+       echo; echo "== the generality suite (compiler/pw-core/tests/generality.rs)"; echo; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/labels_mutations.py)"; echo; \
+       python3 scripts/labels_mutations.py; \
+     } > docs/evidence/E14/labels.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/labels.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

@@ -150,8 +150,12 @@ test.describe("gate 4 — structures the parser repairs", () => {
   });
 
   test("every labelled control has its accessible name", async ({ page }) => {
+    // Each way PW5014 accepts a name (ADR-0143): a `<label for>`, the
+    // `<label>` that wraps the control, and `aria-labelledby`.
     await expect(page.locator("#size")).toHaveAccessibleName("Size");
     await expect(page.locator("#q2")).toHaveAccessibleName("Search");
+    await expect(page.locator("#field")).toHaveAccessibleName("Tea");
+    await expect(page.locator("#note")).toHaveAccessibleName("Delivery note");
     await expect(page.locator("#voids img")).toHaveAccessibleName("Blue Bottle");
   });
 });

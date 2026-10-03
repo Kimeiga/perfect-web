@@ -1,0 +1,51 @@
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..20f3052 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -134,6 +134,12 @@ page StorePage(id: StoreId) {
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
+ 
++    // The request form: what is typed, the error, and the thanks.
++    signal requested: String = ""
++    signal problem: String = ""
++    signal invalid: Bool = false
++    signal thanks: String = ""
++
+     view {
+         <main>
+             <h1 id="store-name">{store.name}</h1>
+@@ -154,6 +160,33 @@ page StorePage(id: StoreId) {
+                 </ul>
+             </section>
+ 
++            <section aria-label="Request an item">
++                <form on:submit|prevent={() => {
++                    if requested == "" {
++                        problem = "Enter an item to request."
++                        invalid = true
++                        thanks = ""
++                    } else {
++                        problem = ""
++                        invalid = false
++                        thanks = "Thanks! We'll ask the store about {requested}."
++                        requested = ""
++                    }
++                }}>
++                    <label for="request">Item to request</label>
++                    <input
++                        id="request"
++                        type="text"
++                        aria-describedby="request-error"
++                        aria-invalid={invalid}
++                        bind:value={requested}
++                    />
++                    <button type="submit">Request</button>
++                </form>
++                <p id="request-error" role="alert">{problem}</p>
++                <p role="status">{thanks}</p>
++            </section>
++
+             <section aria-label="Cart">
+                 <p id="cart-count">{cart.line_count}</p>
+                 <button

@@ -1,0 +1,12 @@
+// @status: NEIGHBOUR
+// @invariant: control_without_label
+// @dimension: valid neighbour — `aria-labelledby` names a heading with text
+module generality.label_labelledby_heading
+
+view SearchForm() !{} {
+    <form>
+        <h2 id="search-title">Search the menu</h2>
+        <input type="search" name="q" aria-labelledby="search-title" />
+        <button type="submit">Search</button>
+    </form>
+}

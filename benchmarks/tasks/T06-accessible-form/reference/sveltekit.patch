@@ -1,0 +1,53 @@
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..541bd27 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -3,6 +3,25 @@
+   import type { PageProps } from "./$types";
+ 
+   let { data }: PageProps = $props();
++
++  // Ask for an item the store does not sell. Answered on the page: the field
++  // is labelled, the error is its description and is announced, and so is
++  // the thanks.
++  let requested = $state("");
++  let problem = $state("");
++  let thanks = $state("");
++
++  function request(event: SubmitEvent) {
++    event.preventDefault();
++    if (requested === "") {
++      problem = "Enter an item to request.";
++      thanks = "";
++      return;
++    }
++    problem = "";
++    thanks = `Thanks! We'll ask the store about ${requested}.`;
++    requested = "";
++  }
+ </script>
+ 
+ <main>
+@@ -22,6 +41,22 @@
+     </ul>
+   </section>
+ 
++  <section aria-label="Request an item">
++    <form onsubmit={request}>
++      <label for="request">Item to request</label>
++      <input
++        id="request"
++        type="text"
++        bind:value={requested}
++        aria-invalid={problem !== ""}
++        aria-describedby="request-error"
++      />
++      <button type="submit">Request</button>
++    </form>
++    <p id="request-error" role="alert">{problem}</p>
++    <p role="status">{thanks}</p>
++  </section>
++
+   <section aria-label="Cart">
+     <p id="cart-count">{data.cartCount}</p>
+     <form method="POST" action="?/clear" use:enhance>

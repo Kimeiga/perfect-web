@@ -1,0 +1,11 @@
+// @status: GENERAL
+// @invariant: control_without_label
+// @dimension: indirect invalid — an `id` and a placeholder, and no label points at it
+module generality.label_id_alone
+
+view RequestForm() !{} {
+    <form>
+        <input id="request" type="text" name="request" placeholder="Item to request" />
+        <button type="submit">Request</button>
+    </form>
+}

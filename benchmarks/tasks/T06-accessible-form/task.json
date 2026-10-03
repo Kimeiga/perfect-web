@@ -1,0 +1,6 @@
+{
+  "id": "T06",
+  "title": "An accessible form: request an item",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T06.spec.mjs"
+}

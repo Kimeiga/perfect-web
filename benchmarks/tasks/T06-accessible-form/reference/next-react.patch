@@ -1,0 +1,72 @@
+diff --git a/app/stores/[storeId]/RequestForm.tsx b/app/stores/[storeId]/RequestForm.tsx
+new file mode 100644
+index 0000000..a141f03
+--- /dev/null
++++ b/app/stores/[storeId]/RequestForm.tsx
+@@ -0,0 +1,45 @@
++"use client";
++
++import { useState, type FormEvent } from "react";
++
++// Ask for an item the store does not sell. Answered on the page: the field
++// is labelled, the error is its description and is announced, and so is
++// the thanks.
++export function RequestForm() {
++  const [requested, setRequested] = useState("");
++  const [problem, setProblem] = useState("");
++  const [thanks, setThanks] = useState("");
++
++  function submit(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    if (requested === "") {
++      setProblem("Enter an item to request.");
++      setThanks("");
++      return;
++    }
++    setProblem("");
++    setThanks(`Thanks! We'll ask the store about ${requested}.`);
++    setRequested("");
++  }
++
++  return (
++    <section aria-label="Request an item">
++      <form onSubmit={submit}>
++        <label htmlFor="request">Item to request</label>
++        <input
++          id="request"
++          type="text"
++          value={requested}
++          onChange={(e) => setRequested(e.target.value)}
++          aria-invalid={problem !== ""}
++          aria-describedby="request-error"
++        />
++        <button type="submit">Request</button>
++      </form>
++      <p id="request-error" role="alert">
++        {problem}
++      </p>
++      <p role="status">{thanks}</p>
++    </section>
++  );
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..6e902a3 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
+ import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
++import { RequestForm } from "./RequestForm";
+ 
+ export default async function StorePage({
+   params,
+@@ -33,6 +34,8 @@ export default async function StorePage({
+         </ul>
+       </section>
+ 
++      <RequestForm />
++
+       <section aria-label="Cart">
+         <p id="cart-count">{lineCount(cart)}</p>
+         <form action={clearCartAction}>

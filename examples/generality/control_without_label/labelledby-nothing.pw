@@ -1,0 +1,11 @@
+// @status: GENERAL
+// @invariant: control_without_label
+// @dimension: indirect invalid — `aria-labelledby` names an element that is not there
+module generality.label_labelledby_nothing
+
+view SearchForm() !{} {
+    <form>
+        <input type="search" name="q" aria-labelledby="search-title" />
+        <button type="submit">Search</button>
+    </form>
+}

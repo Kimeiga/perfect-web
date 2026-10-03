@@ -31,6 +31,9 @@
 //            and `<br/>`'s slash is ignored, so both look fine and one of them
 //            is a different tree
 //   form     works with no script at all
+//   labels   a control is named by a `<label for>`, by the `<label>` that
+//            wraps it, or by `aria-labelledby` (ADR-0143), and each must
+//            reach the accessibility tree as the control's name
 
 module render.tricky
 
@@ -63,8 +66,11 @@ view Tricky() !{} {
             <img src="/logo.png" alt="Blue Bottle">
             <br>
             <hr>
-            <input id="field" name="q" type="text" value="tea">
+            <label>Tea <input id="field" name="q" type="text" value="tea"></label>
         </div>
+
+        <p id="note-title">Delivery note</p>
+        <input id="note" name="note" type="text" aria-labelledby="note-title">
 
         <form id="search" action="/search" method="get">
             <label for="q2">Search</label>

@@ -25,9 +25,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
    readable from the sandbox.
 3. **E14-C, tasks T01-T12**, each with a prompt, hidden tests, a reference
    patch and an unsafe patch per stack, and all four controls green. A task
-   Pleris cannot express (T06 forms, T11 dialogs, today) is recorded as such.
-   T01, T08 and T12 are written. T12's Pleris wrong fix is refused since
-   ADR-0128.
+   Pleris cannot express is recorded as such. T01, T06, T08, T11 and T12
+   are written. T12's Pleris wrong fix is refused since ADR-0128.
    - ~~**E14-L, a value's label.**~~ Done 2026-10-02 (ADR-0129).
    - ~~**Rulings: UI state, view composition, typed events.**~~ Done
      2026-10-02 (ADR-0130, ADR-0131).
@@ -46,11 +45,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
      unsafe patch is refused by `pw check` (PW5303).
    - ~~**`bind:value`.**~~ Done 2026-10-02 (ADR-0142), for a `String`
      signal.
-   - **Next: T06, an accessible form**, written as T11 was: a prompt, hidden
-     tests, a reference and an unsafe patch per stack, all four controls.
-     What the form needs that Pleris lacks is decided as the task is
-     written: forms as one typed record (ADR-0131, ruling 6), or a codec.
-   - **Then:** provided signals (ADR-0130's step 3).
+   - ~~**T06, an accessible form.**~~ Written 2026-10-02: all four controls
+     hold on all three stacks (`just e14-harness T06`). Pleris's unsafe patch
+     is refused by `pw check` (PW5014). The form needed no typed record: a
+     `String` signal bound to its field, and a submit handler, express it.
+   - ~~**Correction: what names a form control.**~~ Done 2026-10-02
+     (ADR-0143). Writing T06 found that PW5014 took any `id` as a name, and
+     refused a control wrapped in its label.
+   - **Next: provided signals** (ADR-0130's step 3): a view's own signals,
+     and a signal a page provides to the views it composes.
+   - **Then E14-Q**, the server's generality for queries, which T02, T03,
+     T04, T07, T09 and T10 wait on; T05 waits on `<stream>` (ADR-0075).
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

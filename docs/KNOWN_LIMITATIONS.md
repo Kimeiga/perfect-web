@@ -401,6 +401,19 @@ the page does not show waits for a view's signals (ADR-0130, step 3). A page
 that reads queries holds signals on the store's route only (ADR-0140); any
 other page with queries is not served yet (E14-Q).
 
+**A form control is named only in the declaration that renders it**
+(ADR-0143). PW5014 matches a `<label for>`, a wrapping `<label>` and an
+`aria-labelledby`, written as text in the same view or page. These are not
+matched:
+- a computed `for`, `id` or IDREF;
+- an `id` inside `{#each}`, which names no single row.
+
+Wrapping the control in its label is the repair for each. A name the
+program computes, such as `aria-label={x}` or a label's interpolated text,
+is taken as a name, though it may be empty when the page runs. A label in a
+page for a field in a view is refused, though HTML allows it. `title` and a
+placeholder name nothing, though axe-core accepts both.
+
 **A handler that is not a lambda is refused at build** (ADR-0134).
 `on:submit={save}` has no code to run until the event is passed to a
 handler (ADR-0131); `pw build` refuses it with the repair, and `pw check`

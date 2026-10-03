@@ -5956,7 +5956,11 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
         }
     }
 
-    for id in body.walk_markup(&roots) {
+    // What names each form control, read once over the whole markup (ADR-0143).
+    let order = body.walk_markup(&roots);
+    let named = named_controls(body, &order);
+
+    for &id in &order {
         match body.node(id) {
             // A list without a key cannot preserve identity across a reorder.
             Node::Block { directive, .. } => {
@@ -6111,27 +6115,19 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
 
                 // A form control with nothing naming it.
                 if matches!(tag.as_str(), "input" | "select" | "textarea") {
-                    let typ =
-                        attrs
-                            .iter()
-                            .find(|a| a.name == "type")
-                            .and_then(|a| match &a.value {
-                                AttrValue::Static(v) => Some(v.trim_matches('"').to_string()),
-                                _ => None,
-                            });
                     // `hidden` and `submit` inputs are not labelled controls.
-                    if matches!(
-                        typ.as_deref(),
-                        Some("hidden") | Some("submit") | Some("button")
-                    ) {
+                    let typ = static_attr(attrs, "type").map(str::to_ascii_lowercase);
+                    if matches!(typ.as_deref(), Some("hidden" | "submit" | "button")) {
                         continue;
                     }
-                    let named = attrs.iter().any(|a| {
-                        matches!(a.name.as_str(), "aria-label" | "aria-labelledby" | "id")
-                    });
-                    if named {
+                    if named.contains(&id) {
                         continue;
                     }
+                    let mut related = vec![Related {
+                        span: hir.decl_span(decl_id_of(hir, decl)),
+                        label: format!("`{}` renders this control", decl.name),
+                    }];
+                    related.extend(unnamed_because(body, &order, id, &decl.name));
                     out.push(Diagnostic {
                         code: "PW5014",
                         invariant: "a form control must have something that names it",
@@ -6140,28 +6136,362 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                         severity: Severity::Error,
                         message: format!("`<{tag}>` has no associated label"),
                         primary_span: body.node_span(id),
-                        related: vec![Related {
-                            span: hir.decl_span(decl_id_of(hir, decl)),
-                            label: format!("`{}` renders this control", decl.name),
-                        }],
+                        related,
                         explanation: Some(
                             "A control with no accessible name is announced as \"edit text\" \
                              and nothing else. `name` is submitted to the server; it is not \
-                             read to the user."
+                             read to the user. An `id` names nothing by itself: a label \
+                             names the control when it is in the same declaration, has \
+                             text, and its `for` is the control's `id` or it wraps the \
+                             control. A placeholder is not a label: it disappears when \
+                             someone types."
                                 .to_string(),
                         ),
-                        repairs: vec![Repair {
-                            description: "associate a `<label for=...>`, or supply \
-                                          `aria-label`/`aria-labelledby`"
-                                .to_string(),
-                            replacement: None,
-                        }],
+                        repairs: vec![
+                            Repair {
+                                description: "associate a `<label for=...>`, or supply \
+                                              `aria-label`/`aria-labelledby`"
+                                    .to_string(),
+                                replacement: None,
+                            },
+                            Repair {
+                                description: "or wrap the control in a `<label>` with text"
+                                    .to_string(),
+                                replacement: None,
+                            },
+                        ],
                     });
                 }
             }
 
             _ => {}
         }
+    }
+}
+
+// --- what names a form control (ADR-0143) ------------------------------------
+
+/// **The form controls something in one declaration's own markup names**
+/// (ADR-0143). It follows the HTML standard's labeled control and the
+/// accessible-name computation (accname 1.2):
+///
+/// - a `<label for=X>` with text names the first element, in tree order,
+///   whose `id` is `X`;
+/// - a `<label>` with no `for`, with text, names its first labelable
+///   descendant;
+/// - `aria-labelledby` names its element when one of its IDREFs is an element
+///   here with text;
+/// - an `aria-label` names it unless it is blank. One the program computes is
+///   taken as a name: whether it is empty is known only when it runs.
+///
+/// An `id` names nothing by itself. Until ADR-0143 one counted as a name, on
+/// the assumption that a label pointed at it, and nothing checked that one
+/// did. The label must be in the same declaration, so a view that renders a
+/// control is accessible wherever it is used. A `for`, an `id` or an IDREF
+/// the program computes is not matched.
+fn named_controls(body: &Body, order: &[hir::NodeId]) -> BTreeSet<hir::NodeId> {
+    let by_id = first_with_id(body, order);
+    let mut named = BTreeSet::new();
+    for &n in order {
+        let Node::Element { tag, attrs, .. } = body.node(n) else {
+            continue;
+        };
+        if tag == "label"
+            && let Some(control) = labeled_control(body, n, &by_id)
+            && has_text(body, n, control)
+        {
+            named.insert(control);
+        }
+        let labelled = match attrs.iter().find(|a| a.name == "aria-label") {
+            Some(a) => match &a.value {
+                AttrValue::Static(_) => non_blank(attrs, "aria-label"),
+                AttrValue::Expr(_) => true,
+                AttrValue::None => false,
+            },
+            None => false,
+        };
+        if labelled || labelled_by(body, n, &by_id).is_some() {
+            named.insert(n);
+        }
+    }
+    named
+}
+
+/// An attribute's value when it is written as text, its quotes removed.
+fn static_attr<'a>(attrs: &'a [hir::Attr], name: &str) -> Option<&'a str> {
+    attrs
+        .iter()
+        .find(|a| a.name == name)
+        .and_then(|a| match &a.value {
+            AttrValue::Static(v) => Some(v.trim_matches(|c| c == '"' || c == '\'')),
+            _ => None,
+        })
+}
+
+fn non_blank(attrs: &[hir::Attr], name: &str) -> bool {
+    static_attr(attrs, name).is_some_and(|v| !v.trim().is_empty())
+}
+
+/// The nodes inside an `{#each}`, which render once per row.
+fn inside_each(body: &Body, order: &[hir::NodeId]) -> BTreeSet<hir::NodeId> {
+    let mut rows = BTreeSet::new();
+    for &n in order {
+        if let Node::Block {
+            directive,
+            children,
+            ..
+        } = body.node(n)
+            && directive.trim_start().starts_with("{#each")
+        {
+            rows.extend(body.walk_markup(children));
+        }
+    }
+    rows
+}
+
+/// The first element, in tree order, with each `id` written as text: the one
+/// a `<label for>` and an IDREF name. An `id` inside an `{#each}` names no
+/// element: every row has it, and a reference reaches only the first row's.
+fn first_with_id<'b>(body: &'b Body, order: &[hir::NodeId]) -> BTreeMap<&'b str, hir::NodeId> {
+    let mut by_id = BTreeMap::new();
+    for &n in order {
+        if let Node::Element { attrs, .. } = body.node(n)
+            && let Some(id) = static_attr(attrs, "id")
+        {
+            by_id.entry(id).or_insert(n);
+        }
+    }
+    let rows = inside_each(body, order);
+    by_id.retain(|_, n| !rows.contains(n));
+    by_id
+}
+
+/// Is an element labelable (HTML, "labelable elements")? `None` for a
+/// composed view or a custom element, whose markup this declaration does not
+/// see.
+fn labelable(tag: &str, attrs: &[hir::Attr]) -> Option<bool> {
+    // No HTML element's name has a capital, a `.` or a `-` in it.
+    if tag.contains(['.', '-']) || tag.starts_with(|c: char| c.is_ascii_uppercase()) {
+        return None;
+    }
+    Some(match tag {
+        "input" => !static_attr(attrs, "type").is_some_and(|t| t.eq_ignore_ascii_case("hidden")),
+        "button" | "meter" | "output" | "progress" | "select" | "textarea" => true,
+        _ => false,
+    })
+}
+
+/// A `<label>`'s labeled control (HTML, "the label element"). With `for`, it
+/// is the first element whose `id` that is, when that one is labelable.
+/// Without, it is the first labelable descendant. `None` when it names
+/// nothing, or when what it names is not known here.
+fn labeled_control(
+    body: &Body,
+    label: hir::NodeId,
+    by_id: &BTreeMap<&str, hir::NodeId>,
+) -> Option<hir::NodeId> {
+    let Node::Element {
+        attrs, children, ..
+    } = body.node(label)
+    else {
+        return None;
+    };
+    if attrs.iter().any(|a| a.name == "for") {
+        let target = *by_id.get(static_attr(attrs, "for")?)?;
+        let Node::Element { tag, attrs, .. } = body.node(target) else {
+            return None;
+        };
+        return (labelable(tag, attrs) == Some(true)).then_some(target);
+    }
+    first_labelable(body, children)
+}
+
+/// The first labelable element under `children`, in tree order. `None` when
+/// there is none, or when which is first depends on what renders: one inside
+/// a block, or a composed view's markup.
+fn first_labelable(body: &Body, children: &[hir::NodeId]) -> Option<hir::NodeId> {
+    // `Err` when which one is first is not known here.
+    fn walk(body: &Body, n: hir::NodeId, in_block: bool) -> Result<Option<hir::NodeId>, ()> {
+        let (children, in_block) = match body.node(n) {
+            Node::Element {
+                tag,
+                attrs,
+                children,
+                ..
+            } => match labelable(tag, attrs) {
+                Some(true) if !in_block => return Ok(Some(n)),
+                Some(true) | None => return Err(()),
+                Some(false) => (children, in_block),
+            },
+            Node::Block { children, .. } => (children, true),
+            _ => return Ok(None),
+        };
+        for &c in children {
+            if let Some(found) = walk(body, c, in_block)? {
+                return Ok(Some(found));
+            }
+        }
+        Ok(None)
+    }
+    for &c in children {
+        match walk(body, c, false) {
+            Ok(None) => {}
+            Ok(found) => return found,
+            Err(()) => return None,
+        }
+    }
+    None
+}
+
+/// Does `n` hold text a name can be read from (accname 1.2, steps 2C to 2G)?
+/// That is a non-blank text node or an interpolation inside it, or a
+/// descendant's non-blank `aria-label` or `alt`. A hidden descendant gives
+/// none, and `skip`'s subtree is left out: a control is not named by its own
+/// options.
+fn has_text(body: &Body, n: hir::NodeId, skip: hir::NodeId) -> bool {
+    let children = match body.node(n) {
+        Node::Element { children, .. } | Node::Block { children, .. } => children,
+        _ => return false,
+    };
+    children.iter().any(|&c| {
+        c != skip
+            && match body.node(c) {
+                Node::Text(t) => !t.trim().is_empty(),
+                Node::Interpolation(_) => true,
+                Node::Element { attrs, .. } => {
+                    let hidden = attrs.iter().any(|a| a.name == "hidden")
+                        || static_attr(attrs, "aria-hidden") == Some("true");
+                    !hidden
+                        && (non_blank(attrs, "aria-label")
+                            || non_blank(attrs, "alt")
+                            || has_text(body, c, skip))
+                }
+                Node::Block { .. } => has_text(body, c, skip),
+                Node::Branch { .. } => false,
+            }
+    })
+}
+
+/// The element `aria-labelledby` names a control by: the first of its IDREFs
+/// that is an element here with text. IDREFs the program computes are not
+/// known here.
+fn labelled_by(
+    body: &Body,
+    n: hir::NodeId,
+    by_id: &BTreeMap<&str, hir::NodeId>,
+) -> Option<hir::NodeId> {
+    let Node::Element { attrs, .. } = body.node(n) else {
+        return None;
+    };
+    static_attr(attrs, "aria-labelledby")?
+        .split_ascii_whitespace()
+        .filter_map(|r| by_id.get(r).copied())
+        .find(|&t| {
+            t != n
+                && match body.node(t) {
+                    Node::Element { attrs, .. } => {
+                        non_blank(attrs, "aria-label") || has_text(body, t, n)
+                    }
+                    _ => false,
+                }
+        })
+}
+
+/// Why nothing names a control, when its markup says: the note PW5014 adds,
+/// so the repair is the right one.
+fn unnamed_because(
+    body: &Body,
+    order: &[hir::NodeId],
+    control: hir::NodeId,
+    decl: &str,
+) -> Option<Related> {
+    let Node::Element { attrs, .. } = body.node(control) else {
+        return None;
+    };
+    let attr = |k: &str| attrs.iter().find(|a| a.name == k);
+    let note = |a: &hir::Attr, label: String| {
+        Some(Related {
+            span: a.span.clone(),
+            label,
+        })
+    };
+    if let Some(a) = attr("aria-label") {
+        return note(a, "this `aria-label` is blank".to_string());
+    }
+    if let Some(a) = attr("aria-labelledby") {
+        return note(
+            a,
+            match &a.value {
+                AttrValue::Static(_) => {
+                    format!("no element in `{decl}` with text has one of these ids")
+                }
+                _ => "these ids are computed, so what they name is not known here".to_string(),
+            },
+        );
+    }
+    // A label that wraps the control and does not name it.
+    let by_id = first_with_id(body, order);
+    for &l in order {
+        let Node::Element {
+            tag,
+            attrs: label,
+            children,
+            ..
+        } = body.node(l)
+        else {
+            continue;
+        };
+        if tag != "label" || !body.walk_markup(children).contains(&control) {
+            continue;
+        }
+        let why = match labeled_control(body, l, &by_id) {
+            Some(c) if c == control => "this `<label>` has no text",
+            Some(_) if label.iter().any(|a| a.name == "for") => {
+                "this `<label>` has a `for`, so it names that element, not what it wraps"
+            }
+            Some(_) => "this `<label>` names the first control inside it, which is another",
+            None => "which control this `<label>` names depends on what renders inside it",
+        };
+        return Some(Related {
+            span: body.node_span(l),
+            label: why.to_string(),
+        });
+    }
+    let a = attr("id")?;
+    let Some(id) = static_attr(attrs, "id") else {
+        return note(
+            a,
+            "this `id` is computed, so no `<label for>` can be matched to it".to_string(),
+        );
+    };
+    if inside_each(body, order).contains(&control) {
+        return note(
+            a,
+            format!(
+                "every row of the `{{#each}}` has `id=\"{id}\"`, so a `<label for>` names \
+                 only the first: wrap the control in its `<label>`"
+            ),
+        );
+    }
+    if by_id.get(id) != Some(&control) {
+        return note(
+            a,
+            format!("an earlier element has `id=\"{id}\"`, and a `<label for>` names that one"),
+        );
+    }
+    let empty = order.iter().copied().find(|&l| {
+        matches!(body.node(l), Node::Element { tag, attrs, .. }
+            if tag == "label" && static_attr(attrs, "for") == Some(id))
+    });
+    match empty {
+        Some(l) => Some(Related {
+            span: body.node_span(l),
+            label: format!("this `<label for=\"{id}\">` has no text"),
+        }),
+        None => note(
+            a,
+            format!("no `<label for=\"{id}\">` in `{decl}` names this `id`"),
+        ),
     }
 }
 

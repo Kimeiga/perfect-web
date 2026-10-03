@@ -1,0 +1,11 @@
+// @status: NEIGHBOUR
+// @invariant: control_without_label
+// @dimension: valid neighbour — the label wraps its control, with no `for` and no `id`
+module generality.label_wrapped
+
+view AddressForm() !{} {
+    <form>
+        <label>Country <select name="country"><option>US</option></select></label>
+        <button type="submit">Save</button>
+    </form>
+}

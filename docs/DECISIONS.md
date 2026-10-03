@@ -1088,3 +1088,14 @@ attribute a signal decides in place, never from the field's own typing. A
 block a signal decides is rendered again only for what it cannot set in
 place, so a field bound inside one keeps its focus. Until then a block was
 rendered again for every signal read anywhere in it.
+
+[ADR-0143](DECISIONS/ADR-0143-what-names-a-form-control.md): a correction to
+PW5014. A form control is named only by something in the same declaration
+that reaches it, as the HTML standard and accname 1.2 define:
+- a `<label for>` with text, naming the first element with that `id`;
+- a `<label>` with text wrapping it;
+- an `aria-labelledby` reaching text;
+- a non-blank `aria-label`.
+
+Until then any `id` counted as a name, unchecked, so T06's unsafe store and
+`tricky.pw`'s field passed with no label, and a wrapping label was refused.
