@@ -1140,3 +1140,15 @@ E14-Q's fourth slice.
   rendered again for its own item alone.
 
 This replaces ADR-0145's refusal of such a block.
+
+[ADR-0147](DECISIONS/ADR-0147-a-query-binding-is-the-query-s-value.md): what
+T04 needed, and two corrections it found.
+- A page's query binding is the query's value, the `Ok` value of its
+  declared result. A `{#match}` over it takes that value apart and covers
+  every case. Taking its `Result` apart waits for T10.
+- Loops and arms are typed together until nothing more is learned.
+- A page whose queries fail is answered 503, and a served one is told to
+  reload, where the server had panicked holding its subscriber table and
+  failed every request after.
+- The development server holds a session's order, which the kitchen's
+  benchmark hook sets.

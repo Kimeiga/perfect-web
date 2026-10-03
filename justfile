@@ -1718,6 +1718,25 @@ e14-bind:
      } > docs/evidence/E14/bind.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/bind.txt
 
+# ADR-0147: a query binding is the query's value, and a page that cannot be
+# read is answered. The typer's tests, the server's, `pw-render --plan`'s, and
+# the mutation controls.
+e14-query-values:
+    @{ echo "ADR-0147 - a query binding is the query's value, and a page that cannot be read is answered"; echo; \
+       echo "produced by: just e14-query-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the typer (compiler/pw-core/tests/query_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test query_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== pw-render --plan (runtime/pw-render/tests/plan_lists.rs)"; echo; \
+       cargo test --locked -p pw-render --test plan_lists 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/query_values_mutations.py)"; echo; \
+       python3 scripts/query_values_mutations.py; \
+     } > docs/evidence/E14/query-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/query-values.txt
+
 # ADR-0146: a block a query decides is rendered and kept current. The plan's
 # tests, the server's, the browser's spec in three engines, and the mutation
 # controls, against one staged build.

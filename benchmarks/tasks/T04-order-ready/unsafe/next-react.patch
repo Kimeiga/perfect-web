@@ -1,0 +1,17 @@
+diff --git a/lib/store.ts b/lib/store.ts
+index ab52dc7..930c6fb 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -47,10 +47,10 @@ export function getCart(session: string | undefined): Cart {
+ }
+ 
+ /** Where a customer's order is: what the kitchen last said. */
+-export type OrderStatus = "placed" | "preparing" | "delivered";
++export type OrderStatus = "placed" | "preparing" | "ready" | "delivered";
+ 
+ /** Every status the kitchen may set. */
+-export const ORDER_STATUSES: readonly OrderStatus[] = ["placed", "preparing", "delivered"];
++export const ORDER_STATUSES: readonly OrderStatus[] = ["placed", "preparing", "ready", "delivered"];
+ 
+ const orders: Map<string, OrderStatus> =
+   ((globalThis as Record<string, unknown>).__pwBenchOrders as Map<string, OrderStatus>) ??

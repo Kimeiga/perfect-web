@@ -1,0 +1,97 @@
+diff --git a/app/bench/order/route.ts b/app/bench/order/route.ts
+new file mode 100644
+index 0000000..27d232f
+--- /dev/null
++++ b/app/bench/order/route.ts
+@@ -0,0 +1,18 @@
++import { NextResponse, type NextRequest } from "next/server";
++import { ensureSession } from "@/lib/session";
++import { isOrderStatus, setOrder } from "@/lib/store";
++
++/** The kitchen sets the session's order: `?status=preparing`, or no status to
++ * remove it. A benchmark's hook, as every stack in it has one. */
++export async function POST(request: NextRequest) {
++  const status = request.nextUrl.searchParams.get("status") ?? "";
++  if (!status) {
++    setOrder(await ensureSession(), undefined);
++    return NextResponse.json({});
++  }
++  if (!isOrderStatus(status)) {
++    return NextResponse.json({ error: `no order status ${status}` }, { status: 400 });
++  }
++  setOrder(await ensureSession(), status);
++  return NextResponse.json({});
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..9ad5008 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,5 +1,5 @@
+ import { notFound } from "next/navigation";
+-import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
++import { getCart, getMenu, getOrder, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
+ 
+@@ -12,7 +12,9 @@ export default async function StorePage({
+   const store = getStore(storeId);
+   const menu = getMenu(storeId);
+   if (!store || !menu) notFound();
+-  const cart = getCart(await currentSession());
++  const session = await currentSession();
++  const cart = getCart(session);
++  const order = getOrder(session);
+ 
+   return (
+     <main>
+@@ -42,6 +44,13 @@ export default async function StorePage({
+           </button>
+         </form>
+       </section>
++
++      <section aria-label="Your order">
++        {order === undefined && <p>No order yet.</p>}
++        {order === "placed" && <p>Your order is placed.</p>}
++        {order === "preparing" && <p>Your order is being prepared.</p>}
++        {order === "delivered" && <p>Your order was delivered.</p>}
++      </section>
+     </main>
+   );
+ }
+diff --git a/lib/store.ts b/lib/store.ts
+index 7291a61..ab52dc7 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -46,6 +46,32 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++/** Where a customer's order is: what the kitchen last said. */
++export type OrderStatus = "placed" | "preparing" | "delivered";
++
++/** Every status the kitchen may set. */
++export const ORDER_STATUSES: readonly OrderStatus[] = ["placed", "preparing", "delivered"];
++
++const orders: Map<string, OrderStatus> =
++  ((globalThis as Record<string, unknown>).__pwBenchOrders as Map<string, OrderStatus>) ??
++  new Map();
++(globalThis as Record<string, unknown>).__pwBenchOrders = orders;
++
++/** The session's order, as the kitchen last set it; none before there is one. */
++export function getOrder(session: string | undefined): OrderStatus | undefined {
++  return session ? orders.get(session) : undefined;
++}
++
++/** The kitchen sets a session's order, or removes it. */
++export function setOrder(session: string, status: OrderStatus | undefined): void {
++  if (status) orders.set(session, status);
++  else orders.delete(session);
++}
++
++export function isOrderStatus(status: string): status is OrderStatus {
++  return (ORDER_STATUSES as readonly string[]).includes(status);
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);

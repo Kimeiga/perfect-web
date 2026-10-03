@@ -1,0 +1,109 @@
+diff --git a/domain.pw b/domain.pw
+index c6b3c03..4ed1d9f 100644
+--- a/domain.pw
++++ b/domain.pw
+@@ -121,6 +121,12 @@ type CartError =
+ 
+ // --- orders ---------------------------------------------------------------
+ 
++// **Where a customer's order is** (E14, T04): what the kitchen last said.
++type OrderStatus =
++    | Placed
++    | Preparing
++    | Delivered
++
+ type OrderDraft = OrderDraft {
+     id: OrderId,
+     cart: Cart,
+diff --git a/lib/Orders.pw b/lib/Orders.pw
+new file mode 100644
+index 0000000..2bceaec
+--- /dev/null
++++ b/lib/Orders.pw
+@@ -0,0 +1,17 @@
++// @corpus: fixture
++// @id: E14-orders
++// @category: the store's data layer — a session's order
++// @charter: §15
++// @milestone: E14
++//
++// What the kitchen last said about a customer's order (E14, T04), from the
++// host's data layer, as a cart is.
++
++module Orders
++
++import domain.{ OrderStatus, TrackingError }
++import capability.{ Session, SessionId }
++
++// The session's order, as the kitchen last set it; none before there is one.
++fn current(s: Session<SessionId>) -> Result<Option<OrderStatus>, TrackingError> !{ database.read<Orders> }
++    host "store:data/orders#current"
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..de5f663 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -26,6 +26,7 @@ module store.page
+ import Stores
+ import Carts
+ import Menus
++import Orders
+ // The invocation context. `current_session()` was called and never imported
+ // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
+ // dotted paths whose head looks like a module, and a bare call to nothing
+@@ -39,7 +40,7 @@ import Menus
+ // ruling and the reason the repair waited for a frozen matrix.
+ import context.{ current_session }
+ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, InteractionId,
+-    MenuItemId, PositiveInt }
++    MenuItemId, PositiveInt, OrderStatus, TrackingError }
+ import capability.{ Session, SessionId }
+ import Events.{ CartChanged }
+ 
+@@ -99,6 +100,19 @@ session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+ // The mutation. Idempotent by interaction id, so a double-tap is one add, and
+ // optimistic with a declared rollback so the count moves before the round trip
+ // and moves back if it fails.
++// **The session's order**, as the kitchen last set it (E14, T04).
++session query Order(session: Session<SessionId>) -> Result<Option<OrderStatus>, TrackingError>
++    freshness     0.seconds
++    consistency   read_your_writes
++    cache         private
++    key           session
++    concurrency   one_per_key
++    on_key_change cancel
++    timeout       2.seconds
++{
++    Orders.current(session)
++}
++
+ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+     -> Result<Cart, CartError>
+     requires      SignedIn
+@@ -133,6 +147,7 @@ page StorePage(id: StoreId) {
+     let store = query Store(id)
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
++    let order = query Order(current_session())
+ 
+     view {
+         <main>
+@@ -164,6 +179,19 @@ page StorePage(id: StoreId) {
+                     Clear
+                 </button>
+             </section>
++
++            <section aria-label="Your order">
++                {#match order}
++                {:Some(status)}
++                    {#match status}
++                    {:Placed}<p>Your order is placed.</p>
++                    {:Preparing}<p>Your order is being prepared.</p>
++                    {:Delivered}<p>Your order was delivered.</p>
++                    {/match}
++                {:None}
++                    <p>No order yet.</p>
++                {/match}
++            </section>
+         </main>
+     }
+ }

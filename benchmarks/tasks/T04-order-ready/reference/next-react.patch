@@ -1,0 +1,29 @@
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 9ad5008..3cf66d5 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -49,6 +49,7 @@ export default async function StorePage({
+         {order === undefined && <p>No order yet.</p>}
+         {order === "placed" && <p>Your order is placed.</p>}
+         {order === "preparing" && <p>Your order is being prepared.</p>}
++        {order === "ready" && <p>Your order is ready for pickup.</p>}
+         {order === "delivered" && <p>Your order was delivered.</p>}
+       </section>
+     </main>
+diff --git a/lib/store.ts b/lib/store.ts
+index ab52dc7..930c6fb 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -47,10 +47,10 @@ export function getCart(session: string | undefined): Cart {
+ }
+ 
+ /** Where a customer's order is: what the kitchen last said. */
+-export type OrderStatus = "placed" | "preparing" | "delivered";
++export type OrderStatus = "placed" | "preparing" | "ready" | "delivered";
+ 
+ /** Every status the kitchen may set. */
+-export const ORDER_STATUSES: readonly OrderStatus[] = ["placed", "preparing", "delivered"];
++export const ORDER_STATUSES: readonly OrderStatus[] = ["placed", "preparing", "ready", "delivered"];
+ 
+ const orders: Map<string, OrderStatus> =
+   ((globalThis as Record<string, unknown>).__pwBenchOrders as Map<string, OrderStatus>) ??

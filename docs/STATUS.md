@@ -13,6 +13,25 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Corrections, ADR-0147, 2026-10-02: a page's query binding had no type,
+and a failed query stopped the development server; T04 is written, seven
+tasks of twelve.**
+([ADR-0147](DECISIONS/ADR-0147-a-query-binding-is-the-query-s-value.md)).
+Writing T04 found two defects:
+- `let order = query Order(..)` had no type, so a `{#match}` over a query's
+  value typed nothing below it, and its arms were refused. It is the query's
+  `Ok` value now, as the server gives it, and a match over it must cover
+  every case.
+- A query that failed panicked the server while it held its table of
+  subscribers, and every later request failed. Such a page is answered 503
+  now, a served one is told to reload, and the server goes on.
+
+T04 adds an order's new state, ready for pickup. All four controls hold on
+all three stacks. The plausible wrong fix adds the state and forgets to show
+it. Next.js and SvelteKit build it, in each framework's common idiom, and
+show nothing for a ready order. Pleris refuses it at `pw check`: `{#match
+status}` does not cover `Ready` (PW0305).
+
 **E14-Q, fourth slice, ADR-0146, 2026-10-02: a block a query decides is
 rendered and kept current**
 ([ADR-0146](DECISIONS/ADR-0146-a-block-a-query-decides-is-rendered-and-kept-current.md)).

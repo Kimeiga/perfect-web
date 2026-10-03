@@ -103,44 +103,67 @@ fn main() -> std::process::ExitCode {
     // The page's signals, at their first values (ADR-0140): what `pw build`'s
     // plan for the page says, so a page that holds UI state renders here as
     // the server renders it.
-    let env = match flag("--plan") {
-        Some(path) => {
-            let plan = std::fs::read_to_string(&path)
-                .map_err(|e| e.to_string())
-                .and_then(|s| {
-                    serde_json::from_str::<serde_json::Value>(&s).map_err(|e| e.to_string())
-                });
-            match plan {
-                Ok(plan) => {
-                    let mut env = env;
-                    for s in plan["signals"].as_array().into_iter().flatten() {
-                        let name = s["name"].as_str().unwrap_or_default();
-                        env = env.set(name, Value::from_wire(&s["initial"]));
-                    }
-                    // A list a session's query fills, the values not giving
-                    // it: this render is no session's, and no session's list
-                    // is empty, as its cart's count is 0 (ADR-0145).
-                    for c in plan["collections"].as_array().into_iter().flatten() {
-                        let Some(name) = c.as_str() else { continue };
-                        let private = plan["bindings"]
-                            .as_array()
-                            .into_iter()
-                            .flatten()
-                            .any(|b| b["binding"] == name && b["policy"]["cache"] == "private");
-                        if private && !given.contains(name) {
-                            env = env.set(name, Value::List(Vec::new()));
+    // The page the plan is for, and its blocks a session's query decides
+    // that the values do not give: this render is no session's, and renders
+    // nothing there (ADR-0146).
+    let mut unasked: Vec<(String, u32)> = Vec::new();
+    let env =
+        match flag("--plan") {
+            Some(path) => {
+                let plan = std::fs::read_to_string(&path)
+                    .map_err(|e| e.to_string())
+                    .and_then(|s| {
+                        serde_json::from_str::<serde_json::Value>(&s).map_err(|e| e.to_string())
+                    });
+                match plan {
+                    Ok(plan) => {
+                        let mut env = env;
+                        for s in plan["signals"].as_array().into_iter().flatten() {
+                            let name = s["name"].as_str().unwrap_or_default();
+                            env = env.set(name, Value::from_wire(&s["initial"]));
                         }
+                        // A list a session's query fills, the values not giving
+                        // it: this render is no session's, and no session's list
+                        // is empty, as its cart's count is 0 (ADR-0145).
+                        for c in plan["collections"].as_array().into_iter().flatten() {
+                            let Some(name) = c.as_str() else { continue };
+                            let private =
+                                plan["bindings"].as_array().into_iter().flatten().any(|b| {
+                                    b["binding"] == name && b["policy"]["cache"] == "private"
+                                });
+                            if private && !given.contains(name) {
+                                env = env.set(name, Value::List(Vec::new()));
+                            }
+                        }
+                        let page = plan["page"].as_str().unwrap_or_default();
+                        for b in plan["blocks"].as_array().into_iter().flatten() {
+                            let id = b.as_u64().unwrap_or_default() as u32;
+                            let root = templates
+                                .iter()
+                                .filter(|t| t.path == page)
+                                .find_map(|t| subject_of(&t.chunks, id));
+                            let private = |name: &str| {
+                                plan["bindings"].as_array().into_iter().flatten().any(|b| {
+                                    b["binding"] == name && b["policy"]["cache"] == "private"
+                                })
+                            };
+                            if let Some(root) = root
+                                && private(&root)
+                                && !given.contains(&root)
+                            {
+                                unasked.push((page.to_string(), id));
+                            }
+                        }
+                        env
                     }
-                    env
-                }
-                Err(e) => {
-                    eprintln!("pw-render: {path}: {e}");
-                    return std::process::ExitCode::from(2);
+                    Err(e) => {
+                        eprintln!("pw-render: {path}: {e}");
+                        return std::process::ExitCode::from(2);
+                    }
                 }
             }
-        }
-        None => env,
-    };
+            None => env,
+        };
 
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
         eprintln!("pw-render: cannot create {out_dir}: {e}");
@@ -164,6 +187,12 @@ fn main() -> std::process::ExitCode {
 
     let mut written = 0usize;
     for t in &templates {
+        let mut env = env.clone();
+        for (page, id) in &unasked {
+            if *page == t.path {
+                env = env.materialized(pw_render::PartId(*id), "");
+            }
+        }
         let body = match render(t, &env, &templates) {
             Ok(b) => b,
             Err(e) => {
@@ -296,4 +325,26 @@ fn convert(v: &serde_json::Value) -> Result<Value, String> {
         }
         serde_json::Value::Null => return Err("null has no rendering".into()),
     })
+}
+
+/// The root of the value the block numbered `id` decides, where it is.
+fn subject_of(chunks: &[pw_render::Chunk], id: u32) -> Option<String> {
+    use pw_render::{Chunk, Part};
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        match p {
+            Part::Conditional { id: at, value, .. } | Part::Match { id: at, value, .. }
+                if at.0 == id =>
+            {
+                return value.split('.').next().map(str::to_string);
+            }
+            _ => {}
+        }
+        for region in p.nested() {
+            if let Some(found) = subject_of(region, id) {
+                return Some(found);
+            }
+        }
+    }
+    None
 }

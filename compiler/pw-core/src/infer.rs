@@ -167,6 +167,45 @@ impl<'a> Types<'a> {
             }
         }
 
+        // **A page's query binding is the query's value** (ADR-0146): its
+        // declared result's `Ok` value, as the host gives it and every
+        // template read takes it. Until 2026-10-02 such a binding had no
+        // type, so a `{#match}` over it, and a loop over its arm's binding,
+        // typed nothing.
+        for id in body.walk() {
+            let Expr::Let {
+                pat: Some(pat),
+                ty: None,
+                init: Some(init),
+            } = body.expr(id)
+            else {
+                continue;
+            };
+            let Expr::Keyword {
+                keyword, modifiers, ..
+            } = body.expr(*init)
+            else {
+                continue;
+            };
+            if !matches!(keyword.as_str(), "query" | "subscription") {
+                continue;
+            }
+            let Some(result) = modifiers
+                .first()
+                .and_then(|m| sigs.in_module(module, m))
+                .and_then(|sig| sig.result())
+            else {
+                continue;
+            };
+            let value = match result.as_builtin() {
+                Some(Builtin::Result) => result.args().first().cloned(),
+                _ => Some(result.clone()),
+            };
+            if let (crate::hir::Pattern::Bind { .. }, Some(v)) = (body.pat(*pat), value) {
+                bindings.entry(Binder::Pattern(*pat)).or_insert(v);
+            }
+        }
+
         // A lambda's written parameter type, `(e: InputEvent) => ..`, and an
         // `on:` handler's event where none is written: the record its event
         // gives it (ADR-0138).
@@ -255,57 +294,76 @@ impl<'a> Types<'a> {
                 types.bindings.insert(Binder::Stream(n), p);
             }
         }
+        // Loops and arms, typed together until nothing more is learned. A
+        // loop's list can be an arm's binding, `{:Ok(items)} {#each items ..}`,
+        // and an arm's subject a loop's item, `{#each orders as o} {#match
+        // o.status}`, so neither order alone types both. Until 2026-10-02
+        // loops were typed first, and an item over an arm's binding had no
+        // type (PW5016).
         let eaches: Vec<(crate::hir::NodeId, Option<Binder>)> = types
             .lexical
             .each_blocks()
             .filter(|(_, collection, _)| !collection.contains(['.', '(']))
             .map(|(n, _, head)| (n, head))
             .collect();
-        for (n, head) in eaches {
-            if let Some(elem) = head.and_then(|b| types.element_of_binder(body, b)) {
-                types.bindings.insert(Binder::Each(n), elem);
-            }
-        }
-
-        // The same rule for a `{#match}` arm (ADR-0042):
-        //
-        //     Option<Entry>          Result<T, E>
-        //         | {:Some(e)}           | {:Ok(v)}  {:Err(x)}
-        //     e : Entry              v : T     x : E
         let arms: Vec<(crate::hir::NodeId, ExprId)> = types.lexical.template_arms().collect();
-        for (n, s) in arms {
-            let Node::Branch { arm: Some(arm), .. } = body.node(n) else {
-                continue;
-            };
-            let Some(ty) = types.of(body, s) else {
-                continue;
-            };
-            let payload = match (ty.as_builtin(), arm.short()) {
-                (Some(Builtin::Option), "Some") | (Some(Builtin::Result), "Ok") => {
-                    ty.args().first()
+        loop {
+            let learned = types.bindings.len();
+            for (n, head) in &eaches {
+                if types.bindings.contains_key(&Binder::Each(*n)) {
+                    continue;
                 }
-                (Some(Builtin::Result), "Err") => ty.args().get(1),
-                _ => None,
-            };
-            if let (Some(p), [_]) = (payload.cloned(), arm.bindings.as_slice()) {
-                types.bindings.insert(Binder::Arm(n, 0), p);
-                continue;
+                if let Some(elem) = head.and_then(|b| types.element_of_binder(body, b)) {
+                    types.bindings.insert(Binder::Each(*n), elem);
+                }
             }
-            // A declared case's fields (ADR-0061), where the type has no
-            // arguments a field could mention.
-            if let Some(def) = ty.def_id()
-                && ty.args().is_empty()
-                && let Some((_, fields)) = sigs
-                    .type_decl(def)
-                    .and_then(|t| t.variants.as_ref())
-                    .and_then(|cases| cases.iter().find(|(c, _)| c == arm.short()))
-                && fields.len() == arm.bindings.len()
-            {
-                for (i, f) in fields.iter().enumerate() {
-                    if let Some(t) = f.resolved() {
-                        types.bindings.insert(Binder::Arm(n, i), t.clone());
+
+            // The same rule for a `{#match}` arm (ADR-0042):
+            //
+            //     Option<Entry>          Result<T, E>
+            //         | {:Some(e)}           | {:Ok(v)}  {:Err(x)}
+            //     e : Entry              v : T     x : E
+            for (n, s) in &arms {
+                let (n, s) = (*n, *s);
+                if types.bindings.contains_key(&Binder::Arm(n, 0)) {
+                    continue;
+                }
+                let Node::Branch { arm: Some(arm), .. } = body.node(n) else {
+                    continue;
+                };
+                let Some(ty) = types.of(body, s) else {
+                    continue;
+                };
+                let payload = match (ty.as_builtin(), arm.short()) {
+                    (Some(Builtin::Option), "Some") | (Some(Builtin::Result), "Ok") => {
+                        ty.args().first()
+                    }
+                    (Some(Builtin::Result), "Err") => ty.args().get(1),
+                    _ => None,
+                };
+                if let (Some(p), [_]) = (payload.cloned(), arm.bindings.as_slice()) {
+                    types.bindings.insert(Binder::Arm(n, 0), p);
+                    continue;
+                }
+                // A declared case's fields (ADR-0061), where the type has no
+                // arguments a field could mention.
+                if let Some(def) = ty.def_id()
+                    && ty.args().is_empty()
+                    && let Some((_, fields)) = sigs
+                        .type_decl(def)
+                        .and_then(|t| t.variants.as_ref())
+                        .and_then(|cases| cases.iter().find(|(c, _)| c == arm.short()))
+                    && fields.len() == arm.bindings.len()
+                {
+                    for (i, f) in fields.iter().enumerate() {
+                        if let Some(t) = f.resolved() {
+                            types.bindings.insert(Binder::Arm(n, i), t.clone());
+                        }
                     }
                 }
+            }
+            if types.bindings.len() == learned {
+                break;
             }
         }
 

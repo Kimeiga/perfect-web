@@ -81,8 +81,8 @@ MUTANTS = [
         "what was sent is not remembered",
         "server",
         SERVER,
-        "                    shown.insert(session.to_string(), now);\n                    patches\n",
-        "                    let _ = now;\n                    patches\n",
+        "                        shown.insert(session.to_string(), now);\n                        patches\n",
+        "                        let _ = now;\n                        patches\n",
     ),
     (
         "what a served document shows is not recorded",
@@ -123,8 +123,8 @@ MUTANTS = [
         "a shared list renders empty when it is not given",
         "render",
         BIN,
-        "                            .any(|b| b[\"binding\"] == name && b[\"policy\"][\"cache\"] == \"private\");\n",
-        "                            .any(|b| b[\"binding\"] == name);\n",
+        "                            let private =\n                                plan[\"bindings\"].as_array().into_iter().flatten().any(|b| {\n                                    b[\"binding\"] == name && b[\"policy\"][\"cache\"] == \"private\"\n",
+        "                            let private =\n                                plan[\"bindings\"].as_array().into_iter().flatten().any(|b| {\n                                    b[\"binding\"] == name\n",
     ),
     (
         "the browser ignores a patch set",

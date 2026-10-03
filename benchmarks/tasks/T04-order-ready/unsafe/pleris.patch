@@ -1,0 +1,12 @@
+diff --git a/domain.pw b/domain.pw
+index 4ed1d9f..33972d2 100644
+--- a/domain.pw
++++ b/domain.pw
+@@ -125,6 +125,7 @@ type CartError =
+ type OrderStatus =
+     | Placed
+     | Preparing
++    | Ready
+     | Delivered
+ 
+ type OrderDraft = OrderDraft {

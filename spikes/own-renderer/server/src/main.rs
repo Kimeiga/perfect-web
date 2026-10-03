@@ -60,7 +60,8 @@ use pw_host::engine::{HostFn, Val};
 use pw_host::{Admission, ComponentContract, Granted, Limits, Node, Topology, admit};
 use pw_materialize::{Clock, EntryKey, FragmentPolicy, Materializer};
 use pw_protocol::{
-    CURRENT, CausalBasis, Patch, PatchOp, PatchSet, ResourceEntryId, StreamFrame, Targeted, Version,
+    CURRENT, CausalBasis, Patch, PatchOp, PatchSet, Recovery, ResourceEntryId, StreamFrame,
+    Targeted, Version,
 };
 use pw_render::{Env, PartId, Template, Value};
 use pw_resource::{DevelopmentIdentityKey, EntryIdentity};
@@ -302,6 +303,10 @@ struct Server {
     /// and then patched: what a change is derived against. Locked after
     /// `pending`, never before.
     shown: Mutex<BTreeMap<String, Shown>>,
+    /// **Each session's order, by its status's case** (E14, T04): what
+    /// `store:data/orders#current` answers. The kitchen sets it through
+    /// `/bench/order`; no order is `None`.
+    orders: Mutex<BTreeMap<String, String>>,
     /// **The compiler's contracts, and the node this server is.**
     ///
     /// E8's last gate item asks for the command path to go through the host
@@ -477,6 +482,8 @@ fn dev_topology() -> Topology {
             grants: [
                 "database.read<Carts>",
                 "database.read<Menus>",
+                // A session's order (E14, T04).
+                "database.read<Orders>",
                 "database.read<Stores>",
                 "database.write<Carts>",
                 // 2026-08-10. The store gained the `import context.{
@@ -598,6 +605,7 @@ impl Server {
             artifacts,
             pending: Mutex::new(BTreeMap::new()),
             shown: Mutex::new(BTreeMap::new()),
+            orders: Mutex::new(BTreeMap::new()),
             contracts,
             topology,
             speculation,
@@ -1211,6 +1219,24 @@ impl Server {
             "pw:host/session#read".to_string(),
             Self::session_operation(session),
         );
+        // The session's order, as its status's case (E14, T04). A case the
+        // program's type does not have is refused by the component's types,
+        // as any value the host gives is.
+        let order = self.orders.lock().expect("orders").get(session).cloned();
+        let this_session = session.to_string();
+        host.insert(
+            "store:data/orders#current".to_string(),
+            Arc::new(move |args: &[Val]| {
+                let Some(Val::String(s)) = args.first() else {
+                    return Err(format!("orders#current received {args:?}"));
+                };
+                if *s != this_session {
+                    return Err("orders#current was passed another session".to_string());
+                }
+                let status = order.clone().map(|case| Box::new(Val::Variant(case, None)));
+                Ok(vec![Val::Result(Ok(Some(Box::new(Val::Option(status)))))])
+            }),
+        );
         host.extend(self.catalog());
         let host = host
             .into_iter()
@@ -1322,9 +1348,10 @@ impl Server {
             .drain(&self.graph, std::slice::from_ref(&key));
         // The count the page shows, as the page computes it: the cart query's
         // value, read through `domain.line_count` (ADR-0125).
-        let value = self
-            .part_text(session, "cart.line_count")
-            .unwrap_or_else(|e| panic!("the cart part could not be computed: {e}"));
+        let value = match self.part_text(session, "cart.line_count") {
+            Ok(value) => value,
+            Err(why) => return self.unshowable(session, &why),
+        };
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!(
                 "drain session={session} invalidated={} value={value} existing={}",
@@ -1358,12 +1385,14 @@ impl Server {
         }
 
         // What the page shows now, from its queries (ADR-0145).
-        let bindings = self
-            .bindings(session)
-            .unwrap_or_else(|e| panic!("the store page's queries: {e}"));
-        let now = self
-            .showing(session, &bindings)
-            .unwrap_or_else(|e| panic!("the store page's values: {e}"));
+        let bindings = match self.bindings(session) {
+            Ok(bindings) => bindings,
+            Err(why) => return self.unshowable(session, &why),
+        };
+        let now = match self.showing(session, &bindings) {
+            Ok(now) => now,
+            Err(why) => return self.unshowable(session, &why),
+        };
 
         // Two frames per change: the entry advanced, and every place in the
         // document the server DERIVED from it, as one set (ADR-0145). A
@@ -1376,13 +1405,17 @@ impl Server {
         let patches = {
             let mut shown = self.shown.lock().expect("shown");
             match shown.get(session) {
-                Some(was) => {
-                    let patches = self
-                        .derive(session, &bindings, was, &now)
-                        .unwrap_or_else(|e| panic!("the store page's change: {e}"));
-                    shown.insert(session.to_string(), now);
-                    patches
-                }
+                Some(was) => match self.derive(session, &bindings, was, &now) {
+                    Ok(patches) => {
+                        shown.insert(session.to_string(), now);
+                        patches
+                    }
+                    Err(why) => {
+                        drop(shown);
+                        drop(queue);
+                        return self.unshowable(session, &why);
+                    }
+                },
                 None => Vec::new(),
             }
         };
@@ -1649,14 +1682,19 @@ impl Server {
     /// page does not ask for frames the reload already made meaningless.
     #[cfg(test)]
     fn serve_document(&self, session: &str) -> (String, u64) {
-        let (rendered, cursor, _) = self.serve_document_with_entries(session);
+        let (rendered, cursor, _) = self
+            .serve_document_with_entries(session)
+            .unwrap_or_else(|e| panic!("{e}"));
         (rendered, cursor)
     }
 
     /// The document, its cursor, and the values of the entries it speculates
     /// on (ADR-0122), all read under one hold of the subscriber table, so the
     /// values are the ones the rendered parts show.
-    fn serve_document_with_entries(&self, session: &str) -> (String, u64, serde_json::Value) {
+    fn serve_document_with_entries(
+        &self,
+        session: &str,
+    ) -> Result<(String, u64, serde_json::Value), String> {
         self.drain(session);
         self.forget_idle_subscribers();
         let mut queue = self.pending.lock().expect("pending");
@@ -1670,12 +1708,12 @@ impl Server {
         // Rendered while the table is held, so a change cannot land between
         // the clear and the render and be lost by it. And what it shows is
         // recorded with it: a change is sent as the difference (ADR-0145).
-        let (html, shown) = self.render_store_showing(session);
+        let (html, shown) = self.render_store_showing(session)?;
         self.shown
             .lock()
             .expect("shown")
             .insert(session.to_string(), shown);
-        (html, cursor, self.speculated_entries(session))
+        Ok((html, cursor, self.speculated_entries(session)))
     }
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
@@ -1818,25 +1856,49 @@ impl Server {
 
     #[cfg(test)]
     fn render_store(&self, session: &str) -> String {
-        self.render_store_showing(session).0
+        self.render_store_showing(session)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .0
     }
 
-    /// The store's document, and what it shows (ADR-0145).
-    fn render_store_showing(&self, session: &str) -> (String, Shown) {
+    /// **The store's document, and what it shows** (ADR-0145), or why it
+    /// cannot be rendered: a query that failed is a page that cannot be
+    /// shown, answered as such, never a server that stops (E14, T04).
+    fn render_store_showing(&self, session: &str) -> Result<(String, Shown), String> {
         let template = self.store_template();
         // Every value is a query's (ADR-0125): each binding runs its compiled
         // component, and each part reads the binding's value by the steps the
         // compiler planned. The menu's items are the `Menu` query's.
         let bindings = self
             .bindings(session)
-            .unwrap_or_else(|e| panic!("the store page's queries: {e}"));
+            .map_err(|e| format!("the store page's queries: {e}"))?;
         let shown = self
             .showing(session, &bindings)
-            .unwrap_or_else(|e| panic!("the store page's values: {e}"));
+            .map_err(|e| format!("the store page's values: {e}"))?;
         let env = self.document_env(session, &bindings, &shown);
-        let html =
-            pw_render::render(template, &env, &self.templates).expect("the store page renders");
-        (html, shown)
+        let html = pw_render::render(template, &env, &self.templates)
+            .map_err(|b| format!("the store page does not render: {b:?}"))?;
+        Ok((html, shown))
+    }
+
+    /// **A session's page whose values cannot be read** (E14, T04): its
+    /// document cannot be kept current, and is told to read itself again,
+    /// which answers why. Never a panic: one failed query is one page that
+    /// cannot be shown, not a server that stops for everyone.
+    fn unshowable(&self, session: &str, why: &str) {
+        if std::env::var("PW_TRACE").is_ok() {
+            eprintln!("unshowable session={session}: {why}");
+        }
+        let mut queue = self.pending.lock().expect("pending");
+        if self.shown.lock().expect("shown").remove(session).is_some() {
+            queue
+                .entry(session.to_string())
+                .or_default()
+                .push(StreamFrame::Recovery {
+                    protocol: CURRENT,
+                    recovery: Recovery::Reload,
+                });
+        }
     }
 
     /// The store page's template.
@@ -2742,6 +2804,24 @@ fn handle(server: &Server, mut stream: TcpStream) {
             server.drain(&session);
             respond_json(&mut stream, 202, &session, fresh, "{}");
         }
+        // **The kitchen sets a session's order** (E14, T04): a benchmark's
+        // hook, as every stack in it has one. `?status=preparing` sets the
+        // status's case; no status removes the order. The page reads it again
+        // when it is next served.
+        ("POST", "/bench/order") => {
+            let status = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("status="))
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
+            let mut orders = server.orders.lock().expect("orders");
+            match status {
+                Some(s) => orders.insert(session.clone(), s),
+                None => orders.remove(&session),
+            };
+            drop(orders);
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
         // E7-P's structural commands. Each mutates the keyed collection and
         // broadcasts the patch that describes the mutation. A refusal returns
         // 409 and changes nothing — including the version.
@@ -3004,7 +3084,22 @@ fn handle(server: &Server, mut stream: TcpStream) {
             // from this moment on, so a structural change after this moment
             // has an address in it. A registration deferred to the first poll
             // would silently drop every change that raced it.
-            let (rendered, cursor, entries) = server.serve_document_with_entries(&session);
+            let (rendered, cursor, entries) = match server.serve_document_with_entries(&session) {
+                Ok(served) => served,
+                Err(why) => {
+                    // A page whose values could not be read is answered as
+                    // unavailable, and the server goes on (E14, T04).
+                    respond(
+                        &mut stream,
+                        503,
+                        "text/plain; charset=utf-8",
+                        &session,
+                        fresh,
+                        format!("the store page cannot be shown: {why}").as_bytes(),
+                    );
+                    return;
+                }
+            };
             let speculation = server
                 .speculation
                 .as_ref()
@@ -3604,44 +3699,87 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
 
     /// The store, its `app.pw` changed by `change`, built and served.
     fn lines_server_with(change: fn(&str) -> String) -> Server {
+        served_from(change, None)
+    }
+
+    /// **The store with T04's setup**: a session's order, which the kitchen
+    /// sets (E14, T04). The benchmark's own patch, applied as its harness
+    /// applies it, so this and the task cannot drift apart.
+    fn orders_server() -> Server {
+        served_from(
+            |app| app.to_string(),
+            Some(include_str!(
+                "../../../../benchmarks/tasks/T04-order-ready/setup/pleris.patch"
+            )),
+        )
+    }
+
+    /// The store's sources copied, `app.pw` changed by `change` and `patch`
+    /// applied, built by the compiler as `pw build` builds them, and served
+    /// from what was written.
+    fn served_from(change: fn(&str) -> String, patch: Option<&str>) -> Server {
         static BUILT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
-        let mut sources: Vec<(String, String)> = Vec::new();
-        let mut dir = |rel: &str| {
-            let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(rel))
-                .unwrap_or_else(|e| panic!("{rel}: {e}"))
-                .map(|e| e.expect("entry").path())
-                .filter(|p| p.extension().is_some_and(|x| x == "pw"))
-                .collect();
-            paths.sort();
-            for p in paths {
-                let src = std::fs::read_to_string(&p).expect("read");
-                sources.push((p.display().to_string(), src));
-            }
-        };
-        dir("packages/pw-std");
-        dir("packages/pw-platform-web");
-        sources.push((
-            "examples/domain.pw".to_string(),
-            std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain"),
+        let work = std::env::temp_dir().join(format!(
+            "pw-served-{}-{}",
+            std::process::id(),
+            BUILT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
         ));
-        let mut dir = |rel: &str| {
-            let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(rel))
-                .unwrap_or_else(|e| panic!("{rel}: {e}"))
+        let _ = std::fs::remove_dir_all(&work);
+        let examples = work.join("examples");
+        let pw_files = |dir: &std::path::Path| -> Vec<std::path::PathBuf> {
+            let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
+                .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
                 .map(|e| e.expect("entry").path())
                 .filter(|p| p.extension().is_some_and(|x| x == "pw"))
                 .collect();
             paths.sort();
-            for p in paths {
-                let mut src = std::fs::read_to_string(&p).expect("read");
-                if p.ends_with("store/app.pw") {
-                    src = change(&src);
-                }
-                sources.push((p.display().to_string(), src));
-            }
+            paths
         };
-        dir("examples/lib");
-        dir("examples/store");
+        for rel in ["lib", "store"] {
+            std::fs::create_dir_all(examples.join(rel)).expect("dir");
+            for p in pw_files(&root.join("examples").join(rel)) {
+                let to = examples.join(rel).join(p.file_name().expect("name"));
+                std::fs::copy(&p, &to).expect("copy");
+            }
+        }
+        std::fs::copy(root.join("examples/domain.pw"), examples.join("domain.pw")).expect("copy");
+        let app = examples.join("store/app.pw");
+        let changed = change(&std::fs::read_to_string(&app).expect("app"));
+        std::fs::write(&app, changed).expect("app");
+        if let Some(patch) = patch {
+            let file = work.join("setup.patch");
+            std::fs::write(&file, patch).expect("patch");
+            let applied = std::process::Command::new("git")
+                .arg("apply")
+                .arg(&file)
+                .current_dir(&examples)
+                .output()
+                .expect("git runs");
+            assert!(
+                applied.status.success(),
+                "the patch applies: {}",
+                String::from_utf8_lossy(&applied.stderr)
+            );
+        }
+        let mut sources: Vec<(String, String)> = Vec::new();
+        let mut read = |p: std::path::PathBuf| {
+            let src = std::fs::read_to_string(&p).expect("read");
+            sources.push((p.display().to_string(), src));
+        };
+        for p in pw_files(&root.join("packages/pw-std")) {
+            read(p);
+        }
+        for p in pw_files(&root.join("packages/pw-platform-web")) {
+            read(p);
+        }
+        read(examples.join("domain.pw"));
+        for p in pw_files(&examples.join("lib")) {
+            read(p);
+        }
+        for p in pw_files(&examples.join("store")) {
+            read(p);
+        }
         let units: Vec<pw_core::check::Unit> = sources
             .into_iter()
             .map(|(path, src)| pw_core::check::Unit {
@@ -3650,16 +3788,72 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
                 src,
             })
             .collect();
-        let build = pw_core::build::build(&units).expect("the store with its lines builds");
+        let build = pw_core::build::build(&units).expect("the store builds");
         assert!(build.refusals().is_empty(), "{:?}", build.refusals());
-        let out = std::env::temp_dir().join(format!(
-            "pw-lines-{}-{}",
-            std::process::id(),
-            BUILT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-        ));
-        let _ = std::fs::remove_dir_all(&out);
+        let out = work.join("build");
         build.write(&out).expect("the build is written");
         Server::from_build(out.clone(), out).expect("served")
+    }
+
+    #[test]
+    fn an_order_the_kitchen_sets_is_the_order_query_s_value() {
+        let s = orders_server();
+        let (none, _) = s.serve_document("a");
+        assert!(visible(&none).contains("No order yet."), "{none}");
+        s.orders
+            .lock()
+            .expect("orders")
+            .insert("a".into(), "preparing".into());
+        let (preparing, _) = s.serve_document("a");
+        assert!(
+            visible(&preparing).contains("Your order is being prepared."),
+            "{preparing}"
+        );
+        // Another session has none.
+        let (other, _) = s.serve_document("b");
+        assert!(visible(&other).contains("No order yet."), "{other}");
+    }
+
+    #[test]
+    fn a_page_whose_values_cannot_be_read_is_answered_and_the_server_goes_on() {
+        let s = orders_server();
+        // A status the program's type does not have: the component's types
+        // refuse what the host gives, and the query fails.
+        s.orders
+            .lock()
+            .expect("orders")
+            .insert("a".into(), "ready".into());
+        let refused = s
+            .serve_document_with_entries("a")
+            .expect_err("a page that cannot be shown");
+        assert!(refused.contains("the store page's queries"), "{refused}");
+        // Nothing was left held: another session's page is served.
+        let (other, _) = s.serve_document("b");
+        assert!(visible(&other).contains("No order yet."), "{other}");
+    }
+
+    #[test]
+    fn a_served_page_whose_values_fail_is_told_to_read_itself_again() {
+        let s = orders_server();
+        s.serve_document("a");
+        s.orders
+            .lock()
+            .expect("orders")
+            .insert("a".into(), "ready".into());
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("the command commits");
+        let queue = s.pending.lock().expect("pending");
+        assert!(
+            queue["a"].frames.iter().any(|(_, f)| matches!(
+                f,
+                StreamFrame::Recovery {
+                    recovery: Recovery::Reload,
+                    ..
+                }
+            )),
+            "{:?}",
+            queue["a"].frames
+        );
     }
 
     /// Each patch set queued for a session, in order.
@@ -4208,7 +4402,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     #[test]
     fn a_speculating_page_is_sent_its_carts_value() {
         let s = speculating_server();
-        let (_, _, entries) = s.serve_document_with_entries("session-v");
+        let (_, _, entries) = s.serve_document_with_entries("session-v").expect("served");
         assert_eq!(entries["cart"]["value"], serde_json::json!({ "lines": [] }));
         let before = entries["cart"]["version"].as_u64().expect("a version");
 
@@ -4254,7 +4448,9 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
 
         // The control: the same page, built without speculations.
         let plain = rendering_server();
-        let (_, _, entries) = plain.serve_document_with_entries("session-w");
+        let (_, _, entries) = plain
+            .serve_document_with_entries("session-w")
+            .expect("served");
         assert_eq!(entries, serde_json::json!({}));
         plain
             .command_json(

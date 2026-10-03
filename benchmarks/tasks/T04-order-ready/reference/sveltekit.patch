@@ -1,0 +1,30 @@
+diff --git a/src/lib/server/store.ts b/src/lib/server/store.ts
+index ab52dc7..930c6fb 100644
+--- a/src/lib/server/store.ts
++++ b/src/lib/server/store.ts
+@@ -47,10 +47,10 @@ export function getCart(session: string | undefined): Cart {
+ }
+ 
+ /** Where a customer's order is: what the kitchen last said. */
+-export type OrderStatus = "placed" | "preparing" | "delivered";
++export type OrderStatus = "placed" | "preparing" | "ready" | "delivered";
+ 
+ /** Every status the kitchen may set. */
+-export const ORDER_STATUSES: readonly OrderStatus[] = ["placed", "preparing", "delivered"];
++export const ORDER_STATUSES: readonly OrderStatus[] = ["placed", "preparing", "ready", "delivered"];
+ 
+ const orders: Map<string, OrderStatus> =
+   ((globalThis as Record<string, unknown>).__pwBenchOrders as Map<string, OrderStatus>) ??
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index b0b0d85..136ac68 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -36,6 +36,8 @@
+       <p>Your order is placed.</p>
+     {:else if data.order === "preparing"}
+       <p>Your order is being prepared.</p>
++    {:else if data.order === "ready"}
++      <p>Your order is ready for pickup.</p>
+     {:else if data.order === "delivered"}
+       <p>Your order was delivered.</p>
+     {/if}

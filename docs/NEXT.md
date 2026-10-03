@@ -25,8 +25,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
    readable from the sandbox.
 3. **E14-C, tasks T01-T12**, each with a prompt, hidden tests, a reference
    patch and an unsafe patch per stack, and all four controls green. A task
-   Pleris cannot express is recorded as such. T01, T03, T06, T08, T11 and
-   T12 are written. T12's Pleris wrong fix is refused since ADR-0128.
+   Pleris cannot express is recorded as such. T01, T03, T04, T06, T08, T11
+   and T12 are written. T12's Pleris wrong fix is refused since ADR-0128.
    - ~~**E14-L, a value's label.**~~ Done 2026-10-02 (ADR-0129).
    - ~~**Rulings: UI state, view composition, typed events.**~~ Done
      2026-10-02 (ADR-0130, ADR-0131).
@@ -67,8 +67,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
    - ~~**A block a query decides.**~~ Done 2026-10-02 (ADR-0146): planned,
      rendered from each binding's whole value, and sent again where its
      rendering changed.
-   - **Then T04, an order-state variant**, which needs an order resource in
-     all three stores. Then T02, T09 and T10, which need a data source that
+   - ~~**T04, an order-state variant.**~~ Written 2026-10-02, with ADR-0147:
+     all four controls hold on all three stacks. Pleris's unsafe patch is
+     refused by `pw check` (PW0305).
+   - **Next: T10, an error state**: a ruling on how a page shows a query's
+     failure (the charter's `Failed` state and `fallback`), and a data source
+     that can fail, in all three stacks. Then T09 and T02, which need it to
+     count its calls too. Then T02, T09 and T10, which need a data source that
      can be slow, fail and count its calls, in all three stacks; T07 needs a
      page that navigates, and T05 `<stream>` (ADR-0075).
 4. **E14-D, `pw diff`** for the store (gate item 1).

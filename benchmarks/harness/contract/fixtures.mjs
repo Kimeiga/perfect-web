@@ -47,6 +47,12 @@ export const test = base.extend({
         await answered;
       },
       count: (p = page) => p.locator("#cart-count"),
+      // The kitchen sets the session's order (T04): the same hook on every
+      // stack, carrying the page's session.
+      order: async (status, p = page) => {
+        const r = await p.request.post(`/bench/order?status=${status}`);
+        if (!r.ok()) throw new Error(`/bench/order?status=${status}: ${r.status()}`);
+      },
     });
   },
 });

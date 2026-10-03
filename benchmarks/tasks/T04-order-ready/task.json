@@ -1,0 +1,6 @@
+{
+  "id": "T04",
+  "title": "An order-state variant: ready for pickup",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T04.spec.mjs"
+}
