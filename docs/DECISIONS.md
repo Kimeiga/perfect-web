@@ -1272,3 +1272,10 @@ Found on the way:
 - E14-A's contract ran against the canonical store;
 - the value relations behind PW0605 typed a command's call by its declared
   result.
+
+[ADR-0158](DECISIONS/ADR-0158-a-test-leaves-nothing-behind.md): the
+repository's tests had left 4,809 directories, 673 MB, in the temporary
+directory, and made about 500 more each `just ci`. A Rust test's directory is
+a `tempfile::TempDir` now, removed when the test is done with it. The
+development server's test store keeps its directory as long as its server.
+The harness removes its sandboxes and copied specs however a step ends.

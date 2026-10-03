@@ -166,8 +166,8 @@ fn koka_answers(
 #[test]
 #[ignore = "needs Koka 3.2.3; `just e10-pure` runs it"]
 fn compiled_int_computation_agrees_with_koka() {
-    let dir = std::env::temp_dir().join(format!("pw-koka-oracle-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("temp dir");
+    let temp = tempfile::TempDir::with_prefix("pw-koka-oracle-").expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     let inputs = inputs();
     let koka = koka_answers(&dir, &inputs);
     assert_eq!(

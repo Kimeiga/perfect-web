@@ -13,6 +13,13 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0158, 2026-10-03: a test leaves nothing behind**
+([ADR-0158](DECISIONS/ADR-0158-a-test-leaves-nothing-behind.md)). The tests
+had left 4,809 directories, 673 MB, in the temporary directory, about 500
+more each `just ci`, on a disk that runs nearly full. A Rust test's
+directory is removed when the test is done with it, and so is each harness
+sandbox, however its step ends. A test run now leaves none.
+
 **ADR-0157, 2026-10-03: a handler is answered what its command did, never
 its value**
 ([ADR-0157](DECISIONS/ADR-0157-a-handler-is-answered-what-its-command-did.md)).

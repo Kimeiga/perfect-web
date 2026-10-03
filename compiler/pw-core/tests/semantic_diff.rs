@@ -9,14 +9,10 @@ use pw_core::semantic::{Model, diff};
 
 /// The store, with `patches` applied in order to a copy of its sources.
 fn store(patches: &[&str]) -> Vec<Unit> {
-    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let work = std::env::temp_dir().join(format!(
-        "pw-semantic-{}-{}",
-        std::process::id(),
-        N.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-    ));
-    let _ = std::fs::remove_dir_all(&work);
+    // Removed when the sources are read (ADR-0158).
+    let temp = tempfile::TempDir::with_prefix("pw-semantic-").expect("a temporary directory");
+    let work = temp.path().to_path_buf();
     let pw = |dir: &std::path::Path| -> Vec<std::path::PathBuf> {
         let mut out: Vec<_> = std::fs::read_dir(dir)
             .map(|d| d.map(|e| e.expect("entry").path()).collect())

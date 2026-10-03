@@ -82,8 +82,8 @@ fn the_stores_transition_runs_and_its_part_reads_the_result() {
     assert_eq!(m.bindings[0].resource, "store.page.Cart");
     assert_eq!(m.bindings[0].key, ["current_session()"]);
 
-    let dir = std::env::temp_dir().join(format!("pw-speculation-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("dir");
+    let temp = tempfile::TempDir::with_prefix("pw-speculation-").expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     std::fs::write(dir.join("m.mjs"), &m.source).expect("write");
     let out = node(
         &dir,

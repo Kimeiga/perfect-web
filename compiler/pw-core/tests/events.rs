@@ -73,12 +73,8 @@ fn page(markup: &str) -> String {
 /// What a handler module does when its event is `event`: each signal it
 /// sets, in order, under Node.
 fn sets(module: &pw_core::backend::js::HandlerModule, event: &str) -> serde_json::Value {
-    let dir = std::env::temp_dir().join(format!(
-        "pw-event-{}-{}",
-        std::process::id(),
-        module.identity
-    ));
-    std::fs::create_dir_all(&dir).expect("temp");
+    let temp = tempfile::TempDir::with_prefix("pw-event-").expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     std::fs::write(dir.join("handler.mjs"), &module.source).expect("write");
     std::fs::write(
         dir.join("run.mjs"),
@@ -86,7 +82,7 @@ fn sets(module: &pw_core::backend::js::HandlerModule, event: &str) -> serde_json
          const sets = [];\n\
          await run({\n  captures: {},\n  event: JSON.parse(process.argv[2]),\n  \
          get: () => undefined,\n  set: (name, value) => sets.push([name, value]),\n  \
-         command: async () => ({ committed: true }),\n});\n\
+         command: async () => ({ $case: \"ok\" }),\n});\n\
          console.log(JSON.stringify(sets));\n",
     )
     .expect("write");

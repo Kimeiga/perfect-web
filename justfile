@@ -2636,6 +2636,22 @@ e14-harness TASK="T08":
      } > docs/evidence/E14/harness-{{TASK}}.txt
     @cat docs/evidence/E14/harness-{{TASK}}.txt
 
+# Every task's four controls on the Pleris stack alone: what a change to the
+# compiler, the runtime or the benchmark's store can move, without rebuilding
+# the frameworks' stores, whose controls `just e14-harness TASK` records.
+e14-pleris-controls:
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "E14 - every task's four controls, the Pleris stack"; echo; \
+       echo "produced by: just e14-pleris-controls"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "node: $(node --version)  pnpm: $(pnpm --version)  rust: $(rustc --version)"; echo; \
+       for t in $(ls benchmarks/tasks | grep -oE '^T[0-9]+' | sort -u); do \
+         (cd benchmarks/harness && node bench.mjs controls --task $t --stack pleris 2>&1) || true; \
+       done; \
+     } > docs/evidence/E14/pleris-controls.txt
+    @cat docs/evidence/E14/pleris-controls.txt
+
 # The development server under sustained commands and session churn: frames
 # held, subscribers, outbox rows and materialized entries, each bounded. The
 # compiled command called 20,000 times through the E8 host, with resident memory

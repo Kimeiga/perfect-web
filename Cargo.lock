@@ -948,6 +948,7 @@ dependencies = [
  "pw-host",
  "pw-syntax",
  "serde_json",
+ "tempfile",
  "wasmtime",
 ]
 
@@ -959,6 +960,7 @@ dependencies = [
  "pw-syntax",
  "serde",
  "serde_json",
+ "tempfile",
  "wasm-encoder 0.257.1",
  "wasmparser 0.257.1",
  "wit-component 0.257.1",
@@ -979,6 +981,7 @@ dependencies = [
  "pw-syntax",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1037,6 +1040,7 @@ dependencies = [
  "pw-resource",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

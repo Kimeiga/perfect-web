@@ -9,12 +9,9 @@ use std::process::{Command, Stdio};
 
 /// A page that lists `list`, bound by a query cached `cache`.
 fn render(list: &str, cache: &str) -> (bool, String) {
-    let dir = std::env::temp_dir().join(format!(
-        "pw-plan-lists-{}-{list}-{cache}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+    let temp = tempfile::TempDir::with_prefix(format!("pw-plan-lists-{list}-{cache}-"))
+        .expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     let plan = serde_json::json!({
         "page": "t.P",
         "params": [],
@@ -87,9 +84,9 @@ fn a_shared_list_must_be_given() {
 /// A page whose block a query decides, the query cached `cache`, rendered
 /// for no session with no values.
 fn render_block(cache: &str) -> (bool, String) {
-    let dir = std::env::temp_dir().join(format!("pw-plan-block-{}-{cache}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+    let temp = tempfile::TempDir::with_prefix(format!("pw-plan-block-{cache}-"))
+        .expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     let plan = serde_json::json!({
         "page": "t.P",
         "params": [],
@@ -163,9 +160,9 @@ fn a_block_a_private_query_decides_renders_nothing_for_no_session() {
 /// A page `plan` and `chunks` describe, rendered for no session with no
 /// values: whether it rendered, and the page or why not.
 fn render_page(name: &str, plan: serde_json::Value, chunks: serde_json::Value) -> (bool, String) {
-    let dir = std::env::temp_dir().join(format!("pw-plan-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+    let temp =
+        tempfile::TempDir::with_prefix(format!("pw-plan-{name}-")).expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     std::fs::write(dir.join("plan.json"), plan.to_string()).expect("plan");
     std::fs::write(dir.join("values.json"), "{}").expect("values");
     let template = serde_json::json!([{

@@ -707,8 +707,9 @@ fn agree_on(
     cases: &[(String, Vec<Vec<Val>>)],
     tag: u64,
 ) -> (usize, usize, usize) {
-    let dir = std::env::temp_dir().join(format!("pw-js-{}-{tag:x}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("temp");
+    let temp =
+        tempfile::TempDir::with_prefix(format!("pw-js-{tag:x}-")).expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     let ops: BTreeMap<String, HostFn> = BTreeMap::new();
     let mut cases_js = Vec::new();
     let mut expected: Vec<(String, String, serde_json::Value)> = Vec::new();
@@ -819,8 +820,8 @@ fn kiokuns_shard_rule_as_a_module_agrees_with_its_component() {
 #[test]
 fn the_modules_case_mapping_is_rusts_for_every_code_point() {
     let us = units(&[("j.pw", PROGRAM)]);
-    let dir = std::env::temp_dir().join(format!("pw-js-case-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("temp");
+    let temp = tempfile::TempDir::with_prefix("pw-js-case-").expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     for id in ["j.CaseLower", "j.CaseUpper"] {
         let module = pw_core::backend::js_pure::module(&us, id).unwrap_or_else(|e| panic!("{e}"));
         std::fs::write(dir.join(format!("{id}.mjs")), module).expect("write");

@@ -4768,12 +4768,6 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &st
     }
 }
 
-/// **A page whose values are its signals alone, as a document** (ADR-0130).
-///
-/// Its parts manifest carries what the browser holds and renders again:
-/// each signal's first value, each part a signal decides, and the template
-/// of each block one decides, which the browser's copy of the renderer
-/// renders when it changes.
 /// A query string's value, decoded: `%XX` as the byte it escapes, and `+`
 /// as a space, as a form encodes one. `None` for an escape that is not one,
 /// or bytes that are not UTF-8.
@@ -4849,6 +4843,13 @@ fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
     env
 }
 
+/// **A page that binds no query, as a document** (ADR-0130, ADR-0148): its
+/// values are its signals and its streams' parts.
+///
+/// Its parts manifest carries what the browser holds and renders again:
+/// each signal's first value, each part a signal decides, and the template
+/// of each block one decides, which the browser's copy of the renderer
+/// renders when it changes.
 fn signal_document(
     body: &str,
     template: &Template,
@@ -5146,19 +5147,19 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
 
     /// **That store, built by the compiler as `pw build` builds it, and
     /// served from what was written** (ADR-0145).
-    fn lines_server() -> Server {
+    fn lines_server() -> Served {
         lines_server_with(with_lines)
     }
 
     /// The store, its `app.pw` changed by `change`, built and served.
-    fn lines_server_with(change: fn(&str) -> String) -> Server {
+    fn lines_server_with(change: fn(&str) -> String) -> Served {
         served_from(change, None)
     }
 
     /// **The store with T04's setup**: a session's order, which the kitchen
     /// sets (E14, T04). The benchmark's own patch, applied as its harness
     /// applies it, so this and the task cannot drift apart.
-    fn orders_server() -> Server {
+    fn orders_server() -> Served {
         served_from(
             |app| app.to_string(),
             Some(include_str!(
@@ -5170,30 +5171,25 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     /// The store's sources copied, `app.pw` changed by `change` and `patch`
     /// applied, built by the compiler as `pw build` builds them, and served
     /// from what was written.
-    fn served_from(change: fn(&str) -> String, patch: Option<&str>) -> Server {
+    fn served_from(change: fn(&str) -> String, patch: Option<&str>) -> Served {
         served_from_patches(change, patch.as_slice())
     }
 
     /// The store, changed by `change` and then by each patch in order: a
     /// task's setup, and its reference after it. The benchmark's store
     /// (ADR-0156), which every task's patches are written against.
-    fn served_from_patches(change: fn(&str) -> String, patches: &[&str]) -> Server {
+    fn served_from_patches(change: fn(&str) -> String, patches: &[&str]) -> Served {
         served_from_patches_in("benchmarks/baselines/pleris", change, patches)
     }
 
     /// [`served_from_patches`], the store's sources read from `base`, under
     /// the repository's root: the benchmark's store, or the canonical one,
     /// `examples`.
-    fn served_from_patches_in(base: &str, change: fn(&str) -> String, patches: &[&str]) -> Server {
-        static BUILT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    fn served_from_patches_in(base: &str, change: fn(&str) -> String, patches: &[&str]) -> Served {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let base = root.join(base);
-        let work = std::env::temp_dir().join(format!(
-            "pw-served-{}-{}",
-            std::process::id(),
-            BUILT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-        ));
-        let _ = std::fs::remove_dir_all(&work);
+        let dir = tempfile::TempDir::with_prefix("pw-served-").expect("a temporary directory");
+        let work = dir.path().to_path_buf();
         let examples = work.join("examples");
         let pw_files = |dir: &std::path::Path| -> Vec<std::path::PathBuf> {
             let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
@@ -5260,7 +5256,31 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         assert!(build.refusals().is_empty(), "{:?}", build.refusals());
         let out = work.join("build");
         build.write(&out).expect("the build is written");
-        Server::from_build(out.clone(), out).expect("served")
+        Served {
+            server: Server::from_build(out.clone(), out).expect("served"),
+            _dir: dir,
+        }
+    }
+
+    /// **A build served from a directory of its own, removed when the test
+    /// is done with it** (ADR-0158). The server reads handler modules from
+    /// the directory on request, so the directory lives as long as it does.
+    struct Served {
+        server: Server,
+        _dir: tempfile::TempDir,
+    }
+
+    impl std::ops::Deref for Served {
+        type Target = Server;
+        fn deref(&self) -> &Server {
+            &self.server
+        }
+    }
+
+    impl std::ops::DerefMut for Served {
+        fn deref_mut(&mut self) -> &mut Server {
+            &mut self.server
+        }
     }
 
     #[test]

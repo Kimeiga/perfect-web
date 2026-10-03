@@ -156,47 +156,53 @@ function secrets(task) {
 export function sandbox(task, stack) {
   const s = STACKS[stack];
   const root = fs.mkdtempSync(path.join(os.tmpdir(), `pw-bench-${task.id}-${stack}-`));
-  const app = path.join(root, "app");
-  if (s.baseline) {
-    copy(s.baseline, app, s.exclude);
-    // Its own dependencies, from a lockfile the harness pins, installed from
-    // the local store and never the network: the same versions every run.
-    // Not a symlink to the workspace's: Turbopack refuses a `node_modules`
-    // outside the project's root, and a symlink would share one tree between
-    // runs.
-    fs.copyFileSync(path.join(HARNESS, "locks", `${stack}.pnpm-lock.yaml`), path.join(app, "pnpm-lock.yaml"));
-    const install = sh("pnpm", ["install", "--offline", "--frozen-lockfile", "--ignore-workspace", "--silent"], {
-      cwd: app,
-    });
-    if (!install.ok) throw new Error(`the sandbox's dependencies did not install: ${tail(install.out)}`);
-  } else {
-    fs.mkdirSync(app);
-    for (const src of s.sources) {
-      copy(path.join(REPO, src), path.join(app, path.basename(src)));
+  // A sandbox that could not be made leaves nothing behind (ADR-0158).
+  try {
+    const app = path.join(root, "app");
+    if (s.baseline) {
+      copy(s.baseline, app, s.exclude);
+      // Its own dependencies, from a lockfile the harness pins, installed from
+      // the local store and never the network: the same versions every run.
+      // Not a symlink to the workspace's: Turbopack refuses a `node_modules`
+      // outside the project's root, and a symlink would share one tree between
+      // runs.
+      fs.copyFileSync(path.join(HARNESS, "locks", `${stack}.pnpm-lock.yaml`), path.join(app, "pnpm-lock.yaml"));
+      const install = sh("pnpm", ["install", "--offline", "--frozen-lockfile", "--ignore-workspace", "--silent"], {
+        cwd: app,
+      });
+      if (!install.ok) throw new Error(`the sandbox's dependencies did not install: ${tail(install.out)}`);
+    } else {
+      fs.mkdirSync(app);
+      for (const src of s.sources) {
+        copy(path.join(REPO, src), path.join(app, path.basename(src)));
+      }
     }
-  }
-  const git = (...args) => sh("git", args, { cwd: app });
-  git("init", "-q");
-  git("config", "user.email", "bench@localhost");
-  git("config", "user.name", "bench");
-  fs.writeFileSync(path.join(app, ".gitignore"), "node_modules\n.next\n.svelte-kit\nbuild\n");
-  const setup = path.join(task.root, "setup", `${stack}.patch`);
-  if (fs.existsSync(setup)) {
-    const r = git("apply", setup);
-    if (!r.ok) throw new Error(`the setup patch does not apply: ${r.out}`);
-  }
-  git("add", "-A");
-  git("commit", "-q", "-m", "baseline");
-  fs.copyFileSync(task.prompt, path.join(root, "PROMPT.md"));
+    const git = (...args) => sh("git", args, { cwd: app });
+    git("init", "-q");
+    git("config", "user.email", "bench@localhost");
+    git("config", "user.name", "bench");
+    fs.writeFileSync(path.join(app, ".gitignore"), "node_modules\n.next\n.svelte-kit\nbuild\n");
+    const setup = path.join(task.root, "setup", `${stack}.patch`);
+    if (fs.existsSync(setup)) {
+      const r = git("apply", setup);
+      if (!r.ok) throw new Error(`the setup patch does not apply: ${r.out}`);
+    }
+    git("add", "-A");
+    git("commit", "-q", "-m", "baseline");
+    fs.copyFileSync(task.prompt, path.join(root, "PROMPT.md"));
 
-  // Isolation, checked rather than assumed: no file in the sandbox is, byte
-  // for byte, one the agent must not see.
-  const hidden = new Set(secrets(task).map(digest));
-  const leaked = files(root).filter((f) => hidden.has(digest(f)));
-  if (leaked.length > 0) {
-    throw new Error(`refusing to run: the sandbox holds hidden files: ${leaked.join(", ")}`);
+    // Isolation, checked rather than assumed: no file in the sandbox is, byte
+    // for byte, one the agent must not see.
+    const hidden = new Set(secrets(task).map(digest));
+    const leaked = files(root).filter((f) => hidden.has(digest(f)));
+    if (leaked.length > 0) {
+      throw new Error(`refusing to run: the sandbox holds hidden files: ${leaked.join(", ")}`);
+    }
+    return { root, app };
+  } catch (error) {
+    fs.rmSync(root, { recursive: true, force: true });
+    throw error;
   }
-  return { root, app };
 }
 
 // --- the agent -------------------------------------------------------------
@@ -281,6 +287,7 @@ async function grade(task, stack, box) {
   let serverOut = "";
   server.stdout.on("data", (d) => (serverOut += d));
   server.stderr.on("data", (d) => (serverOut += d));
+  let specs = null;
   try {
     const base = `http://127.0.0.1:${port}`;
     if (!(await waitFor(`${base}${s.storePath}`, 60_000))) {
@@ -292,7 +299,7 @@ async function grade(task, stack, box) {
     // The contract and the hidden tests, copied outside the sandbox, beside
     // the harness so they resolve its `@playwright/test`.
     fs.mkdirSync(path.join(HARNESS, ".grading"), { recursive: true });
-    const specs = fs.mkdtempSync(path.join(HARNESS, ".grading", "run-"));
+    specs = fs.mkdtempSync(path.join(HARNESS, ".grading", "run-"));
     for (const f of fs.readdirSync(path.join(HARNESS, "contract"))) {
       fs.copyFileSync(path.join(HARNESS, "contract", f), path.join(specs, f));
     }
@@ -326,8 +333,8 @@ async function grade(task, stack, box) {
         seconds: (Date.now() - started) / 1000,
       });
     }
-    fs.rmSync(specs, { recursive: true, force: true });
   } finally {
+    if (specs) fs.rmSync(specs, { recursive: true, force: true });
     try {
       process.kill(-server.pid, "SIGTERM");
     } catch {
@@ -367,35 +374,39 @@ export async function run({ task: id, stack, agent }) {
   if (!task.stacks.includes(stack)) throw new Error(`${task.id} is not written for ${stack}`);
   const started = new Date();
   const box = sandbox(task, stack);
-  const agentRun = runAgent(task, stack, agent, box);
-  const diff = sh("git", ["diff", "--numstat"], { cwd: box.app }).out.trim();
-  const changed = diff
-    ? diff.split("\n").reduce((n, l) => n + l.split("\t").slice(0, 2).map(Number).reduce((a, b) => a + (b || 0), 0), 0)
-    : 0;
-  const stages = agentRun.ok ? await grade(task, stack, box) : [];
-  const score = agentRun.ok && stages.length > 0 && stages.every((s) => s.ok) ? 1 : 0;
-  const failedAt = !agentRun.ok ? "agent" : stages.find((s) => !s.ok)?.name ?? null;
-  const result = {
-    task: task.id,
-    stack,
-    agent,
-    score,
-    failed_at: failedAt,
-    changed_lines: changed,
-    agent_run: agentRun,
-    stages,
-    started: started.toISOString(),
-    seconds: (Date.now() - started.getTime()) / 1000,
-    commit: sh("git", ["rev-parse", "HEAD"], { cwd: REPO }).out.trim(),
-  };
-  fs.mkdirSync(RESULTS, { recursive: true });
-  const file = path.join(
-    RESULTS,
-    `${task.id}-${stack}-${agent.replace(/[^a-z0-9]+/gi, "_")}-${started.getTime()}.json`,
-  );
-  fs.writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`);
-  if (!process.env.BENCH_KEEP) fs.rmSync(box.root, { recursive: true, force: true });
-  return { ...result, file };
+  // However the run ends (ADR-0158), unless it is kept to be looked at.
+  try {
+    const agentRun = runAgent(task, stack, agent, box);
+    const diff = sh("git", ["diff", "--numstat"], { cwd: box.app }).out.trim();
+    const changed = diff
+      ? diff.split("\n").reduce((n, l) => n + l.split("\t").slice(0, 2).map(Number).reduce((a, b) => a + (b || 0), 0), 0)
+      : 0;
+    const stages = agentRun.ok ? await grade(task, stack, box) : [];
+    const score = agentRun.ok && stages.length > 0 && stages.every((s) => s.ok) ? 1 : 0;
+    const failedAt = !agentRun.ok ? "agent" : stages.find((s) => !s.ok)?.name ?? null;
+    const result = {
+      task: task.id,
+      stack,
+      agent,
+      score,
+      failed_at: failedAt,
+      changed_lines: changed,
+      agent_run: agentRun,
+      stages,
+      started: started.toISOString(),
+      seconds: (Date.now() - started.getTime()) / 1000,
+      commit: sh("git", ["rev-parse", "HEAD"], { cwd: REPO }).out.trim(),
+    };
+    fs.mkdirSync(RESULTS, { recursive: true });
+    const file = path.join(
+      RESULTS,
+      `${task.id}-${stack}-${agent.replace(/[^a-z0-9]+/gi, "_")}-${started.getTime()}.json`,
+    );
+    fs.writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`);
+    return { ...result, file };
+  } finally {
+    if (!process.env.BENCH_KEEP) fs.rmSync(box.root, { recursive: true, force: true });
+  }
 }
 
 // --- the controls --------------------------------------------------------------

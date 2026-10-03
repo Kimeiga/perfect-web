@@ -122,14 +122,14 @@ fn a_binding_is_a_value_and_a_handler() {
             _ => None,
         })
         .expect("the binding's handler");
-    let dir = std::env::temp_dir().join(format!("pw-bind-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("temp");
+    let temp = tempfile::TempDir::with_prefix("pw-bind-").expect("a temporary directory");
+    let dir = temp.path().to_path_buf();
     std::fs::write(dir.join("handler.mjs"), &module.source).expect("write");
     std::fs::write(
         dir.join("run.mjs"),
         "import { run } from \"./handler.mjs\";\nconst sets = [];\n\
          await run({ captures: {}, event: { value: \"Grace\" }, get: () => undefined,\n  \
-         set: (n, v) => sets.push([n, v]), command: async () => ({}) });\n\
+         set: (n, v) => sets.push([n, v]), command: async () => ({ $case: \"ok\" }) });\n\
          console.log(JSON.stringify(sets));\n",
     )
     .expect("write");

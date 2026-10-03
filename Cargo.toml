@@ -65,6 +65,11 @@ rusqlite = { version = "0.40.1", features = ["bundled"] }
 # CC0-1.0 OR Apache-2.0. `keyed_hash` IS the PRF, so nothing here composes a
 # construction by hand.
 blake3 = "1.8.6"
+# ADR-0158: a test's directory, removed when the test is done with it. Already
+# in the graph through wasmtime. Verified on crates.io 2026-10-03: 3.27.0, the
+# newest, not yanked, MIT OR Apache-2.0; its API (`TempDir::with_prefix`,
+# `path`, deleting on drop) checked against docs.rs for 3.27.0.
+tempfile = "3.27.0"
 
 [profile.release]
 lto = "thin"
