@@ -6041,8 +6041,12 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                     }
                 }
 
-                // Interactive behaviour on a non-interactive element.
-                let handler = attrs.iter().find(|a| a.name.starts_with("on:"));
+                // Interactive behaviour on a non-interactive element. A
+                // handler `bind:value` wrote is PW5304's (ADR-0142).
+                let handler = attrs.iter().find(|a| {
+                    a.name.starts_with("on:")
+                        && !matches!(a.value, AttrValue::Expr(e) if body.bound.contains(&e))
+                });
                 // `<form on:submit>` is the normal way to submit a form, and
                 // omitting `form` here made R-022 — a handler *type* mismatch —
                 // report as an accessibility defect instead. Right file, wrong

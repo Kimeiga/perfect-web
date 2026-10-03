@@ -141,60 +141,14 @@ pub struct Live {
     pub path: String,
     /// The part's kind, as the parts manifest names it.
     pub kind: String,
-    /// Every signal a block reads anywhere inside it, its own included: the
-    /// block is rendered again when any of them changes. Empty for a text
-    /// part, which reads `signal` alone.
+    /// The signals a block is rendered again for: its own, and each read
+    /// where the browser does not set a part in place (ADR-0142). Empty for
+    /// a text part or an attribute, which reads `signal` alone.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reads: Vec<String>,
-}
-
-/// Every path a part reads, itself and anything inside it.
-fn paths_read(part: &crate::template_ir::Part, out: &mut Vec<String>) {
-    use crate::template_ir::{Chunk, Part, Segment};
-    fn chunks(cs: &[Chunk], out: &mut Vec<String>) {
-        for c in cs {
-            if let Chunk::Dynamic(p) = c {
-                paths_read(p, out);
-            }
-        }
-    }
-    match part {
-        Part::Text { value, .. }
-        | Part::Attribute { value, .. }
-        | Part::BooleanAttribute { value, .. }
-        | Part::RawHtml { value, .. } => out.push(value.clone()),
-        Part::InterpolatedAttribute { segments, .. } => {
-            for s in segments {
-                if let Segment::Value(v) = s {
-                    out.push(v.clone());
-                }
-            }
-        }
-        Part::Conditional {
-            value,
-            then,
-            otherwise,
-            ..
-        } => {
-            out.push(value.clone());
-            chunks(then, out);
-            chunks(otherwise, out);
-        }
-        Part::Match { value, arms, .. } => {
-            out.push(value.clone());
-            for a in arms {
-                chunks(&a.body, out);
-            }
-        }
-        Part::Each {
-            collection, body, ..
-        } => {
-            out.push(collection.clone());
-            chunks(body, out);
-        }
-        Part::Component { args, .. } => out.extend(args.iter().map(|(_, v)| v.clone())),
-        Part::Event { .. } | Part::Blocked { .. } => {}
-    }
+    /// The attribute, for an attribute part: `value`, `disabled` (ADR-0142).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub attribute: String,
 }
 
 /// The part numbered `id`, wherever it is in `chunks`.
@@ -301,15 +255,20 @@ fn rendered_again(
                             Part::Text { .. } | Part::Conditional { .. } | Part::Match { .. },
                             Reach::Top,
                         ) => {}
+                        // Set in place (ADR-0142).
+                        (Part::Attribute { .. } | Part::BooleanAttribute { .. }, Reach::Top)
+                            if set_in_place(p) => {}
                         (
                             Part::Attribute { .. }
                             | Part::BooleanAttribute { .. }
                             | Part::InterpolatedAttribute { .. },
-                            _,
+                            Reach::Top,
                         ) => {
                             return Err(format!(
-                                "part {id} is an attribute a signal decides, which this slice \
-                                 does not render again (ADR-0130)"
+                                "part {id} is an attribute a signal decides whose value is a URL \
+                                 or a style, or written with holes, which the browser does not \
+                                 set again: it would check what the server checks a second way \
+                                 (ADR-0142)"
                             ));
                         }
                         (Part::Event { .. }, _) => {
@@ -382,6 +341,130 @@ fn rendered_again(
         }
     }
     Ok(())
+}
+
+/// **What a part reads itself**, not inside its regions: each path, as the
+/// template names it.
+fn own_reads(p: &crate::template_ir::Part) -> Vec<String> {
+    use crate::template_ir::{Part, Segment};
+    match p {
+        Part::Text { value, .. }
+        | Part::Attribute { value, .. }
+        | Part::BooleanAttribute { value, .. }
+        | Part::RawHtml { value, .. }
+        | Part::Conditional { value, .. }
+        | Part::Match { value, .. } => vec![value.clone()],
+        Part::Each { collection, .. } => vec![collection.clone()],
+        Part::InterpolatedAttribute { segments, .. } => segments
+            .iter()
+            .filter_map(|s| match s {
+                Segment::Value(v) => Some(v.clone()),
+                Segment::Static(_) => None,
+            })
+            .collect(),
+        Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
+        Part::Event { .. } | Part::Blocked { .. } => Vec::new(),
+    }
+}
+
+/// **Does the browser set this part in place when its signal changes?**
+/// (ADR-0142): a text part, and an attribute whose value is neither a URL nor
+/// a style, outside any loop.
+fn set_in_place(p: &crate::template_ir::Part) -> bool {
+    use crate::template_ir::{Context, Part};
+    match p {
+        Part::Text { .. } | Part::BooleanAttribute { .. } => true,
+        Part::Attribute { context, .. } => *context == Context::Attribute,
+        _ => false,
+    }
+}
+
+/// **The signals a block a signal decides is rendered again for**
+/// (ADR-0142): its own, and each read where the browser does not set a part
+/// in place, inside a loop, or by a part it does not set. A text part or an
+/// attribute outside any loop is set in place, and a block a signal decides
+/// renders itself. Until 2026-10-02 a block rendered again for every signal
+/// read anywhere in it, so a field bound to a signal inside one was replaced
+/// at each key pressed, and lost its focus.
+fn block_reads(part: &crate::template_ir::Part, signals: &[String]) -> Vec<String> {
+    use crate::template_ir::{Chunk, Part};
+    let root = |p: &str| p.split('.').next().unwrap_or_default().to_string();
+    fn walk(
+        chunks: &[Chunk],
+        signals: &[String],
+        framed: bool,
+        root: &dyn Fn(&str) -> String,
+        out: &mut BTreeSet<String>,
+    ) {
+        for c in chunks {
+            let Chunk::Dynamic(p) = c else { continue };
+            let decided = matches!(p, Part::Conditional { .. } | Part::Match { .. })
+                && own_reads(p).iter().any(|v| signals.contains(&root(v)));
+            // A block a signal decides, outside a loop, renders itself.
+            if decided && !framed {
+                continue;
+            }
+            if framed || !set_in_place(p) {
+                out.extend(
+                    own_reads(p)
+                        .iter()
+                        .map(|v| root(v))
+                        .filter(|r| signals.contains(r)),
+                );
+            }
+            let inner = framed || matches!(p, Part::Each { .. });
+            for region in p.nested() {
+                walk(region, signals, inner, root, out);
+            }
+        }
+    }
+    let mut out: BTreeSet<String> = own_reads(part)
+        .iter()
+        .map(|v| root(v))
+        .filter(|r| signals.contains(r))
+        .collect();
+    for region in part.nested() {
+        walk(region, signals, false, &root, &mut out);
+    }
+    out.into_iter().collect()
+}
+
+/// **Each attribute a signal decides that the browser sets in place**
+/// (ADR-0142): outside any loop, at top level or in a block a signal decides.
+fn live_attributes(
+    chunks: &[crate::template_ir::Chunk],
+    signals: &[String],
+    framed: bool,
+    out: &mut Vec<Live>,
+) {
+    use crate::template_ir::{Chunk, Part};
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if !framed
+            && set_in_place(p)
+            && let Part::Attribute {
+                id, name, value, ..
+            }
+            | Part::BooleanAttribute {
+                id, name, value, ..
+            } = p
+            && let Some(root) = value.split('.').next()
+            && signals.iter().any(|s| s == root)
+        {
+            out.push(Live {
+                part: id.0,
+                signal: root.to_string(),
+                path: value.clone(),
+                kind: p.kind().to_string(),
+                reads: Vec::new(),
+                attribute: name.clone(),
+            });
+        }
+        let inner = framed || matches!(p, Part::Each { .. });
+        for region in p.nested() {
+            live_attributes(region, signals, inner, out);
+        }
+    }
 }
 
 /// A page's plan.
@@ -611,10 +694,12 @@ fn plan(
         };
         let reads: Vec<String> = segments.collect();
         // A part a signal decides is the browser's to render again
-        // (ADR-0130). Inside a block a query decides, its address carries a
-        // frame the browser would have to compute: not this slice.
+        // (ADR-0130): set in place, at top level or in a block a signal
+        // decides (ADR-0142). Inside a loop, its address carries a frame the
+        // browser does not compute, and its block renders it again
+        // (ADR-0137).
         if signals.contains(&root) {
-            if hole.nested {
+            if hole.framed {
                 continue;
             }
             live.push(Live {
@@ -626,6 +711,7 @@ fn plan(
                     .join("."),
                 kind: "text".to_string(),
                 reads: Vec::new(),
+                attribute: String::new(),
             });
             continue;
         }
@@ -694,28 +780,21 @@ fn plan(
         if matches!(entry.kind, "conditional" | "match")
             && let Some(root) = entry.value.split('.').next()
             && signals.iter().any(|s| s == root)
+            && let Some(part) = find_part(&template.chunks, entry.id.0)
         {
-            let mut read = Vec::new();
-            if let Some(part) = find_part(&template.chunks, entry.id.0) {
-                paths_read(part, &mut read);
-            }
-            let mut reads: Vec<String> = read
-                .iter()
-                .filter_map(|p| p.split('.').next())
-                .filter(|r| signals.iter().any(|s| s == r))
-                .map(str::to_string)
-                .collect();
-            reads.sort();
-            reads.dedup();
             live.push(Live {
                 part: entry.id.0,
                 signal: root.to_string(),
                 path: entry.value.clone(),
                 kind: entry.kind.to_string(),
-                reads,
+                reads: block_reads(part, &signals),
+                attribute: String::new(),
             });
         }
     }
+    // An attribute a signal decides, set in place (ADR-0142).
+    live_attributes(&template.chunks, &signals, false, &mut live);
+    live.sort_by_key(|l| l.part);
 
     Ok((
         PageValues {

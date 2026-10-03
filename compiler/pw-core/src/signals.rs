@@ -104,6 +104,8 @@ fn check_body(
 
     // A `<dialog>` a signal shows (ADR-0141).
     dialogs(body, &lexical, &signals, out);
+    // What an input binds its value to (ADR-0142).
+    bindings(body, &lexical, &signals, out);
 
     for id in body.walk() {
         match body.expr(id) {
@@ -126,8 +128,10 @@ fn check_body(
                     }
                     continue;
                 }
-                // A binding of the body, changed by a handler.
+                // A binding of the body, changed by a handler. One `bind:value`
+                // wrote is PW5304's to say (ADR-0142).
                 if let Place::Handler(handler) = place
+                    && !body.bound.contains(&handler)
                     && let Some(declared) = lets.get(&binder)
                     && !within(body, handler, *declared)
                     && let Expr::Name(name) = body.expr(target)
@@ -291,6 +295,123 @@ fn dialog_close_unheard(body: &Body, at: crate::hir::NodeId, signal: &str) -> Di
         )),
         repairs: vec![Repair {
             description: format!("handle its closing: `on:close={{() => {signal} = ..}}`"),
+            replacement: None,
+        }],
+    }
+}
+
+/// **An input binds its value to a signal of `String`, by its name**
+/// (ADR-0142). `bind:value={s}` was lowered to `value={s}` and a handler
+/// setting `s`; this reads each such handler, and each `bind:` the lowering
+/// left as written.
+fn bindings(
+    body: &Body,
+    lexical: &Lexical,
+    signals: &BTreeMap<Binder, (String, ExprId)>,
+    out: &mut Vec<Diagnostic>,
+) {
+    let mut roots = Vec::new();
+    for id in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(id) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    for n in body.walk_markup(&roots) {
+        let Node::Element { tag, attrs, .. } = body.node(n) else {
+            continue;
+        };
+        for a in attrs {
+            // A `bind:` the lowering left: not `value`, or not a name.
+            if let Some(("bind", what)) = a.namespace() {
+                out.push(bound_value(
+                    a.span.clone(),
+                    format!("`bind:{what}` binds `value`, to a signal's name: `bind:value={{s}}`"),
+                ));
+                continue;
+            }
+            let AttrValue::Expr(handler) = &a.value else {
+                continue;
+            };
+            if !body.bound.contains(handler) {
+                continue;
+            }
+            if !matches!(tag.as_str(), "input" | "textarea" | "select") {
+                out.push(bound_value(
+                    a.span.clone(),
+                    format!(
+                        "`<{tag}>` has no value a person types: `bind:value` binds an \
+                         `<input>`, a `<textarea>` or a `<select>`"
+                    ),
+                ));
+                continue;
+            }
+            // The handler sets the bound name: `s = event.value`.
+            let Expr::Lambda { body: set, .. } = body.expr(*handler) else {
+                continue;
+            };
+            let Expr::Binary { lhs, .. } = body.expr(*set) else {
+                continue;
+            };
+            let Expr::Name(name) = body.expr(*lhs) else {
+                continue;
+            };
+            let signal = lexical.binder(*lhs).and_then(|b| signals.get(&b));
+            let Some((_, declared)) = signal else {
+                out.push(bound_value(
+                    a.span.clone(),
+                    format!(
+                        "`bind:value` binds `{name}`, which is not a signal: what is typed \
+                         would change nothing the browser holds"
+                    ),
+                ));
+                continue;
+            };
+            // As written: `String`, `Int`, `List<String>`.
+            let written = match body.expr(*declared) {
+                Expr::Let { ty: Some(t), .. } => body
+                    .types
+                    .get(t.index())
+                    .map(|r| match r.args.is_empty() {
+                        true => r.path.clone(),
+                        false => format!("{}<..>", r.path),
+                    })
+                    .unwrap_or_default(),
+                _ => String::new(),
+            };
+            if written != "String" {
+                out.push(bound_value(
+                    a.span.clone(),
+                    format!(
+                        "`bind:value` binds `{name}`, a signal of `{written}`: a signal of \
+                         another type than `String` needs a codec, which is not built \
+                         (ADR-0131)"
+                    ),
+                ));
+            }
+        }
+    }
+}
+
+fn bound_value(at: crate::hir::Span, message: String) -> Diagnostic {
+    let code = crate::codes::BOUND_VALUE;
+    Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "bound_value",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message,
+        primary_span: at,
+        related: Vec::new(),
+        explanation: Some(
+            "`bind:value={s}` shows the signal `s` in a field and sets it to what is typed \
+             (ADR-0142). The browser holds a page's signals, so a value the server holds \
+             would not change, and text becomes another type only through a codec, a \
+             parse and a format back (ADR-0131)."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "declare `signal s: String = \"\"` and write `bind:value={s}`".to_string(),
             replacement: None,
         }],
     }

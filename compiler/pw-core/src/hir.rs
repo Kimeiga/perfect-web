@@ -625,7 +625,15 @@ pub struct Body {
     /// unchanged. Until 2026-10-02 the annotation was dropped, and a written
     /// type checked nothing.
     pub param_types: std::collections::BTreeMap<PatternId, TypeRefId>,
+    /// **The handlers `bind:value` wrote** (ADR-0142): `bind:value={s}` is
+    /// lowered to `value={s}` and an `on:input` handler setting `s`, and this
+    /// says which handlers are those, for the rule on what a binding binds.
+    pub bound: std::collections::BTreeSet<ExprId>,
 }
+
+/// The name a `bind:value` handler gives its event (ADR-0142): one no source
+/// can write, so it hides nothing the page binds.
+pub const BOUND_EVENT: &str = "event~bound";
 
 impl Body {
     pub fn expr(&self, id: ExprId) -> &Expr {

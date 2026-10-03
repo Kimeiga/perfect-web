@@ -712,21 +712,59 @@ function replaceBlock(id, html) {
   return inserted;
 }
 
+/**
+ * **An attribute a signal decides, set in place** (ADR-0142), on the element
+ * the part belongs to. A field's `value` is its property, and is not set from
+ * the field's own typing: what it holds is what was typed, and a value its
+ * handler set behind later keys would move the caret under the person typing
+ * (ADR-0131's concern). Any other change, a handler clearing it, is shown. A
+ * boolean attribute is its presence, and its property where the element has
+ * one (`checked`, `disabled`).
+ */
+function setAttributePart(live, source) {
+  const part = (parts.parts ?? []).find((p) => p.id === live.part);
+  if (!part) return;
+  const v = signalAt(live.path);
+  for (const a of addressesFor(`e${part.owner}`)) {
+    const el = index.get(a)?.element;
+    if (!el) continue;
+    if (live.kind === "boolean_attribute") {
+      const on = v === true;
+      el.toggleAttribute(live.attribute, on);
+      if (typeof el[live.attribute] === "boolean") el[live.attribute] = on;
+    } else if (live.attribute === "value" && "value" in el) {
+      const typed = source?.el === el && source.event === "input";
+      const text = textOf(v);
+      if (!typed && el.value !== text) el.value = text;
+    } else {
+      el.setAttribute(live.attribute, textOf(v));
+    }
+  }
+}
+
 let dirty = new Set();
 let flushing = null;
 
+/** Where each signal's latest change came from: the element and the event
+ * whose handler set it (ADR-0142). */
+let sources = new Map();
+
 /** A handler changed `name`: held now, and rendered once per press. A value
  * the signal already holds changes nothing, and renders nothing. */
-function setSignal(name, value) {
+function setSignal(name, value, source) {
   if (JSON.stringify(signals.get(name)) === JSON.stringify(value)) return;
   signals.set(name, value);
+  if (source) sources.set(name, source);
+  else sources.delete(name);
   dirty.add(name);
   flushing ??= Promise.resolve().then(flushSignals);
 }
 
 async function flushSignals() {
   const changed = dirty;
+  const from = sources;
   dirty = new Set();
+  sources = new Map();
   flushing = null;
   let rendered = false;
   const inserted = [];
@@ -735,6 +773,10 @@ async function flushSignals() {
       if (!changed.has(live.signal)) continue;
       setRange(addressOf([], live.part), textOf(signalAt(live.path)));
       log.push(`signal ${live.signal} -> part ${live.part}`);
+    } else if (live.kind === "attribute" || live.kind === "boolean_attribute") {
+      if (!changed.has(live.signal)) continue;
+      setAttributePart(live, from.get(live.signal));
+      log.push(`signal ${live.signal} -> attribute ${live.attribute} of part ${live.part}`);
     } else if ((live.reads ?? [live.signal]).some((s) => changed.has(s))) {
       inserted.push(...replaceBlock(live.part, await renderBlock(live.part)));
       rendered = true;
@@ -889,9 +931,10 @@ function bindEvents() {
             captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
             // What the event was, read in the listener (ADR-0138).
             event: record,
-            // The page's signals (ADR-0130), as JSON carries them.
+            // The page's signals (ADR-0130), as JSON carries them, and where
+            // a change came from (ADR-0142).
             get: (name) => signals.get(name),
-            set: setSignal,
+            set: (name, value) => setSignal(name, value, { el, event }),
             // Each command speculates before its request (ADR-0122), and its
             // speculation is resolved by the answer, whatever it is.
             command: async (component, args) => {

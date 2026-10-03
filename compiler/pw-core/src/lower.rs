@@ -56,6 +56,7 @@ struct BodyBuilder {
     nodes: Arena<Node>,
     signals: std::collections::BTreeSet<ExprId>,
     param_types: std::collections::BTreeMap<PatternId, TypeRefId>,
+    bound: std::collections::BTreeSet<ExprId>,
 }
 
 impl BodyBuilder {
@@ -563,6 +564,7 @@ impl Lowerer<'_> {
             root,
             signals: b.signals,
             param_types: b.param_types,
+            bound: b.bound,
         };
         (
             Some(BodyId(self.hir.bodies.alloc(body, span_of(node)))),
@@ -1395,7 +1397,7 @@ impl Lowerer<'_> {
                     .map(|o| {
                         o.children()
                             .filter(|c| c.kind() == K::Attr)
-                            .map(|a| self.attr(b, &a))
+                            .flat_map(|a| self.attrs(b, &a))
                             .collect()
                     })
                     .unwrap_or_default();
@@ -1485,6 +1487,70 @@ impl Lowerer<'_> {
             }
             _ => b.node(Node::Text(text(self.src, node)), span),
         }
+    }
+
+    /// An attribute, or the two `bind:value={s}` is short for (ADR-0142):
+    /// `value={s}`, and `on:input` with a handler setting `s` to what was
+    /// typed. Lowered to them, so every rule reads them as it reads any
+    /// attribute and handler. A binding of anything but a name stays as
+    /// written, for the rule on what a binding binds to refuse.
+    fn attrs(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> Vec<Attr> {
+        let attr = self.attr(b, node);
+        if attr.name != "bind:value" {
+            return vec![attr];
+        }
+        let AttrValue::Expr(e) = attr.value else {
+            return vec![attr];
+        };
+        let Some(Expr::Name(signal)) = b.exprs.get(e.index()).cloned() else {
+            return vec![attr];
+        };
+        let span = attr.span.clone();
+        let event = b.pat(
+            Pattern::Bind {
+                name: BOUND_EVENT.to_string(),
+                mutable: false,
+            },
+            span.clone(),
+        );
+        let target = b.expr(Expr::Name(signal), span.clone());
+        let read = b.expr(Expr::Name(BOUND_EVENT.to_string()), span.clone());
+        let typed = b.expr(
+            Expr::Field {
+                base: read,
+                name: "value".to_string(),
+            },
+            span.clone(),
+        );
+        let set = b.expr(
+            Expr::Binary {
+                op: BinOp::Assign,
+                lhs: target,
+                rhs: typed,
+            },
+            span.clone(),
+        );
+        let handler = b.expr(
+            Expr::Lambda {
+                descriptor: None,
+                params: vec![event],
+                body: set,
+            },
+            span.clone(),
+        );
+        b.bound.insert(handler);
+        vec![
+            Attr {
+                name: "value".to_string(),
+                value: AttrValue::Expr(e),
+                span: span.clone(),
+            },
+            Attr {
+                name: "on:input".to_string(),
+                value: AttrValue::Expr(handler),
+                span,
+            },
+        ]
     }
 
     fn attr(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> Attr {

@@ -319,6 +319,11 @@ pub(crate) fn captures_of(
     {
         return captures(body, *d);
     }
+    // What `bind:value` wrote reads its event and sets its signal, and
+    // captures nothing (ADR-0142); a binding of anything else is PW5304's.
+    if body.bound.contains(&lambda) {
+        return Vec::new();
+    }
     let own = crate::resolve::local_bindings_from(body, lambda);
     let signal = |b: crate::lexical::Binder| {
         body.signals.iter().any(|s| {

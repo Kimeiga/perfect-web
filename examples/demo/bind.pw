@@ -1,0 +1,43 @@
+// @corpus: fixture
+// @id: DEMO-bind
+// @category: UI state — a field bound to a signal
+// @charter: §8.2
+// @milestone: E14
+//
+// ADR-0142: `bind:value={name}` shows a signal in a field and sets it to what
+// is typed. What reads the signal is set in place, the field's own value
+// included, though never from the field's own typing. Inside a block a signal
+// decides, the field keeps its focus while typed in.
+
+module demo.bind
+
+import events.{ KeyEvent }
+
+page BindPage() {
+    cache private
+
+    signal name: String = "Ada"
+    signal editing: Bool = false
+    signal note: String = ""
+
+    view {
+        <main>
+            <input
+                id="name"
+                type="text"
+                aria-label="Name"
+                bind:value={name}
+                on:keydown={(e: KeyEvent) => if e.key == "Enter" { name = "" }}
+            />
+            <p id="hello">Hello, {name}</p>
+            <button id="grace" type="button" on:press={() => name = "Grace"}>Grace</button>
+            <button id="edit" type="button" on:press={() => editing = true}>Edit a note</button>
+            {#if editing}
+                <section aria-label="Note">
+                    <input id="note" type="text" aria-label="Note" bind:value={note} />
+                    <p id="note-echo">{note}</p>
+                </section>
+            {/if}
+        </main>
+    }
+}

@@ -3181,6 +3181,16 @@ impl<'a> Typer<'a> {
     /// **`x = e`**: `e` has the type `x` holds (ADR-0051). An assignment to a
     /// field, or to a name whose type is not known, relates nothing here.
     fn assignment(&self, id: ExprId, lhs: ExprId, rhs: ExprId) -> Vec<ValueRelation> {
+        // What `bind:value` wrote: a field's text into its signal, whose type
+        // PW5304 holds to `String` (ADR-0142).
+        if self
+            .body
+            .bound
+            .iter()
+            .any(|l| matches!(self.body.expr(*l), Expr::Lambda { body, .. } if *body == id))
+        {
+            return Vec::new();
+        }
         // A name, or a field read from a value: `b.value = e` holds the
         // field's type, where it related nothing until 2026-09-26 (ADR-0070).
         let (x, declared) = match self.body.expr(lhs) {

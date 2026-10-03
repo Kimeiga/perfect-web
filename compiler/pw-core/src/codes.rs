@@ -505,6 +505,11 @@ codes! {
     // closing the signal never hears of, is a page that cannot open it again.
     MODAL_DIALOG = "PW5303" / modal_dialog / 1, UiState,
         "a modal dialog is shown by a signal's block, and says what closing it does";
+    // ADR-0142: `bind:value={s}`. A binding of a value the server holds, or
+    // of a signal no codec turns text into, would be a field whose typing
+    // changes nothing, or changes it to a value of another type.
+    BOUND_VALUE = "PW5304" / bound_value / 1, UiState,
+        "an input binds its value to a signal of `String`, by its name";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must

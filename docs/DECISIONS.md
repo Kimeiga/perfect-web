@@ -1078,3 +1078,13 @@ the page behind it inert and closes it on Escape. The dialog handles
 `close` (PW5303), so the signal that shows it hears of every closing,
 Escape's included. A dialog nothing shows is refused. Focus goes back to
 what invoked it in every engine, WebKit included.
+
+## 2026-10-02: an input bound to a signal
+
+[ADR-0142](DECISIONS/ADR-0142-an-input-bound-to-a-signal.md): `bind:value={s}`
+is lowered to `value={s}` and an `on:input` handler setting `s`, and binds a
+signal of `String` by its name on a field (PW5304). The browser sets an
+attribute a signal decides in place, never from the field's own typing. A
+block a signal decides is rendered again only for what it cannot set in
+place, so a field bound inside one keeps its focus. Until then a block was
+rendered again for every signal read anywhere in it.

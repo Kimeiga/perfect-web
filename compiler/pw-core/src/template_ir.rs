@@ -465,6 +465,9 @@ struct Indexer {
     /// How many names composition has renamed (ADR-0136), so each new name
     /// is one no other has.
     renamed: u32,
+    /// How many `{#each}` enclose the node being lowered: a part inside one
+    /// is an instance's, addressed with a frame (ADR-0142).
+    frames: u32,
     /// Each view composed into the template, in the order first written.
     views: Vec<DefId>,
 }
@@ -483,8 +486,11 @@ pub struct Hole {
     /// The file and the declaration whose body `expr` is in: the template's
     /// own, or a view composed into it (ADR-0136).
     pub origin: (usize, DeclId),
-    /// Inside a block: an instance of it, whose address carries a frame.
+    /// Inside a block.
     pub nested: bool,
+    /// Inside an `{#each}`: an instance's, whose address carries a frame the
+    /// browser does not compute (ADR-0142).
+    pub framed: bool,
 }
 
 impl Indexer {
@@ -980,6 +986,7 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
                     expr: *e,
                     origin: (ctx.unit, ctx.decl),
                     nested: ix.depth > 0,
+                    framed: ix.frames > 0,
                 });
                 Part::Text {
                     id,
@@ -1422,7 +1429,9 @@ fn lower_block(
         }
         let collection = ctx.read(collection);
         let (scope, mut written) = ctx.binding(std::slice::from_ref(&binding), ix);
+        ix.frames += 1;
         let inner = lower_run(body, &lead, &scope, ix);
+        ix.frames -= 1;
         out.push(Chunk::Dynamic(Part::Each {
             id,
             collection,

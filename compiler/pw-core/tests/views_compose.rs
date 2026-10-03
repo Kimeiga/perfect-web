@@ -578,8 +578,18 @@ fn a_signal_a_view_shows_is_live_as_the_page_s_own() {
         .iter()
         .map(|l| (l.kind.as_str(), l.path.as_str()))
         .collect();
-    assert_eq!(kinds, [("text", "greeting"), ("match", "panel")]);
-    assert_eq!(inline.live[1].reads, ["greeting", "panel", "presses"]);
+    // The block is rendered again for `panel`, and the parts in it that read
+    // the other two are set in place (ADR-0142).
+    assert_eq!(
+        kinds,
+        [
+            ("text", "greeting"),
+            ("match", "panel"),
+            ("text", "greeting"),
+            ("text", "presses")
+        ]
+    );
+    assert_eq!(inline.live[1].reads, ["panel"]);
 }
 
 #[test]

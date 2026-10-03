@@ -1701,6 +1701,23 @@ e14-dialogs:
      } > docs/evidence/E14/dialogs.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/dialogs.txt
 
+# ADR-0142: an input bound to a signal. The compiler's lowering, its rule
+# and the plan's in-place parts, and the mutation controls; the browser's
+# half is `e2e/bind.spec.mjs`, in the own-renderer suite.
+e14-bind:
+    @{ echo "ADR-0142 - an input bound to a signal"; echo; \
+       echo "produced by: just e14-bind"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the binding (compiler/pw-core/tests/bind.rs)"; echo; \
+       cargo test --locked -p pw-core --test bind 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what the browser sets in place (compiler/pw-core/tests/signals_render_again.rs)"; echo; \
+       cargo test --locked -p pw-core --test signals_render_again 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/bind_mutations.py)"; echo; \
+       python3 scripts/bind_mutations.py; \
+     } > docs/evidence/E14/bind.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/bind.txt
+
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
 # binding a case's fields, kiokun's server carrying a case, and the mutation

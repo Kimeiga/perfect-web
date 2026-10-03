@@ -149,8 +149,19 @@ fn a_list_a_signal_holds_is_rendered_again_only_inside_its_block() {
 }
 
 #[test]
-fn an_attribute_a_signal_decides_is_refused_as_before() {
-    refuses("<p title={title}>x</p>", "is an attribute a signal decides");
+fn an_attribute_a_signal_decides_is_set_in_place_or_refused() {
+    // Set in place since ADR-0142, outside any loop.
+    builds("<p title={title}>x</p>");
+    // A URL is checked by the renderer, and would be checked a second way.
+    refuses(
+        "<a href={title}>x</a>",
+        "is an attribute a signal decides whose value is a URL or a style",
+    );
+    // Inside a block a query decides, as any part a signal decides.
+    refuses(
+        "<ul>{#each menu as item (item.id)}<li title={title}>{item.name}</li>{/each}</ul>",
+        "reads the signal `title` inside a block a value other than a signal decides",
+    );
 }
 
 #[test]

@@ -44,8 +44,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
    - ~~**T11, an accessible dialog.**~~ Written 2026-10-02: all four
      controls hold on all three stacks (`just e14-harness T11`). Pleris's
      unsafe patch is refused by `pw check` (PW5303).
-   - **Next:** `bind:value` and forms (ADR-0131, rulings 5 and 6), toward
-     T06; provided signals (ADR-0130's step 3).
+   - ~~**`bind:value`.**~~ Done 2026-10-02 (ADR-0142), for a `String`
+     signal.
+   - **Next: T06, an accessible form**, written as T11 was: a prompt, hidden
+     tests, a reference and an unsafe patch per stack, all four controls.
+     What the form needs that Pleris lacks is decided as the task is
+     written: forms as one typed record (ADR-0131, ruling 6), or a codec.
+   - **Then:** provided signals (ADR-0130's step 3).
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

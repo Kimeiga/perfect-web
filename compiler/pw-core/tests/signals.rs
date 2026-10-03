@@ -159,6 +159,9 @@ fn the_plan_holds_each_signals_first_value_and_the_parts_it_decides() {
         .iter()
         .map(|l| (l.kind.clone(), l.signal.clone(), l.reads.clone()))
         .collect();
+    // The block is rendered again for `panel` alone, and `{count}` inside
+    // it is set in place (ADR-0142): until 2026-10-02 the block was rendered
+    // again for every signal read anywhere in it.
     assert_eq!(
         live,
         [
@@ -166,8 +169,9 @@ fn the_plan_holds_each_signals_first_value_and_the_parts_it_decides() {
             (
                 "match".to_string(),
                 "panel".to_string(),
-                vec!["count".to_string(), "panel".to_string()]
+                vec!["panel".to_string()]
             ),
+            ("text".to_string(), "count".to_string(), vec![]),
         ]
     );
 }

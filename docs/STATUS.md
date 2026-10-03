@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0142, 2026-10-02: an input bound to a signal**
+([ADR-0142](DECISIONS/ADR-0142-an-input-bound-to-a-signal.md), ADR-0131's
+fifth ruling). `bind:value={name}` shows a signal in a field and sets it to
+what is typed. An attribute a signal decides is set in place, and a field is
+never set from its own typing. Found on the way: a block a signal decides
+was rendered again for every signal read anywhere in it. A field bound
+inside one, a form in a dialog, would have been replaced at each key. A
+block is rendered again only for what it cannot set in place now.
+Demonstrated by `examples/demo/bind.pw` in Chromium, Firefox and WebKit.
+
 **E14-C, 2026-10-02: T11 is written, four tasks of twelve.** Clear asks
 first, in an accessible modal dialog; all four controls hold on all three
 stacks. The plausible wrong fix forgets that Escape closes the dialog by

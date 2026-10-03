@@ -121,6 +121,10 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             out.push(ambiguous_case(hir, id, decl, span, &name, &types));
         }
         for (span, name) in walk.immutable {
+            // What `bind:value` wrote is PW5304's to refuse (ADR-0142).
+            if body.bound.iter().any(|l| body.expr_span(*l) == span) {
+                continue;
+            }
             out.push(immutable_target(hir, id, decl, span, &name));
         }
     }
