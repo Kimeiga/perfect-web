@@ -13,6 +13,34 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-Q, third slice, ADR-0145, 2026-10-02: a page keeps every part and list
+its queries decide current; T03 is written, six tasks of twelve**
+([ADR-0145](DECISIONS/ADR-0145-a-page-keeps-what-its-queries-decide-current.md)).
+Until now the dev server patched the store's cart count and its menu by
+name. A page listing a private query's values did not render at all.
+
+Now it renders every list a session's queries fill. It records what each
+document shows, and after a command sends the difference:
+- a text patch for each part that changed;
+- keyed operations for each list: remove, insert after the one before,
+  move, and set in place inside the item, so an item that stays keeps its
+  nodes.
+
+One change's patches travel as one `patch_set` frame. The page holds the
+new version once all of them applied, and a set it cannot apply whole makes
+it read the page again.
+
+Found on the way: a block a query's value decides was left out of the page
+plan. The store with `{#if cart.lines}` checked and built, and the server
+failed at its first render. The plan refuses such a block now, naming it,
+so `pw build` says so, until a host renders and patches one.
+
+T03 lists the cart's lines from a private query of their own. All four
+controls hold on all three stacks. The plausible wrong fix keeps the lines
+between requests, keyed by the store alone. Next.js and SvelteKit build it,
+and a second customer sees the first one's cart; Pleris refuses it at
+`pw check` (PW5001).
+
 **ADR-0144, 2026-10-02: a view holds its own signals, and a page provides
 signals to the views it composes**
 ([ADR-0144](DECISIONS/ADR-0144-a-view-holds-signals-and-a-page-provides-them.md),

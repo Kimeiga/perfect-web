@@ -55,7 +55,8 @@ test("every frame the browser receives is a protocol frame", async ({ page }) =>
   expect(frames.length, "frames were observed").toBeGreaterThan(0);
 
   // `entry_value` since ADR-0122: the value of an entry the page speculates on.
-  const KNOWN = new Set(["resource_changed", "patch", "recovery", "entry_value"]);
+  // `patch_set` since ADR-0145: one change's patches, applied together.
+  const KNOWN = new Set(["resource_changed", "patch", "patch_set", "recovery", "entry_value"]);
   for (const frame of frames) {
     expect(KNOWN.has(frame.frame), `unknown frame kind ${frame.frame}`).toBe(true);
     expect(frame.protocol, "every frame carries its protocol version").toBe(1);

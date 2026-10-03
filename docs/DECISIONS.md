@@ -1114,3 +1114,16 @@ ADR-0130's third step.
 - One compiled handler serves every instance: the element says which
   instance each signal it names is.
 - An instance in a block starts again when the block shows another arm.
+
+[ADR-0145](DECISIONS/ADR-0145-a-page-keeps-what-its-queries-decide-current.md):
+E14-Q's third slice. The server renders every list a session's queries fill,
+and keeps a page current by difference.
+- It records what each document shows, and after a command derives a text
+  patch for each part that changed, and keyed list operations: remove,
+  insert after the one before, move, and set in place inside an instance.
+- One change's patches travel as one `patch_set` frame, held once whole.
+- A set the document cannot apply reloads it.
+
+Until then the store patched its cart count and its menu by name, and a page
+listing a private query's values did not render. T03 is gradable on Pleris
+since.

@@ -59,7 +59,9 @@ use pw_document::{IdentityDomain, LocalPartId, PartAddress, Partition, TemplateS
 use pw_host::engine::{HostFn, Val};
 use pw_host::{Admission, ComponentContract, Granted, Limits, Node, Topology, admit};
 use pw_materialize::{Clock, EntryKey, FragmentPolicy, Materializer};
-use pw_protocol::{CURRENT, CausalBasis, Patch, PatchOp, ResourceEntryId, StreamFrame, Version};
+use pw_protocol::{
+    CURRENT, CausalBasis, Patch, PatchOp, PatchSet, ResourceEntryId, StreamFrame, Targeted, Version,
+};
 use pw_render::{Env, PartId, Template, Value};
 use pw_resource::{DevelopmentIdentityKey, EntryIdentity};
 
@@ -209,6 +211,16 @@ const BUILD: &str = "B1";
 /// The deployment's PRF key, from a provider rather than a literal.
 const IDENTITY: DevelopmentIdentityKey = DevelopmentIdentityKey;
 
+/// **What a session's document shows** (ADR-0145): each part's text, by its
+/// number, and each list its queries fill, item by item. A change is sent as
+/// the difference from it, so a part that did not change is not patched and
+/// an item whose key stayed keeps its nodes.
+#[derive(Debug, Clone, Default)]
+struct Shown {
+    texts: BTreeMap<u32, String>,
+    lists: BTreeMap<String, Vec<Value>>,
+}
+
 struct Server {
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
@@ -284,6 +296,10 @@ struct Server {
     calls: Arc<Mutex<BTreeMap<String, u64>>>,
     /// Frames waiting for each session's subscriber.
     pending: Mutex<BTreeMap<String, Subscriber>>,
+    /// **What each session's document shows** (ADR-0145), as it was served
+    /// and then patched: what a change is derived against. Locked after
+    /// `pending`, never before.
+    shown: Mutex<BTreeMap<String, Shown>>,
     /// **The compiler's contracts, and the node this server is.**
     ///
     /// E8's last gate item asks for the command path to go through the host
@@ -579,6 +595,7 @@ impl Server {
             dist,
             artifacts,
             pending: Mutex::new(BTreeMap::new()),
+            shown: Mutex::new(BTreeMap::new()),
             contracts,
             topology,
             speculation,
@@ -1338,26 +1355,47 @@ impl Server {
             return;
         }
 
-        // One frame per change: the entry advanced, and here is the patch the
-        // server DERIVED from it. Two frames rather than one, because a
-        // subscription and a patch are logically separate — a server may derive
-        // a patch from a change rather than must.
+        // What the page shows now, from its queries (ADR-0145).
+        let bindings = self
+            .bindings(session)
+            .unwrap_or_else(|e| panic!("the store page's queries: {e}"));
+        let now = self
+            .showing(&bindings)
+            .unwrap_or_else(|e| panic!("the store page's values: {e}"));
+
+        // Two frames per change: the entry advanced, and every place in the
+        // document the server DERIVED from it, as one set (ADR-0145). A
+        // subscription and a patch are logically separate — a server may
+        // derive a patch from a change rather than must.
         let entry = cart_entry(session);
         let version = self.version(session);
         let mut queue = self.pending.lock().expect("pending");
+        // Against what the document shows. With none served, none shows.
+        let patches = {
+            let mut shown = self.shown.lock().expect("shown");
+            match shown.get(session) {
+                Some(was) => {
+                    let patches = self
+                        .derive(session, &bindings, was, &now)
+                        .unwrap_or_else(|e| panic!("the store page's change: {e}"));
+                    shown.insert(session.to_string(), now);
+                    patches
+                }
+                None => Vec::new(),
+            }
+        };
         let waiting = queue.entry(session.to_string()).or_default();
         waiting.push(StreamFrame::ResourceChanged {
             protocol: CURRENT,
             entry: entry.clone(),
             version,
         });
-        waiting.push(StreamFrame::Patch(Patch {
+        // Sent with no patches too: the document reflects the new version
+        // when nothing it shows changed.
+        waiting.push(StreamFrame::PatchSet(PatchSet {
             protocol: CURRENT,
             basis: CausalBasis::of(entry, version),
-            target: self.cart_address(),
-            operation: PatchOp::ReplaceText {
-                text: value.to_string(),
-            },
+            patches,
         }));
         // And the value itself, to a page that speculates on it (ADR-0122).
         if self.speculates_on_cart().is_some() {
@@ -1628,12 +1666,14 @@ impl Server {
         waiting.last_seq += 1;
         let cursor = waiting.last_seq;
         // Rendered while the table is held, so a change cannot land between
-        // the clear and the render and be lost by it.
-        (
-            self.render_store(session),
-            cursor,
-            self.speculated_entries(session),
-        )
+        // the clear and the render and be lost by it. And what it shows is
+        // recorded with it: a change is sent as the difference (ADR-0145).
+        let (html, shown) = self.render_store_showing(session);
+        self.shown
+            .lock()
+            .expect("shown")
+            .insert(session.to_string(), shown);
+        (html, cursor, self.speculated_entries(session))
     }
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
@@ -1686,27 +1726,6 @@ impl Server {
     /// page reconciles a speculation against.
     fn committed_basis(&self, session: &str) -> serde_json::Value {
         serde_json::json!([{ "entry": cart_entry(session), "version": self.version(session) }])
-    }
-
-    /// Where the cart's value appears.
-    ///
-    /// Found in the template IR by the value it reads, so the address is the
-    /// compiler's answer rather than a number typed twice.
-    fn cart_address(&self) -> PartAddress {
-        let template = self
-            .templates
-            .iter()
-            .find(|t| t.name == "StorePage")
-            .expect("the store page is in the IR");
-        let part = template
-            .manifest()
-            .into_iter()
-            .find(|p| p.value == "cart.line_count")
-            .expect("the cart part is in the manifest");
-        PartAddress::new(
-            &TemplateSchemaId(template.schema.clone()),
-            LocalPartId(part.id.0),
-        )
     }
 
     /// Every handler identity this build's templates name.
@@ -1795,24 +1814,46 @@ impl Server {
             .collect()
     }
 
+    #[cfg(test)]
     fn render_store(&self, session: &str) -> String {
-        let template = self
-            .templates
-            .iter()
-            .find(|t| t.name == "StorePage")
-            .expect("StorePage");
-        // Both bound BEFORE the chain. A `MutexGuard` produced inside a method
-        // argument lives until the end of the whole STATEMENT, so locking the
-        // menu inside the chain and locking it again inside `menu_fragment`
-        // deadlocked a non-reentrant mutex against itself — presenting as a
-        // request that simply never returned.
-        //
+        self.render_store_showing(session).0
+    }
+
+    /// The store's document, and what it shows (ADR-0145).
+    fn render_store_showing(&self, session: &str) -> (String, Shown) {
+        let template = self.store_template();
         // Every value is a query's (ADR-0125): each binding runs its compiled
         // component, and each part reads the binding's value by the steps the
         // compiler planned. The menu's items are the `Menu` query's.
         let bindings = self
             .bindings(session)
             .unwrap_or_else(|e| panic!("the store page's queries: {e}"));
+        let shown = self
+            .showing(&bindings)
+            .unwrap_or_else(|e| panic!("the store page's values: {e}"));
+        let env = self.document_env(session, &bindings, &shown);
+        let html =
+            pw_render::render(template, &env, &self.templates).expect("the store page renders");
+        (html, shown)
+    }
+
+    /// The store page's template.
+    fn store_template(&self) -> &Template {
+        self.templates
+            .iter()
+            .find(|t| t.name == "StorePage")
+            .expect("StorePage")
+    }
+
+    /// **What the store's document renders from**: its parts' values, the
+    /// menu's public fragment, each list a session's queries fill, and its
+    /// signals at their first values, in the session's identity domain.
+    fn document_env(&self, session: &str, bindings: &BTreeMap<String, Val>, shown: &Shown) -> Env {
+        // Both bound BEFORE the chain. A `MutexGuard` produced inside a method
+        // argument lives until the end of the whole STATEMENT, so locking the
+        // menu inside the chain and locking it again inside `menu_fragment`
+        // deadlocked a non-reentrant mutex against itself — presenting as a
+        // request that simply never returned.
         let items = menu_items(&bindings["menu"]);
         let fragment = self.menu_fragment(&items);
         let mut env = Env::new()
@@ -1824,17 +1865,113 @@ impl Server {
         for part in self.plan["parts"].as_array().into_iter().flatten() {
             let path = part["path"].as_str().unwrap_or_default();
             let value = self
-                .read_part(&bindings, part)
+                .read_part(bindings, part)
                 .unwrap_or_else(|e| panic!("part `{path}`: {e}"));
             env = env.set(path, val_to_value(&value));
         }
+        // Each list a session's query fills (ADR-0145).
+        for (list, items) in &shown.lists {
+            env = env.set(list, Value::List(items.clone()));
+        }
         // Its signals, at their first values (ADR-0140).
-        let env = with_signals(env, &self.plan)
+        with_signals(env, &self.plan)
             // A page, not a materialization: its domain is the route identity
             // and its partition. The generation is carried whatever the
             // partition is — the two are orthogonal.
-            .in_domain(self.domain(session));
-        pw_render::render(template, &env, &self.templates).expect("the store page renders")
+            .in_domain(self.domain(session))
+    }
+
+    /// **The lists a session's queries fill** (ADR-0145): each collection
+    /// the page iterates whose binding is not cached shared. A shared one is
+    /// a fragment every reader shares, patched once for all of them (the
+    /// menu, E7-P).
+    fn own_lists(&self) -> Vec<String> {
+        let shared = |name: &str| {
+            self.plan["bindings"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|b| b["binding"] == name && b["policy"]["cache"] == "shared")
+        };
+        self.plan["collections"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|c| c.as_str())
+            .filter(|c| !shared(c))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// **What a session's document shows, from its queries' values**
+    /// (ADR-0145): each part's text, and each list a session's query fills.
+    fn showing(&self, bindings: &BTreeMap<String, Val>) -> Result<Shown, String> {
+        let mut shown = Shown::default();
+        for part in self.plan["parts"].as_array().into_iter().flatten() {
+            let id = part["part"].as_u64().unwrap_or_default() as u32;
+            let value = val_to_value(&self.read_part(bindings, part)?);
+            let text = text_of(&value).ok_or_else(|| format!("part {id} has no text form"))?;
+            shown.texts.insert(id, text);
+        }
+        for list in self.own_lists() {
+            let value = bindings
+                .get(&list)
+                .ok_or_else(|| format!("no binding `{list}`"))?;
+            let Value::List(items) = val_to_value(value) else {
+                return Err(format!("`{list}` is not a list"));
+            };
+            shown.lists.insert(list, items);
+        }
+        Ok(shown)
+    }
+
+    /// **The patches that turn what a document shows into what it should**
+    /// (ADR-0145): each part whose text changed, and each list's change as
+    /// keyed operations.
+    fn derive(
+        &self,
+        session: &str,
+        bindings: &BTreeMap<String, Val>,
+        was: &Shown,
+        now: &Shown,
+    ) -> Result<Vec<Targeted>, String> {
+        let template = self.store_template();
+        let schema = TemplateSchemaId(template.schema.clone());
+        let mut out = Vec::new();
+        for (id, text) in &now.texts {
+            if was.texts.get(id) != Some(text) {
+                out.push(Targeted {
+                    target: PartAddress::new(&schema, LocalPartId(*id)),
+                    operation: PatchOp::ReplaceText { text: text.clone() },
+                });
+            }
+        }
+        let env = self.document_env(session, bindings, now);
+        for (list, items) in &now.lists {
+            // A list at the top of the page only. One inside a block would
+            // have no range while the block is not shown, and patching it
+            // would read the page again at every change. No page served here
+            // has one: a block a query decides is not rendered by this server
+            // yet, and one a signal decides reads no query (ADR-0137).
+            let top = template.chunks.iter().any(|c| {
+                matches!(c, pw_render::Chunk::Dynamic(pw_render::Part::Each { collection, .. })
+                    if collection == list)
+            });
+            if !top {
+                continue;
+            }
+            let old = was.lists.get(list).map(Vec::as_slice).unwrap_or(&[]);
+            out.extend(list_patches(
+                template,
+                &schema,
+                list,
+                old,
+                items,
+                &env,
+                &self.templates,
+            )?);
+        }
+        Ok(out)
     }
 }
 
@@ -2069,6 +2206,183 @@ fn val_to_value(v: &Val) -> Value {
         ),
         other => Value::Text(format!("{other:?}")),
     }
+}
+
+/// A value as a text part shows it, as the renderer writes it: `None` for a
+/// list or a record, which a text part does not show.
+fn text_of(v: &Value) -> Option<String> {
+    match v {
+        Value::Text(t) => Some(t.clone()),
+        Value::Int(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
+/// The value at a dotted path from a record: `quantity` from a line.
+fn field_at<'v>(v: &'v Value, path: &str) -> Option<&'v Value> {
+    path.split('.')
+        .filter(|s| !s.is_empty())
+        .try_fold(v, |v, field| match v {
+            Value::Record(fields) => fields.get(field),
+            _ => None,
+        })
+}
+
+/// **A list's change, as keyed operations** (ADR-0145). The list the
+/// template iterates over `list` becomes `new`:
+/// - an item whose key left is removed;
+/// - a new one is inserted where it now is;
+/// - one out of place is moved;
+/// - one whose value changed is set in place, text part by text part, or
+///   replaced when its markup holds more than text.
+///
+/// An item whose key stayed keeps its nodes, as E7-P keeps the menu's: a
+/// focus, a scroll, and anything a test marked on it stay.
+fn list_patches(
+    template: &Template,
+    schema: &TemplateSchemaId,
+    list: &str,
+    old: &[Value],
+    new: &[Value],
+    env: &Env,
+    others: &[Template],
+) -> Result<Vec<Targeted>, String> {
+    let Some((each, binding, key, body)) = each_over(&template.chunks, list) else {
+        return Err(format!("`{}` iterates no list `{list}`", template.path));
+    };
+    let target = PartAddress::new(schema, LocalPartId(each.0));
+    let token = |v: &Value| pw_render::instance_token_of(each, v, &key, env);
+    let render = |v: &Value| {
+        pw_render::render_instance(template, each, v, env, others).map_err(|b| format!("{b:?}"))
+    };
+    // Where the instance after `prev` goes: after it, or at the head.
+    let insert = |prev: &Option<pw_document::InstanceToken>, html: String| match prev {
+        None => PatchOp::InsertBefore {
+            instance: None,
+            html,
+        },
+        Some(p) => PatchOp::InsertAfter {
+            instance: Some(p.clone()),
+            html,
+        },
+    };
+    let at = |operation: PatchOp| Targeted {
+        target: target.clone(),
+        operation,
+    };
+    // The text parts an item's markup is, when it is text alone: each read
+    // from the item by its path.
+    let texts: Option<Vec<(PartId, String)>> = body
+        .iter()
+        .filter_map(|c| match c {
+            pw_render::Chunk::Dynamic(p) => Some(p),
+            _ => None,
+        })
+        .map(|p| match p {
+            pw_render::Part::Text { id, value, .. } => value
+                .strip_prefix(&format!("{binding}."))
+                .map(|field| (*id, field.to_string())),
+            _ => None,
+        })
+        .collect();
+
+    let wanted: Vec<pw_document::InstanceToken> = new.iter().map(token).collect();
+    let mut out = Vec::new();
+    // What the document holds, as each operation leaves it.
+    let mut current: Vec<(pw_document::InstanceToken, Value)> = Vec::new();
+    for v in old {
+        let t = token(v);
+        if wanted.contains(&t) {
+            current.push((t, v.clone()));
+        } else {
+            out.push(at(PatchOp::RemoveInstance { instance: t }));
+        }
+    }
+    let mut prev: Option<pw_document::InstanceToken> = None;
+    for (i, item) in new.iter().enumerate() {
+        let t = wanted[i].clone();
+        match current.iter().position(|(c, _)| *c == t) {
+            None => {
+                out.push(at(insert(&prev, render(item)?)));
+                current.insert(i, (t.clone(), item.clone()));
+            }
+            Some(found) => {
+                if found != i {
+                    out.push(at(PatchOp::MoveInstance {
+                        instance: t.clone(),
+                        after: prev.clone(),
+                    }));
+                    let moved = current.remove(found);
+                    current.insert(i, moved);
+                }
+                if current[i].1 != *item {
+                    let was = current[i].1.clone();
+                    let in_place = texts.as_ref().and_then(|texts| {
+                        texts
+                            .iter()
+                            .map(|(id, field)| {
+                                let old = field_at(&was, field).and_then(text_of)?;
+                                let now = field_at(item, field).and_then(text_of)?;
+                                Some((old != now).then(|| {
+                                    Targeted {
+                                        target: PartAddress::new(schema, LocalPartId(id.0))
+                                            .within(LocalPartId(each.0), t.clone()),
+                                        operation: PatchOp::ReplaceText { text: now },
+                                    }
+                                }))
+                            })
+                            .collect::<Option<Vec<_>>>()
+                    });
+                    match in_place {
+                        Some(changes) => out.extend(changes.into_iter().flatten()),
+                        // More than text: the instance is rendered again, where
+                        // it is.
+                        None => {
+                            out.push(at(PatchOp::RemoveInstance {
+                                instance: t.clone(),
+                            }));
+                            out.push(at(insert(&prev, render(item)?)));
+                        }
+                    }
+                    current[i].1 = item.clone();
+                }
+            }
+        }
+        prev = Some(t);
+    }
+    Ok(out)
+}
+
+/// The `{#each}` over `list`: its part, the name each item is bound to, its
+/// key's path, and its markup. Searched through every block, as the
+/// renderer's parts are.
+fn each_over<'t>(
+    chunks: &'t [pw_render::Chunk],
+    list: &str,
+) -> Option<(PartId, &'t str, String, &'t [pw_render::Chunk])> {
+    for c in chunks {
+        let pw_render::Chunk::Dynamic(p) = c else {
+            continue;
+        };
+        if let pw_render::Part::Each {
+            id,
+            collection,
+            binding,
+            key,
+            body,
+        } = p
+            && collection == list
+        {
+            return Some((*id, binding.as_str(), key.clone().unwrap_or_default(), body));
+        }
+        for region in p.nested() {
+            if let Some(found) = each_over(region, list) {
+                return Some(found);
+            }
+        }
+    }
+    None
 }
 
 /// A component value as a speculation module decodes it (ADR-0122).
@@ -3176,6 +3490,365 @@ fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The store's `app.pw`, with the cart's lines listed below the menu from
+    /// a private query of their own: what T03's reference adds (ADR-0145).
+    fn with_lines(app: &str) -> String {
+        let query = "
+// What the cart section shows of each line: its item's name, and how many.
+type CartEntry = CartEntry {
+    item_id: MenuItemId,
+    name: String,
+    quantity: Int,
+}
+
+// The name a menu gives an item.
+fn name_in(menu: List<MenuItem>, item: MenuItemId) -> String !{} {
+    List.fold(menu, \"\", fn(found, entry) if same_item(entry.id, item) { entry.name } else { found })
+}
+
+session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List<CartEntry>, CartError>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            id, session
+    invalidates_on CartChanged(session)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    let cart = Carts.current(session)?
+    let menu = match Menus.for_store(id) {
+        Ok(items) => items,
+        Err(_) => [],
+    }
+    Ok(List.map(cart.lines, fn(line) CartEntry { item_id: line.item_id, name: name_in(menu, line.item_id), quantity: line.quantity.count }))
+}
+";
+        let out = app
+            .replacen("import context.{ current_session }", "import context.{ current_session }\nimport List", 1)
+            .replacen("    MenuItemId, PositiveInt }", "    MenuItemId, PositiveInt, same_item }", 1)
+            .replacen("\ncommand add_to_cart(", &format!("{query}\ncommand add_to_cart("), 1)
+            .replacen(
+                "    let cart = query Cart(current_session())\n",
+                "    let cart = query Cart(current_session())\n    let lines = query CartLines(id, current_session())\n",
+                1,
+            )
+            .replacen(
+                "                <p id=\"cart-count\">{cart.line_count}</p>",
+                "                <p id=\"cart-count\">{cart.line_count}</p>\n                <ul id=\"cart-lines\">\n                    {#each lines as line (line.item_id)}\n                        <li>{line.name} × {line.quantity}</li>\n                    {/each}\n                </ul>",
+                1,
+            );
+        assert!(out.contains("CartLines(id, current_session())") && out.contains("cart-lines"));
+        out
+    }
+
+    /// **That store, built by the compiler as `pw build` builds it, and
+    /// served from what was written** (ADR-0145).
+    fn lines_server() -> Server {
+        lines_server_with(with_lines)
+    }
+
+    /// The store, its `app.pw` changed by `change`, built and served.
+    fn lines_server_with(change: fn(&str) -> String) -> Server {
+        static BUILT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let mut sources: Vec<(String, String)> = Vec::new();
+        let mut dir = |rel: &str| {
+            let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(rel))
+                .unwrap_or_else(|e| panic!("{rel}: {e}"))
+                .map(|e| e.expect("entry").path())
+                .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+                .collect();
+            paths.sort();
+            for p in paths {
+                let src = std::fs::read_to_string(&p).expect("read");
+                sources.push((p.display().to_string(), src));
+            }
+        };
+        dir("packages/pw-std");
+        dir("packages/pw-platform-web");
+        sources.push((
+            "examples/domain.pw".to_string(),
+            std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain"),
+        ));
+        let mut dir = |rel: &str| {
+            let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(rel))
+                .unwrap_or_else(|e| panic!("{rel}: {e}"))
+                .map(|e| e.expect("entry").path())
+                .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+                .collect();
+            paths.sort();
+            for p in paths {
+                let mut src = std::fs::read_to_string(&p).expect("read");
+                if p.ends_with("store/app.pw") {
+                    src = change(&src);
+                }
+                sources.push((p.display().to_string(), src));
+            }
+        };
+        dir("examples/lib");
+        dir("examples/store");
+        let units: Vec<pw_core::check::Unit> = sources
+            .into_iter()
+            .map(|(path, src)| pw_core::check::Unit {
+                hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
+                path,
+                src,
+            })
+            .collect();
+        let build = pw_core::build::build(&units).expect("the store with its lines builds");
+        assert!(build.refusals().is_empty(), "{:?}", build.refusals());
+        let out = std::env::temp_dir().join(format!(
+            "pw-lines-{}-{}",
+            std::process::id(),
+            BUILT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        ));
+        let _ = std::fs::remove_dir_all(&out);
+        build.write(&out).expect("the build is written");
+        Server::from_build(out.clone(), out).expect("served")
+    }
+
+    /// Each patch set queued for a session, in order.
+    fn patch_sets(s: &Server, session: &str) -> Vec<PatchSet> {
+        let queue = s.pending.lock().expect("pending");
+        queue
+            .get(session)
+            .map(|w| {
+                w.frames
+                    .iter()
+                    .filter_map(|(_, f)| match f {
+                        StreamFrame::PatchSet(p) => Some(p.clone()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// One patch, as `operation@part[:instance frames]`, for an assertion.
+    fn said(t: &Targeted) -> String {
+        let op = match &t.operation {
+            PatchOp::ReplaceText { text } => format!("text {text:?}"),
+            PatchOp::InsertBefore { instance, html } => {
+                format!("insert before {} {}", instance.is_some(), visible(html))
+            }
+            PatchOp::InsertAfter { instance, html } => {
+                format!("insert after {} {}", instance.is_some(), visible(html))
+            }
+            PatchOp::RemoveInstance { .. } => "remove".to_string(),
+            PatchOp::MoveInstance { after, .. } => format!("move after {}", after.is_some()),
+            other => format!("{other:?}"),
+        };
+        format!(
+            "{op} @{}{}",
+            t.target.part.0,
+            if t.target.instances.is_empty() {
+                ""
+            } else {
+                " in an instance"
+            }
+        )
+    }
+
+    /// Markup's text, its comments and tags dropped.
+    fn visible(html: &str) -> String {
+        let mut out = String::new();
+        let mut depth = 0;
+        for c in html.chars() {
+            match c {
+                '<' => depth += 1,
+                '>' => depth -= 1,
+                c if depth == 0 => out.push(c),
+                _ => {}
+            }
+        }
+        out.trim().to_string()
+    }
+
+    #[test]
+    fn a_list_a_session_s_query_fills_is_rendered() {
+        let s = lines_server();
+        s.command(ADD, "a", &add("espresso", 2), false)
+            .expect("runs");
+        let (page, _) = s.serve_document("a");
+        let page = visible(&page);
+        assert!(page.contains("Espresso × 2"), "the session's lines: {page}");
+        // Another session's document lists none of them.
+        let (other, _) = s.serve_document("b");
+        let other = visible(&other);
+        assert!(!other.contains("× 2"), "another session's: {other}");
+    }
+
+    #[test]
+    fn a_change_patches_every_place_it_reaches_in_one_frame() {
+        let s = lines_server();
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        let sets = patch_sets(&s, "a");
+        assert_eq!(sets.len(), 1, "one frame for the change: {sets:?}");
+        let got: Vec<String> = sets[0].patches.iter().map(said).collect();
+        // The count, and the first line, at the head of the list.
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert!(got[0].starts_with("text \"1\""), "{got:?}");
+        assert!(
+            got[1].starts_with("insert before false Espresso × 1"),
+            "{got:?}"
+        );
+    }
+
+    #[test]
+    fn an_item_that_stays_is_set_in_place() {
+        let s = lines_server();
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        let got: Vec<String> = patch_sets(&s, "a")[0].patches.iter().map(said).collect();
+        // The count, and the line's quantity inside its instance: its nodes
+        // stay, nothing is removed or inserted.
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert!(got[0].starts_with("text \"2\""), "{got:?}");
+        assert!(
+            got[1].starts_with("text \"2\"") && got[1].ends_with("in an instance"),
+            "{got:?}"
+        );
+    }
+
+    #[test]
+    fn a_new_item_goes_after_the_one_before_it() {
+        let s = lines_server();
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.serve_document("a");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        let got: Vec<String> = patch_sets(&s, "a")[0].patches.iter().map(said).collect();
+        assert!(
+            got.iter()
+                .any(|p| p.starts_with("insert after true Cortado × 1")),
+            "{got:?}"
+        );
+    }
+
+    #[test]
+    fn an_item_that_leaves_is_removed() {
+        let s = lines_server();
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        s.serve_document("a");
+        s.command(CLEAR, "a", &[], false).expect("runs");
+        let got: Vec<String> = patch_sets(&s, "a")[0].patches.iter().map(said).collect();
+        assert_eq!(
+            got.iter().filter(|p| p.starts_with("remove")).count(),
+            2,
+            "{got:?}"
+        );
+        assert!(got[0].starts_with("text \"0\""), "{got:?}");
+    }
+
+    #[test]
+    fn each_change_is_derived_from_the_last_one_sent() {
+        let s = lines_server();
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        let sets = patch_sets(&s, "a");
+        assert_eq!(sets.len(), 2, "{sets:?}");
+        // The second set inserts the cortado after the espresso the first
+        // one inserted, and inserts nothing else.
+        let got: Vec<String> = sets[1].patches.iter().map(said).collect();
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert!(got[0].starts_with("text \"2\""), "{got:?}");
+        assert!(
+            got[1].starts_with("insert after true Cortado × 1"),
+            "{got:?}"
+        );
+    }
+
+    #[test]
+    fn the_menu_is_no_session_s_list() {
+        // A shared list is one fragment for every reader, patched once for
+        // all of them (E7-P); a session's lists are the private ones.
+        assert_eq!(lines_server().own_lists(), ["lines".to_string()]);
+    }
+
+    #[test]
+    fn a_session_s_change_reaches_its_own_document_alone() {
+        let s = lines_server();
+        s.serve_document("a");
+        s.serve_document("b");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        assert_eq!(patch_sets(&s, "a").len(), 1);
+        assert!(
+            patch_sets(&s, "b").is_empty(),
+            "b's document changed nothing"
+        );
+    }
+
+    #[test]
+    fn a_list_moves_what_moved_and_replaces_what_holds_more_than_text() {
+        let s = lines_server();
+        let template = s.store_template().clone();
+        let schema = TemplateSchemaId(template.schema.clone());
+        let env = Env::new().in_domain(s.domain("a"));
+        let line = |id: &str, n: i64| {
+            Value::Record(
+                [
+                    ("item_id".to_string(), Value::Text(id.into())),
+                    ("name".to_string(), Value::Text(id.to_uppercase())),
+                    ("quantity".to_string(), Value::Int(n)),
+                ]
+                .into(),
+            )
+        };
+        // A move keeps the nodes: no removal, no insertion.
+        let moved = list_patches(
+            &template,
+            &schema,
+            "lines",
+            &[line("a", 1), line("b", 1), line("c", 1)],
+            &[line("c", 1), line("a", 1), line("b", 1)],
+            &env,
+            &s.templates,
+        )
+        .expect("derived");
+        let got: Vec<String> = moved.iter().map(said).collect();
+        assert_eq!(got.len(), 1, "{got:?}");
+        assert!(got[0].starts_with("move after false"), "{got:?}");
+        // A menu item's markup holds a button as well as text: one whose name
+        // changed is rendered again where it is.
+        let item = |id: &str, name: &str| {
+            Value::Record(
+                [
+                    ("id".to_string(), Value::Text(id.into())),
+                    ("name".to_string(), Value::Text(name.into())),
+                ]
+                .into(),
+            )
+        };
+        let renamed = list_patches(
+            &template,
+            &schema,
+            "menu",
+            &[item("a", "A"), item("b", "B")],
+            &[item("a", "A"), item("b", "Bee")],
+            &env,
+            &s.templates,
+        )
+        .expect("derived");
+        let got: Vec<String> = renamed.iter().map(said).collect();
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert!(got[0].starts_with("remove"), "{got:?}");
+        assert!(got[1].starts_with("insert after true Bee"), "{got:?}");
+    }
 
     /// A node that grants nothing at all.
     fn barren() -> Topology {

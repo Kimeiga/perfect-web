@@ -794,6 +794,20 @@ fn plan(
         {
             collections.push(root.to_string());
         }
+        // A block a query's value decides is not planned yet: a host would
+        // render it without the value, and keep it current by nothing
+        // (ADR-0145). Refused here, so the build says so, where a server
+        // would have failed at the first render.
+        if matches!(entry.kind, "conditional" | "match")
+            && let Some(root) = entry.value.split('.').next()
+            && found.iter().any(|(n, ..)| n == root)
+        {
+            return Err(format!(
+                "part {} is a block `{}` decides, a query's value, and a host renders \
+                 no block a query decides yet (E14-Q)",
+                entry.id.0, entry.value
+            ));
+        }
         // A block a signal decides (ADR-0130). What the browser cannot
         // render again was refused above (ADR-0137).
         if matches!(entry.kind, "conditional" | "match")

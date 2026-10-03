@@ -1,0 +1,76 @@
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..aa6b785 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -38,8 +38,9 @@ import Menus
+ // page renders without authority moved with it. That was the architect's
+ // ruling and the reason the repair waited for a frozen matrix.
+ import context.{ current_session }
++import List
+ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, InteractionId,
+-    MenuItemId, PositiveInt }
++    MenuItemId, PositiveInt, same_item }
+ import capability.{ Session, SessionId }
+ import Events.{ CartChanged }
+ 
+@@ -99,6 +100,40 @@ session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+ // The mutation. Idempotent by interaction id, so a double-tap is one add, and
+ // optimistic with a declared rollback so the count moves before the round trip
+ // and moves back if it fails.
++// What the cart section lists of each line: its item's name, and how many.
++type CartEntry = CartEntry {
++    item_id: MenuItemId,
++    name: String,
++    quantity: Int,
++}
++
++// The name a menu gives an item.
++fn name_in(menu: List<MenuItem>, item: MenuItemId) -> String !{} {
++    List.fold(menu, "", fn(found, entry) if same_item(entry.id, item) { entry.name } else { found })
++}
++
++public query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List<CartEntry>, CartError>
++    freshness      0.seconds
++    consistency    snapshot
++    cache          shared
++    key            id, session
++    invalidates_on CartChanged(session)
++    concurrency    one_per_key
++    on_key_change  cancel
++    timeout        2.seconds
++{
++    let cart = Carts.current(session)?
++    let menu = match Menus.for_store(id) {
++        Ok(items) => items,
++        Err(_) => [],
++    }
++    Ok(List.map(cart.lines, fn(line) CartEntry {
++        item_id: line.item_id,
++        name: name_in(menu, line.item_id),
++        quantity: line.quantity.count,
++    }))
++}
++
+ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+     -> Result<Cart, CartError>
+     requires      SignedIn
+@@ -133,6 +168,7 @@ page StorePage(id: StoreId) {
+     let store = query Store(id)
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
++    let lines = query CartLines(id, current_session())
+ 
+     view {
+         <main>
+@@ -156,6 +192,11 @@ page StorePage(id: StoreId) {
+ 
+             <section aria-label="Cart">
+                 <p id="cart-count">{cart.line_count}</p>
++                <ul aria-label="In your cart">
++                    {#each lines as line (line.item_id)}
++                        <li>{line.name} × {line.quantity}</li>
++                    {/each}
++                </ul>
+                 <button
+                     id="clear-cart"
+                     type="button"

@@ -27,3 +27,9 @@ pw-render = { path = "../../../runtime/pw-render" }
 pw-resource = { path = "../../../runtime/pw-resource" }
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+# ADR-0145: a test builds a program with the compiler, as `pw build` builds
+# it, and serves what was built.
+pw-core = { path = "../../../compiler/pw-core" }
+pw-syntax = { path = "../../../compiler/pw-syntax" }

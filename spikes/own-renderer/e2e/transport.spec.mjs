@@ -199,8 +199,9 @@ test("the frames carry no trace of which adapter delivered them", async ({ page 
     .poll(() => page.evaluate(() => window.__pw.log.some((l) => l.startsWith("updated "))))
     .toBe(true);
 
-  // `value` since ADR-0122: an `entry_value` frame's, a protocol field.
-  const FRAME_FIELDS = new Set(["frame", "protocol", "basis", "target", "operation", "entry", "version", "reason", "value"]);
+  // `value` since ADR-0122: an `entry_value` frame's, a protocol field. And
+  // `patches` since ADR-0145: a `patch_set`'s, each a target and an operation.
+  const FRAME_FIELDS = new Set(["frame", "protocol", "basis", "target", "operation", "entry", "version", "reason", "value", "patches"]);
   let checked = 0;
   for (const body of bodies) {
     for (const line of body.split("\n").filter(Boolean)) {

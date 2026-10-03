@@ -75,10 +75,18 @@ fn main() -> std::process::ExitCode {
         None => domain,
     };
 
+    // The names the values give: a private list they do not give is empty
+    // in a render no session asked for (ADR-0145).
+    let mut given = std::collections::BTreeSet::new();
     let env = match flag("--values") {
         Some(path) => match std::fs::read_to_string(&path) {
             Ok(s) => match values_from_json(&s) {
-                Ok(env) => env.in_domain(domain.clone()),
+                Ok(env) => {
+                    if let Ok(serde_json::Value::Object(o)) = serde_json::from_str(&s) {
+                        given.extend(o.keys().cloned());
+                    }
+                    env.in_domain(domain.clone())
+                }
                 Err(e) => {
                     eprintln!("pw-render: {path}: {e}");
                     return std::process::ExitCode::from(2);
@@ -108,6 +116,20 @@ fn main() -> std::process::ExitCode {
                     for s in plan["signals"].as_array().into_iter().flatten() {
                         let name = s["name"].as_str().unwrap_or_default();
                         env = env.set(name, Value::from_wire(&s["initial"]));
+                    }
+                    // A list a session's query fills, the values not giving
+                    // it: this render is no session's, and no session's list
+                    // is empty, as its cart's count is 0 (ADR-0145).
+                    for c in plan["collections"].as_array().into_iter().flatten() {
+                        let Some(name) = c.as_str() else { continue };
+                        let private = plan["bindings"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .any(|b| b["binding"] == name && b["policy"]["cache"] == "private");
+                        if private && !given.contains(name) {
+                            env = env.set(name, Value::List(Vec::new()));
+                        }
                     }
                     env
                 }

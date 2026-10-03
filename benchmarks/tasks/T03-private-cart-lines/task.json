@@ -1,0 +1,6 @@
+{
+  "id": "T03",
+  "title": "A private resource: the cart's lines on the store page",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T03.spec.mjs"
+}

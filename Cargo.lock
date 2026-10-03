@@ -969,12 +969,14 @@ dependencies = [
 name = "pw-dev-server"
 version = "0.0.0"
 dependencies = [
+ "pw-core",
  "pw-document",
  "pw-host",
  "pw-materialize",
  "pw-protocol",
  "pw-render",
  "pw-resource",
+ "pw-syntax",
  "serde",
  "serde_json",
 ]

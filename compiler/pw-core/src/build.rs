@@ -49,6 +49,128 @@ pub struct Build {
 }
 
 impl Build {
+    /// **Write every artifact under `dir`** (ADR-0123), and say what was
+    /// written, one line each. What `pw build --out DIR` writes, in one place,
+    /// so a host's tests can serve a program they built (ADR-0145):
+    ///
+    /// ```text
+    /// DIR/templates.json            the template IR, with handler identities
+    /// DIR/handlers/<identity>.mjs   each resumable handler's compiled body
+    /// DIR/components/<id>.wasm      each command and query, audited
+    /// DIR/modules/<id>.mjs          each query that reaches no host (ADR-0044)
+    /// DIR/contracts.json            what the host admits each component by
+    /// DIR/app.wit                   the worlds the components implement
+    /// DIR/pages/<page>.json         what each page shows (ADR-0125)
+    /// DIR/graph.json                what a materializer consumes (ADR-0123)
+    /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
+    /// ```
+    pub fn write(&self, dir: &std::path::Path) -> Result<Vec<String>, String> {
+        let write = |rel: &str, bytes: &[u8]| -> Result<(), String> {
+            let path = dir.join(rel);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("{}: {e}", parent.display()))?;
+            }
+            std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))
+        };
+        let mut lines = Vec::new();
+        let templates = serde_json::to_string_pretty(&self.templates).map_err(|e| e.to_string())?;
+        write("templates.json", format!("{templates}\n").as_bytes())?;
+        let contracts = serde_json::to_string_pretty(&self.contracts).map_err(|e| e.to_string())?;
+        write("contracts.json", format!("{contracts}\n").as_bytes())?;
+        write("app.wit", self.wit.as_bytes())?;
+        for h in &self.handlers {
+            if let crate::backend::wasm::Encoding::Encoded(m) = &h.module {
+                write(&format!("handlers/{}.mjs", m.identity), m.source.as_bytes())?;
+                lines.push(format!(
+                    "  handler    {}  `{}` calls `{}`  {} bytes",
+                    m.identity,
+                    m.name,
+                    m.commands.join("`, `"),
+                    m.source.len()
+                ));
+            }
+        }
+        for (id, built) in &self.components {
+            match built {
+                Built::Component { compiled, audited } => {
+                    let c = &compiled.component;
+                    write(&format!("components/{id}.wasm"), &c.bytes)?;
+                    lines.push(format!(
+                        "  component  {id}  {} bytes ({} core), {audited} function(s) audited, \
+                         imports [{}]",
+                        c.bytes.len(),
+                        c.core.len(),
+                        c.imports.join(", ")
+                    ));
+                }
+                Built::NoBody { kind } => {
+                    lines.push(format!("  no body    {id}  a {kind:?}"));
+                }
+                Built::Placeholder => {
+                    lines.push(format!(
+                        "  todo       {id}  a placeholder body; nothing built depends on it"
+                    ));
+                }
+                Built::Refused(_) => {}
+            }
+        }
+        for (id, source) in &self.modules {
+            write(&format!("modules/{id}.mjs"), source.as_bytes())?;
+            lines.push(format!("  module     {id}  {} bytes", source.len()));
+        }
+        // What each page shows, as a host computes it (ADR-0125).
+        for page in &self.pages {
+            if let Ok(plan) = &page.plan {
+                let text = serde_json::to_string_pretty(plan).map_err(|e| e.to_string())?;
+                write(
+                    &format!("pages/{}.json", plan.page),
+                    format!("{text}\n").as_bytes(),
+                )?;
+                lines.push(format!(
+                    "  page       {}  {} binding(s), {} part(s)",
+                    plan.page,
+                    plan.bindings.len(),
+                    plan.parts.len()
+                ));
+            }
+        }
+        // What a host's materializer consumes (ADR-0123).
+        let graph = serde_json::to_string_pretty(&self.graph).map_err(|e| e.to_string())?;
+        write("graph.json", format!("{graph}\n").as_bytes())?;
+        for s in &self.speculations {
+            if let crate::backend::wasm::Encoding::Encoded(m) = &s.module {
+                let manifest = serde_json::json!({
+                    "page": m.page,
+                    "module": format!("{}.mjs", m.page),
+                    "bindings": m.bindings,
+                    "commands": m.commands,
+                });
+                write(&format!("speculations/{}.mjs", m.page), m.source.as_bytes())?;
+                write(
+                    &format!("speculations/{}.json", m.page),
+                    format!(
+                        "{}\n",
+                        serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?
+                    )
+                    .as_bytes(),
+                )?;
+                lines.push(format!(
+                    "  speculate  {}  {} on {}  {} bytes",
+                    m.page,
+                    m.commands.join(", "),
+                    m.bindings
+                        .iter()
+                        .map(|b| b.binding.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    m.source.len()
+                ));
+            }
+        }
+        Ok(lines)
+    }
+
     /// Everything that was refused, one line each. A build with any is not
     /// finished: a page would render a button whose handler cannot load, or a
     /// host would be asked for a component that does not exist.

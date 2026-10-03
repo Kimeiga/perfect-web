@@ -1111,118 +1111,14 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    let dir = std::path::Path::new(out);
-    let write = |rel: &str, bytes: &[u8]| -> Result<(), String> {
-        let path = dir.join(rel);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+    let result = build.write(std::path::Path::new(out));
+    let lines = match result {
+        Ok(lines) => lines,
+        Err(e) => {
+            eprintln!("pw: cannot write the build: {e}");
+            return ExitCode::from(2);
         }
-        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))
     };
-    let mut lines = Vec::new();
-    let result = (|| -> Result<(), String> {
-        let templates =
-            serde_json::to_string_pretty(&build.templates).map_err(|e| e.to_string())?;
-        write("templates.json", format!("{templates}\n").as_bytes())?;
-        let contracts =
-            serde_json::to_string_pretty(&build.contracts).map_err(|e| e.to_string())?;
-        write("contracts.json", format!("{contracts}\n").as_bytes())?;
-        write("app.wit", build.wit.as_bytes())?;
-        for h in &build.handlers {
-            if let pw_core::backend::wasm::Encoding::Encoded(m) = &h.module {
-                write(&format!("handlers/{}.mjs", m.identity), m.source.as_bytes())?;
-                lines.push(format!(
-                    "  handler    {}  `{}` calls `{}`  {} bytes",
-                    m.identity,
-                    m.name,
-                    m.commands.join("`, `"),
-                    m.source.len()
-                ));
-            }
-        }
-        for (id, built) in &build.components {
-            match built {
-                pw_core::backend::component::Built::Component { compiled, audited } => {
-                    let c = &compiled.component;
-                    write(&format!("components/{id}.wasm"), &c.bytes)?;
-                    lines.push(format!(
-                        "  component  {id}  {} bytes ({} core), {audited} function(s) audited, \
-                         imports [{}]",
-                        c.bytes.len(),
-                        c.core.len(),
-                        c.imports.join(", ")
-                    ));
-                }
-                pw_core::backend::component::Built::NoBody { kind } => {
-                    lines.push(format!("  no body    {id}  a {kind:?}"));
-                }
-                pw_core::backend::component::Built::Placeholder => {
-                    lines.push(format!(
-                        "  todo       {id}  a placeholder body; nothing built depends on it"
-                    ));
-                }
-                pw_core::backend::component::Built::Refused(_) => {}
-            }
-        }
-        for (id, source) in &build.modules {
-            write(&format!("modules/{id}.mjs"), source.as_bytes())?;
-            lines.push(format!("  module     {id}  {} bytes", source.len()));
-        }
-        // What each page shows, as a host computes it (ADR-0125).
-        for page in &build.pages {
-            if let Ok(plan) = &page.plan {
-                let text = serde_json::to_string_pretty(plan).map_err(|e| e.to_string())?;
-                write(
-                    &format!("pages/{}.json", plan.page),
-                    format!("{text}\n").as_bytes(),
-                )?;
-                lines.push(format!(
-                    "  page       {}  {} binding(s), {} part(s)",
-                    plan.page,
-                    plan.bindings.len(),
-                    plan.parts.len()
-                ));
-            }
-        }
-        // What a host's materializer consumes (ADR-0123).
-        let graph = serde_json::to_string_pretty(&build.graph).map_err(|e| e.to_string())?;
-        write("graph.json", format!("{graph}\n").as_bytes())?;
-        for s in &build.speculations {
-            if let pw_core::backend::wasm::Encoding::Encoded(m) = &s.module {
-                let manifest = serde_json::json!({
-                    "page": m.page,
-                    "module": format!("{}.mjs", m.page),
-                    "bindings": m.bindings,
-                    "commands": m.commands,
-                });
-                write(&format!("speculations/{}.mjs", m.page), m.source.as_bytes())?;
-                write(
-                    &format!("speculations/{}.json", m.page),
-                    format!(
-                        "{}\n",
-                        serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?
-                    )
-                    .as_bytes(),
-                )?;
-                lines.push(format!(
-                    "  speculate  {}  {} on {}  {} bytes",
-                    m.page,
-                    m.commands.join(", "),
-                    m.bindings
-                        .iter()
-                        .map(|b| b.binding.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    m.source.len()
-                ));
-            }
-        }
-        Ok(())
-    })();
-    if let Err(e) = result {
-        eprintln!("pw: cannot write the build: {e}");
-        return ExitCode::from(2);
-    }
     let handlers = build.handlers.len();
     let components = build
         .components

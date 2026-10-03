@@ -22,8 +22,8 @@ MUTANTS = [
     (
         "the store renders without its signals",
         SERVER,
-        "        let env = with_signals(env, &self.plan)\n",
-        "        let env = env\n",
+        "        // Its signals, at their first values (ADR-0140).\n        with_signals(env, &self.plan)\n",
+        "        // Its signals, at their first values (ADR-0140).\n        env\n",
     ),
     (
         "the store's document carries no signals",

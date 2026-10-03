@@ -201,3 +201,76 @@ test("a notice is not an application", async ({ page }) => {
   expect(Object.keys(state.known).length, "a notice was received").toBeGreaterThan(0);
   expect(Object.keys(state.held).length, "and a patch was applied").toBeGreaterThan(0);
 });
+
+// ADR-0145: one change's patches travel as one set, applied together.
+test("a patch set is held once, after all of it applied", async ({ page }) => {
+  await ready(page);
+  await page.locator("#menu button").first().click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(window.__pwHeld()).length))
+    .toBeGreaterThan(0);
+  const state = await page.evaluate(() => ({
+    held: window.__pwHeld(),
+    parts: window.__pw.parts,
+  }));
+  const [entry, version] = Object.entries(state.held)[0];
+  const cart = state.parts.parts.find((p) => p.value === "cart.line_count");
+  const name = state.parts.parts.find((p) => p.value === "store.name");
+  const at = (part) => ({ template: state.parts.schema, instances: [], part: part.id });
+  const set = (v, patches) => ({
+    frame: "patch_set",
+    protocol: 1,
+    basis: { resources: [{ entry, version: v }] },
+    patches,
+  });
+  const text = (part, t) => ({ target: at(part), operation: { op: "replace_text", text: t } });
+
+  // Two places, one version: both applied, and the version held.
+  await page.evaluate(
+    (f) => window.__pwTestApply(f),
+    set(version + 10, [text(cart, "7"), text(name, "Green Bottle")]),
+  );
+  await expect(page.locator("#cart-count")).toHaveText("7");
+  await expect(page.locator("#store-name")).toHaveText("Green Bottle");
+  expect(await page.evaluate((e) => window.__pwHeld()[e], entry)).toBe(version + 10);
+
+  // The same version again advances nothing, and is not applied.
+  await page.evaluate((f) => window.__pwTestApply(f), set(version + 10, [text(cart, "8")]));
+  await page.waitForTimeout(100);
+  await expect(page.locator("#cart-count")).toHaveText("7");
+});
+
+test("a patch set the document cannot apply whole reloads it", async ({ page }) => {
+  await ready(page);
+  const state = await page.evaluate(() => ({ parts: window.__pw.parts }));
+  const cart = state.parts.parts.find((p) => p.value === "cart.line_count");
+  await page.evaluate(() => {
+    window.__t = "this document";
+  });
+  const reloaded = page.waitForEvent("load");
+  await page.evaluate(
+    ({ schema, part }) =>
+      window.__pwTestApply({
+        frame: "patch_set",
+        protocol: 1,
+        basis: { resources: [{ entry: "a-new-entry", version: 1 }] },
+        patches: [
+          {
+            target: { template: schema, instances: [], part },
+            operation: { op: "replace_text", text: "5" },
+          },
+          {
+            target: { template: schema, instances: [], part: 9999 },
+            operation: { op: "replace_text", text: "nowhere" },
+          },
+        ],
+      }),
+    { schema: state.parts.schema, part: cart.id },
+  );
+  // Never "try anyway": the document is read again, and shows the server's.
+  await reloaded;
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady);
+  expect(await page.evaluate(() => window.__t)).toBeUndefined();
+  await expect(page.locator("#cart-count")).toHaveText("0");
+});

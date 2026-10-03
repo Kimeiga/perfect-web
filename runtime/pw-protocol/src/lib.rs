@@ -199,6 +199,28 @@ pub struct Patch {
     pub operation: PatchOp,
 }
 
+/// **One change, every place it reaches** (ADR-0145).
+///
+/// A change to one entry can reach several places in a document: a cart's
+/// count, and the lines it lists. Sent as patches of their own, each with the
+/// change's basis, the second would advance nothing and be refused, and a
+/// document showing some of a change and not the rest reflects no version.
+/// So they travel together, are applied in order, and the receiver holds the
+/// new version once every one of them applied.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PatchSet {
+    pub protocol: ProtocolVersion,
+    pub basis: CausalBasis,
+    pub patches: Vec<Targeted>,
+}
+
+/// One change to one place, inside a [`PatchSet`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Targeted {
+    pub target: PartAddress,
+    pub operation: PatchOp,
+}
+
 /// Why a document cannot continue, and what a receiver may do instead.
 ///
 /// The E7V vocabulary, on the stream. A recovery is never "try anyway".
@@ -226,6 +248,8 @@ pub enum StreamFrame {
         version: Version,
     },
     Patch(Patch),
+    /// One change's patches, applied together (ADR-0145).
+    PatchSet(PatchSet),
     Recovery {
         protocol: ProtocolVersion,
         recovery: Recovery,
@@ -293,6 +317,7 @@ impl StreamFrame {
             | StreamFrame::Recovery { protocol, .. }
             | StreamFrame::EntryValue { protocol, .. } => *protocol,
             StreamFrame::Patch(p) => p.protocol,
+            StreamFrame::PatchSet(p) => p.protocol,
         }
     }
 
@@ -436,6 +461,42 @@ mod tests {
         // comparison exists to prevent.
         let held: BTreeMap<ResourceEntryId, Version> = BTreeMap::new();
         assert!(!CausalBasis::default().is_newer_than(&held));
+    }
+
+    #[test]
+    fn one_change_s_patches_travel_together() {
+        // ADR-0145: a cart's count and the lines it lists change together.
+        let set = StreamFrame::PatchSet(PatchSet {
+            protocol: CURRENT,
+            basis: CausalBasis::of(entry("a"), Version(15)),
+            patches: vec![
+                Targeted {
+                    target: address(),
+                    operation: PatchOp::ReplaceText { text: "2".into() },
+                },
+                Targeted {
+                    target: PartAddress::new(&TemplateSchemaId("t".into()), LocalPartId(7)),
+                    operation: PatchOp::InsertAfter {
+                        instance: None,
+                        html: "<li>Espresso</li>".into(),
+                    },
+                },
+            ],
+        });
+        let bytes = set.encode();
+        assert_eq!(StreamFrame::decode(&bytes).unwrap(), set);
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["frame"], "patch_set");
+        assert_eq!(json["patches"][1]["operation"]["op"], "insert_after");
+        // Its version is checked as any frame's.
+        let mut old = set.clone();
+        if let StreamFrame::PatchSet(p) = &mut old {
+            p.protocol = ProtocolVersion(99);
+        }
+        assert!(matches!(
+            StreamFrame::decode(&old.encode()),
+            Err(Malformed::UnsupportedProtocol { .. })
+        ));
     }
 
     #[test]

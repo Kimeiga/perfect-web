@@ -1165,6 +1165,49 @@ function applyFrame(frame) {
       return;
     }
 
+    case "patch_set": {
+      // **One change, every place it reaches** (ADR-0145): applied in order,
+      // and the version held once all of them applied.
+      if (!isNewer(frame.basis)) {
+        window.__pw.ignored = (window.__pw.ignored ?? 0) + 1;
+        log.push(`ignored a patch set that advances nothing`);
+        return;
+      }
+      const at = frame.basis.resources.map((r) => r.version).join(",");
+      for (const { target, operation: op } of frame.patches) {
+        const key = addressKey(target);
+        const applied =
+          op.op === "replace_text" ? setRange(key, op.text) : applyList(key, target.part, op);
+        if (!applied) {
+          // The document is not what the server derived the change from, and
+          // every later change would be derived from it too. Never "try
+          // anyway": the version is not held, and a fresh document comes with
+          // a fresh queue, as a `reload` recovery does.
+          window.__pw.refused = (window.__pw.refused ?? 0) + 1;
+          log.push(`refused ${op.op} on ${key}: the document disagrees; reloading`);
+          if (!window.__pw.reloading) {
+            window.__pw.reloading = true;
+            location.reload();
+          }
+          return;
+        }
+        if (op.op === "replace_text") {
+          window.__pw.updated.push(key);
+          log.push(`updated ${key} at version ${at}`);
+        } else {
+          // A structural change moves nodes: the index is read again, so the
+          // next patch in the set finds what this one put in place.
+          buildIndex();
+          window.__pw.updated.push(`${key}:${op.op}`);
+          log.push(`${op.op} on ${key} at version ${at}`);
+        }
+      }
+      for (const r of frame.basis.resources) held.set(r.entry, r.version);
+      // What a change inserted may be pressed.
+      bindEvents();
+      return;
+    }
+
     case "entry_value":
       entryValue(frame);
       return;
