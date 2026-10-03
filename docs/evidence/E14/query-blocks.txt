@@ -1,0 +1,78 @@
+ADR-0146 - a block a query decides is rendered and kept current
+
+produced by: just e14-query-blocks
+commit: 86fe9b5d772add6e155e6660d4f927e7a0609140
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+playwright: Version 1.58.0
+
+== the plan (compiler/pw-core/tests/page_blocks.rs)
+
+test what_a_row_reads_of_another_query_is_refused ... ok
+test a_block_a_query_decides_is_planned ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.02s
+
+== the server (spikes/own-renderer/server)
+
+test tests::a_case_is_a_case ... ok
+test tests::a_browsers_arguments_are_typed_by_the_components_own_parameters ... ok
+test tests::a_command_is_refused_on_a_node_that_does_not_grant_its_capability ... ok
+test tests::a_failing_command_commits_neither_state_nor_event ... ok
+test tests::a_command_drops_the_entry_it_invalidates_and_no_other ... ok
+test tests::a_parameter_is_the_text_the_address_carries ... ok
+test tests::a_menu_change_drops_the_menus_kept_values ... ok
+test tests::a_document_whose_handlers_were_not_compiled_is_refused ... ok
+test tests::a_retried_interaction_runs_its_command_once ... ok
+test tests::a_command_commits_the_events_it_declares ... ok
+test tests::a_shared_query_is_run_once_for_its_readers_and_a_private_one_for_each ... ok
+test tests::a_subscriber_that_falls_behind_is_told_to_reload ... ok
+test tests::an_entry_key_is_scoped_by_session_only_when_private ... ok
+test tests::an_event_value_the_server_cannot_compute_is_refused ... ok
+test tests::a_speculating_page_is_sent_its_carts_value ... ok
+test tests::a_block_whose_rendering_changed_is_rendered_again ... ok
+test tests::a_block_a_query_decides_is_rendered ... ok
+test tests::a_list_a_session_s_query_fills_is_rendered ... ok
+test tests::a_change_patches_every_place_it_reaches_in_one_frame ... ok
+test tests::an_unknown_component_is_refused_rather_than_defaulted ... ok
+test tests::every_command_commits_its_state_and_its_event_together ... ok
+test tests::a_list_moves_what_moved_and_replaces_what_holds_more_than_text ... ok
+test tests::clear_cart_is_authorised_separately ... ok
+test tests::concurrent_commands_on_one_session_all_commit ... ok
+test tests::the_commands_and_handlers_are_the_compilers ... ok
+test tests::a_forgotten_page_that_polls_is_told_to_reload ... ok
+test tests::a_session_s_change_reaches_its_own_document_alone ... ok
+test tests::store_commands_carry_and_enforce_their_signed_in_precondition ... ok
+test tests::a_new_item_goes_after_the_one_before_it ... ok
+test tests::the_compiled_command_carries_its_arguments_to_the_data_layer ... ok
+test tests::the_store_s_document_carries_its_signals ... ok
+test tests::interactions_kept_are_bounded_per_session ... ok
+test tests::the_pages_values_are_its_queries ... ok
+test tests::the_same_command_runs_where_the_capability_exists ... ok
+test tests::the_store_renders_its_signals_at_their_first_values ... ok
+test tests::an_item_that_leaves_is_removed ... ok
+test tests::an_item_that_stays_is_set_in_place ... ok
+test tests::each_change_is_derived_from_the_last_one_sent ... ok
+test tests::the_menu_is_no_session_s_list ... ok
+test tests::a_frame_a_stream_wrote_to_a_page_that_is_gone_still_reaches_the_next ... ok
+test tests::a_stream_drops_what_its_page_says_it_applied ... ok
+test tests::sustained_load_leaves_the_server_bounded ... ok
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.34s
+
+== the browser (e2e/resource-path.spec.mjs), three engines
+
+  36 passed (17.0s)
+
+== mutation controls (scripts/query_blocks_mutations.py)
+
+baseline (plan): 2 passed, 0 failed
+baseline (server): 42 passed, 0 failed
+baseline (browser): 12 passed, 0 failed
+a block a query decides is not planned [plan]: KILLED (1 of 2 tests fail)
+a block inside one is planned as if at the top [plan]: KILLED (1 of 2 tests fail)
+a row reads another query [plan]: KILLED (1 of 2 tests fail)
+a row's blocks are not read [plan]: KILLED (1 of 2 tests fail)
+a binding's whole value is not given [server]: KILLED (2 of 42 tests fail)
+a case is text [server]: KILLED (1 of 42 tests fail)
+a block's rendering is not compared [server]: KILLED (1 of 42 tests fail)
+a block is not rendered again [server]: KILLED (1 of 42 tests fail)
+the browser renders no range again [browser]: KILLED (1 of 12 tests fail)
+9 of 9 mutants killed
