@@ -1,0 +1,30 @@
+ADR-0162 - each store at its route
+
+produced by: just e14-stores
+commit: 419013b9c0c71ae47383890c3e8bf077d7531b0c
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+playwright: Version 1.58.0
+
+== the development server (pw-dev-server)
+
+test tests::a_change_to_one_stores_menu_reaches_that_stores_pages_only ... ok
+test tests::a_path_gives_a_route_its_parameters ... ok
+test tests::each_store_is_served_at_its_route ... ok
+test result: ok. 73 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.09s
+
+== each store at its route, and test 11 (e2e/stores.spec.mjs), three engines
+
+  9 passed (17.9s)
+
+== mutation controls (scripts/stores_mutations.py)
+
+baseline (cargo): 73 passed, 0 failed
+baseline (browser): 3 passed, 0 failed
+a path's segment is decoded as a query: KILLED (1 of 73 tests fail)
+a path of another length is taken for the route: KILLED (1 of 73 tests fail)
+no page is named by its route: KILLED (1 of 1 tests fail)
+a page's parameter is the default store's: KILLED (1 of 73 tests fail)
+the second store is not held: KILLED (2 of 73 tests fail)
+one menu fragment for every store: KILLED (1 of 73 tests fail)
+a change to one store's menu reaches every store's pages: KILLED (1 of 73 tests fail)
+7 of 7 mutants killed
