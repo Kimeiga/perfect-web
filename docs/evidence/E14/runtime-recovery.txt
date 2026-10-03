@@ -1,0 +1,17 @@
+ADR-0155 - the page keeps its subscription, and recovers a refused handler
+
+produced by: just e14-runtime-recovery
+commit: afa2dce96c48120b182928ff71008608f241b192
+playwright: Version 1.58.0
+
+== the browser (e2e/transport.spec.mjs, e2e/recovery.spec.mjs), three engines
+
+  48 passed (20.7s)
+
+== mutation controls (scripts/runtime_recovery_mutations.py)
+
+baseline: 4 passed, 0 failed
+a failed subscription request ends the subscription: KILLED (1 of 3 tests fail)
+a press on a refused handler does nothing: KILLED (2 of 4 tests fail)
+the recovery codes are read one place off: KILLED (2 of 4 tests fail)
+3 of 3 mutants killed
