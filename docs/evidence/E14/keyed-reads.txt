@@ -1,0 +1,109 @@
+ADR-0152 - a key a page changes, and what its stale work does
+
+produced by: just e14-keyed-reads
+commit: 0c608dc31ac093aa86b59773ec4e86b0bbe2c08c
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+playwright: Version 1.58.0
+
+== the rules and the plan (compiler/pw-core/tests/keyed.rs)
+
+test a_signal_read_in_the_body_otherwise_is_still_read_once ... ok
+test a_query_a_signal_keys_says_what_its_stale_work_does ... ok
+test a_key_is_a_string_an_int_or_a_bool ... ok
+test a_page_query_given_a_signal_is_planned_keyed_by_it ... ok
+test a_binding_keyed_by_parameters_alone_has_no_signals ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+== the server's keyed reads, among its tests (spikes/own-renderer/server)
+
+test tests::a_case_is_a_case ... ok
+test tests::a_browsers_arguments_are_typed_by_the_components_own_parameters ... ok
+test tests::a_command_drops_the_entry_it_invalidates_and_no_other ... ok
+test tests::a_command_is_refused_on_a_node_that_does_not_grant_its_capability ... ok
+test tests::a_command_commits_the_events_it_declares ... ok
+test tests::a_failing_command_commits_neither_state_nor_event ... ok
+test tests::a_document_whose_handlers_were_not_compiled_is_refused ... ok
+test tests::a_block_whose_rendering_changed_is_rendered_again ... ok
+test tests::a_change_that_reaches_a_session_while_its_page_is_read_is_not_lost ... ok
+test tests::a_block_a_query_decides_is_rendered ... ok
+test tests::a_declared_error_and_a_host_s_failure_are_shown_apart ... ok
+test tests::a_declared_error_is_given_and_not_kept ... ok
+test tests::a_menu_change_drops_the_menus_kept_values ... ok
+test tests::a_change_patches_every_place_it_reaches_in_one_frame ... ok
+test tests::a_browser_that_leaves_lets_go_of_its_read ... ok
+test tests::a_failed_estimate_fills_its_region_and_the_page_is_served ... ok
+test tests::a_command_asks_only_the_queries_its_page_shows_once ... ok
+test tests::a_parameter_is_the_text_the_address_carries ... ok
+test tests::a_forgotten_page_that_polls_is_told_to_reload ... ok
+test tests::a_menu_changed_at_its_source_shows_once_its_value_is_read_again ... ok
+test tests::a_keyed_read_is_applied_as_one_patch_set ... ok
+test tests::a_list_a_session_s_query_fills_is_rendered ... ok
+test tests::a_list_moves_what_moved_and_replaces_what_holds_more_than_text ... ok
+test tests::a_retried_interaction_runs_its_command_once ... ok
+test tests::a_notice_is_kept_as_its_freshness_says_and_each_ask_is_counted ... ok
+test tests::a_page_with_nothing_streamed_is_one_response_of_known_length ... ok
+test tests::a_page_whose_values_cannot_be_read_is_answered_and_the_server_goes_on ... ok
+test tests::a_shared_query_is_run_once_for_its_readers_and_a_private_one_for_each ... ok
+test tests::a_new_item_goes_after_the_one_before_it ... ok
+test tests::an_entry_key_is_scoped_by_session_only_when_private ... ok
+test tests::a_subscriber_that_falls_behind_is_told_to_reload ... ok
+test tests::an_event_value_the_server_cannot_compute_is_refused ... ok
+test tests::a_flight_another_reader_waits_for_is_not_stopped ... ok
+test tests::a_speculating_page_is_sent_its_carts_value ... ok
+test tests::an_unknown_component_is_refused_rather_than_defaulted ... ok
+test tests::clear_cart_is_authorised_separately ... ok
+test tests::a_read_older_than_the_latest_is_not_applied ... ok
+test tests::a_served_page_whose_values_fail_is_told_to_read_itself_again ... ok
+test tests::a_frame_a_stream_wrote_to_a_page_that_is_gone_still_reaches_the_next ... ok
+test tests::concurrent_commands_on_one_session_all_commit ... ok
+test tests::every_command_commits_its_state_and_its_event_together ... ok
+test tests::a_session_s_change_reaches_its_own_document_alone ... ok
+test tests::store_commands_carry_and_enforce_their_signed_in_precondition ... ok
+test tests::interactions_kept_are_bounded_per_session ... ok
+test tests::the_commands_and_handlers_are_the_compilers ... ok
+test tests::an_item_that_leaves_is_removed ... ok
+test tests::an_order_the_kitchen_sets_is_the_order_query_s_value ... ok
+test tests::an_item_that_stays_is_set_in_place ... ok
+test tests::a_session_s_estimate_is_its_estimator_s ... ok
+test tests::the_compiled_command_carries_its_arguments_to_the_data_layer ... ok
+test tests::the_store_s_document_carries_its_signals ... ok
+test tests::the_pages_values_are_its_queries ... ok
+test tests::the_same_command_runs_where_the_capability_exists ... ok
+test tests::a_streamed_region_follows_its_document_in_the_same_response ... ok
+test tests::the_store_renders_its_signals_at_their_first_values ... ok
+test tests::each_change_is_derived_from_the_last_one_sent ... ok
+test tests::the_menu_is_no_session_s_list ... ok
+test tests::pages_read_at_once_each_ask_when_their_query_says_parallel ... ok
+test tests::pages_read_at_once_share_an_ask_their_query_says_is_one_per_key ... ok
+test tests::under_cancel_a_newer_key_stops_the_old_keys_read ... ok
+test tests::a_stream_drops_what_its_page_says_it_applied ... ok
+test tests::under_keep_the_new_key_is_read_after_the_old_one_ends ... ok
+test tests::under_supersede_the_old_keys_read_runs_on_unshown ... ok
+test tests::a_region_past_its_budget_is_given_the_host_s_failure_when_its_budget_is_spent ... ok
+test tests::sustained_load_leaves_the_server_bounded ... ok
+test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.85s
+
+== presses in order (e2e/signals.spec.mjs), three engines
+
+  24 passed (18.7s)
+
+== mutation controls (scripts/keyed_reads_mutations.py)
+
+baseline: 70 passed, 0 failed
+a page query's signal argument is read once: KILLED (11 of 70 tests fail)
+a key of any type: KILLED (1 of 70 tests fail)
+a keyed query needs no stale-work policy: KILLED (1 of 70 tests fail)
+a signal argument is not planned as the binding's key: KILLED (8 of 70 tests fail)
+an older read is applied: KILLED (1 of 70 tests fail)
+a replaced page's read is applied: KILLED (7 of 70 tests fail)
+cancel lets go of nothing: KILLED (2 of 70 tests fail)
+a slow source does not see its read stopped: KILLED (2 of 70 tests fail)
+keep's reads run at once: KILLED (1 of 70 tests fail)
+a flight is stopped while another reader waits for it: KILLED (1 of 70 tests fail)
+10 of 10 mutants killed
+
+== the press-order control (scripts/press_order_mutations.py)
+
+baseline: 1 passed, 0 failed
+a press's handler starts without waiting for the press before it: KILLED (1 of 1 tests fail)
+1 of 1 mutants killed

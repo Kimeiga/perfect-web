@@ -1919,11 +1919,26 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`f68f723` (2026-10-03): `just ci` passes locally, and E14's gate items 1, 2
-and 5 are recorded at it. GitHub CI is the authority for each pushed head.
+`0c608dc` (2026-10-03): `just ci` passes locally, and E14's gate items 1, 2
+and 5 are recorded at it, over all twelve tasks. GitHub CI is the authority
+for each pushed head.
 
 ## completed gate items
 
+- **2026-10-03: E14 gate items 1, 2 and 5, again at `0c608dc`, over all
+  twelve tasks.** All four controls hold on all three stacks for each
+  (`harness-T*.txt`). `pw diff` reports every task's Pleris patches, and
+  the unsafe table counts nine of twelve wrong fixes refused by Pleris's
+  checker, none by the frameworks'.
+
+  Every mutant is killed:
+  - stream controls, 26;
+  - document reads, 4;
+  - keyed reads, 10, and press order, 1;
+  - diffs, 6;
+  - optimistic, 6.
+
+  The browser suite passes 460 of 460 in each of three runs.
 - **2026-10-03: E14 gate item 5, and items 1 and 2 again, at `f68f723`.**
   - Item 5, which bug classes became unrepresentable: stated rule by rule in
     `docs/milestones/E14.md`, from `docs/evidence/E14/unsafe-table.txt`

@@ -1,5 +1,5 @@
 produced by: just e14-unsafe-table
-commit: f68f723b2ee74a7b9804240e422d9edc93762e00
+commit: 0c608dc31ac093aa86b59773ec4e86b0bbe2c08c
 
 E14 gate item 5 - where each task's plausible wrong fix is caught
 
@@ -8,51 +8,55 @@ or `svelte-check`), contract is the shared contract tests, and hidden
 is the task's hidden tests. A row is admissible only when all four of
 the task's controls hold on that stack.
 
-T01  an optimistic update that cannot be rolled back    controls at f68f723
+T01  an optimistic update that cannot be rolled back    controls at 0c608dc
       pleris      check (PW0330, PW0331)
       next-react  hidden
       sveltekit   hidden
-T02  a live value served stale, to spare its source     controls at f68f723
+T02  a live value served stale, to spare its source     controls at 0c608dc
       pleris      hidden
       next-react  hidden
       sveltekit   hidden
-T03  one session's data in a cache other sessions read  controls at f68f723
+T03  one session's data in a cache other sessions read  controls at 0c608dc
       pleris      check (PW5001)
       next-react  hidden
       sveltekit   hidden
-T04  a state the page does not show                     controls at f68f723
+T04  a state the page does not show                     controls at 0c608dc
       pleris      check (PW0305)
       next-react  hidden
       sveltekit   hidden
-T05  a page held back by a slow source it could stream  controls at f68f723
+T05  a page held back by a slow source it could stream  controls at 0c608dc
       pleris      check (PW5400)
       next-react  hidden
       sveltekit   hidden
-T06  a form field with no accessible name               controls at f68f723
+T06  a form field with no accessible name               controls at 0c608dc
       pleris      check (PW5014)
       next-react  hidden
       sveltekit   hidden
-T08  a command delivered twice and applied twice        controls at f68f723
-      pleris      check (PW0312)
-      next-react  contract
-      sveltekit   contract
-T09  a value kept longer than the product allows        controls at f68f723
+T07  a read the customer moved past left running        controls at 0c608dc
       pleris      hidden
       next-react  hidden
       sveltekit   hidden
-T10  a loading state with no failed state               controls at f68f723
+T08  a command delivered twice and applied twice        controls at 0c608dc
+      pleris      check (PW0312)
+      next-react  contract
+      sveltekit   contract
+T09  a value kept longer than the product allows        controls at 0c608dc
+      pleris      hidden
+      next-react  hidden
+      sveltekit   hidden
+T10  a loading state with no failed state               controls at 0c608dc
       pleris      check (PW5401)
       next-react  hidden
       sveltekit   hidden
-T11  a modal dialog whose state does not hear it close  controls at f68f723
+T11  a modal dialog whose state does not hear it close  controls at 0c608dc
       pleris      check (PW5303)
       next-react  hidden
       sveltekit   hidden
-T12  one session's data in a cache other sessions read  controls at f68f723
+T12  one session's data in a cache other sessions read  controls at 0c608dc
       pleris      check (PW5001)
       next-react  contract
       sveltekit   contract
 
-pleris: 9 of 11 wrong fixes refused by its checker (T01, T03, T04, T05, T06, T08, T10, T11, T12)
-next-react: 0 of 11 wrong fixes refused by its checker
-sveltekit: 0 of 11 wrong fixes refused by its checker
+pleris: 9 of 12 wrong fixes refused by its checker (T01, T03, T04, T05, T06, T08, T10, T11, T12)
+next-react: 0 of 12 wrong fixes refused by its checker
+sveltekit: 0 of 12 wrong fixes refused by its checker

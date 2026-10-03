@@ -1,22 +1,22 @@
 ADR-0148 - a stream region shows its query's state, and its settled arm comes in the same response
 
 produced by: just e14-streams
-commit: f68f723b2ee74a7b9804240e422d9edc93762e00
+commit: 0c608dc31ac093aa86b59773ec4e86b0bbe2c08c
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
 == the rules and the typer (compiler/pw-core/tests/streams.rs)
 
-test a_placeholder_the_page_waits_past_is_refused ... ok
-test a_stream_shows_what_its_query_answered ... ok
 test a_stream_shows_a_query ... ok
+test a_streamed_stream_shows_a_placeholder ... ok
+test a_placeholder_the_page_waits_past_is_refused ... ok
 test a_stream_shows_its_failure ... ok
 test a_streamed_query_declares_how_long_it_may_take ... ok
-test a_streamed_stream_shows_a_placeholder ... ok
-test the_failed_arm_s_value_is_an_option_to_every_reader ... ok
+test a_stream_shows_what_its_query_answered ... ok
 test a_page_does_not_wait_for_a_streamed_query ... ok
-test a_query_that_declares_no_error_gives_its_failed_arm_nothing ... ok
 test a_stream_that_shows_every_state_checks ... ok
+test the_failed_arm_s_value_is_an_option_to_every_reader ... ok
+test a_query_that_declares_no_error_gives_its_failed_arm_nothing ... ok
 test the_failed_arm_is_given_the_declared_error_or_nothing ... ok
 test a_stream_holds_its_parts_once_and_nothing_else ... ok
 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
@@ -25,19 +25,19 @@ test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 test a_stream_inside_a_block_is_not_built_yet ... ok
 test a_fallback_no_host_executes_is_refused_by_the_plan ... ok
-test one_the_page_waits_for_is_not_streamed ... ok
+test a_page_that_streams_a_query_does_not_take_its_authority ... ok
 test a_signal_shown_in_a_stream_is_refused_by_the_plan ... ok
 test a_stream_is_a_part_with_its_query_and_its_arms ... ok
-test a_page_that_streams_a_query_does_not_take_its_authority ... ok
+test one_the_page_waits_for_is_not_streamed ... ok
 test the_plan_names_each_stream_with_its_query_s_policies ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
 
 == the renderer (runtime/pw-render/tests/streams.rs)
 
 test a_region_the_page_waits_for_is_never_pending ... ok
 test a_pending_streamed_region_shows_its_placeholder_in_a_patchable_range ... ok
-test the_patch_holds_what_the_settled_region_holds ... ok
 test a_settled_region_shows_its_arm_with_the_value_bound ... ok
+test the_patch_holds_what_the_settled_region_holds ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 == the server, its streamed response among it (spikes/own-renderer/server)
@@ -47,60 +47,67 @@ test tests::a_command_is_refused_on_a_node_that_does_not_grant_its_capability ..
 test tests::a_browsers_arguments_are_typed_by_the_components_own_parameters ... ok
 test tests::a_command_drops_the_entry_it_invalidates_and_no_other ... ok
 test tests::a_command_commits_the_events_it_declares ... ok
-test tests::a_document_whose_handlers_were_not_compiled_is_refused ... ok
 test tests::a_failing_command_commits_neither_state_nor_event ... ok
-test tests::a_block_a_query_decides_is_rendered ... ok
-test tests::a_change_that_reaches_a_session_while_its_page_is_read_is_not_lost ... ok
+test tests::a_document_whose_handlers_were_not_compiled_is_refused ... ok
 test tests::a_block_whose_rendering_changed_is_rendered_again ... ok
+test tests::a_change_that_reaches_a_session_while_its_page_is_read_is_not_lost ... ok
+test tests::a_block_a_query_decides_is_rendered ... ok
 test tests::a_declared_error_and_a_host_s_failure_are_shown_apart ... ok
 test tests::a_declared_error_is_given_and_not_kept ... ok
 test tests::a_change_patches_every_place_it_reaches_in_one_frame ... ok
-test tests::a_menu_change_drops_the_menus_kept_values ... ok
-test tests::a_parameter_is_the_text_the_address_carries ... ok
 test tests::a_failed_estimate_fills_its_region_and_the_page_is_served ... ok
-test tests::a_retried_interaction_runs_its_command_once ... ok
-test tests::a_list_moves_what_moved_and_replaces_what_holds_more_than_text ... ok
-test tests::a_list_a_session_s_query_fills_is_rendered ... ok
+test tests::a_menu_change_drops_the_menus_kept_values ... ok
+test tests::a_browser_that_leaves_lets_go_of_its_read ... ok
 test tests::a_command_asks_only_the_queries_its_page_shows_once ... ok
+test tests::a_parameter_is_the_text_the_address_carries ... ok
 test tests::a_forgotten_page_that_polls_is_told_to_reload ... ok
-test tests::a_shared_query_is_run_once_for_its_readers_and_a_private_one_for_each ... ok
 test tests::a_menu_changed_at_its_source_shows_once_its_value_is_read_again ... ok
+test tests::a_keyed_read_is_applied_as_one_patch_set ... ok
+test tests::a_list_a_session_s_query_fills_is_rendered ... ok
+test tests::a_retried_interaction_runs_its_command_once ... ok
+test tests::a_notice_is_kept_as_its_freshness_says_and_each_ask_is_counted ... ok
+test tests::a_list_moves_what_moved_and_replaces_what_holds_more_than_text ... ok
 test tests::a_page_with_nothing_streamed_is_one_response_of_known_length ... ok
+test tests::a_page_whose_values_cannot_be_read_is_answered_and_the_server_goes_on ... ok
+test tests::a_new_item_goes_after_the_one_before_it ... ok
 test tests::a_subscriber_that_falls_behind_is_told_to_reload ... ok
 test tests::an_entry_key_is_scoped_by_session_only_when_private ... ok
-test tests::a_speculating_page_is_sent_its_carts_value ... ok
-test tests::a_page_whose_values_cannot_be_read_is_answered_and_the_server_goes_on ... ok
-test tests::a_notice_is_kept_as_its_freshness_says_and_each_ask_is_counted ... ok
-test tests::a_new_item_goes_after_the_one_before_it ... ok
+test tests::a_shared_query_is_run_once_for_its_readers_and_a_private_one_for_each ... ok
+test tests::a_flight_another_reader_waits_for_is_not_stopped ... ok
 test tests::an_event_value_the_server_cannot_compute_is_refused ... ok
+test tests::a_speculating_page_is_sent_its_carts_value ... ok
 test tests::an_unknown_component_is_refused_rather_than_defaulted ... ok
+test tests::a_read_older_than_the_latest_is_not_applied ... ok
 test tests::concurrent_commands_on_one_session_all_commit ... ok
 test tests::clear_cart_is_authorised_separately ... ok
 test tests::a_served_page_whose_values_fail_is_told_to_read_itself_again ... ok
-test tests::a_session_s_change_reaches_its_own_document_alone ... ok
 test tests::every_command_commits_its_state_and_its_event_together ... ok
+test tests::a_session_s_change_reaches_its_own_document_alone ... ok
+test tests::a_frame_a_stream_wrote_to_a_page_that_is_gone_still_reaches_the_next ... ok
 test tests::interactions_kept_are_bounded_per_session ... ok
 test tests::store_commands_carry_and_enforce_their_signed_in_precondition ... ok
-test tests::a_frame_a_stream_wrote_to_a_page_that_is_gone_still_reaches_the_next ... ok
 test tests::the_commands_and_handlers_are_the_compilers ... ok
-test tests::a_session_s_estimate_is_its_estimator_s ... ok
-test tests::the_compiled_command_carries_its_arguments_to_the_data_layer ... ok
 test tests::an_item_that_leaves_is_removed ... ok
-test tests::an_order_the_kitchen_sets_is_the_order_query_s_value ... ok
+test tests::the_compiled_command_carries_its_arguments_to_the_data_layer ... ok
 test tests::an_item_that_stays_is_set_in_place ... ok
+test tests::an_order_the_kitchen_sets_is_the_order_query_s_value ... ok
+test tests::a_session_s_estimate_is_its_estimator_s ... ok
 test tests::the_store_s_document_carries_its_signals ... ok
 test tests::the_pages_values_are_its_queries ... ok
 test tests::the_same_command_runs_where_the_capability_exists ... ok
 test tests::a_streamed_region_follows_its_document_in_the_same_response ... ok
 test tests::the_store_renders_its_signals_at_their_first_values ... ok
 test tests::each_change_is_derived_from_the_last_one_sent ... ok
+test tests::the_menu_is_no_session_s_list ... ok
 test tests::pages_read_at_once_each_ask_when_their_query_says_parallel ... ok
 test tests::pages_read_at_once_share_an_ask_their_query_says_is_one_per_key ... ok
-test tests::the_menu_is_no_session_s_list ... ok
+test tests::under_cancel_a_newer_key_stops_the_old_keys_read ... ok
 test tests::a_stream_drops_what_its_page_says_it_applied ... ok
+test tests::under_supersede_the_old_keys_read_runs_on_unshown ... ok
+test tests::under_keep_the_new_key_is_read_after_the_old_one_ends ... ok
 test tests::a_region_past_its_budget_is_given_the_host_s_failure_when_its_budget_is_spent ... ok
 test tests::sustained_load_leaves_the_server_bounded ... ok
-test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.05s
+test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.67s
 
 == the accepted corpus, A-008 among it, checks as one program
 
@@ -109,14 +116,14 @@ pw check: 64 file(s), no diagnostics
 == the browser (e2e/stream.spec.mjs), three engines and the host's Chrome
 
   2 skipped
-  16 passed (18.1s)
+  16 passed (18.7s)
 
 == mutation controls (scripts/streams_mutations.py)
 
 baseline (rules): 12 passed, 0 failed
 baseline (plan): 7 passed, 0 failed
 baseline (render): 4 passed, 0 failed
-baseline (server): 58 passed, 0 failed
+baseline (server): 65 passed, 0 failed
 baseline (server-browser): 6 passed, 0 failed
 a page may wait for a streamed query [rules]: KILLED (1 of 12 tests fail)
 a streamed stream needs no placeholder [rules]: KILLED (1 of 12 tests fail)
@@ -135,11 +142,11 @@ a signal shown in a stream is planned [plan]: KILLED (1 of 7 tests fail)
 a pending region has no range to patch [render]: KILLED (1 of 4 tests fail)
 a region the page waits for may be pending [render]: KILLED (1 of 4 tests fail)
 a declared error is shown as the host's failure [render]: KILLED (1 of 4 tests fail)
-the document waits for its streamed regions [server]: KILLED (3 of 58 tests fail)
-a region's budget is not honoured [server]: KILLED (1 of 58 tests fail)
-a declared error is told as the host's failure [server]: KILLED (2 of 58 tests fail)
-a declared error is kept [server]: KILLED (1 of 58 tests fail)
-the response is not ended with its last region [server]: KILLED (1 of 58 tests fail)
+the document waits for its streamed regions [server]: KILLED (3 of 65 tests fail)
+a region's budget is not honoured [server]: KILLED (1 of 65 tests fail)
+a declared error is told as the host's failure [server]: KILLED (2 of 65 tests fail)
+a declared error is kept [server]: KILLED (1 of 65 tests fail)
+the response is not ended with its last region [server]: KILLED (1 of 65 tests fail)
 a handler in a stream is in no table [server-browser]: KILLED (1 of 2 tests fail)
 the runtime starts when the response ends [server-browser]: KILLED (1 of 1 tests fail)
 a patch the browser left is not applied [browser]: KILLED (1 of 2 tests fail)

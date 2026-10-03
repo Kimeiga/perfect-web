@@ -1,7 +1,7 @@
 ADR-0149 - pw diff, what a change means, for review
 
 produced by: just e14-diffs
-commit: f68f723b2ee74a7b9804240e422d9edc93762e00
+commit: 0c608dc31ac093aa86b59773ec4e86b0bbe2c08c
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/semantic_diff.rs)
@@ -13,7 +13,7 @@ test a_new_query_brings_its_effects_capabilities_and_policies ... ok
 test a_freshness_change_is_a_cache_change ... ok
 test a_streamed_region_is_a_page_change ... ok
 test a_new_case_is_a_domain_change ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.74s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.69s
 
 == each task's Pleris patches (scripts/semantic_diffs.py)
 
@@ -362,6 +362,94 @@ Other policies
 === T06-accessible-form: unsafe
 
 pw diff: unsafe: it does not check: store/app.pw: PW5014 `<input>` has no associated label
+
+=== T07-stale-category: reference
+
+Domain changes
+- none
+
+Effects
+- none
+
+Capabilities
+- none
+
+Privacy changes
+- none
+
+Placement
+- none
+
+Cache and freshness
+- `store.page.MenuIn`: `on_key_change` is `cancel`, was `keep`
+
+Invalidation
+- none
+
+Pages
+- none
+
+Client impact
+- none
+
+Server components
+- none
+
+Obligations
+- none
+
+Unsafe changes
+- none
+
+Diagnostics
+- none
+
+Other policies
+- none
+
+=== T07-stale-category: unsafe
+
+Domain changes
+- none
+
+Effects
+- none
+
+Capabilities
+- none
+
+Privacy changes
+- none
+
+Placement
+- none
+
+Cache and freshness
+- `store.page.MenuIn`: `on_key_change` is `supersede`, was `keep`
+
+Invalidation
+- none
+
+Pages
+- none
+
+Client impact
+- none
+
+Server components
+- none
+
+Obligations
+- none
+
+Unsafe changes
+- none
+
+Diagnostics
+- none
+
+Other policies
+- none
 
 === T08-duplicate-submissions: reference
 
