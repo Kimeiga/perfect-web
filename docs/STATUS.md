@@ -2230,11 +2230,14 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`4f75868` (2026-10-03): `just ci` passes locally. E14's gate items 1, 2 and
-5 are recorded over all twelve tasks at `0c608dc`, and again at `4f75868` for
-what it changed: T08's controls, ADR-0153's and ADR-0154's rules, keyed
-reads in three engines, the diffs, the browser suite and the unsafe table.
-GitHub CI is the authority for each pushed head.
+`36d263c` (2026-10-03, ADR-0169): `just ci` passes locally, the workspace's
+1790 tests pass, and the browser suite passes 529, with 2 skipped. Its
+evidence is `docs/evidence/E14/row-reads.txt`, recorded at that commit.
+
+E14's gate items 1, 2 and 5 are recorded over all twelve tasks at `0c608dc`,
+and again at `4f75868` for what it changed: T08's controls, ADR-0153's and
+ADR-0154's rules, keyed reads in three engines, the diffs, the browser suite
+and the unsafe table. GitHub CI is the authority for each pushed head.
 
 ## completed gate items
 
