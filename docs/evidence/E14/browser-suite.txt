@@ -1,12 +1,18 @@
 E10 - the store page, compiled commands and handlers, in browser engines: chromium firefox webkit
 
 produced by: just e10-browser "chromium firefox webkit" docs/evidence/E14/browser-suite.txt
-commit: 35662095a0cf6d4b247c38a50821b0209c1224ab
+commit: da0fcffb34e28eb566f8bc42bfb22dcace4ee44e
 playwright: Version 1.58.0
 
 == full run 1
-  441 passed (44.4s)
+  1) [firefox] › e2e/lazy-handler.spec.mjs:129:1 › two fast presses are one fetch ──────────────────
+    Error: expect(locator).toHaveText(expected) failed
+  1 failed
+  2 skipped
+  456 passed (49.0s)
 == full run 2
-  441 passed (42.1s)
+  2 skipped
+  457 passed (46.8s)
 == full run 3
-  441 passed (41.9s)
+  2 skipped
+  457 passed (42.8s)
