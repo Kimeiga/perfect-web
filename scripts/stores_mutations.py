@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0161: each document is its own subscriber.
+"""Mutation controls for ADR-0162: the store at its route, and a second
+store at its own.
 
-Each mutant puts back one piece of the session-wide subscriber:
-- in the server: serving a document replaces the session's others, a change
-  reaches only the session's latest document, a keyed read goes to the
-  latest document, and a session is forgotten with any one of its documents;
-- in the browser runtime: the page's long poll, or its stream, names no
-  document.
+Each mutant undoes one piece:
+- the route: a path's segment decoded as a query is, a path of another
+  length taken for the route, and no page named by any route;
+- the store: a page's parameter given the default store whatever the
+  address says, the second store not held, one menu fragment for every
+  store, and a change to one store's menu sent to every store's pages.
 
-A server mutant must fail the server's tests, all of them run. The
-runtime's must fail the two-tab browser test, in Chromium.
+A mutant must fail the server's tests, all of them run, or the stores'
+browser test in Chromium.
 
-Run from the repository root; `just e14-documents` records the output. The
+Run from the repository root; `just e14-stores` records the output. The
 source is restored after every mutant, whatever happens.
 """
 
@@ -24,73 +25,66 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
-RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
     (
-        "serving a document replaces the session's others",
+        "a path's segment is decoded as a query",
         "cargo",
         SERVER,
-        "        let served = (|| {\n",
-        # Bound first: a lock taken in a `for` loop's head is held through
-        # its body, and the mutant would wait for itself.
-        "        let others = documents_of(&self.pending.lock().expect(\"pending\"), session);\n"
-        "        for d in others {\n"
-        "            self.pending.lock().expect(\"pending\").remove(&d);\n"
-        "        }\n"
-        "        let served = (|| {\n",
+        "                let value = path_decoded(p).filter(|v| !v.is_empty())?;\n",
+        "                let value = percent_decoded(p).filter(|v| !v.is_empty())?;\n",
     ),
     (
-        "a change reaches only the session's latest document",
+        "a path of another length is taken for the route",
         "cargo",
         SERVER,
-        "        let documents = documents_of(&self.pending.lock().expect(\"pending\"), session);\n"
-        "        let mut read = Vec::new();\n",
-        "        let documents: Vec<Doc> =\n"
-        "            documents_of(&self.pending.lock().expect(\"pending\"), session)\n"
-        "                .into_iter()\n"
-        "                .rev()\n"
-        "                .take(1)\n"
-        "                .collect();\n"
-        "        let mut read = Vec::new();\n",
+        "    let (route, path) = (segments(route), segments(path));\n"
+        "    if route.len() != path.len() {\n",
+        "    let (route, path) = (segments(route), segments(path));\n"
+        "    if route.len() > path.len() {\n",
     ),
     (
-        "a keyed read goes to the session's latest document",
-        "cargo",
-        SERVER,
-        "        let doc: Doc = (session.to_string(), document);\n"
-        "        // A read for a document the server does not hold is no page's, and\n",
-        "        let doc: Doc = documents_of(&self.keyed.lock().expect(\"keyed\"), session)\n"
-        "            .pop()\n"
-        "            .unwrap_or((session.to_string(), document));\n"
-        "        // A read for a document the server does not hold is no page's, and\n",
-    ),
-    (
-        "a session is forgotten with any one of its documents",
-        "cargo",
-        SERVER,
-        "        .filter(|session| documents_of(queue, session).is_empty())\n",
-        "        .filter(|_| true)\n",
-    ),
-    (
-        "the page's long poll names no document",
+        "no page is named by its route",
         "browser",
-        RUNTIME,
-        "  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}`);\n",
-        "  const response = await fetch(`/stream?since=${cursor}`);\n",
+        SERVER,
+        "            route_params(route, path).map(|params| (page.clone(), params))\n",
+        "            route_params(route, path).map(|params| (page.clone(), params)).filter(|_| false)\n",
     ),
     (
-        "the page's stream names no document",
-        "browser",
-        RUNTIME,
-        "  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}&mode=stream`);\n",
-        "  const response = await fetch(`/stream?since=${cursor}&mode=stream`);\n",
+        "a page's parameter is the default store's",
+        "cargo",
+        SERVER,
+        "                        .map(Val::String)\n"
+        "                        .ok_or_else(|| format!(\"the page's `{name}` is given no value here\"))\n",
+        "                        .map(|_| Val::String(STORE_ID.into()))\n"
+        "                        .ok_or_else(|| format!(\"the page's `{name}` is given no value here\"))\n",
+    ),
+    (
+        "the second store is not held",
+        "cargo",
+        SERVER,
+        "        _ if id == SECOND_STORE.0 => Some(SECOND_STORE.1),\n",
+        "        _ if id == SECOND_STORE.0 => None,\n",
+    ),
+    (
+        "one menu fragment for every store",
+        "cargo",
+        SERVER,
+        "        EntryKey::from_identity(&menu_identity(store))\n",
+        "        EntryKey::from_identity(&menu_identity(STORE_ID))\n",
+    ),
+    (
+        "a change to one store's menu reaches every store's pages",
+        "cargo",
+        SERVER,
+        "        for (_, waiting) in queue.iter_mut().filter(|(doc, _)| readers(doc)) {\n",
+        "        for (_, waiting) in queue.iter_mut().filter(|(doc, _)| readers(doc) || true) {\n",
     ),
 ]
 
 CARGO = [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]]
-BROWSER = ["e2e/tabs.spec.mjs"]
+BROWSER = ["e2e/stores.spec.mjs"]
 
 # How long one command may run. A mutant can make a test wait for ever (a
 # lock taken twice); past the bound it is killed with everything it started,

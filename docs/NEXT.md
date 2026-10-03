@@ -135,9 +135,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
           and PW0340, PW0621 and PW0341 hold it to its page.
         - ~~Each document its own subscriber~~ (ADR-0161): a second tab
           no longer clears what the first was waiting for.
-        - **Next: the store served at its route, beside a second store**,
-          each document reading its own parameters, with §15.6 test 11 end
-          to end.
+        - ~~The store served at its route, beside a second store~~
+          (ADR-0162), with §15.6 test 11 end to end.
+        - **Next: a page says when it is absent.** `/stores/999` is
+          answered 503, as a page whose queries fail (ADR-0147). Only the
+          page can say which declared error means "absent", as Next.js's
+          `notFound()` and SvelteKit's `error(404)` are the page's own
+          calls.
      2. The recommendation and estimate slots in the store itself, with T05
         and T10 re-based.
      3. Decrement, remove, and a per-line cart.

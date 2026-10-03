@@ -1314,3 +1314,12 @@ Found on the way:
 - the browser suite served a build made with an older runtime;
 - a stopped mutation run could leave its mutant unseen;
 - two earlier mutants survived and are dealt with.
+
+[ADR-0162](DECISIONS/ADR-0162-each-store-at-its-route.md): the third step of
+the route gap.
+- The development server routes a path by the plans' routes, so the store is
+  served at `/stores/{id}`.
+- Each document reads its own parameters.
+- A second store, 48, has its own menu fragment.
+- A change to a store's menu reaches that store's pages only: §15.6 test 11,
+  end to end.

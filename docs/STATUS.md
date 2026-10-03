@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `231eb51`, with ADR-0159.
+**Reviewed:** 2026-10-03, against master `e8d14f1`, with ADR-0162.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,20 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0162, 2026-10-03: each store at its route**
+([ADR-0162](DECISIONS/ADR-0162-each-store-at-its-route.md)). The audit's route
+gap, charter §15.3, is closed:
+- the development server routes a path by the plans' routes, and serves the
+  store at `/stores/{id}`;
+- each document reads its own parameters;
+- a second store, Harbor Coffee, has a menu fragment of its own.
+
+§15.6 test 11 runs end to end in three engines: a change to store 47's menu
+reaches its page, and store 48's page is as it was. An unknown store is
+still answered 503, as a page whose queries fail. Answering it 404 needs the
+page to say which error means absent, the next ruling. Seven mutants
+(`just e14-stores`).
 
 **Correction, ADR-0161, 2026-10-03: each document is its own subscriber**
 ([ADR-0161](DECISIONS/ADR-0161-each-document-is-its-own-subscriber.md)).

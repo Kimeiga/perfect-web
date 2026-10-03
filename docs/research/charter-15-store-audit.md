@@ -67,7 +67,7 @@ are fixed (ADR-0155):
 
 | item | status |
 |---|---|
-| route `/stores/:store_id` | missing: `StorePage(id)` has no route clause, and the server fixes `id` at "47" |
+| route `/stores/:store_id` | met since ADR-0160-0162: `route "/stores/{id}"`, held to the page's parameters; served at it, each document reading its own; a second store; an unknown store is answered 503, not yet 404 |
 | semantic heading, menu content early, cart summary slot | met (the cart as a count) |
 | delivery estimate slot, recommendation slot | missing from the store (T10's, T05's patches) |
 | add item | met |
@@ -112,7 +112,7 @@ are fixed (ADR-0155):
 | 6, 7, 8 | one key one request; a changed key cancels stale work; leaving cancels | met on T07's store, three engines (ADR-0152) |
 | 9 | optimistic rollback | met |
 | 10 | an unavailable item gives a typed error and a consistent cart | met since ADR-0157: refused by name, the handler shows it, the count goes back, in three engines (`e2e/availability.spec.mjs`) |
-| 11 | `MenuChanged(store_47)` invalidates store 47 only | met in `pw-materialize`'s tests; the server holds one store |
+| 11 | `MenuChanged(store_47)` invalidates store 47 only | met since ADR-0162, end to end in three engines (`e2e/stores.spec.mjs`), and in `pw-materialize`'s tests |
 | 12 | A's cart never observed by B | met |
 | 13 | shared caches hold no session or secret fields | partial: synthetic values only |
 | 14 | keyboard and screen-reader semantics | partial: every Add button is named "Add", and the count has no live region (the cart's notice has one since ADR-0157); no automated audit |
@@ -127,8 +127,8 @@ are fixed (ADR-0155):
    ADR-0157, a check before commit, a stale-item control, and the typed
    error returned to the page. What remains is §15.1's and §15.2's:
    `available` on `MenuItem`, shown before the press.
-2. **The route, and more than one store** (§15.3): `route "/stores/{id}"`,
-   the server reading `id` from the address.
+2. ~~**The route, and more than one store**~~ (§15.3): met by ADR-0160 to
+   ADR-0162, but for an unknown store answered 404.
 3. **The recommendation and estimate slots** (tests 3 and 17): in the store
    itself, with T05 and T10 re-based.
 4. **Decrement, remove, and a per-line list** (§15.3).

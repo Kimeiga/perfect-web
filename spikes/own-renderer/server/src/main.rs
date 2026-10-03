@@ -268,6 +268,10 @@ fn reload_batch(cursor: u64) -> String {
 /// session had one subscriber, and serving a document cleared it.
 type Doc = (String, u64);
 
+/// **A page's parameters**, as its address gives them (ADR-0162): `id`,
+/// from `/stores/{id}`.
+type Params = BTreeMap<String, String>;
+
 /// Each of `session`'s documents in `map`, in the order they were served.
 fn documents_of<V>(map: &BTreeMap<Doc, V>, session: &str) -> Vec<Doc> {
     map.range((session.to_string(), 0)..=(session.to_string(), u64::MAX))
@@ -496,6 +500,10 @@ struct Server {
     /// **The next document's number** (ADR-0161), server-wide and from one,
     /// so a document's cursor is never zero.
     documents: std::sync::atomic::AtomicU64,
+    /// **Each document's parameters** (ADR-0162), as its address gave them:
+    /// which store it shows. Registered with its subscriber, before it is
+    /// read, and forgotten with it.
+    params: Mutex<BTreeMap<Doc, Params>>,
     /// **Each session's order, by its status's case** (E14, T04): what
     /// `store:data/orders#current` answers. The kitchen sets it through
     /// `/bench/order`; no order is `None`.
@@ -526,9 +534,10 @@ struct Server {
     /// How many reads of a category saw they were stopped, and ended early
     /// (E14, T07).
     category_stopped: Arc<std::sync::atomic::AtomicU64>,
-    /// **The items the menu's fragment was last rendered from**: a fragment
-    /// is rendered again when the `Menu` query's value is not what it shows.
-    menu_rendered_from: Mutex<Vec<(String, String)>>,
+    /// **The items each store's menu fragment was last rendered from**: a
+    /// fragment is rendered again when the `Menu` query's value is not what
+    /// it shows.
+    menu_rendered_from: Mutex<BTreeMap<String, Vec<(String, String)>>>,
     /// **The compiler's contracts, and the node this server is.**
     ///
     /// E8's last gate item asks for the command path to go through the host
@@ -576,10 +585,18 @@ fn cart_identity(session: &str) -> EntryIdentity {
     .generation(BUILD)
 }
 
-/// The menu's entry identity — PUBLIC, and carrying the same generation a
-/// session-scoped entry does. Partition and compatibility are orthogonal.
-fn menu_identity() -> EntryIdentity {
-    EntryIdentity::new("store.page.Menu", &["47"], pw_resource::Partition::Public).generation(BUILD)
+/// A store's menu's entry identity — PUBLIC, and carrying the same
+/// generation a session-scoped entry does. Partition and compatibility are
+/// orthogonal. One per store (ADR-0162): a change to one store's menu is not
+/// another's.
+fn menu_identity(store: &str) -> EntryIdentity {
+    EntryIdentity::new("store.page.Menu", &[store], pw_resource::Partition::Public)
+        .generation(BUILD)
+}
+
+/// The parameters of the store page for the store `id` (ADR-0162).
+fn store_params(id: &str) -> Params {
+    BTreeMap::from([("id".to_string(), id.to_string())])
 }
 
 fn cart_entry(session: &str) -> ResourceEntryId {
@@ -838,6 +855,7 @@ impl Server {
             pending: Mutex::new(BTreeMap::new()),
             shown: Mutex::new(BTreeMap::new()),
             documents: std::sync::atomic::AtomicU64::new(1),
+            params: Mutex::new(BTreeMap::new()),
             orders: Mutex::new(BTreeMap::new()),
             recommender: Mutex::new(Recommender::default()),
             estimators: Mutex::new(BTreeMap::new()),
@@ -847,7 +865,7 @@ impl Server {
             keyed: Mutex::new(BTreeMap::new()),
             categories: Mutex::new(Categories::default()),
             category_stopped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            menu_rendered_from: Mutex::new(Vec::new()),
+            menu_rendered_from: Mutex::new(BTreeMap::new()),
             contracts,
             topology,
             speculation,
@@ -1328,6 +1346,12 @@ impl Server {
                 shown.remove(doc);
             }
         }
+        {
+            let mut params = self.params.lock().expect("params");
+            for doc in &documents {
+                params.remove(doc);
+            }
+        }
         for session in forgotten {
             self.materializer.evict(&self.cart_key(&session));
             // And the query values kept for it alone (ADR-0127): a private
@@ -1364,10 +1388,13 @@ impl Server {
             )))))]
         };
         let get: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] if id == STORE_ID => {
+            [Val::String(id)] if store_named(id).is_some() => {
                 Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![
-                    ("id".into(), Val::String(STORE_ID.into())),
-                    ("name".into(), Val::String(STORE_NAME.into())),
+                    ("id".into(), Val::String(id.clone())),
+                    (
+                        "name".into(),
+                        Val::String(store_named(id).unwrap_or_default().into()),
+                    ),
                     (
                         "hours".into(),
                         Val::Record(vec![
@@ -1381,9 +1408,14 @@ impl Server {
             other => Err(format!("stores#get received {other:?}")),
         });
         let for_store: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] if id == STORE_ID => {
+            [Val::String(id)] if store_named(id).is_some() => {
+                let items = match id.as_str() {
+                    STORE_ID => menu.clone(),
+                    _ => second_menu(),
+                };
                 Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
-                    menu.iter()
+                    items
+                        .iter()
                         .map(|(id, name)| {
                             Val::Record(vec![
                                 ("id".into(), Val::String(id.clone())),
@@ -1859,7 +1891,24 @@ impl Server {
             .into_iter()
             .flatten()
             .map(|a| match a.as_str() {
-                Some("id") => Ok(Val::String(STORE_ID.into())),
+                // A page parameter, as the document's address gave it
+                // (ADR-0162).
+                Some(name)
+                    if self.plan["params"]
+                        .as_array()
+                        .is_some_and(|ps| ps.iter().any(|p| p == name)) =>
+                {
+                    document
+                        .and_then(|d| {
+                            self.params
+                                .lock()
+                                .expect("params")
+                                .get(&(session.to_string(), d))
+                                .and_then(|p| p.get(name).cloned())
+                        })
+                        .map(Val::String)
+                        .ok_or_else(|| format!("the page's `{name}` is given no value here"))
+                }
                 Some("current_session()") => Ok(Val::String(session.into())),
                 Some(signal) if signals.contains(&signal) => {
                     let value = match keys {
@@ -2002,11 +2051,12 @@ impl Server {
         let documents = documents_of(&self.pending.lock().expect("pending"), session);
         let mut read = Vec::new();
         for doc in documents {
+            let store = self.store_of(&doc);
             let now = self
                 .bindings(session, doc.1)
-                .and_then(|bindings| Ok((self.showing(session, &bindings)?, bindings)));
+                .and_then(|bindings| Ok((self.showing(session, &store, &bindings)?, bindings)));
             match now {
-                Ok((now, bindings)) => read.push((doc, bindings, now)),
+                Ok((now, bindings)) => read.push((doc, store, bindings, now)),
                 Err(why) => self.unshowable(&doc, &why),
             }
         }
@@ -2019,7 +2069,7 @@ impl Server {
         let version = self.version(session);
         let mut failed = Vec::new();
         let mut queue = self.pending.lock().expect("pending");
-        for (doc, bindings, now) in read {
+        for (doc, store, bindings, now) in read {
             // And the value itself, to a page that speculates on it
             // (ADR-0122), from the snapshot the patches are derived from.
             // Until 2026-10-03 it was read again after the table was let go,
@@ -2034,7 +2084,7 @@ impl Server {
             let patches = {
                 let mut shown = self.shown.lock().expect("shown");
                 match shown.get(&doc) {
-                    Some(was) => match self.derive(session, &bindings, was, &now) {
+                    Some(was) => match self.derive(session, &store, &bindings, was, &now) {
                         Ok(patches) => {
                             shown.insert(doc.clone(), now);
                             patches
@@ -2147,9 +2197,13 @@ impl Server {
     /// shared cache entry would get different bytes — which is the exact
     /// composition `IdentityDomain` exists to make unrepresentable, arriving
     /// through the back door of "the page renders the fragment".
-    fn fragment_domain(&self) -> IdentityDomain {
-        IdentityDomain::document("store.page.Menu(47)", Partition::Public, BUILD)
-            .keyed("own-renderer-spike-key")
+    fn fragment_domain(&self, store: &str) -> IdentityDomain {
+        IdentityDomain::document(
+            &format!("store.page.Menu({store})"),
+            Partition::Public,
+            BUILD,
+        )
+        .keyed("own-renderer-spike-key")
     }
 
     /// The fragment's render environment.
@@ -2164,10 +2218,10 @@ impl Server {
     /// splices in, and putting it here made `menu_env` call `menu_fragment`
     /// call `menu_env` — unbounded recursion that presented as a server which
     /// accepted connections and answered none.
-    fn menu_env(&self, items: &[(String, String)]) -> Env {
+    fn menu_env(&self, store: &str, items: &[(String, String)]) -> Env {
         Env::new()
             .set("menu", menu_value(items))
-            .in_domain(self.fragment_domain())
+            .in_domain(self.fragment_domain(store))
     }
 
     /// The menu fragment's bytes, materialized once and reused.
@@ -2177,8 +2231,8 @@ impl Server {
     /// because they are the same bytes — the entry is read, not re-rendered —
     /// and that is what makes `cache shared` a fact about the system rather
     /// than a claim about two renders agreeing.
-    fn menu_fragment(&self, items: &[(String, String)]) -> String {
-        let key = self.menu_key();
+    fn menu_fragment(&self, store: &str, items: &[(String, String)]) -> String {
+        let key = self.menu_key(store);
         // Kept while it shows the `Menu` query's value. Until 2026-10-03 it
         // was kept until a command invalidated it, so a value that changed at
         // its source, read again once its freshness was spent, was not what
@@ -2186,31 +2240,32 @@ impl Server {
         let mut rendered_from = self.menu_rendered_from.lock().expect("rendered from");
         if let Some(entry) = self.materializer.entry(&key)
             && !entry.stale
-            && *rendered_from == items
+            && rendered_from.get(store).is_some_and(|was| *was == items)
         {
             return entry.body;
         }
         let (template, part) = self.menu_part();
-        let env = self.menu_env(items);
+        let env = self.menu_env(store, items);
         let html = pw_render::render_part(template, part, &env, &self.templates)
             .expect("the menu fragment renders");
         self.clock.advance(1);
         self.materializer.invalidate(&key, 0);
         self.materializer
             .regenerate(&key, None, || Ok(html.clone()));
-        *rendered_from = items.to_vec();
+        rendered_from.insert(store.to_string(), items.to_vec());
         html
     }
 
-    /// The public entry whose version every menu patch is caused by.
-    fn menu_key(&self) -> EntryKey {
-        EntryKey::from_identity(&menu_identity())
+    /// The public entry whose version every patch to a store's menu is
+    /// caused by.
+    fn menu_key(&self, store: &str) -> EntryKey {
+        EntryKey::from_identity(&menu_identity(store))
     }
 
-    fn menu_version(&self) -> Version {
+    fn menu_version(&self, store: &str) -> Version {
         Version(
             self.materializer
-                .entry(&self.menu_key())
+                .entry(&self.menu_key(store))
                 .map(|e| e.generated_at)
                 .unwrap_or(0),
         )
@@ -2248,9 +2303,10 @@ impl Server {
         self.queries.invalidate("store.page.Menu");
 
         // The fragment is re-materialized, in its own domain, once.
+        // The menu E7-P changes is store 47's (ADR-0162).
         let items = self.menu.lock().expect("menu").clone();
         let (template, part) = self.menu_part();
-        let env = self.menu_env(&items);
+        let env = self.menu_env(STORE_ID, &items);
         let html = pw_render::render_part(template, part, &env, &self.templates)
             .map_err(|b| format!("{b:?}"))?;
         self.clock.advance(1);
@@ -2258,13 +2314,16 @@ impl Server {
         // without this the fragment kept its first rendering and every
         // document served after a change showed the old menu, while pages
         // already open were patched (found 2026-10-02, ADR-0127).
-        self.materializer.invalidate(&self.menu_key(), 0);
+        self.materializer.invalidate(&self.menu_key(STORE_ID), 0);
         self.materializer
-            .regenerate(&self.menu_key(), None, || Ok(html));
-        *self.menu_rendered_from.lock().expect("rendered from") = items.clone();
+            .regenerate(&self.menu_key(STORE_ID), None, || Ok(html));
+        self.menu_rendered_from
+            .lock()
+            .expect("rendered from")
+            .insert(STORE_ID.to_string(), items.clone());
 
-        let entry = ResourceEntryId::derive(&menu_identity(), &IDENTITY);
-        let version = self.menu_version();
+        let entry = ResourceEntryId::derive(&menu_identity(STORE_ID), &IDENTITY);
+        let version = self.menu_version(STORE_ID);
 
         // ONE patch, for every reader.
         //
@@ -2284,10 +2343,18 @@ impl Server {
             part,
         );
 
+        // To each document that shows the store (§15.6 test 11): another
+        // store's menu is not this one's.
+        let params = self.params.lock().expect("params");
+        let readers = |doc: &Doc| {
+            params
+                .get(doc)
+                .is_some_and(|p| p.get("id").map(String::as_str) == Some(STORE_ID))
+        };
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!("broadcast {:?} to {} document(s)", op, queue.len());
         }
-        for waiting in queue.values_mut() {
+        for (_, waiting) in queue.iter_mut().filter(|(doc, _)| readers(doc)) {
             waiting.push(StreamFrame::ResourceChanged {
                 protocol: CURRENT,
                 entry: entry.clone(),
@@ -2333,8 +2400,15 @@ impl Server {
         &self,
         session: &str,
     ) -> Result<(String, u64, serde_json::Value), String> {
-        self.serve_document_settled(session, &[])
+        self.serve_document_settled(session, &store_params(STORE_ID), &[])
             .map(|(html, cursor, entries, _)| (html, cursor, entries))
+    }
+
+    /// [`Server::serve_document`], for the store `id` (ADR-0162).
+    #[cfg(test)]
+    fn serve_store_document(&self, session: &str, id: &str) -> Result<(String, u64), String> {
+        self.serve_document_settled(session, &store_params(id), &[])
+            .map(|(html, cursor, _, _)| (html, cursor))
     }
 
     /// The document as [`Server::serve_document_with_entries`] serves it,
@@ -2344,6 +2418,7 @@ impl Server {
     fn serve_document_settled(
         &self,
         session: &str,
+        params: &Params,
         settled: &[(u32, Settled)],
     ) -> Result<(String, u64, serde_json::Value, Env), String> {
         self.drain(session);
@@ -2362,10 +2437,15 @@ impl Server {
             self.documents
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
+        // Its parameters with it (ADR-0162): which store it reads.
+        self.params
+            .lock()
+            .expect("params")
+            .insert(doc.clone(), params.clone());
         let served = (|| {
             for _ in 1..DOCUMENT_ATTEMPTS {
                 let pushed = self.subscribed(&doc);
-                let read = self.render_store_document(session, settled)?;
+                let read = self.render_store_document(&doc, settled)?;
                 let mut queue = self.pending.lock().expect("pending");
                 if let Some(served) = self.installed(&mut queue, &doc, read, Some(pushed)) {
                     return Ok(served);
@@ -2375,7 +2455,7 @@ impl Server {
             // was before: nothing can reach the session between the read and
             // the install, so a page is always served.
             let mut queue = self.pending.lock().expect("pending");
-            let read = self.render_store_document(session, settled)?;
+            let read = self.render_store_document(&doc, settled)?;
             Ok(self
                 .installed(&mut queue, &doc, read, None)
                 .expect("nothing reaches a session inside the table"))
@@ -2384,6 +2464,7 @@ impl Server {
         // nothing.
         if served.is_err() {
             self.pending.lock().expect("pending").remove(&doc);
+            self.params.lock().expect("params").remove(&doc);
         }
         served
     }
@@ -2612,8 +2693,39 @@ impl Server {
     /// shown, answered as such, never a server that stops (E14, T04).
     #[cfg(test)]
     fn render_store_showing(&self, session: &str) -> Result<(String, Shown), String> {
-        self.render_store_document(session, &[])
-            .map(|(html, shown, _)| (html, shown))
+        // A document of the default store, read and not served.
+        let doc: Doc = (
+            session.to_string(),
+            self.documents
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        );
+        self.params
+            .lock()
+            .expect("params")
+            .insert(doc.clone(), store_params(STORE_ID));
+        let read = self.render_store_document(&doc, &[]);
+        self.params.lock().expect("params").remove(&doc);
+        read.map(|(html, shown, _)| (html, shown))
+    }
+
+    /// **The page a path names by its route**, and the parameters the path
+    /// gives it (ADR-0162): among the pages this build planned with one.
+    /// One route is one page's (PW0341), so the first is the only one.
+    fn routed(&self, path: &str) -> Option<(String, Params)> {
+        self.plans.iter().find_map(|(page, plan)| {
+            let route = plan["route"].as_str()?;
+            route_params(route, path).map(|params| (page.clone(), params))
+        })
+    }
+
+    /// The store a document shows (ADR-0162): its `id`.
+    fn store_of(&self, doc: &Doc) -> String {
+        self.params
+            .lock()
+            .expect("params")
+            .get(doc)
+            .and_then(|p| p.get("id").cloned())
+            .unwrap_or_else(|| STORE_ID.to_string())
     }
 
     /// The store's document, what it shows, and the environment it was
@@ -2621,9 +2733,11 @@ impl Server {
     /// streamed region not given is rendered pending, with its placeholder.
     fn render_store_document(
         &self,
-        session: &str,
+        doc: &Doc,
         settled: &[(u32, Settled)],
     ) -> Result<(String, Shown, Env), String> {
+        let session = doc.0.as_str();
+        let store = self.store_of(doc);
         let template = self.store_template();
         // Every value is a query's (ADR-0125): each binding runs its compiled
         // component, and each part reads the binding's value by the steps the
@@ -2631,12 +2745,12 @@ impl Server {
         // A new document's keys are its signals' first values, as the
         // browser holds them when it loads (ADR-0152).
         let bindings = self
-            .bindings_where(session, None, |_| true, &Keys::First)
+            .bindings_where(session, Some(doc.1), |_| true, &Keys::First)
             .map_err(|e| format!("the store page's queries: {e}"))?;
         let shown = self
-            .showing(session, &bindings)
+            .showing(session, &store, &bindings)
             .map_err(|e| format!("the store page's values: {e}"))?;
-        let mut env = self.document_env(session, &bindings);
+        let mut env = self.document_env(session, &store, &bindings);
         for (part, outcome) in settled {
             env = env.settle(PartId(*part), outcome.clone());
         }
@@ -2688,9 +2802,15 @@ impl Server {
                 "`{binding}`'s key is its signals' values: {signals:?}"
             ));
         }
+        let doc: Doc = (session.to_string(), document);
+        // A read for a document the server does not hold is no page's, and
+        // takes nothing (ADR-0161): not even its arguments, which are the
+        // document's (ADR-0162).
+        if !self.keyed.lock().expect("keyed").contains_key(&doc) {
+            return Ok(KeyOutcome::Superseded);
+        }
         let asked = Keys::Asked { binding, key };
         let args = self.args_of(session, Some(document), b, &asked)?;
-        let doc: Doc = (session.to_string(), document);
         let flight = self.answer_key(session, b, &args)?;
         let cancel = b["policy"]["on_key_change"] == "cancel";
         let keep = b["policy"]["on_key_change"] == "keep";
@@ -2763,7 +2883,8 @@ impl Server {
         let mut bindings =
             self.bindings_where(session, Some(document), |n| n != binding, &Keys::Shown)?;
         bindings.insert(binding.to_string(), value);
-        let now = self.showing(session, &bindings)?;
+        let store = self.store_of(&doc);
+        let now = self.showing(session, &store, &bindings)?;
         let mut queue = self.pending.lock().expect("pending");
         let mut keyed = self.keyed.lock().expect("keyed");
         let Some(read) = keyed
@@ -2778,7 +2899,7 @@ impl Server {
             let Some(was) = shown.get(&doc) else {
                 return Ok(KeyOutcome::Superseded);
             };
-            let patches = self.derive(session, &bindings, was, &now)?;
+            let patches = self.derive(session, &store, &bindings, was, &now)?;
             shown.insert(doc.clone(), now);
             patches
         };
@@ -2955,14 +3076,14 @@ impl Server {
     /// session's query fills is its binding's value: until 2026-10-03 it was
     /// set a second time, from what the document shows, which since ADR-0146
     /// is the same value under the same name.
-    fn document_env(&self, session: &str, bindings: &BTreeMap<String, Val>) -> Env {
+    fn document_env(&self, session: &str, store: &str, bindings: &BTreeMap<String, Val>) -> Env {
         // Both bound BEFORE the chain. A `MutexGuard` produced inside a method
         // argument lives until the end of the whole STATEMENT, so locking the
         // menu inside the chain and locking it again inside `menu_fragment`
         // deadlocked a non-reentrant mutex against itself — presenting as a
         // request that simply never returned.
         let items = menu_items(&bindings["menu"]);
-        let fragment = self.menu_fragment(&items);
+        let fragment = self.menu_fragment(store, &items);
         // Each binding's whole value, so a block a query decides, and what is
         // inside it, reads any field of it (ADR-0146).
         let mut env = Env::new();
@@ -3014,7 +3135,12 @@ impl Server {
 
     /// **What a session's document shows, from its queries' values**
     /// (ADR-0145): each part's text, and each list a session's query fills.
-    fn showing(&self, session: &str, bindings: &BTreeMap<String, Val>) -> Result<Shown, String> {
+    fn showing(
+        &self,
+        session: &str,
+        store: &str,
+        bindings: &BTreeMap<String, Val>,
+    ) -> Result<Shown, String> {
         let mut shown = Shown::default();
         for part in self.plan["parts"].as_array().into_iter().flatten() {
             let id = part["part"].as_u64().unwrap_or_default() as u32;
@@ -3032,7 +3158,7 @@ impl Server {
             shown.lists.insert(list, items);
         }
         // Each block a query decides, as it renders now (ADR-0146).
-        let env = self.document_env(session, bindings);
+        let env = self.document_env(session, store, bindings);
         let template = self.store_template();
         for block in self.plan["blocks"].as_array().into_iter().flatten() {
             let id = block.as_u64().unwrap_or_default() as u32;
@@ -3049,6 +3175,7 @@ impl Server {
     fn derive(
         &self,
         session: &str,
+        store: &str,
         bindings: &BTreeMap<String, Val>,
         was: &Shown,
         now: &Shown,
@@ -3064,7 +3191,7 @@ impl Server {
                 });
             }
         }
-        let env = self.document_env(session, bindings);
+        let env = self.document_env(session, store, bindings);
         for (list, items) in &now.lists {
             // A list at the top of the page only. One inside a block would
             // have no range while the block is not shown, and patching it
@@ -3534,6 +3661,31 @@ fn category_of(item: &str) -> &'static str {
 /// The one store this server holds (ADR-0125): what `stores#get` answers.
 const STORE_ID: &str = "47";
 const STORE_NAME: &str = "Blue Bottle";
+
+/// **The second store** (ADR-0162): its id and name. Its menu is its own,
+/// and nothing changes it, so a change to store 47's is seen not to reach
+/// it (§15.6 test 11).
+const SECOND_STORE: (&str, &str) = ("48", "Harbor Coffee");
+
+/// The second store's menu.
+fn second_menu() -> Vec<(String, String)> {
+    [
+        ("drip", "Drip Coffee"),
+        ("matcha", "Matcha Latte"),
+        ("scone", "Blueberry Scone"),
+    ]
+    .map(|(id, name)| (id.to_string(), name.to_string()))
+    .to_vec()
+}
+
+/// A store's name, by its id: the stores this server holds.
+fn store_named(id: &str) -> Option<&'static str> {
+    match id {
+        STORE_ID => Some(STORE_NAME),
+        _ if id == SECOND_STORE.0 => Some(SECOND_STORE.1),
+        _ => None,
+    }
+}
 
 /// A component value as the renderer reads it: a record by its Pleris field
 /// names (the WIT's kebab case undone), an `Int` as an `Int`.
@@ -4007,6 +4159,12 @@ fn handle(server: &Server, mut stream: TcpStream) {
 
     let route = path.split('?').next().unwrap_or("/");
     let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
+    // The page a path names by its route, and the parameters it gives
+    // (ADR-0162).
+    let routed = match method {
+        "GET" => server.routed(route),
+        _ => None,
+    };
 
     match (method, route) {
         // **A command the compiler built, by its component id**: what a
@@ -4368,8 +4526,8 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // what the BROWSER does when a server and a page disagree, and a
         // correct server never produces the disagreement.
         ("POST", "/command/menu_ghost") => {
-            let entry = ResourceEntryId::derive(&menu_identity(), &IDENTITY);
-            let version = server.menu_version();
+            let entry = ResourceEntryId::derive(&menu_identity(STORE_ID), &IDENTITY);
+            let version = server.menu_version(STORE_ID);
             let mut queue = server.pending.lock().expect("pending");
             for doc in documents_of(&queue, &session) {
                 if let Some(waiting) = queue.get_mut(&doc) {
@@ -4391,9 +4549,9 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // more: the storage key never appears, because the browser has no
         // business knowing how an entry is stored.
         ("GET", "/menu-entry") => {
-            let identity = menu_identity();
+            let identity = menu_identity(STORE_ID);
             let entry = ResourceEntryId::derive(&identity, &IDENTITY);
-            let version = server.menu_version();
+            let version = server.menu_version(STORE_ID);
             respond_json(
                 &mut stream,
                 200,
@@ -4498,40 +4656,17 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // ADR-0148).
         ("GET", route) if route.starts_with("/page/") => {
             let path = route.trim_start_matches("/page/");
-            let not_found = |stream: &mut TcpStream, why: String| {
-                respond(
-                    stream,
+            match server.page_params(path, query) {
+                Ok(params) => serve_page(server, &mut stream, &session, fresh, path, params),
+                Err(why) => respond(
+                    &mut stream,
                     404,
                     "text/plain; charset=utf-8",
                     &session,
                     fresh,
                     why.as_bytes(),
-                );
-            };
-            let runs = server.page_params(path, query).and_then(|params| {
-                let plan = &server.plans[path];
-                stream_runs(plan, &session, &params).map(|runs| (params, runs))
-            });
-            let (params, runs) = match runs {
-                Ok(found) => found,
-                Err(why) => return not_found(&mut stream, why),
-            };
-            std::thread::scope(|scope| {
-                let mut settling = Settling::start(scope, server, &session, runs);
-                let settled = settling.for_document();
-                match server.render_page(path, &params, &session, &settled) {
-                    Ok((page, env, template)) => server.respond_streaming(
-                        &mut stream,
-                        &session,
-                        fresh,
-                        &page,
-                        template,
-                        &env,
-                        &mut settling,
-                    ),
-                    Err(why) => not_found(&mut stream, why),
-                }
-            });
+                ),
+            }
         }
         // What this build compiled, for the browser's resume decision
         // (ADR-0132): one `identity|capture` line per handler. Served with
@@ -4591,66 +4726,13 @@ fn handle(server: &Server, mut stream: TcpStream) {
                         .map(|i| (format!("item-{i}"), format!("Item {i}")))
                         .collect();
                     drop(menu);
-                    server.materializer.invalidate(&server.menu_key(), 0);
+                    server
+                        .materializer
+                        .invalidate(&server.menu_key(STORE_ID), 0);
                     server.queries.invalidate("store.page.Menu");
                 }
             }
-            let unavailable = |stream: &mut TcpStream, why: String| {
-                // A page whose values could not be read is answered as
-                // unavailable, and the server goes on (E14, T04).
-                respond(
-                    stream,
-                    503,
-                    "text/plain; charset=utf-8",
-                    &session,
-                    fresh,
-                    format!("the store page cannot be shown: {why}").as_bytes(),
-                );
-            };
-            // Each stream's query, started before the document is rendered
-            // (ADR-0148): the page waits for the ones it is declared to wait
-            // for, and the rest fill their regions in the same response.
-            let params = BTreeMap::from([("id".to_string(), STORE_ID.to_string())]);
-            let runs = match stream_runs(&server.plan, &session, &params) {
-                Ok(runs) => runs,
-                Err(why) => return unavailable(&mut stream, why),
-            };
-            std::thread::scope(|scope| {
-                let mut settling = Settling::start(scope, server, &session, runs);
-                let settled = settling.for_document();
-                // Registering the subscriber HERE, when the document is
-                // served, rather than when it first subscribes: the page
-                // holds instances from this moment on, so a structural change
-                // after this moment has an address in it. A registration
-                // deferred to the first poll would silently drop every change
-                // that raced it.
-                let (rendered, cursor, entries, env) =
-                    match server.serve_document_settled(&session, &settled) {
-                        Ok(served) => served,
-                        Err(why) => return unavailable(&mut stream, why),
-                    };
-                let speculation = server
-                    .speculation
-                    .as_ref()
-                    .and_then(|m| m["module"].as_str())
-                    .map(|module| (format!("/speculation/{module}"), entries));
-                let page = document(
-                    &rendered,
-                    &server.templates,
-                    &server.plan,
-                    cursor,
-                    speculation,
-                );
-                server.respond_streaming(
-                    &mut stream,
-                    &session,
-                    fresh,
-                    &page,
-                    server.store_template(),
-                    &env,
-                    &mut settling,
-                );
-            });
+            serve_store(server, &mut stream, &session, fresh, store_params(STORE_ID));
         }
         // A command this server does not host, including the address-resolving
         // `/command/add_to_cart?instance=..` route E10 deleted. Named, rather
@@ -4664,6 +4746,21 @@ fn handle(server: &Server, mut stream: TcpStream) {
             fresh,
             b"no such command",
         ),
+        // **A page at its route** (ADR-0162): the store at `/stores/{id}`,
+        // its parameters as the address gives them, and any other page that
+        // declares one.
+        ("GET", _)
+            if routed
+                .as_ref()
+                .is_some_and(|(page, _)| server.plan["page"] == *page) =>
+        {
+            let (_, params) = routed.expect("matched");
+            serve_store(server, &mut stream, &session, fresh, params)
+        }
+        ("GET", _) if routed.is_some() => {
+            let (page, params) = routed.expect("matched");
+            serve_page(server, &mut stream, &session, fresh, &page, params)
+        }
         ("GET", _) => serve_file(server, &mut stream, route, &session, fresh),
         _ => respond(&mut stream, 405, "text/plain", &session, fresh, b"method"),
     }
@@ -4845,6 +4942,167 @@ fn stream_frames(
         fresh,
         &format!("{{\"cursor\":{since},\"frames\":[]}}"),
     );
+}
+
+/// **The store's page, at the parameters `params` give it** (ADR-0162):
+/// `/StorePage.html` and `/` for store 47, and `/stores/{id}` for any.
+fn serve_store(
+    server: &Server,
+    stream: &mut TcpStream,
+    session: &str,
+    fresh: bool,
+    params: Params,
+) {
+    let unavailable = |stream: &mut TcpStream, why: String| {
+        // A page whose values could not be read is answered as
+        // unavailable, and the server goes on (E14, T04).
+        respond(
+            stream,
+            503,
+            "text/plain; charset=utf-8",
+            session,
+            fresh,
+            format!("the store page cannot be shown: {why}").as_bytes(),
+        );
+    };
+    // Each stream's query, started before the document is rendered
+    // (ADR-0148): the page waits for the ones it is declared to wait
+    // for, and the rest fill their regions in the same response.
+    let runs = match stream_runs(&server.plan, session, &params) {
+        Ok(runs) => runs,
+        Err(why) => return unavailable(stream, why),
+    };
+    std::thread::scope(|scope| {
+        let mut settling = Settling::start(scope, server, session, runs);
+        let settled = settling.for_document();
+        // Registering the subscriber HERE, when the document is
+        // served, rather than when it first subscribes: the page
+        // holds instances from this moment on, so a structural change
+        // after this moment has an address in it. A registration
+        // deferred to the first poll would silently drop every change
+        // that raced it.
+        let (rendered, cursor, entries, env) =
+            match server.serve_document_settled(session, &params, &settled) {
+                Ok(served) => served,
+                Err(why) => return unavailable(stream, why),
+            };
+        let speculation = server
+            .speculation
+            .as_ref()
+            .and_then(|m| m["module"].as_str())
+            .map(|module| (format!("/speculation/{module}"), entries));
+        let page = document(
+            &rendered,
+            &server.templates,
+            &server.plan,
+            cursor,
+            speculation,
+        );
+        server.respond_streaming(
+            stream,
+            session,
+            fresh,
+            &page,
+            server.store_template(),
+            &env,
+            &mut settling,
+        );
+    });
+}
+
+/// **A page that binds no query, at the parameters `params` give it**
+/// (ADR-0130, ADR-0162): from `/page/<path>?..`, or its route.
+fn serve_page(
+    server: &Server,
+    stream: &mut TcpStream,
+    session: &str,
+    fresh: bool,
+    path: &str,
+    params: Params,
+) {
+    let not_found = |stream: &mut TcpStream, why: String| {
+        respond(
+            stream,
+            404,
+            "text/plain; charset=utf-8",
+            session,
+            fresh,
+            why.as_bytes(),
+        );
+    };
+    let runs = match server
+        .plans
+        .get(path)
+        .ok_or_else(|| format!("no page `{path}` in this build"))
+        .and_then(|plan| stream_runs(plan, session, &params))
+    {
+        Ok(runs) => runs,
+        Err(why) => return not_found(stream, why),
+    };
+    std::thread::scope(|scope| {
+        let mut settling = Settling::start(scope, server, session, runs);
+        let settled = settling.for_document();
+        match server.render_page(path, &params, session, &settled) {
+            Ok((page, env, template)) => server.respond_streaming(
+                stream,
+                session,
+                fresh,
+                &page,
+                template,
+                &env,
+                &mut settling,
+            ),
+            Err(why) => not_found(stream, why),
+        }
+    });
+}
+
+/// **The parameters a path gives a route** (ADR-0162), or `None` when it is
+/// not the route's: one segment each, as the compiler's link check matches
+/// a link to a route (`routes::matches`), each decoded as a path is.
+fn route_params(route: &str, path: &str) -> Option<Params> {
+    let segments = |s: &str| -> Vec<String> {
+        match s.trim_matches('/') {
+            "" => Vec::new(),
+            t => t.split('/').map(str::to_string).collect(),
+        }
+    };
+    let (route, path) = (segments(route), segments(path));
+    if route.len() != path.len() {
+        return None;
+    }
+    let mut out = Params::new();
+    for (r, p) in route.iter().zip(&path) {
+        match r.strip_prefix('{').and_then(|r| r.strip_suffix('}')) {
+            Some(name) => {
+                let value = path_decoded(p).filter(|v| !v.is_empty())?;
+                out.insert(name.to_string(), value);
+            }
+            None if r == p => {}
+            None => return None,
+        }
+    }
+    Some(out)
+}
+
+/// A path segment, decoded: `%XX` as the byte it escapes. A `+` is itself,
+/// as RFC 3986 has it in a path; only a form's query makes it a space.
+/// `None` for an escape that is not one, or bytes that are not UTF-8.
+fn path_decoded(v: &str) -> Option<String> {
+    let bytes = v.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = std::str::from_utf8(bytes.get(i + 1..i + 3)?).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
 }
 
 fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &str, fresh: bool) {
@@ -6154,8 +6412,12 @@ public query Store(",
             s.documents
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
+        s.params
+            .lock()
+            .expect("params")
+            .insert(doc.clone(), store_params(STORE_ID));
         let pushed = s.subscribed(&doc);
-        let before = s.render_store_document("a", &[]).expect("the page reads");
+        let before = s.render_store_document(&doc, &[]).expect("the page reads");
         s.command(ADD, "a", &add("espresso", 1), false)
             .expect("the command commits");
         let mut queue = s.pending.lock().expect("pending");
@@ -7470,6 +7732,95 @@ public query Store(",
             waiting.acknowledge(cursor);
             assert!(waiting.after(document).1.is_empty());
         });
+    }
+
+    /// **A path gives a route its parameters** (ADR-0162): one segment each,
+    /// as the compiler's link check matches a link, decoded as a path is.
+    #[test]
+    fn a_path_gives_a_route_its_parameters() {
+        let id = |path: &str| route_params("/stores/{id}", path).map(|p| p["id"].clone());
+        assert_eq!(id("/stores/48").as_deref(), Some("48"));
+        assert_eq!(id("/stores/48/").as_deref(), Some("48"));
+        assert_eq!(id("/stores/flat%20white").as_deref(), Some("flat white"));
+        // A `+` in a path is itself; a form's query makes it a space.
+        assert_eq!(id("/stores/a+b").as_deref(), Some("a+b"));
+        // Not the route: another word, another length, or no segment.
+        for other in ["/shops/48", "/stores", "/stores/48/menu", "/stores//", "/"] {
+            assert_eq!(id(other), None, "{other}");
+        }
+        // Not text: refused rather than passed through.
+        assert_eq!(id("/stores/%zz"), None);
+        assert_eq!(id("/stores/%FF"), None);
+        // A route of words alone, and the root.
+        assert_eq!(route_params("/about", "/about"), Some(Params::new()));
+        assert_eq!(route_params("/", "/"), Some(Params::new()));
+    }
+
+    /// **The store at its route, and a second store at its own** (ADR-0162,
+    /// charter §15.3): `/stores/{id}` names the store page, and `48` is a
+    /// store with its own name and menu.
+    #[test]
+    fn each_store_is_served_at_its_route() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (page, params) = s.routed("/stores/48").expect("the store's route");
+        assert_eq!(page, "store.page.StorePage");
+        assert_eq!(params, store_params("48"));
+        assert_eq!(s.routed("/stores"), None);
+        let (harbor, _) = s.serve_store_document("a", "48").expect("served");
+        let harbor = visible(&harbor);
+        assert!(harbor.contains("Harbor Coffee"), "{harbor}");
+        assert!(harbor.contains("Matcha Latte"), "{harbor}");
+        assert!(!harbor.contains("Blue Bottle"), "{harbor}");
+        assert!(!harbor.contains("Espresso"), "{harbor}");
+        // Store 47 at its route is the page `/StorePage.html` serves.
+        let (blue, _) = s.serve_store_document("b", STORE_ID).expect("served");
+        assert!(visible(&blue).contains("Blue Bottle"), "{blue}");
+        // And store 48 again, after 47: each store's menu is its own
+        // fragment, not the one rendered last.
+        let (again, _) = s.serve_store_document("d", "48").expect("served");
+        let again = visible(&again);
+        assert!(again.contains("Matcha Latte"), "{again}");
+        assert!(!again.contains("Espresso"), "{again}");
+        // A store this server does not hold: a page that cannot be read
+        // (ADR-0147), not yet answered absent.
+        assert!(s.serve_store_document("c", "999").is_err());
+    }
+
+    /// **A change to one store's menu reaches that store's pages only**
+    /// (§15.6 test 11, ADR-0162), and a change to the session's cart reaches
+    /// both its stores' pages.
+    #[test]
+    fn a_change_to_one_stores_menu_reaches_that_stores_pages_only() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, blue) = s.serve_store_document("a", STORE_ID).expect("served");
+        let (_, harbor) = s.serve_store_document("a", "48").expect("served");
+        let doc = |d: u64| ("a".to_string(), d);
+        s.broadcast_menu(MenuOp::Rename {
+            id: "espresso".to_string(),
+            name: "Espresso Doppio".to_string(),
+        })
+        .expect("the menu changes");
+        let patched = |d: u64| {
+            s.pending.lock().expect("pending")[&doc(d)]
+                .frames
+                .iter()
+                .any(|(_, f)| matches!(f, StreamFrame::Patch(_)))
+        };
+        assert!(
+            patched(blue),
+            "store 47's page was not told its menu changed"
+        );
+        assert!(!patched(harbor), "store 48's page was told of 47's menu");
+        // The cart is the session's: an add reaches both.
+        s.command(ADD, "a", &add("drip", 1), false).expect("runs");
+        let sets = |d: u64| {
+            s.pending.lock().expect("pending")[&doc(d)]
+                .frames
+                .iter()
+                .filter(|(_, f)| matches!(f, StreamFrame::PatchSet(set) if !set.patches.is_empty()))
+                .count()
+        };
+        assert_eq!((sets(blue), sets(harbor)), (1, 1));
     }
 
     /// **A document is its own subscriber** (ADR-0161). Two tabs in one

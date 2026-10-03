@@ -52,6 +52,8 @@ const MUTATING = [
   "stream",
   // ADR-0157: an item sold out is one per server.
   "availability",
+  // ADR-0162: store 47's menu, which a test renames, is one per server.
+  "stores",
 ];
 
 export const MUTABLE_PORTS = Object.fromEntries(

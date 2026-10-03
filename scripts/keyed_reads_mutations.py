@@ -64,10 +64,8 @@ MUTANTS = [
         # for one the server does not hold must take nothing.
         "a read for a document the server does not hold is taken",
         SERVER,
-        "            let Some(page) = keyed.get_mut(&doc) else {\n"
-        "                return Ok(KeyOutcome::Superseded);\n"
-        "            };\n",
-        "            let page = keyed.entry(doc.clone()).or_default();\n",
+        "        if !self.keyed.lock().expect(\"keyed\").contains_key(&doc) {\n",
+        "        if !self.keyed.lock().expect(\"keyed\").contains_key(&doc) && false {\n",
     ),
     (
         "cancel lets go of nothing",
