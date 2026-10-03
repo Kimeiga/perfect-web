@@ -1,9 +1,10 @@
 {
   "store.name": "Blue Bottle",
+  "store.description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning.",
   "menu": [
-    { "id": "espresso", "name": "Espresso" },
-    { "id": "cortado", "name": "Cortado" },
-    { "id": "cold-brew", "name": "Cold Brew" }
+    { "id": "espresso", "name": "Espresso", "description": "A double shot, pulled short." },
+    { "id": "cortado", "name": "Cortado", "description": "Espresso cut with an equal part of warm milk." },
+    { "id": "cold-brew", "name": "Cold Brew", "description": "Steeped for eighteen hours and served over ice." }
   ],
   "cart.line_count": 0
 }

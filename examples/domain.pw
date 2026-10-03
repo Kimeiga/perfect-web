@@ -42,9 +42,13 @@ opaque type InteractionId = String
 // reading another — harmless while nothing depended on the element's type, and
 // not harmless now that a resumable handler inside the loop hashes it into a
 // capture schema.
+//
+// Its description since ADR-0166, charter §15.1's: what the item is, which a
+// menu's row shows under its name.
 type MenuItem = MenuItem {
     id: MenuItemId,
     name: String,
+    description: String,
 }
 
 // --- quantities -----------------------------------------------------------
@@ -74,9 +78,11 @@ type StoreHours = StoreHours {
     closes_minute: Int,
 }
 
+// What the store says of itself since ADR-0166, charter §15.1's.
 type Store = Store {
     id: StoreId,
     name: String,
+    description: String,
     hours: StoreHours,
 }
 

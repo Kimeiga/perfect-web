@@ -81,7 +81,17 @@
       ]
     },
     {
-      "part": 6,
+      "part": 1,
+      "path": "store.description",
+      "binding": "store",
+      "steps": [
+        {
+          "field": "description"
+        }
+      ]
+    },
+    {
+      "part": 8,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -102,7 +112,7 @@
   ],
   "live": [
     {
-      "part": 7,
+      "part": 9,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
@@ -110,7 +120,7 @@
   ],
   "streams": [
     {
-      "part": 1,
+      "part": 2,
       "resource": "store.page.Estimate",
       "args": [
         "current_session()"
@@ -130,7 +140,7 @@
       "streamed": true
     },
     {
-      "part": 9,
+      "part": 11,
       "resource": "store.page.Recommendations",
       "args": [
         "id"

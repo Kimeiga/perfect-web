@@ -1978,6 +1978,34 @@ e14-slots:
      } > docs/evidence/E14/slots.txt
     @grep -E "^test result|pw check|passed|skipped|mutants killed" docs/evidence/E14/slots.txt
 
+# ADR-0166: the store and its items say what they are, and a host's answer is
+# read through the program's own types. The engine's tests, the server's, the
+# slots in three engines (WebKit's paint among them), and the mutation
+# controls.
+e14-descriptions:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0166 - the store and its items say what they are"; echo; \
+       echo "produced by: just e14-descriptions"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a host's answer, read through the declared type (runtime/pw-host/tests/host_answers.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test host_answers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store checks"; echo; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       echo; echo "== the development server (pw-dev-server), the benchmark's store among its tests"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_store_and_each_item|^test result'; \
+       echo; echo "== the slots, three engines, WebKit painting the store before them (e2e/slots.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/descriptions_mutations.py)"; echo; \
+       python3 scripts/descriptions_mutations.py; \
+     } > docs/evidence/E14/descriptions.txt
+    @grep -E "^test result|pw check|passed|skipped|mutants killed" docs/evidence/E14/descriptions.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

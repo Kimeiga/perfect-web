@@ -1220,6 +1220,76 @@ pub mod engine {
             .ok_or_else(|| format!("`{interface}` exports no function `{function}`"))
     }
 
+    /// **A host's answer, read through the type the component declares**
+    /// (ADR-0166). A data layer's row can hold more than a program asks for:
+    /// a record's fields its type does not name are not passed in, and a
+    /// field it names that the answer lacks is refused, by name. The rest is
+    /// the engine's to check, as it was: a tuple of another length, a case
+    /// the variant does not have, or a value of another kind is passed on,
+    /// and refused there.
+    pub fn project(
+        v: wasmtime::component::Val,
+        ty: &wasmtime::component::types::Type,
+    ) -> Result<wasmtime::component::Val, String> {
+        use wasmtime::component::Val;
+        use wasmtime::component::types::Type;
+        let inner = |v: Option<Box<Val>>, ty: Option<Type>| -> Result<Option<Box<Val>>, String> {
+            match (v, ty) {
+                (Some(v), Some(ty)) => Ok(Some(Box::new(project(*v, &ty)?))),
+                (v, _) => Ok(v),
+            }
+        };
+        let each = |items: Vec<Val>, ty: &Type| -> Result<Vec<Val>, String> {
+            items.into_iter().map(|v| project(v, ty)).collect()
+        };
+        Ok(match (v, ty) {
+            (Val::Record(fields), Type::Record(record)) => {
+                let mut given: std::collections::BTreeMap<String, Val> =
+                    fields.into_iter().collect();
+                let mut out = Vec::new();
+                for field in record.fields() {
+                    let v = given.remove(field.name).ok_or_else(|| {
+                        format!("the host's record has no field `{}`", field.name)
+                    })?;
+                    out.push((field.name.to_string(), project(v, &field.ty)?));
+                }
+                Val::Record(out)
+            }
+            (Val::List(items), Type::List(list)) => Val::List(each(items, &list.ty())?),
+            (Val::FixedLengthList(items), Type::FixedLengthList(list)) => {
+                Val::FixedLengthList(each(items, &list.ty())?)
+            }
+            (Val::Map(pairs), Type::Map(map)) => {
+                let (key, value) = (map.key(), map.value());
+                Val::Map(
+                    pairs
+                        .into_iter()
+                        .map(|(k, v)| Ok((project(k, &key)?, project(v, &value)?)))
+                        .collect::<Result<_, String>>()?,
+                )
+            }
+            (Val::Tuple(items), Type::Tuple(tuple)) if items.len() == tuple.types().len() => {
+                Val::Tuple(
+                    items
+                        .into_iter()
+                        .zip(tuple.types())
+                        .map(|(v, ty)| project(v, &ty))
+                        .collect::<Result<_, _>>()?,
+                )
+            }
+            (Val::Option(v), Type::Option(option)) => Val::Option(inner(v, Some(option.ty()))?),
+            (Val::Result(Ok(v)), Type::Result(result)) => Val::Result(Ok(inner(v, result.ok())?)),
+            (Val::Result(Err(v)), Type::Result(result)) => {
+                Val::Result(Err(inner(v, result.err())?))
+            }
+            (Val::Variant(case, v), Type::Variant(variant)) => {
+                let ty = variant.cases().find(|c| c.name == case).and_then(|c| c.ty);
+                Val::Variant(case, inner(v, ty)?)
+            }
+            (v, _) => v,
+        })
+    }
+
     /// One JSON value, as a value of this component type, or why not.
     fn from_json(
         ty: &wasmtime::component::types::Type,
@@ -1376,8 +1446,9 @@ pub mod engine {
                         "`{key}` is granted and the host implements nothing for it"
                     ));
                 };
+                let named = key.clone();
                 instance
-                    .func_new(func, move |_, _ty, args, results| {
+                    .func_new(func, move |_, ty, args, results| {
                         let out = implementation(args).map_err(wasmtime::Error::msg)?;
                         if out.len() != results.len() {
                             return Err(wasmtime::Error::msg(format!(
@@ -1386,8 +1457,12 @@ pub mod engine {
                                 results.len()
                             )));
                         }
-                        for (slot, v) in results.iter_mut().zip(out) {
-                            *slot = v;
+                        // Read through the type the component declares
+                        // (ADR-0166): a data layer's row may hold more than
+                        // the program asks for.
+                        for ((slot, v), ty) in results.iter_mut().zip(out).zip(ty.results()) {
+                            *slot = project(v, &ty)
+                                .map_err(|e| wasmtime::Error::msg(format!("`{named}`: {e}")))?;
                         }
                         Ok(())
                     })

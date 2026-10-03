@@ -4,6 +4,7 @@
 ///
 // Not E8's production host: its deletion condition is that E8 replaces it with
 // the capability-constrained one while preserving the `pw-protocol` boundary.
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
@@ -98,13 +99,30 @@ const builtWith = (dist) => {
 if (builtWith("dist") !== null && builtWith("dist") !== RUNTIME) {
   throw new Error("dist was built with another pw-runtime.mjs: run run.sh again");
 }
-const KEYED_STALE =
-  existsSync(new URL("./dist-keyed/build", import.meta.url)) && builtWith("dist-keyed") !== RUNTIME;
+// And the sources it was built from (ADR-0166), each by its digest, as
+// `run.sh` records them. On 2026-10-03 the suite ran on a build of an
+// experiment whose source had since been put back, and passed a page the
+// sources no longer described. A source that is gone is a copy a build made
+// for itself (`keyed-store.sh`'s), and is not held to.
+const changedSince = (dist) => {
+  const recorded = new URL(`./${dist}/sources.json`, import.meta.url);
+  if (!existsSync(recorded)) return `${dist} records no sources`;
+  const { files } = JSON.parse(readFileSync(recorded, "utf8"));
+  const digest = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+  const changed = files.find(({ path, sha256 }) => existsSync(path) && digest(path) !== sha256);
+  return changed ? `${changed.path} changed since ${dist} was built` : null;
+};
+if (builtWith("dist") !== null && changedSince("dist")) {
+  throw new Error(`${changedSince("dist")}: run run.sh again`);
+}
+const KEYED_WHY = !existsSync(new URL("./dist-keyed/build", import.meta.url))
+  ? null
+  : builtWith("dist-keyed") !== RUNTIME
+    ? "dist-keyed was built with another pw-runtime.mjs"
+    : changedSince("dist-keyed");
+const KEYED_STALE = KEYED_WHY !== null;
 if (KEYED_STALE) {
-  console.warn(
-    "dist-keyed was built with another pw-runtime.mjs: e2e/keyed.spec.mjs is not run; " +
-      "run keyed-store.sh again",
-  );
+  console.warn(`${KEYED_WHY}: e2e/keyed.spec.mjs is not run; run keyed-store.sh again`);
 }
 const KEYED_BUILT = existsSync(new URL("./dist-keyed/build", import.meta.url)) && !KEYED_STALE;
 

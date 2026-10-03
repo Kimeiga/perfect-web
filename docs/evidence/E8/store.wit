@@ -156,6 +156,7 @@ package pw:types {
         record domain-menu-item {
             id: domain-menu-item-id,
             name: string,
+            description: string,
         }
         type domain-positive-int = s64;
         record domain-money {
@@ -168,6 +169,7 @@ package pw:types {
         record domain-store {
             id: domain-store-id,
             name: string,
+            description: string,
             hours: domain-store-hours,
         }
         variant domain-store-error {

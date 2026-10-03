@@ -147,18 +147,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
      2. ~~The recommendation and estimate slots in the store itself~~
         (ADR-0165, `just e14-slots`): tests 3 and 17 hold in Chromium and
         Firefox. T05 and T10 needed no re-basing (ADR-0156).
-     3. **Next: §15.1's descriptions and prices** (the audit's eighth gap,
-        brought forward). `Store.description`, `MenuItem.description` and
-        `MenuItem.price`, shown on the page.
-        - WebKit paints a page only once it holds about 200 characters of
-          text, and the store holds about 90. Safari shows nothing until
-          the slots are filled. This is the text that fixes it: turn on
-          `e2e/slots.spec.mjs`'s two `fixme` tests in WebKit.
-        - The data layer answers both the canonical store and the
-          benchmark's frozen copy, whose records are smaller. Each program
-          must receive the fields its own types declare.
-        - Then refuse a `//` line inside markup, which renders as text
-          (ADR-0165).
+     3. ~~§15.1's descriptions~~ (ADR-0166, `just e14-descriptions`):
+        the store and its items say what they are, a host's answer is read
+        through the program's own types, and WebKit paints the store before
+        its slots. The browser suite refuses a build whose sources changed
+        (a correction to ADR-0165).
+        - **Next: refuse a `//` line inside markup**, which renders as text
+          (found by ADR-0165). Then money shown as text, for §15.1's
+          `price`.
      4. Decrement, remove, and a per-line cart.
      5. A command retried on a transport failure.
      6. §15.5's missing controls.

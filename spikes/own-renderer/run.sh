@@ -138,6 +138,20 @@ fi
 rm -rf "$OUT.again"
 echo "   byte-identical"
 
+# What this build was made from, each source by its digest (ADR-0166). The
+# browser suite refuses a build whose sources have changed since: on
+# 2026-10-03 the suite ran on a build of an experiment, and reported a page
+# the sources no longer described.
+node -e '
+const { createHash } = require("node:crypto");
+const { readFileSync } = require("node:fs");
+const files = process.argv.slice(1).map((path) => ({
+  path,
+  sha256: createHash("sha256").update(readFileSync(path)).digest("hex"),
+}));
+console.log(JSON.stringify({ files }, null, 2));
+' "${SERVED[@]}" "${PAGES[@]}" > "$OUT/sources.json"
+
 # `just e10-browser` builds through here and runs the suite itself, three
 # times, so one set of build steps serves both.
 if [ "${BUILD_ONLY:-}" = 1 ]; then

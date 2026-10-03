@@ -414,7 +414,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-02: `events` declares `close`, a dialog's, whose record is its
     // return value (ADR-0141): a modal dialog's closing is heard by the
     // signal that shows it.
-    const EXPECTED: u64 = 0xc17d9614372e049b;
+    // 2026-10-03: `examples/domain.pw`'s `Store` and `MenuItem` declare a
+    // `description`, charter §15.1's, which the store's page shows
+    // (ADR-0166).
+    const EXPECTED: u64 = 0xcb9af1a07ab585cf;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

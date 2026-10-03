@@ -1402,6 +1402,12 @@ impl Server {
                         "name".into(),
                         Val::String(store_named(id).unwrap_or_default().into()),
                     ),
+                    // A program whose `Store` declares none is not given it
+                    // (ADR-0166): the benchmark's.
+                    (
+                        "description".into(),
+                        Val::String(store_description(id).into()),
+                    ),
                     (
                         "hours".into(),
                         Val::Record(vec![
@@ -1427,6 +1433,12 @@ impl Server {
                             Val::Record(vec![
                                 ("id".into(), Val::String(id.clone())),
                                 ("name".into(), Val::String(name.clone())),
+                                // Read through the program's `MenuItem`
+                                // (ADR-0166): the benchmark's has none.
+                                (
+                                    "description".into(),
+                                    Val::String(item_description(id).into()),
+                                ),
                             ])
                         })
                         .collect(),
@@ -4096,7 +4108,42 @@ fn item(id: &str, name: &str) -> Value {
     let mut f = BTreeMap::new();
     f.insert("id".to_string(), Value::Text(id.into()));
     f.insert("name".to_string(), Value::Text(name.into()));
+    f.insert(
+        "description".to_string(),
+        Value::Text(item_description(id).into()),
+    );
     Value::Record(f)
+}
+
+/// **What each item is** (ADR-0166, charter §15.1), by its id: what the data
+/// layer answers with an item, and what a menu's row shows under its name. An
+/// item the table does not know, such as one E7-P inserts, is described by
+/// nothing.
+fn item_description(id: &str) -> &'static str {
+    match id {
+        "espresso" => "A double shot, pulled short.",
+        "cortado" => "Espresso cut with an equal part of warm milk.",
+        "cold-brew" => "Steeped for eighteen hours and served over ice.",
+        "drip" => "Brewed to order, one cup at a time.",
+        "matcha" => "Ceremonial matcha whisked with steamed milk.",
+        "scone" => "Baked each morning with wild blueberries.",
+        _ => "",
+    }
+}
+
+/// **What each store says of itself** (ADR-0166, charter §15.1), by its id.
+fn store_description(id: &str) -> &'static str {
+    match id {
+        STORE_ID => {
+            "Small-batch coffee, served at the bar or carried out. The espresso changes \
+             with the season, and the pastries come in every morning."
+        }
+        _ if id == SECOND_STORE.0 => {
+            "A neighborhood cafe by the water, pouring drip coffee brewed to order and \
+             matcha whisked by hand."
+        }
+        _ => "",
+    }
 }
 
 fn menu_value(items: &[(String, String)]) -> Value {
@@ -8036,6 +8083,40 @@ public query Store(",
         let (blue, _) = s.serve_store_document("c", STORE_ID).expect("served");
         assert_eq!(reads(), read + 1, "store 47's menu was not read again");
         assert!(visible(&blue).contains("Espresso Doppio"), "{blue}");
+    }
+
+    /// **The store and each item say what they are** (ADR-0166, charter
+    /// §15.1): the data layer's descriptions, read through the store's
+    /// `Store` and `MenuItem`, each store its own. The benchmark's store,
+    /// whose types declare none, is served from the same rows: its tests
+    /// would fail if a host answer were not read through its types.
+    #[test]
+    fn the_store_and_each_item_say_what_they_are() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = |id: &str| {
+            let (html, _) = s.serve_store_document("a", id).expect("served");
+            visible(&html)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let blue = page(STORE_ID);
+        for said in [
+            "Small-batch coffee, served at the bar or carried out.",
+            "Espresso A double shot, pulled short.",
+            "Cortado Espresso cut with an equal part of warm milk.",
+            "Cold Brew Steeped for eighteen hours and served over ice.",
+        ] {
+            assert!(blue.contains(said), "{said}: {blue}");
+        }
+        let harbor = page("48");
+        for said in [
+            "A neighborhood cafe by the water",
+            "Drip Coffee Brewed to order, one cup at a time.",
+        ] {
+            assert!(harbor.contains(said), "{said}: {harbor}");
+        }
+        assert!(!harbor.contains("Small-batch"), "{harbor}");
     }
 
     /// **The patch that fills a slot of the store** (ADR-0165): the opening

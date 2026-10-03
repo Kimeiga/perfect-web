@@ -18,27 +18,22 @@ test.afterEach(async ({ request }) => {
   await request.post("/bench/recommendations");
 });
 
-// WebKit paints a page only once it holds about 200 characters of text, or
-// has loaded (ADR-0148). The store holds fewer until it says more about
-// itself and its items, as charter §15.1 asks: the next ruling. Until then,
-// in Safari, the store is shown only when its slots are filled.
-const WEBKIT_PAINTS_LATE = "WebKit shows the store only when its slots are filled";
-
 const delivery = (page) => page.getByRole("region", { name: "Delivery" });
 const recommendations = (page) => page.getByRole("region", { name: "Recommendations" });
 // Polled, not on animation frames, Playwright's default: WebKit runs no
-// frame before its first paint, and the store is not painted there until its
-// slots are filled (the last test).
+// frame before its first paint, which a page that says too little does not
+// have until it has loaded (the last test).
 const ready = (page) =>
   page.waitForFunction(() => document.documentElement.dataset.pwReady, null, { polling: 50 });
 
 test("the slots come after the store's own content (test 3)", async ({ page, request }) => {
-  await request.post("/bench/recommendations?delay=1500");
+  await request.post("/bench/recommendations?delay=2500");
   await page.goto("/stores/47", { waitUntil: "commit" });
-  // The store's own content, while the recommendations are still coming.
+  // The store's own content, while the recommendations are still coming:
+  // the placeholder first, so a slow engine under load does not race it.
+  await expect(recommendations(page)).toHaveText("Finding recommendations");
   await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
   await expect(page.locator("#menu li")).toHaveCount(3);
-  await expect(recommendations(page)).toHaveText("Finding recommendations");
   // Then each slot, filled where it is. The estimate is said to a screen
   // reader when it comes.
   await expect(delivery(page)).toHaveText("Delivery in 25 min");
@@ -46,14 +41,9 @@ test("the slots come after the store's own content (test 3)", async ({ page, req
   await expect(recommendations(page).getByRole("listitem")).toHaveText(["Cortado", "Cold Brew"]);
 });
 
-test("slow recommendations do not hold up an Add (test 17)", async ({
-  page,
-  request,
-  browserName,
-}) => {
+test("slow recommendations do not hold up an Add (test 17)", async ({ page, request }) => {
   // A press needs a page that is shown: Playwright waits for the button to
   // be still across two frames, and a person for it to be there at all.
-  test.fixme(browserName === "webkit", WEBKIT_PAINTS_LATE);
   await request.post("/bench/recommendations?delay=2500");
   await page.goto("/stores/47", { waitUntil: "commit" });
   await ready(page);
@@ -84,8 +74,12 @@ test("an estimate that fails says so, and the page still works", async ({ page }
   await expect(page.locator("#cart-count")).toHaveText("1");
 });
 
-test("the store is shown before its slots are filled", async ({ page, request, browserName }) => {
-  test.fixme(browserName === "webkit", WEBKIT_PAINTS_LATE);
+test("the store is shown before its slots are filled", async ({ page, request }) => {
+  // WebKit paints a page while it loads only once it holds more than 200
+  // characters of text, or 32 by 32 pixels of an image (WebKit's
+  // `LocalFrameView`). The store says enough of itself and its items to
+  // (ADR-0166); until it did, Safari showed it only when its slots were
+  // filled.
   await request.post("/bench/recommendations?delay=2500");
   await page.goto("/stores/47", { waitUntil: "commit" });
   await page.waitForFunction(

@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `7ba162b`, with ADR-0165.
+**Reviewed:** 2026-10-03, against master `1c7b2e7`, with ADR-0166.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,33 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0166, 2026-10-03: ADR-0165's browser suite ran on a stale
+build** ([ADR-0166](DECISIONS/ADR-0166-the-store-and-its-items-say-what-they-are.md)).
+- **What was wrong.** To see whether the estimate's position changed when
+  WebKit paints, it was moved below the cart and the page rebuilt. The source
+  was put back without rebuilding, and the full suite ran on the experiment's
+  build. ADR-0165 reported "518 passed" for a page the sources no longer
+  described. Against the committed page, two `store.spec.mjs` tests that
+  named the menu loop's part by number fail in every engine. ADR-0165's own
+  evidence builds first, and stands.
+- **Now** `run.sh` records each source's SHA-256, and the browser suite
+  refuses a build whose sources have changed since. The two tests find the
+  menu's tokens by where they are.
+
+**ADR-0166, 2026-10-03: the store and its items say what they are**. Charter
+§15.1's descriptions:
+- `Store` and `MenuItem` declare a `description`, and the store's page shows
+  each;
+- a host's answer is read through the type the importing component
+  declares. Fields it does not name are not passed in, and one it names
+  that is missing is refused by name. One data layer serves the canonical
+  store and the benchmark's frozen copy.
+
+WebKit now paints the store before its slots are filled: first paint at
+16-32 ms, where it was 2527 ms. §15.6 tests 3 and 17 hold in all three
+engines. `price` waits for a ruling on showing money as text. Eight mutants
+(`just e14-descriptions`).
 
 **ADR-0165, 2026-10-03: the store's delivery estimate and recommendations**
 ([ADR-0165](DECISIONS/ADR-0165-the-store-s-estimate-and-recommendations.md)).

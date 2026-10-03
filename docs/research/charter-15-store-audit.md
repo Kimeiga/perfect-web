@@ -69,7 +69,7 @@ are fixed (ADR-0155):
 |---|---|
 | route `/stores/:store_id` | met since ADR-0160-0163: `route "/stores/{id}"`, held to the page's parameters; served at it, each document reading its own; a second store; an unknown store answered 404, as the page declares (`not_found_on StoreError.NotFound`, PW0342) |
 | semantic heading, menu content early, cart summary slot | met (the cart as a count) |
-| delivery estimate slot, recommendation slot | met since ADR-0165: each a named `<stream>` region, the estimate's said to a screen reader when it comes; WebKit paints the store only when they are filled, until §15.1's fields |
+| delivery estimate slot, recommendation slot | met since ADR-0165: each a named `<stream>` region, the estimate's said to a screen reader when it comes; painted before they are filled in WebKit too since ADR-0166 |
 | add item | met |
 | increment quantity | partial: pressing Add again grows the line; no per-line control |
 | decrement quantity, remove item | missing: the data layer has add, clear and current |
@@ -107,7 +107,7 @@ are fixed (ADR-0155):
 |---|---|---|
 | 1 | readable without JavaScript | met |
 | 2 | static public shell holds no private cart data | partial: the store page is `cache private`, so it has no public shell |
-| 3 | recommendations stream after core content | met since ADR-0165 in the store's response, and in Chromium and Firefox (`e2e/slots.spec.mjs`); WebKit paints the store only when its slots are filled |
+| 3 | recommendations stream after core content | met since ADR-0165 in the store's response, and in three engines since ADR-0166 (`e2e/slots.spec.mjs`) |
 | 4, 5 | one interaction one mutation; two interactions two | met |
 | 6, 7, 8 | one key one request; a changed key cancels stale work; leaving cancels | met on T07's store, three engines (ADR-0152) |
 | 9 | optimistic rollback | met |
@@ -118,7 +118,7 @@ are fixed (ADR-0155):
 | 14 | keyboard and screen-reader semantics | partial: every Add button is named "Add", and the count has no live region (the cart's notice has one since ADR-0157); no automated audit |
 | 15 | focus preserved | met |
 | 16 | handler version mismatch recovers | partial: refused safely, the recovery not acted on (fixed) |
-| 17 | slow recommendations do not block Add | met since ADR-0165 in Chromium and Firefox (`e2e/slots.spec.mjs`); not in WebKit, which shows nothing to press until the slots are filled |
+| 17 | slow recommendations do not block Add | met since ADR-0165 in Chromium and Firefox, and in WebKit since ADR-0166, which gave the store enough text to be painted before its slots (`e2e/slots.spec.mjs`) |
 | 18 | last-known-good only for declared public data | partial: the materializer's tests; nothing limits the fallback to public data, and the server never serves one |
 
 ## Gaps, most important first
@@ -130,18 +130,17 @@ are fixed (ADR-0155):
 2. ~~**The route, and more than one store**~~ (§15.3): met by ADR-0160 to
    ADR-0163.
 3. ~~**The recommendation and estimate slots**~~ (tests 3 and 17): met by
-   ADR-0165, but in WebKit, which paints the store only once it holds about
-   200 characters of text. §15.1's descriptions and prices (item 8) are
-   that text, so item 8 comes next.
+   ADR-0165, and in WebKit by ADR-0166.
 4. **Decrement, remove, and a per-line list** (§15.3).
 5. **A command retried on a transport failure** (§15.4), with its
    interaction.
 6. **§15.5's missing controls.**
 7. **Last-known-good** (test 18): a rule limiting it to public data, and
    the server serving it.
-8. **§15.1's fields**, and `PositiveInt` checked at the boundary. Next,
-   since ADR-0165: the store's and its items' descriptions and prices are
-   also what lets WebKit paint the store before its slots are filled.
+8. **§15.1's fields**, and `PositiveInt` checked at the boundary. The
+   descriptions are met by ADR-0166. Still missing: `price`, which needs
+   money shown as text; `available`, `category` and `menu_version`; and
+   `DeliveryEstimate`'s range.
 9. **Accessibility** (test 14): each Add named by its item, a live region
    for the count, an automated audit.
 10. **Tests 2 and 13** against the running store's shared output.

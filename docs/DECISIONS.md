@@ -1353,3 +1353,14 @@ Found on the way:
   under 200 characters of text: tests 3 and 17 hold in Chromium and Firefox.
   §15.1's descriptions and prices are next.
 - A `//` line in markup is text.
+
+[ADR-0166](DECISIONS/ADR-0166-the-store-and-its-items-say-what-they-are.md):
+part of the audit's eighth gap, and a correction to ADR-0165.
+- `Store` and `MenuItem` declare a `description` (§15.1), and the store's
+  page shows them: WebKit now paints it before its slots are filled.
+- A host's answer is read through the type the importing component
+  declares: fields it does not name are not passed in, and one it names
+  that is missing is refused by name. One data layer serves the canonical
+  store and the benchmark's frozen copy.
+- Correction: ADR-0165's browser suite ran on a stale build. The suite now
+  refuses a build whose sources have changed since.

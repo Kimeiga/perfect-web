@@ -18,10 +18,13 @@ import StoreId
 fn decode_store(raw: Unknown) -> Result<Store, DecodeError> !{} {
     let id = field(raw, "id", string)?
     let name = field(raw, "name", string)?
+    // Charter §15.1's, since ADR-0166.
+    let description = field(raw, "description", string)?
     let hours = field(raw, "hours", decode_hours)?
     Ok(Store {
         id: StoreId.from_string(id)?,
         name: name,
+        description: description,
         hours: hours,
     })
 }

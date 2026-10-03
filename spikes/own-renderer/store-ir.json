@@ -5,7 +5,7 @@
     "params": [
       "id"
     ],
-    "schema": "6272dcf48af3a4f9",
+    "schema": "3766b366d290caab",
     "chunks": [
       {
         "chunk": "static",
@@ -22,13 +22,26 @@
       },
       {
         "chunk": "static",
-        "value": "</h1>\n\n            <section aria-label=\"Delivery\" aria-live=\"polite\">\n                "
+        "value": "</h1>\n            <p id=\"store-description\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 1,
+          "value": "store.description",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</p>\n\n            <section aria-label=\"Delivery\" aria-live=\"polite\">\n                "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 1,
+          "id": 2,
           "query": "store.page.Estimate",
           "args": [
             "current_session()"
@@ -51,7 +64,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "text",
-                  "id": 2,
+                  "id": 3,
                   "value": "estimate.minutes",
                   "context": "text"
                 }
@@ -80,7 +93,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 3,
+          "id": 4,
           "collection": "menu",
           "binding": "item",
           "key": "id",
@@ -93,20 +106,33 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 4,
+                "id": 5,
                 "value": "item.name",
                 "context": "text"
               }
             },
             {
               "chunk": "static",
-              "value": "</span>\n                            <button data-pw=\"0\" type=\"button\""
+              "value": "</span>\n                            <p>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 6,
+                "value": "item.description",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</p>\n                            <button data-pw=\"0\" type=\"button\""
             },
             {
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 5,
+                "id": 7,
                 "owner": 0,
                 "event": "press",
                 "handler": "0e75dbe9268fceb8",
@@ -131,7 +157,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 6,
+          "id": 8,
           "value": "cart.line_count",
           "context": "text"
         }
@@ -144,7 +170,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 7,
+          "id": 9,
           "value": "notice",
           "context": "text"
         }
@@ -157,7 +183,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 8,
+          "id": 10,
           "owner": 1,
           "event": "press",
           "handler": "b5c3e56ff370a6a8",
@@ -172,7 +198,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 9,
+          "id": 11,
           "query": "store.page.Recommendations",
           "args": [
             "id"
@@ -195,7 +221,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "each",
-                  "id": 10,
+                  "id": 12,
                   "collection": "items",
                   "binding": "item",
                   "key": "id",
@@ -208,7 +234,7 @@
                       "chunk": "dynamic",
                       "value": {
                         "part": "text",
-                        "id": 11,
+                        "id": 13,
                         "value": "item.name",
                         "context": "text"
                       }
