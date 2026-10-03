@@ -67,7 +67,10 @@ fn the_store_builds_every_artifact_from_source() {
             // component of its own since ADR-0125.
             "domain.line_count",
             "store.page.Cart",
+            // The store's slots, since ADR-0165: each stream's query.
+            "store.page.Estimate",
             "store.page.Menu",
+            "store.page.Recommendations",
             "store.page.Store",
             "store.page.add_to_cart",
             "store.page.clear_cart",

@@ -16,9 +16,22 @@ fn build(change: impl Fn(&str) -> String) -> pw_core::build::Build {
     try_build(change).unwrap_or_else(|e| panic!("{e:?}"))
 }
 
-/// The store, its `app.pw` changed by `change`, built or refused.
+/// The store, its `app.pw` changed by `change`, built or refused. The
+/// benchmark's store, which streams nothing and does not change (ADR-0156):
+/// these tests add a stream to it. The canonical store has two since
+/// ADR-0165, which `the_store_streams_its_estimate_and_its_recommendations`
+/// reads.
 fn try_build(change: impl Fn(&str) -> String) -> Result<pw_core::build::Build, String> {
+    try_build_in("benchmarks/baselines/pleris", change)
+}
+
+/// [`try_build`], the store read from `base`, under the repository's root.
+fn try_build_in(
+    base: &str,
+    change: impl Fn(&str) -> String,
+) -> Result<pw_core::build::Build, String> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let base = root.join(base);
     let mut units = Vec::new();
     let mut add = |path: std::path::PathBuf, change: &dyn Fn(&str) -> String| {
         let src = change(&std::fs::read_to_string(&path).expect("read"));
@@ -30,13 +43,13 @@ fn try_build(change: impl Fn(&str) -> String) -> Result<pw_core::build::Build, S
     };
     let same = |s: &str| s.to_string();
     for dir in [
-        "packages/pw-std",
-        "packages/pw-platform-web",
-        "examples/lib",
-        "examples/store",
+        root.join("packages/pw-std"),
+        root.join("packages/pw-platform-web"),
+        base.join("lib"),
+        base.join("store"),
     ] {
-        let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(dir))
-            .unwrap_or_else(|e| panic!("{dir}: {e}"))
+        let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
             .map(|e| e.expect("entry").path())
             .filter(|p| p.extension().is_some_and(|x| x == "pw"))
             .collect();
@@ -49,7 +62,7 @@ fn try_build(change: impl Fn(&str) -> String) -> Result<pw_core::build::Build, S
             }
         }
     }
-    add(root.join("examples/domain.pw"), &same);
+    add(base.join("domain.pw"), &same);
     pw_core::build::build(&units)
 }
 
@@ -119,6 +132,60 @@ fn plan_of(b: pw_core::build::Build) -> Result<pw_core::page_values::PageValues,
         .find(|p| p.page == "store.page.StorePage")
         .expect("the store page")
         .plan
+}
+
+/// **The canonical store's slots** (charter §15.3, ADR-0165): its delivery
+/// estimate, the session's and kept for no one, and its recommendations,
+/// public and kept ten minutes. Both are streamed, and each is bounded.
+#[test]
+fn the_store_streams_its_estimate_and_its_recommendations() {
+    let b = try_build_in("examples", |app| app.to_string()).expect("the store builds");
+    let planned = plan_of(b).expect("planned");
+    let streams: Vec<(&str, &[String], &str, u64, bool)> = planned
+        .streams
+        .iter()
+        .map(|s| {
+            (
+                s.resource.as_str(),
+                s.args.as_slice(),
+                s.policy.cache.as_str(),
+                s.policy.freshness_ms,
+                s.streamed,
+            )
+        })
+        .collect();
+    assert_eq!(
+        streams,
+        [
+            (
+                "store.page.Estimate",
+                ["current_session()".to_string()].as_slice(),
+                "private",
+                0,
+                true
+            ),
+            (
+                "store.page.Recommendations",
+                ["id".to_string()].as_slice(),
+                "shared",
+                600_000,
+                true
+            ),
+        ]
+    );
+    assert!(
+        planned
+            .streams
+            .iter()
+            .all(|s| s.policy.timeout_ms == Some(3000))
+    );
+    // The document waits for neither: no binding reads them.
+    assert!(
+        !planned
+            .bindings
+            .iter()
+            .any(|b| b.resource.ends_with("Estimate") || b.resource.ends_with("Recommendations"))
+    );
 }
 
 #[test]

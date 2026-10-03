@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `379e869`, with ADR-0164.
+**Reviewed:** 2026-10-03, against master `7ba162b`, with ADR-0165.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,25 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0165, 2026-10-03: the store's delivery estimate and recommendations**
+([ADR-0165](DECISIONS/ADR-0165-the-store-s-estimate-and-recommendations.md)).
+The audit's third gap, charter §15.3's slots:
+- the canonical store streams its delivery estimate, under its name, and its
+  recommendations, after its cart, each in a named region;
+- the recommendations are public, kept ten minutes, and dropped when the
+  store's menu changes, an event that now reaches a stream's kept answer.
+
+§15.6 tests 3 and 17 hold in Chromium and Firefox.
+- **Not in WebKit.** WebKit paints a page once it holds about 200 characters
+  of text, and the store holds about 90. Measured: the runtime was ready at
+  47 ms and the first paint came at 2527 ms, when the slots were filled. A
+  Safari user sees nothing until then.
+- `e2e/slots.spec.mjs` marks both gaps `fixme`. The fix is §15.1's
+  descriptions and prices, the audit's eighth gap, next.
+- **Also found:** a `//` line inside markup is rendered as text, as in JSX.
+
+Seven mutants (`just e14-slots`).
 
 **Correction, ADR-0164, 2026-10-03: a menu change drops what declares it, for
 its store** ([ADR-0164](DECISIONS/ADR-0164-a-menu-change-drops-what-declares-it.md)).

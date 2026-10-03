@@ -127,8 +127,34 @@
       ]
     },
     {
+      "path": "store.page.Estimate",
+      "name": "Estimate",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "session",
+      "key": [
+        "session"
+      ],
+      "params": [
+        "session"
+      ]
+    },
+    {
       "path": "store.page.Menu",
       "name": "Menu",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [
+        "id"
+      ],
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.page.Recommendations",
+      "name": "Recommendations",
       "node": "resource",
       "partition": "shared",
       "privacy": "public",
@@ -244,6 +270,14 @@
     },
     {
       "from": "store.page.Menu",
+      "to": "Events.MenuChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.page.Recommendations",
       "to": "Events.MenuChanged",
       "kind": "invalidated_by",
       "key": [

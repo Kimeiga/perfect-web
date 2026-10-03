@@ -91,7 +91,10 @@ fn the_stores_transition_runs_and_its_part_reads_the_result() {
 import * as m from "./m.mjs";
 const held = m.decode.cart({ lines: [{ item_id: "espresso", quantity: 2, unit_price: { minor_units: 450 } }] });
 const [s] = m.commands["store.page.add_to_cart"];
-const read = m.parts.cart["4"];
+// The cart's one part, the count, whatever number the page gives it.
+const reads = Object.values(m.parts.cart);
+if (reads.length !== 1) throw new Error(`the cart has ${reads.length} parts`);
+const [read] = reads;
 const more = s.transition(held, ["espresso", 1]);
 const other = s.transition(more, ["cortado", 3]);
 const show = (v) => JSON.stringify(v, (_, x) => (typeof x === "bigint" ? Number(x) : x));

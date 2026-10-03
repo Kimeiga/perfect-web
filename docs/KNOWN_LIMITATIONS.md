@@ -169,7 +169,13 @@ refused by name:
     text**, or has loaded. A smaller shell is blank in Safari until its
     regions settle, however it is rendered.
   - **A region is rendered once per document.** A change to its query after
-    it settles is not sent.
+    it settles is not sent. Its keyed rows are addressed in the document's
+    own domain, not shared as a public fragment's are.
+  - **WebKit paints the store only when its slots are filled** (ADR-0165).
+    WebKit paints a page once it holds about 200 characters of text, or has
+    loaded, and the store holds about 90 until §15.1's descriptions and
+    prices are shown. Until then a Safari user sees nothing, and can press
+    nothing, while the recommendations come.
   - **A stream sits at the top of a page, or in a view composed there.** One
     inside a block or a loop's row is refused at build, as is a signal shown
     in one, or a view holding one.

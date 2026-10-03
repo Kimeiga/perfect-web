@@ -22,7 +22,8 @@ fn contracts() -> Vec<ComponentContract> {
 }
 
 /// A deployment that can host the store: a laptop and an origin serving the
-/// three read domains and the one write domain the demo needs.
+/// read domains and the one write domain the demo needs, and the network its
+/// recommender is reached over.
 fn full() -> Topology {
     Topology {
         nodes: vec![
@@ -39,11 +40,17 @@ fn full() -> Topology {
                 // since E4. The page builds a query key from the session, so
                 // it reads the session to render, and a node that does not
                 // publish `session.read` cannot host it.
+                //
+                // The estimate's domain and the network joined on 2026-10-03,
+                // when the store gained its delivery estimate and its
+                // recommendations (ADR-0165).
                 grants: BTreeSet::from([
                     "database.read<Carts>".to_string(),
+                    "database.read<Estimates>".to_string(),
                     "database.read<Menus>".to_string(),
                     "database.read<Stores>".to_string(),
                     "database.write<Carts>".to_string(),
+                    "network.fetch".to_string(),
                     "session.read".to_string(),
                 ]),
             },

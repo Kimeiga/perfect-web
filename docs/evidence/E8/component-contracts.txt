@@ -40,11 +40,23 @@ store.page.Cart  abi 37cb9e8b9dc1738c
   host      store:data/carts#current  (database.read<Carts>)
   exports   query Cart
 
+store.page.Estimate  abi 415fdfe738cf5f70
+  runs at   origin
+  needs     database.read<Estimates>
+  host      store:data/estimates#current  (database.read<Estimates>)
+  exports   query Estimate
+
 store.page.Menu  abi 60058db28f2ab607
   runs at   origin
   needs     database.read<Menus>
   host      store:data/menus#for-store  (database.read<Menus>)
   exports   query Menu
+
+store.page.Recommendations  abi 362c2dcd203e1e3f
+  runs at   browser, edge, origin
+  needs     network.fetch
+  host      store:data/recommendations#for-store  (network.fetch)
+  exports   query Recommendations
 
 store.page.Store  abi 4aedcc2febb0861f
   runs at   origin
@@ -56,7 +68,9 @@ store.page.StorePage  abi d803b26130c7cf49
   runs at   origin
   needs     session.read
   component pw:app/store.page.Cart#Cart
+  component pw:app/store.page.Estimate#Estimate
   component pw:app/store.page.Menu#Menu
+  component pw:app/store.page.Recommendations#Recommendations
   component pw:app/store.page.Store#Store
   component pw:app/store.page.add_to_cart#add_to_cart
   component pw:app/store.page.clear_cart#clear_cart

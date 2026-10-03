@@ -42,9 +42,19 @@ interface store-page-cart-api {
     cart: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
 }
 
+interface store-page-estimate-api {
+    use pw:types/types.{capability-session-id, domain-delivery-estimate, domain-estimate-error};
+    estimate: func(arg0: capability-session-id) -> result<domain-delivery-estimate, domain-estimate-error>;
+}
+
 interface store-page-menu-api {
     use pw:types/types.{domain-menu-item, domain-store-error, domain-store-id};
     menu: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
+}
+
+interface store-page-recommendations-api {
+    use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
+    recommendations: func(arg0: domain-store-id) -> result<list<domain-recommendation>, domain-recommendation-error>;
 }
 
 interface store-page-store-api {
@@ -92,9 +102,19 @@ world store-page-cart {
     export store-page-cart-api;
 }
 
+world store-page-estimate {
+    import store:data/estimates;
+    export store-page-estimate-api;
+}
+
 world store-page-menu {
     import store:data/menus;
     export store-page-menu-api;
+}
+
+world store-page-recommendations {
+    import store:data/recommendations;
+    export store-page-recommendations-api;
 }
 
 world store-page-store {
@@ -107,7 +127,9 @@ world store-page-store-page {
     import store-page-add-to-cart-api;
     import store-page-cart-api;
     import store-page-clear-cart-api;
+    import store-page-estimate-api;
     import store-page-menu-api;
+    import store-page-recommendations-api;
     import store-page-store-api;
     export store-page-store-page-api;
 }
@@ -172,6 +194,21 @@ package pw:types {
         record domain-order-failure {
             label: string,
         }
+        record domain-delivery-estimate {
+            minutes: s64,
+        }
+        variant domain-estimate-error {
+            no-coverage,
+            location-unavailable,
+        }
+        record domain-recommendation {
+            id: domain-menu-item-id,
+            name: string,
+        }
+        variant domain-recommendation-error {
+            none-available,
+            timeout,
+        }
     }
 }
 
@@ -189,10 +226,18 @@ package store:data {
         clear: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
         current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
     }
+    interface estimates {
+        use pw:types/types.{capability-session-id, domain-delivery-estimate, domain-estimate-error};
+        current: func(arg0: capability-session-id) -> result<domain-delivery-estimate, domain-estimate-error>;
+    }
     interface menus {
         use pw:types/types.{domain-menu-item, domain-menu-item-id, domain-store-error, domain-store-id};
         for-store: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
         is-available: func(arg0: domain-menu-item-id) -> bool;
+    }
+    interface recommendations {
+        use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
+        for-store: func(arg0: domain-store-id) -> result<list<domain-recommendation>, domain-recommendation-error>;
     }
     interface stores {
         use pw:types/types.{domain-store, domain-store-error, domain-store-id};

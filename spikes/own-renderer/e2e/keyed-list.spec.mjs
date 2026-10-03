@@ -331,17 +331,18 @@ test("two sessions see the same change at the same address", async ({ browser })
   }
 
   // And they moved at the SAME address, which is what makes one patch enough.
+  // The menu's addresses: a stream's region is rendered for its document,
+  // and its tokens are that document's (ADR-0165).
   const tokens = await Promise.all(
     [pa, pb].map((p) =>
       p.evaluate(() =>
-        [...document.body.childNodes].length &&
         (function walk(node, out) {
           for (const n of node.childNodes) {
             if (n.nodeType === Node.COMMENT_NODE && /^pw:s\d+@/.test(n.data)) out.push(n.data);
             walk(n, out);
           }
           return out;
-        })(document.body, []),
+        })(document.getElementById("menu"), []),
       ),
     ),
   );

@@ -378,8 +378,11 @@ struct Recommender {
     /// `declared`: the query's declared error, `NoneAvailable`. `host`: the
     /// call itself fails, as a source that is down does.
     fail: Option<String>,
-    /// What it recommends, `(id, name)`.
-    items: Vec<(String, String)>,
+    /// What it recommends, `(id, name)`, for any store a test asks about.
+    /// `None`: each store's own menu, after its first item, two of them
+    /// (ADR-0165), so what it suggests is what the store sells, and changes
+    /// when its menu does.
+    items: Option<Vec<(String, String)>>,
 }
 
 impl Default for Recommender {
@@ -387,12 +390,15 @@ impl Default for Recommender {
         Recommender {
             delay_ms: 1200,
             fail: None,
-            items: vec![
-                ("cortado".to_string(), "Cortado".to_string()),
-                ("cold-brew".to_string(), "Cold Brew".to_string()),
-            ],
+            items: None,
         }
     }
+}
+
+/// **What a store's recommender suggests from its menu** (ADR-0165): the
+/// items after the first, two of them.
+fn recommended_from(menu: &[(String, String)]) -> Vec<(String, String)> {
+    menu.iter().skip(1).take(2).cloned().collect()
 }
 
 /// **The estimator the store's data layer reaches, for one session** (E14,
@@ -1432,11 +1438,20 @@ impl Server {
         // What the recommender answers (ADR-0148), after its delay: a slow
         // source, which a streamed region does not wait for.
         let recommender = self.recommender.lock().expect("recommender").clone();
+        // Store 47's menu as it is now, which its recommendations are drawn
+        // from (ADR-0165).
+        let suggested_from = self.menu.lock().expect("menu").clone();
         let recommend: HostFn = Arc::new(move |args: &[Val]| {
-            let [Val::String(_)] = args else {
+            let [Val::String(store)] = args else {
                 return Err(format!("recommendations#for-store received {args:?}"));
             };
             std::thread::sleep(std::time::Duration::from_millis(recommender.delay_ms));
+            let items = match (&recommender.items, store.as_str()) {
+                (Some(items), _) => items.clone(),
+                (None, STORE_ID) => recommended_from(&suggested_from),
+                (None, id) if store_named(id).is_some() => recommended_from(&second_menu()),
+                (None, _) => Vec::new(),
+            };
             match recommender.fail.as_deref() {
                 Some("host") => Err("the recommender is down".to_string()),
                 Some(_) => Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
@@ -1444,8 +1459,7 @@ impl Server {
                     None,
                 )))))]),
                 None => Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
-                    recommender
-                        .items
+                    items
                         .iter()
                         .map(|(id, name)| {
                             Val::Record(vec![
@@ -1677,11 +1691,14 @@ impl Server {
     /// a query's `invalidates_on`. An event that leaves a key unbound (`_`,
     /// ADR-0091) drops every entry of that query.
     fn invalidate_queries(&self, command: &str, session: &str, events: &[pw_materialize::Event]) {
+        // A query's policy, which keys its entries: read by a `let`, or by a
+        // stream, whose answer is kept too (ADR-0148). Until 2026-10-03 only
+        // a `let`'s was found, so an event never reached a stream's kept
+        // answer (ADR-0165).
         let policy_of = |resource: &str| {
-            self.plan["bindings"]
-                .as_array()
+            ["bindings", "streams"]
                 .into_iter()
-                .flatten()
+                .flat_map(|k| self.plan[k].as_array().into_iter().flatten())
                 .find(|b| b["resource"] == resource)
                 .map(|b| b["policy"].clone())
         };
@@ -4369,11 +4386,13 @@ fn handle(server: &Server, mut stream: TcpStream) {
             }
             set.fail = q("fail").filter(|f| !f.is_empty());
             if let Some(items) = q("items") {
-                set.items = items
-                    .split(',')
-                    .filter_map(|pair| pair.split_once(':'))
-                    .map(|(id, name)| (id.to_string(), name.to_string()))
-                    .collect();
+                set.items = Some(
+                    items
+                        .split(',')
+                        .filter_map(|pair| pair.split_once(':'))
+                        .map(|(id, name)| (id.to_string(), name.to_string()))
+                        .collect(),
+                );
             }
             *server.recommender.lock().expect("recommender") = set;
             // Every query a page of this build reads: what it kept, and what
@@ -8017,6 +8036,155 @@ public query Store(",
         let (blue, _) = s.serve_store_document("c", STORE_ID).expect("served");
         assert_eq!(reads(), read + 1, "store 47's menu was not read again");
         assert!(visible(&blue).contains("Espresso Doppio"), "{blue}");
+    }
+
+    /// **The patch that fills a slot of the store** (ADR-0165): the opening
+    /// of the `<template for>` its pending range names, if it is pending.
+    fn slot_patch(page: &str, label: &str) -> Option<String> {
+        let at = page
+            .find(&format!("aria-label=\"{label}\""))
+            .unwrap_or_else(|| panic!("no {label} slot: {page}"));
+        let section = &page[at..at + page[at..].find("</section>").expect("its end")];
+        let name = &section[section.find("<?start name=\"")? + "<?start name=\"".len()..];
+        Some(format!("<template for=\"{}\">", &name[..name.find('"')?]))
+    }
+
+    /// **What a slot of the store shows** (ADR-0165), as a reader sees it:
+    /// the arm its section holds in place, or, pending there, the arm its
+    /// patch carries after the document.
+    fn slot(page: &str, label: &str) -> String {
+        let at = page
+            .find(&format!("aria-label=\"{label}\""))
+            .unwrap_or_else(|| panic!("no {label} slot: {page}"));
+        let shown = match slot_patch(page, label) {
+            Some(patch) => {
+                let arm = &page[page.find(&patch).unwrap_or_else(|| panic!("no {patch}"))..];
+                &arm[..arm.find("</template>").expect("the patch's end")]
+            }
+            None => {
+                let open = page[..at].rfind("<section").expect("its section");
+                &page[open..at + page[at..].find("</section>").expect("its end")]
+            }
+        };
+        // Whatever is not a tag, its spaces made one.
+        visible(shown)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// **The store's slots come after its own content, in the same
+    /// response** (charter §15.3, §15.6 test 3, ADR-0165): its name, menu
+    /// and cart, with each slot pending, and then each slot's arm as its
+    /// query answers, the estimate's first.
+    #[test]
+    fn the_store_sends_its_slots_after_its_own_content() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        recommend(&s, 600, None);
+        s.estimators.lock().expect("estimators").insert(
+            "a".to_string(),
+            Estimator {
+                delay_ms: 200,
+                fail: None,
+                minutes: 30,
+            },
+        );
+        let chunks = fetched_as(&s, "/stores/47", Some("a"));
+        let at =
+            |text: &str| arrived(&chunks, text).unwrap_or_else(|| panic!("never sent: {text}"));
+        let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
+        // The store's own content, and both slots pending, at once.
+        let shell = at("Finding recommendations");
+        assert!(shell < std::time::Duration::from_millis(150), "{shell:?}");
+        for own in [
+            "Blue Bottle",
+            "Cold Brew",
+            "id=\"cart-count\"",
+            "Estimating delivery",
+        ] {
+            assert!(at(own) <= shell, "{own} came after the document");
+        }
+        // Then each arm, as its query answers: the estimate, then the
+        // recommendations.
+        let estimated = at(&slot_patch(&whole, "Delivery").expect("the estimate pending"));
+        let recommended = at(&slot_patch(&whole, "Recommendations").expect("pending"));
+        assert!(
+            estimated >= std::time::Duration::from_millis(200),
+            "{estimated:?}"
+        );
+        assert!(
+            recommended >= std::time::Duration::from_millis(600),
+            "{recommended:?}"
+        );
+        assert!(estimated < recommended, "{estimated:?} {recommended:?}");
+        assert_eq!(slot(&whole, "Delivery"), "Delivery in 30 min");
+        assert_eq!(slot(&whole, "Recommendations"), "Cortado Cold Brew");
+        assert!(whole.ends_with("</template></body>\n</html>\n"), "{whole}");
+        // An estimator that is down fills its slot with the failure, and the
+        // page is served.
+        estimate(&s, "b", Some("down"), 0);
+        let failed: String = fetched_as(&s, "/stores/47", Some("b"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert!(failed.starts_with("HTTP/1.1 200 OK\r\n"), "{failed}");
+        assert_eq!(slot(&failed, "Delivery"), "Delivery estimate unavailable");
+    }
+
+    /// **A store's recommendations are its own, kept ten minutes, and
+    /// dropped when its menu changes** (ADR-0165, ADR-0164). The change is
+    /// `MenuChanged(47)`, and it reaches the kept answer of a stream's query
+    /// as it reaches a `let`'s: store 47's recommendations are asked again,
+    /// and store 48's are kept.
+    #[test]
+    fn a_menu_change_drops_that_stores_recommendations_only() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        recommend(&s, 0, None);
+        for session in ["a", "b", "c"] {
+            estimate(&s, session, None, 25);
+        }
+        let page = |path: &str, session: &str| -> String {
+            fetched_as(&s, path, Some(session))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        let asks = || calls(&s, "store:data/recommendations#for-store");
+        // Each store's recommendations are drawn from its own menu.
+        assert_eq!(
+            slot(&page("/stores/47", "a"), "Recommendations"),
+            "Cortado Cold Brew"
+        );
+        assert_eq!(
+            slot(&page("/stores/48", "a"), "Recommendations"),
+            "Matcha Latte Blueberry Scone"
+        );
+        let asked = asks();
+        assert_eq!(asked, 2);
+        // Control: both are kept, so neither is asked again.
+        page("/stores/47", "b");
+        page("/stores/48", "b");
+        assert_eq!(asks(), asked);
+        s.broadcast_menu(MenuOp::Rename {
+            id: "cortado".to_string(),
+            name: "Cortado Grande".to_string(),
+        })
+        .expect("the menu changes");
+        // Store 48's are still kept ...
+        page("/stores/48", "c");
+        assert_eq!(
+            asks(),
+            asked,
+            "store 47's change dropped store 48's recommendations"
+        );
+        // ... and store 47's are asked again, and name the change.
+        let again = slot(&page("/stores/47", "c"), "Recommendations");
+        assert_eq!(
+            asks(),
+            asked + 1,
+            "store 47's recommendations were not asked again"
+        );
+        assert_eq!(again, "Cortado Grande Cold Brew");
     }
 
     /// **A document is its own subscriber** (ADR-0161). Two tabs in one

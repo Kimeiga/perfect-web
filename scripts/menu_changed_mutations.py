@@ -66,8 +66,14 @@ MUTANTS = [
     (
         "the store's menu declares no invalidation",
         STORE,
-        "    invalidates_on MenuChanged(id)\n    concurrency    one_per_key\n",
-        "    concurrency    one_per_key\n",
+        # Re-anchored by ADR-0165, whose recommendations declare it too.
+        "    invalidates_on MenuChanged(id)\n"
+        "    concurrency    one_per_key\n"
+        "    on_key_change  cancel\n"
+        "    timeout        2.seconds\n",
+        "    concurrency    one_per_key\n"
+        "    on_key_change  cancel\n"
+        "    timeout        2.seconds\n",
     ),
 ]
 

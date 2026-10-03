@@ -260,6 +260,100 @@
     ]
   },
   {
+    "component_id": "store.page.Estimate",
+    "capability_mapping": 1,
+    "abi_schema": "415fdfe738cf5f70",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Estimates"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/estimates",
+        "name": "current",
+        "capability": "database.read<Estimates>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Estimates"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.DeliveryEstimate"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.EstimateError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Estimate",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "argument 0",
+                "ty": "Session<SessionId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "result",
+                "ty": "DeliveryEstimate"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-estimate-api@0.1.0",
+          "function": "estimate"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Menu",
     "capability_mapping": 1,
     "abi_schema": "60058db28f2ab607",
@@ -335,6 +429,86 @@
         "component": {
           "interface": "pw:app/store-page-menu-api@0.1.0",
           "function": "menu"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.Recommendations",
+    "capability_mapping": 1,
+    "abi_schema": "362c2dcd203e1e3f",
+    "required_capabilities": [
+      {
+        "family": "network",
+        "operation": "fetch"
+      }
+    ],
+    "allowed_placements": [
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/recommendations",
+        "name": "for-store",
+        "capability": "network.fetch",
+        "capabilities": [
+          {
+            "family": "network",
+            "operation": "fetch"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "domain.Recommendation"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.RecommendationError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Recommendations",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-recommendations-api@0.1.0",
+          "function": "recommendations"
         }
       }
     ]
@@ -433,8 +607,20 @@
         "kind": "component"
       },
       {
+        "interface": "pw:app/store.page.Estimate",
+        "name": "Estimate",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
         "interface": "pw:app/store.page.Menu",
         "name": "Menu",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.Recommendations",
+        "name": "Recommendations",
         "owner": "external",
         "kind": "component"
       },

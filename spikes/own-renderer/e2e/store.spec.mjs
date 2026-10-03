@@ -57,8 +57,10 @@ test.describe("the document the server produced", () => {
     });
     // store name 2, the loop's own range 2, three loop INSTANCE boundaries 6,
     // the item name inside each instance 6, the cart count 2, the cart's
-    // notice 2 (ADR-0157) = 20.
-    expect(shape.anchors).toBe(20);
+    // notice 2 (ADR-0157) = 20. And the store's slots, filled (ADR-0165): the
+    // estimate's range 2 and its minutes 2; the recommendations' range 2,
+    // their loop's 2, two instances 4 and two names 4 = 16. 36 in all.
+    expect(shape.anchors).toBe(36);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`.
     expect(shape.anchoredElements, "the Add buttons and Clear").toBe(4);

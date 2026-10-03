@@ -144,12 +144,25 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - ~~Correction: a menu change dropped every store's kept menu~~
           (ADR-0164, `just e14-menu-changed`). It is the event
           `MenuChanged(47)` now, which the store's `Menu` declares.
-     2. **Next: the recommendation and estimate slots in the store
-        itself**, with T05 and T10 re-based.
-     3. Decrement, remove, and a per-line cart.
-     4. A command retried on a transport failure.
-     5. §15.5's missing controls.
-     6. Availability on the page before the press: `MenuItem.available`, and
+     2. ~~The recommendation and estimate slots in the store itself~~
+        (ADR-0165, `just e14-slots`): tests 3 and 17 hold in Chromium and
+        Firefox. T05 and T10 needed no re-basing (ADR-0156).
+     3. **Next: §15.1's descriptions and prices** (the audit's eighth gap,
+        brought forward). `Store.description`, `MenuItem.description` and
+        `MenuItem.price`, shown on the page.
+        - WebKit paints a page only once it holds about 200 characters of
+          text, and the store holds about 90. Safari shows nothing until
+          the slots are filled. This is the text that fixes it: turn on
+          `e2e/slots.spec.mjs`'s two `fixme` tests in WebKit.
+        - The data layer answers both the canonical store and the
+          benchmark's frozen copy, whose records are smaller. Each program
+          must receive the fields its own types declare.
+        - Then refuse a `//` line inside markup, which renders as text
+          (ADR-0165).
+     4. Decrement, remove, and a per-line cart.
+     5. A command retried on a transport failure.
+     6. §15.5's missing controls.
+     7. Availability on the page before the press: `MenuItem.available`, and
         an `InventoryChanged` the menu hears.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical

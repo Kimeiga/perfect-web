@@ -57,8 +57,8 @@ are fixed (ADR-0155):
 |---|---|
 | store and public menu | partial: shared queries and a public materialized fragment; the edge placement is declared, not run (one origin node) |
 | item availability | partial: read inside `add_to_cart` since ADR-0157; the page does not show it, and `MenuFragment` listens for `InventoryChanged`, which nothing emits |
-| recommendations | missing from the store; T05's patches add them |
-| delivery estimate | missing from the store; T10's patches add it |
+| recommendations | met since ADR-0165: public, shared, kept ten minutes and dropped by `MenuChanged(id)`, streamed |
+| delivery estimate | met since ADR-0165: the session's, private, kept for no time, streamed |
 | cart | met: a `session` query, `read_your_writes`, `cache private`, keyed by session; `consistency` is not enforced as a mode |
 | payment methods | not needed in the first demo (the charter says so) |
 | device location | missing in the store; the platform type exists, and the shared-cache rule refuses a `Device` value |
@@ -69,7 +69,7 @@ are fixed (ADR-0155):
 |---|---|
 | route `/stores/:store_id` | met since ADR-0160-0163: `route "/stores/{id}"`, held to the page's parameters; served at it, each document reading its own; a second store; an unknown store answered 404, as the page declares (`not_found_on StoreError.NotFound`, PW0342) |
 | semantic heading, menu content early, cart summary slot | met (the cart as a count) |
-| delivery estimate slot, recommendation slot | missing from the store (T10's, T05's patches) |
+| delivery estimate slot, recommendation slot | met since ADR-0165: each a named `<stream>` region, the estimate's said to a screen reader when it comes; WebKit paints the store only when they are filled, until §15.1's fields |
 | add item | met |
 | increment quantity | partial: pressing Add again grows the line; no per-line control |
 | decrement quantity, remove item | missing: the data layer has add, clear and current |
@@ -92,7 +92,7 @@ are fixed (ADR-0155):
 
 | control | status |
 |---|---|
-| recommendations 1200 ms, estimate 400 ms | met as controls (`/bench/recommendations`, `/bench/estimate`); the store's page reads neither |
+| recommendations 1200 ms, estimate 400 ms | met (`/bench/recommendations`, `/bench/estimate`), and the store's page reads both since ADR-0165 |
 | store delay, cart delay | missing |
 | one-shot database error | partial: `/command/add_and_fail` runs one failing add; nothing arms the next real command or a read |
 | one-shot network error | partial: aborts inside browser tests only |
@@ -107,7 +107,7 @@ are fixed (ADR-0155):
 |---|---|---|
 | 1 | readable without JavaScript | met |
 | 2 | static public shell holds no private cart data | partial: the store page is `cache private`, so it has no public shell |
-| 3 | recommendations stream after core content | partial: the demo page and T05 |
+| 3 | recommendations stream after core content | met since ADR-0165 in the store's response, and in Chromium and Firefox (`e2e/slots.spec.mjs`); WebKit paints the store only when its slots are filled |
 | 4, 5 | one interaction one mutation; two interactions two | met |
 | 6, 7, 8 | one key one request; a changed key cancels stale work; leaving cancels | met on T07's store, three engines (ADR-0152) |
 | 9 | optimistic rollback | met |
@@ -118,7 +118,7 @@ are fixed (ADR-0155):
 | 14 | keyboard and screen-reader semantics | partial: every Add button is named "Add", and the count has no live region (the cart's notice has one since ADR-0157); no automated audit |
 | 15 | focus preserved | met |
 | 16 | handler version mismatch recovers | partial: refused safely, the recovery not acted on (fixed) |
-| 17 | slow recommendations do not block Add | partial: T05's hidden test; the demo uses another button |
+| 17 | slow recommendations do not block Add | met since ADR-0165 in Chromium and Firefox (`e2e/slots.spec.mjs`); not in WebKit, which shows nothing to press until the slots are filled |
 | 18 | last-known-good only for declared public data | partial: the materializer's tests; nothing limits the fallback to public data, and the server never serves one |
 
 ## Gaps, most important first
@@ -129,15 +129,19 @@ are fixed (ADR-0155):
    `available` on `MenuItem`, shown before the press.
 2. ~~**The route, and more than one store**~~ (§15.3): met by ADR-0160 to
    ADR-0163.
-3. **The recommendation and estimate slots** (tests 3 and 17): in the store
-   itself, with T05 and T10 re-based.
+3. ~~**The recommendation and estimate slots**~~ (tests 3 and 17): met by
+   ADR-0165, but in WebKit, which paints the store only once it holds about
+   200 characters of text. §15.1's descriptions and prices (item 8) are
+   that text, so item 8 comes next.
 4. **Decrement, remove, and a per-line list** (§15.3).
 5. **A command retried on a transport failure** (§15.4), with its
    interaction.
 6. **§15.5's missing controls.**
 7. **Last-known-good** (test 18): a rule limiting it to public data, and
    the server serving it.
-8. **§15.1's fields**, and `PositiveInt` checked at the boundary.
+8. **§15.1's fields**, and `PositiveInt` checked at the boundary. Next,
+   since ADR-0165: the store's and its items' descriptions and prices are
+   also what lets WebKit paint the store before its slots are filled.
 9. **Accessibility** (test 14): each Add named by its item, a live region
    for the count, an automated audit.
 10. **Tests 2 and 13** against the running store's shared output.

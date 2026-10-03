@@ -1951,6 +1951,33 @@ e14-menu-changed:
      } > docs/evidence/E14/menu-changed.txt
     @grep -E "^test result|MenuChanged|mutants killed" docs/evidence/E14/menu-changed.txt
 
+# ADR-0165: the store's delivery estimate and recommendations. The store's
+# streams, the server's tests, the slots in three engines, and the mutation
+# controls.
+e14-slots:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0165 - the store's delivery estimate and recommendations"; echo; \
+       echo "produced by: just e14-slots"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the store's streams (compiler/pw-core/tests/stream_plan.rs)"; echo; \
+       cargo test --locked -p pw-core --test stream_plan 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store checks"; echo; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(the_store_sends_its_slots|a_menu_change_drops_that_stores)|^test result'; \
+       echo; echo "== the slots, three engines (e2e/slots.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/slots_mutations.py)"; echo; \
+       python3 scripts/slots_mutations.py; \
+     } > docs/evidence/E14/slots.txt
+    @grep -E "^test result|pw check|passed|skipped|mutants killed" docs/evidence/E14/slots.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

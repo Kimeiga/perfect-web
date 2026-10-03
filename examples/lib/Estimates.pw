@@ -13,9 +13,15 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
     RecommendationError, PaymentError, TrackingError,
     DeliveryEstimate, EstimateError }
 import device.{ Location }
-import capability.{ SessionId }
+import capability.{ Session, SessionId }
 import browser.{ Element, MapHandle, MapError }
 
 fn for_location(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fetch } {
     todo
 }
+
+// The session's delivery estimate, from the estimator the store's data layer
+// reaches (E14, T10; the store's own since ADR-0165): slow, and sometimes
+// down.
+fn current(s: Session<SessionId>) -> Result<DeliveryEstimate, EstimateError> !{ database.read<Estimates> }
+    host "store:data/estimates#current"

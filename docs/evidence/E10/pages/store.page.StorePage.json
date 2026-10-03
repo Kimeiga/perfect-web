@@ -81,7 +81,7 @@
       ]
     },
     {
-      "part": 4,
+      "part": 6,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -102,10 +102,52 @@
   ],
   "live": [
     {
-      "part": 5,
+      "part": 7,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
+    }
+  ],
+  "streams": [
+    {
+      "part": 1,
+      "resource": "store.page.Estimate",
+      "args": [
+        "current_session()"
+      ],
+      "policy": {
+        "cache": "private",
+        "privacy": "session",
+        "freshness_ms": 0,
+        "timeout_ms": 3000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ],
+        "on_key_change": "cancel"
+      },
+      "streamed": true
+    },
+    {
+      "part": 9,
+      "resource": "store.page.Recommendations",
+      "args": [
+        "id"
+      ],
+      "policy": {
+        "cache": "shared",
+        "privacy": "public",
+        "freshness_ms": 600000,
+        "timeout_ms": 3000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ],
+        "on_key_change": "cancel"
+      },
+      "streamed": true
     }
   ]
 }

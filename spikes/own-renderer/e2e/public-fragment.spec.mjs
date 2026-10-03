@@ -47,6 +47,9 @@ async function fragment(page) {
 }
 
 /** Every instance token in the document, in order. */
+// The menu's: the public fragment. A stream's region, such as the store's
+// recommendations (ADR-0165), is rendered for its document, and its tokens
+// are that document's.
 async function tokens(page) {
   return page.evaluate(() => {
     const out = [];
@@ -59,7 +62,7 @@ async function tokens(page) {
         walk(c);
       }
     };
-    walk(document.body);
+    walk(document.getElementById("menu"));
     return out;
   });
 }

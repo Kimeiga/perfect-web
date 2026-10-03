@@ -1340,3 +1340,16 @@ correction to ADR-0162's test 11.
   name, in the server's code.
 - The store's `Menu` now declares `invalidates_on MenuChanged(id)`, and the
   change is the event `MenuChanged(47)`, which drops store 47's entry only.
+
+[ADR-0165](DECISIONS/ADR-0165-the-store-s-estimate-and-recommendations.md):
+the audit's third gap.
+- The canonical store streams its delivery estimate and its recommendations,
+  each in a named region, after its own content (§15.6 tests 3 and 17).
+- The recommendations are A-008's: shared, kept ten minutes, dropped by
+  `MenuChanged(id)`, which now reaches a stream's kept answer.
+
+Found on the way:
+- WebKit paints the store only when its slots are filled, since it holds
+  under 200 characters of text: tests 3 and 17 hold in Chromium and Firefox.
+  §15.1's descriptions and prices are next.
+- A `//` line in markup is text.
