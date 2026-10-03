@@ -1,0 +1,40 @@
+ADR-0142 - an input bound to a signal
+
+produced by: just e14-bind
+commit: 7daddfbf614c54e85d791dc38b83590ead4a4764
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the binding (compiler/pw-core/tests/bind.rs)
+
+test a_binding_binds_a_signal_of_string_by_its_name ... ok
+test a_binding_is_a_value_and_a_handler ... ok
+test a_block_is_rendered_again_only_for_what_it_cannot_set_in_place ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+== what the browser sets in place (compiler/pw-core/tests/signals_render_again.rs)
+
+test a_list_a_signal_holds_is_rendered_again_only_inside_its_block ... ok
+test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
+test an_attribute_a_signal_decides_is_set_in_place_or_refused ... ok
+test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
+test a_block_a_signal_decides_reads_the_signals_and_its_own_names ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s
+
+== mutation controls (scripts/bind_mutations.py)
+
+baseline: 8 passed, 0 failed
+bind:value is not lowered: KILLED (3 of 8 tests fail)
+the handler a binding wrote is not marked: KILLED (1 of 8 tests fail)
+a binding of a value that is not a signal is accepted: KILLED (1 of 8 tests fail)
+a signal of another type binds: KILLED (1 of 8 tests fail)
+any element binds a value: KILLED (1 of 8 tests fail)
+PW5302 reads a binding's handler too: KILLED (1 of 8 tests fail)
+a binding's assignment is related as any other: KILLED (1 of 8 tests fail)
+PW0611 reads a binding's assignment too: KILLED (1 of 8 tests fail)
+a binding's handler captures what it sets: KILLED (1 of 8 tests fail)
+the inert-handler rule reads a binding's handler: KILLED (1 of 8 tests fail)
+an attribute a signal decides is not set in place: KILLED (1 of 8 tests fail)
+a block is rendered again for every signal in it: KILLED (1 of 8 tests fail)
+a block reads its own signal alone: KILLED (1 of 8 tests fail)
+a URL attribute is set in place: KILLED (1 of 8 tests fail)
+14 of 14 mutants killed
