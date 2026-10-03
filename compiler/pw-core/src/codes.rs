@@ -185,6 +185,10 @@ codes! {
         "a route is `/` and segments, a word or a `{parameter}` each, and names each of its page's parameters once";
     ROUTE_DECLARED_TWICE = "PW0341" / route_declared_twice / 1, DeclarationRules,
         "one route is one page's: an address names the page it is for";
+    // ADR-0163: a page that cannot be read was answered 503 whatever the
+    // reason, and an address naming nothing is 404's.
+    NOT_FOUND_NAMES_A_CASE = "PW0342" / not_found_names_a_case / 1, DeclarationRules,
+        "a page's `not_found_on` names a case of an error a query it reads can answer";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 

@@ -22,7 +22,10 @@
           0
         ],
         "on_key_change": "cancel"
-      }
+      },
+      "not_found": [
+        "not-found"
+      ]
     },
     {
       "binding": "menu",
@@ -41,7 +44,10 @@
           0
         ],
         "on_key_change": "cancel"
-      }
+      },
+      "not_found": [
+        "not-found"
+      ]
     },
     {
       "binding": "cart",

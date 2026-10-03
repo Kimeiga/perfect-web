@@ -220,6 +220,9 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // UNKNOWN policy — which is the parser saying, correctly, that a clause it
     // is being asked to classify is not in its vocabulary.
     "route",
+    // ADR-0163: the declared error that means a page's address names
+    // nothing, answered 404 rather than 503.
+    "not_found_on",
     "privacy",
     "storage",
     "offline",

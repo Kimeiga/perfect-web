@@ -82,6 +82,10 @@ pub enum Domain {
     Listener,
     /// A predicate over the caller: `requires SignedIn, OwnsOrder(order)`.
     PredicateRef,
+    /// **A case of a declared sum type**: `not_found_on StoreError.NotFound`
+    /// (ADR-0163). Resolved, and held to the page's queries, by
+    /// `routes::not_found_case`.
+    CaseRef,
     /// **An optimistic transition.** `optimistic Cart(current_session()) as
     /// cart => cart.add(item, quantity)` — a resource ENTRY, a binder for its
     /// current value, and a pure expression producing the speculative one.
@@ -298,6 +302,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // ADR-0040: the operation the compiler supplies, by its name.
         "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
+        "not_found_on" => Domain::CaseRef,
         "impact" => Domain::ConditionedWord(&[
             "layout_read",
             "layout_write",
@@ -828,6 +833,7 @@ mod tests {
             "requires",
             "placement",
             "route",
+            "not_found_on",
             "privacy",
             "capability",
             "host",

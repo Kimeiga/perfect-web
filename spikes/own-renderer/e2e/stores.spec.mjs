@@ -1,6 +1,7 @@
 // ADR-0162, charter §15.3 and §15.6 test 11: the store at its route,
 // `/stores/{id}`, and a second store at its own. A change to one store's menu
-// reaches that store's pages, and no other store's.
+// reaches that store's pages, and no other store's. And ADR-0163: a store
+// that is not there is not found.
 import { expect, test } from "@playwright/test";
 import { MUTABLE_PORTS } from "../playwright.config.mjs";
 
@@ -27,6 +28,20 @@ test("each store is served at its route", async ({ page }) => {
   await ready(page, "/stores/47");
   await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
   await expect(names(page)).toHaveText(["Espresso", "Cortado", "Cold Brew"]);
+});
+
+test("a store that is not there is not found", async ({ page }) => {
+  // The page declares `not_found_on StoreError.NotFound`: 404, where a page
+  // whose values cannot be read is 503 (ADR-0147).
+  const absent = await page.goto("/stores/999");
+  expect(absent.status()).toBe(404);
+  await expect(page).toHaveTitle("Not found");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Not found");
+  // Nothing of the store's page.
+  await expect(page.locator("#menu")).toHaveCount(0);
+  await expect(page.locator("#cart-count")).toHaveCount(0);
+  // Control: a store that is there.
+  expect((await page.goto("/stores/48")).status()).toBe(200);
 });
 
 test("the second store's Add adds to the session's cart", async ({ page }) => {

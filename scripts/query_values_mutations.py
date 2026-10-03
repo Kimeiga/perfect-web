@@ -55,7 +55,8 @@ MUTANTS = [
         "a page whose queries fail stops the server",
         "server",
         SERVER,
-        "            .map_err(|e| format!(\"the store page's queries: {e}\"))?;\n",
+        # Re-anchored by ADR-0163: a failure keeps its kind.
+        "            .map_err(|e| e.of(\"the store page's queries\"))?;\n",
         "            .unwrap_or_else(|e| panic!(\"the store page's queries: {e}\"));\n",
     ),
     (

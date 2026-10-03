@@ -48,6 +48,12 @@ pub struct Binding {
     /// for a binding whose key the page never changes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub signals: Vec<String>,
+    /// **The declared errors that mean the page is not found** (ADR-0163),
+    /// by their WIT case names: `not-found`. The page's `not_found_on`, for
+    /// a binding whose query can answer it. A host answers 404 for them,
+    /// and 503 for any other failure.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub not_found: Vec<String>,
 }
 
 /// A query's policies, as a host applies them (ADR-0127).
@@ -861,6 +867,11 @@ fn plan(
         })
         .collect();
     let found = query_bindings(ws, unit, body);
+    // The error that means the page is not found (ADR-0163), PW0342's to
+    // hold to the page's queries.
+    let not_found = crate::routes::not_found_case(ws, sigs, unit, decl)
+        .ok()
+        .flatten();
     let mut bindings = Vec::new();
     for (name, resource, keys) in &found {
         let mut args = Vec::new();
@@ -892,6 +903,12 @@ fn plan(
             args,
             policy: policy_of(decl),
             signals: keyed_by,
+            not_found: match &not_found {
+                Some((ty, case)) if crate::routes::error_of(sigs, *resource) == Some(*ty) => {
+                    vec![crate::wit::ident(case)]
+                }
+                _ => Vec::new(),
+            },
         });
     }
 

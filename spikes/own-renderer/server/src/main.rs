@@ -1375,7 +1375,8 @@ impl Server {
 
     /// **The deployment's catalogue** (ADR-0125): `store:data/stores#get` and
     /// `store:data/menus#for-store`, what the `Store` and `Menu` queries read.
-    /// This server holds one store; its menu is the keyed list E7-P mutates.
+    /// This server holds two stores (ADR-0162): 47, whose menu is the keyed
+    /// list E7-P mutates, and 48. Any other is answered `not-found`.
     ///
     /// Its slow sources poll `stopped`, to end early a read nobody is
     /// waiting for (ADR-0152).
@@ -1549,9 +1550,20 @@ impl Server {
         session: &str,
         binding: &serde_json::Value,
         args: &[Val],
-    ) -> Result<Val, String> {
+    ) -> Result<Val, Unread> {
         let resource = binding["resource"].as_str().unwrap_or_default();
-        unwrapped(resource, self.fetch_answer(session, binding, args)?)
+        let answer = self.fetch_answer(session, binding, args)?;
+        // A declared error the page says means it is not found (ADR-0163),
+        // told from every other failure.
+        if let Val::Result(Err(Some(e))) = &answer
+            && let Val::Variant(case, _) = e.as_ref()
+            && binding["not_found"]
+                .as_array()
+                .is_some_and(|cases| cases.iter().any(|c| c == case.as_str()))
+        {
+            return Err(Unread::NotFound(format!("{resource} answered {case}")));
+        }
+        Ok(unwrapped(resource, answer)?)
     }
 
     /// **A query's answer, run by its declared policies** (ADR-0127): its
@@ -1830,18 +1842,18 @@ impl Server {
         unwrapped(component_id, self.answer(component_id, session, args)?)
     }
 
-    /// **Each binding of the store page, by its query** (ADR-0125): the page
-    /// parameter `id` is the store this server holds, `current_session()` is
-    /// the request's session, and a signal's key is what `document` shows
-    /// (ADR-0161).
+    /// **Each binding of the store page, by its query** (ADR-0125): a page
+    /// parameter is what `document`'s address gave it (ADR-0162),
+    /// `current_session()` is the request's session, and a signal's key is
+    /// what `document` shows (ADR-0161).
     fn bindings(&self, session: &str, document: u64) -> Result<BTreeMap<String, Val>, String> {
-        self.bindings_where(session, Some(document), |_| true, &Keys::Shown)
+        Ok(self.bindings_where(session, Some(document), |_| true, &Keys::Shown)?)
     }
 
     /// One binding's value, by its name, read for none of the session's
     /// documents: a binding no signal keys is every document's.
     fn binding(&self, session: &str, name: &str) -> Result<BTreeMap<String, Val>, String> {
-        self.bindings_where(session, None, |b| b == name, &Keys::Shown)
+        Ok(self.bindings_where(session, None, |b| b == name, &Keys::Shown)?)
     }
 
     /// The bindings whose names `wanted` takes, each run by its policies, a
@@ -1853,7 +1865,7 @@ impl Server {
         document: Option<u64>,
         wanted: impl Fn(&str) -> bool,
         keys: &Keys,
-    ) -> Result<BTreeMap<String, Val>, String> {
+    ) -> Result<BTreeMap<String, Val>, Unread> {
         let mut out = BTreeMap::new();
         for b in self.plan["bindings"].as_array().into_iter().flatten() {
             if !wanted(b["binding"].as_str().unwrap_or_default()) {
@@ -1868,10 +1880,10 @@ impl Server {
         Ok(out)
     }
 
-    /// **A binding's arguments**, as a host computes them: the page parameter
-    /// `id` is the store this server holds, `current_session()` the request's
-    /// session, and a page signal the key `keys` says (ADR-0152), as
-    /// `document` shows it (ADR-0161).
+    /// **A binding's arguments**, as a host computes them: a page parameter
+    /// is what `document`'s address gave it (ADR-0162), `current_session()`
+    /// the request's session, and a page signal the key `keys` says
+    /// (ADR-0152), as `document` shows it (ADR-0161).
     fn args_of(
         &self,
         session: &str,
@@ -2402,11 +2414,13 @@ impl Server {
     ) -> Result<(String, u64, serde_json::Value), String> {
         self.serve_document_settled(session, &store_params(STORE_ID), &[])
             .map(|(html, cursor, entries, _)| (html, cursor, entries))
+            .map_err(String::from)
     }
 
-    /// [`Server::serve_document`], for the store `id` (ADR-0162).
+    /// [`Server::serve_document`], for the store `id` (ADR-0162), or why it
+    /// could not be read (ADR-0163).
     #[cfg(test)]
-    fn serve_store_document(&self, session: &str, id: &str) -> Result<(String, u64), String> {
+    fn serve_store_document(&self, session: &str, id: &str) -> Result<(String, u64), Unread> {
         self.serve_document_settled(session, &store_params(id), &[])
             .map(|(html, cursor, _, _)| (html, cursor))
     }
@@ -2420,7 +2434,7 @@ impl Server {
         session: &str,
         params: &Params,
         settled: &[(u32, Settled)],
-    ) -> Result<(String, u64, serde_json::Value, Env), String> {
+    ) -> Result<(String, u64, serde_json::Value, Env), Unread> {
         self.drain(session);
         self.forget_idle_subscribers();
         // The document's values are read, and it is rendered, OUTSIDE the
@@ -2706,6 +2720,7 @@ impl Server {
         let read = self.render_store_document(&doc, &[]);
         self.params.lock().expect("params").remove(&doc);
         read.map(|(html, shown, _)| (html, shown))
+            .map_err(String::from)
     }
 
     /// **The page a path names by its route**, and the parameters the path
@@ -2735,7 +2750,7 @@ impl Server {
         &self,
         doc: &Doc,
         settled: &[(u32, Settled)],
-    ) -> Result<(String, Shown, Env), String> {
+    ) -> Result<(String, Shown, Env), Unread> {
         let session = doc.0.as_str();
         let store = self.store_of(doc);
         let template = self.store_template();
@@ -2746,7 +2761,7 @@ impl Server {
         // browser holds them when it loads (ADR-0152).
         let bindings = self
             .bindings_where(session, Some(doc.1), |_| true, &Keys::First)
-            .map_err(|e| format!("the store page's queries: {e}"))?;
+            .map_err(|e| e.of("the store page's queries"))?;
         let shown = self
             .showing(session, &store, &bindings)
             .map_err(|e| format!("the store page's values: {e}"))?;
@@ -3658,9 +3673,59 @@ fn category_of(item: &str) -> &'static str {
     }
 }
 
-/// The one store this server holds (ADR-0125): what `stores#get` answers.
+/// The store `/StorePage.html` and `/` show (ADR-0125), the first of the two
+/// this server holds (ADR-0162).
 const STORE_ID: &str = "47";
 const STORE_NAME: &str = "Blue Bottle";
+
+/// **Why a page's values could not be read** (ADR-0163): its address names
+/// nothing, as the page declares, or it cannot be shown now. Told apart by
+/// type, so no failure's text can make it the other.
+#[derive(Debug)]
+enum Unread {
+    /// A binding's query answered the case the page's `not_found_on` names:
+    /// answered 404.
+    NotFound(String),
+    /// Any other failure (ADR-0147): answered 503.
+    Failed(String),
+}
+
+impl Unread {
+    /// The same failure, said of `what`.
+    fn of(self, what: &str) -> Unread {
+        match self {
+            Unread::NotFound(why) => Unread::NotFound(format!("{what}: {why}")),
+            Unread::Failed(why) => Unread::Failed(format!("{what}: {why}")),
+        }
+    }
+}
+
+impl From<String> for Unread {
+    fn from(why: String) -> Unread {
+        Unread::Failed(why)
+    }
+}
+
+impl std::fmt::Display for Unread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Unread::NotFound(why) => write!(f, "not found: {why}"),
+            Unread::Failed(why) => f.write_str(why),
+        }
+    }
+}
+
+impl From<Unread> for String {
+    fn from(unread: Unread) -> String {
+        unread.to_string()
+    }
+}
+
+/// **What a page whose address names nothing is answered** (ADR-0163), with
+/// 404: accessible, and nothing of the page's.
+const NOT_FOUND_PAGE: &str = "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+     <title>Not found</title>\n</head>\n<body>\n<main>\n<h1>Not found</h1>\n\
+     <p>Nothing is at this address.</p>\n</main>\n</body>\n</html>\n";
 
 /// **The second store** (ADR-0162): its id and name. Its menu is its own,
 /// and nothing changes it, so a change to store 47's is seen not to reach
@@ -4953,24 +5018,34 @@ fn serve_store(
     fresh: bool,
     params: Params,
 ) {
-    let unavailable = |stream: &mut TcpStream, why: String| {
+    let unavailable = |stream: &mut TcpStream, why: Unread| match why {
+        // A page whose address names nothing, as the page declares it
+        // (ADR-0163), is not found.
+        Unread::NotFound(_) => respond(
+            stream,
+            404,
+            "text/html; charset=utf-8",
+            session,
+            fresh,
+            NOT_FOUND_PAGE.as_bytes(),
+        ),
         // A page whose values could not be read is answered as
         // unavailable, and the server goes on (E14, T04).
-        respond(
+        Unread::Failed(why) => respond(
             stream,
             503,
             "text/plain; charset=utf-8",
             session,
             fresh,
             format!("the store page cannot be shown: {why}").as_bytes(),
-        );
+        ),
     };
     // Each stream's query, started before the document is rendered
     // (ADR-0148): the page waits for the ones it is declared to wait
     // for, and the rest fill their regions in the same response.
     let runs = match stream_runs(&server.plan, session, &params) {
         Ok(runs) => runs,
-        Err(why) => return unavailable(stream, why),
+        Err(why) => return unavailable(stream, Unread::Failed(why)),
     };
     std::thread::scope(|scope| {
         let mut settling = Settling::start(scope, server, session, runs);
@@ -5430,6 +5505,20 @@ fn respond_json(stream: &mut TcpStream, code: u16, session: &str, fresh: bool, b
     );
 }
 
+/// **A status code's reason phrase** (RFC 9110 §15). A client ignores it
+/// (RFC 9112 §4); a person reading the response does not. Until 2026-10-03
+/// every response said `OK`, a 404 and a 503 among them.
+fn reason(code: u16) -> &'static str {
+    match code {
+        200 => "OK",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        413 => "Content Too Large",
+        503 => "Service Unavailable",
+        _ => "",
+    }
+}
+
 fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: bool, body: &[u8]) {
     let cookie = if fresh {
         format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
@@ -5437,7 +5526,8 @@ fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: 
         String::new()
     };
     let head = format!(
-        "HTTP/1.1 {code} OK\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{cookie}connection: close\r\n\r\n",
+        "HTTP/1.1 {code} {}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{cookie}connection: close\r\n\r\n",
+        reason(code),
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());
@@ -7781,9 +7871,75 @@ public query Store(",
         let again = visible(&again);
         assert!(again.contains("Matcha Latte"), "{again}");
         assert!(!again.contains("Espresso"), "{again}");
-        // A store this server does not hold: a page that cannot be read
-        // (ADR-0147), not yet answered absent.
-        assert!(s.serve_store_document("c", "999").is_err());
+        // A store this server does not hold is not found, as the page
+        // declares (ADR-0163).
+        let absent = s
+            .serve_store_document("c", "999")
+            .expect_err("no store 999");
+        assert!(matches!(absent, Unread::NotFound(_)), "{absent:?}");
+    }
+
+    /// **A store that is not there is not found** (ADR-0163): the page
+    /// declares `not_found_on StoreError.NotFound`, and a store the data
+    /// layer does not hold is answered 404, a page that is nothing of the
+    /// store's, where any other failure is answered 503 (ADR-0147).
+    #[test]
+    fn a_store_that_is_not_there_is_not_found() {
+        let fetched = |s: &Server, path: &str, session: &str| -> String {
+            fetched_as(s, path, Some(session))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let absent = fetched(&s, "/stores/999", "a");
+        // With its reason, as every response has it.
+        assert!(absent.starts_with("HTTP/1.1 404 Not Found\r\n"), "{absent}");
+        let page = visible(&absent);
+        assert!(page.contains("Not found"), "{page}");
+        for of_the_store in ["Blue Bottle", "Harbor Coffee", "Espresso", "Add"] {
+            assert!(!page.contains(of_the_store), "{page}");
+        }
+        // And it is no document the server holds.
+        assert!(
+            !s.pending
+                .lock()
+                .expect("pending")
+                .keys()
+                .any(|(session, _)| session == "a"),
+            "a page that was not found waits for changes"
+        );
+        // Control: a store the server holds is served.
+        assert!(fetched(&s, "/stores/48", "b").starts_with("HTTP/1.1 200 OK\r\n"));
+        // Control: the clause names the case that means absent. Naming
+        // another, the store's absence is a failure like any other.
+        let other = served_from_patches_in(
+            "examples",
+            |app| {
+                app.replace(
+                    "not_found_on StoreError.NotFound",
+                    "not_found_on StoreError.Unavailable",
+                )
+            },
+            &[],
+        );
+        let failed = fetched(&other, "/stores/999", "a");
+        assert!(
+            failed.starts_with("HTTP/1.1 503 Service Unavailable\r\n"),
+            "{failed}"
+        );
+        // Control: a page that names none is answered 503 for it.
+        let none = served_from_patches_in(
+            "examples",
+            |app| app.replace("    not_found_on StoreError.NotFound\n", ""),
+            &[],
+        );
+        assert!(!none.plan.to_string().contains("not_found"));
+        let failed = fetched(&none, "/stores/999", "a");
+        assert!(
+            failed.starts_with("HTTP/1.1 503 Service Unavailable\r\n"),
+            "{failed}"
+        );
     }
 
     /// **A change to one store's menu reaches that store's pages only**

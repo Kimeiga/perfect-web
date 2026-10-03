@@ -369,6 +369,50 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
     out
 }
 
+/// **The case a page's `not_found_on` names** (ADR-0163): the error type, by
+/// identity, and the case's name, when the clause is `Type.Case` and the type
+/// has the case. `Ok(None)` for a declaration without the clause.
+pub(crate) fn not_found_case(
+    ws: &crate::resolve::Workspace,
+    sigs: &crate::signatures::Signatures,
+    unit: usize,
+    decl: &crate::hir::Decl,
+) -> Result<Option<(crate::resolve::DefId, String)>, String> {
+    use crate::resolve::{Namespace, Resolution};
+    let Some(p) = decl.policy("not_found_on") else {
+        return Ok(None);
+    };
+    let value = p.value.trim();
+    let Some((ty, case)) = value.rsplit_once('.') else {
+        return Err(format!("`{value}` is not a case: write `Type.Case`"));
+    };
+    // `StoreError`, or `domain.StoreError` by a module the file imports.
+    let def = match ws.resolve_path_in(unit, Namespace::Type, ty) {
+        Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
+        _ => return Err(format!("`{ty}` names no type visible here")),
+    };
+    let has = sigs
+        .type_decl(def)
+        .and_then(|t| t.variants.as_ref())
+        .is_some_and(|cases| cases.iter().any(|(c, _)| c == case));
+    if !has {
+        return Err(format!("`{ty}` has no case `{case}`"));
+    }
+    Ok(Some((def, case.to_string())))
+}
+
+/// The error type a query declares, `E` of its `Result<T, E>`, by identity.
+pub(crate) fn error_of(
+    sigs: &crate::signatures::Signatures,
+    query: crate::resolve::DefId,
+) -> Option<crate::resolve::DefId> {
+    let result = sigs.by_def(query)?.result()?;
+    if result.as_builtin() != Some(crate::resolved::Builtin::Result) {
+        return None;
+    }
+    result.args().get(1)?.def_id()
+}
+
 /// Does this program own the target?
 fn is_internal(target: &str) -> bool {
     target.starts_with('/') && !target.starts_with("//")

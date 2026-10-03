@@ -130,20 +130,19 @@ E14 comes before E11-E13. Its plan, controls and task list are
      `return` or by `?`. A handler matches the answer, or discards it by name.
      The benchmark's store discards by name, with T11 re-based.
    - **Next: the audit's remaining gaps, in its order.**
-     1. The route `/stores/{id}`, and more than one store.
+     1. ~~The route `/stores/{id}`, and more than one store.~~ Done
+        2026-10-03:
         - ~~The compiler's half~~ (ADR-0160): the plan carries the route,
           and PW0340, PW0621 and PW0341 hold it to its page.
         - ~~Each document its own subscriber~~ (ADR-0161): a second tab
           no longer clears what the first was waiting for.
         - ~~The store served at its route, beside a second store~~
           (ADR-0162), with §15.6 test 11 end to end.
-        - **Next: a page says when it is absent.** `/stores/999` is
-          answered 503, as a page whose queries fail (ADR-0147). Only the
-          page can say which declared error means "absent", as Next.js's
-          `notFound()` and SvelteKit's `error(404)` are the page's own
-          calls.
-     2. The recommendation and estimate slots in the store itself, with T05
-        and T10 re-based.
+        - ~~A page says when it is absent~~ (ADR-0163,
+          `just e14-not-found`): `not_found_on StoreError.NotFound`, held
+          by PW0342, and `/stores/999` answered 404.
+     2. **Next: the recommendation and estimate slots in the store
+        itself**, with T05 and T10 re-based.
      3. Decrement, remove, and a per-line cart.
      4. A command retried on a transport failure.
      5. §15.5's missing controls.

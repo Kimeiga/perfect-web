@@ -226,6 +226,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // parameters, and one route is one page's.
             out.extend(crate::routes::parameters_agree(&u.hir, i, &sigs));
             out.extend(crate::routes::declared_twice(&hirs, i));
+            // ADR-0163: a page says when its address names nothing.
+            out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             out.extend(check_unit_with(
                 &env,
@@ -302,6 +304,84 @@ fn sent_without_idempotency(
                 replacement: None,
             }],
         });
+    }
+    out
+}
+
+/// **A page says when its address names nothing** (ADR-0163, PW0342):
+/// `not_found_on Type.Case` is a page's, names a case of a declared type,
+/// and a query the page reads can answer it. Otherwise the clause would
+/// never fire, and the page would answer 503 for the absence it names.
+fn not_found_names_a_case(
+    hir: &Hir,
+    unit: usize,
+    sigs: &Signatures,
+    ws: &crate::resolve::Workspace,
+) -> Vec<Diagnostic> {
+    let code = crate::codes::NOT_FOUND_NAMES_A_CASE;
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        let Some(p) = decl.policy("not_found_on") else {
+            continue;
+        };
+        let value = p.value.trim();
+        let refused = |message: String, repair: &str| Diagnostic {
+            code: code.id,
+            invariant: code.invariant,
+            reason: "not_found_names_a_case",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message,
+            primary_span: p.span.clone(),
+            related: vec![Related {
+                span: hir.decl_span(id),
+                label: format!("a policy of `{}`", decl.name),
+            }],
+            explanation: Some(
+                "A page whose queries fail is answered 503: it cannot be shown now. A page \
+                 whose address names nothing is answered 404, and only the page can say \
+                 which of its queries' declared errors means that (ADR-0163)."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: repair.to_string(),
+                replacement: None,
+            }],
+        };
+        if decl.kind != DeclKind::Page {
+            out.push(refused(
+                format!(
+                    "`not_found_on {value}` is a page's: `{}` is not one",
+                    decl.name
+                ),
+                "move it to the page whose address it is about",
+            ));
+            continue;
+        }
+        let (ty, _) = match crate::routes::not_found_case(ws, sigs, unit, decl) {
+            Ok(Some(found)) => found,
+            Ok(None) => continue,
+            Err(why) => {
+                out.push(refused(
+                    format!("`not_found_on {value}`: {why}"),
+                    "name a case of a declared error, `StoreError.NotFound`",
+                ));
+                continue;
+            }
+        };
+        let Some(b) = decl.body else { continue };
+        let answers = crate::page_values::query_bindings(ws, unit, hir.body(b))
+            .iter()
+            .any(|(_, query, _)| crate::routes::error_of(sigs, *query) == Some(ty));
+        if !answers {
+            out.push(refused(
+                format!(
+                    "`not_found_on {value}`: no query `{}` reads can answer it",
+                    decl.name
+                ),
+                "name an error a query the page reads declares",
+            ));
+        }
     }
     out
 }

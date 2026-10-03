@@ -67,7 +67,7 @@ are fixed (ADR-0155):
 
 | item | status |
 |---|---|
-| route `/stores/:store_id` | met since ADR-0160-0162: `route "/stores/{id}"`, held to the page's parameters; served at it, each document reading its own; a second store; an unknown store is answered 503, not yet 404 |
+| route `/stores/:store_id` | met since ADR-0160-0163: `route "/stores/{id}"`, held to the page's parameters; served at it, each document reading its own; a second store; an unknown store answered 404, as the page declares (`not_found_on StoreError.NotFound`, PW0342) |
 | semantic heading, menu content early, cart summary slot | met (the cart as a count) |
 | delivery estimate slot, recommendation slot | missing from the store (T10's, T05's patches) |
 | add item | met |
@@ -128,7 +128,7 @@ are fixed (ADR-0155):
    error returned to the page. What remains is §15.1's and §15.2's:
    `available` on `MenuItem`, shown before the press.
 2. ~~**The route, and more than one store**~~ (§15.3): met by ADR-0160 to
-   ADR-0162, but for an unknown store answered 404.
+   ADR-0163.
 3. **The recommendation and estimate slots** (tests 3 and 17): in the store
    itself, with T05 and T10 re-based.
 4. **Decrement, remove, and a per-line list** (§15.3).

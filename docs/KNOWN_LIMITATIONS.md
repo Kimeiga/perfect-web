@@ -460,6 +460,13 @@ shown by the view's own signal or one provided to it (ADR-0144). A page
 that reads queries holds signals on the store's route only (ADR-0140); any
 other page with queries is not served yet (E14-Q).
 
+**A page that is absent is answered with the host's own page** (ADR-0163).
+`not_found_on` names one case of one declared error, and a host answers it
+404 with a page that holds nothing of the program's. A program declares no
+not-found view yet, for this or for an address no route names, which the
+development server answers 404 as plain text. A keyed read that answers the
+case after the page is shown fails as any read does.
+
 **A form control is named only in the declaration that renders it**
 (ADR-0143). PW5014 matches a `<label for>`, a wrapping `<label>` and an
 `aria-labelledby`, written as text in the same view or page. These are not

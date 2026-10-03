@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `e8d14f1`, with ADR-0162.
+**Reviewed:** 2026-10-03, against master `a106e23`, with ADR-0163.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,21 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0163, 2026-10-03: a page says when it is absent**
+([ADR-0163](DECISIONS/ADR-0163-a-page-says-when-it-is-absent.md)). The last
+step of the route gap:
+- a page declares the error that means its address names nothing, and the
+  store declares `not_found_on StoreError.NotFound`;
+- PW0342 holds the clause to a case of a declared error that a query the page
+  reads with `let` can fail with;
+- the plan carries the case on the bindings that can answer it. The
+  development server answers `/stores/999` 404, with a page of its own;
+  any other failure is still 503.
+
+**Correction, found on the way:** every response the development server wrote
+said `OK`, a 404 and a 503 among them. Each status now has its own reason
+phrase. Seventeen mutants (`just e14-not-found`).
 
 **ADR-0162, 2026-10-03: each store at its route**
 ([ADR-0162](DECISIONS/ADR-0162-each-store-at-its-route.md)). The audit's route

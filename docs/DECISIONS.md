@@ -1323,3 +1323,13 @@ the route gap.
 - A second store, 48, has its own menu fragment.
 - A change to a store's menu reaches that store's pages only: §15.6 test 11,
   end to end.
+
+[ADR-0163](DECISIONS/ADR-0163-a-page-says-when-it-is-absent.md): the last step
+of the route gap.
+- A page declares the error that means its address names nothing:
+  `not_found_on StoreError.NotFound`.
+- PW0342 holds the clause to a case that a query the page reads can fail with.
+- The plan carries the case, and the development server answers it 404, any
+  other failure still 503.
+
+Found on the way: every response said `OK`, whatever its status.
