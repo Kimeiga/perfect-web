@@ -1,0 +1,81 @@
+diff --git a/lib/Estimates.pw b/lib/Estimates.pw
+index 619d521..5b8d43a 100644
+--- a/lib/Estimates.pw
++++ b/lib/Estimates.pw
+@@ -13,9 +13,14 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+     RecommendationError, PaymentError, TrackingError,
+     DeliveryEstimate, EstimateError }
+ import device.{ Location }
+-import capability.{ SessionId }
++import capability.{ Session, SessionId }
+ import browser.{ Element, MapHandle, MapError }
+ 
+ fn for_location(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fetch } {
+     todo
+ }
++
++// The session's delivery estimate, from the estimator the store's data layer
++// reaches (E14, T10): slow, and sometimes down.
++fn current(s: Session<SessionId>) -> Result<DeliveryEstimate, EstimateError> !{ database.read<Estimates> }
++    host "store:data/estimates#current"
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..aba6d22 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -26,6 +26,7 @@ module store.page
+ import Stores
+ import Carts
+ import Menus
++import Estimates
+ // The invocation context. `current_session()` was called and never imported
+ // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
+ // dotted paths whose head looks like a module, and a bare call to nothing
+@@ -39,7 +40,7 @@ import Menus
+ // ruling and the reason the repair waited for a frozen matrix.
+ import context.{ current_session }
+ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, InteractionId,
+-    MenuItemId, PositiveInt }
++    MenuItemId, PositiveInt, DeliveryEstimate, EstimateError }
+ import capability.{ Session, SessionId }
+ import Events.{ CartChanged }
+ 
+@@ -99,6 +100,20 @@ session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+ // The mutation. Idempotent by interaction id, so a double-tap is one add, and
+ // optimistic with a declared rollback so the count moves before the round trip
+ // and moves back if it fails.
++// **The session's delivery estimate** (E14, T10), from an estimator that is
++// slow and sometimes fails.
++session query Estimate(session: Session<SessionId>) -> Result<DeliveryEstimate, EstimateError>
++    freshness     0.seconds
++    consistency   read_your_writes
++    cache         private
++    key           session
++    concurrency   one_per_key
++    on_key_change cancel
++    timeout       3.seconds
++{
++    Estimates.current(session)
++}
++
+ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+     -> Result<Cart, CartError>
+     requires      SignedIn
+@@ -133,6 +148,7 @@ page StorePage(id: StoreId) {
+     let store = query Store(id)
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
++    let estimate = query Estimate(current_session())
+ 
+     view {
+         <main>
+@@ -164,6 +180,10 @@ page StorePage(id: StoreId) {
+                     Clear
+                 </button>
+             </section>
++
++            <section aria-label="Delivery">
++                <p>Delivery in {estimate.minutes} min</p>
++            </section>
+         </main>
+     }
+ }

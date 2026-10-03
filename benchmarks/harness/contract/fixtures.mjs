@@ -53,6 +53,27 @@ export const test = base.extend({
         const r = await p.request.post(`/bench/order?status=${status}`);
         if (!r.ok()) throw new Error(`/bench/order?status=${status}: ${r.status()}`);
       },
+      // How the recommender behaves (T05): `delay=…&fail=…&items=…`, the
+      // same hook on every stack. One per server.
+      recommend: async (query = "", p = page) => {
+        const r = await p.request.post(`/bench/recommendations?${query}`);
+        if (!r.ok()) throw new Error(`/bench/recommendations?${query}: ${r.status()}`);
+      },
+      // How the estimator behaves for the page's session (T10):
+      // `delay=…&fail=…&minutes=…`, the same hook on every stack.
+      estimate: async (query = "", p = page) => {
+        const r = await p.request.post(`/bench/estimate?${query}`);
+        if (!r.ok()) throw new Error(`/bench/estimate?${query}: ${r.status()}`);
+      },
+      // The page takes a press, without waiting for it to finish loading: a
+      // page still streaming has not loaded. The Pleris page attaches its
+      // handlers after its resume decision (E7V). Both frameworks' forms
+      // work before hydration, as plain form posts.
+      ready: async (p = page) => {
+        if (stack === "pleris") {
+          await p.waitForFunction(() => document.documentElement.dataset.pwReady);
+        }
+      },
     });
   },
 });

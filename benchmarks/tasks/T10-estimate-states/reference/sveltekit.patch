@@ -1,0 +1,45 @@
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 03ef2f0..0da1a35 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -12,15 +12,20 @@ import {
+ } from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+-export const load: PageServerLoad = async ({ params, cookies }) => {
++export const load: PageServerLoad = ({ params, cookies }) => {
+   const store = getStore(params.storeId);
+   const menu = getMenu(params.storeId);
+   if (!store || !menu) error(404, "no such store");
++  // Not awaited: it streams to the page when the estimator answers. Its
++  // failure is handled here, so one before the page renders does not end the
++  // server (SvelteKit's docs, "Streaming with promises").
++  const estimate = getEstimate(currentSession(cookies));
++  estimate.catch(() => {});
+   return {
+     store,
+     menu,
+     cartCount: lineCount(getCart(currentSession(cookies))),
+-    estimate: await getEstimate(currentSession(cookies)),
++    estimate,
+   };
+ };
+ 
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 6ac8791..b635080 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -30,6 +30,12 @@
+   </section>
+ 
+   <section aria-label="Delivery">
+-    <p>Delivery in {data.estimate.minutes} min</p>
++    {#await data.estimate}
++      <p>Estimating delivery</p>
++    {:then estimate}
++      <p>Delivery in {estimate.minutes} min</p>
++    {:catch}
++      <p>Delivery estimate unavailable</p>
++    {/await}
+   </section>
+ </main>

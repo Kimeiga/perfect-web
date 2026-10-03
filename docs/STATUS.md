@@ -13,6 +13,33 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**E14-C, 2026-10-03: T05 and T10 are written, nine tasks of twelve.** All
+four controls hold on all three stacks for each.
+- **T05** shows the store's recommendations, which take over a second,
+  without holding up the menu. The plausible wrong fix waits for them before
+  the page is sent. Next.js and SvelteKit build it, and only the hidden test
+  that presses Add while they are pending fails it. Pleris refuses it at
+  `pw check` (PW5400).
+- **T10** gives the session's delivery estimate a loading and an error state.
+  The plausible wrong fix forgets the error state:
+  - in Next.js a failed estimate replaces the whole page with "This page
+    couldn't load";
+  - in SvelteKit the section goes blank.
+
+  Both build. Pleris refuses the same patch at `pw check` (PW5401).
+
+**Correction, found by T10: a Pleris build could not render a private
+query's text part.** `pw-render --plan`, the static render inside the build,
+had no value for one the values file did not give, so T10's setup did not
+build. It now shows nothing of a session's value there, as it already
+rendered a private list empty and a private block as nothing.
+
+**Correction to ADR-0148's controls: four mutants were tested by no test that
+ran.** The controls ran the server's tests filtered by `stream`, and three
+of the five that tell a region's budget, failure and caching have no "stream"
+in their names. They run every server test now. A fifth survived because the
+second type pass's half was untested. A test now covers it.
+
 **ADR-0148, 2026-10-03: a stream region shows its query's state, and its
 settled arm comes in the same response**
 ([ADR-0148](DECISIONS/ADR-0148-a-stream-region-shows-its-query-s-state.md)).

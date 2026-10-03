@@ -76,19 +76,19 @@ E14 comes before E11-E13. Its plan, controls and task list are
      patch. PW5400-PW5402. The failed arm is given `Option` of the declared
      error. Demonstrated by `examples/demo/streamed.pw` in three engines, and
      natively in Chrome 154.
-   - **Next: T05, streaming recommendations, and T10, a loading and an error
-     state**, each with its four controls on all three stacks:
-     - T05 shows the store's recommendations, which take over a second,
-       without holding up the menu. Its plausible wrong fix waits for them.
-       Pleris refuses that (PW5400); the hidden tests catch it elsewhere.
-     - T10 shows the session's delivery estimate, which sometimes fails,
-       without failing the page. Its plausible wrong fix adds the loading
-       state and forgets the failure. Pleris refuses that (PW5401).
-     - The recommender and the estimator, slow and failing on a test's
-       word, go in each stack's setup. Pleris's development server has the
-       recommender (ADR-0148); the estimator is T10's.
-   - Then T09 and T02, which need a data source that counts its calls in all
-     three stacks, and T07, which needs a page that navigates.
+   - ~~**T05, streaming recommendations, and T10, a loading and an error
+     state.**~~ Written 2026-10-03: all four controls hold on all three
+     stacks for each. Pleris's unsafe patches are refused by `pw check`:
+     T05's by PW5400, T10's by PW5401.
+   - **Next: T09, a cache's freshness**, the tenth task, which the gate
+     needs. Each stack's setup keeps the menu five minutes, counts the menu
+     source's calls (`GET /bench/calls`), and lets the kitchen mark an item
+     sold out at the source with no event (`POST /bench/menu`). The task:
+     a sold-out item leaves the menu within ten seconds, and the source is
+     still asked at most once in ten seconds. The plausible wrong fix drops
+     the cache, which the call count fails on every stack, Pleris's
+     included: `freshness 0.seconds` is legal. Then T02, which needs the
+     same counter, and T07, which needs a page that navigates.
 4. **E14-D, `pw diff`** for the store (gate item 1).
 5. **E14-E, agent runs**, after the owner chooses models, budget, and how
    Pleris is taught to an agent.

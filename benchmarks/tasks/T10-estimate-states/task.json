@@ -1,0 +1,6 @@
+{
+  "id": "T10",
+  "title": "A loading and an error state for the delivery estimate",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T10.spec.mjs"
+}

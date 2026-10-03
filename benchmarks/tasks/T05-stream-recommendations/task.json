@@ -1,0 +1,6 @@
+{
+  "id": "T05",
+  "title": "Stream the store's recommendations",
+  "stacks": ["pleris", "next-react", "sveltekit"],
+  "hidden": "hidden/T05.spec.mjs"
+}

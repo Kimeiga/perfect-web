@@ -1,0 +1,33 @@
+diff --git a/store/app.pw b/store/app.pw
+index aba6d22..dd422d1 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -109,6 +109,7 @@ session query Estimate(session: Session<SessionId>) -> Result<DeliveryEstimate,
+     key           session
+     concurrency   one_per_key
+     on_key_change cancel
++    delivery      streamed
+     timeout       3.seconds
+ {
+     Estimates.current(session)
+@@ -148,7 +149,6 @@ page StorePage(id: StoreId) {
+     let store = query Store(id)
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
+-    let estimate = query Estimate(current_session())
+ 
+     view {
+         <main>
+@@ -182,7 +182,11 @@ page StorePage(id: StoreId) {
+             </section>
+ 
+             <section aria-label="Delivery">
+-                <p>Delivery in {estimate.minutes} min</p>
++                <stream query={Estimate(current_session())}>
++                    <placeholder><p>Estimating delivery</p></placeholder>
++                    <ready as={estimate}><p>Delivery in {estimate.minutes} min</p></ready>
++                    <failed><p>Delivery estimate unavailable</p></failed>
++                </stream>
+             </section>
+         </main>
+     }

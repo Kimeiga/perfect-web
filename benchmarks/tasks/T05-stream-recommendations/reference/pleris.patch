@@ -1,0 +1,25 @@
+diff --git a/store/app.pw b/store/app.pw
+index b5a54c0..de0ac61 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -180,6 +180,20 @@ page StorePage(id: StoreId) {
+                     Clear
+                 </button>
+             </section>
++
++            <section aria-label="Recommendations">
++                <stream query={Recommendations(id)}>
++                    <placeholder><p>Finding recommendations</p></placeholder>
++                    <ready as={items}>
++                        <ul>
++                            {#each items as item (item.id)}
++                                <li>{item.name}</li>
++                            {/each}
++                        </ul>
++                    </ready>
++                    <failed><p>No recommendations right now</p></failed>
++                </stream>
++            </section>
+         </main>
+     }
+ }

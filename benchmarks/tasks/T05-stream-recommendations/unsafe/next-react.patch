@@ -1,0 +1,34 @@
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..f77957d 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,5 +1,5 @@
+ import { notFound } from "next/navigation";
+-import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
++import { getCart, getMenu, getRecommendations, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
+ 
+@@ -13,6 +13,7 @@ export default async function StorePage({
+   const menu = getMenu(storeId);
+   if (!store || !menu) notFound();
+   const cart = getCart(await currentSession());
++  const recommendations = await getRecommendations(store.id);
+ 
+   return (
+     <main>
+@@ -42,6 +43,14 @@ export default async function StorePage({
+           </button>
+         </form>
+       </section>
++
++      <section aria-label="Recommendations">
++        <ul>
++          {recommendations.map((item) => (
++            <li key={item.id}>{item.name}</li>
++          ))}
++        </ul>
++      </section>
+     </main>
+   );
+ }

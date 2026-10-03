@@ -1,0 +1,43 @@
+diff --git a/store/app.pw b/store/app.pw
+index bec40ea..b5a54c0 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -26,6 +26,7 @@ module store.page
+ import Stores
+ import Carts
+ import Menus
++import Recommender
+ // The invocation context. `current_session()` was called and never imported
+ // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
+ // dotted paths whose head looks like a module, and a bare call to nothing
+@@ -39,7 +40,7 @@ import Menus
+ // ruling and the reason the repair waited for a frozen matrix.
+ import context.{ current_session }
+ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, InteractionId,
+-    MenuItemId, PositiveInt }
++    MenuItemId, PositiveInt, Recommendation, RecommendationError }
+ import capability.{ Session, SessionId }
+ import Events.{ CartChanged }
+ 
+@@ -57,6 +58,21 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+     Menus.for_store(id)
+ }
+ 
++// **What the recommender suggests for a store** (E14, T05). Slow: it takes
++// over a second to answer, so a page is sent before it does.
++public query Recommendations(id: StoreId) -> Result<List<Recommendation>, RecommendationError>
++    freshness     0.seconds
++    consistency   eventual
++    cache         shared
++    key           id
++    concurrency   one_per_key
++    on_key_change cancel
++    delivery      streamed
++    timeout       3.seconds
++{
++    Recommender.for_store(id)
++}
++
+ public query Store(id: StoreId) -> Result<Store, StoreError>
+     freshness     30.seconds
+     consistency   snapshot

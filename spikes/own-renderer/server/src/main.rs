@@ -251,6 +251,29 @@ impl Default for Recommender {
     }
 }
 
+/// **The estimator the store's data layer reaches, for one session** (E14,
+/// T10): what `store:data/estimates#current` answers, after how long, and how
+/// it fails. A test sets it through `/bench/estimate`.
+#[derive(Debug, Clone)]
+struct Estimator {
+    /// How long an estimate takes. Charter §15.5: 400 ms.
+    delay_ms: u64,
+    /// `declared`: the query's declared error. Anything else: the call itself
+    /// fails, as an estimator that is down does.
+    fail: Option<String>,
+    minutes: i64,
+}
+
+impl Default for Estimator {
+    fn default() -> Estimator {
+        Estimator {
+            delay_ms: 400,
+            fail: None,
+            minutes: 25,
+        }
+    }
+}
+
 struct Server {
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
@@ -337,6 +360,9 @@ struct Server {
     /// **The recommender** (ADR-0148): what a streamed region's query reads,
     /// with the delay and failure a test sets.
     recommender: Mutex<Recommender>,
+    /// **Each session's estimator** (E14, T10), as a test set it; the default
+    /// for a session no test has.
+    estimators: Mutex<BTreeMap<String, Estimator>>,
     /// **The compiler's contracts, and the node this server is.**
     ///
     /// E8's last gate item asks for the command path to go through the host
@@ -518,6 +544,8 @@ fn dev_topology() -> Topology {
                 "database.write<Carts>",
                 // The recommender (ADR-0148), a source reached over the network.
                 "network.fetch",
+                // A session's delivery estimate (E14, T10).
+                "database.read<Estimates>",
                 // 2026-08-10. The store gained the `import context.{
                 // current_session }` it had been missing since E4, so the page
                 // and both commands read the session. A dev origin that does
@@ -639,6 +667,7 @@ impl Server {
             shown: Mutex::new(BTreeMap::new()),
             orders: Mutex::new(BTreeMap::new()),
             recommender: Mutex::new(Recommender::default()),
+            estimators: Mutex::new(BTreeMap::new()),
             contracts,
             topology,
             speculation,
@@ -1320,6 +1349,39 @@ impl Server {
                 }
                 let status = order.clone().map(|case| Box::new(Val::Variant(case, None)));
                 Ok(vec![Val::Result(Ok(Some(Box::new(Val::Option(status)))))])
+            }),
+        );
+        // The session's delivery estimate (E14, T10), after the estimator's
+        // delay: a slow source, which a streamed region does not wait for.
+        let estimator = self
+            .estimators
+            .lock()
+            .expect("estimators")
+            .get(session)
+            .cloned()
+            .unwrap_or_default();
+        let this_session = session.to_string();
+        host.insert(
+            "store:data/estimates#current".to_string(),
+            Arc::new(move |args: &[Val]| {
+                let Some(Val::String(s)) = args.first() else {
+                    return Err(format!("estimates#current received {args:?}"));
+                };
+                if *s != this_session {
+                    return Err("estimates#current was passed another session".to_string());
+                }
+                std::thread::sleep(std::time::Duration::from_millis(estimator.delay_ms));
+                match estimator.fail.as_deref() {
+                    Some("declared") => Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                        "location-unavailable".into(),
+                        None,
+                    )))))]),
+                    Some(_) => Err("the estimator is down".to_string()),
+                    None => Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![(
+                        "minutes".into(),
+                        Val::S64(estimator.minutes),
+                    )])))))]),
+                }
             }),
         );
         host.extend(self.catalog());
@@ -3271,6 +3333,35 @@ fn handle(server: &Server, mut stream: TcpStream) {
             }
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
+        // How the estimator behaves for the request's session (E14, T10): how
+        // long it takes, how it fails, and what it estimates. What was kept
+        // for the session is not served after.
+        ("POST", "/bench/estimate") => {
+            let q = |k: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{k}=")))
+                    .and_then(percent_decoded)
+            };
+            let mut set = Estimator::default();
+            if let Some(ms) = q("delay").and_then(|v| v.parse().ok()) {
+                set.delay_ms = ms;
+            }
+            set.fail = q("fail").filter(|f| !f.is_empty());
+            if let Some(m) = q("minutes").and_then(|v| v.parse().ok()) {
+                set.minutes = m;
+            }
+            server
+                .estimators
+                .lock()
+                .expect("estimators")
+                .insert(session.clone(), set);
+            let own = format!("session={session}");
+            server
+                .queries
+                .evict_where(|k| k.key == own || k.key.starts_with(&format!("{own}\u{1f}")));
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
         // E7-P's structural commands. Each mutates the keyed collection and
         // broadcasts the patch that describes the mutation. A refusal returns
         // 409 and changes nothing — including the version.
@@ -4193,6 +4284,12 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     /// applied, built by the compiler as `pw build` builds them, and served
     /// from what was written.
     fn served_from(change: fn(&str) -> String, patch: Option<&str>) -> Server {
+        served_from_patches(change, patch.as_slice())
+    }
+
+    /// The store, changed by `change` and then by each patch in order: a
+    /// task's setup, and its reference after it.
+    fn served_from_patches(change: fn(&str) -> String, patches: &[&str]) -> Server {
         static BUILT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let work = std::env::temp_dir().join(format!(
@@ -4222,8 +4319,8 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let app = examples.join("store/app.pw");
         let changed = change(&std::fs::read_to_string(&app).expect("app"));
         std::fs::write(&app, changed).expect("app");
-        if let Some(patch) = patch {
-            let file = work.join("setup.patch");
+        for (i, patch) in patches.iter().enumerate() {
+            let file = work.join(format!("{i}.patch"));
             std::fs::write(&file, patch).expect("patch");
             let applied = std::process::Command::new("git")
                 .arg("apply")
@@ -4378,6 +4475,15 @@ public query Store(",
     /// What one request to `s` answers, chunk by chunk, each with when it
     /// arrived: the connection served by `handle`, as a browser's is.
     fn fetched(s: &Server, path: &str) -> Vec<(std::time::Duration, String)> {
+        fetched_as(s, path, None)
+    }
+
+    /// [`fetched`], the request carrying `session`'s cookie when given.
+    fn fetched_as(
+        s: &Server,
+        path: &str,
+        session: Option<&str>,
+    ) -> Vec<(std::time::Duration, String)> {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let at = listener.local_addr().expect("address");
         std::thread::scope(|scope| {
@@ -4386,8 +4492,11 @@ public query Store(",
                 handle(s, stream);
             });
             let mut client = TcpStream::connect(at).expect("connect");
+            let cookie = session
+                .map(|id| format!("Cookie: pw-session={id}\r\n"))
+                .unwrap_or_default();
             client
-                .write_all(format!("GET {path} HTTP/1.1\r\nHost: t\r\n\r\n").as_bytes())
+                .write_all(format!("GET {path} HTTP/1.1\r\nHost: t\r\n{cookie}\r\n").as_bytes())
                 .expect("request");
             let started = std::time::Instant::now();
             let mut chunks = Vec::new();
@@ -4524,6 +4633,67 @@ public query Store(",
             .map(|(_, c)| c)
             .collect();
         assert!(kept.contains("Cold Brew"), "{kept}");
+    }
+
+    /// T10's store: a session's delivery estimate, which the page waits for.
+    const ESTIMATE_SETUP: &str =
+        include_str!("../../../../benchmarks/tasks/T10-estimate-states/setup/pleris.patch");
+    /// And T10's reference after it: the estimate streamed, failure and all.
+    const ESTIMATE_STREAMED: &str =
+        include_str!("../../../../benchmarks/tasks/T10-estimate-states/reference/pleris.patch");
+
+    fn estimate(s: &Server, session: &str, fail: Option<&str>, minutes: i64) {
+        s.estimators.lock().expect("estimators").insert(
+            session.to_string(),
+            Estimator {
+                delay_ms: 0,
+                fail: fail.map(str::to_string),
+                minutes,
+            },
+        );
+    }
+
+    fn page_as(s: &Server, session: &str) -> String {
+        fetched_as(s, "/StorePage.html", Some(session))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect()
+    }
+
+    #[test]
+    fn a_session_s_estimate_is_its_estimator_s() {
+        let s = served_from_patches(|app| app.to_string(), &[ESTIMATE_SETUP]);
+        estimate(&s, "a", None, 35);
+        assert!(visible(&page_as(&s, "a")).contains("Delivery in 35 min"));
+        // Another session's estimator is its own.
+        assert!(visible(&page_as(&s, "b")).contains("Delivery in 25 min"));
+        // A page that waits for an estimate that fails is unavailable, as
+        // any page whose values cannot be read is (ADR-0147): what T10 fixes.
+        estimate(&s, "a", Some("down"), 35);
+        assert!(page_as(&s, "a").starts_with("HTTP/1.1 503"));
+    }
+
+    #[test]
+    fn a_failed_estimate_fills_its_region_and_the_page_is_served() {
+        let s = served_from_patches(|app| app.to_string(), &[ESTIMATE_SETUP, ESTIMATE_STREAMED]);
+        estimate(&s, "a", Some("down"), 35);
+        let failed = page_as(&s, "a");
+        assert!(failed.starts_with("HTTP/1.1 200"), "{failed}");
+        assert!(visible(&failed).contains("Espresso"), "{failed}");
+        let arm = &failed[failed.find("<template for=").expect("the region's arm")..];
+        assert!(
+            visible(arm).contains("Delivery estimate unavailable"),
+            "{arm}"
+        );
+        // And a declared error is a failure too, where the arm binds none.
+        estimate(&s, "b", Some("declared"), 35);
+        let declared = page_as(&s, "b");
+        assert!(
+            visible(&declared).contains("Delivery estimate unavailable"),
+            "{declared}"
+        );
+        estimate(&s, "c", None, 35);
+        assert!(visible(&page_as(&s, "c")).contains("Delivery in 35 min"));
     }
 
     #[test]

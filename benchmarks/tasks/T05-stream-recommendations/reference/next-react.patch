@@ -1,0 +1,42 @@
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..55acc88 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,5 +1,6 @@
++import { Suspense } from "react";
+ import { notFound } from "next/navigation";
+-import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
++import { getCart, getMenu, getRecommendations, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
+ 
+@@ -42,6 +43,29 @@ export default async function StorePage({
+           </button>
+         </form>
+       </section>
++
++      <section aria-label="Recommendations">
++        <Suspense fallback={<p>Finding recommendations</p>}>
++          <Recommendations store={store.id} />
++        </Suspense>
++      </section>
+     </main>
+   );
+ }
++
++/** The store's recommendations, streamed in when the recommender answers. */
++async function Recommendations({ store }: { store: string }) {
++  let items;
++  try {
++    items = await getRecommendations(store);
++  } catch {
++    return <p>No recommendations right now</p>;
++  }
++  return (
++    <ul>
++      {items.map((item) => (
++        <li key={item.id}>{item.name}</li>
++      ))}
++    </ul>
++  );
++}

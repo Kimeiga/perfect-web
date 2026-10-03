@@ -1,0 +1,50 @@
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 1cebba6..bb198d5 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,9 +1,18 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import {
++  addToCart,
++  clearCart,
++  getCart,
++  getMenu,
++  getRecommendations,
++  getStore,
++  isMenuItem,
++  lineCount,
++} from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+-export const load: PageServerLoad = ({ params, cookies }) => {
++export const load: PageServerLoad = async ({ params, cookies }) => {
+   const store = getStore(params.storeId);
+   const menu = getMenu(params.storeId);
+   if (!store || !menu) error(404, "no such store");
+@@ -11,6 +20,7 @@ export const load: PageServerLoad = ({ params, cookies }) => {
+     store,
+     menu,
+     cartCount: lineCount(getCart(currentSession(cookies))),
++    recommendations: await getRecommendations(params.storeId),
+   };
+ };
+ 
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..9e85b43 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -28,4 +28,12 @@
+       <button id="clear-cart" type="submit">Clear</button>
+     </form>
+   </section>
++
++  <section aria-label="Recommendations">
++    <ul>
++      {#each data.recommendations as item (item.id)}
++        <li>{item.name}</li>
++      {/each}
++    </ul>
++  </section>
+ </main>

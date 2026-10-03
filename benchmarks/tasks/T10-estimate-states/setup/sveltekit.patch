@@ -1,0 +1,111 @@
+diff --git a/src/lib/server/store.ts b/src/lib/server/store.ts
+index 7291a61..7224c47 100644
+--- a/src/lib/server/store.ts
++++ b/src/lib/server/store.ts
+@@ -46,6 +46,35 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++/** A delivery estimate: how many minutes until an order would arrive. */
++export type DeliveryEstimate = { minutes: number };
++
++/** How the estimator behaves for a session: how long it takes to answer,
++ * whether it fails, and what it estimates. A benchmark's hook sets it. */
++type Estimator = { delayMs: number; fail: boolean; minutes: number };
++
++const ESTIMATOR: Estimator = { delayMs: 400, fail: false, minutes: 25 };
++
++const estimators: Map<string, Estimator> =
++  ((globalThis as Record<string, unknown>).__pwBenchEstimators as Map<string, Estimator>) ??
++  new Map();
++(globalThis as Record<string, unknown>).__pwBenchEstimators = estimators;
++
++/** The session's delivery estimate, from the estimator. It can take a few
++ * seconds, and it sometimes fails. */
++export async function getEstimate(session: string | undefined): Promise<DeliveryEstimate> {
++  const { delayMs, fail, minutes } = (session && estimators.get(session)) || ESTIMATOR;
++  await new Promise((resolve) => setTimeout(resolve, delayMs));
++  if (fail) throw new Error("the estimator is unavailable");
++  return { minutes };
++}
++
++/** Set how the estimator behaves for a session; what is not given, as it was
++ * at the start. */
++export function setEstimator(session: string, change: Partial<Estimator>): void {
++  estimators.set(session, { ...ESTIMATOR, ...change });
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);
+diff --git a/src/routes/bench/estimate/+server.ts b/src/routes/bench/estimate/+server.ts
+new file mode 100644
+index 0000000..48d1d3b
+--- /dev/null
++++ b/src/routes/bench/estimate/+server.ts
+@@ -0,0 +1,19 @@
++import { json, type RequestHandler } from "@sveltejs/kit";
++import { ensureSession } from "$lib/server/session";
++import { setEstimator } from "$lib/server/store";
++
++/** Set how the estimator behaves for the request's session: `?delay=2000`
++ * milliseconds, `?fail=down`, `?minutes=35`; with nothing, as it was at the
++ * start. A benchmark's hook, as every stack in it has one. */
++export const POST: RequestHandler = ({ url, cookies }) => {
++  const q = url.searchParams;
++  const session = ensureSession(cookies);
++  const delay = q.get("delay");
++  const minutes = q.get("minutes");
++  setEstimator(session, {
++    ...(delay ? { delayMs: Number(delay) } : {}),
++    ...(q.get("fail") ? { fail: true } : {}),
++    ...(minutes ? { minutes: Number(minutes) } : {}),
++  });
++  return json({});
++};
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 1cebba6..03ef2f0 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,9 +1,18 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import {
++  addToCart,
++  clearCart,
++  getCart,
++  getEstimate,
++  getMenu,
++  getStore,
++  isMenuItem,
++  lineCount,
++} from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+-export const load: PageServerLoad = ({ params, cookies }) => {
++export const load: PageServerLoad = async ({ params, cookies }) => {
+   const store = getStore(params.storeId);
+   const menu = getMenu(params.storeId);
+   if (!store || !menu) error(404, "no such store");
+@@ -11,6 +20,7 @@ export const load: PageServerLoad = ({ params, cookies }) => {
+     store,
+     menu,
+     cartCount: lineCount(getCart(currentSession(cookies))),
++    estimate: await getEstimate(currentSession(cookies)),
+   };
+ };
+ 
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..6ac8791 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -28,4 +28,8 @@
+       <button id="clear-cart" type="submit">Clear</button>
+     </form>
+   </section>
++
++  <section aria-label="Delivery">
++    <p>Delivery in {data.estimate.minutes} min</p>
++  </section>
+ </main>

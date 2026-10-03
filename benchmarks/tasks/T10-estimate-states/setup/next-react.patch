@@ -1,0 +1,98 @@
+diff --git a/app/bench/estimate/route.ts b/app/bench/estimate/route.ts
+new file mode 100644
+index 0000000..789145e
+--- /dev/null
++++ b/app/bench/estimate/route.ts
+@@ -0,0 +1,19 @@
++import { NextResponse, type NextRequest } from "next/server";
++import { ensureSession } from "@/lib/session";
++import { setEstimator } from "@/lib/store";
++
++/** Set how the estimator behaves for the request's session: `?delay=2000`
++ * milliseconds, `?fail=down`, `?minutes=35`; with nothing, as it was at the
++ * start. A benchmark's hook, as every stack in it has one. */
++export async function POST(request: NextRequest) {
++  const q = request.nextUrl.searchParams;
++  const session = await ensureSession();
++  const delay = q.get("delay");
++  const minutes = q.get("minutes");
++  setEstimator(session, {
++    ...(delay ? { delayMs: Number(delay) } : {}),
++    ...(q.get("fail") ? { fail: true } : {}),
++    ...(minutes ? { minutes: Number(minutes) } : {}),
++  });
++  return NextResponse.json({});
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..65f9953 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,5 +1,5 @@
+ import { notFound } from "next/navigation";
+-import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
++import { getCart, getEstimate, getMenu, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
+ 
+@@ -12,7 +12,9 @@ export default async function StorePage({
+   const store = getStore(storeId);
+   const menu = getMenu(storeId);
+   if (!store || !menu) notFound();
+-  const cart = getCart(await currentSession());
++  const session = await currentSession();
++  const cart = getCart(session);
++  const estimate = await getEstimate(session);
+ 
+   return (
+     <main>
+@@ -42,6 +44,10 @@ export default async function StorePage({
+           </button>
+         </form>
+       </section>
++
++      <section aria-label="Delivery">
++        <p>Delivery in {estimate.minutes} min</p>
++      </section>
+     </main>
+   );
+ }
+diff --git a/lib/store.ts b/lib/store.ts
+index 7291a61..7224c47 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -46,6 +46,35 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++/** A delivery estimate: how many minutes until an order would arrive. */
++export type DeliveryEstimate = { minutes: number };
++
++/** How the estimator behaves for a session: how long it takes to answer,
++ * whether it fails, and what it estimates. A benchmark's hook sets it. */
++type Estimator = { delayMs: number; fail: boolean; minutes: number };
++
++const ESTIMATOR: Estimator = { delayMs: 400, fail: false, minutes: 25 };
++
++const estimators: Map<string, Estimator> =
++  ((globalThis as Record<string, unknown>).__pwBenchEstimators as Map<string, Estimator>) ??
++  new Map();
++(globalThis as Record<string, unknown>).__pwBenchEstimators = estimators;
++
++/** The session's delivery estimate, from the estimator. It can take a few
++ * seconds, and it sometimes fails. */
++export async function getEstimate(session: string | undefined): Promise<DeliveryEstimate> {
++  const { delayMs, fail, minutes } = (session && estimators.get(session)) || ESTIMATOR;
++  await new Promise((resolve) => setTimeout(resolve, delayMs));
++  if (fail) throw new Error("the estimator is unavailable");
++  return { minutes };
++}
++
++/** Set how the estimator behaves for a session; what is not given, as it was
++ * at the start. */
++export function setEstimator(session: string, change: Partial<Estimator>): void {
++  estimators.set(session, { ...ESTIMATOR, ...change });
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);

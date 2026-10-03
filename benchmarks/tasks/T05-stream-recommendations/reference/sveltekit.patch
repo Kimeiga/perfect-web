@@ -1,0 +1,60 @@
+diff --git a/src/routes/stores/[storeId]/+page.server.ts b/src/routes/stores/[storeId]/+page.server.ts
+index 1cebba6..2732b1d 100644
+--- a/src/routes/stores/[storeId]/+page.server.ts
++++ b/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,16 +1,31 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import {
++  addToCart,
++  clearCart,
++  getCart,
++  getMenu,
++  getRecommendations,
++  getStore,
++  isMenuItem,
++  lineCount,
++} from "$lib/server/store";
+ import { currentSession, ensureSession } from "$lib/server/session";
+ 
+ export const load: PageServerLoad = ({ params, cookies }) => {
+   const store = getStore(params.storeId);
+   const menu = getMenu(params.storeId);
+   if (!store || !menu) error(404, "no such store");
++  // Not awaited: it streams to the page when the recommender answers. Its
++  // failure is handled here, so one before the page renders does not end the
++  // server (SvelteKit's docs, "Streaming with promises").
++  const recommendations = getRecommendations(params.storeId);
++  recommendations.catch(() => {});
+   return {
+     store,
+     menu,
+     cartCount: lineCount(getCart(currentSession(cookies))),
++    recommendations,
+   };
+ };
+ 
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 26deb29..c664c8b 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -28,4 +28,18 @@
+       <button id="clear-cart" type="submit">Clear</button>
+     </form>
+   </section>
++
++  <section aria-label="Recommendations">
++    {#await data.recommendations}
++      <p>Finding recommendations</p>
++    {:then items}
++      <ul>
++        {#each items as item (item.id)}
++          <li>{item.name}</li>
++        {/each}
++      </ul>
++    {:catch}
++      <p>No recommendations right now</p>
++    {/await}
++  </section>
+ </main>

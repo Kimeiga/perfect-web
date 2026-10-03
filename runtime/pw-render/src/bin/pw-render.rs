@@ -135,6 +135,22 @@ fn main() -> std::process::ExitCode {
                                 env = env.set(name, Value::List(Vec::new()));
                             }
                         }
+                        // And a text part a session's query decides, which
+                        // this render, no session's, shows nothing of: as its
+                        // list is empty and its block shows no arm. Found by
+                        // T10, whose store shows a session's estimate as text,
+                        // and failed to build here.
+                        for part in plan["parts"].as_array().into_iter().flatten() {
+                            let path = part["path"].as_str().unwrap_or_default();
+                            let binding = part["binding"].as_str().unwrap_or_default();
+                            let private =
+                                plan["bindings"].as_array().into_iter().flatten().any(|b| {
+                                    b["binding"] == binding && b["policy"]["cache"] == "private"
+                                });
+                            if private && !given.contains(path) {
+                                env = env.set(path, Value::Text(String::new()));
+                            }
+                        }
                         let page = plan["page"].as_str().unwrap_or_default();
                         for b in plan["blocks"].as_array().into_iter().flatten() {
                             let id = b.as_u64().unwrap_or_default() as u32;

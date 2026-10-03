@@ -1,0 +1,27 @@
+diff --git a/store/app.pw b/store/app.pw
+index b5a54c0..be3b958 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -149,6 +149,7 @@ page StorePage(id: StoreId) {
+     let store = query Store(id)
+     let menu = query Menu(id)
+     let cart = query Cart(current_session())
++    let recommendations = query Recommendations(id)
+ 
+     view {
+         <main>
+@@ -180,6 +181,14 @@ page StorePage(id: StoreId) {
+                     Clear
+                 </button>
+             </section>
++
++            <section aria-label="Recommendations">
++                <ul>
++                    {#each recommendations as item (item.id)}
++                        <li>{item.name}</li>
++                    {/each}
++                </ul>
++            </section>
+         </main>
+     }
+ }

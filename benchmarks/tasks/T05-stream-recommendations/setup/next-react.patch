@@ -1,0 +1,77 @@
+diff --git a/app/bench/recommendations/route.ts b/app/bench/recommendations/route.ts
+new file mode 100644
+index 0000000..131eb49
+--- /dev/null
++++ b/app/bench/recommendations/route.ts
+@@ -0,0 +1,24 @@
++import { NextResponse, type NextRequest } from "next/server";
++import { setRecommender } from "@/lib/store";
++
++/** Set how the recommender behaves: `?delay=2000` milliseconds, `?fail=host`,
++ * `?items=mocha:Mocha,latte:Latte`; with nothing, as it was at the start. A
++ * benchmark's hook, as every stack in it has one. */
++export async function POST(request: NextRequest) {
++  const q = request.nextUrl.searchParams;
++  const delay = q.get("delay");
++  const items = q.get("items");
++  setRecommender({
++    ...(delay ? { delayMs: Number(delay) } : {}),
++    ...(q.get("fail") ? { fail: true } : {}),
++    ...(items
++      ? {
++          items: items.split(",").map((pair) => {
++            const [id, name] = pair.split(":");
++            return { id, name };
++          }),
++        }
++      : {}),
++  });
++  return NextResponse.json({});
++}
+diff --git a/lib/store.ts b/lib/store.ts
+index 7291a61..1f5ec1e 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -46,6 +46,42 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++/** What the recommender suggests for a store. */
++export type Recommendation = { id: MenuItemId; name: string };
++
++/** How the recommender behaves: how long it takes to answer, whether it
++ * fails, and what it suggests. A benchmark's hook sets it. */
++type Recommender = { delayMs: number; fail: boolean; items: Recommendation[] };
++
++const RECOMMENDER: Recommender = {
++  delayMs: 1200,
++  fail: false,
++  items: [
++    { id: "cortado", name: "Cortado" },
++    { id: "cold-brew", name: "Cold Brew" },
++  ],
++};
++
++const recommender: { now: Recommender } =
++  ((globalThis as Record<string, unknown>).__pwBenchRecommender as { now: Recommender }) ?? {
++    now: RECOMMENDER,
++  };
++(globalThis as Record<string, unknown>).__pwBenchRecommender = recommender;
++
++/** The store's recommendations, from the recommender. Slow: it takes over a
++ * second to answer, and it can fail. */
++export async function getRecommendations(store: StoreId): Promise<Recommendation[]> {
++  const { delayMs, fail, items } = recommender.now;
++  await new Promise((resolve) => setTimeout(resolve, delayMs));
++  if (fail || !STORES[store]) throw new Error("the recommender is unavailable");
++  return items;
++}
++
++/** Set how the recommender behaves; what is not given, as it was at the start. */
++export function setRecommender(change: Partial<Recommender>): void {
++  recommender.now = { ...RECOMMENDER, ...change };
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);
