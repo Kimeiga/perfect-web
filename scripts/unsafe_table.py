@@ -26,6 +26,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PW = ROOT / "target/debug/pw"
 TASKS = sorted((ROOT / "benchmarks/tasks").glob("T*"))
+# The store every task starts from: the benchmark's own copy (ADR-0156).
+BASE = ROOT / "benchmarks/baselines/pleris"
 STACKS = ["pleris", "next-react", "sveltekit"]
 
 # What each task's wrong fixes get wrong, whatever the stack.
@@ -79,9 +81,9 @@ def refusals(task_dir: pathlib.Path) -> str:
         return ""
     with tempfile.TemporaryDirectory() as tmp:
         at = pathlib.Path(tmp)
-        shutil.copyfile(ROOT / "examples/domain.pw", at / "domain.pw")
+        shutil.copyfile(BASE / "domain.pw", at / "domain.pw")
         for d in ["lib", "store"]:
-            shutil.copytree(ROOT / "examples" / d, at / d)
+            shutil.copytree(BASE / d, at / d)
         for p in patches:
             if p.exists():
                 subprocess.run(["git", "apply", str(p)], cwd=at, check=True, capture_output=True)

@@ -1,0 +1,97 @@
+// @corpus: fixture
+// @id: LIB-Carts
+// @category: application service — cart data
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Reads and writes are separate rows: a query may read, only a command may write.
+
+module Carts
+
+import domain.{ StoreId, Store, StoreError, Cart, CartLine, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError, same_item, added, unpriced }
+import List
+import capability.{ Session, SessionId }
+import browser.{ Element, MapHandle, MapError }
+
+// **`store:data`, not `pw:host`.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > `pw:host/carts#add` looks like Pleris itself defines a universal carts
+// > API. It doesn't. […] Do not let `pw:host/carts` become the permanent
+// > standard-library design merely because it was the first thing that made
+// > the demo executable.
+//
+// These are the STORE's data operations, externally implemented for now and
+// expected to become compiled Pleris over narrower platform primitives. The
+// package name is the ownership assertion, and the contract records it as
+// `owner: external` beside `pw:host/session#read`'s `owner: platform`.
+//
+// **Supplied externally today.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > Host implementation is explicit declaration metadata, never inferred from
+// > a missing/`todo` body or from the effect row.
+//
+// So each carries a `host` binding naming the operation the platform provides,
+// and has no body: `todo` means *there is not an implementation here*, and it
+// must not secretly mean *the platform supplies an FFI implementation*.
+//
+// The operation is per FUNCTION, not per capability. `add` and `clear` both
+// require `database.write<Carts>` and have different ABIs — which is the model
+// error the Wasm encoder found, and the reason a capability may never be a
+// callable identity.
+fn current(s: Session<SessionId>) -> Result<Cart, CartError> !{ database.read<Carts> }
+    host "store:data/carts#current"
+
+fn is_empty(s: Session<SessionId>) -> Bool !{ database.read<Carts> } {
+    todo
+}
+
+fn add(s: Session<SessionId>, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write<Carts> }
+    host "store:data/carts#add"
+
+// Placing the order. Declared here because `R-030` called it and imported
+// nothing — the fixture whose subject is private data in a resume manifest was
+// also calling a name that did not exist.
+// **A pure transition**, for an optimistic update.
+//
+// Declared 2026-08-11, when `optimistic` became a real transition (ADR-0025)
+// and the corpus's `cart.add(item, quantity)` turned out to call a member
+// `Cart` does not have — `Cart` is a record of `lines`, and the effect the
+// analysis attributed to it came from THIS module's `add` through the
+// last-segment member fallback. A 3-argument origin write standing in for a
+// 2-argument client-side transformation.
+//
+// `!{}` is the point: an optimistic transition runs on the client and is
+// discarded by restoring the value that was held, so it may not perform
+// anything an externally visible effect would leave behind.
+fn with_line(cart: Cart, item: MenuItemId, quantity: PositiveInt) -> Cart !{} {
+    let held = List.any(cart.lines, fn(line) same_item(line.item_id, item))
+    if held {
+        Cart { lines: List.map(cart.lines, fn(line) grown(line, item, quantity)) }
+    } else {
+        Cart {
+            lines: List.concat(cart.lines, [CartLine { item_id: item, quantity: quantity, unit_price: unpriced() }]),
+        }
+    }
+}
+
+// One line, grown by `quantity` when it holds `item` (ADR-0122).
+fn grown(line: CartLine, item: MenuItemId, quantity: PositiveInt) -> CartLine !{} {
+    if same_item(line.item_id, item) {
+        CartLine { item_id: line.item_id, quantity: added(line.quantity, quantity), unit_price: line.unit_price }
+    } else {
+        line
+    }
+}
+
+fn checkout(id: Session<SessionId>) -> Result<Cart, CartError> !{ database.write<Carts> } {
+    todo
+}
+
+fn clear(s: Session<SessionId>) -> Result<Cart, CartError> !{ database.write<Carts> }
+    host "store:data/carts#clear"

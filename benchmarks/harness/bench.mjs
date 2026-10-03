@@ -53,7 +53,11 @@ const STACKS = {
     // The store's sources. The platform packages and the toolchain are the
     // repository's: a Pleris agent edits its program, as a Next agent edits
     // its app and not Next.
-    sources: ["examples/domain.pw", "examples/lib", "examples/store"],
+    sources: [
+      "benchmarks/baselines/pleris/domain.pw",
+      "benchmarks/baselines/pleris/lib",
+      "benchmarks/baselines/pleris/store",
+    ],
     storePath: "/StorePage.html",
     // `pw check` runs inside the build, which refuses a program that does
     // not check; it is its own stage so the result says which one failed.

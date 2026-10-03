@@ -1246,3 +1246,8 @@ three runtime defects an audit of the store against charter §15 found.
 - A press on a handler from another build did nothing: it reads the page
   again, once, and never replays the press (§15.6 test 16).
 - The recovery codes were read one place off.
+
+[ADR-0156](DECISIONS/ADR-0156-the-benchmark-s-pleris-store-is-its-own-copy.md):
+the benchmark's Pleris store is `benchmarks/baselines/pleris`, frozen as the
+other two stacks' are. The canonical `examples/store` can then grow toward
+charter §15 without moving the 108 patches the tasks are anchored on.

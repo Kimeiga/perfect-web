@@ -1,0 +1,20 @@
+// @corpus: fixture
+// @id: LIB-Receipts
+// @category: application service — rendering receipts
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Declared so the effect row is a fact, not a guess.
+
+module Receipts
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import capability.{ SessionId, Secret, Payments }
+import html.{ Html }
+import browser.{ Element, MapHandle, MapError }
+
+fn render(key: Secret<Payments>, order: OrderId) -> Html !{} {
+    todo
+}

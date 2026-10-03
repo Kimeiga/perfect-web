@@ -13,8 +13,10 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 SOURCES="$WORK/examples"
 mkdir -p "$SOURCES"
-cp "$REPO_ROOT/examples/domain.pw" "$SOURCES/"
-cp -R "$REPO_ROOT/examples/lib" "$REPO_ROOT/examples/store" "$SOURCES/"
+# The benchmark's store, which T07's patches apply to (ADR-0156).
+BASE="$REPO_ROOT/benchmarks/baselines/pleris"
+cp "$BASE/domain.pw" "$SOURCES/"
+cp -R "$BASE/lib" "$BASE/store" "$SOURCES/"
 (cd "$SOURCES" && git apply "$TASK/setup/pleris.patch" && git apply "$TASK/reference/pleris.patch")
 
 # Its own IR files, so the canonical store's, which the server's tests read,

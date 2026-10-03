@@ -1,0 +1,20 @@
+// @corpus: fixture
+// @id: LIB-Recommender
+// @category: application service — recommendations
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Declared so the effect row is a fact, not a guess. The store's data layer
+// supplies it, as it supplies a menu (ADR-0148): the development server
+// answers with a delay and a failure a test sets.
+
+module Recommender
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import capability.{ SessionId }
+import browser.{ Element, MapHandle, MapError }
+
+fn for_store(id: StoreId) -> Result<List<Recommendation>, RecommendationError> !{ network.fetch }
+    host "store:data/recommendations#for-store"

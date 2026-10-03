@@ -1,0 +1,59 @@
+// @corpus: fixture
+// @id: LIB-Stores
+// @category: application service — store data
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// database.read<Stores> is why a browser-placed body cannot call this, and why a `view` declaring `!{{}}` that does is not pure.
+
+module Stores
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import capability.{ SessionId }
+import browser.{ Element, MapHandle, MapError }
+
+// **`store:data`, not `pw:host`.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > `pw:host/carts#add` looks like Pleris itself defines a universal carts
+// > API. It doesn't. […] Do not let `pw:host/carts` become the permanent
+// > standard-library design merely because it was the first thing that made
+// > the demo executable.
+//
+// These are the STORE's data operations, externally implemented for now and
+// expected to become compiled Pleris over narrower platform primitives. The
+// package name is the ownership assertion, and the contract records it as
+// `owner: external` beside `pw:host/session#read`'s `owner: platform`.
+//
+// **Supplied externally today.**
+//
+// Architect ruling, 2026-08-20:
+//
+// > Host implementation is explicit declaration metadata, never inferred from
+// > a missing/`todo` body or from the effect row.
+//
+// So each carries a `host` binding naming the operation the platform provides,
+// and has no body: `todo` means *there is not an implementation here*, and it
+// must not secretly mean *the platform supplies an FFI implementation*.
+//
+// The operation is per FUNCTION, not per capability. `add` and `clear` both
+// require `database.write<Carts>` and have different ABIs — which is the model
+// error the Wasm encoder found, and the reason a capability may never be a
+// callable identity.
+fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> }
+    host "store:data/stores#get"
+
+// `find` may not find one, and says so in its type. `get` is the form that
+// fails loudly; this is the form whose absence is a value.
+fn find(id: StoreId) -> Option<Store> !{ database.read<Stores> } {
+    todo
+}
+
+// Over the network rather than the database: the store record lives in an
+// upstream service. Corpus R-001 calls this from a view.
+fn fetch_store(id: StoreId) -> Result<Store, StoreError> !{ network.fetch } {
+    todo
+}

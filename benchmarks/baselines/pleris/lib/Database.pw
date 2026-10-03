@@ -1,0 +1,61 @@
+// @corpus: fixture
+// @id: LIB-Database
+// @category: application service — transactions
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// A transaction is an effect. E9C will make failing to end one an error.
+
+module Database
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError, DatabaseTransaction,
+    DatabaseConnection }
+import capability.{ SessionId }
+import browser.{ Element, MapHandle, MapError }
+
+// A live connection. It is a resource for the same reason a transaction is —
+// something outside the program is holding state open on this program's behalf
+// — and that is also why it cannot be written into a resume manifest.
+fn connect() -> DatabaseConnection
+    !{ database.connect, resource.acquire<DatabaseConnection> }
+{
+    todo
+}
+
+fn disconnect(c: DatabaseConnection) -> ()
+    !{ resource.release<DatabaseConnection> }
+{
+    todo
+}
+
+// Sends what the connection holds buffered. R-010 and its witnesses call it
+// from a handler that captures the connection; until 2026-09-25 they called a
+// `flush` that nothing declared, and nothing checked a member (ADR-0048).
+fn flush(c: DatabaseConnection) -> () !{ database.connect } { todo }
+
+// `resource.acquire<T>` in the row is what makes the returned value affine.
+// The checker reads the row; it holds no list of functions that open things,
+// so a new resource is declared here rather than in the compiler.
+fn begin() -> DatabaseTransaction
+    !{ database.transaction, resource.acquire<DatabaseTransaction> }
+{
+    todo
+}
+
+// The two ways a transaction ends. Exactly one of them must happen on every
+// path, which is what `resource.release<T>` says.
+fn commit(tx: DatabaseTransaction) -> Result<(), CartError>
+    !{ database.transaction, resource.release<DatabaseTransaction> }
+{
+    todo
+}
+
+// The same result as `commit`: ending a transaction either way can fail, and
+// a body ending in `if .. { rollback(tx) } else { commit(tx) }` has one type.
+fn rollback(tx: DatabaseTransaction) -> Result<(), CartError>
+    !{ database.transaction, resource.release<DatabaseTransaction> }
+{
+    todo
+}

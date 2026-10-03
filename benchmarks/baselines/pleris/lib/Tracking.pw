@@ -1,0 +1,19 @@
+// @corpus: fixture
+// @id: LIB-Tracking
+// @category: application service — order tracking
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// A subscription, not a fetch: it stays open, which is why its scope matters.
+
+module Tracking
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import capability.{ SessionId }
+import browser.{ Element, MapHandle, MapError }
+
+fn follow(order: OrderId) -> Result<OrderProgress, TrackingError> !{ network.subscribe } {
+    todo
+}

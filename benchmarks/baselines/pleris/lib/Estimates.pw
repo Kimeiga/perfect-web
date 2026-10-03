@@ -1,0 +1,21 @@
+// @corpus: fixture
+// @id: LIB-Estimates
+// @category: application service — delivery estimates
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Declared so the effect row is a fact, not a guess.
+
+module Estimates
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError,
+    DeliveryEstimate, EstimateError }
+import device.{ Location }
+import capability.{ SessionId }
+import browser.{ Element, MapHandle, MapError }
+
+fn for_location(at: Location) -> Result<DeliveryEstimate, EstimateError> !{ network.fetch } {
+    todo
+}

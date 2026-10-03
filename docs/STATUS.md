@@ -13,6 +13,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0156, 2026-10-03: the benchmark's Pleris store is its own copy**
+([ADR-0156](DECISIONS/ADR-0156-the-benchmark-s-pleris-store-is-its-own-copy.md)).
+The tasks' Pleris patches were written against `examples/store`, which is
+also the canonical store the audit leaves to grow. So it is frozen now as
+`benchmarks/baselines/pleris`, as the other two stacks' baselines are. Every
+task's sandbox, `pw diff`, the unsafe table and the keyed store build from
+it. The canonical store grows toward §15 without re-basing 108 patches.
+
 **Corrections, ADR-0155, 2026-10-03: the page keeps its subscription, and
 recovers a refused handler**
 ([ADR-0155](DECISIONS/ADR-0155-the-page-keeps-its-subscription-and-recovers-a-refused-handler.md)).

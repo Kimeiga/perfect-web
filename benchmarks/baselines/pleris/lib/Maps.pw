@@ -1,0 +1,35 @@
+// @corpus: fixture
+// @id: LIB-Maps
+// @category: external implementation — map widget
+// @charter: §7.5, §15.1
+// @milestone: E2C
+//
+// Declared, not ambient. `create` reads geometry during init, which is why any component using it must declare and attribute an unsafe capability.
+
+module Maps
+
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItemId, LatLng,
+    OrderId, OrderProgress, PositiveInt, Recommendation,
+    RecommendationError, PaymentError, TrackingError }
+import capability.{ SessionId }
+import browser.{ ElementRef, MapHandle, MapError }
+
+fn create(container: ElementRef, center: LatLng) -> Result<MapHandle, MapError>
+    !{ dom.mutate, layout.measure, resource.acquire<MapHandle> }
+{
+    todo
+}
+
+// The centre a map opens on when the caller has none. Declared here rather
+// than assumed: `R-012` called `default_center()` and imported nothing, so the
+// fixture whose subject is a leaked resource also called a name that did not
+// exist — found by PW0021 on the day it learned to examine bare calls.
+fn default_center() -> LatLng !{} {
+    LatLng { lat: 0.0, lng: 0.0 }
+}
+
+fn destroy(handle: MapHandle) -> ()
+    !{ dom.mutate, resource.release<MapHandle> }
+{
+    todo
+}

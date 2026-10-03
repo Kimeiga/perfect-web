@@ -1,0 +1,224 @@
+// @corpus: fixture
+// @id: DOMAIN
+// @category: shared domain types for the corpus
+// @charter: §7.1, §15.1
+// @milestone: E2B
+//
+// The types the corpus imports from `domain`. Written as real source on the
+// architect's ruling of 2026-08-06:
+//
+//   External implementation is allowed. Missing declaration is not.
+//
+// Twelve corpus files import from this module and, until now, it did not
+// exist — so strict name resolution would have failed all of them on E2B's
+// first day. Declaring them here also makes the corpus an actual program, so
+// imports, visibility, constructor resolution and cross-file exhaustiveness
+// are exercised rather than assumed.
+//
+// `decode`, `capability` and `browser` are NOT here. They are platform
+// modules and arrive with E2C's signature manifests.
+
+module domain
+
+// `line_count` sums a cart's quantities (ADR-0048).
+import List
+
+// --- identities -----------------------------------------------------------
+//
+// Opaque, so a raw String cannot be passed where an id is expected. E0 finding
+// F-4 measured that Koka erases such wrappers at the JS boundary; `pw` owns
+// the nominal identity regardless (ADR-0011).
+
+opaque type StoreId = String
+opaque type MenuItemId = String
+opaque type ConsumerId = String
+opaque type OrderId = String
+opaque type InteractionId = String
+
+// --- menu -----------------------------------------------------------------
+
+// What a menu holds. `List<MenuItemId>` was what `Menu` used to return, and a
+// page that renders `item.name` from a list of ids is describing one thing and
+// reading another — harmless while nothing depended on the element's type, and
+// not harmless now that a resumable handler inside the loop hashes it into a
+// capture schema.
+type MenuItem = MenuItem {
+    id: MenuItemId,
+    name: String,
+}
+
+// --- quantities -----------------------------------------------------------
+
+opaque type PositiveInt = Int
+
+// The count a `PositiveInt` holds, for other modules. The type is opaque
+// outside this one, where `.value` reads its representation (ADR-0048).
+fn count(n: PositiveInt) -> Int !{} { n.value }
+
+// The sum of two counts, for a transition that adds to a line (ADR-0122).
+fn added(a: PositiveInt, b: PositiveInt) -> PositiveInt !{} { PositiveInt(a.value + b.value) }
+
+type USD = USD { code: String }
+
+type Money<C> = Money { minor_units: Int }
+
+// A geographic point. A-007, A-019 and A-024 wrote `center: LatLng` for two
+// years of corpus history while no module declared it — an annotation naming
+// nothing, which checked nothing, and nothing said so until 2026-09-24.
+type LatLng = LatLng { lat: Float, lng: Float }
+
+// --- store ----------------------------------------------------------------
+
+type StoreHours = StoreHours {
+    opens_minute: Int,
+    closes_minute: Int,
+}
+
+type Store = Store {
+    id: StoreId,
+    name: String,
+    hours: StoreHours,
+}
+
+// A live connection to the database. Opaque, and a resource: `Database.connect`
+// declares `resource.acquire<DatabaseConnection>`.
+opaque type DatabaseConnection = String
+
+// An open transaction. Affine: it must end exactly once, and the row of the
+// function that produced it says so.
+opaque type DatabaseTransaction = String
+
+type StoreError =
+    | NotFound
+    | Unavailable
+    | DecodeFailed(String)
+
+// --- cart -----------------------------------------------------------------
+
+type CartLine = CartLine {
+    item_id: MenuItemId,
+    quantity: PositiveInt,
+    unit_price: Money<USD>,
+}
+
+type Cart = Cart {
+    lines: List<CartLine>,
+}
+
+// **What a cart count shows**: the quantity across its lines. The store's page
+// rendered `{cart.line_count}` from the first E7 demo, and `Cart` has no such
+// field: the dev server filled that path from its own state, and nothing
+// checked that the type had it (ADR-0048). It is a member of `Cart` now, and
+// the host's value is this function's.
+fn line_count(cart: Cart) -> Int !{} {
+    List.fold(cart.lines, 0, fn(n, line) n + line.quantity.count)
+}
+
+type CartError =
+    | ItemUnavailable(MenuItemId)
+    | QuantityTooLarge
+    | CartExpired
+
+// --- orders ---------------------------------------------------------------
+
+type OrderDraft = OrderDraft {
+    id: OrderId,
+    cart: Cart,
+}
+
+type OrderProgress = OrderProgress {
+    stage_label: String,
+}
+
+type PaymentError =
+    | Declined
+    | InsufficientFunds
+    | TransportFailed
+
+type TrackingError =
+    | OrderNotFound
+    | TrackingUnavailable
+
+// The four `OrderState` payloads. A-002 declares the union and imports these;
+// R-007 matches on it non-exhaustively, and the witness names them — which is
+// how `Cancelled(CancellationReason)` reaches the diagnostic rather than
+// `Cancelled(String)`.
+
+type OrderConfirmation = OrderConfirmation {
+    reference: String,
+}
+
+type OrderProgressStage = OrderProgressStage {
+    stage_label: String,
+}
+
+type DeliveryReceipt = DeliveryReceipt {
+    delivered_at_local: String,
+}
+
+type CancellationReason = CancellationReason {
+    label: String,
+}
+
+type OrderFailure = OrderFailure {
+    label: String,
+}
+
+// The order lifecycle. Declared here rather than in a view module so both
+// A-002 (which handles every variant) and R-007 (which does not) import it
+// through the ordinary module graph. R-007 previously relied on assumption
+// A-009's ambient union to see it at all — name-resolution failure must not be
+// what makes an exhaustiveness fixture red.
+
+type OrderState =
+    | Draft
+    | Pricing
+    | AuthorizingPayment
+    | Submitting
+    | SearchingForDasher
+    | Confirmed(OrderConfirmation)
+    | InProgress(OrderProgress)
+    | Delivered(DeliveryReceipt)
+    | Cancelled(CancellationReason)
+    | Failed(OrderFailure)
+
+// --- recommendations ------------------------------------------------------
+
+// What a captured payment returns (A-010). Named by the corpus, declared by
+// nothing, until the value relations made an unresolved annotation an error.
+type PaymentReceipt = PaymentReceipt { order: OrderId, amount: Money<USD> }
+
+// A delivery estimate and why one could not be made (R-025).
+type DeliveryEstimate = DeliveryEstimate { minutes: Int }
+
+type EstimateError =
+    | NoCoverage
+    | LocationUnavailable
+
+// A row of the inventory table (A-023).
+type InventoryRow = InventoryRow { id: MenuItemId, name: String, status: String }
+
+type Recommendation = Recommendation {
+    id: MenuItemId,
+    name: String,
+}
+
+type RecommendationError =
+    | NoneAvailable
+    | Timeout
+
+// --- sync -----------------------------------------------------------------
+
+type SyncError =
+    | Conflict
+    | Offline
+
+// Whether two ids name one item. The representation is readable only here
+// (ADR-0048), so the comparison is written here (ADR-0122).
+fn same_item(a: MenuItemId, b: MenuItemId) -> Bool !{} { a.value == b.value }
+
+// **A line's price before the server has priced it** (ADR-0122). An
+// optimistic transition adds a line for an item the cart did not hold, and
+// the price is the server's to say: `add_to_cart` takes none. Zero until the
+// command's result replaces the speculation. No page renders it.
+fn unpriced() -> Money<USD> !{} { Money { minor_units: 0 } }

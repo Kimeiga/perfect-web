@@ -4996,10 +4996,19 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     }
 
     /// The store, changed by `change` and then by each patch in order: a
-    /// task's setup, and its reference after it.
+    /// task's setup, and its reference after it. The benchmark's store
+    /// (ADR-0156), which every task's patches are written against.
     fn served_from_patches(change: fn(&str) -> String, patches: &[&str]) -> Server {
+        served_from_patches_in("benchmarks/baselines/pleris", change, patches)
+    }
+
+    /// [`served_from_patches`], the store's sources read from `base`, under
+    /// the repository's root: the benchmark's store, or the canonical one,
+    /// `examples`.
+    fn served_from_patches_in(base: &str, change: fn(&str) -> String, patches: &[&str]) -> Server {
         static BUILT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let base = root.join(base);
         let work = std::env::temp_dir().join(format!(
             "pw-served-{}-{}",
             std::process::id(),
@@ -5018,12 +5027,12 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         };
         for rel in ["lib", "store"] {
             std::fs::create_dir_all(examples.join(rel)).expect("dir");
-            for p in pw_files(&root.join("examples").join(rel)) {
+            for p in pw_files(&base.join(rel)) {
                 let to = examples.join(rel).join(p.file_name().expect("name"));
                 std::fs::copy(&p, &to).expect("copy");
             }
         }
-        std::fs::copy(root.join("examples/domain.pw"), examples.join("domain.pw")).expect("copy");
+        std::fs::copy(base.join("domain.pw"), examples.join("domain.pw")).expect("copy");
         let app = examples.join("store/app.pw");
         let changed = change(&std::fs::read_to_string(&app).expect("app"));
         std::fs::write(&app, changed).expect("app");

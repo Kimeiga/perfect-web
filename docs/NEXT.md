@@ -129,9 +129,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
      5. A command retried on a transport failure.
      6. §15.5's missing controls.
 
-     Changing the store's markup re-bases the tasks' patches, so 1-4 go
-     together. Then E14-E's design, ready for the owner's choice of models
-     and budget.
+     The benchmark's store is its own copy since ADR-0156, so the canonical
+     store grows without re-basing the tasks. Then E14-E's design, ready for
+     the owner's choice of models and budget.
 4. ~~**E14-D, `pw diff`** for the store (gate item 1).~~ Done 2026-10-03
    (ADR-0149, `just e14-diffs`). It reports each task's Pleris reference
    and unsafe patch in charter §19.2's sections. Its first use found that a

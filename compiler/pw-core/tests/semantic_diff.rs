@@ -27,11 +27,15 @@ fn store(patches: &[&str]) -> Vec<Unit> {
     };
     for rel in ["lib", "store"] {
         std::fs::create_dir_all(work.join(rel)).expect("dir");
-        for p in pw(&root.join("examples").join(rel)) {
+        for p in pw(&root.join("benchmarks/baselines/pleris").join(rel)) {
             std::fs::copy(&p, work.join(rel).join(p.file_name().expect("name"))).expect("copy");
         }
     }
-    std::fs::copy(root.join("examples/domain.pw"), work.join("domain.pw")).expect("copy");
+    std::fs::copy(
+        root.join("benchmarks/baselines/pleris/domain.pw"),
+        work.join("domain.pw"),
+    )
+    .expect("copy");
     for (i, patch) in patches.iter().enumerate() {
         let file = work.join(format!("{i}.patch"));
         std::fs::write(&file, patch).expect("patch");
