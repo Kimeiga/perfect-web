@@ -1755,8 +1755,8 @@ e14-streams:
        cargo test --locked -p pw-core --test stream_plan 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the renderer (runtime/pw-render/tests/streams.rs)"; echo; \
        cargo test --locked -p pw-render --test streams 2>&1 | grep -E '^(test |test result)'; \
-       echo; echo "== the server's streamed response (spikes/own-renderer/server)"; echo; \
-       cargo test --locked -p pw-dev-server stream 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server, its streamed response among it (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the accepted corpus, A-008 among it, checks as one program"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \

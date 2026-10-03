@@ -222,6 +222,36 @@ fn the_failed_arm_is_given_the_declared_error_or_nothing() {
 }
 
 #[test]
+fn the_failed_arm_s_value_is_an_option_to_every_reader() {
+    // The value relations agree with the typer: a view that takes an
+    // `Option<Oops>` is given it, and one that takes the declared error bare
+    // is not. Until 2026-10-03 the two passes would each have to be told.
+    let given = |param: &str| {
+        let mut src = page(
+            STREAMED,
+            "",
+            &stream(&[
+                PLACEHOLDER,
+                READY,
+                "<failed as={why}><Why reason={why} /></failed>",
+            ]),
+        );
+        src.push_str(&format!(
+            "\nview Why(reason: {param}) !{{}} {{\n    <p>No recommendations right now</p>\n}}\n"
+        ));
+        reported(&src)
+    };
+    assert_eq!(given("Option<Oops>"), Vec::<String>::new());
+    assert_eq!(
+        given("Oops"),
+        [
+            "PW0605 argument 1 of `Why's prop `reason`` is declared `t.Oops` and this is \
+          `Option<t.Oops>`"
+        ]
+    );
+}
+
+#[test]
 fn a_query_that_declares_no_error_gives_its_failed_arm_nothing() {
     let count = |failed: &str| {
         format!("<stream query={{Count(id)}}><ready as={{n}}><p>{{n}}</p></ready>{failed}</stream>")

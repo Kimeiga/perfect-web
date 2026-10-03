@@ -239,7 +239,10 @@ CARGO = {
     "rules": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "streams"],
     "plan": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "stream_plan"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "streams"],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "stream"],
+    # Every server test. Filtered by `stream` on 2026-10-03 it ran four, and
+    # missed the three a stream's budget, failure and caching are told by,
+    # whose names do not say "stream": four mutants survived the filter.
+    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
 }
 BROWSER = [
     "pnpm", "exec", "playwright", "test", "e2e/stream.spec.mjs",
