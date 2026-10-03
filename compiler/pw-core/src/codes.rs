@@ -460,6 +460,10 @@ codes! {
     // taken.
     UNKNOWN_MODIFIER = "PW5027" / unknown_modifier / 1, Markup,
         "an event's modifier is one the runtime applies";
+    // ADR-0167: `// the slots` between two elements checked, and the page
+    // showed it (found by ADR-0165).
+    COMMENT_AS_TEXT = "PW5028" / comment_as_text / 1, Markup,
+        "a comment in markup is `<!-- -->`: text that reads as one would be shown";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

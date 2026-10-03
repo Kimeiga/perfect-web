@@ -17,7 +17,7 @@ import domain.{ CartLine }
 
 view CartLines(lines: List<CartLine>) !{} {
     <ul aria-label="Cart">
-        // ERROR: no key for a mutable list.
+        <!-- ERROR: no key for a mutable list. -->
         {#each lines as line}
             <li>{line.item_id} x{line.quantity}</li>
         {/each}

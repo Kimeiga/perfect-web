@@ -17,7 +17,7 @@ import domain.{ MenuItem }
 
 view Menu(items: List<MenuItem>) !{} {
     <ul aria-label="Menu">
-        // ERROR: <div> is not a valid child of <ul>.
+        <!-- ERROR: <div> is not a valid child of <ul>. -->
         <div class="header">Today</div>
         {#each items as item (item.id)}
             <li>{item.name}</li>

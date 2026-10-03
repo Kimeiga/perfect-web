@@ -1102,6 +1102,11 @@ impl<'a> P<'a> {
                 self.error("PW0099", "template made no progress");
                 break;
             }
+            // `//` in markup content is text, which the lexer read as a
+            // comment (ADR-0167).
+            if depth > 0 {
+                self.markup_text();
+            }
             // Whitespace between markup is CONTENT. It is what separates two
             // inline elements, and leaving it as trivia drops it from HIR — so
             // `<span>a</span> <span>b</span>` renders without the space.
@@ -1111,6 +1116,10 @@ impl<'a> P<'a> {
                 self.finish();
             }
             match self.cur() {
+                // `<!-- … -->`, which the page does not show (ADR-0167).
+                Kind::LAngle if self.src[self.cur_span().start..].starts_with("<!--") => {
+                    self.markup_comment();
+                }
                 Kind::LAngle if self.nth_is(1, Kind::Slash) => {
                     depth -= 1;
                     self.start(K::CloseTag);
@@ -1240,10 +1249,36 @@ impl<'a> P<'a> {
         }
         self.finish(); // AttrName
         if self.eat(Kind::Eq) {
+            // Whitespace may stand between `=` and the value, as in HTML. A
+            // value that begins with `//` begins no comment (ADR-0167): it is
+            // read before the value's node is started, which would take a
+            // comment as trivia.
+            while self
+                .toks
+                .get(self.pos)
+                .is_some_and(|t| t.kind == Kind::Whitespace)
+            {
+                let t = self.toks[self.pos].clone();
+                self.b.token(&t);
+                self.pos += 1;
+            }
+            if self
+                .toks
+                .get(self.pos)
+                .is_some_and(|t| matches!(t.kind, Kind::LineComment | Kind::DocAttr))
+            {
+                self.read_unquoted_value();
+            }
             self.start(K::AttrValue);
             if self.at(Kind::LBrace) {
                 self.interpolation();
-            } else if self.at(Kind::Str) || self.at(Kind::Int) || self.at(Kind::Ident) {
+            } else if self.at(Kind::Str) || self.at(Kind::MarkupText) {
+                self.bump();
+            } else if !(self.at_eof()
+                || self.at(Kind::RAngle)
+                || self.at(Kind::Slash) && self.nth_is(1, Kind::RAngle))
+            {
+                self.read_unquoted_value();
                 self.bump();
             }
             self.finish(); // AttrValue
@@ -1251,15 +1286,45 @@ impl<'a> P<'a> {
         self.finish(); // Attr
     }
 
+    /// **An unquoted attribute value, read as HTML reads it** (ADR-0167):
+    /// the token at the cursor, and what follows it up to a space, `>` or
+    /// `/>`, made one token. Until 2026-10-03 it was read as code, so a value
+    /// was one word or number, and `href=http://x.y` built `href="http"`: the
+    /// `//` began a comment that took the rest of the line.
+    fn read_unquoted_value(&mut self) {
+        let i = self.pos;
+        let start = self.toks[i].span.start;
+        let rest = &self.src[start..];
+        let len = rest
+            .char_indices()
+            .find(|(at, c)| c.is_whitespace() || *c == '>' || rest[*at..].starts_with("/>"))
+            .map_or(rest.len(), |(at, _)| at);
+        if len > 0 {
+            self.read_again(
+                i,
+                Token {
+                    kind: Kind::MarkupText,
+                    span: start..start + len,
+                },
+            );
+        }
+    }
+
     /// Character data between tags, as one node per run.
     fn text_run(&mut self) {
         self.start(K::Text);
         let mut moved = false;
-        while !self.at_eof()
-            && !self.at(Kind::LAngle)
-            && !self.at(Kind::LBrace)
-            && !self.at(Kind::RBrace)
-        {
+        loop {
+            // A `//` met inside the run is text too (ADR-0167): read as a
+            // comment, it ran to the line's end, over the closing tag.
+            self.markup_text();
+            if self.at_eof()
+                || self.at(Kind::LAngle)
+                || self.at(Kind::LBrace)
+                || self.at(Kind::RBrace)
+            {
+                break;
+            }
             self.bump();
             moved = true;
         }
@@ -1267,6 +1332,78 @@ impl<'a> P<'a> {
             self.bump(); // never spin
         }
         self.finish();
+    }
+
+    /// **Markup text is text** (ADR-0167). The lexer does not know markup,
+    /// and read a `//` in it as a comment, which runs to the line's end: in
+    /// `<p>http://example.com</p>` it took the closing tag, and the page did
+    /// not parse. Where pending markup content holds such a comment, the
+    /// source is read again from it: as text up to the next `<`, `{` or `}`,
+    /// and lexed as before from there.
+    fn markup_text(&mut self) {
+        let Some(at) = self.toks[self.pos..]
+            .iter()
+            .take_while(|t| t.kind.is_trivia())
+            .position(|t| matches!(t.kind, Kind::LineComment | Kind::DocAttr))
+        else {
+            return;
+        };
+        let i = self.pos + at;
+        let start = self.toks[i].span.start;
+        let rest = &self.src[start..];
+        let end = start + rest.find(['<', '{', '}']).unwrap_or(rest.len());
+        self.read_again(
+            i,
+            Token {
+                kind: Kind::MarkupText,
+                span: start..end,
+            },
+        );
+    }
+
+    /// **`<!-- … -->`, a comment in markup** (ADR-0167): kept in the tree,
+    /// and shown by no page. Until 2026-10-03 it was read as an element with
+    /// no name, and what followed it was broken: `<!-- x --><p>one</p>`
+    /// rendered `< x p>one</>`. Read from the source, since the lexer read its
+    /// inside as code. An unclosed one runs to the end, as HTML's does.
+    fn markup_comment(&mut self) {
+        self.eat_trivia();
+        let i = self.pos;
+        let start = self.toks[i].span.start;
+        let rest = &self.src[start..];
+        let (end, closed) = match rest.find("-->") {
+            Some(at) => (start + at + "-->".len(), true),
+            None => (self.src.len(), false),
+        };
+        self.read_again(
+            i,
+            Token {
+                kind: Kind::MarkupComment,
+                span: start..end,
+            },
+        );
+        if !closed {
+            self.error_help(
+                "PW0006",
+                "a comment in markup is not closed",
+                "close it with `-->`",
+            );
+        }
+        self.bump();
+    }
+
+    /// The tokens from `i` on, replaced by `first` and the source after it,
+    /// lexed again. The tokens still cover every byte (the lexer's
+    /// invariant): `first` starts where token `i` did.
+    fn read_again(&mut self, i: usize, first: Token) {
+        let end = first.span.end;
+        self.toks.truncate(i);
+        self.toks.push(first);
+        self.toks
+            .extend(lex(&self.src[end..]).into_iter().map(|t| Token {
+                kind: t.kind,
+                span: t.span.start + end..t.span.end + end,
+            }));
     }
 
     /// `{ expr }`, `{#each items as x (x.id)}`, `{/each}` inside a template.
@@ -2859,6 +2996,106 @@ mod tests {
                 .any(|t| t.kind() == K::UnterminatedStr),
             "a single-quoted string must not swallow the newline"
         );
+    }
+
+    /// **Markup text is text** (ADR-0167): `//` and `/*` in it begin no
+    /// comment. Until 2026-10-03 the lexer read `//` as one, which ran to the
+    /// line's end, over the closing tag: `<p>http://example.com</p>` did not
+    /// parse.
+    #[test]
+    fn a_slash_slash_in_markup_text_is_text() {
+        for (markup, text) in [
+            ("<p>http://example.com</p>", "http://example.com"),
+            ("<p>a // b</p>", "a // b"),
+            ("<p>a /* b */ c</p>", "a /* b */ c"),
+            ("<p>// shown</p>", "// shown"),
+            ("<p>// shown\n</p>", "// shown\n"),
+        ] {
+            let src = format!("view V() !{{}} {{\n    <main>{markup}<p>next</p></main>\n}}\n");
+            let p = parse_ok(&src);
+            assert_lossless(&src, &p);
+            let paragraphs = texts(&p, K::Element);
+            assert_eq!(
+                paragraphs[1..],
+                [markup.to_string(), "<p>next</p>".to_string()],
+                "{markup}"
+            );
+            assert_eq!(texts(&p, K::Text)[0], text, "{markup}");
+        }
+        // Control: in code, `//` still begins a comment.
+        let src = "view V() !{} {\n    <main><p>{f(1) // the one\n}</p></main>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        assert!(texts(&p, K::Text).iter().all(|t| !t.contains("the one")));
+        assert!(
+            p.green
+                .descendants_with_tokens()
+                .any(|t| t.kind() == K::LineComment && t.to_string() == "// the one")
+        );
+    }
+
+    /// **`<!-- … -->` is a comment in markup** (ADR-0167): one token, which
+    /// no node of the tree's markup holds. Until 2026-10-03 it was read as an
+    /// element with no name, and broke what followed it.
+    #[test]
+    fn an_html_comment_in_markup_is_a_comment() {
+        let src = "view V() !{} {\n    <ul><!-- a // <li> { here -->\n<li>one</li></ul>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let ul = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::Element)
+            .expect("the list");
+        let items: Vec<String> = ul
+            .children()
+            .filter(|c| c.kind() == K::Element)
+            .map(|c| c.text().to_string())
+            .collect();
+        assert_eq!(items, ["<li>one</li>"]);
+        let comments: Vec<String> = ul
+            .children_with_tokens()
+            .filter(|c| c.kind() == K::MarkupComment)
+            .map(|c| c.to_string())
+            .collect();
+        assert_eq!(comments, ["<!-- a // <li> { here -->"]);
+        // One that is not closed runs to the end, and says so.
+        let src = "view V() !{} {\n    <ul><!-- open\n<li>one</li></ul>\n}\n";
+        let p = parse_tree(src);
+        assert_lossless(src, &p);
+        assert!(
+            p.errors
+                .iter()
+                .any(|e| e.code == "PW0006" && e.message == "a comment in markup is not closed"),
+            "{:?}",
+            p.errors
+        );
+    }
+
+    /// **An unquoted attribute value is read as HTML reads it** (ADR-0167):
+    /// up to a space, `>` or `/>`. Until 2026-10-03 it was read as code, and
+    /// `href=http://x.y` built `href="http"`, its `//` a comment that took the
+    /// rest of the line, the element after it included.
+    #[test]
+    fn an_unquoted_attribute_value_is_read_as_html_reads_it() {
+        for (tag, values) in [
+            ("<a href=http://x.y>y</a>", &["http://x.y"][..]),
+            ("<a href=//cdn.x/y.js>y</a>", &["//cdn.x/y.js"][..]),
+            ("<a href = /stores/48>y</a>", &["/stores/48"][..]),
+            ("<input type=text aria-label=Name>", &["text", "Name"][..]),
+            ("<img src=x.png alt=x/>", &["x.png", "x"][..]),
+            ("<a href=\"/a\" title=b>y</a>", &["\"/a\"", "b"][..]),
+        ] {
+            let src = format!("view V() !{{}} {{\n    <main>{tag}<p>next</p></main>\n}}\n");
+            let p = parse_ok(&src);
+            assert_lossless(&src, &p);
+            assert_eq!(texts(&p, K::AttrValue), values, "{tag}");
+            // And the element after it is whole.
+            assert!(
+                texts(&p, K::Element).contains(&"<p>next</p>".to_string()),
+                "{tag}"
+            );
+        }
     }
 
     #[test]

@@ -17,7 +17,7 @@ import html.{ raw_html }
 
 view StoreDescription(description: String) !{} {
     <section>
-        // ERROR: raw HTML injection without capability or justification.
+        <!-- ERROR: raw HTML injection without capability or justification. -->
         {raw_html(description)}
     </section>
 }

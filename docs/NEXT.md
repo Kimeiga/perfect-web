@@ -152,9 +152,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
         through the program's own types, and WebKit paints the store before
         its slots. The browser suite refuses a build whose sources changed
         (a correction to ADR-0165).
-        - **Next: refuse a `//` line inside markup**, which renders as text
-          (found by ADR-0165). Then money shown as text, for §15.1's
-          `price`.
+        - ~~Refuse a `//` line inside markup~~ (ADR-0167,
+          `just e14-markup-comments`). It found more: markup was read as
+          code, so URLs in text and unquoted attribute values mis-built.
+          Markup text, `<!-- -->` and unquoted values are read as HTML reads
+          them; PW5028 refuses a line that reads as a comment.
+        - **Next: money shown as text**, for §15.1's `price`.
      4. Decrement, remove, and a per-line cart.
      5. A command retried on a transport failure.
      6. §15.5's missing controls.

@@ -133,6 +133,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(crate::streams::check(&workspace, &hirs, &sigs, i, &u.hir));
         // ADR-0094: a template writes no code.
         per_unit.extend(code_in_markup(&u.hir));
+        // ADR-0167: a comment in markup is `<!-- -->`.
+        per_unit.extend(comment_as_text(&u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0107: a cache key names each parameter its entry depends on.
@@ -2180,6 +2182,87 @@ fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, crate::h
             .unwrap_or_default(),
         HPat::Wild | HPat::Literal(_) | HPat::Error => Vec::new(),
     }
+}
+
+/// **A comment in markup is `<!-- -->`** (ADR-0167, PW5028). In markup,
+/// `//` and `/*` begin no comment: what follows them is the page's text, as
+/// in HTML and JSX. A line of text that begins with one reads as a comment
+/// and would be shown, so it is refused, as `eslint-plugin-react`'s
+/// `jsx-no-comment-textnodes` refuses it in JSX.
+fn comment_as_text(hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        // A stylesheet's or a script's text is its own language's, where
+        // `/* */` and `//` are comments (PW5023 refuses a script's anyway).
+        let mut raw = std::collections::HashSet::new();
+        for n in body.walk_markup(&roots) {
+            if let Node::Element { tag, children, .. } = body.node(n)
+                && matches!(tag.to_ascii_lowercase().as_str(), "style" | "script")
+            {
+                raw.extend(body.walk_markup(children));
+            }
+        }
+        for n in body.walk_markup(&roots) {
+            let Node::Text(text) = body.node(n) else {
+                continue;
+            };
+            if raw.contains(&n) {
+                continue;
+            }
+            let at = body.node_span(n);
+            let mut offset = 0;
+            for line in text.split_inclusive('\n') {
+                let written = line.trim_start();
+                let start = offset + (line.len() - written.len());
+                offset += line.len();
+                if !(written.starts_with("//") || written.starts_with("/*")) {
+                    continue;
+                }
+                let shown = written.trim_end();
+                out.push(Diagnostic {
+                    code: crate::codes::COMMENT_AS_TEXT.id,
+                    invariant: crate::codes::COMMENT_AS_TEXT.invariant,
+                    reason: "comment_as_text",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message: format!("`{shown}` reads as a comment, and the page would show it"),
+                    primary_span: at.start + start..at.start + start + shown.len(),
+                    related: vec![Related {
+                        span: hir.decl_span(decl_id),
+                        label: format!("`{}` renders this", decl.name),
+                    }],
+                    explanation: Some(
+                        "In markup, `//` and `/*` begin no comment: what follows is the \
+                         page's text, as in HTML and JSX. Until 2026-10-03 such a line \
+                         between two elements checked, and the page showed it (ADR-0167)."
+                            .to_string(),
+                    ),
+                    repairs: vec![
+                        Repair {
+                            description: "write a comment as `<!-- -->`, which no page shows"
+                                .to_string(),
+                            replacement: None,
+                        },
+                        Repair {
+                            description: "write text that begins so as a string: \
+                                          `{\"// …\"}`"
+                                .to_string(),
+                            replacement: None,
+                        },
+                    ],
+                });
+            }
+        }
+    }
+    out
 }
 
 /// **A template writes no code** (ADR-0094).

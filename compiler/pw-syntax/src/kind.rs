@@ -61,6 +61,10 @@ pub enum SyntaxKind {
     Underscore,
     Unknown,
     Eof,
+    /// Character data between tags, read by the parser (ADR-0167).
+    MarkupText,
+    /// `<!-- … -->` in markup, read by the parser (ADR-0167).
+    MarkupComment,
 
     // ---- nodes ---------------------------------------------------------- 100..
     /// The whole file.
@@ -258,6 +262,8 @@ impl From<TokenKind> for SyntaxKind {
             TokenKind::Underscore => SyntaxKind::Underscore,
             TokenKind::Unknown => SyntaxKind::Unknown,
             TokenKind::Eof => SyntaxKind::Eof,
+            TokenKind::MarkupText => SyntaxKind::MarkupText,
+            TokenKind::MarkupComment => SyntaxKind::MarkupComment,
         }
     }
 }
@@ -334,6 +340,8 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         Underscore,
         Unknown,
         Eof,
+        MarkupText,
+        MarkupComment,
         SourceFile,
         ModuleDecl,
         ImportDecl,

@@ -35,7 +35,7 @@ page StorePage(id: StoreId) {
     view {
         <main>
             <h1>{store.name}</h1>
-            // ERROR: session data inside a shared materialization.
+            <!-- ERROR: session data inside a shared materialization. -->
             <p>Items in cart: {cart.line_count}</p>
         </main>
     }

@@ -21,7 +21,7 @@ page Landing() {
 
     view {
         <main>
-            // ERROR: wall clock read in a build-time render.
+            <!-- ERROR: wall clock read in a build-time render. -->
             <p>Generated at {clock.now_wall()}</p>
         </main>
     }

@@ -20,7 +20,7 @@ fn save_address() -> () !{} { todo }
 
 view AddressForm() !{} {
     <form on:submit={save_address}>
-        // ERROR: no label associated with this control.
+        <!-- ERROR: no label associated with this control. -->
         <input type="text" name="street" />
         <button type="submit">Save</button>
     </form>

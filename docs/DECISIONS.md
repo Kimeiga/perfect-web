@@ -1364,3 +1364,15 @@ part of the audit's eighth gap, and a correction to ADR-0165.
   store and the benchmark's frozen copy.
 - Correction: ADR-0165's browser suite ran on a stale build. The suite now
   refuses a build whose sources have changed since.
+
+[ADR-0167](DECISIONS/ADR-0167-markup-text-is-text.md): markup text is text,
+and a comment in markup is `<!-- -->`.
+- The lexer read `//` in markup as a comment. A `//` line between elements
+  became page text. `<p>http://example.com</p>` did not parse. An unquoted
+  `href=http://x.y` built `href="http"` and broke the next element. An HTML
+  comment built a nameless element. None of these was reported.
+- The parser now reads markup text, `<!-- -->` and unquoted attribute
+  values from the source, as HTML reads them.
+- PW5028 refuses a line of markup text that begins with `//` or `/*`.
+- Seven rejected fixtures had shown their `// ERROR:` notes as page text;
+  they are `<!-- -->` now.

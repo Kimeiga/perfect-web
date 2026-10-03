@@ -409,6 +409,10 @@ awaited in order. What remains:
 - **A view may write `<meta>` and `<link>`** (ADR-0096): a refresh that
   redirects, a stylesheet from anywhere. Neither runs a script, and which
   head elements a body may hold needs a ruling.
+- **A comment in markup is `<!-- -->`** (ADR-0167), and no page renders it.
+  HTML's other bogus comments, `<!x>` and `<?x>`, are read as elements. A
+  line of markup text that begins with `//` or `/*` is refused (PW5028),
+  except in a `<style>` or a `<script>`.
 - **A hole cannot hold a string** (ADR-0049). `"{f("a")}"` ends the outer
   token at the inner quote. Escapes are defined, and every backend reads one
   decoder; policy strings (`because`, `route`, `host`) are read as written.

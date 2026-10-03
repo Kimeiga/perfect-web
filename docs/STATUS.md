@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `1c7b2e7`, with ADR-0166.
+**Reviewed:** 2026-10-03, against master `dae4d73`, with ADR-0167.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,24 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0167, 2026-10-03: markup was read as code**
+([ADR-0167](DECISIONS/ADR-0167-markup-text-is-text.md)).
+- **What was wrong.** The lexer does not know markup, and read every `//` in
+  it as a comment that ran to the line's end. None of these was reported:
+  - a `//` line between elements became page text;
+  - `<p>http://example.com</p>` did not parse;
+  - `<a href=http://x.y>` built `href="http"` and broke the element after
+    it;
+  - `<!-- x -->` built a nameless element.
+- **Seven rejected-corpus fixtures** (R-004, R-016, R-018, R-019, R-021,
+  R-023, R-024) had shown their own `// ERROR:` notes as page text.
+- **Now** the parser reads markup text, comments and unquoted attribute
+  values from the source, as HTML reads them. A comment in markup is
+  `<!-- -->`, and no page renders it. PW5028 refuses a line of text that
+  begins with `//` or `/*`.
+
+13 mutants (`just e14-markup-comments`).
 
 **Correction, ADR-0166, 2026-10-03: ADR-0165's browser suite ran on a stale
 build** ([ADR-0166](DECISIONS/ADR-0166-the-store-and-its-items-say-what-they-are.md)).

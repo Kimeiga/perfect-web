@@ -2006,6 +2006,29 @@ e14-descriptions:
      } > docs/evidence/E14/descriptions.txt
     @grep -E "^test result|pw check|passed|skipped|mutants killed" docs/evidence/E14/descriptions.txt
 
+# ADR-0167: markup text is text, and a comment in markup is `<!-- -->`. The
+# parser's tests, the checker's (PW5028), the corpus checking clean, and the
+# mutation controls.
+e14-markup-comments:
+    @cargo build --quiet --locked -p pw-cli
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0167 - markup text is text, and a comment in markup is <!-- -->"; echo; \
+       echo "produced by: just e14-markup-comments"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the parser (compiler/pw-syntax)"; echo; \
+       cargo test --locked -p pw-syntax --lib -- a_slash_slash_in_markup an_html_comment_in_markup an_unquoted_attribute_value 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the checker and what a page sends (compiler/pw-core/tests/markup_comments.rs)"; echo; \
+       cargo test --locked -p pw-core --test markup_comments 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus: each rejected fixture emits its own defect, and no other"; echo; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test (every_rejected|no_accepted)|^test result'; \
+       echo; echo "== the store checks"; echo; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/markup_comments_mutations.py)"; echo; \
+       python3 scripts/markup_comments_mutations.py; \
+     } > docs/evidence/E14/markup-comments.txt
+    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/markup-comments.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

@@ -77,6 +77,15 @@ pub enum Kind {
     /// A byte that is not part of any legal token.
     Unknown,
     Eof,
+
+    // --- markup, as the parser reads it again (ADR-0167) -------------------
+    // The lexer does not know markup, so it never makes these: the parser
+    // does, where its content holds what the lexer read as code.
+    /// Character data between tags: everything up to the next `<`, `{` or
+    /// `}`, `//` and `/*` included, since in markup they begin no comment.
+    MarkupText,
+    /// `<!-- … -->`: a comment in markup, which the page does not show.
+    MarkupComment,
 }
 
 impl Kind {
@@ -128,6 +137,8 @@ impl Kind {
             Kind::Underscore => "`_`",
             Kind::Unknown => "an unexpected character",
             Kind::Eof => "end of file",
+            Kind::MarkupText => "text",
+            Kind::MarkupComment => "a comment in markup",
         }
     }
 }
