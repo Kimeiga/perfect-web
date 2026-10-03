@@ -409,6 +409,10 @@ awaited in order. What remains:
 - **A view may write `<meta>` and `<link>`** (ADR-0096): a refresh that
   redirects, a stylesheet from anywhere. Neither runs a script, and which
   head elements a body may hold needs a ruling.
+- **A single patch that addresses nothing is ignored** (ADR-0168): a patch
+  set that does is refused and the page read again, but a lone
+  `ReplaceText` or `SetAttribute` is not. It hid E7-P's scrambled list until
+  2026-10-03.
 - **A comment in markup is `<!-- -->`** (ADR-0167), and no page renders it.
   HTML's other bogus comments, `<!x>` and `<?x>`, are read as elements. A
   line of markup text that begins with `//` or `/*` is refused (PW5028),

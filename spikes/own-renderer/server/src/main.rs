@@ -2197,17 +2197,6 @@ impl Server {
         (template, LocalPartId(part.id.0))
     }
 
-    /// The text part inside the loop body that shows an item's name.
-    fn item_name_part(&self) -> LocalPartId {
-        let (template, _) = self.menu_part();
-        let part = template
-            .manifest()
-            .into_iter()
-            .find(|p| p.value == "item.name")
-            .expect("the loop body shows the item's name");
-        LocalPartId(part.id.0)
-    }
-
     fn menu_address(&self) -> PartAddress {
         let (template, part) = self.menu_part();
         PartAddress::new(&TemplateSchemaId(template.schema.clone()), part)
@@ -2332,13 +2321,16 @@ impl Server {
         // Without the interlock both orders are possible and the second one
         // applies a change twice — an item inserted, then inserted again.
         let mut queue = self.pending.lock().expect("pending");
-        {
+        // The menu before the change: what a renamed item was (ADR-0168).
+        let before = {
             // Refusals happen before anything is regenerated: a rejected
             // operation must leave no version behind, or the page would be
             // told to catch up to a change that did not happen.
             let mut items = self.menu.lock().expect("menu");
+            let before = items.clone();
             op.apply(&mut items)?;
-        }
+            before
+        };
         // The deployment's menu changed, which is `MenuChanged(47)`: it drops
         // what the program says depends on it, the entries of each query
         // that declares `invalidates_on MenuChanged(id)` for this store, and
@@ -2383,16 +2375,35 @@ impl Server {
         // previous version derived a patch per subscriber because the fragment
         // inherited each document's domain — which was per-session bytes for a
         // shared cache entry, dressed up as a broadcast.
-        let operation = op
-            .patch(template, part, &items, &env, &self.templates)
-            .map_err(|b| format!("{b:?}"))?;
-        let target = op.target(
-            &self.menu_address(),
-            part,
-            self.item_name_part(),
-            &env,
-            part,
-        );
+        //
+        // A rename sets each part of the item's instance that reads what
+        // changed, its text and its attributes alike (ADR-0168). Until
+        // 2026-10-03 it set the name's text and nothing else, so an Add
+        // button kept the name of the item it was before.
+        let patches: Vec<Targeted> = match &op {
+            MenuOp::Rename { id, .. } => {
+                let row = |items: &[(String, String)]| {
+                    items
+                        .iter()
+                        .find(|(i, _)| i == id)
+                        .map(|(i, n)| item(i, n))
+                        .ok_or_else(|| format!("no item {id} to rename"))
+                };
+                let (was, now) = (row(&before)?, row(&items)?);
+                let token = pw_render::instance_token_of(part, &now, "id", &env);
+                let changes =
+                    pw_render::instance_changes(template, part, &was, &now, &env, &self.templates)
+                        .map_err(|b| format!("{b:?}"))?
+                        .ok_or_else(|| format!("renaming {id} changes more than its text"))?;
+                instance_patches(&self.menu_address().template, part, &token, changes)
+            }
+            _ => vec![Targeted {
+                target: self.menu_address(),
+                operation: op
+                    .patch(template, part, &items, &env, &self.templates)
+                    .map_err(|b| format!("{b:?}"))?,
+            }],
+        };
 
         // To each document that shows the store (§15.6 test 11): another
         // store's menu is not this one's.
@@ -2411,12 +2422,20 @@ impl Server {
                 entry: entry.clone(),
                 version,
             });
-            waiting.push(StreamFrame::Patch(Patch {
-                protocol: CURRENT,
-                basis: CausalBasis::of(entry.clone(), version),
-                target: target.clone(),
-                operation: operation.clone(),
-            }));
+            // One patch alone, or the set that applies whole (ADR-0145).
+            waiting.push(match patches.as_slice() {
+                [only] => StreamFrame::Patch(Patch {
+                    protocol: CURRENT,
+                    basis: CausalBasis::of(entry.clone(), version),
+                    target: only.target.clone(),
+                    operation: only.operation.clone(),
+                }),
+                _ => StreamFrame::PatchSet(PatchSet {
+                    protocol: CURRENT,
+                    basis: CausalBasis::of(entry.clone(), version),
+                    patches: patches.clone(),
+                }),
+            });
         }
         Ok(())
     }
@@ -3568,33 +3587,18 @@ impl MenuOp {
                 instance: token(id),
                 after: after.as_deref().map(token),
             },
-            MenuOp::Rename { name, .. } => {
-                // The item's TEXT part, addressed inside the instance by
-                // `target` below. A rename that reinserted the item would also
-                // work visually and would destroy the node — which is the whole
-                // distinction this milestone exists to make.
+            // A rename sets the parts of its item's instance where they are,
+            // which `broadcast_menu` derives from the template (ADR-0168):
+            // reinserting the item would also work visually, and destroy the
+            // node, which is the distinction E7-P exists to make.
+            MenuOp::Rename { .. } => {
                 let _ = items;
-                PatchOp::ReplaceText { text: name.clone() }
+                return Err(pw_render::Blocked::UnrepresentedConstruct {
+                    reason: "a rename's patches are its instance's parts".into(),
+                    at: template.path.clone(),
+                });
             }
         })
-    }
-
-    /// For `Rename`, the address is inside the instance rather than the loop.
-    fn target(
-        &self,
-        base: &PartAddress,
-        scope: LocalPartId,
-        inner: LocalPartId,
-        env: &Env,
-        each: PartId,
-    ) -> PartAddress {
-        match self {
-            MenuOp::Rename { id, .. } => {
-                let token = pw_render::instance_token_of(each, &item(id, ""), "id", env);
-                PartAddress::new(&base.template, inner).within(scope, token)
-            }
-            _ => base.clone(),
-        }
     }
 }
 
@@ -3847,14 +3851,32 @@ fn text_of(v: &Value) -> Option<String> {
     }
 }
 
-/// The value at a dotted path from a record: `quantity` from a line.
-fn field_at<'v>(v: &'v Value, path: &str) -> Option<&'v Value> {
-    path.split('.')
-        .filter(|s| !s.is_empty())
-        .try_fold(v, |v, field| match v {
-            Value::Record(fields) => fields.get(field),
-            _ => None,
+/// **The patches that set an instance's changed parts where they are**
+/// (ADR-0168): a text part's text, and an attribute's value, each addressed
+/// inside the instance.
+fn instance_patches(
+    schema: &TemplateSchemaId,
+    each: PartId,
+    instance: &pw_document::InstanceToken,
+    changes: Vec<(PartId, pw_render::InstanceChange)>,
+) -> Vec<Targeted> {
+    changes
+        .into_iter()
+        .map(|(id, change)| Targeted {
+            target: PartAddress::new(schema, LocalPartId(id.0))
+                .within(LocalPartId(each.0), instance.clone()),
+            operation: match change {
+                pw_render::InstanceChange::Text(text) => PatchOp::ReplaceText { text },
+                pw_render::InstanceChange::Attribute {
+                    name,
+                    value: Some(value),
+                } => PatchOp::SetAttribute { name, value },
+                pw_render::InstanceChange::Attribute { name, value: None } => {
+                    PatchOp::RemoveAttribute { name }
+                }
+            },
         })
+        .collect()
 }
 
 /// **A list's change, as keyed operations** (ADR-0145). The list the
@@ -3876,7 +3898,7 @@ fn list_patches(
     env: &Env,
     others: &[Template],
 ) -> Result<Vec<Targeted>, String> {
-    let Some((each, binding, key, body)) = each_over(&template.chunks, list) else {
+    let Some((each, key)) = each_over(&template.chunks, list) else {
         return Err(format!("`{}` iterates no list `{list}`", template.path));
     };
     let target = PartAddress::new(schema, LocalPartId(each.0));
@@ -3899,22 +3921,6 @@ fn list_patches(
         target: target.clone(),
         operation,
     };
-    // The text parts an item's markup is, when it is text alone: each read
-    // from the item by its path.
-    let texts: Option<Vec<(PartId, String)>> = body
-        .iter()
-        .filter_map(|c| match c {
-            pw_render::Chunk::Dynamic(p) => Some(p),
-            _ => None,
-        })
-        .map(|p| match p {
-            pw_render::Part::Text { id, value, .. } => value
-                .strip_prefix(&format!("{binding}."))
-                .map(|field| (*id, field.to_string())),
-            _ => None,
-        })
-        .collect();
-
     let wanted: Vec<pw_document::InstanceToken> = new.iter().map(token).collect();
     let mut out = Vec::new();
     // What the document holds, as each operation leaves it.
@@ -3946,24 +3952,13 @@ fn list_patches(
                 }
                 if current[i].1 != *item {
                     let was = current[i].1.clone();
-                    let in_place = texts.as_ref().and_then(|texts| {
-                        texts
-                            .iter()
-                            .map(|(id, field)| {
-                                let old = field_at(&was, field).and_then(text_of)?;
-                                let now = field_at(item, field).and_then(text_of)?;
-                                Some((old != now).then(|| {
-                                    Targeted {
-                                        target: PartAddress::new(schema, LocalPartId(id.0))
-                                            .within(LocalPartId(each.0), t.clone()),
-                                        operation: PatchOp::ReplaceText { text: now },
-                                    }
-                                }))
-                            })
-                            .collect::<Option<Vec<_>>>()
-                    });
+                    // Each text and attribute the change reaches, set where
+                    // it is (ADR-0168).
+                    let in_place =
+                        pw_render::instance_changes(template, each, &was, item, env, others)
+                            .map_err(|b| format!("{b:?}"))?;
                     match in_place {
-                        Some(changes) => out.extend(changes.into_iter().flatten()),
+                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),
                         // More than text: the instance is rendered again, where
                         // it is.
                         None => {
@@ -3982,13 +3977,9 @@ fn list_patches(
     Ok(out)
 }
 
-/// The `{#each}` over `list`: its part, the name each item is bound to, its
-/// key's path, and its markup. Searched through every block, as the
-/// renderer's parts are.
-fn each_over<'t>(
-    chunks: &'t [pw_render::Chunk],
-    list: &str,
-) -> Option<(PartId, &'t str, String, &'t [pw_render::Chunk])> {
+/// The `{#each}` over `list`: its part, and its key's path. Searched through
+/// every block, as the renderer's parts are.
+fn each_over(chunks: &[pw_render::Chunk], list: &str) -> Option<(PartId, String)> {
     for c in chunks {
         let pw_render::Chunk::Dynamic(p) = c else {
             continue;
@@ -3996,13 +3987,12 @@ fn each_over<'t>(
         if let pw_render::Part::Each {
             id,
             collection,
-            binding,
             key,
-            body,
+            ..
         } = p
             && collection == list
         {
-            return Some((*id, binding.as_str(), key.clone().unwrap_or_default(), body));
+            return Some((*id, key.clone().unwrap_or_default()));
         }
         for region in p.nested() {
             if let Some(found) = each_over(region, list) {
@@ -4623,11 +4613,13 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // broadcasts the patch that describes the mutation. A refusal returns
         // 409 and changes nothing — including the version.
         ("POST", "/command/menu") => {
+            // Each value decoded as a form's is, as the other controls' are.
+            // Until 2026-10-03 only `%20` was, and `%26` stayed in a name.
             let q = |k: &str| {
                 query
                     .split('&')
                     .find_map(|p| p.strip_prefix(&format!("{k}=")))
-                    .map(|v| v.replace("%20", " "))
+                    .and_then(percent_decoded)
             };
             let id = q("id").unwrap_or_default();
             let op = match q("op").as_deref() {
@@ -6898,7 +6890,7 @@ public query Store(",
     }
 
     #[test]
-    fn a_list_moves_what_moved_and_replaces_what_holds_more_than_text() {
+    fn a_list_moves_what_moved_and_sets_what_changed_where_it_is() {
         let s = lines_server();
         let template = s.store_template().clone();
         let schema = TemplateSchemaId(template.schema.clone());
@@ -6927,8 +6919,10 @@ public query Store(",
         let got: Vec<String> = moved.iter().map(said).collect();
         assert_eq!(got.len(), 1, "{got:?}");
         assert!(got[0].starts_with("move after false"), "{got:?}");
-        // A menu item's markup holds a button as well as text: one whose name
-        // changed is rendered again where it is.
+        // A menu item's markup holds a button as well as text. A rename
+        // changes neither the button nor what it captures, so the name is set
+        // where it is, and the item's nodes stay (ADR-0168). Until 2026-10-03
+        // an item that held more than text was rendered again.
         let item = |id: &str, name: &str| {
             Value::Record(
                 [
@@ -6949,9 +6943,7 @@ public query Store(",
         )
         .expect("derived");
         let got: Vec<String> = renamed.iter().map(said).collect();
-        assert_eq!(got.len(), 2, "{got:?}");
-        assert!(got[0].starts_with("remove"), "{got:?}");
-        assert!(got[1].starts_with("insert after true Bee"), "{got:?}");
+        assert_eq!(got, ["text \"Bee\" @2 in an instance"]);
     }
 
     /// A node that grants nothing at all.
@@ -8032,11 +8024,12 @@ public query Store(",
             name: "Espresso Doppio".to_string(),
         })
         .expect("the menu changes");
+        // A rename sets its item's parts, one patch or a set (ADR-0168).
         let patched = |d: u64| {
             s.pending.lock().expect("pending")[&doc(d)]
                 .frames
                 .iter()
-                .any(|(_, f)| matches!(f, StreamFrame::Patch(_)))
+                .any(|(_, f)| matches!(f, StreamFrame::Patch(_) | StreamFrame::PatchSet(_)))
         };
         assert!(
             patched(blue),
@@ -8044,7 +8037,6 @@ public query Store(",
         );
         assert!(!patched(harbor), "store 48's page was told of 47's menu");
         // The cart is the session's: an add reaches both.
-        s.command(ADD, "a", &add("drip", 1), false).expect("runs");
         let sets = |d: u64| {
             s.pending.lock().expect("pending")[&doc(d)]
                 .frames
@@ -8052,7 +8044,9 @@ public query Store(",
                 .filter(|(_, f)| matches!(f, StreamFrame::PatchSet(set) if !set.patches.is_empty()))
                 .count()
         };
-        assert_eq!((sets(blue), sets(harbor)), (1, 1));
+        let before = (sets(blue), sets(harbor));
+        s.command(ADD, "a", &add("drip", 1), false).expect("runs");
+        assert_eq!((sets(blue) - before.0, sets(harbor) - before.1), (1, 1));
     }
 
     /// **A change to store 47's menu drops store 47's kept menu, and only
@@ -8083,6 +8077,45 @@ public query Store(",
         let (blue, _) = s.serve_store_document("c", STORE_ID).expect("served");
         assert_eq!(reads(), read + 1, "store 47's menu was not read again");
         assert!(visible(&blue).contains("Espresso Doppio"), "{blue}");
+    }
+
+    /// **A change reaches every part that reads it** (ADR-0168): renaming
+    /// store 47's espresso sets its name's text and its Add button's name,
+    /// where they are, in one patch set. Until 2026-10-03 a rename set the
+    /// name's text alone, and the button stayed "Add Espresso".
+    #[test]
+    fn a_rename_sets_every_part_that_reads_the_name() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
+        s.broadcast_menu(MenuOp::Rename {
+            id: "espresso".to_string(),
+            name: "Espresso Doppio".to_string(),
+        })
+        .expect("renamed");
+        let queue = s.pending.lock().expect("pending");
+        let set = queue[&("a".to_string(), document)]
+            .frames
+            .iter()
+            .find_map(|(_, f)| match f {
+                StreamFrame::PatchSet(set) => Some(set.clone()),
+                _ => None,
+            })
+            .expect("one patch set for the rename");
+        let operations: Vec<PatchOp> = set.patches.iter().map(|p| p.operation.clone()).collect();
+        assert_eq!(
+            operations,
+            [
+                PatchOp::ReplaceText {
+                    text: "Espresso Doppio".to_string()
+                },
+                PatchOp::SetAttribute {
+                    name: "aria-label".to_string(),
+                    value: "Add Espresso Doppio".to_string()
+                },
+            ]
+        );
+        // Each inside the espresso's own instance, which keeps its nodes.
+        assert!(set.patches.iter().all(|p| p.target.instances.len() == 1));
     }
 
     /// **The store and each item say what they are** (ADR-0166, charter

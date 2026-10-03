@@ -1376,3 +1376,14 @@ and a comment in markup is `<!-- -->`.
 - PW5028 refuses a line of markup text that begins with `//` or `/*`.
 - Seven rejected fixtures had shown their `// ERROR:` notes as page text;
   they are `<!-- -->` now.
+
+[ADR-0168](DECISIONS/ADR-0168-a-change-reaches-every-part-that-reads-it.md): a
+change reaches every part that reads it.
+- The store names each Add by its item and says its count in a live region.
+  Naming the buttons showed a rename left an attribute stale.
+- The renderer now says what changed in an instance, text and attributes
+  alike, and a host sets them in place with `SetAttribute`, which the
+  runtime now applies.
+
+Found on the way: E7-P moved an instance already in place, which scrambled
+the list's anchors; a single patch that addressed nothing hid it.

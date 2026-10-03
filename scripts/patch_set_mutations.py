@@ -69,8 +69,11 @@ MUTANTS = [
         "a changed item is always rendered again",
         "server",
         SERVER,
-        "                    let in_place = texts.as_ref().and_then(|texts| {\n",
-        "                    let in_place = texts.as_ref().filter(|_| false).and_then(|texts| {\n",
+        # Re-anchored by ADR-0168: what changed, part by part.
+        "                    match in_place {\n"
+        "                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),\n",
+        "                    match in_place.filter(|_| false) {\n"
+        "                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),\n",
     ),
     (
         "a new item goes to the head",

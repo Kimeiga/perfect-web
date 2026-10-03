@@ -115,7 +115,7 @@ are fixed (ADR-0155):
 | 11 | `MenuChanged(store_47)` invalidates store 47 only | met since ADR-0162 for pages, end to end in three engines (`e2e/stores.spec.mjs`), and in `pw-materialize`'s tests; since ADR-0164 for the query cache too, which had dropped every store's kept menu |
 | 12 | A's cart never observed by B | met |
 | 13 | shared caches hold no session or secret fields | partial: synthetic values only |
-| 14 | keyboard and screen-reader semantics | partial: every Add button is named "Add", and the count has no live region (the cart's notice has one since ADR-0157); no automated audit |
+| 14 | keyboard and screen-reader semantics | partial: since ADR-0168 each Add is named by its item, renamed with it, and the count is said in a polite live region (the cart's notice has one since ADR-0157); no automated audit |
 | 15 | focus preserved | met |
 | 16 | handler version mismatch recovers | partial: refused safely, the recovery not acted on (fixed) |
 | 17 | slow recommendations do not block Add | met since ADR-0165 in Chromium and Firefox, and in WebKit since ADR-0166, which gave the store enough text to be painted before its slots (`e2e/slots.spec.mjs`) |
@@ -141,8 +141,8 @@ are fixed (ADR-0155):
    descriptions are met by ADR-0166. Still missing: `price`, which needs
    money shown as text; `available`, `category` and `menu_version`; and
    `DeliveryEstimate`'s range.
-9. **Accessibility** (test 14): each Add named by its item, a live region
-   for the count, an automated audit.
+9. **Accessibility** (test 14): an automated audit. Each Add named by its
+   item, and a live region for the count, are met by ADR-0168.
 10. **Tests 2 and 13** against the running store's shared output.
 
 Changing the store's markup moves the context every benchmark task's patch

@@ -157,7 +157,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
           code, so URLs in text and unquoted attribute values mis-built.
           Markup text, `<!-- -->` and unquoted values are read as HTML reads
           them; PW5028 refuses a line that reads as a comment.
-        - **Next: money shown as text**, for §15.1's `price`.
+        - ~~Each Add named by its item, the count in a live region~~
+          (ADR-0168, `just e14-instance-changes`): a change now reaches every
+          part that reads it, attributes included. Found on the way: E7-P
+          scrambled its list on a move to where an item already was.
+        - **Next: money shown as text**, for §15.1's `price`, and a member
+          read inside a block, which ADR-0125 refuses: a menu row's price is
+          one.
      4. Decrement, remove, and a per-line cart.
      5. A command retried on a transport failure.
      6. §15.5's missing controls.

@@ -202,6 +202,19 @@ test("a reorder moves the nodes rather than rebuilding them", async ({ page }) =
   ).toEqual(["mark-0", "mark-2", "mark-1"]);
 });
 
+test("a move to where an instance already is moves nothing", async ({ page }) => {
+  // Its anchor is its own first node. Until 2026-10-03 `moveBefore` put the
+  // instance's nodes before its own start, the list's anchors no longer
+  // nested, and the next patch to it was refused (ADR-0168).
+  await ready(page);
+  await command(page, "op=move&id=cortado&after=espresso");
+  await command(page, "op=move&id=espresso");
+  await command(page, "op=rename&id=cortado&name=Gibraltar");
+  const rows = await settled(page, ["Espresso", "Gibraltar", "Cold Brew"]);
+  expect(rows.map((r) => r.identity)).toEqual(["mark-0", "mark-1", "mark-2"]);
+  expect(await page.evaluate(() => window.__pw.refused ?? 0)).toBe(0);
+});
+
 test("a move to the front is a move, not a recreation", async ({ page }) => {
   await ready(page);
   await command(page, "op=move&id=cold-brew");

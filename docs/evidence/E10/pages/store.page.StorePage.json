@@ -91,7 +91,7 @@
       ]
     },
     {
-      "part": 8,
+      "part": 9,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -112,7 +112,7 @@
   ],
   "live": [
     {
-      "part": 9,
+      "part": 10,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
@@ -140,7 +140,7 @@
       "streamed": true
     },
     {
-      "part": 11,
+      "part": 12,
       "resource": "store.page.Recommendations",
       "args": [
         "id"

@@ -212,6 +212,7 @@ page StorePage(id: StoreId) {
                             <p>{item.description}</p>
                             <button
                                 type="button"
+                                aria-label="Add {item.name}"
                                 on:press={resumable(captures = { item }) => match add_to_cart(item.id, PositiveInt(1)) {
                                     Ok(_) => notice = "",
                                     Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
@@ -226,7 +227,7 @@ page StorePage(id: StoreId) {
             </section>
 
             <section aria-label="Cart">
-                <p id="cart-count">{cart.line_count}</p>
+                <p aria-live="polite" aria-atomic="true">Items in cart: <span id="cart-count">{cart.line_count}</span></p>
                 <p id="cart-notice" role="status">{notice}</p>
                 <button
                     id="clear-cart"

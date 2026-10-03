@@ -44,6 +44,28 @@ test("a store that is not there is not found", async ({ page }) => {
   expect((await page.goto("/stores/48")).status()).toBe(200);
 });
 
+test("each Add is named by its item, and a rename renames it", async ({ page, request }) => {
+  // The audit's test 14: three buttons each named "Add" said nothing of
+  // which item. And a rename reaches every part that reads the name
+  // (ADR-0168): until 2026-10-03 the button kept its old name.
+  await ready(page, "/stores/47");
+  await expect(page.getByRole("button", { name: "Add Cortado", exact: true })).toBeVisible();
+  try {
+    // An `&`, which the patch carries as the document writes it, `&amp;`,
+    // and the browser reads as the document would.
+    const renamed = await request.post(
+      "/command/menu?op=rename&id=cortado&name=Cortado%20%26%20Milk",
+    );
+    expect(renamed.ok()).toBe(true);
+    await expect(
+      page.getByRole("button", { name: "Add Cortado & Milk", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Cortado", exact: true })).toHaveCount(0);
+  } finally {
+    await request.post("/command/menu?op=rename&id=cortado&name=Cortado");
+  }
+});
+
 test("the second store's Add adds to the session's cart", async ({ page }) => {
   await ready(page, "/stores/48");
   await expect(page.locator("#cart-count")).toHaveText("0");

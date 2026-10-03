@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `dae4d73`, with ADR-0167.
+**Reviewed:** 2026-10-03, against master `904844c`, with ADR-0168.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,29 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0168, 2026-10-03: a change did not reach an attribute, and
+E7-P could scramble its list**
+([ADR-0168](DECISIONS/ADR-0168-a-change-reaches-every-part-that-reads-it.md)).
+- **What was wrong.**
+  - With each Add named by its item (`aria-label="Add {item.name}"`), a
+    renamed item kept its old button name. A host set a changed item's text
+    parts in place and no attribute; the runtime applied no `SetAttribute`.
+  - E7-P's runtime moved an instance to where it already was, and
+    `moveBefore` then put its nodes before their own start. The list's
+    anchors no longer nested, and the next patch addressed nothing. A
+    single patch that addressed nothing was ignored, which hid it.
+- **Now**
+  - the renderer says what changed in an instance, part by part;
+  - a host sets text with `ReplaceText` and attributes with `SetAttribute`,
+    nodes kept;
+  - the runtime applies attribute patches, read by the browser's own
+    parser;
+  - an instance already in place is not moved.
+- **Also** each Add is named by its item, and the cart's count is said in a
+  polite live region (§15.6 test 14). The menu control decodes `%26`.
+
+Nine mutants (`just e14-instance-changes`).
 
 **Correction, ADR-0167, 2026-10-03: markup was read as code**
 ([ADR-0167](DECISIONS/ADR-0167-markup-text-is-text.md)).

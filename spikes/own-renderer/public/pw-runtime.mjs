@@ -262,6 +262,11 @@ function applyList(key, scope, op) {
         if (!loop) return false;
         anchor = loop.start.nextSibling;
       }
+      // Already where it is asked to go: its own first node is the anchor,
+      // and there is nothing to move. Moved anyway, `moveBefore` put the
+      // instance's nodes before its own start, and the list's anchors no
+      // longer nested (found 2026-10-03, ADR-0168).
+      if (nodes.includes(anchor)) return true;
       window.__pw.moveKind = moveNodes(at.start.parentNode, nodes, anchor);
       return true;
     }
@@ -1379,6 +1384,32 @@ function addressKey(address) {
   return `${address.template}/${path.join("/")}|${address.part}`;
 }
 
+/**
+ * **An attribute a change reaches** (ADR-0168): the element the part
+ * belongs to, by its owner in the parts manifest, in the instance the
+ * address names. The value is as the document's HTML writes it, and the
+ * platform's own parser reads it, so a patched attribute means what a
+ * rendered one does. Until 2026-10-03 no patch set an attribute: an Add button
+ * kept the name of an item renamed since.
+ */
+function setAttributeAt(address, op) {
+  const part = (parts.parts ?? []).find((p) => p.id === address.part);
+  if (part?.owner == null) return false;
+  const path = (address.instances ?? []).map((f) => `${f.scope}@${f.instance}`);
+  const element = index.get(`${address.template}/${path.join("/")}|e${part.owner}`)?.element;
+  if (!element) return false;
+  if (op.op === "remove_attribute") {
+    element.removeAttribute(op.name);
+    return true;
+  }
+  const parsed = document.createElement("template");
+  parsed.innerHTML = `<i ${op.name}="${op.value}"></i>`;
+  element.setAttribute(op.name, parsed.content.firstChild.getAttribute(op.name) ?? "");
+  return true;
+}
+
+const isAttributeOp = (op) => op.op === "set_attribute" || op.op === "remove_attribute";
+
 function applyFrame(frame) {
   if (frame.protocol !== undefined && frame.protocol !== 1) {
     // Incomparable, not different. A frame from another protocol version is
@@ -1420,6 +1451,13 @@ function applyFrame(frame) {
         }
         return;
       }
+      if (isAttributeOp(op)) {
+        if (setAttributeAt(frame.target, op)) {
+          window.__pw.updated.push(`${key}:${op.name}`);
+          log.push(`${op.op} ${op.name} on ${key} at version ${at}`);
+        }
+        return;
+      }
 
       // Structural operations on a keyed collection. The target names the LOOP;
       // `op.instance` names which of its instances.
@@ -1455,7 +1493,9 @@ function applyFrame(frame) {
             ? setRange(key, op.text)
             : op.op === "replace_range"
               ? replaceRangeAt(key, op.html) !== null
-              : applyList(key, target.part, op);
+              : isAttributeOp(op)
+                ? setAttributeAt(target, op)
+                : applyList(key, target.part, op);
         if (!applied) {
           // The document is not what the server derived the change from, and
           // every later change would be derived from it too. Never "try
@@ -1472,6 +1512,9 @@ function applyFrame(frame) {
         if (op.op === "replace_text") {
           window.__pw.updated.push(key);
           log.push(`updated ${key} at version ${at}`);
+        } else if (isAttributeOp(op)) {
+          window.__pw.updated.push(`${key}:${op.name}`);
+          log.push(`${op.op} ${op.name} on ${key} at version ${at}`);
         } else {
           // A structural change moves nodes: the index is read again, so the
           // next patch in the set finds what this one put in place.

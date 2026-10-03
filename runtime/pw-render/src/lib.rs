@@ -491,6 +491,102 @@ pub fn render_instance(
 ///
 /// The server needs it to say WHICH instance a patch removes or moves, and
 /// deriving it here rather than in the patch generator keeps one derivation.
+/// **What changed in one instance of a keyed loop** (ADR-0168).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InstanceChange {
+    /// A text part's new text, as `ReplaceText` sets it.
+    Text(String),
+    /// An attribute's new value as the document writes it, or `None` for a
+    /// boolean attribute now absent.
+    Attribute { name: String, value: Option<String> },
+}
+
+/// **What changed in one instance of the keyed loop `each`, from `was` to
+/// `now`, part by part** (ADR-0168): each text part's new text, and each
+/// attribute's new value, in the order the template writes them. `None` when
+/// anything else changed (a block, a component, a raw value, what a handler
+/// captures): the instance is rendered again.
+///
+/// Until 2026-10-03 a host patched an instance's text parts and nothing
+/// else, so an attribute that read a changed field kept its old value: an
+/// Add button named "Add Espresso" stayed so after the item was renamed.
+pub fn instance_changes(
+    t: &Template,
+    each: PartId,
+    was: &Value,
+    now: &Value,
+    env: &Env,
+    others: &[Template],
+) -> Result<Option<Vec<(PartId, InstanceChange)>>, Blocked> {
+    let Some(Part::Each {
+        id,
+        binding,
+        key: Some(field),
+        body,
+        ..
+    }) = find_part(&t.chunks, each)
+    else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("part {each} is not a keyed loop in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    let scoped = |item: &Value| {
+        let token = env
+            .domain
+            .instance_token(&env.path, *id, &key_of(item, field));
+        env.with(binding, item.clone()).within(*id, token)
+    };
+    let (before, after) = (scoped(was), scoped(now));
+    let rendered = |c: &Chunk, e: &Env| -> Result<String, Blocked> {
+        let mut out = String::new();
+        emit(std::slice::from_ref(c), e, others, &mut out)?;
+        Ok(out)
+    };
+    let mut out = Vec::new();
+    for c in body {
+        let Chunk::Dynamic(p) = c else { continue };
+        let text = |e: &Env, value: &String| match e.get(value) {
+            Some(Value::Raw { .. }) => Ok(None),
+            Some(v) => Ok(v.as_str()),
+            None => Err(Blocked::MissingValue {
+                path: value.clone(),
+            }),
+        };
+        match p {
+            Part::Text { id, value, .. } => match (text(&before, value)?, text(&after, value)?) {
+                (Some(x), Some(y)) => {
+                    if x != y {
+                        out.push((*id, InstanceChange::Text(y)));
+                    }
+                }
+                _ => {
+                    if rendered(c, &before)? != rendered(c, &after)? {
+                        return Ok(None);
+                    }
+                }
+            },
+            Part::Attribute { id, .. }
+            | Part::BooleanAttribute { id, .. }
+            | Part::InterpolatedAttribute { id, .. } => {
+                let x = attribute_value(p, &before)?;
+                let y = attribute_value(p, &after)?;
+                if x != y
+                    && let Some((name, value)) = y
+                {
+                    out.push((*id, InstanceChange::Attribute { name, value }));
+                }
+            }
+            _ => {
+                if rendered(c, &before)? != rendered(c, &after)? {
+                    return Ok(None);
+                }
+            }
+        }
+    }
+    Ok(Some(out))
+}
+
 pub fn instance_token_of(each: PartId, item: &Value, key_field: &str, env: &Env) -> InstanceToken {
     env.domain
         .instance_token(&env.path, each, &key_of(item, key_field))
@@ -608,6 +704,69 @@ fn insert_at(
         return Err(conflict());
     }
     Ok(())
+}
+
+/// **An attribute part's name, and its value as the document writes it**
+/// (ADR-0168): what [`render`] puts between the attribute's quotes, escaped by
+/// its context. `None` for a boolean attribute that is absent, and `Ok(None)`
+/// for a part that is no attribute. A patch to the attribute carries this
+/// value, and the browser reads it with its own parser, so a patched
+/// attribute means what a rendered one does.
+pub fn attribute_value(p: &Part, env: &Env) -> Result<Option<(String, Option<String>)>, Blocked> {
+    let read = |path: &String| {
+        env.get(path)
+            .ok_or(Blocked::MissingValue { path: path.clone() })
+    };
+    Ok(Some(match p {
+        Part::Attribute {
+            name,
+            value,
+            context,
+            ..
+        } => {
+            let s = read(value)?.as_str().ok_or(Blocked::MissingValue {
+                path: value.clone(),
+            })?;
+            (name.clone(), Some(escaped(&s, *context)))
+        }
+        Part::BooleanAttribute { name, value, .. } => (
+            name.clone(),
+            read(value)?.condition(value)?.then(String::new),
+        ),
+        Part::InterpolatedAttribute {
+            name,
+            segments,
+            context,
+            ..
+        } => {
+            let mut value = String::new();
+            for s in segments {
+                match s {
+                    Segment::Static(t) => value.push_str(t),
+                    Segment::Value(path) => {
+                        let v = env
+                            .get(path)
+                            .and_then(Value::as_str)
+                            .ok_or(Blocked::MissingValue { path: path.clone() })?;
+                        value.push_str(&match context {
+                            Context::Url => escape::url_component(&v),
+                            Context::Attribute => escape::attribute(&v),
+                            other => {
+                                return Err(Blocked::UnrepresentedConstruct {
+                                    reason: format!(
+                                        "a value interpolated into a {other:?} attribute"
+                                    ),
+                                    at: name.clone(),
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            (name.clone(), Some(value))
+        }
+        _ => return Ok(None),
+    }))
 }
 
 pub fn render(t: &Template, env: &Env, others: &[Template]) -> Result<String, Blocked> {
@@ -733,28 +892,18 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             Ok(())
         }
 
-        Part::Attribute {
-            name,
-            value,
-            context,
-            ..
-        } => {
-            let v = env.get(value).ok_or(Blocked::MissingValue {
-                path: value.clone(),
-            })?;
-            let s = v.as_str().ok_or(Blocked::MissingValue {
-                path: value.clone(),
-            })?;
-            out.push_str(&format!("{name}=\"{}\"", escaped(&s, *context)));
+        // Each attribute's value is [`attribute_value`]'s, which a patch to
+        // it carries too (ADR-0168).
+        Part::Attribute { .. } | Part::InterpolatedAttribute { .. } => {
+            if let Some((name, Some(value))) = attribute_value(p, env)? {
+                out.push_str(&format!("{name}=\"{value}\""));
+            }
             Ok(())
         }
 
         // False means ABSENT, not empty: `disabled=""` is disabled.
-        Part::BooleanAttribute { name, value, .. } => {
-            let v = env.get(value).ok_or(Blocked::MissingValue {
-                path: value.clone(),
-            })?;
-            if v.condition(value)? {
+        Part::BooleanAttribute { name, .. } => {
+            if let Some((_, Some(_))) = attribute_value(p, env)? {
                 out.push_str(name);
             } else if out.ends_with(' ') {
                 // Remove the separator the IR emitted for an attribute that
@@ -960,40 +1109,6 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
 
         // Text as written, and each value escaped for the attribute's context:
         // a URI component in a URL, attribute-escaped elsewhere (ADR-0042).
-        Part::InterpolatedAttribute {
-            name,
-            segments,
-            context,
-            ..
-        } => {
-            let mut value = String::new();
-            for s in segments {
-                match s {
-                    Segment::Static(t) => value.push_str(t),
-                    Segment::Value(path) => {
-                        let v = env
-                            .get(path)
-                            .and_then(Value::as_str)
-                            .ok_or(Blocked::MissingValue { path: path.clone() })?;
-                        value.push_str(&match context {
-                            Context::Url => escape::url_component(&v),
-                            Context::Attribute => escape::attribute(&v),
-                            other => {
-                                return Err(Blocked::UnrepresentedConstruct {
-                                    reason: format!(
-                                        "a value interpolated into a {other:?} attribute"
-                                    ),
-                                    at: name.clone(),
-                                });
-                            }
-                        });
-                    }
-                }
-            }
-            out.push_str(&format!("{name}=\"{value}\""));
-            Ok(())
-        }
-
         Part::Component { id, path, args } => {
             let t = others
                 .iter()

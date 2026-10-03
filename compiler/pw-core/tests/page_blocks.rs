@@ -12,7 +12,9 @@ use pw_core::check::Unit;
 use pw_core::lower::lower_file;
 use pw_syntax::parse_tree;
 
-/// The store, its `app.pw` changed by `change`, built.
+/// The store, its `app.pw` changed by `change`, built. The benchmark's store,
+/// which does not change (ADR-0156): these tests anchor their changes on its
+/// markup, which the canonical store's has moved past (ADR-0168).
 fn build(change: impl Fn(&str) -> String) -> pw_core::build::Build {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut units = Vec::new();
@@ -28,8 +30,8 @@ fn build(change: impl Fn(&str) -> String) -> pw_core::build::Build {
     for dir in [
         "packages/pw-std",
         "packages/pw-platform-web",
-        "examples/lib",
-        "examples/store",
+        "benchmarks/baselines/pleris/lib",
+        "benchmarks/baselines/pleris/store",
     ] {
         let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(dir))
             .unwrap_or_else(|e| panic!("{dir}: {e}"))
@@ -45,7 +47,7 @@ fn build(change: impl Fn(&str) -> String) -> pw_core::build::Build {
             }
         }
     }
-    add(root.join("examples/domain.pw"), &same);
+    add(root.join("benchmarks/baselines/pleris/domain.pw"), &same);
     pw_core::build::build(&units).expect("builds")
 }
 
