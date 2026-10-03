@@ -1933,6 +1933,24 @@ e14-not-found:
      } > docs/evidence/E14/not-found.txt
     @grep -E "^test result|pw check|passed|mutants killed" docs/evidence/E14/not-found.txt
 
+# ADR-0164: a menu change drops what declares it, for its store. The server's
+# tests, the store's graph, and the mutation controls.
+e14-menu-changed:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0164 - a menu change drops what declares it, for its store"; echo; \
+       echo "produced by: just e14-menu-changed"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the store's graph: what MenuChanged(id) invalidates"; echo; \
+       cargo run --quiet --locked -p pw-cli -- emit-graph --plain examples/domain.pw examples/lib/*.pw examples/store/*.pw \
+         | grep -E "MenuChanged"; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_menu_change_drops|a_change_to_one_stores_menu)|^test result'; \
+       echo; echo "== mutation controls (scripts/menu_changed_mutations.py)"; echo; \
+       python3 scripts/menu_changed_mutations.py; \
+     } > docs/evidence/E14/menu-changed.txt
+    @grep -E "^test result|MenuChanged|mutants killed" docs/evidence/E14/menu-changed.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

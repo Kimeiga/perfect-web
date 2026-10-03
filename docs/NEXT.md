@@ -141,6 +141,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - ~~A page says when it is absent~~ (ADR-0163,
           `just e14-not-found`): `not_found_on StoreError.NotFound`, held
           by PW0342, and `/stores/999` answered 404.
+        - ~~Correction: a menu change dropped every store's kept menu~~
+          (ADR-0164, `just e14-menu-changed`). It is the event
+          `MenuChanged(47)` now, which the store's `Menu` declares.
      2. **Next: the recommendation and estimate slots in the store
         itself**, with T05 and T10 re-based.
      3. Decrement, remove, and a per-line cart.

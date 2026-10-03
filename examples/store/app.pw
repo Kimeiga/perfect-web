@@ -41,18 +41,20 @@ import context.{ current_session }
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, InteractionId,
     MenuItemId, PositiveInt }
 import capability.{ Session, SessionId }
-import Events.{ CartChanged }
+import Events.{ CartChanged, MenuChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
-// key is just the store.
+// key is just the store. A change to one store's menu drops that store's kept
+// menu and no other (§15.6 test 11, ADR-0164).
 public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
-    freshness     5.minutes
-    consistency   snapshot
-    cache         shared
-    key           id
-    concurrency   one_per_key
-    on_key_change cancel
-    timeout       2.seconds
+    freshness      5.minutes
+    consistency    snapshot
+    cache          shared
+    key            id
+    invalidates_on MenuChanged(id)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
 {
     Menus.for_store(id)
 }

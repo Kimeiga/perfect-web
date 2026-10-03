@@ -1333,3 +1333,10 @@ of the route gap.
   other failure still 503.
 
 Found on the way: every response said `OK`, whatever its status.
+
+[ADR-0164](DECISIONS/ADR-0164-a-menu-change-drops-what-declares-it.md): a
+correction to ADR-0162's test 11.
+- A change to store 47's menu dropped every store's kept menu, by the query's
+  name, in the server's code.
+- The store's `Menu` now declares `invalidates_on MenuChanged(id)`, and the
+  change is the event `MenuChanged(47)`, which drops store 47's entry only.

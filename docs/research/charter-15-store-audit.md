@@ -112,7 +112,7 @@ are fixed (ADR-0155):
 | 6, 7, 8 | one key one request; a changed key cancels stale work; leaving cancels | met on T07's store, three engines (ADR-0152) |
 | 9 | optimistic rollback | met |
 | 10 | an unavailable item gives a typed error and a consistent cart | met since ADR-0157: refused by name, the handler shows it, the count goes back, in three engines (`e2e/availability.spec.mjs`) |
-| 11 | `MenuChanged(store_47)` invalidates store 47 only | met since ADR-0162, end to end in three engines (`e2e/stores.spec.mjs`), and in `pw-materialize`'s tests |
+| 11 | `MenuChanged(store_47)` invalidates store 47 only | met since ADR-0162 for pages, end to end in three engines (`e2e/stores.spec.mjs`), and in `pw-materialize`'s tests; since ADR-0164 for the query cache too, which had dropped every store's kept menu |
 | 12 | A's cart never observed by B | met |
 | 13 | shared caches hold no session or secret fields | partial: synthetic values only |
 | 14 | keyboard and screen-reader semantics | partial: every Add button is named "Add", and the count has no live region (the cart's notice has one since ADR-0157); no automated audit |

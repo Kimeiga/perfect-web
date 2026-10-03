@@ -243,6 +243,14 @@
       ]
     },
     {
+      "from": "store.page.Menu",
+      "to": "Events.MenuChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
       "from": "store.page.StorePage",
       "to": "store.page.Cart",
       "kind": "reads",

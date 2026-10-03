@@ -2310,9 +2310,19 @@ impl Server {
             let mut items = self.menu.lock().expect("menu");
             op.apply(&mut items)?;
         }
-        // The deployment's menu changed: the `Menu` query's kept values are
-        // stale (ADR-0127), as `MenuChanged` says to the materializer.
-        self.queries.invalidate("store.page.Menu");
+        // The deployment's menu changed, which is `MenuChanged(47)`: it drops
+        // what the program says depends on it, the entries of each query
+        // that declares `invalidates_on MenuChanged(id)` for this store, and
+        // no other store's (§15.6 test 11, ADR-0164). Until 2026-10-03 every
+        // store's kept `Menu` was dropped here, by the query's name.
+        self.invalidate_queries(
+            "",
+            "",
+            &[pw_materialize::Event::new(
+                "Events.MenuChanged",
+                &[STORE_ID],
+            )],
+        );
 
         // The fragment is re-materialized, in its own domain, once.
         // The menu E7-P changes is store 47's (ADR-0162).
@@ -7977,6 +7987,36 @@ public query Store(",
                 .count()
         };
         assert_eq!((sets(blue), sets(harbor)), (1, 1));
+    }
+
+    /// **A change to store 47's menu drops store 47's kept menu, and only
+    /// it** (§15.6 test 11, ADR-0164). The change is `MenuChanged(47)`, and
+    /// it reaches the entries whose queries declare `invalidates_on
+    /// MenuChanged(id)`, for that id. Until 2026-10-03 the server dropped
+    /// every store's kept menu, by the query's name.
+    #[test]
+    fn a_menu_change_drops_that_stores_kept_menu_only() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let reads = || calls(&s, "store:data/menus#for-store");
+        s.serve_store_document("a", STORE_ID).expect("served");
+        s.serve_store_document("a", "48").expect("served");
+        let read = reads();
+        // Control: each is kept, so serving them again reads neither.
+        s.serve_store_document("b", STORE_ID).expect("served");
+        s.serve_store_document("b", "48").expect("served");
+        assert_eq!(reads(), read);
+        s.broadcast_menu(MenuOp::Rename {
+            id: "espresso".to_string(),
+            name: "Espresso Doppio".to_string(),
+        })
+        .expect("the menu changes");
+        // Store 48's menu is still kept ...
+        s.serve_store_document("c", "48").expect("served");
+        assert_eq!(reads(), read, "store 47's change dropped store 48's menu");
+        // ... and store 47's is read again, with the change.
+        let (blue, _) = s.serve_store_document("c", STORE_ID).expect("served");
+        assert_eq!(reads(), read + 1, "store 47's menu was not read again");
+        assert!(visible(&blue).contains("Espresso Doppio"), "{blue}");
     }
 
     /// **A document is its own subscriber** (ADR-0161). Two tabs in one

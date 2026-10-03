@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `a106e23`, with ADR-0163.
+**Reviewed:** 2026-10-03, against master `379e869`, with ADR-0164.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,17 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0164, 2026-10-03: a menu change drops what declares it, for
+its store** ([ADR-0164](DECISIONS/ADR-0164-a-menu-change-drops-what-declares-it.md)).
+- **What was wrong.** ADR-0162 recorded §15.6 test 11, "`MenuChanged(store_47)`
+  invalidates store 47 only", as met. It was met for pages. But the server's
+  query cache was dropped by the query's name: a change to store 47's menu
+  dropped every store's kept menu, and store 48's next document read its
+  menu again. A server test failed: three reads where two are right.
+- **Now** the store's `Menu` declares `invalidates_on MenuChanged(id)`. The
+  change is the event `MenuChanged(47)`, and it drops what the program says
+  depends on it, for store 47 only. Five mutants (`just e14-menu-changed`).
 
 **ADR-0163, 2026-10-03: a page says when it is absent**
 ([ADR-0163](DECISIONS/ADR-0163-a-page-says-when-it-is-absent.md)). The last
