@@ -1,7 +1,7 @@
 ADR-0149 - pw diff, what a change means, for review
 
 produced by: just e14-diffs
-commit: 4f75868b3ec91d162fb6dd366e7d0abc7619c2f4
+commit: 9fc930b8c9f938084604a09509ea17442d0ba91b
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/semantic_diff.rs)
@@ -13,7 +13,7 @@ test a_new_query_brings_its_effects_capabilities_and_policies ... ok
 test a_freshness_change_is_a_cache_change ... ok
 test a_streamed_region_is_a_page_change ... ok
 test a_new_case_is_a_domain_change ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.67s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.71s
 
 == each task's Pleris patches (scripts/semantic_diffs.py)
 
@@ -45,7 +45,7 @@ Pages
 
 Client impact
 - added the speculation of `store.page.StorePage`, 2460 bytes
-- the browser's compiled code: 3416 bytes, was 956
+- the browser's compiled code: 4468 bytes, was 2008
 
 Server components
 - none
@@ -342,7 +342,7 @@ Client impact
 - added the handler a5e94305 in `store.page.StorePage`, 1051 bytes
 - added the handler f9efa45e in `store.page.StorePage`, 335 bytes
 - the speculation of `store.page.StorePage`: 2461 bytes, was 2460
-- the browser's compiled code: 4803 bytes, was 3416
+- the browser's compiled code: 5855 bytes, was 4468
 
 Server components
 - none
@@ -673,9 +673,9 @@ Pages
 Client impact
 - added the handler 2148f1ab in `store.page.StorePage`, 266 bytes
 - added the handler 6cc02212 in `store.page.StorePage`, 265 bytes
-- added the handler 90bcde58 in `store.page.StorePage`, 331 bytes
+- added the handler 90bcde58 in `store.page.StorePage`, 857 bytes
 - removed the handler `clear_cart` in `store.page.StorePage`
-- the browser's compiled code: 4014 bytes, was 3416
+- the browser's compiled code: 5066 bytes, was 4468
 
 Server components
 - none
