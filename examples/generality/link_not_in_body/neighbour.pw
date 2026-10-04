@@ -1,0 +1,16 @@
+// @status: NEIGHBOUR
+// @invariant: link_not_in_body
+// @dimension: valid neighbour — body-ok relations in a view, written in another case, and an item's property
+//
+// Every relation body-ok, compared as HTML compares keywords, and a link
+// that is an item's property: each is allowed where markup is written.
+
+module generality.link_body_ok
+
+view Assets() !{} {
+    <link rel="Stylesheet" href="/menu.css" />
+    <link rel="dns-prefetch preconnect" href="https://images.example.com" />
+    <div itemscope itemtype="https://schema.org/Offer">
+        <link itemprop="availability" href="https://schema.org/InStock" />
+    </div>
+}

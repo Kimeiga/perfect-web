@@ -1614,3 +1614,11 @@ a page's runtime is bounded as it is sent, in every run.
   suite; controls grow each file past its bound.
 - For the owner: minifying the runtime, which needs a minifier this session
   did not download.
+
+[ADR-0189](DECISIONS/ADR-0189-a-link-is-written-where-html-allows-it.md): a
+`<link>` is written where HTML allows it.
+- `<link rel="canonical">` and `rel="icon"` in markup checked, built, and
+  were written into the body, where HTML does not allow them and nothing
+  reads them. PW5035: a `<link>` in markup has only body-ok relations
+  (`stylesheet`, `preload`, `preconnect`...) or is an item's property.
+- Corpus C12: R-053, A-028; generality 38 / 38.

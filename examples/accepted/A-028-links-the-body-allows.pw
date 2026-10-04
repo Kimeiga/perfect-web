@@ -1,0 +1,30 @@
+// @corpus: accepted
+// @id: A-028
+// @category: links the body allows
+// @charter: §8.2
+// @milestone: 14
+//
+// HTML allows a `<link>` in the body when each of its relations is body-ok:
+// a stylesheet, a resource to preload or prefetch, an origin to connect to
+// early (ADR-0189). And an item's property, by `itemprop`. Each is written
+// where it is.
+
+module store.store_links
+
+import domain.{ StoreId }
+
+page StoreLinks(id: StoreId) !{} {
+    route "/stores/{id}/links"
+    view {
+        <title>Store</title>
+        <link rel="stylesheet" href="/menu.css" />
+        <link rel="preconnect" href="https://images.example.com" />
+        <main>
+            <h1>Store</h1>
+            <div itemscope itemtype="https://schema.org/Offer">
+                <link itemprop="availability" href="https://schema.org/InStock" />
+                <p>Espresso</p>
+            </div>
+        </main>
+    }
+}

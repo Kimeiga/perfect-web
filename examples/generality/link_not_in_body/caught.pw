@@ -1,0 +1,13 @@
+// @status: GENERAL
+// @invariant: link_not_in_body
+//
+// Structurally different from R-053: the link is a view's, an icon, and it
+// is written among relations the body allows. A view's markup is its page's
+// body all the same, and no browser shows an icon named there.
+
+module generality.link_icon
+
+view Brand() !{} {
+    <link rel="preload icon" href="/favicon.ico" />
+    <p>Blue Bottle</p>
+}

@@ -497,6 +497,11 @@ codes! {
     // result, a link's preview. Lighthouse's SEO audit failed every page.
     METADATA_MISPLACED = "PW5034" / metadata_misplaced / 1, Markup,
         "a page's metadata is the page's, at the top of its view: named once as text, its content text and values, and a name HTML allows once stated once";
+    // ADR-0189: a `<link rel="canonical">` or `rel="icon"` in a view checked
+    // and built, and was written into the body, where HTML does not allow
+    // it and nothing reads it.
+    LINK_NOT_IN_BODY = "PW5035" / link_not_in_body / 1, Markup,
+        "a `<link>` in markup is one HTML allows in the body: each relation body-ok, or an item's property";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

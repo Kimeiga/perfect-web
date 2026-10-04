@@ -2492,6 +2492,33 @@ e14-ids:
      } > docs/evidence/E14/ids.txt
     @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/ids.txt
 
+# ADR-0189: a `<link>` is written where HTML allows it. The rule's tests, the
+# corpus at C12, every program clean, and the mutation controls.
+e14-links:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0189 - a <link> is written where HTML allows it"; echo; \
+       echo "produced by: just e14-links"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/links.rs)"; echo; \
+       cargo test --locked -p pw-core --test links 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus at C12 (corpus-check, generality.rs, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
+         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+       echo; echo "== every program the repository checks"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         benchmarks/baselines/pleris/domain.pw benchmarks/baselines/pleris/lib/*.pw benchmarks/baselines/pleris/store/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/links_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/links_mutations.py; \
+     } > docs/evidence/E14/links.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/links.txt
+
 # ADR-0186: a page states its description. The compiler's, the renderer's
 # and the server's tests, each store's page in three engines, the corpus at
 # C11, every program clean, and the mutation controls.

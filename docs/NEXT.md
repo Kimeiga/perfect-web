@@ -258,6 +258,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
         `just e14-runtime-size`, `just e7-performance`): bounded as sent,
         compressed with Brotli, in every suite; the renderer's WebAssembly
         bounded too; E7's record recorded again.
+    15. ~~A `<link>` the head holds, written in markup~~ (ADR-0189,
+        `just e14-links`): PW5035; corpus C12.
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core) and

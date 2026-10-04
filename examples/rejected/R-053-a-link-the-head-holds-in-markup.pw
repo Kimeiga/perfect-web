@@ -1,0 +1,26 @@
+// @corpus: rejected
+// @id: R-053
+// @category: a link the head holds, written in markup
+// @rule: PW5035
+// @invariant: link_not_in_body
+// @charter: §8.2
+// @milestone: 14
+// @expect-error: `<link rel="canonical">` in `StorePage` is written into the body, where HTML does not allow `canonical` and nothing reads it
+// @expect-error: a `<link>` in markup is one HTML allows in the body: each relation body-ok, or an item's property
+//
+// A canonical address is the head's. Markup is written into the body, where
+// HTML does not allow a `canonical` link and no search engine reads one: the
+// page would say which address is its own to nothing.
+
+module store.canonical
+
+import domain.{ StoreId }
+
+page StorePage(id: StoreId) !{} {
+    route "/stores/{id}/about"
+    view {
+        <title>Store</title>
+        <link rel="canonical" href="/stores/{id}" />
+        <main><h1>Store</h1></main>
+    }
+}

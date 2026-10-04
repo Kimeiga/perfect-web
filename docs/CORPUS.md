@@ -677,3 +677,26 @@ Generality at open:        37/37 invariants generality-tested
 | A-027 | added: a page's description and Open Graph title, from the values it reads | new category, `page states its description` |
 | R-052 | added: a `<meta>` in a view (`PW5034`) | new category |
 | `metadata_misplaced` | a GENERAL witness, a page that states its description twice, and a NEIGHBOUR one, a description and two Open Graph images after `<main>` | new invariant |
+
+## C12: a `<link>` is written where HTML allows it, 2026-10-04
+
+Opened because the specification changed: a `<link>` in markup is one HTML
+allows in the body, each relation body-ok or an item's property
+(`PW5035`).
+[ADR-0189](DECISIONS/ADR-0189-a-link-is-written-where-html-allows-it.md) is
+the decision. No invariant is retired, no `@expect-error` line of an earlier
+fixture changed, and no fixture moved.
+
+```text
+Corpus version:            C12
+Accepted programs:         28
+Rejected programs:         53
+Charter categories:        28/28 accepted, 53/53 rejected
+Generality at open:        38/38 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-028 | added: links the body allows, a stylesheet, a preconnect and an item's property | new category, `links the body allows` |
+| R-053 | added: a canonical link in a page's markup (`PW5035`) | new category |
+| `link_not_in_body` | a GENERAL witness, an icon among body-ok relations in a view, and a NEIGHBOUR one, body-ok relations in another case and an item's property | new invariant |

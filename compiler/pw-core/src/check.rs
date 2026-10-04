@@ -139,6 +139,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(titles(&u.hir));
         // ADR-0186: and what it says of itself to what reads it unshown.
         per_unit.extend(metadata(&u.hir));
+        // ADR-0189: a `<link>` is one HTML allows where it is written.
+        per_unit.extend(links(&u.hir));
         // ADR-0185: an id names one element, a reference names one shown
         // with it, and ARIA is what WAI-ARIA defines.
         per_unit.extend(ids_and_aria(&u.hir));
@@ -3155,6 +3157,119 @@ fn metadata(hir: &Hir) -> Vec<Diagnostic> {
                     description: "write it once at the top of the page's view, beside its \
                                   `<title>`: `<meta name=\"description\" \
                                   content={store.description} />`"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// **A `<link>` is written where HTML allows it** (ADR-0189): in the body,
+/// where markup is written, a link whose every relation is body-ok
+/// (`stylesheet`, `preload`, `modulepreload`, `prefetch`, `preconnect`,
+/// `dns-prefetch`, `pingback`), or an item's property, `itemprop`. Every
+/// other relation, `canonical`, `icon`, `manifest`, `alternate`, is the
+/// head's: written into the body it is not conforming and nothing reads it.
+///
+/// PW5035 refuses a `<link>` with neither `rel` nor `itemprop`, or both; one
+/// whose `rel` is computed in place; and one with a relation that is not
+/// body-ok, compared as HTML compares keywords, ignoring ASCII case.
+fn links(hir: &Hir) -> Vec<Diagnostic> {
+    const BODY_OK: [&str; 7] = [
+        "dns-prefetch",
+        "modulepreload",
+        "pingback",
+        "preconnect",
+        "prefetch",
+        "preload",
+        "stylesheet",
+    ];
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        for n in body.walk_markup(&roots) {
+            let Node::Element { tag, attrs, .. } = body.node(n) else {
+                continue;
+            };
+            if tag != "link" {
+                continue;
+            }
+            let attr = |name: &str| attrs.iter().find(|a| a.name == name);
+            let message = match (attr("rel"), attr("itemprop")) {
+                (None, None) => Some(format!(
+                    "`<link>` in `{}` names no relation and no item's property",
+                    decl.name
+                )),
+                (Some(_), Some(_)) => Some(format!(
+                    "`<link>` in `{}` is a relation and an item's property at once: HTML \
+                     allows one of `rel` and `itemprop`",
+                    decl.name
+                )),
+                (None, Some(_)) => None,
+                (Some(rel), None) => match &rel.value {
+                    AttrValue::Static(_) => {
+                        let written = static_attr(attrs, "rel").unwrap_or_default();
+                        let relations: Vec<&str> = written.split_ascii_whitespace().collect();
+                        match relations
+                            .iter()
+                            .find(|r| !BODY_OK.iter().any(|ok| ok.eq_ignore_ascii_case(r)))
+                        {
+                            _ if relations.is_empty() => {
+                                Some(format!("`<link>` in `{}` names no relation", decl.name))
+                            }
+                            Some(head) => Some(format!(
+                                "`<link rel=\"{written}\">` in `{}` is written into the body, \
+                                 where HTML does not allow `{head}` and nothing reads it: the \
+                                 document's head holds the page's title and metadata, and the \
+                                 host's links",
+                                decl.name
+                            )),
+                            None => None,
+                        }
+                    }
+                    _ => Some(format!(
+                        "`<link rel>` in `{}` is a value computed in place, and which relation \
+                         it names decides whether HTML allows it in the body",
+                        decl.name
+                    )),
+                },
+            };
+            let Some(message) = message else { continue };
+            out.push(Diagnostic {
+                code: crate::codes::LINK_NOT_IN_BODY.id,
+                invariant: crate::codes::LINK_NOT_IN_BODY.invariant,
+                reason: "link_not_in_body",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: body.node_span(n),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id),
+                    label: format!("`{}` renders this", decl.name),
+                }],
+                explanation: Some(
+                    "Markup is written into the document's body. HTML allows a `<link>` there \
+                     only when each of its relations is body-ok: `stylesheet`, `preload`, \
+                     `modulepreload`, `prefetch`, `preconnect`, `dns-prefetch` and \
+                     `pingback`; or when it is an item's property. A `canonical`, an `icon`, \
+                     a `manifest` or an `alternate` link belongs to the head, and in the body \
+                     nothing reads it: no search engine takes the address, and no browser \
+                     shows the icon."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "state what the page says of itself as its metadata, \
+                                  `<meta name=\"description\" content={...} />` (ADR-0186); \
+                                  the document's other links are the host's"
                         .to_string(),
                     replacement: None,
                 }],

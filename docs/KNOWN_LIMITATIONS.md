@@ -575,6 +575,12 @@ nothing. Not supported:
 
 No page is required to state a description.
 
+**A page writes a `<link>` only where HTML allows one in the body**
+(ADR-0189): its relations body-ok, or an item's property. It cannot state a
+canonical or an alternate address. A `<style>` in markup is written where it
+is, into the body, where browsers apply it and HTML does not put it. Styling
+is charter §8.3's.
+
 **A page that is absent is answered with the host's own page** (ADR-0163).
 `not_found_on` names one case of one declared error, and a host answers it
 404 with a page that holds nothing of the program's. A program declares no

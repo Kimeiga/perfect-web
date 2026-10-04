@@ -13,6 +13,18 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0189, 2026-10-04: a `<link>` is written where HTML allows it.**
+`<link rel="canonical">` and `rel="icon"` written in markup checked and
+built. They went into the body, where HTML does not allow them and nothing
+reads them.
+- PW5035: a `<link>` in markup has only body-ok relations (`stylesheet`,
+  `preload`, `modulepreload`, `prefetch`, `preconnect`, `dns-prefetch`,
+  `pingback`), or is an item's property.
+- The head stays the host's, but for a page's title and metadata.
+
+Corpus C12: R-053 and A-028; **generality is 38 / 38**. 9 mutants
+(`just e14-links`).
+
 **Correction, ADR-0188, 2026-10-04: E7's gate item 7b had failed, unseen,
 since ADR-0172 at the latest.** Its test bounds what the store's page
 downloads to run, the runtime's script and the resume's WebAssembly, at
@@ -65,7 +77,7 @@ since 2026-08-07. ADR-0188 is the ruling.
   - the host's charset and viewport refused.
 - A `<meta itemprop>` is microdata, written in the body where it is.
 
-Corpus C11: R-052 and A-027; **generality is 37 / 37**. 34 mutants
+Corpus C11: R-052 and A-027; generality 37 / 37. 34 mutants
 (`just e14-metadata`).
 
 **Correction to ADR-0183, the same day.** A static page that stated its
