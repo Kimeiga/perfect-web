@@ -249,14 +249,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
         limits a name; a `<meta itemprop>` written where it is; corpus C11.
         With a correction to ADR-0183: a static page that stated its title
         shipped the runtime.
-    13. **The store's page shifts as it loads.** Lighthouse measured a
-        cumulative layout shift of 0.136 on a phone. The menu's items are
-        laid out 42px tall until they are first rendered
-        (`content-visibility: auto`, `contain-intrinsic-size: auto 42px`),
-        and a phone shows them about 125px tall, so the cart moves 249px
-        down. Acceptance: no shift as the page loads, measured in three
-        engines, and the large menu's rendering cost (`just e7-performance`)
-        kept.
+    13. ~~The store's page shifts as it loads~~ (ADR-0187,
+        `just e14-stable-layout`): Lighthouse, CLS 0.136. An item is
+        contained only 28 items or 16 categories down its page, the
+        placeholder is an item's height, and the style is in the head. No
+        shift at a phone's or a desktop's size; E7's gate item 10 kept.
+    14. **E7's gate item 7b has failed since ADR-0172, unseen.** The store's
+        page downloads 141,339 bytes to run, against a 128 KiB bound that only
+        `just e7-performance` checks, last run on 2026-08-07. ADR-0188 rules
+        on what the bound measures and where it runs.
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core).

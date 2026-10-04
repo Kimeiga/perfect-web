@@ -13,6 +13,29 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0187, 2026-10-04: nothing the store contains is on screen when its
+page is first laid out.** Lighthouse on a phone measured a cumulative layout
+shift of 0.136. Every menu item was contained (`content-visibility: auto`)
+with a 42 px placeholder. Items are 125 px tall, so when the browser rendered
+the three on screen, the cart moved 249 px. That happened before the first
+paint, and was reported all the same.
+- An item is contained when 28 items precede it in its list, or 16 lists
+  precede its list: at least 2,400 px down. There is no shift in Chromium at
+  a phone's, a desktop's or a 2,400 px-tall size, for the store and for
+  menus of a thousand items or forty categories.
+- The placeholder is 7.75em, within 5% of an item in three engines. With
+  42 px a thousand-item page grew by 64% as it was scrolled.
+- The style is in the head, where HTML puts it.
+
+E7's gate item 10 holds: 972 of a thousand items are contained, and their
+first layout takes 2.3 ms as served, against 15.2 ms uncontained. 6 mutants
+(`just e14-stable-layout`).
+
+**Found on the way: E7's gate item 7b had failed, unseen.** The bytes the
+store's page downloads to run passed its 128 KiB bound between ADR-0152 and
+ADR-0172. Its test runs only in `just e7-performance`, which had not run
+since 2026-08-07. ADR-0188 is the ruling.
+
 **ADR-0186, 2026-10-04: a page states its description.** Lighthouse
 13.4.1 on the store's page gave SEO 75: it had no meta description.
 - A page writes `<meta name="description" content={store.description} />`,

@@ -33,7 +33,9 @@ RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 APP = ROOT / "examples/store/app.pw"
 
 STYLE = (
-    'const STYLE: &str = "#menu li { content-visibility: auto; contain-intrinsic-size: auto 42px; }";\n'
+    # Re-anchored by ADR-0187: an item is contained only far down its page.
+    'const STYLE: &str = "#menu > ul > li:nth-child(n+29), #menu > ul:nth-of-type(n+17) > li \\\n'
+    '                     { content-visibility: auto; contain-intrinsic-size: auto 7.75em; }";\n'
 )
 
 

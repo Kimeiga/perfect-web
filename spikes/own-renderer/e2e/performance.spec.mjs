@@ -342,19 +342,30 @@ test("gate 10: a thousand-item menu keeps a bounded rendering cost", async ({ pa
 
   const measured = await page.evaluate(() => {
     const source = document.querySelector("#menu");
-    const declared = getComputedStyle(source.querySelector("li")).contentVisibility;
+    const items = source.querySelectorAll("li");
+    // Not an item that may be on screen as the page is first laid out, and
+    // every one far enough down (ADR-0187).
+    const first = getComputedStyle(items[0]).contentVisibility;
+    const last = getComputedStyle(items[items.length - 1]);
+    const declared = last.contentVisibility;
+    const placeholder = last.containIntrinsicSize;
+    const served = [...items].map((li) => getComputedStyle(li).contentVisibility);
+    const contained = served.filter((v) => v === "auto").length;
 
     // Build and first layout, from the page's own markup. Detached, built,
     // inserted, then read — so the number is the cost of putting a thousand
     // items on the screen rather than of touching a list already there.
+    // `contentVisibility` is one value for every item, or `served` for each
+    // as the page contains it.
     const build = (contentVisibility) => {
       const list = document.createElement("ul");
       list.style.cssText = "position:absolute;left:-99999px;width:400px";
       list.innerHTML = source.innerHTML;
-      for (const li of list.querySelectorAll("li")) {
-        li.style.contentVisibility = contentVisibility;
-        li.style.containIntrinsicSize = "auto 42px";
-      }
+      list.querySelectorAll("li").forEach((li, i) => {
+        li.style.contentVisibility =
+          contentVisibility === "served" ? served[i] : contentVisibility;
+        li.style.containIntrinsicSize = placeholder;
+      });
       const start = performance.now();
       document.body.append(list);
       void list.offsetHeight; // force the layout we are timing
@@ -367,23 +378,30 @@ test("gate 10: a thousand-item menu keeps a bounded rendering cost", async ({ pa
     // ran first while the style engine was cold.
     const visible = [];
     const auto = [];
+    const asServed = [];
     for (let i = 0; i < 5; i++) {
       visible.push(build("visible"));
       auto.push(build("auto"));
+      asServed.push(build("served"));
     }
     const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
     return {
+      first,
       declared,
+      contained,
       items: source.querySelectorAll("li").length,
       visible: median(visible),
       auto: median(auto),
+      asServed: median(asServed),
       visibleAll: visible.map((v) => Number(v.toFixed(1))),
       autoAll: auto.map((v) => Number(v.toFixed(1))),
+      asServedAll: asServed.map((v) => Number(v.toFixed(1))),
     };
   });
 
   console.log(`EVIDENCE large-menu-items=${measured.items}`);
   console.log(`EVIDENCE large-menu-content-visibility=${measured.declared}`);
+  console.log(`EVIDENCE large-menu-contained=${measured.contained}`);
   console.log(
     `EVIDENCE large-menu-first-layout-ms-visible=${measured.visible.toFixed(1)} ` +
       `samples=${JSON.stringify(measured.visibleAll)}`,
@@ -392,12 +410,21 @@ test("gate 10: a thousand-item menu keeps a bounded rendering cost", async ({ pa
     `EVIDENCE large-menu-first-layout-ms-contained=${measured.auto.toFixed(1)} ` +
       `samples=${JSON.stringify(measured.autoAll)}`,
   );
+  console.log(
+    `EVIDENCE large-menu-first-layout-ms-as-served=${measured.asServed.toFixed(1)} ` +
+      `samples=${JSON.stringify(measured.asServedAll)}`,
+  );
 
   expect(measured.declared, "the page declares the containment it relies on").toBe("auto");
+  expect(measured.first, "nothing that may be on screen as the page loads is contained").toBe(
+    "visible",
+  );
   // The uncontained case must be worth bounding, or the comparison is noise
   // dressed as a result.
   expect(measured.visible, "a thousand unbounded items cost measurable time").toBeGreaterThan(1);
   expect(measured.auto, "containment bounds the cost").toBeLessThan(measured.visible);
+  // And the page as it is served, its first items uncontained (ADR-0187).
+  expect(measured.asServed, "as served, the cost is bounded").toBeLessThan(measured.visible);
 
   // Bounded COST, not a bounded DOM: every item is still there to be found,
   // which is the correctness half of the trade.

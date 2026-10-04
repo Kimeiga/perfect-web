@@ -2531,6 +2531,32 @@ e14-metadata:
      } > docs/evidence/E14/metadata.txt
     @grep -E "^test result|passed|no diagnostics|mutants killed" docs/evidence/E14/metadata.txt
 
+# ADR-0187: nothing the store contains is on screen when its page is first
+# laid out. The page in three engines, a thousand items alone in Chromium
+# (E7 gate item 10), and the mutation controls.
+e14-stable-layout:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0187 - nothing the store contains is on screen when its page is first laid out"; echo; \
+       echo "produced by: just e14-stable-layout"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the page, in three engines (e2e/stable-layout.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/stable-layout.spec.mjs --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== a thousand items, alone in Chromium (e2e/performance.spec.mjs, E7 gate item 10)"; echo; \
+       (cd spikes/own-renderer && PW_PERFORMANCE=1 pnpm exec playwright test e2e/performance.spec.mjs \
+          --project=chromium --workers=1 --reporter=list -g "gate 10" 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g' \
+         | grep -E "EVIDENCE|^ +(✓|✘|-) |^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/stable_layout_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/stable_layout_mutations.py; \
+     } > docs/evidence/E14/stable-layout.txt
+    @grep -E "passed|failed|mutants killed" docs/evidence/E14/stable-layout.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

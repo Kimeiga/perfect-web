@@ -4819,7 +4819,7 @@ fn store_description(id: &str) -> &'static str {
     }
 }
 
-/// The containment the large-menu case relies on.
+/// The containment the large-menu case relies on (E7 gate item 10).
 ///
 /// `content-visibility: auto` rather than virtualization: a menu is
 /// semantically a list of independent items, so every item stays in the
@@ -4828,10 +4828,22 @@ fn store_description(id: &str) -> &'static str {
 /// removes items from the document, which is a correctness cost that has to be
 /// justified per case rather than adopted as a default.
 ///
+/// **Only an item that cannot be on screen as the page is first laid out**
+/// (ADR-0187): one with 28 items before it in its list, or in a list with 16
+/// lists before it. That is at least 2,400 CSS pixels down at 16 px text, and
+/// leaves at most 448 items uncontained, whatever the menu. The browser
+/// renders a contained item on screen in its first frame anyway, and what
+/// follows the item then moves: that is reported as a layout shift though
+/// it is never painted. Until 2026-10-04 every item was contained, and the
+/// cart moved 249 px on a phone.
+///
 /// `contain-intrinsic-size` is not optional with it: without a placeholder
 /// size the scrollbar jumps as items are realized, which is the visible defect
-/// that makes people abandon containment and reach for virtualization.
-const STYLE: &str = "#menu li { content-visibility: auto; contain-intrinsic-size: auto 42px; }";
+/// that makes people abandon containment and reach for virtualization. It is
+/// an item's height. Until 2026-10-04 it was 42 px, and items had grown to
+/// 125.
+const STYLE: &str = "#menu > ul > li:nth-child(n+29), #menu > ul:nth-of-type(n+17) > li \
+                     { content-visibility: auto; contain-intrinsic-size: auto 7.75em; }";
 
 /// **The events a command declares it emits**, with their values
 /// (ADR-0104).
@@ -6443,12 +6455,12 @@ fn document(
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
     // Laid out at a phone's width, as every page this host serves is
-    // (ADR-0182).
+    // (ADR-0182). Its style in its head, where HTML puts it and where it is
+    // read before the body is laid out (ADR-0187).
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{title}</title>\n{metadata}</head>\n<body>\n{body}\n\
-         <style>{STYLE}</style>\n\
+         <title>{title}</title>\n{metadata}<style>{STYLE}</style>\n</head>\n<body>\n{body}\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         title = pw_render::escape::text(title)
@@ -7737,9 +7749,29 @@ public query Store(",
 
     /// Markup's text, its comments and tags dropped.
     fn visible(html: &str) -> String {
+        // A style's or a script's text is not shown, and CSS's `>` is not a
+        // tag's end (ADR-0187 moved the store's style into its head).
+        let mut text = String::new();
+        let mut rest = html;
+        while let Some((at, open)) = ["<style", "<script"]
+            .into_iter()
+            .filter_map(|open| rest.find(open).map(|at| (at, open)))
+            .min()
+        {
+            text.push_str(&rest[..at]);
+            let close = if open == "<style" {
+                "</style>"
+            } else {
+                "</script>"
+            };
+            rest = rest[at..]
+                .find(close)
+                .map_or("", |end| &rest[at + end + close.len()..]);
+        }
+        text.push_str(rest);
         let mut out = String::new();
         let mut depth = 0;
-        for c in html.chars() {
+        for c in text.chars() {
             match c {
                 '<' => depth += 1,
                 '>' => depth -= 1,

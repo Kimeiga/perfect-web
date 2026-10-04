@@ -1588,3 +1588,16 @@ states its description.
   19 reads it.
 - A correction to ADR-0183: a static page that stated its title shipped the
   browser runtime. Corpus C11: R-052, A-027; generality 37 / 37.
+
+[ADR-0187](DECISIONS/ADR-0187-nothing-contained-is-on-screen-when-the-page-is-first-laid-out.md):
+nothing the store contains is on screen when its page is first laid out.
+- Found by Lighthouse on a phone: CLS 0.136. Every menu item was contained
+  with a 42 px placeholder, and items are 125 px, so the cart moved 249 px
+  when the browser rendered the three on screen. That was before the first
+  paint, and the Layout Instability API, which field data reads, reported it
+  all the same.
+- An item is contained when 28 items precede it in its list, or 16 lists
+  precede its list: at least 2,400 px down, below any first screen up to a
+  4K display's. At most 448 items are laid out uncontained, whatever the
+  menu. The placeholder is 7.75em, within 5% of an item in three engines,
+  and the style is in the head.

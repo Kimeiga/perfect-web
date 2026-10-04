@@ -549,6 +549,14 @@ changes when the page's values are next read. A title, or metadata, that
 reads a member function is refused where the page is planned: a host
 computes one in a text part of the page's body, or a loop's row.
 
+**The store contains a menu item only far down its page** (ADR-0187): when
+28 items precede it in its list, or 16 lists precede its list. That is at
+least 2,400 CSS pixels at 16 px text, in a single column. Not covered:
+- a grid of items, which puts the 29th item higher;
+- a first screen taller than 2,400 CSS pixels;
+- sixteen categories with no items, about 1,300 px;
+- text smaller than 16 px.
+
 **A page's metadata is a name and a content** (ADR-0186). A page states its
 description and Open Graph properties with `<meta>` at the top of its view.
 They are written into the head as the page is served, and set again by

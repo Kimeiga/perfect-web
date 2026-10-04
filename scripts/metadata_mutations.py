@@ -302,11 +302,13 @@ MUTANTS = [
         "        .any(|_| true);\n",
     ),
     (
+        # Re-anchored by ADR-0187: the store's style follows its metadata in
+        # its head.
         "the store's page is written without its metadata",
         "server",
         SERVER,
-        "         <title>{title}</title>\\n{metadata}</head>",
-        "         <title>{title}</title>\\n</head>",
+        "         <title>{title}</title>\\n{metadata}<style>",
+        "         <title>{title}</title>\\n<style>",
     ),
     (
         "a signal page is written without its metadata",
