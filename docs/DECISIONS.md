@@ -1449,3 +1449,12 @@ is idempotent.
 - Correction: PW0312 let `transport_only` retry a command that is not
   idempotent, though a browser cannot tell a request never sent from one
   whose answer was lost.
+
+[ADR-0174](DECISIONS/ADR-0174-a-store-delay-a-cart-delay-and-a-one-shot-database-error.md):
+a store delay, a cart delay, and a one-shot database error.
+- `/bench/store?delay=`, one for every reader; `/bench/cart?delay=`, one
+  session's; `/bench/fail?next=write|read`, the session's next cart write
+  or read failing once as a database that is down does (charter §15.5).
+- Correction: the one test of a rolled-back command posted an add of the
+  server's own from another session, so it could not fail. It is the page's
+  own press now.

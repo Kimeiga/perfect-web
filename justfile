@@ -2184,6 +2184,29 @@ e14-command-retry:
      } > docs/evidence/E14/command-retry.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/command-retry.txt
 
+# ADR-0174: charter §15.5's store delay, cart delay and one-shot database
+# error. The server's tests, the controls in three engines, and the mutation
+# controls.
+e14-test-controls:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0174 - a store delay, a cart delay, and a one-shot database error"; echo; \
+       echo "produced by: just e14-test-controls"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_one_shot|a_delay_slows)|^test result'; \
+       echo; echo "== the controls, and a rolled-back command, in three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/controls.spec.mjs e2e/resource-path.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/test_controls_mutations.py)"; echo; \
+       python3 scripts/test_controls_mutations.py; \
+     } > docs/evidence/E14/test-controls.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/test-controls.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

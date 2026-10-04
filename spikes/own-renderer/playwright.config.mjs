@@ -60,6 +60,8 @@ const MUTATING = [
   // ADR-0172: an item sold out, which a cart's test refuses, is one per
   // server.
   "cart",
+  // ADR-0174: the store's delay, which a test sets, is one per server.
+  "controls",
 ];
 
 export const MUTABLE_PORTS = Object.fromEntries(

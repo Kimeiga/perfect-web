@@ -187,11 +187,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
         where no answer came, as its `retry` clause bounds it, in three
         engines. Correction: PW0312 let `transport_only` retry a command
         that is not idempotent.
-     6. **Next: §15.5's missing controls.** A store delay and a cart delay,
-        and a one-shot error that the next real command or read meets, each
-        set by a `/bench/` request, as the estimate's and the
-        recommendations' delays are. Acceptance: each is seen by a test of
-        the page that it slows or fails, in three engines.
+     6. **§15.5's missing controls.**
+        - ~~A store delay, a cart delay and a one-shot database error~~
+          (ADR-0174, `just e14-test-controls`). Correction: the one test
+          of a rolled-back command could not fail.
+        - **Next: a one-shot network error the server makes, and a forced
+          reconnect.** The server drops the session's next command
+          connection, before or after it commits, and ends its open
+          subscriptions once. Acceptance: a press survives either drop as
+          one mutation, and a change made while the page is cut off
+          reaches it, in three engines.
+        - Then a materializer failure, end to end: a regeneration that
+          fails must not leave a committed change undelivered.
      7. Availability on the page before the press: `MenuItem.available`, and
         an `InventoryChanged` the menu hears.
 

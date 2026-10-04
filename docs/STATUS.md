@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `ff803bf`, with ADR-0173.
+**Reviewed:** 2026-10-04, against master `461ef0a`, with ADR-0174.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,24 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0174, 2026-10-04: the one test of a rolled-back command
+could not fail**
+([ADR-0174](DECISIONS/ADR-0174-a-store-delay-a-cart-delay-and-a-one-shot-database-error.md)).
+`e2e/resource-path.spec.mjs`'s "a rolled-back command produces no browser
+update" posted `/command/add_and_fail` through a request context that is
+another session, so the page could not have heard its change whatever the
+server did. Since ADR-0172 that add also failed on its arguments. The test
+now arms the page's own session (`/bench/fail?next=write`), and the page's
+own press meets the failure. Also: every document read its cart twice, once
+in a drain that changed nothing.
+
+**ADR-0174, 2026-10-04: a store delay, a cart delay, and a one-shot database
+error** (charter §15.5, part of the audit's sixth gap).
+`/bench/store?delay=` slows every reader's store; `/bench/cart?delay=` one
+session's cart; `/bench/fail?next=write|read` fails the session's next cart
+write or read once. 10 mutants (`just e14-test-controls`); the controls'
+tests pass in three engines.
 
 **Correction, ADR-0173, 2026-10-04: PW0312 let `transport_only` retry a
 command that is not idempotent**
@@ -2773,8 +2791,9 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **§15.5's missing controls** (the audit's sixth gap): store and cart
-   delays, and a one-shot error for the next real command or read.
+1. **§15.5's remaining controls** (the audit's sixth gap): a one-shot
+   network error the server makes, a forced reconnect, and a materializer
+   failure, each seen end to end.
 2. **Last-known-good for declared public data** (test 18, the audit's
    seventh gap): a rule limiting it to public data, and the server serving
    it.

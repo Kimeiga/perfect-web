@@ -405,6 +405,16 @@ fn recommended_from(menu: &[(String, String)]) -> Vec<(String, String)> {
     menu.iter().skip(1).take(2).cloned().collect()
 }
 
+/// **What one session's cart meets at the database** (charter §15.5,
+/// ADR-0174): how long a read of it takes, and whether its next write and its
+/// next read fail, once each, as a database that is down fails.
+#[derive(Debug, Clone, Default)]
+struct CartFaults {
+    delay_ms: u64,
+    fail_write: bool,
+    fail_read: bool,
+}
+
 /// **The estimator the store's data layer reaches, for one session** (E14,
 /// T10): what `store:data/estimates#current` answers, after how long, and how
 /// it fails. A test sets it through `/bench/estimate`.
@@ -548,6 +558,16 @@ struct Server {
     /// that adds one. A test sells one out through `/bench/stock`, and the
     /// page that shows it is not told.
     sold_out: Mutex<std::collections::BTreeSet<String>>,
+    /// **How long the store's data layer takes to answer for a store**
+    /// (charter §15.5's store delay, ADR-0174), in milliseconds: one delay
+    /// for every reader, as the store is one value for all of them. A test
+    /// sets it through `/bench/store`.
+    store_delay_ms: Arc<std::sync::atomic::AtomicU64>,
+    /// **What each session's cart meets at the database** (charter §15.5,
+    /// ADR-0174): how long a read of it takes, and whether its next write
+    /// and its next read fail. A test sets them through `/bench/cart` and
+    /// `/bench/fail`.
+    cart_faults: Arc<Mutex<BTreeMap<String, CartFaults>>>,
     /// **Each document's keyed reads** (ADR-0152, ADR-0161).
     keyed: Mutex<BTreeMap<Doc, Keyed>>,
     /// **The menu's categories** (E14, T07): which is slow, and how slow.
@@ -910,6 +930,8 @@ impl Server {
             notice: Mutex::new("Open until 7 pm".to_string()),
             prep_minutes: Mutex::new(12),
             sold_out: Mutex::new(std::collections::BTreeSet::new()),
+            store_delay_ms: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            cart_faults: Arc::new(Mutex::new(BTreeMap::new())),
             keyed: Mutex::new(BTreeMap::new()),
             categories: Mutex::new(Categories::default()),
             category_stopped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
@@ -1095,8 +1117,11 @@ impl Server {
     /// (ADR-0019), so a command that fails, or traps, commits nothing and the
     /// browser receives nothing.
     ///
-    /// `fail` makes the data layer answer `cart-expired`, the rollback path the
-    /// browser tests exercise.
+    /// `fail` makes the data layer answer `cart-expired`, the declared
+    /// refusal. A test's: a page's press reaches [`Server::command_answer`],
+    /// and the browser meets a database's failure through `/bench/fail`
+    /// (ADR-0174).
+    #[cfg(test)]
     fn command(
         &self,
         component_id: &str,
@@ -1138,7 +1163,10 @@ impl Server {
             let mut carts = self.carts.lock().expect("carts");
             let current = carts.get(session).cloned().unwrap_or_default();
             let staged: Arc<Mutex<Option<Lines>>> = Arc::default();
-            let mut host = Self::data_layer(session, current, staged.clone(), fail, self.catalog());
+            let mut host = self.faulted(
+                session,
+                Self::data_layer(session, current, staged.clone(), fail, self.catalog()),
+            );
             host.insert(
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
@@ -1332,6 +1360,57 @@ impl Server {
         Ok(Answered::from_kept(&outcome))
     }
 
+    /// **The session's cart operations, as its faults make them**
+    /// (ADR-0174). A read waits the session's delay. The next write, and the
+    /// next read, fail once each as a database that is down fails: the
+    /// operation answers no value, and the component that called it traps.
+    fn faulted(
+        &self,
+        session: &str,
+        mut host: BTreeMap<String, HostFn>,
+    ) -> BTreeMap<String, HostFn> {
+        for (name, writes) in [
+            ("current", false),
+            ("add", true),
+            ("decrease", true),
+            ("remove", true),
+            ("clear", true),
+        ] {
+            let key = format!("store:data/carts#{name}");
+            let Some(op) = host.remove(&key) else {
+                continue;
+            };
+            let faults = self.cart_faults.clone();
+            let session = session.to_string();
+            host.insert(
+                key,
+                Arc::new(move |args: &[Val]| {
+                    let delay = {
+                        let mut all = faults.lock().expect("cart faults");
+                        let mut mine = all.get_mut(&session);
+                        let failing = mine.as_deref_mut().is_some_and(|m| {
+                            std::mem::take(if writes {
+                                &mut m.fail_write
+                            } else {
+                                &mut m.fail_read
+                            })
+                        });
+                        if failing {
+                            return Err(format!("carts#{name}: the database is unavailable"));
+                        }
+                        mine.map(|m| if writes { 0 } else { m.delay_ms })
+                            .unwrap_or_default()
+                    };
+                    if delay > 0 {
+                        std::thread::sleep(std::time::Duration::from_millis(delay));
+                    }
+                    op(args)
+                }),
+            );
+        }
+        host
+    }
+
     /// **The deployment's data layer: `store:data/carts`, whole.**
     ///
     /// Every operation the interface declares, whichever command is running;
@@ -1513,8 +1592,14 @@ impl Server {
                 None,
             )))))]
         };
+        // Charter §15.5's store delay (ADR-0174), as a test set it.
+        let store_delay = self.store_delay_ms.clone();
         let get: HostFn = Arc::new(move |args: &[Val]| match args {
             [Val::String(id)] if store_named(id).is_some() => {
+                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst);
+                if delay > 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(delay));
+                }
                 Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![
                     ("id".into(), Val::String(id.clone())),
                     (
@@ -1913,7 +1998,10 @@ impl Server {
             .get(session)
             .cloned()
             .unwrap_or_default();
-        let mut host = Self::data_layer(session, current, Arc::default(), false, self.catalog());
+        let mut host = self.faulted(
+            session,
+            Self::data_layer(session, current, Arc::default(), false, self.catalog()),
+        );
         host.insert(
             "pw:host/session#read".to_string(),
             Self::session_operation(session),
@@ -2244,6 +2332,14 @@ impl Server {
         let invalidated = self
             .materializer
             .drain(&self.graph, std::slice::from_ref(&key));
+        // Nothing changed since the session's entry was made: nothing to
+        // read (ADR-0174). Until 2026-10-04 every document read the cart
+        // here and then again to render it, and a one-shot read error met
+        // this read, which no one sees, rather than the page's.
+        let existing = self.materializer.entry(&key).is_some();
+        if existing && invalidated.is_empty() {
+            return;
+        }
         // The count the page shows, as the page computes it: the cart query's
         // value, read through `domain.line_count` (ADR-0125).
         let value = match self.part_text(session, "cart.line_count") {
@@ -2252,9 +2348,8 @@ impl Server {
         };
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!(
-                "drain session={session} invalidated={} value={value} existing={}",
+                "drain session={session} invalidated={} value={value} existing={existing}",
                 invalidated.len(),
-                self.materializer.entry(&key).is_some()
             );
         }
 
@@ -2265,13 +2360,10 @@ impl Server {
         // version 0, and then the browser's staleness comparison compares
         // nothing while looking exactly like it works. Advancing here rather
         // than keeping a counter is what keeps the version the MATERIALIZER's.
-        let existing = self.materializer.entry(&key).is_some();
-        if !existing || !invalidated.is_empty() {
-            let because = invalidated.first().map(|(_, id)| *id);
-            self.clock.advance(1);
-            self.materializer
-                .regenerate(&key, because, || Ok(value.to_string()));
-        }
+        let because = invalidated.first().map(|(_, id)| *id);
+        self.clock.advance(1);
+        self.materializer
+            .regenerate(&key, because, || Ok(value.to_string()));
 
         // Frames only for an INVALIDATION. The first materialization is the
         // value the document was rendered with, and a frame for it would tell
@@ -4652,15 +4744,6 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 }
             }
         }
-        ("POST", "/command/add_and_fail") => {
-            let _ = server.command(
-                "store.page.add_to_cart",
-                &session,
-                &[Val::String("espresso".into()), Val::S64(1)],
-                true,
-            );
-            respond_json(&mut stream, 500, &session, fresh, "{\"committed\":false}");
-        }
         ("POST", "/command/menu_changed") => {
             // An event nothing about the cart listens for. It reaches the
             // materializer and selects no cart entry.
@@ -4868,6 +4951,89 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // How the estimator behaves for the request's session (E14, T10): how
         // long it takes, how it fails, and what it estimates. What was kept
         // for the session is not served after.
+        // **The store's delay** (charter §15.5, ADR-0174): how long the data
+        // layer takes to answer for a store, for every reader, as the store is
+        // one value for all of them. What any page kept of a store is read
+        // again, so the next reader waits.
+        ("POST", "/bench/store") => {
+            let delay = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("delay="))
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
+            server
+                .store_delay_ms
+                .store(delay, std::sync::atomic::Ordering::SeqCst);
+            let resources: std::collections::BTreeSet<String> = server
+                .plans
+                .values()
+                .flat_map(|plan| {
+                    plan["bindings"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|b| b["resource"].as_str().map(str::to_string))
+                })
+                .collect();
+            for resource in resources {
+                server.queries.invalidate(&resource);
+            }
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **This session's cart delay** (charter §15.5, ADR-0174): how long a
+        // read of its cart takes. Another session's does not wait, and what
+        // this session's pages kept is read again.
+        ("POST", "/bench/cart") => {
+            let delay = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("delay="))
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
+            server
+                .cart_faults
+                .lock()
+                .expect("cart faults")
+                .entry(session.clone())
+                .or_default()
+                .delay_ms = delay;
+            let own = format!("session={session}");
+            server
+                .queries
+                .evict_where(|k| k.key == own || k.key.starts_with(&format!("{own}\u{1f}")));
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **A one-shot database error** (charter §15.5, ADR-0174): this
+        // session's next cart write, or its next cart read, fails as a
+        // database that is down does. Once: the one after it succeeds. Until
+        // 2026-10-04 `/command/add_and_fail` ran an add of its own, which no
+        // page's press met.
+        ("POST", "/bench/fail") => {
+            let next = query.split('&').find_map(|p| p.strip_prefix("next="));
+            let mut faults = server.cart_faults.lock().expect("cart faults");
+            let mine = faults.entry(session.clone()).or_default();
+            match next {
+                Some("write") => mine.fail_write = true,
+                Some("read") => mine.fail_read = true,
+                _ => {
+                    drop(faults);
+                    respond_json(
+                        &mut stream,
+                        400,
+                        &session,
+                        fresh,
+                        "{\"error\":\"next is `write` or `read`\"}",
+                    );
+                    return;
+                }
+            }
+            drop(faults);
+            // A read the page kept would not reach the database.
+            let own = format!("session={session}");
+            server
+                .queries
+                .evict_where(|k| k.key == own || k.key.starts_with(&format!("{own}\u{1f}")));
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
         ("POST", "/bench/estimate") => {
             let q = |k: &str| {
                 query
@@ -7611,6 +7777,91 @@ public query Store(",
             served.join().unwrap();
         });
         assert_eq!(quantities(&s, "session-9"), [("cortado".to_string(), 1)]);
+    }
+
+    /// **A one-shot database error** (charter §15.5, ADR-0174): the
+    /// session's next cart write fails as a database that is down does, and
+    /// nothing is committed; the one after succeeds, and another session's
+    /// is not touched.
+    #[test]
+    fn a_one_shot_write_error_fails_the_next_write_once() {
+        let s = rendering_server();
+        s.cart_faults
+            .lock()
+            .unwrap()
+            .entry("session-9".into())
+            .or_default()
+            .fail_write = true;
+        s.command(ADD, "session-10", &add_shown("espresso", 1), false)
+            .expect("another session's write");
+        let failed = s
+            .command(ADD, "session-9", &add_shown("cortado", 1), false)
+            .expect_err("the database is down");
+        assert!(failed.contains("the database is unavailable"), "{failed}");
+        assert_eq!(quantities(&s, "session-9"), []);
+        s.command(ADD, "session-9", &add_shown("cortado", 1), false)
+            .expect("the next write succeeds");
+        assert_eq!(quantities(&s, "session-9"), [("cortado".to_string(), 1)]);
+        assert_eq!(quantities(&s, "session-10"), [("espresso".to_string(), 1)]);
+    }
+
+    /// And its next cart read: the session's page cannot be shown, once
+    /// (ADR-0174), as a page whose query failed cannot be (ADR-0147).
+    #[test]
+    fn a_one_shot_read_error_fails_the_next_read_once() {
+        let s = rendering_server();
+        // A page of the session's, served: its entry is made.
+        s.serve_document_with_entries("session-9").expect("served");
+        s.cart_faults
+            .lock()
+            .unwrap()
+            .entry("session-9".into())
+            .or_default()
+            .fail_read = true;
+        s.render_store("session-10");
+        let failed = s
+            .serve_document_with_entries("session-9")
+            .expect_err("the database is down");
+        assert!(failed.contains("the database is unavailable"), "{failed}");
+        s.serve_document_with_entries("session-9")
+            .expect("the next read succeeds");
+    }
+
+    /// **A delay slows what it names** (charter §15.5, ADR-0174): a cart
+    /// delay its own session's reads of the cart, and no other session's;
+    /// the store's delay every reader's store, when the store is read.
+    #[test]
+    fn a_delay_slows_what_it_names_and_nothing_else() {
+        let s = rendering_server();
+        let second = std::time::Duration::from_millis(1000);
+        let timed = |session: &str| {
+            let started = std::time::Instant::now();
+            s.render_store(session);
+            started.elapsed()
+        };
+        // The shared queries, read and kept.
+        timed("warm");
+        s.cart_faults
+            .lock()
+            .unwrap()
+            .entry("slow".into())
+            .or_default()
+            .delay_ms = 1000;
+        assert!(timed("slow") >= second, "its own session's cart");
+        assert!(timed("quick") < second, "not another's");
+
+        s.store_delay_ms
+            .store(1000, std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            timed("quick") < second,
+            "a store kept within its freshness is not read"
+        );
+        s.query_clock.0.advance(30_001);
+        assert!(timed("quick") >= second, "read again, and slow");
+        s.store_delay_ms
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+        s.query_clock.0.advance(30_001);
+        assert!(timed("quick") < second, "cleared");
     }
 
     /// **What a line records is the store's, not the request's** (ADR-0172).

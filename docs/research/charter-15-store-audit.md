@@ -96,8 +96,8 @@ are fixed (ADR-0155):
 | control | status |
 |---|---|
 | recommendations 1200 ms, estimate 400 ms | met (`/bench/recommendations`, `/bench/estimate`), and the store's page reads both since ADR-0165 |
-| store delay, cart delay | missing |
-| one-shot database error | partial: `/command/add_and_fail` runs one failing add; nothing arms the next real command or a read |
+| store delay, cart delay | met since ADR-0174: `/bench/store?delay=`, every reader's, and `/bench/cart?delay=`, one session's |
+| one-shot database error | met since ADR-0174: `/bench/fail?next=write` or `next=read` fails the session's next cart write or read, once; the add of the server's own is retired |
 | one-shot network error | partial: aborts inside browser tests only |
 | forced stale item | met since ADR-0157: `POST /bench/stock?item=..&available=false` |
 | forced duplicate click | met (`idempotent-command.spec.mjs`, T08) |

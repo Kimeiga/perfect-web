@@ -63,15 +63,31 @@ test("the cart updates from the resource, not from the command", async ({ page }
     .toMatch(/at version \d+/);
 });
 
-test("a rolled-back command produces no browser update", async ({ page, request }) => {
+test("a rolled-back command produces no browser update", async ({ page }) => {
   // The state change did not happen, so the event must not exist, so nothing
   // reaches the browser. If a stray update arrived, the page would show a cart
   // the server does not have.
+  //
+  // The command is the page's own press, its write failed at the database
+  // (charter §15.5, ADR-0174). Until 2026-10-04 this test posted an add of
+  // the server's own, through a request context that is another session, so
+  // the page could not have heard it whatever the server did; and since
+  // ADR-0172 that add failed on its arguments.
   await ready(page);
   await expect(page.locator("#cart-count")).toHaveText("0");
+  const updates = () =>
+    page.evaluate(() => window.__pw.log.filter((l) => l.startsWith("updated")).length);
+  const before = await updates();
 
-  await request.post("/command/add_and_fail").catch(() => {});
+  expect((await page.request.post("/bench/fail?next=write")).ok()).toBe(true);
+  await page.locator("#menu button").first().click();
+  // The press failed, and the line its speculation showed is gone.
+  await expect(page.locator("[data-pw-handler-error]")).toHaveCount(1);
+  await expect(page.locator("#cart-count")).toHaveText("0");
   await page.waitForTimeout(400);
+  expect(await updates(), "no update reached the page").toBe(before);
+  // Nothing was committed: a page read again shows no line.
+  await ready(page);
   await expect(page.locator("#cart-count")).toHaveText("0");
 });
 
