@@ -115,15 +115,32 @@ fn a_title_reads_what_the_page_is_given_or_is_refused() {
 
 /// `pw-render`'s document for one template, rendered with no values.
 fn document(chunks: serde_json::Value) -> String {
+    rendered(chunks, serde_json::json!({}), false)
+}
+
+/// `pw-render`'s document for one template, rendered with `values`, and
+/// offered the runtime if `runtime`.
+fn rendered(chunks: serde_json::Value, values: serde_json::Value, runtime: bool) -> String {
     use std::io::Write;
     use std::process::{Command, Stdio};
     let temp = tempfile::TempDir::with_prefix("pw-titles-").expect("a temporary directory");
     let out = temp.path().join("out");
+    let given = temp.path().join("values.json");
+    std::fs::write(&given, values.to_string()).expect("the values");
     let template = serde_json::json!([{
         "path": "t.P", "name": "P", "schema": "s", "params": [], "chunks": chunks,
     }]);
+    let mut args = vec![
+        "--out".to_string(),
+        out.to_str().expect("a path").to_string(),
+        "--values".to_string(),
+        given.to_str().expect("a path").to_string(),
+    ];
+    if runtime {
+        args.extend(["--runtime".to_string(), "/pw-runtime.mjs".to_string()]);
+    }
     let mut child = Command::new(env!("CARGO_BIN_EXE_pw-render"))
-        .args(["--out", out.to_str().expect("a path")])
+        .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -162,4 +179,54 @@ fn a_page_s_document_is_titled_as_the_page_states_and_a_view_s_by_its_name() {
     );
     let untitled = document(serde_json::json!([main]));
     assert!(untitled.contains("<title>P</title>"), "{untitled}");
+}
+
+/// A static page states its title and ships no runtime, offered one or not:
+/// its title and metadata are written in its head as it is served, and alone
+/// leave a runtime nothing to do (charter §14 M7 gate 2). Until 2026-10-04
+/// one that stated a title shipped the runtime and its manifest (a
+/// correction to ADR-0183).
+#[test]
+fn a_static_page_that_states_its_title_ships_no_runtime() {
+    let main = serde_json::json!({ "chunk": "static", "value": "<main><h1>Terms</h1></main>" });
+    let page = rendered(
+        serde_json::json!([
+            main,
+            { "chunk": "dynamic", "value": {
+                "part": "title", "id": 0, "pieces": [{ "piece": "text", "value": "Terms" }],
+            }},
+            { "chunk": "dynamic", "value": {
+                "part": "meta", "id": 1, "attribute": "name", "key": "description",
+                "content": [{ "piece": "text", "value": "What a store agrees to." }],
+            }},
+        ]),
+        serde_json::json!({}),
+        true,
+    );
+    assert!(page.contains("<title>Terms</title>"), "{page}");
+    assert!(!page.contains("<script"), "{page}");
+    // A page with a part in its body ships both, and its title among the
+    // parts, which the runtime keeps current with them.
+    let page = rendered(
+        serde_json::json!([
+            { "chunk": "static", "value": "<main><h1>" },
+            { "chunk": "dynamic", "value": {
+                "part": "text", "id": 0, "value": "store.name", "context": "text",
+            }},
+            { "chunk": "static", "value": "</h1></main>" },
+            { "chunk": "dynamic", "value": {
+                "part": "title", "id": 1, "pieces": [{ "piece": "value", "value": "store.name" }],
+            }},
+        ]),
+        serde_json::json!({ "store": { "name": "Blue Bottle" } }),
+        true,
+    );
+    assert!(
+        page.contains("<script type=\"module\" src=\"/pw-runtime.mjs\"></script>"),
+        "{page}"
+    );
+    assert!(
+        page.contains("{\"anchor\":\"document\",\"id\":1,\"kind\":\"title\""),
+        "{page}"
+    );
 }

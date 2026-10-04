@@ -1,0 +1,21 @@
+// @corpus: rejected
+// @id: R-052
+// @category: metadata outside the top of a page's view
+// @rule: PW5034
+// @invariant: metadata_misplaced
+// @charter: §8.2
+// @milestone: 14
+// @expect-error: `<meta>` in the view `StoreCard` describes every page that composes it
+// @expect-error: a page's metadata is the page's, at the top of its view: named once as text, its content text and values, and a name HTML allows once stated once
+//
+// A description is what a page says of itself to whatever reads it without
+// showing it: a search engine's result, a link's preview. One written in a
+// view would describe every page the view is composed into, the same, and a
+// page that composed two would describe itself twice.
+
+module store.store_card
+
+view StoreCard() !{} {
+    <meta name="description" content="A store." />
+    <h2>Store</h2>
+}

@@ -654,3 +654,26 @@ The two witnesses' old texts are in `examples/history/C10/`.
 - `label-for-another.pw`'s is reported for both its defects, each where it
   is;
 - `labelledby-nothing.pw`'s for the reference alone.
+
+## C11: a page states its description, 2026-10-04
+
+Opened because the specification changed: a page's metadata is the page's,
+at the top of its view, named once as text, its content text and values,
+and a name HTML allows once stated once (`PW5034`).
+[ADR-0186](DECISIONS/ADR-0186-a-page-states-its-description.md) is the
+decision. No invariant is retired, no `@expect-error` line of an earlier
+fixture changed, and no fixture moved.
+
+```text
+Corpus version:            C11
+Accepted programs:         27
+Rejected programs:         52
+Charter categories:        27/27 accepted, 52/52 rejected
+Generality at open:        37/37 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-027 | added: a page's description and Open Graph title, from the values it reads | new category, `page states its description` |
+| R-052 | added: a `<meta>` in a view (`PW5034`) | new category |
+| `metadata_misplaced` | a GENERAL witness, a page that states its description twice, and a NEIGHBOUR one, a description and two Open Graph images after `<main>` | new invariant |

@@ -334,6 +334,19 @@ pub enum Part {
     /// not where it is written, so it renders nothing in the body. Numbered
     /// after every other part of the page, so writing one moves no other.
     Title { id: PartId, pieces: Vec<TitlePiece> },
+    /// `<meta name="description" content={store.description} />` at the top
+    /// of a page's view (ADR-0186): what the page says of itself to what
+    /// reads it without showing it. Its host writes it into the document's
+    /// `<head>` as the page is served; it renders nothing in the body.
+    /// Numbered after the title.
+    Meta {
+        id: PartId,
+        /// `name` or `property`.
+        attribute: String,
+        /// `description`, `og:title`.
+        key: String,
+        content: Vec<TitlePiece>,
+    },
     /// Verbatim bytes.
     ///
     /// Reachable only from a value whose type carries the raw-HTML capability.
@@ -437,7 +450,8 @@ impl Part {
             | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
             | Part::RawHtml { id, .. }
-            | Part::Title { id, .. } => *id,
+            | Part::Title { id, .. }
+            | Part::Meta { id, .. } => *id,
             Part::Blocked { .. } => return None,
         })
     }
@@ -467,7 +481,7 @@ impl Part {
             | Part::Stream { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
-            Part::Title { .. } => Anchor::Document,
+            Part::Title { .. } | Part::Meta { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
         })
     }
@@ -486,6 +500,7 @@ impl Part {
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
             Part::Title { .. } => "title",
+            Part::Meta { .. } => "meta",
             Part::Blocked { .. } => "blocked",
         }
     }
@@ -622,6 +637,8 @@ pub enum ReadKind {
     List,
     /// A value a page's `<title>` reads (ADR-0183).
     Title,
+    /// A value a page's `<meta>` reads (ADR-0186).
+    Meta,
 }
 
 /// Where a [`Read`] is written.
@@ -758,8 +775,12 @@ impl Template {
                         Part::Component { path, .. } => path.clone(),
                         // The query whose state the region shows.
                         Part::Stream { query, .. } => query.clone(),
-                        // Every value the title reads, in order.
-                        Part::Title { pieces, .. } => pieces
+                        // Every value the title or the metadata reads, in
+                        // order.
+                        Part::Title {
+                            pieces: content, ..
+                        }
+                        | Part::Meta { content, .. } => content
                             .iter()
                             .filter_map(|p| match p {
                                 TitlePiece::Value(v) => Some(v.as_str()),
@@ -969,14 +990,21 @@ pub fn lowered(
     };
     // A page's title is lowered after the rest of its view, wherever it is
     // written, so writing one moves no other part's number (ADR-0183).
-    let (titles, rest): (Vec<NodeId>, Vec<NodeId>) = roots_of(body)
+    // Its metadata after its title, for the same reason (ADR-0186).
+    let page = decl.kind == crate::hir::DeclKind::Page;
+    let (head, rest): (Vec<NodeId>, Vec<NodeId>) = roots_of(body)
         .into_iter()
-        .partition(|r| decl.kind == crate::hir::DeclKind::Page && is_title(body, *r));
+        .partition(|r| page && (is_title(body, *r) || is_meta(body, *r)));
+    let (titles, metas): (Vec<NodeId>, Vec<NodeId>) =
+        head.into_iter().partition(|r| is_title(body, *r));
     for root in rest {
         lower_node(body, root, &ctx, &mut ix, &mut chunks);
     }
     for title in titles {
         chunks.push(Chunk::Dynamic(lower_title(body, title, &ctx, &mut ix)));
+    }
+    for meta in metas {
+        chunks.push(Chunk::Dynamic(lower_meta(body, meta, &ctx, &mut ix)));
     }
     let chunks = coalesce(chunks);
     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
@@ -1223,6 +1251,95 @@ fn is_title(body: &Body, n: NodeId) -> bool {
     matches!(body.node(n), Node::Element { tag, .. } if tag == "title")
 }
 
+/// Whether a node is the page's metadata: a `<meta>` that is not an item's
+/// property (microdata), which is written where it is (ADR-0186).
+fn is_meta(body: &Body, n: NodeId) -> bool {
+    matches!(body.node(n), Node::Element { tag, attrs, .. }
+        if tag == "meta" && !attrs.iter().any(|a| a.name == "itemprop"))
+}
+
+/// **A page's metadata** (ADR-0186): what it names, `name` or `property`, as
+/// written, and its content as text and the values it reads. Anything else
+/// is refused at check (PW5034), and blocked here.
+fn lower_meta(body: &Body, n: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer) -> Part {
+    let blocked = |reason: &str| Part::Blocked {
+        reason: reason.to_string(),
+        at: "<meta>".to_string(),
+    };
+    let Node::Element { attrs, .. } = body.node(n) else {
+        return blocked("metadata is an element");
+    };
+    let attr = |name: &str| attrs.iter().find(|a| a.name == name);
+    // Its name and its content, and nothing the head would not carry.
+    if attrs
+        .iter()
+        .any(|a| !["name", "property", "content"].contains(&a.name.as_str()))
+    {
+        return blocked("metadata is its name and its content (PW5034)");
+    }
+    let named: Vec<(&str, &crate::hir::Attr)> = ["name", "property"]
+        .into_iter()
+        .filter_map(|k| attr(k).map(|a| (k, a)))
+        .collect();
+    let [(attribute, a)] = named.as_slice() else {
+        return blocked("metadata names what it describes once (PW5034)");
+    };
+    let AttrValue::Static(v) = &a.value else {
+        return blocked("metadata names what it describes as text (PW5034)");
+    };
+    let key = unquote(v).to_string();
+    let mut content = Vec::new();
+    let mut values = Vec::new();
+    match attr("content").map(|a| &a.value) {
+        Some(AttrValue::Static(v)) => content.push(TitlePiece::Text(unquote(v).to_string())),
+        Some(AttrValue::Expr(e)) => match body.expr(*e) {
+            Expr::Interpolated { text, parts } => {
+                let mut holes = parts.iter();
+                let mut rest = unquote(text);
+                while let Some(open) = rest.find('{') {
+                    let after = &rest[open + 1..];
+                    let Some(close) = after.find('}') else { break };
+                    if open > 0 {
+                        content.push(TitlePiece::Text(rest[..open].to_string()));
+                    }
+                    let Some(path) = holes
+                        .next()
+                        .and_then(|h| value_path(body, *h).map(|p| (p, *h)))
+                    else {
+                        return blocked("a value in metadata is read by its path");
+                    };
+                    let read = ctx.read(path.0);
+                    values.push((read.clone(), path.1));
+                    content.push(TitlePiece::Value(read));
+                    rest = &after[close + 1..];
+                }
+                if !rest.is_empty() {
+                    content.push(TitlePiece::Text(rest.to_string()));
+                }
+            }
+            _ => {
+                let Some(path) = value_path(body, *e) else {
+                    return blocked("a value in metadata is read by its path");
+                };
+                let read = ctx.read(path);
+                values.push((read.clone(), *e));
+                content.push(TitlePiece::Value(read));
+            }
+        },
+        _ => return blocked("metadata has content (PW5034)"),
+    }
+    let id = ix.part();
+    for (path, e) in values {
+        ix.read(id, &path, ReadKind::Meta, ReadAt::Expr(e), ctx);
+    }
+    Part::Meta {
+        id,
+        attribute: attribute.to_string(),
+        key,
+        content,
+    }
+}
+
 /// **A page's title** (ADR-0183): its text as written, and each value it
 /// reads by its path. Anything else in it is refused at check (PW5030), and
 /// blocked here.
@@ -1410,6 +1527,15 @@ fn lower_element(
         out.push(Chunk::Dynamic(Part::Blocked {
             reason: "a title is the page's, at the top of its view (PW5030)".to_string(),
             at: "<title>".to_string(),
+        }));
+        return;
+    }
+    // And metadata (ADR-0186, PW5034). An item's property is written where
+    // it is.
+    if tag == "meta" && !attrs.iter().any(|a| a.name == "itemprop") {
+        out.push(Chunk::Dynamic(Part::Blocked {
+            reason: "metadata is the page's, at the top of its view (PW5034)".to_string(),
+            at: "<meta>".to_string(),
         }));
         return;
     }
@@ -2424,8 +2550,15 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                             feed(h, value.as_bytes());
                             feed(h, capability.as_bytes());
                         }
-                        Part::Title { pieces, .. } => {
-                            for p in pieces {
+                        Part::Title {
+                            pieces: content, ..
+                        }
+                        | Part::Meta { content, .. } => {
+                            if let Part::Meta { attribute, key, .. } = p {
+                                feed(h, attribute.as_bytes());
+                                feed(h, key.as_bytes());
+                            }
+                            for p in content {
                                 match p {
                                     TitlePiece::Text(t) => {
                                         feed(h, b"T");

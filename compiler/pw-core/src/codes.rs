@@ -492,6 +492,11 @@ codes! {
         "an id reference names an element its page shows whenever the referrer is shown";
     ARIA_UNKNOWN = "PW5033" / aria_unknown / 1, Markup,
         "an ARIA attribute, its value and a role are ones WAI-ARIA defines";
+    // ADR-0186: a page said what it is to a person, its title (ADR-0183),
+    // and nothing to what reads it without showing it: a search engine's
+    // result, a link's preview. Lighthouse's SEO audit failed every page.
+    METADATA_MISPLACED = "PW5034" / metadata_misplaced / 1, Markup,
+        "a page's metadata is the page's, at the top of its view: named once as text, its content text and values, and a name HTML allows once stated once";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

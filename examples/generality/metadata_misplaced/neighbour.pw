@@ -1,0 +1,21 @@
+// @status: NEIGHBOUR
+// @invariant: metadata_misplaced
+// @dimension: valid neighbour — a description and two Open Graph images, after `<main>`
+//
+// Where among the view's top elements metadata is written does not matter,
+// and a `property` may repeat: Open Graph reads two images as a list.
+
+module generality.metadata_last
+
+import domain.{ StoreId }
+
+page Hours(id: StoreId) !{} {
+    route "/stores/{id}/hours"
+    view {
+        <title>Hours</title>
+        <main><h1>Hours</h1></main>
+        <meta name="description" content="When store {id} is open." />
+        <meta property="og:image" content="/images/front.jpg" />
+        <meta property="og:image" content="/images/counter.jpg" />
+    }
+}

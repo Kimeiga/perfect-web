@@ -106,9 +106,21 @@ fn a_page_s_title_is_a_part_of_the_document_numbered_after_the_rest() {
         panic!("one title at the top of the template: {titles:?}");
     };
     assert_eq!(pieces, &[TitlePiece::Value("store.name".to_string())]);
-    // Last, wherever it is written: the store writes it before `<main>`.
+    // After every part of the body, wherever it is written: the store writes
+    // it before `<main>`. Only the page's metadata follows it (ADR-0186).
     let manifest = t.manifest();
-    assert_eq!(manifest.last().map(|e| e.id), Some(*id), "{manifest:?}");
+    assert_eq!(
+        manifest.iter().rfind(|e| e.kind != "meta").map(|e| e.id),
+        Some(*id),
+        "{manifest:?}"
+    );
+    assert!(
+        manifest
+            .iter()
+            .filter(|e| e.kind == "meta")
+            .all(|e| e.id.0 > id.0),
+        "{manifest:?}"
+    );
     let entry = manifest.iter().find(|e| e.id == *id).expect("listed");
     assert_eq!(
         (entry.kind, entry.anchor, entry.value.as_str()),
@@ -127,7 +139,7 @@ fn a_page_s_title_is_a_part_of_the_document_numbered_after_the_rest() {
 }
 
 #[test]
-fn writing_a_title_moves_no_other_part() {
+fn writing_a_title_moves_no_part_of_the_body() {
     let with = build(|s| s.to_string()).expect("builds");
     // Without it the store states no title, which its route refuses: the
     // control is the store served at no route.
@@ -137,11 +149,13 @@ fn writing_a_title_moves_no_other_part() {
         s.replace(TITLE, "").replace(ROUTE, "")
     })
     .expect("builds");
+    // The head's parts aside: the metadata, numbered after the title
+    // (ADR-0186), is set again by nothing.
     let others = |b: &pw_core::build::Build| -> Vec<(u32, &'static str, String)> {
         store_template(b)
             .manifest()
             .into_iter()
-            .filter(|e| e.kind != "title")
+            .filter(|e| e.kind != "title" && e.kind != "meta")
             .map(|e| (e.id.0, e.kind, e.value))
             .collect()
     };

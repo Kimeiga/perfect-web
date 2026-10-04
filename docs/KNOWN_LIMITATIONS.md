@@ -545,8 +545,22 @@ and its queries' values. Refused at build:
 - one that reads a value a press speculates.
 
 The store has no change event of its own, so its title, like its heading,
-changes when the page's values are next read. A page writes no `<meta>` and
-no description.
+changes when the page's values are next read. A title, or metadata, that
+reads a member function is refused where the page is planned: a host
+computes one in a text part of the page's body, or a loop's row.
+
+**A page's metadata is a name and a content** (ADR-0186). A page states its
+description and Open Graph properties with `<meta>` at the top of its view.
+They are written into the head as the page is served, and set again by
+nothing. Not supported:
+- `media` and `lang` on metadata, which are refused. So a page has one
+  `theme-color` for light and dark alike.
+- A `<link>` in the head: a canonical URL, an alternate language, an icon.
+- Structured data as JSON-LD.
+- Microdata's own rules. A `<meta itemprop>` is written where it is, and
+  whether it is inside an item is not read.
+
+No page is required to state a description.
 
 **A page that is absent is answered with the host's own page** (ADR-0163).
 `not_found_on` names one case of one declared error, and a host answers it

@@ -243,6 +243,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
     11. ~~Ids and the ARIA that names them, checked at build~~ (ADR-0185,
         `just e14-ids`): charter §8.2's duplicate ids and invalid ARIA
         relations, PW5031 to PW5033; corpus C10.
+    12. ~~A page states its description~~ (ADR-0186, `just e14-metadata`):
+        found by Lighthouse, SEO 75 with no meta description. `<meta>` at
+        the top of a page's view, written into the head; PW5034, as HTML
+        limits a name; a `<meta itemprop>` written where it is; corpus C11.
+        With a correction to ADR-0183: a static page that stated its title
+        shipped the runtime.
+    13. **The store's page shifts as it loads.** Lighthouse measured a
+        cumulative layout shift of 0.136 on a phone. The menu's items are
+        laid out 42px tall until they are first rendered
+        (`content-visibility: auto`, `contain-intrinsic-size: auto 42px`),
+        and a phone shows them about 125px tall, so the cart moves 249px
+        down. Acceptance: no shift as the page loads, measured in three
+        engines, and the large menu's rendering cost (`just e7-performance`)
+        kept.
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core).

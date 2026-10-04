@@ -543,10 +543,11 @@ fn generality_is_reported_separately_from_conformance() {
     // declaration is given. 33 / 33 since 2026-10-04: ADR-0183's two,
     // `title_missing` and `title_misplaced`, each with a GENERAL witness. 36 /
     // 36 the same day: ADR-0185's three, `duplicate_id`,
-    // `reference_names_nothing` and `aria_unknown`.
+    // `reference_names_nothing` and `aria_unknown`. 37 / 37 the same day:
+    // ADR-0186's `metadata_misplaced`.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (36, 0, 0),
+        (37, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."

@@ -13,6 +13,25 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0186, 2026-10-04: a page states its description.** Lighthouse
+13.4.1 on the store's page gave SEO 75: it had no meta description.
+- A page writes `<meta name="description" content={store.description} />`,
+  or Open Graph's `<meta property="og:title" …>`, at the top of its view.
+  Its host writes it into the head as the page is served. It is optional.
+- PW5034 follows HTML:
+  - one `description`, `color-scheme`, `application-name` and
+    `theme-color`, compared ignoring case;
+  - no `media` or `lang`, which the head would drop;
+  - the host's charset and viewport refused.
+- A `<meta itemprop>` is microdata, written in the body where it is.
+
+Corpus C11: R-052 and A-027; **generality is 37 / 37**. 34 mutants
+(`just e14-metadata`).
+
+**Correction to ADR-0183, the same day.** A static page that stated its
+title shipped the browser runtime, against charter §14 M7 gate 2. It ships
+none now.
+
 **ADR-0185, 2026-10-04: ids, and the ARIA that names them, checked at
 build** (charter §8.2). Until now these were the browser's to find, on a
 page someone read (ADR-0182's audit).
@@ -24,7 +43,7 @@ page someone read (ADR-0182's audit).
   is refused, and `aria-labelledby` offered.
 
 A field left unnamed by such a mistake is not reported again by PW5014.
-Corpus C10: R-049 to R-051 and A-026; **generality is 36 / 36**. 13 mutants
+Corpus C10: R-049 to R-051 and A-026; generality 36 / 36. 13 mutants
 (`just e14-ids`).
 
 **Correction, the same day.** An id written with holes, `id="line-{x}"`,

@@ -245,6 +245,7 @@ fn rendered_again(
                 .collect(),
             Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
             Part::Title { pieces, .. } => title_reads(pieces),
+            Part::Meta { content, .. } => title_reads(content),
             // A stream's query's arguments, each a value's path or an
             // invocation-context call (ADR-0148).
             Part::Stream { args, .. } => {
@@ -393,11 +394,13 @@ fn own_reads(p: &crate::template_ir::Part) -> Vec<String> {
         Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
         Part::Stream { args, .. } => args.iter().filter(|a| !a.ends_with(')')).cloned().collect(),
         Part::Title { pieces, .. } => title_reads(pieces),
+        Part::Meta { content, .. } => title_reads(content),
         Part::Event { .. } | Part::Blocked { .. } => Vec::new(),
     }
 }
 
-/// **What a page's title reads** (ADR-0183): each value among its pieces.
+/// **What a page's title reads** (ADR-0183), or its metadata's content
+/// (ADR-0186): each value among its pieces.
 fn title_reads(pieces: &[crate::template_ir::TitlePiece]) -> Vec<String> {
     use crate::template_ir::TitlePiece;
     pieces
@@ -1320,6 +1323,7 @@ fn plan(
             crate::template_ir::ReadKind::Subject => "what a block decides by",
             crate::template_ir::ReadKind::List => "a loop's list",
             crate::template_ir::ReadKind::Title => "the page's title",
+            crate::template_ir::ReadKind::Meta => "the page's metadata",
         };
         let row = row_read(
             hirs,

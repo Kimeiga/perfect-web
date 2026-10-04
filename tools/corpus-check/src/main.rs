@@ -52,6 +52,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "page states its title",
     // ADR-0185, corpus C10: charter §8.2's ids and ARIA relations.
     "ids and the ARIA that names them",
+    // ADR-0186, corpus C11: what a page says of itself unshown.
+    "page states its description",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -123,6 +125,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "duplicate id",
     "ARIA relation names nothing",
     "unknown ARIA attribute or role",
+    // ADR-0186, corpus C11: PW5034.
+    "metadata outside the top of a page's view",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

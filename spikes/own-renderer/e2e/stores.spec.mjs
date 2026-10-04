@@ -45,6 +45,17 @@ test("a store's menu is grouped by its category", async ({ page }) => {
   await expect(menu.getByRole("heading", { level: 2 })).toHaveText(["Coffee"]);
 });
 
+test("each store's page describes itself, for what reads it unshown", async ({ page }) => {
+  // ADR-0186: its description in the document's head, for a search
+  // engine's result and a link's preview.
+  const description = page.locator('head meta[name="description"]');
+  await ready(page, "/stores/47");
+  await expect(description).toHaveAttribute("content", /^Small-batch coffee, served at the bar/);
+  await ready(page, "/stores/48");
+  await expect(description).toHaveAttribute("content", /^A neighborhood cafe by the water/);
+  await expect(page.locator('body meta')).toHaveCount(0);
+});
+
 test("a store that is not there is not found", async ({ page }) => {
   // The page declares `not_found_on StoreError.NotFound`: 404, where a page
   // whose values cannot be read is 503 (ADR-0147).

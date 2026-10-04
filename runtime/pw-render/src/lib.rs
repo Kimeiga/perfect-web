@@ -1121,6 +1121,51 @@ pub fn render(t: &Template, env: &Env, others: &[Template]) -> Result<String, Bl
     Ok(out)
 }
 
+/// **A page's metadata, as its head writes it** (ADR-0186): each `<meta>` at
+/// the top of the template, in order, its name and its content escaped for
+/// an attribute. Empty for a template that states none.
+pub fn head_metadata(t: &Template, env: &Env) -> Result<String, Blocked> {
+    let mut out = String::new();
+    for c in &t.chunks {
+        let Chunk::Dynamic(Part::Meta {
+            attribute,
+            key,
+            content,
+            ..
+        }) = c
+        else {
+            continue;
+        };
+        let mut text = String::new();
+        for piece in content {
+            match piece {
+                TitlePiece::Text(t) => text.push_str(t),
+                TitlePiece::Value(path) => {
+                    let v = env
+                        .get(path)
+                        .ok_or(Blocked::MissingValue { path: path.clone() })?;
+                    if let Value::Raw { .. } = v {
+                        return Err(Blocked::UnrepresentedConstruct {
+                            reason: "metadata is text, and this value is HTML".to_string(),
+                            at: format!("<meta {attribute}=\"{key}\">"),
+                        });
+                    }
+                    let s = v
+                        .as_str()
+                        .ok_or(Blocked::MissingValue { path: path.clone() })?;
+                    text.push_str(&s);
+                }
+            }
+        }
+        out.push_str(&format!(
+            "<meta {attribute}=\"{}\" content=\"{}\">\n",
+            escape::attribute(key),
+            escape::attribute(&text)
+        ));
+    }
+    Ok(out)
+}
+
 /// **A page's title, as text** (ADR-0183): its text, and each value by its
 /// path, with its whitespace collapsed and trimmed as a browser's
 /// `document.title` reads it. Its host writes it into `<title>`, escaped,
@@ -1258,6 +1303,8 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
         // Written into the document's head by its host (`title_text`), not
         // where the page writes it (ADR-0183).
         Part::Title { .. } => Ok(()),
+        // And its metadata (`head_metadata`, ADR-0186).
+        Part::Meta { .. } => Ok(()),
 
         Part::Text { id, value, context } => {
             let v = env.get(value).ok_or(Blocked::MissingValue {

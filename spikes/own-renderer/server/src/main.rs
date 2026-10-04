@@ -3357,12 +3357,15 @@ impl Server {
         );
         let body = pw_render::render(template, &env, &self.templates)
             .map_err(|e| format!("`{path}` does not render: {e:?}"))?;
-        // The page's own title, or its name where it states none (ADR-0183).
+        // The page's own title, or its name where it states none (ADR-0183),
+        // and its metadata (ADR-0186).
         let title = pw_render::title_text(template, &env)
             .map_err(|e| format!("`{path}`'s title does not render: {e:?}"))?
             .unwrap_or_else(|| template.name.clone());
+        let metadata = pw_render::head_metadata(template, &env)
+            .map_err(|e| format!("`{path}`'s metadata does not render: {e:?}"))?;
         Ok((
-            signal_document(&body, &title, template, plan, &self.templates),
+            signal_document(&body, &title, &metadata, template, plan, &self.templates),
             env,
             template,
         ))
@@ -6026,9 +6029,17 @@ fn serve_store(
             Ok(title) => title.unwrap_or_else(|| "Store".to_string()),
             Err(why) => return unavailable(stream, Unread::Failed(format!("its title: {why:?}"))),
         };
+        // And what it says of itself to what reads it unshown (ADR-0186).
+        let metadata = match pw_render::head_metadata(server.store_template(), &env) {
+            Ok(metadata) => metadata,
+            Err(why) => {
+                return unavailable(stream, Unread::Failed(format!("its metadata: {why:?}")));
+            }
+        };
         let page = document(
             &rendered,
             &title,
+            &metadata,
             &server.templates,
             &server.plan,
             cursor,
@@ -6247,6 +6258,7 @@ fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
 fn signal_document(
     body: &str,
     title: &str,
+    metadata: &str,
     template: &Template,
     plan: &serde_json::Value,
     templates: &[Template],
@@ -6270,7 +6282,7 @@ fn signal_document(
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{}</title>\n</head>\n<body>\n{body}\n\
+         <title>{}</title>\n{metadata}</head>\n<body>\n{body}\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         pw_render::escape::text(title)
@@ -6352,6 +6364,7 @@ fn resume_manifest(templates: &[Template]) -> serde_json::Value {
 fn document(
     body: &str,
     title: &str,
+    metadata: &str,
     templates: &[Template],
     plan: &serde_json::Value,
     cursor: u64,
@@ -6434,7 +6447,7 @@ fn document(
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{title}</title>\n</head>\n<body>\n{body}\n\
+         <title>{title}</title>\n{metadata}</head>\n<body>\n{body}\n\
          <style>{STYLE}</style>\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
@@ -10657,6 +10670,64 @@ public query Store(",
         assert_eq!(title_of(&untitled, "/"), "Store");
     }
 
+    /// **A store's page describes itself** (ADR-0186): its description, from
+    /// its values, in the document's head, for a search engine's result and a
+    /// link's preview, and none of it in the body.
+    #[test]
+    fn a_store_s_page_describes_itself_in_its_head() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        recommend(&s, 0, None);
+        let page = |path: &str| -> String {
+            fetched_as(&s, path, Some("a"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        for store in [STORE_ID, SECOND_STORE.0] {
+            let whole = page(&format!("/stores/{store}"));
+            let (head, body) = whole.split_once("</head>").expect("a head");
+            let meta = format!(
+                "<meta name=\"description\" content=\"{}\">",
+                pw_render::escape::attribute(store_description(store))
+            );
+            assert!(head.contains(&meta), "{store}: {head}");
+            assert!(!body.contains("<meta"), "{store}: {body}");
+        }
+    }
+
+    /// **A page that binds no query describes itself in its head too**
+    /// (ADR-0186): its title and its metadata, escaped as its renderer
+    /// wrote them, and nothing of either in its body.
+    #[test]
+    fn a_signal_page_s_head_holds_its_title_and_metadata() {
+        let template = Template {
+            path: "t.P".into(),
+            name: "P".into(),
+            params: vec![],
+            schema: "s".into(),
+            chunks: vec![],
+        };
+        let page = signal_document(
+            "<main><h1>Panel</h1></main>",
+            "Panel & co",
+            "<meta name=\"description\" content=\"A panel.\">\n",
+            &template,
+            &serde_json::json!({}),
+            &[],
+        );
+        let (head, body) = page.split_once("</head>").expect("a head");
+        assert!(
+            head.ends_with(
+                "<title>Panel &amp; co</title>\n<meta name=\"description\" content=\"A panel.\">\n"
+            ),
+            "{head}"
+        );
+        assert!(
+            !body.contains("<meta") && !body.contains("<title"),
+            "{body}"
+        );
+    }
+
     /// **A title that changed is set as text** (ADR-0183), at the title's
     /// address, which the browser sets as `document.title`. One that did not
     /// change is not set.
@@ -10971,7 +11042,7 @@ public query Store(",
         assert!(body.contains("<p id=\"shown\">open</p>"), "{body}");
         // ... and the document says what the browser holds and renders again.
         let templates = vec![template];
-        let manifest = manifest_of(&document(&body, "Store", &templates, &plan, 3, None));
+        let manifest = manifest_of(&document(&body, "Store", "", &templates, &plan, 3, None));
         assert_eq!(manifest["signals"], serde_json::json!({ "open": true }));
         assert_eq!(manifest["live"][0]["part"], 0);
         assert!(manifest["blocks"]["0"]["then"].is_array(), "{manifest}");
@@ -10979,6 +11050,7 @@ public query Store(",
         let manifest = manifest_of(&document(
             &body,
             "Store",
+            "",
             &templates,
             &serde_json::json!({}),
             3,

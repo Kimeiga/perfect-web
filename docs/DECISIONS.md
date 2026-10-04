@@ -1573,3 +1573,18 @@ ids, and the ARIA that names them, checked at build.
 - One mistake, one report: a field left unnamed by such a reference or id is
   not reported again by PW5014. Corpus C10: R-049 to R-051, A-026;
   generality 36 / 36.
+
+[ADR-0186](DECISIONS/ADR-0186-a-page-states-its-description.md): a page
+states its description.
+- Found by Lighthouse on the store's page: SEO 75, with no meta
+  description. A page writes `<meta name="description" content={…} />` or
+  Open Graph's `<meta property="og:title" …>` at the top of its view, and
+  its host writes it into the head as the page is served. Optional: a
+  description is not an accessibility requirement.
+- PW5034 follows HTML: one description, `color-scheme`, `application-name`
+  and `theme-color`, compared ignoring case; no `media` or `lang`, which the
+  head would drop; the host's charset and viewport refused. A
+  `<meta itemprop>` is microdata, written in the body where it is, as React
+  19 reads it.
+- A correction to ADR-0183: a static page that stated its title shipped the
+  browser runtime. Corpus C11: R-052, A-027; generality 37 / 37.

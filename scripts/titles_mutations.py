@@ -63,11 +63,17 @@ MUTANTS = [
         "            let misplaced = if false {\n",
     ),
     (
+        # Re-anchored by ADR-0186: a page's metadata is refused inside an
+        # element by a line of the same text.
         "a title inside an element is let through",
         "core",
         CHECK,
-        "            } else if !roots.contains(&n) {\n",
-        "            } else if false {\n",
+        "            } else if !roots.contains(&n) {\n"
+        "                Some(format!(\n"
+        "                    \"`<title>` in `{}` is inside an element or a block, not at the top of its view\",\n",
+        "            } else if false {\n"
+        "                Some(format!(\n"
+        "                    \"`<title>` in `{}` is inside an element or a block, not at the top of its view\",\n",
     ),
     (
         "a second title is let through",

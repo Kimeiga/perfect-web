@@ -258,6 +258,9 @@ session page StorePage(id: StoreId) {
         <!-- What the page is: the store's name, which a screen reader says
              first and a tab shows (ADR-0183). -->
         <title>{store.name}</title>
+        <!-- What it says of itself to a search engine's result and a link's
+             preview (ADR-0186). -->
+        <meta name="description" content={store.description} />
         <main>
             <h1 id="store-name">{store.name}</h1>
             <p id="store-description">{store.description}</p>

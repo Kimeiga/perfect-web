@@ -199,6 +199,17 @@ pub enum Part {
     /// the page's title. Its host writes it into the document's `<head>`
     /// ([`crate::title_text`]), so it renders nothing in the body.
     Title { id: PartId, pieces: Vec<TitlePiece> },
+    /// `<meta name="description" content={store.description} />` at the top
+    /// of a page's view (ADR-0186). Its host writes it into the document's
+    /// `<head>` ([`crate::head_metadata`]), so it renders nothing in the
+    /// body.
+    Meta {
+        id: PartId,
+        /// `name` or `property`.
+        attribute: String,
+        key: String,
+        content: Vec<TitlePiece>,
+    },
     /// Verbatim bytes.
     ///
     /// Reachable only from a value whose type carries the raw-HTML capability.
@@ -297,7 +308,8 @@ impl Part {
             | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
             | Part::RawHtml { id, .. }
-            | Part::Title { id, .. } => *id,
+            | Part::Title { id, .. }
+            | Part::Meta { id, .. } => *id,
             Part::Blocked { .. } => return None,
         })
     }
@@ -327,7 +339,7 @@ impl Part {
             | Part::Stream { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
-            Part::Title { .. } => Anchor::Document,
+            Part::Title { .. } | Part::Meta { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
         })
     }
@@ -346,6 +358,7 @@ impl Part {
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
             Part::Title { .. } => "title",
+            Part::Meta { .. } => "meta",
             Part::Blocked { .. } => "blocked",
         }
     }
@@ -451,8 +464,12 @@ impl Template {
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
                         Part::Stream { query, .. } => query.clone(),
-                        // Every value the title reads, in order.
-                        Part::Title { pieces, .. } => pieces
+                        // Every value the title or the metadata reads, in
+                        // order.
+                        Part::Title {
+                            pieces: content, ..
+                        }
+                        | Part::Meta { content, .. } => content
                             .iter()
                             .filter_map(|p| match p {
                                 TitlePiece::Value(v) => Some(v.as_str()),

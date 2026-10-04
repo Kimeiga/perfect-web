@@ -241,8 +241,17 @@ fn main() -> std::process::ExitCode {
             }
         };
         let manifest = t.manifest();
+        // And what it says of itself to what reads it unshown (ADR-0186).
+        let metadata = match pw_render::head_metadata(t, &env) {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                eprintln!("pw-render: {}: its metadata: {e}", t.path);
+                return std::process::ExitCode::FAILURE;
+            }
+        };
         let page = document(
             &title,
+            &metadata,
             &body,
             t,
             &manifest,
@@ -274,6 +283,7 @@ fn main() -> std::process::ExitCode {
 /// zoomed it scrolls sideways.
 fn document(
     title: &str,
+    metadata: &str,
     body: &str,
     t: &Template,
     manifest: &[pw_render::PartEntry],
@@ -284,9 +294,17 @@ fn document(
     // dynamic part gets neither the manifest nor the runtime — charter §14 M7
     // gate 2: a static route ships no browser runtime, and "no dynamic parts"
     // is exactly when that is true.
-    let mut head = String::new();
+    //
+    // Its title and metadata are parts of its head, written as it is served,
+    // and alone they leave the runtime nothing to do: the runtime keeps a
+    // title current only as the parts in the body it changes with are.
+    // Until 2026-10-04 a static page that stated its title shipped both (a
+    // correction to ADR-0183).
+    let active = manifest
+        .iter()
+        .any(|e| e.anchor != pw_render::Anchor::Document);
     let mut tail = String::new();
-    if let Some(src) = runtime.filter(|_| !manifest.is_empty()) {
+    if let Some(src) = runtime.filter(|_| active) {
         let resume: serde_json::Value = resume
             .and_then(|r| serde_json::from_str(r).ok())
             .unwrap_or(serde_json::Value::Null);
@@ -307,12 +325,11 @@ fn document(
             "<script type=\"module\" src=\"{}\"></script>\n",
             pw_render::escape::attribute(src)
         ));
-        let _ = &mut head;
     }
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{}</title>\n{head}</head>\n<body>\n{body}\n{tail}</body>\n</html>\n",
+         <title>{}</title>\n{metadata}</head>\n<body>\n{body}\n{tail}</body>\n</html>\n",
         pw_render::escape::text(title)
     )
 }

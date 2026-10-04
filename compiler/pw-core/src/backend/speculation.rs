@@ -610,6 +610,10 @@ fn page_module(
             crate::template_ir::ReadKind::Attribute => RegionKind::Attribute,
             crate::template_ir::ReadKind::Subject => RegionKind::Block,
             crate::template_ir::ReadKind::List => RegionKind::List,
+            // Metadata is written into the head as the page is served, and
+            // set again by nothing (ADR-0186): what a press speculates is no
+            // metadata's.
+            crate::template_ir::ReadKind::Meta => continue,
             // **A title that reads a speculated value** (ADR-0183): the
             // browser renders no title again from a speculation, so the
             // title would say what the value was while the page around it

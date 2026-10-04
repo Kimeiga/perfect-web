@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: metadata_misplaced
+//
+// Structurally different from R-052: the metadata is a page's, and it states
+// one name twice. Which description a search engine reads is then whichever
+// it takes, and nothing says which.
+
+module generality.metadata_twice
+
+import domain.{ StoreId }
+
+page Hours(id: StoreId) !{} {
+    route "/stores/{id}/hours"
+    view {
+        <title>Hours</title>
+        <meta name="description" content="When the store is open." />
+        <meta name="description" content="Opening hours, by day." />
+        <main><h1>Hours</h1></main>
+    }
+}

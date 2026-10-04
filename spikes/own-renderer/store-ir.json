@@ -5,7 +5,7 @@
     "params": [
       "id"
     ],
-    "schema": "b852db974255acf2",
+    "schema": "101a9c340ab39331",
     "chunks": [
       {
         "chunk": "static",
@@ -597,6 +597,21 @@
             {
               "piece": "value",
               "value": "store.name"
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "meta",
+          "id": 34,
+          "attribute": "name",
+          "key": "description",
+          "content": [
+            {
+              "piece": "value",
+              "value": "store.description"
             }
           ]
         }

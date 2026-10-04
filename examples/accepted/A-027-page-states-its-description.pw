@@ -1,0 +1,30 @@
+// @corpus: accepted
+// @id: A-027
+// @category: page states its description
+// @charter: §8.2
+// @milestone: 14
+//
+// A page says what it is to whatever reads it without showing it: its
+// description, for a search engine's result, and its Open Graph title, for a
+// link's preview (ADR-0186). Each at the top of its view, from the values it
+// reads; its host writes them into the document's head.
+
+module store.store_summary
+
+import domain.{ StoreId }
+import Resources.{ Store }
+
+page StoreSummary(id: StoreId) {
+    route "/stores/{id}/summary"
+
+    let store = query Store(id)
+
+    view {
+        <title>{store.name}</title>
+        <meta name="description" content="{store.name}: its menu, and delivery in minutes." />
+        <meta property="og:title" content="{store.name}" />
+        <main>
+            <h1>{store.name}</h1>
+        </main>
+    }
+}

@@ -137,6 +137,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(comment_as_text(&u.hir));
         // ADR-0183: a page states its title.
         per_unit.extend(titles(&u.hir));
+        // ADR-0186: and what it says of itself to what reads it unshown.
+        per_unit.extend(metadata(&u.hir));
         // ADR-0185: an id names one element, a reference names one shown
         // with it, and ARIA is what WAI-ARIA defines.
         per_unit.extend(ids_and_aria(&u.hir));
@@ -2971,6 +2973,206 @@ fn edit_distance(a: &str, b: &str) -> usize {
         }
     }
     row[b.len()]
+}
+
+/// **A page's metadata** (ADR-0186): `<meta name="description" content="…">`
+/// and `<meta property="og:title" content="…">` at the top of its view,
+/// beside its title. What a page says of itself to what reads it without
+/// showing it, a search engine's result or a link's preview. The host writes
+/// it into the document's head, as the page is served.
+///
+/// PW5034 refuses:
+/// - a `<meta>` in a view, which would describe every page that composes it;
+/// - one inside an element or a block;
+/// - the host's own: a charset, an `http-equiv` or the viewport (ADR-0182);
+/// - one that names nothing it describes, names it by a computed value, or
+///   by both `name` and `property`;
+/// - one with any other attribute, `media` or `lang`, which the host does
+///   not write: a page's metadata is its name and its content;
+/// - one with no content, a blank one, or one computed in place;
+/// - a second of a name HTML allows once: `description` and `color-scheme`
+///   once a document, `application-name` once a language and `theme-color`
+///   once a media query, which with neither written is once.
+///
+/// A `<meta itemprop>` is an item's property (microdata), not the page's
+/// metadata, and is written where it is.
+fn metadata(hir: &Hir) -> Vec<Diagnostic> {
+    // Compared as HTML compares them, ignoring ASCII case.
+    const ONCE: [&str; 4] = [
+        "description",
+        "color-scheme",
+        "application-name",
+        "theme-color",
+    ];
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        let page = decl.kind == DeclKind::Page;
+        let mut named: BTreeSet<String> = BTreeSet::new();
+        for n in body.walk_markup(&roots) {
+            let Node::Element { tag, attrs, .. } = body.node(n) else {
+                continue;
+            };
+            if tag != "meta" {
+                continue;
+            }
+            let attr = |name: &str| attrs.iter().find(|a| a.name == name);
+            let keys: Vec<(&str, &hir::Attr)> = ["name", "property"]
+                .into_iter()
+                .filter_map(|k| attr(k).map(|a| (k, a)))
+                .collect();
+            let host = if attr("charset").is_some() {
+                Some("charset")
+            } else if attr("http-equiv").is_some() {
+                Some("http-equiv")
+            } else if static_attr(attrs, "name").is_some_and(|v| v.eq_ignore_ascii_case("viewport"))
+            {
+                Some("name=\"viewport\"")
+            } else {
+                None
+            };
+            let message = if attr("itemprop").is_some() {
+                // An item's property, written where it is.
+                if keys.is_empty() && host.is_none() {
+                    continue;
+                }
+                Some(format!(
+                    "`<meta itemprop>` in `{}` is an item's property and names the page's \
+                     metadata too: HTML allows one of `name`, `http-equiv`, `charset` and \
+                     `itemprop`",
+                    decl.name
+                ))
+            } else if !page {
+                let kind = match decl.kind {
+                    DeclKind::View => "view",
+                    DeclKind::Component => "component",
+                    _ => "declaration",
+                };
+                Some(format!(
+                    "`<meta>` in the {kind} `{}` describes every page that composes it",
+                    decl.name
+                ))
+            } else if !roots.contains(&n) {
+                Some(format!(
+                    "`<meta>` in `{}` is inside an element or a block, not at the top of its view",
+                    decl.name
+                ))
+            } else if let Some(host) = host {
+                Some(format!(
+                    "`<meta {host}>` in `{}` is the host's: it writes the document's charset and \
+                     viewport (ADR-0182)",
+                    decl.name
+                ))
+            } else {
+                match keys.as_slice() {
+                    [] => Some(format!(
+                        "`<meta>` in `{}` names nothing it describes",
+                        decl.name
+                    )),
+                    [_, _] => Some(format!(
+                        "`<meta>` in `{}` names what it describes twice, by `name` and by \
+                         `property`: one `<meta>` names one",
+                        decl.name
+                    )),
+                    [(k, a)] if !matches!(a.value, AttrValue::Static(_)) => Some(format!(
+                        "`<meta {k}>` in `{}` is named by a value computed in place",
+                        decl.name
+                    )),
+                    [(k, _)] => {
+                        let v = static_attr(attrs, k).unwrap_or_default();
+                        let other = attrs
+                            .iter()
+                            .find(|a| !["name", "property", "content"].contains(&a.name.as_str()));
+                        match attr("content").map(|c| &c.value) {
+                            _ if other.is_some() => Some(format!(
+                                "`<meta {k}=\"{v}\">` in `{}` has `{}`, which the host does not \
+                                 write: a page's metadata is its name and its content",
+                                decl.name,
+                                other.map(|a| a.name.as_str()).unwrap_or_default()
+                            )),
+                            None | Some(AttrValue::None) => Some(format!(
+                                "`<meta {k}=\"{v}\">` in `{}` has no content",
+                                decl.name
+                            )),
+                            Some(AttrValue::Static(_)) if !non_blank(attrs, "content") => Some(
+                                format!("`<meta {k}=\"{v}\">` in `{}` has no content", decl.name),
+                            ),
+                            Some(AttrValue::Expr(e)) if !content_reads_values(body, *e) => {
+                                Some(format!(
+                                    "`<meta {k}=\"{v}\">` in `{}` holds a value computed in \
+                                     place, and its content is text and values",
+                                    decl.name
+                                ))
+                            }
+                            _ if *k == "name"
+                                && ONCE.iter().any(|o| o.eq_ignore_ascii_case(v))
+                                && !named.insert(v.to_ascii_lowercase()) =>
+                            {
+                                Some(format!(
+                                    "`{}` states `<meta name=\"{v}\">` twice, which HTML allows \
+                                     once",
+                                    decl.name
+                                ))
+                            }
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                }
+            };
+            let Some(message) = message else { continue };
+            out.push(Diagnostic {
+                code: crate::codes::METADATA_MISPLACED.id,
+                invariant: crate::codes::METADATA_MISPLACED.invariant,
+                reason: "metadata_misplaced",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: body.node_span(n),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id),
+                    label: format!("`{}` renders this", decl.name),
+                }],
+                explanation: Some(
+                    "A page's metadata is what it says of itself to what reads it without \
+                     showing it: a search engine's result, a link's preview. The host writes \
+                     it into the document's head from the page's values, beside the page's \
+                     title, as its name and its content. One in a view would describe every \
+                     page that composes it; one inside an element or a block, or a second \
+                     description, would leave which is meant to chance; and the charset and \
+                     the viewport are the host's, the same for every page. A `<meta itemprop>` \
+                     is an item's property, and is written where it is."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write it once at the top of the page's view, beside its \
+                                  `<title>`: `<meta name=\"description\" \
+                                  content={store.description} />`"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// Whether a `content` written as a value reads values: a path, or text with
+/// holes that are each a path.
+fn content_reads_values(body: &Body, e: ExprId) -> bool {
+    match body.expr(e) {
+        Expr::Interpolated { parts, .. } => parts
+            .iter()
+            .all(|p| crate::template_ir::value_path_of(body, *p).is_some()),
+        _ => crate::template_ir::value_path_of(body, e).is_some(),
+    }
 }
 
 /// **A page states its title** (ADR-0183): `<title>` at the top of its view,
