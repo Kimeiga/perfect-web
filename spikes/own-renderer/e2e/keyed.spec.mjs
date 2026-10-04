@@ -47,17 +47,36 @@ test("a changed key's old read is stopped, and its answer never shown (test 7)",
   const aborted = [];
   page.on("requestfailed", (r) => aborted.push(decodeURIComponent(r.url())));
   await ready(page);
+  // Every list the page shows from here on. The claim is that Hot's answer
+  // is never shown, which two looks at the list could miss between them; a
+  // first version also gave Cold's answer a second, which Firefox passed
+  // under the full suite's load (found 2026-10-03).
+  await page.evaluate(() => {
+    const list = document.getElementById("browse");
+    window.__browsed = [];
+    const seen = () =>
+      window.__browsed.push([...list.querySelectorAll("li")].map((li) => li.textContent.trim()));
+    new MutationObserver(seen).observe(list, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
   await tab(page, "Hot").click();
   // Hot's read is under way.
   await page.waitForTimeout(300);
   await tab(page, "Cold").click();
-  await expect(browsed(page)).toHaveText(["Cold Brew"], { timeout: 1_000 });
+  await expect(browsed(page)).toHaveText(["Cold Brew"]);
   // Hot's request aborted in the browser, and its read stopped on the host.
   await expect.poll(() => aborted.some((url) => url.includes('"hot"'))).toBe(true);
   await expect.poll(() => stopped(request)).toBeGreaterThan(before);
-  // Still Cold's, once Hot would have answered.
+  // Still Cold's, once Hot would have answered ...
   await page.waitForTimeout(1_500);
   await expect(browsed(page)).toHaveText(["Cold Brew"]);
+  // ... and Hot's answer was never shown.
+  const shown = await page.evaluate(() => window.__browsed);
+  expect(shown.length, "the list changed").toBeGreaterThan(0);
+  expect(shown.filter((items) => items.join("|") === "Espresso|Cortado")).toEqual([]);
 });
 
 test("a key the page has is not asked for again (test 6)", async ({ page, request }) => {

@@ -2109,6 +2109,24 @@ e14-nested-lists:
      } > docs/evidence/E14/nested-lists.txt
     @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/nested-lists.txt
 
+# ADR-0171: an attribute at the top of the page that reads a query's value is
+# set again when the value changes. The plan's tests, the server's, and the
+# mutation controls.
+e14-query-attributes:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0171 - an attribute that reads a query's value is set again"; echo; \
+       echo "produced by: just e14-query-attributes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the plan (compiler/pw-core/tests/query_attributes.rs)"; echo; \
+       cargo test --locked -p pw-core --test query_attributes 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::an_attribute_that_reads_a_query|^test result'; \
+       echo; echo "== mutation controls (scripts/query_attributes_mutations.py)"; echo; \
+       python3 scripts/query_attributes_mutations.py; \
+     } > docs/evidence/E14/query-attributes.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/query-attributes.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `25e379d`, with ADR-0170.
+**Reviewed:** 2026-10-03, against master `f77cb32`, with ADR-0171.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,14 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0171, 2026-10-03: an attribute at the top of a page kept
+its first value**
+([ADR-0171](DECISIONS/ADR-0171-an-attribute-that-reads-a-query-is-set-again.md)).
+A host set a text part, a list's rows and a block again when a query's value
+changed, and no attribute at the top of a page: `hidden={cart.lines}` stayed
+as rendered. The plan now names each one, and a host sets it as the page's
+render writes it. 6 mutants (`just e14-query-attributes`).
 
 **Correction, ADR-0170, 2026-10-03: a loop over a list inside a query's
 value built, and failed at its first change**

@@ -176,6 +176,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           `just e14-nested-lists`): `cart.lines` by its path, its rows'
           member reads computed, and a part a speculation would not reach
           refused.
+        - ~~An attribute at the top that reads a query's value~~
+          (ADR-0171, `just e14-query-attributes`): set again when the value
+          changes. Found designing the cart's empty message.
         - **Next: a speculation reaches every part that reads it.** The
           browser renders again a loop, a block or an attribute that reads a
           speculated value. It sets an instance's parts where they are, so

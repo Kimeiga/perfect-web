@@ -1415,3 +1415,12 @@ list inside a query's value, and a part a speculation would not reach.
 - The speculation module refuses an attribute, a block's subject or a loop's
   list that reads a speculated value. The page would have shown two values
   of one thing at once.
+
+[ADR-0171](DECISIONS/ADR-0171-an-attribute-that-reads-a-query-is-set-again.md):
+an attribute at the top of the page that reads a query's value is set again
+when it changes.
+- `hidden={cart.lines}` kept its first value for the document's life: a host
+  set a text part, a list's rows and a block again, and no attribute at the
+  top of a page.
+- The plan names each one, and a host sets it with `SetAttribute`, or
+  removes a boolean one that goes, as the page's render writes it.

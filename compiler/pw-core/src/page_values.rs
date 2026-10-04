@@ -547,6 +547,12 @@ pub struct PageValues {
     /// field the renderer reads from the item itself, and is not here.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rows: Vec<RowRead>,
+    /// **Each attribute at the top of the page that reads a query's value**
+    /// (ADR-0171), by its part: a host sets it again when what it reads
+    /// changes, as it sets a text part. One in a block is rendered with its
+    /// block, and one in a row with its row.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attributes: Vec<u32>,
 }
 
 /// **A row's read through a member function** (ADR-0169): `{item.price.display}`
@@ -1271,6 +1277,22 @@ fn plan(
         }
     }
 
+    // **An attribute at the top of the page reads a query's value**
+    // (ADR-0171): a host sets it again when the value changes. Until
+    // 2026-10-03 nothing did, and it kept its first value for the document's
+    // life. A member read in one is refused above (ADR-0169).
+    let mut attributes = Vec::new();
+    for read in &others {
+        let root = read.path.split('.').next().unwrap_or_default();
+        if read.kind == crate::template_ir::ReadKind::Attribute
+            && !read.nested
+            && found.iter().any(|(n, ..)| n == root)
+            && !attributes.contains(&read.part.0)
+        {
+            attributes.push(read.part.0);
+        }
+    }
+
     // Each list the template iterates at a query's value, by its path: the
     // binding itself, or a list inside it (ADR-0170). Until 2026-10-03 the
     // binding was recorded, and a host given `cart` for `cart.lines` found
@@ -1351,6 +1373,7 @@ fn plan(
             blocks,
             streams,
             rows,
+            attributes,
         },
         members,
     ))

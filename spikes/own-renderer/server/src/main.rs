@@ -366,6 +366,10 @@ struct Shown {
     lists: BTreeMap<String, Vec<Value>>,
     /// Each block a query decides, as rendered (ADR-0146).
     blocks: BTreeMap<u32, String>,
+    /// Each attribute at the top of the page that reads a query's value,
+    /// by its part: its name, and its value as written, or none for a
+    /// boolean one that is absent (ADR-0171).
+    attributes: BTreeMap<u32, (String, Option<String>)>,
 }
 
 /// **The recommender the store's data layer reaches** (ADR-0148): what
@@ -3336,6 +3340,18 @@ impl Server {
                 .map_err(|b| format!("block {id}: {b:?}"))?;
             shown.blocks.insert(id, html);
         }
+        // Each attribute at the top of the page that reads a query's value,
+        // written by the function the page's render writes it with
+        // (ADR-0171).
+        for attribute in self.plan["attributes"].as_array().into_iter().flatten() {
+            let id = attribute.as_u64().unwrap_or_default() as u32;
+            let part = find_part(&template.chunks, id)
+                .ok_or_else(|| format!("the plan's attribute {id} is no part"))?;
+            let written = pw_render::attribute_value(part, &env)
+                .map_err(|b| format!("attribute {id}: {b:?}"))?
+                .ok_or_else(|| format!("part {id} is no attribute"))?;
+            shown.attributes.insert(id, written);
+        }
         Ok(shown)
     }
 
@@ -3385,6 +3401,20 @@ impl Server {
                 &env,
                 &self.templates,
             )?);
+        }
+        // Each attribute whose value changed, set where it is (ADR-0171).
+        for (id, written) in &now.attributes {
+            if was.attributes.get(id) == Some(written) {
+                continue;
+            }
+            let (name, value) = written.clone();
+            out.push(Targeted {
+                target: PartAddress::new(&schema, LocalPartId(*id)),
+                operation: match value {
+                    Some(value) => PatchOp::SetAttribute { name, value },
+                    None => PatchOp::RemoveAttribute { name },
+                },
+            });
         }
         // Each block a query decides whose rendering changed, rendered again
         // where it is (ADR-0146).
@@ -6953,6 +6983,72 @@ public query Store(",
         // Gone, with the last line.
         assert_eq!(sets[2].len(), 2, "{sets:?}");
         assert!(sets[2][1].starts_with("range \"\""), "{sets:?}");
+    }
+
+    /// The store, with a message its cart's lines decide by an attribute:
+    /// `hidden` while the cart holds a line (ADR-0171). Without
+    /// `add_to_cart`'s speculation, which would not reach it (ADR-0170).
+    fn with_empty_message(app: &str) -> String {
+        let speculation = "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n";
+        let count = "                <p id=\"cart-count\">{cart.line_count}</p>";
+        assert_eq!(
+            app.matches(speculation).count(),
+            1,
+            "the speculation's anchor"
+        );
+        assert_eq!(app.matches(count).count(), 1, "the count's anchor");
+        app.replace(speculation, "").replace(
+            count,
+            &format!(
+                "{count}\n                <p id=\"empty\" hidden={{cart.lines}}>Your cart is \
+                 empty.</p>"
+            ),
+        )
+    }
+
+    /// **An attribute at the top of the page that reads a query's value is
+    /// set again when it changes** (ADR-0171): the message is hidden once
+    /// the cart holds a line, and shown when it is cleared. Until 2026-10-03
+    /// it kept the value its document was rendered with.
+    #[test]
+    fn an_attribute_that_reads_a_query_is_set_again_when_it_changes() {
+        let s = lines_server_with(with_empty_message);
+        let (page, _) = s.serve_document("a");
+        assert!(
+            !page.contains("hidden"),
+            "shown while the cart is empty: {page}"
+        );
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(CLEAR, "a", &[], false).expect("runs");
+        let sets: Vec<Vec<String>> = patch_sets(&s, "a")
+            .iter()
+            .map(|p| p.patches.iter().map(said).collect())
+            .collect();
+        assert_eq!(sets.len(), 3, "{sets:?}");
+        let hidden = |set: &[String]| {
+            set.iter()
+                .find(|p| p.contains("\"hidden\""))
+                .cloned()
+                .unwrap_or_default()
+        };
+        // Hidden with the first line, at the top of the page ...
+        assert!(
+            hidden(&sets[0]).starts_with("SetAttribute { name: \"hidden\", value: \"\" }")
+                && !hidden(&sets[0]).ends_with("in an instance"),
+            "{sets:?}"
+        );
+        // ... not set again while it stays hidden ...
+        assert_eq!(hidden(&sets[1]), "", "{sets:?}");
+        // ... and shown again with the last line gone.
+        assert!(
+            hidden(&sets[2]).starts_with("RemoveAttribute { name: \"hidden\" }"),
+            "{sets:?}"
+        );
+        let (page, _) = s.serve_document("a");
+        assert!(!page.contains("hidden"), "{page}");
     }
 
     /// The store, listing its cart's lines: a loop over a list inside a
