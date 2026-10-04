@@ -2311,13 +2311,16 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`a7314bc` (2026-10-04, ADR-0172): `just ci` passes locally, the workspace's
-1813 tests pass, and the browser suite passes 550 in three engines, with 2
-skipped. Its evidence is `docs/evidence/E14/cart-lines.txt`, recorded at that
-commit: 41 of 41 mutants killed, and the cart's 7 tests in each engine.
-ADR-0171's is `query-attributes.txt`, at `f8bd455`; ADR-0170's
-`nested-lists.txt`, at `201ca0e`; and ADR-0169's `row-reads.txt`, at
-`36d263c`.
+`99ddad2` (2026-10-04, ADR-0173): `just ci` passes locally, the workspace's
+1815 tests pass, and the browser suite passes 565 in three engines, with 2
+skipped. Its evidence is `docs/evidence/E14/command-retry.txt`, recorded at
+that commit: 10 of 10 mutants killed, and the retry tests in each engine.
+`6760ef2`, ADR-0173's own commit, failed one browser test in each engine,
+which pinned a handler's call without the retry clause it now passes; the
+expectation was corrected at `99ddad2`. ADR-0172's evidence is
+`cart-lines.txt`, at `a7314bc`; ADR-0171's `query-attributes.txt`, at
+`f8bd455`; ADR-0170's `nested-lists.txt`, at `201ca0e`; and ADR-0169's
+`row-reads.txt`, at `36d263c`.
 
 E14's gate items 1, 2 and 5 are recorded over all twelve tasks at `0c608dc`,
 and again at `4f75868` for what it changed: T08's controls, ADR-0153's and
