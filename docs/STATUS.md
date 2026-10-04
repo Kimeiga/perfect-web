@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `f19ce5a`, with ADR-0185 and its correction.
+**Reviewed:** 2026-10-04, against master `a8b95af`, with ADR-0186.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2519,13 +2519,15 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`f19ce5a` (2026-10-04, ADR-0185's correction): `just ci` passes locally,
-the workspace's 1883 tests pass, and the browser suite passes 648 in three
-engines, with 3 skipped. Its evidence is `docs/evidence/E14/ids.txt`,
-recorded again at that commit: 13 of 13 mutants killed, the corpus at C10,
-and every program the repository checks clean. ADR-0184's is `shared-output.txt`, at `3e35870`;
-ADR-0183's is `titles.txt`, at
-`7c7aba4`, with the corpus at C9; ADR-0182's is `accessibility.txt`, at
+`a8b95af` (2026-10-04, ADR-0186): `just ci` passes locally, the
+workspace's 1894 tests pass, and the browser suite passes 651 in three
+engines, with 3 skipped. Its evidence is `docs/evidence/E14/metadata.txt`,
+recorded at that commit: 34 of 34 mutants killed, the corpus at C11, and
+every program the repository checks clean. ADR-0183's `titles.txt` is
+recorded again at that commit, as ADR-0186 numbers the title before the
+metadata: 16 of 16 mutants killed. ADR-0185's is `ids.txt`, at `f19ce5a`,
+with the corpus at C10; ADR-0184's is `shared-output.txt`, at `3e35870`;
+ADR-0182's is `accessibility.txt`, at
 `bbb4a1b`; ADR-0181's is `menu-categories.txt`, at
 `bb63cb5`; ADR-0180's is `estimate-range.txt`,
 at `6ef776a`; ADR-0179's `invariants.txt`, at `30f5b45`; ADR-0178's `availability.txt`, at `344f331`; ADR-0177's `last-known-good.txt`, at `257b1a5`; ADR-0176's
