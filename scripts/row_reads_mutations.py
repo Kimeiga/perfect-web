@@ -213,8 +213,8 @@ MUTANTS = [
         "a row is given its item's fields alone",
         "server",
         SERVER,
-        "                set_at(row, within, val_to_value(&read_value));\n",
-        "                let _ = (within, read_value);\n",
+        "                    fields.insert(within.to_string(), val_to_value(&read_value));\n",
+        "                    let _ = (within, read_value);\n",
     ),
     (
         "a menu change is rendered from the rows before it",
@@ -236,8 +236,8 @@ MUTANTS = [
         "a path is read one field deep",
         "render",
         RENDER,
-        "            for field in &segments[cut..] {\n",
-        "            for field in segments[cut..].iter().take(1) {\n",
+        "                rest = after;\n",
+        "                rest = &[];\n",
     ),
     (
         "an amount owed back is negated whole",

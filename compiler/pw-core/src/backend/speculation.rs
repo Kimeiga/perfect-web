@@ -32,6 +32,9 @@
 //!   to, an invocation-context call each (`current_session()`);
 //! - a text part reading the binding inside a block (`{#each}`, `{#match}`,
 //!   `{#if}`): its address carries a frame this slice does not compute;
+//! - an attribute, what a block decides by, or a loop's list, reading the
+//!   binding (ADR-0170): this module does not render it again, and the page
+//!   would show two values at once;
 //! - a part whose value has no text form here (a `Float`, ADR-0074).
 
 use crate::hir::{DeclId, DeclKind, Expr, ExprId, Hir, Pattern};
@@ -435,10 +438,41 @@ fn page_module(
         }
     }
 
+    let lowered = crate::template_ir::lowered(
+        cx.hirs,
+        cx.ws,
+        &crate::template_ir::Handlers::new(),
+        unit,
+        page_id,
+    );
+    // **What this module does not render again** (ADR-0170): an attribute,
+    // what a block decides by, or a loop's list, reading a speculated value.
+    // The speculation would not reach it, and the page would show the
+    // speculated value beside the one it held. Until 2026-10-03 such a part
+    // was left as it was, and nothing said so.
+    for read in lowered.iter().flat_map(|l| l.reads.iter()) {
+        let root = read.path.split('.').next().unwrap_or_default();
+        if !speculated.iter().any(|(n, ..)| n == root) {
+            continue;
+        }
+        let what = match read.kind {
+            crate::template_ir::ReadKind::Attribute => "an attribute",
+            crate::template_ir::ReadKind::Subject => "what a block decides by",
+            crate::template_ir::ReadKind::List => "a loop's list",
+        };
+        return Encoding::Unsupported {
+            construct: "a speculated value read where this module does not render it again",
+            reason: format!(
+                "part {} of `{page}` reads `{}` in {what}, which a speculation would not reach",
+                read.part.0, read.path
+            ),
+        };
+    }
+
     // Each part reading a speculated binding: the page's own, and a view's
     // composed into it (ADR-0136), by the path the template reads.
     let mut reads: Vec<(String, u32, usize)> = Vec::new();
-    for hole in crate::template_ir::holes(cx.hirs, cx.ws, unit, page_id) {
+    for hole in lowered.map(|l| l.holes).unwrap_or_default() {
         let root = hole.path.split('.').next().unwrap_or_default();
         let Some((_, _, _, value)) = speculated.iter().find(|(n, ..)| n == root) else {
             continue;

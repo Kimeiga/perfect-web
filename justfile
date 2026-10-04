@@ -2086,6 +2086,29 @@ e14-row-reads:
      } > docs/evidence/E14/row-reads.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/row-reads.txt
 
+# ADR-0170: a loop over a list inside a query's value, and a part a
+# speculation would not reach. The plan's tests, the renderer's, the
+# server's, and the mutation controls.
+e14-nested-lists:
+    @cargo build --quiet --locked -p pw-cli
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0170 - a loop over a list inside a query's value"; echo; \
+       echo "produced by: just e14-nested-lists"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the plan, and what a speculation would not reach (compiler/pw-core/tests/nested_lists.rs)"; echo; \
+       cargo test --locked -p pw-core --test nested_lists 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a value computed for a row, read whole (runtime/pw-render/tests/paths.rs)"; echo; \
+       cargo test --locked -p pw-render --test paths 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_list_inside_a_querys_value|a_block_)|^test result'; \
+       echo; echo "== the store checks"; echo; \
+       ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/nested_lists_mutations.py)"; echo; \
+       python3 scripts/nested_lists_mutations.py; \
+     } > docs/evidence/E14/nested-lists.txt
+    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/nested-lists.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

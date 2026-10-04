@@ -304,6 +304,11 @@ impl Env {
     /// bound and each field after it. `item.price.display` is `item`'s
     /// `price`'s `display` (ADR-0169). Until 2026-10-03 one field was read
     /// after the name, and a path two fields deep named nothing.
+    ///
+    /// At each record, the rest of the path is read whole first: a value a
+    /// host computed for a row is set in it by its path from the row,
+    /// `quantity.count`, where `quantity` is a number with no fields
+    /// (ADR-0170). No field's name holds a `.`, so the two cannot meet.
     fn get(&self, path: &str) -> Option<&Value> {
         if let Some(v) = self.values.get(path) {
             return Some(v);
@@ -313,11 +318,16 @@ impl Env {
             let Some(mut value) = self.values.get(&segments[..cut].join(".")) else {
                 continue;
             };
-            for field in &segments[cut..] {
-                value = match value {
-                    Value::Record(fields) => fields.get(*field)?,
-                    _ => return None,
+            let mut rest = &segments[cut..];
+            while let [field, after @ ..] = rest {
+                let Value::Record(fields) = value else {
+                    return None;
                 };
+                if let Some(whole) = fields.get(&rest.join(".")) {
+                    return Some(whole);
+                }
+                value = fields.get(*field)?;
+                rest = after;
             }
             return Some(value);
         }

@@ -1403,3 +1403,15 @@ refuses.
 
 Found on the way: a transport test assumed the cart's frame came before the
 menu's, and read one entry under load.
+
+[ADR-0170](DECISIONS/ADR-0170-a-list-inside-a-querys-value.md): a loop over a
+list inside a query's value, and a part a speculation would not reach.
+- `{#each cart.lines as line}` built, and the development server failed at
+  the cart's first change: the plan recorded `cart` as the list. A row's
+  member read over it was refused, and one of a number, `quantity.count`,
+  had nowhere to go.
+- A list is recorded by its path. Its rows read members of their item, and
+  a computed value is set in the row whole, by its path.
+- The speculation module refuses an attribute, a block's subject or a loop's
+  list that reads a speculated value. The page would have shown two values
+  of one thing at once.

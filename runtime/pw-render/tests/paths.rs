@@ -5,6 +5,10 @@
 //! host computes for the row is set in it, and the renderer reads it there.
 //! Until 2026-10-03 the renderer read one field after a name, so a path two
 //! fields deep named nothing, and a row could show no member's value.
+//!
+//! A value computed for a row is set in it whole, by its path from the row,
+//! and read whole at each record before a field is (ADR-0170): `quantity` is
+//! a number, which has no field to hold `count`.
 
 use pw_render::*;
 use std::collections::BTreeMap;
@@ -138,5 +142,77 @@ fn a_row_whose_computed_value_changed_sets_its_text_where_it_is() {
         )
         .expect("derived"),
         Some(vec![(PartId(1), InstanceChange::Text("$3.75".into()))])
+    );
+}
+
+/// `{#each cart.lines as line (line.id)}<li>{line.quantity}
+/// {line.quantity.count}</li>{/each}`: a member of a number.
+fn lines() -> Template {
+    let text = |id: u32, value: &str| {
+        Chunk::Dynamic(Part::Text {
+            id: PartId(id),
+            value: value.into(),
+            context: Context::Text,
+        })
+    };
+    Template {
+        path: "t.L".into(),
+        name: "L".into(),
+        params: vec![],
+        schema: "test".into(),
+        chunks: vec![Chunk::Dynamic(Part::Each {
+            id: PartId(0),
+            collection: "cart.lines".into(),
+            binding: "line".into(),
+            key: Some("id".into()),
+            body: vec![
+                Chunk::Static("<li>".into()),
+                text(1, "line.quantity"),
+                Chunk::Static(" ".into()),
+                text(2, "line.quantity.count"),
+                Chunk::Static("</li>".into()),
+            ],
+        })],
+    }
+}
+
+/// A line whose `quantity` is a number, with what a host computed of it set
+/// whole, by its path from the line (ADR-0170).
+fn line(id: &str, quantity: i64, count: &str) -> Value {
+    record(&[
+        ("id", text(id)),
+        ("quantity", Value::Int(quantity)),
+        ("quantity.count", text(count)),
+    ])
+}
+
+#[test]
+fn a_value_computed_for_a_row_is_read_whole_where_a_field_has_none() {
+    // `quantity` is a number, with no field to hold `count`: the row holds
+    // it at its whole path, and the number is still the number.
+    let env = Env::new().set(
+        "cart",
+        record(&[("lines", Value::List(vec![line("a", 2, "two")]))]),
+    );
+    let html = render(&lines(), &env, &[]).expect("renders");
+    assert_eq!(shown(&html), "2 two");
+}
+
+#[test]
+fn a_value_computed_for_a_row_that_changed_is_set_where_it_is() {
+    assert_eq!(
+        instance_changes(
+            &lines(),
+            PartId(0),
+            &line("a", 2, "two"),
+            &line("a", 3, "three"),
+            &Env::new(),
+            &[]
+        )
+        .expect("derived"),
+        Some(vec![
+            (PartId(1), InstanceChange::Text("3".into())),
+            (PartId(2), InstanceChange::Text("three".into())),
+        ])
     );
 }

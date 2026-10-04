@@ -166,12 +166,25 @@ E14 comes before E11-E13. Its plan, controls and task list are
           through `display`. Every other member read no host computes is a
           build refusal. Until 2026-10-03 the plan neither planned nor
           refused one, and a page that made one built, then failed to render.
-     4. **Next: decrement, remove, and a per-line cart.** Each line shows its
+     4. **Decrement, remove, and a per-line cart.** Each line shows its
         item's name, price and quantity, the line's total, and the cart's
         total, with controls to decrement and remove. Acceptance: the
         commands are idempotent and optimistic, as `add_to_cart` is; the
         totals are the items' prices, which the data layer now prices lines
         at (ADR-0169); three engines.
+        - ~~A loop over a list inside a query's value~~ (ADR-0170,
+          `just e14-nested-lists`): `cart.lines` by its path, its rows'
+          member reads computed, and a part a speculation would not reach
+          refused.
+        - **Next: a speculation reaches every part that reads it.** The
+          browser renders again a loop, a block or an attribute that reads a
+          speculated value. It sets an instance's parts where they are, so
+          focus stays, and an optimistic new row is provisional until the
+          server's insert replaces it. Its address is a keyed hash under the
+          deployment's key, which the browser does not hold.
+        - Then the cart's lines, with `add_to_cart` given the item as the
+          page showed it, so an optimistic line has its name and price. The
+          server writes by the item's id alone.
      5. A command retried on a transport failure.
      6. §15.5's missing controls.
      7. Availability on the page before the press: `MenuItem.available`, and

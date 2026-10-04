@@ -422,6 +422,12 @@ awaited in order. What remains:
   - a signal's member, which the browser reads by field.
 - **`display` writes US dollars as en-US does** (ADR-0169). Other locales
   and currencies have no `display`.
+- **A speculation reaches top-level text alone** (ADR-0122, ADR-0170). A
+  loop, a block or an attribute that reads a speculated value is a build
+  refusal, until the browser renders one again.
+- **A list inside a shared query's value is rendered once** (ADR-0170). It
+  is rendered with its document and not patched again. Only the menu's
+  public fragment is patched for every reader (E7-P).
 - **A comment in markup is `<!-- -->`** (ADR-0167), and no page renders it.
   HTML's other bogus comments, `<!x>` and `<?x>`, are read as elements. A
   line of markup text that begins with `//` or `/*` is refused (PW5028),

@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `901bdae`, with ADR-0169.
+**Reviewed:** 2026-10-03, against master `25e379d`, with ADR-0170.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,24 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0170, 2026-10-03: a loop over a list inside a query's
+value built, and failed at its first change**
+([ADR-0170](DECISIONS/ADR-0170-a-list-inside-a-querys-value.md)).
+- **What was wrong.**
+  - The plan recorded `{#each cart.lines}`'s binding, `cart`, as the list,
+    and the development server could not show a session's document once the
+    cart changed.
+  - A row's member read over such a list was refused. A value computed for a
+    row went inside a field, and a number such as `quantity` has none.
+  - The speculation module looked at text alone. A loop, a block or an
+    attribute that read the speculated cart would have kept its old value
+    while the count moved, and nothing said so.
+- **Now** a list is recorded by its path, and its rows read members of their
+  item. A computed value is set in the row whole, by its path. A part a
+  speculation would not reach is refused by name.
+
+6 mutants (`just e14-nested-lists`).
 
 **Correction, ADR-0169, 2026-10-03: a page could build and then fail to
 render** ([ADR-0169](DECISIONS/ADR-0169-a-member-read-is-computed-or-refused.md)).

@@ -2042,26 +2042,39 @@ impl Server {
     /// member's component computes. The renderer reads the rest by field.
     fn rendered_value(&self, binding: &str, value: &Val) -> Result<Value, String> {
         let mut out = val_to_value(value);
-        let reads: Vec<&serde_json::Value> = self.plan["rows"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|r| r["collection"] == binding)
-            .collect();
-        if reads.is_empty() {
-            return Ok(out);
+        // Each list in the binding's value whose rows read through a member:
+        // the value itself, or a list inside it, `cart.lines` (ADR-0170).
+        let mut lists: BTreeMap<&str, Vec<&serde_json::Value>> = BTreeMap::new();
+        for read in self.plan["rows"].as_array().into_iter().flatten() {
+            let Some(collection) = read["collection"].as_str() else {
+                continue;
+            };
+            if collection.split('.').next() == Some(binding) {
+                lists.entry(collection).or_default().push(read);
+            }
         }
-        let (Val::List(items), Value::List(rows)) = (value, &mut out) else {
-            return Err(format!("`{binding}`'s rows are read, and it is no list"));
-        };
-        for (item, row) in items.iter().zip(rows.iter_mut()) {
-            for read in &reads {
-                let read_value = self.follow(item.clone(), &read["steps"])?;
-                // From the item's name: `item.price.display` is
-                // `price.display` in the row.
-                let path = read["path"].as_str().unwrap_or_default();
-                let within = path.split_once('.').map_or("", |(_, rest)| rest);
-                set_at(row, within, val_to_value(&read_value));
+        for (collection, reads) in lists {
+            let fields: Vec<&str> = collection.split('.').skip(1).collect();
+            let (Some(Val::List(items)), Some(Value::List(rows))) =
+                (val_at(value, &fields), value_at_mut(&mut out, &fields))
+            else {
+                return Err(format!("`{collection}`'s rows are read, and it is no list"));
+            };
+            for (item, row) in items.iter().zip(rows.iter_mut()) {
+                let Value::Record(fields) = row else {
+                    return Err(format!("a row of `{collection}` is no record"));
+                };
+                for read in &reads {
+                    let read_value = self.follow(item.clone(), &read["steps"])?;
+                    // Set whole, by its path from the item's name:
+                    // `item.price.display` is `price.display` in the row,
+                    // which the renderer reads as one (ADR-0170). Until
+                    // 2026-10-03 it was set inside `price`, and a member of
+                    // a number, `quantity.count`, had nowhere to go.
+                    let path = read["path"].as_str().unwrap_or_default();
+                    let within = path.split_once('.').map_or("", |(_, rest)| rest);
+                    fields.insert(within.to_string(), val_to_value(&read_value));
+                }
             }
         }
         Ok(out)
@@ -3272,12 +3285,13 @@ impl Server {
                 .flatten()
                 .any(|b| b["binding"] == name && b["policy"]["cache"] == "shared")
         };
+        // A list by its path, whose binding is its first name (ADR-0170).
         self.plan["collections"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(|c| c.as_str())
-            .filter(|c| !shared(c))
+            .filter(|c| !shared(c.split('.').next().unwrap_or_default()))
             .map(str::to_string)
             .collect()
     }
@@ -3297,14 +3311,21 @@ impl Server {
             let text = text_of(&value).ok_or_else(|| format!("part {id} has no text form"))?;
             shown.texts.insert(id, text);
         }
+        // Each list by its path: a binding's value, or a list inside it,
+        // `cart.lines` (ADR-0170). Until 2026-10-03 the binding was asked
+        // for, and `cart` is no list.
         for list in self.own_lists() {
+            let mut path = list.split('.');
+            let binding = path.next().unwrap_or_default();
+            let fields: Vec<&str> = path.collect();
             let value = bindings
-                .get(&list)
-                .ok_or_else(|| format!("no binding `{list}`"))?;
-            let Value::List(items) = self.rendered_value(&list, value)? else {
+                .get(binding)
+                .ok_or_else(|| format!("no binding `{binding}`"))?;
+            let mut rendered = self.rendered_value(binding, value)?;
+            let Some(Value::List(items)) = value_at_mut(&mut rendered, &fields) else {
                 return Err(format!("`{list}` is not a list"));
             };
-            shown.lists.insert(list, items);
+            shown.lists.insert(list.clone(), std::mem::take(items));
         }
         // Each block a query decides, as it renders now (ADR-0146).
         let env = self.document_env(session, store, bindings);
@@ -3872,22 +3893,24 @@ fn store_named(id: &str) -> Option<&'static str> {
     }
 }
 
-/// **A value set at a dotted path inside a row** (ADR-0169), each record on
-/// the way made if it is not there: `price.display` beside `price`'s
-/// `minor_units`.
-fn set_at(row: &mut Value, path: &str, value: Value) {
-    let Some((first, rest)) = path.split_once('.') else {
-        if let Value::Record(fields) = row {
-            fields.insert(path.to_string(), value);
+/// The value at `fields` in what a component returned, each a record's
+/// field by its WIT name (`unit_price` is `unit-price`).
+fn val_at<'a>(value: &'a Val, fields: &[&str]) -> Option<&'a Val> {
+    fields.iter().try_fold(value, |v, field| match v {
+        Val::Record(fs) => {
+            let wit = field.replace('_', "-");
+            fs.iter().find(|(n, _)| *n == wit).map(|(_, v)| v)
         }
-        return;
-    };
-    if let Value::Record(fields) = row {
-        let next = fields
-            .entry(first.to_string())
-            .or_insert_with(|| Value::Record(BTreeMap::new()));
-        set_at(next, rest, value);
-    }
+        _ => None,
+    })
+}
+
+/// The value at `fields` in what the renderer reads.
+fn value_at_mut<'a>(value: &'a mut Value, fields: &[&str]) -> Option<&'a mut Value> {
+    fields.iter().try_fold(value, |v, field| match v {
+        Value::Record(fs) => fs.get_mut(*field),
+        _ => None,
+    })
 }
 
 /// A component value as the renderer reads it: a record by its Pleris field
@@ -6875,9 +6898,16 @@ public query Store(",
     }
 
     /// The store, with a line its cart decides: a block a query decides
-    /// (ADR-0146).
+    /// (ADR-0146). Without `add_to_cart`'s speculation, which would not
+    /// reach the block, and is refused beside one (ADR-0170).
     fn with_block(app: &str) -> String {
-        let out = app.replacen(
+        let speculation = "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n";
+        assert_eq!(
+            app.matches(speculation).count(),
+            1,
+            "the speculation's anchor"
+        );
+        let out = app.replace(speculation, "").replacen(
             "                <p id=\"cart-count\">{cart.line_count}</p>",
             "                <p id=\"cart-count\">{cart.line_count}</p>\n                {#if cart.lines}<p id=\"ready\">Ready when you are.</p>{/if}",
             1,
@@ -6923,6 +6953,64 @@ public query Store(",
         // Gone, with the last line.
         assert_eq!(sets[2].len(), 2, "{sets:?}");
         assert!(sets[2][1].starts_with("range \"\""), "{sets:?}");
+    }
+
+    /// The store, listing its cart's lines: a loop over a list inside a
+    /// query's value, each row reading a member of its line, `count`
+    /// (ADR-0170). Without `add_to_cart`'s speculation, which would not reach
+    /// the list, and is refused beside one.
+    fn with_cart_lines(app: &str) -> String {
+        let speculation = "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n";
+        let count = "                <p id=\"cart-count\">{cart.line_count}</p>";
+        assert_eq!(
+            app.matches(speculation).count(),
+            1,
+            "the speculation's anchor"
+        );
+        assert_eq!(app.matches(count).count(), 1, "the count's anchor");
+        app.replace(speculation, "").replace(
+            count,
+            &format!(
+                "{count}\n                <ul id=\"lines\">{{#each cart.lines as line \
+                 (line.item_id)}}<li>× {{line.quantity.count}}</li>{{/each}}</ul>"
+            ),
+        )
+    }
+
+    /// **A list inside a query's value is rendered, and patched where it
+    /// is** (ADR-0170): `cart.lines`, each row's count computed for it.
+    /// Until 2026-10-03 the server asked for the binding, `cart`, as the
+    /// list, and failed at the cart's first change.
+    #[test]
+    fn a_list_inside_a_querys_value_is_rendered_and_patched_where_it_is() {
+        let s = lines_server_with(with_cart_lines);
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        let sets: Vec<Vec<String>> = patch_sets(&s, "a")
+            .iter()
+            .map(|p| p.patches.iter().map(said).collect())
+            .collect();
+        assert_eq!(sets.len(), 2, "{sets:?}");
+        // The count, and the line inserted at the head of the list ...
+        assert_eq!(sets[0].len(), 2, "{sets:?}");
+        assert!(sets[0][0].starts_with("text \"1\""), "{sets:?}");
+        assert!(
+            sets[0][1].starts_with("insert before false × 1"),
+            "{sets:?}"
+        );
+        // ... then its count set where it is, its nodes kept.
+        assert_eq!(sets[1].len(), 2, "{sets:?}");
+        assert!(sets[1][0].starts_with("text \"2\""), "{sets:?}");
+        assert!(
+            sets[1][1].starts_with("text \"2\"") && sets[1][1].ends_with("in an instance"),
+            "{sets:?}"
+        );
+        // And a document served now shows it.
+        let (page, _) = s.serve_document("a");
+        assert!(visible(&page).contains("× 2"), "{page}");
     }
 
     #[test]

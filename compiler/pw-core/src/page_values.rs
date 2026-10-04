@@ -521,8 +521,10 @@ pub struct PageValues {
     pub bindings: Vec<Binding>,
     /// Each text part outside a block.
     pub parts: Vec<Part>,
-    /// Each binding a block iterates or matches, which a host gives the
-    /// renderer whole: `menu`.
+    /// **Each list a loop iterates at a query's value**, by its path from
+    /// the binding: `menu`, or `cart.lines`, a list inside the value
+    /// (ADR-0170). A host gives the renderer each binding whole, and renders
+    /// a list again when what it holds changes (ADR-0145).
     pub collections: Vec<String>,
     /// The page's signals (ADR-0130). Their first values are the backend's
     /// to compute, and `build` writes them here.
@@ -552,7 +554,8 @@ pub struct PageValues {
 /// parts read it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RowRead {
-    /// The query binding the loop iterates: `menu`.
+    /// The list the loop iterates, by its path from a query's binding:
+    /// `menu`, or `cart.lines` (ADR-0170).
     pub collection: String,
     /// The name each item is bound to: `item`.
     pub binding: String,
@@ -617,10 +620,17 @@ fn row_read(
     else {
         return Ok(None);
     };
-    let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == collection) else {
+    // The list: a query's value, or a list inside it, through its fields
+    // (ADR-0170). One read through a member is a list's own read, which the
+    // plan refuses but in a row (ADR-0169).
+    let mut through = collection.split('.');
+    let query = through.next().unwrap_or_default();
+    let fields: Vec<&str> = through.collect();
+    let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == query) else {
         return Ok(None);
     };
     let Some(element) = value_of(sigs, *resource)
+        .and_then(|t| field_type(sigs, t, &fields))
         .filter(|t| t.as_builtin() == Some(crate::resolved::Builtin::List))
         .and_then(|t| t.args().first().cloned())
     else {
@@ -645,6 +655,23 @@ fn row_read(
         path: path.to_string(),
         steps: out,
     }))
+}
+
+/// The type at `fields` in a value of type `ty`, through record fields
+/// alone: `None` where one is not a field.
+fn field_type(sigs: &Signatures, mut ty: ResolvedType, fields: &[&str]) -> Option<ResolvedType> {
+    for field in fields {
+        ty = sigs
+            .type_decl(ty.def_id()?)?
+            .record
+            .as_ref()?
+            .iter()
+            .find(|(n, _)| n == field)?
+            .1
+            .resolved()?
+            .clone();
+    }
+    Some(ty)
 }
 
 /// A read through a member function that no host computes where it is
@@ -1244,7 +1271,10 @@ fn plan(
         }
     }
 
-    // A block's collection, given whole: each binding the template iterates.
+    // Each list the template iterates at a query's value, by its path: the
+    // binding itself, or a list inside it (ADR-0170). Until 2026-10-03 the
+    // binding was recorded, and a host given `cart` for `cart.lines` found
+    // no list to render again.
     let mut collections = Vec::new();
     let mut blocks = Vec::new();
     // What a loop's row reads of a query besides its own item is not
@@ -1255,9 +1285,9 @@ fn plan(
         if entry.kind == "each"
             && let Some(root) = entry.value.split('.').next()
             && found.iter().any(|(n, ..)| n == root)
-            && !collections.iter().any(|c: &String| c == root)
+            && !collections.contains(&entry.value)
         {
-            collections.push(root.to_string());
+            collections.push(entry.value.clone());
         }
         // A block a query's value decides (ADR-0146): a host renders it,
         // and renders it again when what it renders changed. At the top of
