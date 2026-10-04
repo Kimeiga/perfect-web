@@ -1336,6 +1336,38 @@ pub mod engine {
                 }
             }
             Type::String => Val::String(v.as_str().ok_or_else(|| expected("a string"))?.into()),
+            // **A record, field by field** (ADR-0172): the item a page showed,
+            // which `add_to_cart` makes its new line from. A browser writes a
+            // field by its Pleris name, `minor_units`, and the component
+            // declares it by its WIT name, `minor-units`. A field the type
+            // does not declare is not passed in; one it declares and the
+            // value lacks is refused.
+            Type::Record(record) => {
+                let o = v.as_object().ok_or_else(|| expected("an object"))?;
+                let mut fields = Vec::new();
+                for field in record.fields() {
+                    let written = field.name.replace('-', "_");
+                    let value = o
+                        .get(&written)
+                        .ok_or_else(|| format!("{at}: the record has no field `{written}`"))?;
+                    fields.push((
+                        field.name.to_string(),
+                        from_json(&field.ty, value, &format!("{at}.{written}"))?,
+                    ));
+                }
+                Val::Record(fields)
+            }
+            Type::List(list) => {
+                let items = v.as_array().ok_or_else(|| expected("an array"))?;
+                let element = list.ty();
+                Val::List(
+                    items
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| from_json(&element, x, &format!("{at}[{i}]")))
+                        .collect::<Result<_, _>>()?,
+                )
+            }
             other => {
                 return Err(format!(
                     "{at}: a parameter of type {other:?} is not accepted from a browser"

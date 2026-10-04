@@ -57,6 +57,9 @@ const MUTATING = [
   "stores",
   // ADR-0165: the recommender, which a test slows, is one per server.
   "slots",
+  // ADR-0172: an item sold out, which a cart's test refuses, is one per
+  // server.
+  "cart",
 ];
 
 export const MUTABLE_PORTS = Object.fromEntries(

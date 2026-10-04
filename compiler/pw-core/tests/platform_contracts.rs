@@ -420,7 +420,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-03: `examples/domain.pw`'s `MenuItem` declares a `price`, a
     // `Money<USD>`, charter §15.1's, and `display` and `grouped` write one
     // as a menu's row shows it, as en-US writes dollars (ADR-0169).
-    const EXPECTED: u64 = 0xb529f8ced9a4446a;
+    // 2026-10-04: `examples/domain.pw`'s `CartLine` records its item's `name`
+    // beside its price, and `fewer`, `total` and `subtotal` are declared: the
+    // store's cart lists its lines, each with − and +, its total, and the
+    // cart's subtotal (ADR-0172). `unpriced` is removed: a new line takes the
+    // item's price, as the page showed it.
+    const EXPECTED: u64 = 0xb62fd3a8a1c996b2;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

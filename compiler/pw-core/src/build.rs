@@ -150,6 +150,8 @@ impl Build {
                     "module": format!("{}.mjs", m.page),
                     "bindings": m.bindings,
                     "commands": m.commands,
+                    // Each part the browser renders again with it (ADR-0172).
+                    "regions": m.regions,
                 });
                 write(&format!("speculations/{}.mjs", m.page), m.source.as_bytes())?;
                 write(

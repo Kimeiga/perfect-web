@@ -54,13 +54,13 @@ fn add(clauses: &str) -> String {
     format!(
         "module t\n\nimport Carts\nimport Resources.{{ Cart }}\n\
          import context.{{ current_session }}\n\
-         import domain.{{ CartError, InteractionId, MenuItemId, PositiveInt }}\n\
+         import domain.{{ CartError, InteractionId, MenuItem, PositiveInt }}\n\
          import Events.{{ CartChanged }}\nimport capability.{{ Session, SessionId }}\n\n\
-         command add_to_cart(item: MenuItemId, quantity: PositiveInt)\n    \
+         command add_to_cart(item: MenuItem, quantity: PositiveInt)\n    \
          -> Result<domain.Cart, CartError>\n    requires      SignedIn\n    \
          idempotent_by InteractionId\n    \
          optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n\
-         {clauses}{{\n    Carts.add(current_session(), item, quantity)\n}}\n"
+         {clauses}{{\n    Carts.add(current_session(), item.id, quantity)\n}}\n"
     )
 }
 

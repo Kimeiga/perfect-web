@@ -50,8 +50,11 @@ MUTANTS = [
         "a part a speculation would not reach is not refused",
         "core",
         SPECULATION,
-        "        if !speculated.iter().any(|(n, ..)| n == root) {\n",
-        "        if true || !speculated.iter().any(|(n, ..)| n == root) {\n",
+        # Re-anchored by ADR-0172: such a part at the top of the page is
+        # rendered again in the browser, and what is refused is a speculated
+        # read no region renders.
+        "        if read.nested && speculates(root) && !in_a_region(read.part.0) {\n",
+        "        if false && read.nested && speculates(root) && !in_a_region(read.part.0) {\n",
     ),
     (
         "a list is read from its binding, not its path",

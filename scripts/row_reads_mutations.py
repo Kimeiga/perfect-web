@@ -229,7 +229,7 @@ MUTANTS = [
         "a line is priced 450 whatever its item",
         "server",
         SERVER,
-        "Val::Record(vec![(\"minor-units\".into(), Val::S64(item_price(item)))]),\n",
+        "Val::Record(vec![(\"minor-units\".into(), Val::S64(line.price))]),\n",
         "Val::Record(vec![(\"minor-units\".into(), Val::S64(450))]),\n",
     ),
     (

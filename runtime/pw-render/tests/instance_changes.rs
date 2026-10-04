@@ -159,3 +159,84 @@ fn a_block_that_changed_renders_the_instance_again() {
         None
     );
 }
+
+/// `{#each items as item (item.id)}<li><button on:press={…captures item.name}
+/// on:focus={…captures item.id}>{item.name}</button></li>{/each}`
+fn buttons() -> Template {
+    let st = |s: &str| Chunk::Static(s.to_string());
+    let handler = |id: u32, event: &str, captures: &[&str]| {
+        Chunk::Dynamic(Part::Event {
+            id: PartId(id),
+            owner: ElementId(1),
+            event: event.into(),
+            handler: format!("h{id}"),
+            name: format!("on_{event}"),
+            captures: captures.iter().map(|c| c.to_string()).collect(),
+            renames: Default::default(),
+            modifiers: vec![],
+        })
+    };
+    Template {
+        path: "t.B".into(),
+        name: "B".into(),
+        params: vec![],
+        schema: "s".into(),
+        chunks: vec![Chunk::Dynamic(Part::Each {
+            id: PartId(0),
+            collection: "items".into(),
+            binding: "item".into(),
+            key: Some("id".into()),
+            body: vec![
+                st("<li><button data-pw=\"1\""),
+                handler(1, "press", &["item.name"]),
+                handler(2, "focus", &["item.id"]),
+                st(">"),
+                Chunk::Dynamic(Part::Text {
+                    id: PartId(3),
+                    value: "item.name".into(),
+                    context: Context::Text,
+                }),
+                st("</button></li>"),
+            ],
+        })],
+    }
+}
+
+/// **What a handler captures is set where it is** (ADR-0172): the attribute
+/// the runtime reads when the handler runs, once for its element's handlers.
+/// Until 2026-10-03 a change to it rendered the instance again, and a
+/// renamed item's button lost its nodes, and focus.
+#[test]
+fn what_a_handler_captures_is_set_where_it_is() {
+    let changes = |was: &Value, now: &Value| {
+        instance_changes(&buttons(), PartId(0), was, now, &Env::new(), &[]).expect("derived")
+    };
+    assert_eq!(
+        changes(
+            &item("Tea", "hot", false, false),
+            &item("Green Tea", "hot", false, false)
+        ),
+        Some(vec![
+            (
+                PartId(1),
+                InstanceChange::Attribute {
+                    name: "data-pw-captures".into(),
+                    value: Some(
+                        "{&quot;item&quot;:{&quot;id&quot;:&quot;a&quot;,\
+                         &quot;name&quot;:&quot;Green Tea&quot;}}"
+                            .into()
+                    ),
+                }
+            ),
+            (PartId(3), InstanceChange::Text("Green Tea".into())),
+        ])
+    );
+    // What no handler captures changes nothing of the element's.
+    assert_eq!(
+        changes(
+            &item("Tea", "hot", false, false),
+            &item("Tea", "cold", false, false)
+        ),
+        Some(vec![])
+    );
+}

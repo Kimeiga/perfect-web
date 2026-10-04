@@ -30,6 +30,10 @@ Resources.Store  abi 67b9938482d95947
   runs at   build, browser, edge, origin
   exports   query Store
 
+domain.count  abi 8aaf4448b4ac79d0
+  runs at   build, browser, edge, origin
+  exports   function count
+
 domain.display  abi 8d1fd3f0102ea01e
   runs at   build, browser, edge, origin
   exports   function display
@@ -37,6 +41,14 @@ domain.display  abi 8d1fd3f0102ea01e
 domain.line_count  abi 79995784a8451fc2
   runs at   build, browser, edge, origin
   exports   function line_count
+
+domain.subtotal  abi f91e2f7273509b3a
+  runs at   build, browser, edge, origin
+  exports   function subtotal
+
+domain.total  abi b34c0c8510993136
+  runs at   build, browser, edge, origin
+  exports   function total
 
 store.page.Cart  abi 37cb9e8b9dc1738c
   runs at   origin
@@ -78,6 +90,9 @@ store.page.StorePage  abi d803b26130c7cf49
   component pw:app/store.page.Store#Store
   component pw:app/store.page.add_to_cart#add_to_cart
   component pw:app/store.page.clear_cart#clear_cart
+  component pw:app/store.page.decrease_in_cart#decrease_in_cart
+  component pw:app/store.page.increase_in_cart#increase_in_cart
+  component pw:app/store.page.remove_from_cart#remove_from_cart
   host      pw:host/session#read  (session.read)
   exports   page StorePage
 
@@ -99,5 +114,34 @@ store.page.clear_cart  abi bade60abc3477904
   host      pw:host/session#read  (session.read)
   host      store:data/carts#clear  (database.write<Carts>)
   exports   command clear_cart
+  requires  SignedIn
+
+store.page.decrease_in_cart  abi 8ad56a870ecb332a
+  runs at   origin
+  needs     database.write<Carts>
+  needs     session.read
+  host      pw:host/session#read  (session.read)
+  host      store:data/carts#decrease  (database.write<Carts>)
+  exports   command decrease_in_cart
+  requires  SignedIn
+
+store.page.increase_in_cart  abi 69261a5c0182c363
+  runs at   origin
+  needs     database.read<Menus>
+  needs     database.write<Carts>
+  needs     session.read
+  host      pw:host/session#read  (session.read)
+  host      store:data/carts#add  (database.write<Carts>)
+  host      store:data/menus#is-available  (database.read<Menus>)
+  exports   command increase_in_cart
+  requires  SignedIn
+
+store.page.remove_from_cart  abi 800206716105eda8
+  runs at   origin
+  needs     database.write<Carts>
+  needs     session.read
+  host      pw:host/session#read  (session.read)
+  host      store:data/carts#remove  (database.write<Carts>)
+  exports   command remove_from_cart
   requires  SignedIn
 

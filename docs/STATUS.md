@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-03, against master `f77cb32`, with ADR-0171.
+**Reviewed:** 2026-10-04, against master `0c7e80b`, with ADR-0172.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,42 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0172, 2026-10-04: a press could be shown twice, and a
+session's changes could cross**
+([ADR-0172](DECISIONS/ADR-0172-the-cart-lists-its-lines.md)).
+- **What was wrong.**
+  - **A speculation could be shown twice** (ADR-0122's, since 2026-10-02).
+    When a commit's new value reached the page before the command's answer,
+    the page held the press and still showed it pending: only the answer
+    could drop it. The count read 3 where 2 was right until the answer came.
+  - **Two changes of one session could be sent at once.** A command's
+    commit, a second command or a document being served could each derive
+    patches against the same shown document. One patch set then addressed a
+    document the other had already changed, and the page lost a line.
+- **Now** the value a page is sent names the presses it includes
+  (`applied`), and the page drops them; and a session's changes come one at
+  a time. Found by the per-line cart's browser tests, and pinned by two that
+  hold an answer back after the server has committed it.
+
+**ADR-0172, 2026-10-04: the cart lists its lines, and a speculation reaches
+every part that reads it** (the audit's fourth gap, §15.3).
+- Each line shows its name, its quantity between − and +, its total, and
+  Remove; the cart shows its subtotal, an empty message, and a fees note.
+  `increase_in_cart`, `decrease_in_cart` and `remove_from_cart` are
+  optimistic and idempotent, as `add_to_cart` is. A line records its item's
+  name and price when it is made.
+- `add_to_cart` takes the item the page showed, so a new line has its name
+  and price before the server answers. A browser sends records and lists;
+  a host reads them by the artifact's types, and the data layer records the
+  store's own price, never the request's.
+- The browser renders again each attribute, block and loop at the top of the
+  page that reads a speculated value, with the server's renderer compiled to
+  WebAssembly. A kept row's parts are set where they are, so focus stays; a
+  row that goes passes focus to the next line's control, or to the cart's
+  heading. A region that reads what the browser does not hold is refused.
+- 41 mutants (`just e14-cart-lines`). The cart's 7 browser tests pass in
+  Chromium, Firefox and WebKit.
 
 **Correction, ADR-0171, 2026-10-03: an attribute at the top of a page kept
 its first value**
@@ -2713,14 +2749,13 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **Decrement, remove, and a per-line cart** (§15.3, the audit's fourth
-   gap): each line's item, price, quantity and total, the cart's total, and
-   controls to decrement and remove, idempotent and optimistic as
-   `add_to_cart` is.
-2. **A command retried on a transport failure** (§15.4, the audit's fifth
+1. **A command retried on a transport failure** (§15.4, the audit's fifth
    gap), with its interaction, so a retry is the same mutation.
-3. **§15.5's missing controls** (the audit's sixth gap): store and cart
+2. **§15.5's missing controls** (the audit's sixth gap): store and cart
    delays, and a one-shot error for the next real command or read.
+3. **Last-known-good for declared public data** (test 18, the audit's
+   seventh gap): a rule limiting it to public data, and the server serving
+   it.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

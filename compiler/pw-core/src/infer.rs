@@ -303,20 +303,30 @@ impl<'a> Types<'a> {
         // o.status}`, so neither order alone types both. Until 2026-10-02
         // loops were typed first, and an item over an arm's binding had no
         // type (PW5016).
-        let eaches: Vec<(crate::hir::NodeId, Option<Binder>)> = types
+        // A loop's list is a name, or a path inside its value, `cart.lines`
+        // (ADR-0172). Until 2026-10-03 a path was not typed, and a handler
+        // in its row could not be resumed (PW5016).
+        let eaches: Vec<(crate::hir::NodeId, Option<Binder>, Vec<String>)> = types
             .lexical
             .each_blocks()
-            .filter(|(_, collection, _)| !collection.contains(['.', '(']))
-            .map(|(n, _, head)| (n, head))
+            .filter(|(_, collection, _)| !collection.contains('('))
+            .map(|(n, collection, head)| {
+                let fields = collection
+                    .split('.')
+                    .skip(1)
+                    .map(|f| f.trim().to_string())
+                    .collect();
+                (n, head, fields)
+            })
             .collect();
         let arms: Vec<(crate::hir::NodeId, ExprId)> = types.lexical.template_arms().collect();
         loop {
             let learned = types.bindings.len();
-            for (n, head) in &eaches {
+            for (n, head, fields) in &eaches {
                 if types.bindings.contains_key(&Binder::Each(*n)) {
                     continue;
                 }
-                if let Some(elem) = head.and_then(|b| types.element_of_binder(body, b)) {
+                if let Some(elem) = head.and_then(|b| types.element_at(body, b, fields)) {
                     types.bindings.insert(Binder::Each(*n), elem);
                 }
             }
@@ -527,8 +537,28 @@ impl<'a> Types<'a> {
     /// type, or the declared result of the query or call a `let` is bound
     /// to.
     fn element_of_binder(&self, body: &Body, b: Binder) -> Option<ResolvedType> {
+        element_of_type(&self.binder_type(body, b)?).cloned()
+    }
+
+    /// **The element of a list inside a binding's value** (ADR-0172):
+    /// `cart.lines`'s, the binding's value seen through its `Result` or its
+    /// `Option`, then each field. With no field, the binding's own list.
+    fn element_at(&self, body: &Body, b: Binder, fields: &[String]) -> Option<ResolvedType> {
+        let mut ty = self.binder_type(body, b)?;
+        for field in fields {
+            while matches!(ty.as_builtin(), Some(Builtin::Result | Builtin::Option)) {
+                ty = ty.args().first()?.clone();
+            }
+            ty = self.sigs.member_of(&ty, field)?.result()?.clone();
+        }
+        element_of_type(&ty).cloned()
+    }
+
+    /// The type a binding holds, where a declaration says: its own, or its
+    /// initialiser's, a query's or a call's result.
+    fn binder_type(&self, body: &Body, b: Binder) -> Option<ResolvedType> {
         if let Some(t) = self.bindings.get(&b) {
-            return element_of_type(t).cloned();
+            return Some(t.clone());
         }
         let Binder::Pattern(p) = b else {
             return None;
@@ -555,7 +585,7 @@ impl<'a> Types<'a> {
                 _ => None,
             };
             if let Some(sig) = sig {
-                return element_of_type(sig.result()?).cloned();
+                return sig.result().cloned();
             }
         }
         None

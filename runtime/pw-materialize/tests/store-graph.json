@@ -200,6 +200,30 @@
       "name": "clear_cart",
       "node": "command",
       "params": []
+    },
+    {
+      "path": "store.page.decrease_in_cart",
+      "name": "decrease_in_cart",
+      "node": "command",
+      "params": [
+        "item"
+      ]
+    },
+    {
+      "path": "store.page.increase_in_cart",
+      "name": "increase_in_cart",
+      "node": "command",
+      "params": [
+        "item"
+      ]
+    },
+    {
+      "path": "store.page.remove_from_cart",
+      "name": "remove_from_cart",
+      "node": "command",
+      "params": [
+        "item"
+      ]
     }
   ],
   "edges": [
@@ -334,6 +358,54 @@
     },
     {
       "from": "store.page.clear_cart",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.decrease_in_cart",
+      "to": "Events.CartChanged",
+      "kind": "emits",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.decrease_in_cart",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.increase_in_cart",
+      "to": "Events.CartChanged",
+      "kind": "emits",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.increase_in_cart",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.remove_from_cart",
+      "to": "Events.CartChanged",
+      "kind": "emits",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.remove_from_cart",
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [

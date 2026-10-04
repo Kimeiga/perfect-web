@@ -181,10 +181,16 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
     let modules = modules(&store_units());
     assert_eq!(
         modules.keys().collect::<Vec<_>>(),
-        ["add_to_cart", "clear_cart"]
+        [
+            "add_to_cart",
+            "clear_cart",
+            "decrease_in_cart",
+            "increase_in_cart",
+            "remove_from_cart"
+        ]
     );
 
-    // on:press={resumable(captures = { item }) => match add_to_cart(item.id, PositiveInt(1)) {
+    // on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
     //     Ok(_) => notice = "",
     //     Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
     //     Err(_) => notice = "That item could not be added.",
@@ -197,21 +203,33 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
             "export const name = \"add_to_cart\";\n\
              export const handler = \"{id}\";\n\
              export async function run(context) {{\n\
-             \x20 const v0 = context.captures[\"item\"][\"id\"];\n\
-             \x20 const v1 = 1n;\n\
-             \x20 const v2 = v1;\n\
-             \x20 const v3_answer = await context.command(\"store.page.add_to_cart\", [v0, exact(v2)]);\n",
+             \x20 const v0 = ((o) => ({{ \"id\": o[\"id\"], \"name\": o[\"name\"], \
+             \"description\": o[\"description\"], \"price\": ((o) => ({{ \"minor_units\": \
+             BigInt(o[\"minor_units\"]) }}))(o[\"price\"]) }}))(context.captures[\"item\"]);\n",
             id = add.identity
         )),
-        "the captured item's id, and PositiveInt(1) as its representation, sent \
-         before its answer is read"
+        "the captured item, read whole, field by field, its `Int` as a BigInt \
+         (ADR-0172)"
     );
-    let item = r#"{"item":{"id":"espresso"}}"#;
-    // Answered `Ok`, without the cart (ADR-0157): the notice is cleared.
+    let item = r#"{"item":{"id":"espresso","name":"Espresso","description":"Short.","price":{"minor_units":350}}}"#;
+    // Answered `Ok`, without the cart (ADR-0157): the notice is cleared. The
+    // item is sent as the page showed it, and `PositiveInt(1)` as its
+    // representation.
     let ok = run(add, item);
     assert_eq!(
         sent(&ok),
-        &serde_json::json!([["store.page.add_to_cart", ["espresso", 1]]])
+        &serde_json::json!([[
+            "store.page.add_to_cart",
+            [
+                {
+                    "id": "espresso",
+                    "name": "Espresso",
+                    "description": "Short.",
+                    "price": { "minor_units": 350 }
+                },
+                1
+            ]
+        ]])
     );
     assert_eq!(ok["set"], serde_json::json!([["notice", ""]]));
     // Refused by name: the handler reads the declared error, and says so.
@@ -271,6 +289,49 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
         refused["set"],
         serde_json::json!([["notice", "The cart could not be cleared."]])
     );
+
+    // A line's −, + and Remove (ADR-0172), e.g.
+    // on:press={resumable(captures = { line }) => match increase_in_cart(line.item_id) {
+    //     Ok(_) => notice = "",
+    //     Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+    //     Err(_) => notice = "That line could not be changed.",
+    // }}
+    // Each sends the line's item id, and says when it is refused.
+    let line = r#"{"line":{"item_id":"espresso"}}"#;
+    for (name, notice) in [
+        ("decrease_in_cart", "That line could not be changed."),
+        ("increase_in_cart", "That line could not be changed."),
+        ("remove_from_cart", "That line could not be removed."),
+    ] {
+        let m = &modules[name];
+        let command = format!("store.page.{name}");
+        assert_eq!(m.commands, [command.as_str()]);
+        let ok = run(m, line);
+        assert_eq!(sent(&ok), &serde_json::json!([[command, ["espresso"]]]));
+        assert_eq!(ok["set"], serde_json::json!([["notice", ""]]), "{name}");
+        let refused = run_answered(
+            m,
+            line,
+            "",
+            r#"{"$case":"err","value":{"$case":"cart-expired"}}"#,
+        );
+        assert_eq!(
+            refused["set"],
+            serde_json::json!([["notice", notice]]),
+            "{name}"
+        );
+    }
+    // An item that sold out since it was added is said so on +, as on Add.
+    let sold_out = run_answered(
+        &modules["increase_in_cart"],
+        line,
+        "",
+        r#"{"$case":"err","value":{"$case":"item-unavailable","value":"espresso"}}"#,
+    );
+    assert_eq!(
+        sold_out["set"],
+        serde_json::json!([["notice", "That item just sold out."]])
+    );
 }
 
 /// **A module and its event part are one handler.** The identity the runtime
@@ -282,7 +343,7 @@ fn a_module_and_its_event_part_name_one_handler() {
     let units = store_units();
     let modules = modules(&units);
     let parts = event_parts(&units);
-    assert_eq!(parts.len(), 2, "{parts:?}");
+    assert_eq!(parts.len(), 5, "{parts:?}");
     for (name, identity, captures) in &parts {
         let m = &modules[name];
         assert_eq!(&m.identity, identity, "{name}: one identity");
@@ -298,9 +359,17 @@ fn a_module_and_its_event_part_name_one_handler() {
         parts.iter().map(|(n, _, c)| (n.as_str(), c)).collect();
     assert_eq!(
         captures["add_to_cart"],
-        &["item.id"],
-        "the path read, not the whole item"
+        &["item"],
+        "the whole item: it is sent, and the line it makes shows its name and \
+         price (ADR-0172)"
     );
+    for name in ["decrease_in_cart", "increase_in_cart", "remove_from_cart"] {
+        assert_eq!(
+            captures[name],
+            &["line.item_id"],
+            "{name}: the path read, not the whole line"
+        );
+    }
     assert!(
         captures["clear_cart"].is_empty(),
         "reads nothing it captured"
@@ -349,10 +418,18 @@ opaque type Qty = Int
 opaque type Sku = String
 type Item = Item { id: Sku, name: String, stock: Int }
 type Pack = Pack { n: Int }
+type Size = Small | Large
+type Crate = Crate { size: Size }
+type Hours = Hours { opensMinute: Int }
 
 command Buy(id: Sku, qty: Qty) -> Int { 0 }
 command Rename(id: Sku, name: String) -> Int { 0 }
 command Ship(p: Pack) -> Int { 0 }
+command Order(item: Item) -> Int { 0 }
+command Tag(names: List<String>, packs: List<Pack>) -> Int { 0 }
+command Choose(s: Size) -> Int { 0 }
+command Stack(c: Crate) -> Int { 0 }
+command Open(h: Hours) -> Int { 0 }
 query Look(id: Sku) -> Int { 0 }
 fn helper(x: Int) -> Int { x }
 
@@ -569,12 +646,60 @@ fn a_value_the_handler_did_not_capture_is_not_read() {
     );
 }
 
+/// **A record is sent field by field, and a list element by element**
+/// (ADR-0172), each field by its name and each `Int` exact, as a command's
+/// argument is. Refused until 2026-10-03, when `add_to_cart` came to take
+/// the item the page showed.
+#[test]
+fn a_record_or_a_list_is_sent_as_json_carries_it() {
+    assert_eq!(
+        sent(&sends(
+            "Tag([\"a\", item.name], [Pack { n: item.stock }, Pack { n: 2 }])"
+        )),
+        &serde_json::json!([["shop.ui.Tag", [["a", "nut"], [{ "n": 5 }, { "n": 2 }]]]])
+    );
+    assert_eq!(
+        sent(&sends("Ship(Pack { n: item.stock })")),
+        &serde_json::json!([["shop.ui.Ship", [{ "n": 5 }]]])
+    );
+    // A captured record, whole, its `Sku` as its representation.
+    assert_eq!(
+        sent(&sends("Order(item)")),
+        &serde_json::json!([["shop.ui.Order", [{ "id": "a", "name": "nut", "stock": 5 }]]])
+    );
+    // An `Int` a JavaScript number cannot carry stops the handler before it
+    // sends, in a field as anywhere.
+    let out = sends("Ship(Pack { n: 9007199254740993 })");
+    assert_eq!(sent(&out), &serde_json::json!([]));
+    assert!(
+        out["trap"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("cannot carry exactly"),
+        "{out}"
+    );
+}
+
 #[test]
 fn a_command_parameter_a_browser_cannot_send_is_refused() {
+    // A variant: a host reads none from what a browser writes.
     refused(
-        "Ship(Pack { n: 1 })",
+        "Choose(Size.Small)",
         "a command parameter a browser cannot send",
-        "`Pack`",
+        "`Size`",
+    );
+    // A record that holds one.
+    refused(
+        "Stack(Crate { size: Size.Small })",
+        "a command parameter a browser cannot send",
+        "`Crate`",
+    );
+    // A record whose field's name would not come back from its WIT name:
+    // `opens-minute` is found as `opens_minute`.
+    refused(
+        "Open(Hours { opensMinute: 1 })",
+        "a command parameter a browser cannot send",
+        "`Hours`",
     );
 }
 

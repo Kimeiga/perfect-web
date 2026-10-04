@@ -225,6 +225,12 @@ impl Fmt {
             if PAREN_TAKES_A_SPACE.contains(&self.last_text.as_str()) {
                 return true;
             }
+            // `!(a & b)`: a prefix operator hugs a parenthesised operand as it
+            // hugs any other. Asked here, before the rule below, which wrote
+            // `! (a & b)` (2026-10-04).
+            if matches!(prev, '!' | '-') && follows_a_prefix_operator(t) {
+                return false;
+            }
             return !prev.is_alphanumeric() && prev != '_' && prev != ')' && prev != ']';
         }
         if kind == K::LBracket {
@@ -559,6 +565,17 @@ mod tests {
     fn a_prefix_operator_hugs_an_operand_at_any_depth() {
         let src = "fn f(a: Bool, b: R) -> Bool {\n    !a & !b.row.common & a - -1 > 0\n}\n";
         assert_eq!(format_source(src), src);
+    }
+
+    #[test]
+    fn a_prefix_operator_hugs_a_parenthesised_operand() {
+        let src = "fn f(a: Bool, n: Int) -> Bool {\n    !(a & a) & -(n + 1) < n - (n * 2)\n}\n";
+        assert_eq!(format_source(src), src);
+        // Control: what the formatter wrote until 2026-10-04 is written back.
+        assert_eq!(
+            format_source("fn f(a: Bool) -> Bool {\n    ! (a & a)\n}\n"),
+            "fn f(a: Bool) -> Bool {\n    !(a & a)\n}\n"
+        );
     }
 
     #[test]

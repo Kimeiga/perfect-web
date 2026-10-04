@@ -17,10 +17,10 @@ module cart.add_view
 // `add_to_cart` and `PositiveInt` and imported neither, so a fixture whose
 // subject is an inaccessible element was carrying two silent resolution
 // defects as well.
-import domain.{ MenuItemId, PositiveInt }
+import domain.{ MenuItem, PositiveInt }
 import cart.commands.{ add_to_cart }
 
-view AddButton(item: MenuItemId) !{} {
+view AddButton(item: MenuItem) !{} {
     // ERROR: interactive behavior on a non-interactive element. The add's
     // answer is discarded by name (ADR-0159), so the element is this
     // fixture's one defect.

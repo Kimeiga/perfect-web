@@ -2,9 +2,11 @@
   "store.name": "Blue Bottle",
   "store.description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning.",
   "menu": [
-    { "id": "espresso", "name": "Espresso", "description": "A double shot, pulled short.", "price": { "minor_units": 350, "display": "$3.50" } },
-    { "id": "cortado", "name": "Cortado", "description": "Espresso cut with an equal part of warm milk.", "price": { "minor_units": 425, "display": "$4.25" } },
-    { "id": "cold-brew", "name": "Cold Brew", "description": "Steeped for eighteen hours and served over ice.", "price": { "minor_units": 475, "display": "$4.75" } }
+    { "id": "espresso", "name": "Espresso", "description": "A double shot, pulled short.", "price": { "minor_units": 350 }, "price.display": "$3.50" },
+    { "id": "cortado", "name": "Cortado", "description": "Espresso cut with an equal part of warm milk.", "price": { "minor_units": 425 }, "price.display": "$4.25" },
+    { "id": "cold-brew", "name": "Cold Brew", "description": "Steeped for eighteen hours and served over ice.", "price": { "minor_units": 475 }, "price.display": "$4.75" }
   ],
-  "cart.line_count": 0
+  "cart.line_count": 0,
+  "cart.lines": [],
+  "cart.subtotal.display": "$0.00"
 }

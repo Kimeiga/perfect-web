@@ -14,14 +14,17 @@ import context.{ current_session }
 // The accepted corpus's `Cart` reads what this command writes, and listens
 // for this event (ADR-0101).
 import Events.{ CartChanged }
-import domain.{ MenuItemId, PositiveInt }
+import domain.{ MenuItemId }
 import domain.{ CartError, InteractionId }
 
-command remove_from_cart(item: MenuItemId, quantity: PositiveInt)
+command remove_from_cart(item: MenuItemId)
     -> Result<domain.Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
-    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
+    // The line, taken away from the cart it was given (ADR-0172). Until
+    // 2026-10-03 this added a line, `Carts.with_line`, which now takes the
+    // item a page showed.
+    optimistic    Cart(current_session()) as cart => Carts.without(cart, item)
     invalidates   Cart(current_session())
     emits         CartChanged(current_session())
 {

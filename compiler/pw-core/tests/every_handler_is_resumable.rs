@@ -99,7 +99,7 @@ fn events(b: &pw_core::build::Build) -> Vec<(String, Vec<String>)> {
 /// A page over the store's menu, whose view holds `view`.
 fn page(view: &str) -> String {
     format!(
-        "module t\n\nimport store.page.{{ Menu, add_to_cart }}\nimport domain.{{ StoreId, PositiveInt }}\n\n\
+        "module t\n\nimport store.page.{{ Menu, add_to_cart, increase_in_cart }}\nimport domain.{{ StoreId, PositiveInt }}\n\n\
          page P(id: StoreId) {{\n    cache private\n\n    signal count: Int = 0\n\n    \
          let menu = query Menu(id)\n\n    view {{\n        <main>\n{view}\n        </main>\n    }}\n}}\n"
     )
@@ -129,7 +129,7 @@ fn a_handler_captures_what_it_reads_of_the_page() {
     // A loop's item, read by a field: what the listed form would carry.
     let inferred = page(
         "            {#each menu as item (item.id)}\n                \
-         <button type=\"button\" on:press={() => { let _added = add_to_cart(item.id, PositiveInt(1)) }}>Add</button>\n\
+         <button type=\"button\" on:press={() => { let _added = increase_in_cart(item.id) }}>More</button>\n\
          \x20           {/each}",
     );
     let listed = inferred.replace(
@@ -143,6 +143,16 @@ fn a_handler_captures_what_it_reads_of_the_page() {
     let b = events(&pw_core::build::build(&units(&listed)).expect("builds"));
     assert_eq!(a[0].1, ["item.id"], "inferred");
     assert_eq!(a[0].1, b[0].1, "the same as the listed form");
+
+    // A loop's item, whole, given to a command that takes it (ADR-0172).
+    let whole = page(
+        "            {#each menu as item (item.id)}\n                \
+         <button type=\"button\" on:press={() => { let _added = add_to_cart(item, PositiveInt(1)) }}>Add</button>\n\
+         \x20           {/each}",
+    );
+    assert_eq!(reported(&whole), Vec::<String>::new(), "{whole}");
+    let found = events(&pw_core::build::build(&units(&whole)).expect("builds"));
+    assert_eq!(found[0].1, ["item"]);
 
     // A parameter of the page, whole.
     let param =
@@ -173,7 +183,7 @@ fn a_listed_capture_is_still_held_to_what_the_handler_reads() {
     // binding of the page is the defect it was.
     let src = page(
         "            {#each menu as item (item.id)}\n                \
-         <button type=\"button\" on:press={resumable() => { let _added = add_to_cart(item.id, PositiveInt(1)) }}>Add</button>\n\
+         <button type=\"button\" on:press={resumable() => { let _added = add_to_cart(item, PositiveInt(1)) }}>Add</button>\n\
          \x20           {/each}",
     );
     let found = reported(&src);
@@ -183,6 +193,8 @@ fn a_listed_capture_is_still_held_to_what_the_handler_reads() {
             .any(|d| d.starts_with("PW5025") && d.contains("`item`")),
         "{found:?}"
     );
+    // The program's one defect.
+    assert!(found.iter().all(|d| d.starts_with("PW5025")), "{found:?}");
 }
 
 #[test]

@@ -5,7 +5,7 @@
     "params": [
       "id"
     ],
-    "schema": "d047e954d3b97bd3",
+    "schema": "b76101e02fa0ca58",
     "chunks": [
       {
         "chunk": "static",
@@ -168,10 +168,10 @@
                 "id": 9,
                 "owner": 0,
                 "event": "press",
-                "handler": "0e75dbe9268fceb8",
+                "handler": "96bcd53ac130238d",
                 "name": "add_to_cart",
                 "captures": [
-                  "item.id"
+                  "item"
                 ]
               }
             },
@@ -184,7 +184,7 @@
       },
       {
         "chunk": "static",
-        "value": "\n                </ul>\n            </section>\n\n            <section aria-label=\"Cart\">\n                <p aria-live=\"polite\" aria-atomic=\"true\">Items in cart: <span id=\"cart-count\">"
+        "value": "\n                </ul>\n            </section>\n\n            <section aria-labelledby=\"cart-heading\">\n                \n                <h2 id=\"cart-heading\" tabindex=\"-1\">Cart</h2>\n                <p aria-live=\"polite\" aria-atomic=\"true\">Items in cart: <span id=\"cart-count\">"
       },
       {
         "chunk": "dynamic",
@@ -197,27 +197,246 @@
       },
       {
         "chunk": "static",
-        "value": "</span></p>\n                <p id=\"cart-notice\" role=\"status\">"
+        "value": "</span></p>\n                <p data-pw=\"1\" id=\"cart-empty\" "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "boolean_attribute",
+          "id": 11,
+          "owner": 1,
+          "name": "hidden",
+          "value": "cart.lines"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">Your cart is empty.</p>\n                <ul id=\"cart-lines\">\n                    "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "each",
+          "id": 12,
+          "collection": "cart.lines",
+          "binding": "line",
+          "key": "item_id",
+          "body": [
+            {
+              "chunk": "static",
+              "value": "\n                        <li>\n                            <span>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 13,
+                "value": "line.name",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                            <button data-pw=\"2\" type=\"button\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 14,
+                "owner": 2,
+                "name": "aria-label",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "Decrease quantity of "
+                  },
+                  {
+                    "segment": "value",
+                    "value": "line.name"
+                  }
+                ],
+                "context": "attribute"
+              }
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 15,
+                "owner": 2,
+                "event": "press",
+                "handler": "15483a28f370066a",
+                "name": "decrease_in_cart",
+                "captures": [
+                  "line.item_id"
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                                −\n                            </button>\n                            <span>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 16,
+                "value": "line.quantity.count",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                            <button data-pw=\"3\" type=\"button\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 17,
+                "owner": 3,
+                "name": "aria-label",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "Increase quantity of "
+                  },
+                  {
+                    "segment": "value",
+                    "value": "line.name"
+                  }
+                ],
+                "context": "attribute"
+              }
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 18,
+                "owner": 3,
+                "event": "press",
+                "handler": "e54d74c7f76a6a78",
+                "name": "increase_in_cart",
+                "captures": [
+                  "line.item_id"
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                                +\n                            </button>\n                            <span>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 19,
+                "value": "line.total.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                            <button data-pw=\"4\" type=\"button\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 20,
+                "owner": 4,
+                "name": "aria-label",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "Remove "
+                  },
+                  {
+                    "segment": "value",
+                    "value": "line.name"
+                  }
+                ],
+                "context": "attribute"
+              }
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 21,
+                "owner": 4,
+                "event": "press",
+                "handler": "0884d13a19812a03",
+                "name": "remove_from_cart",
+                "captures": [
+                  "line.item_id"
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                                Remove\n                            </button>\n                        </li>\n                    "
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n                </ul>\n                <p>Subtotal: <span id=\"cart-subtotal\">"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 11,
+          "id": 22,
+          "value": "cart.subtotal.display",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span></p>\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "conditional",
+          "id": 23,
+          "value": "cart.lines",
+          "then": [
+            {
+              "chunk": "static",
+              "value": "<p id=\"cart-fees\">Delivery fee and taxes are added at checkout.</p>"
+            }
+          ],
+          "otherwise": []
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n                <p id=\"cart-notice\" role=\"status\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 24,
           "value": "notice",
           "context": "text"
         }
       },
       {
         "chunk": "static",
-        "value": "</p>\n                <button data-pw=\"1\" id=\"clear-cart\" type=\"button\""
+        "value": "</p>\n                <button data-pw=\"5\" id=\"clear-cart\" type=\"button\""
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 12,
-          "owner": 1,
+          "id": 25,
+          "owner": 5,
           "event": "press",
           "handler": "b5c3e56ff370a6a8",
           "name": "clear_cart"
@@ -231,7 +450,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 13,
+          "id": 26,
           "query": "store.page.Recommendations",
           "args": [
             "id"
@@ -254,7 +473,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "each",
-                  "id": 14,
+                  "id": 27,
                   "collection": "items",
                   "binding": "item",
                   "key": "id",
@@ -267,7 +486,7 @@
                       "chunk": "dynamic",
                       "value": {
                         "part": "text",
-                        "id": 15,
+                        "id": 28,
                         "value": "item.name",
                         "context": "text"
                       }

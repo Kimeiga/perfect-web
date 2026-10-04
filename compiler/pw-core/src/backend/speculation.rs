@@ -37,6 +37,8 @@
 //!   would show two values at once;
 //! - a part whose value has no text form here (a `Float`, ADR-0074).
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::hir::{DeclId, DeclKind, Expr, ExprId, Hir, Pattern};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
 use crate::signatures::Signatures;
@@ -67,8 +69,140 @@ pub struct Speculation {
     pub bindings: Vec<Binding>,
     /// The commands it speculates for, by component id.
     pub commands: Vec<String>,
+    /// **Each part the browser renders again with a speculation**
+    /// (ADR-0172): an attribute, a block or a loop at the top of the page
+    /// that reads a speculated value. The document carries each one's
+    /// template, which the browser's copy of the renderer renders.
+    pub regions: Vec<u32>,
     /// The ES module.
     pub source: String,
+}
+
+/// **A part a speculation renders again in the browser** (ADR-0172).
+struct Region {
+    /// The speculated binding it reads: `cart`.
+    binding: String,
+    part: u32,
+    kind: crate::template_ir::ReadKind,
+}
+
+/// **A speculated loop's rows** (ADR-0172): what the browser needs to render
+/// one, beyond its template.
+#[derive(Clone, Default)]
+struct Rows {
+    /// The loop's part.
+    part: u32,
+    /// The name a row binds: `line`.
+    binding: String,
+    /// The list, by its path: `cart.lines`.
+    collection: String,
+    /// The field a row is keyed by: `item_id`.
+    key: String,
+    /// Each read through a member, by its path in the row, and the function
+    /// that computes it: `quantity.count`.
+    computed: Vec<(String, usize)>,
+}
+
+/// Each part inside the part `id` of `chunks`, and each name a loop, an arm
+/// or a stream's part binds inside it: what a region holds. `None` where no
+/// part is `id`.
+fn inside(
+    chunks: &[crate::template_ir::Chunk],
+    id: u32,
+) -> Option<(BTreeSet<u32>, BTreeSet<String>)> {
+    use crate::template_ir::Chunk;
+    fn collect(
+        p: &crate::template_ir::Part,
+        parts: &mut BTreeSet<u32>,
+        names: &mut BTreeSet<String>,
+    ) {
+        use crate::template_ir::{Chunk, Part};
+        match p {
+            Part::Each { binding, .. } => {
+                names.insert(binding.clone());
+            }
+            Part::Match { arms, .. } => {
+                for arm in arms {
+                    names.extend(arm.binding.iter().cloned());
+                    names.extend(arm.fields.iter().cloned());
+                }
+            }
+            Part::Stream { ready, failed, .. } => {
+                names.extend(ready.binding.iter().cloned());
+                names.extend(failed.binding.iter().cloned());
+            }
+            _ => {}
+        }
+        for region in p.nested() {
+            for c in region {
+                if let Chunk::Dynamic(q) = c {
+                    if let Some(id) = q.id() {
+                        parts.insert(id.0);
+                    }
+                    collect(q, parts, names);
+                }
+            }
+        }
+    }
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if p.id().is_some_and(|i| i.0 == id) {
+            let (mut parts, mut names) = (BTreeSet::new(), BTreeSet::new());
+            collect(p, &mut parts, &mut names);
+            return Some((parts, names));
+        }
+        for region in p.nested() {
+            if let Some(found) = inside(region, id) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+/// The part `id` of `chunks`, wherever it is.
+fn part_of(chunks: &[crate::template_ir::Chunk], id: u32) -> Option<&crate::template_ir::Part> {
+    use crate::template_ir::Chunk;
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if p.id().is_some_and(|i| i.0 == id) {
+            return Some(p);
+        }
+        for region in p.nested() {
+            if let Some(found) = part_of(region, id) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+/// The element of the list at `fields` in a resource's value: `cart.lines`'s
+/// `CartLine` (ADR-0172).
+fn element_at(
+    cx: &Context<'_>,
+    resource: DefId,
+    fields: &[&str],
+) -> Option<crate::resolved::ResolvedType> {
+    let mut ty = cx.sigs.by_def(resource)?.result()?.clone();
+    if ty.as_builtin() == Some(crate::resolved::Builtin::Result) {
+        ty = ty.args().first()?.clone();
+    }
+    for field in fields {
+        ty = cx
+            .sigs
+            .type_decl(ty.def_id()?)?
+            .record
+            .as_ref()?
+            .iter()
+            .find(|(n, _)| n == field)?
+            .1
+            .resolved()?
+            .clone();
+    }
+    (ty.as_builtin() == Some(crate::resolved::Builtin::List))
+        .then(|| ty.args().first().cloned())
+        .flatten()
 }
 
 /// What one page compiled to, or why it did not.
@@ -438,46 +572,243 @@ fn page_module(
         }
     }
 
-    let lowered = crate::template_ir::lowered(
+    // With what each handler captures (ADR-0134): a region writes it, so a
+    // capture of what the browser does not hold is refused below. Lowered
+    // without it, an event part captured nothing, and such a handler built.
+    let Some(lowered) = crate::template_ir::lowered(
         cx.hirs,
         cx.ws,
-        &crate::template_ir::Handlers::new(),
+        &crate::resume::capture_map(cx.hirs, cx.sigs),
         unit,
         page_id,
-    );
-    // **What this module does not render again** (ADR-0170): an attribute,
-    // what a block decides by, or a loop's list, reading a speculated value.
-    // The speculation would not reach it, and the page would show the
-    // speculated value beside the one it held. Until 2026-10-03 such a part
-    // was left as it was, and nothing said so.
-    for read in lowered.iter().flat_map(|l| l.reads.iter()) {
+    ) else {
+        return Encoding::Blocked {
+            why: format!("`{page}` has no template"),
+        };
+    };
+    let speculates = |root: &str| speculated.iter().any(|(n, ..)| n == root);
+
+    // **What the browser renders again with a speculation** (ADR-0172):
+    // each attribute, block and loop at the top of the page that reads a
+    // speculated value. Until 2026-10-03 one was refused (ADR-0170), and
+    // until then it was left as it was, beside a count that moved.
+    let mut regions: Vec<Region> = Vec::new();
+    for read in &lowered.reads {
         let root = read.path.split('.').next().unwrap_or_default();
-        if !speculated.iter().any(|(n, ..)| n == root) {
+        if read.nested || !speculates(root) || regions.iter().any(|r| r.part == read.part.0) {
             continue;
         }
-        let what = match read.kind {
-            crate::template_ir::ReadKind::Attribute => "an attribute",
-            crate::template_ir::ReadKind::Subject => "what a block decides by",
-            crate::template_ir::ReadKind::List => "a loop's list",
+        regions.push(Region {
+            binding: root.to_string(),
+            part: read.part.0,
+            kind: read.kind,
+        });
+    }
+    // What a region holds, the browser renders from what it holds: the
+    // speculated value, the page's signals, and the names bound inside it.
+    // Anything else it does not hold, as a signal's block does not (ADR-0137).
+    let signals: BTreeSet<String> = lowered.instances.iter().map(|i| i.name.clone()).collect();
+    let mut within: Vec<(u32, BTreeSet<u32>)> = Vec::new();
+    for region in &regions {
+        let Some((parts, bound)) = inside(&lowered.template.chunks, region.part) else {
+            continue;
         };
-        return Encoding::Unsupported {
-            construct: "a speculated value read where this module does not render it again",
-            reason: format!(
-                "part {} of `{page}` reads `{}` in {what}, which a speculation would not reach",
-                read.part.0, read.path
-            ),
+        let held =
+            |root: &str| root == region.binding || bound.contains(root) || signals.contains(root);
+        let paths = lowered
+            .holes
+            .iter()
+            .filter(|h| parts.contains(&h.part.0))
+            .map(|h| (h.part.0, h.path.clone()))
+            .chain(
+                lowered
+                    .reads
+                    .iter()
+                    .filter(|r| parts.contains(&r.part.0))
+                    .map(|r| (r.part.0, r.path.clone())),
+            );
+        for (part, path) in paths {
+            let root = path.split('.').next().unwrap_or_default();
+            if !held(root) {
+                return Encoding::Unsupported {
+                    construct: "a value a speculated region reads that the browser does not hold",
+                    reason: format!(
+                        "part {part} of `{page}` reads `{path}` inside part {}, which the \
+                         browser renders again with a speculation of `{}`",
+                        region.part, region.binding
+                    ),
+                };
+            }
+        }
+        // And what each handler in it captures, which the region writes.
+        for part in &parts {
+            if let Some(crate::template_ir::Part::Event {
+                captures, renames, ..
+            }) = part_of(&lowered.template.chunks, *part)
+            {
+                for path in captures {
+                    let root = path.split('.').next().unwrap_or_default();
+                    let root = renames
+                        .get(root)
+                        .map(|to| to.split('.').next().unwrap_or_default().to_string())
+                        .unwrap_or_else(|| root.to_string());
+                    if !held(&root) {
+                        return Encoding::Unsupported {
+                            construct: "a value a speculated region reads that the browser does not hold",
+                            reason: format!(
+                                "part {part} of `{page}` captures `{path}` inside part {}, \
+                                 which the browser renders again with a speculation of `{}`",
+                                region.part, region.binding
+                            ),
+                        };
+                    }
+                }
+            }
+        }
+        within.push((region.part, parts));
+    }
+    let in_a_region = |part: u32| within.iter().any(|(_, parts)| parts.contains(&part));
+    // A speculated value read inside a block no region renders: nothing
+    // would render it again.
+    for read in &lowered.reads {
+        let root = read.path.split('.').next().unwrap_or_default();
+        if read.nested && speculates(root) && !in_a_region(read.part.0) {
+            return Encoding::Unsupported {
+                construct: "a speculated value read where this module does not render it again",
+                reason: format!(
+                    "part {} of `{page}` reads `{}` inside a block, which a speculation \
+                     would not reach",
+                    read.part.0, read.path
+                ),
+            };
+        }
+    }
+
+    // **What a speculated row reads of its item through a member** (ADR-0172):
+    // computed here, as a host computes it for a row (ADR-0169), and set in
+    // the row whole, by its path (ADR-0170).
+    let mut typed = BTreeMap::new();
+    let mut rows: Vec<Rows> = Vec::new();
+    for region in regions
+        .iter()
+        .filter(|r| r.kind == crate::template_ir::ReadKind::List)
+    {
+        let Some(crate::template_ir::Part::Each {
+            binding,
+            collection,
+            key,
+            ..
+        }) = part_of(&lowered.template.chunks, region.part)
+        else {
+            continue;
         };
+        let Some((_, resource, _, _)) = speculated.iter().find(|(n, ..)| *n == region.binding)
+        else {
+            continue;
+        };
+        let fields: Vec<&str> = collection.split('.').skip(1).collect();
+        let Some(element) = element_at(cx, *resource, &fields) else {
+            return Encoding::Unsupported {
+                construct: "a speculated loop over what is not a list of records",
+                reason: format!("part {} of `{page}` iterates `{collection}`", region.part),
+            };
+        };
+        let span = crate::hir::Span::default();
+        let element = lowered!(lower::backend_type(cx, &element, &span));
+        let parts = within
+            .iter()
+            .find(|(p, _)| *p == region.part)
+            .map(|(_, parts)| parts.clone())
+            .unwrap_or_default();
+        let mut computed: Vec<(String, usize)> = Vec::new();
+        let written = lowered
+            .holes
+            .iter()
+            .filter(|h| parts.contains(&h.part.0))
+            .map(|h| {
+                (
+                    h.path.clone(),
+                    h.origin,
+                    crate::template_ir::ReadAt::Expr(h.expr),
+                )
+            })
+            .chain(
+                lowered
+                    .reads
+                    .iter()
+                    .filter(|r| parts.contains(&r.part.0))
+                    .map(|r| (r.path.clone(), r.origin, r.at)),
+            )
+            .collect::<Vec<_>>();
+        for (path, origin, at) in written {
+            let Some((root, rest)) = path.split_once('.') else {
+                continue;
+            };
+            let crate::template_ir::ReadAt::Expr(expr) = at else {
+                continue;
+            };
+            if root != binding.as_str()
+                || computed.iter().any(|(p, _)| p == rest)
+                || !crate::page_values::calls_a_member(
+                    cx.hirs, cx.ws, cx.sigs, &mut typed, origin, at,
+                )
+            {
+                continue;
+            }
+            // Compiled in the body it is written in, where the item may have
+            // another name: a view's parameter (ADR-0136).
+            let (u, d) = origin;
+            let Some(body) = cx.hirs[u].decl(d).body.map(|b| cx.hirs[u].body(b)) else {
+                continue;
+            };
+            let Some(own) = crate::template_ir::value_path_of(body, expr) else {
+                continue;
+            };
+            let (name, own_rest) = own.split_once('.').unwrap_or((own.as_str(), ""));
+            if own_rest != rest {
+                return Encoding::Unsupported {
+                    construct: "a speculated row's read through a view given a field",
+                    reason: format!(
+                        "`{path}` in part {} of `{page}` is read through a view given a field \
+                         of its item",
+                        region.part
+                    ),
+                };
+            }
+            let f = lowered!(lower::pure_expr(
+                cx,
+                u,
+                d,
+                expr,
+                &[(name.to_string(), element.clone())],
+                &format!("{page}#row{}", region.part),
+                body.expr_span(expr),
+            ));
+            functions.push(f);
+            computed.push((rest.to_string(), functions.len() - 1));
+        }
+        rows.push(Rows {
+            part: region.part,
+            binding: binding.clone(),
+            collection: collection.clone(),
+            key: key.clone().unwrap_or_default(),
+            computed,
+        });
     }
 
     // Each part reading a speculated binding: the page's own, and a view's
     // composed into it (ADR-0136), by the path the template reads.
     let mut reads: Vec<(String, u32, usize)> = Vec::new();
-    for hole in lowered.map(|l| l.holes).unwrap_or_default() {
+    for hole in lowered.holes.clone() {
         let root = hole.path.split('.').next().unwrap_or_default();
         let Some((_, _, _, value)) = speculated.iter().find(|(n, ..)| n == root) else {
             continue;
         };
         if hole.nested {
+            // Rendered with its region (ADR-0172).
+            if in_a_region(hole.part.0) {
+                continue;
+            }
             return Encoding::Unsupported {
                 construct: "a speculated value read inside a block",
                 reason: format!(
@@ -564,6 +895,45 @@ fn page_module(
             .collect();
         source.push_str(&format!("  {}: {{ {} }},\n", json(name), mine.join(", ")));
     }
+    // Each region, by the binding it reads (ADR-0172): what the browser
+    // renders again from the speculated value, and for a loop, what each row
+    // reads through a member.
+    source.push_str("};\n\nexport const regions = {\n");
+    for (name, ..) in &speculated {
+        let mine: Vec<String> = regions
+            .iter()
+            .filter(|r| r.binding == *name)
+            .map(|r| match r.kind {
+                crate::template_ir::ReadKind::Attribute => {
+                    format!("{{ kind: \"attribute\", part: {} }}", r.part)
+                }
+                crate::template_ir::ReadKind::Subject => {
+                    format!("{{ kind: \"block\", part: {} }}", r.part)
+                }
+                crate::template_ir::ReadKind::List => {
+                    let found = rows
+                        .iter()
+                        .find(|rows| rows.part == r.part)
+                        .cloned()
+                        .unwrap_or_default();
+                    let reads: Vec<String> = found
+                        .computed
+                        .iter()
+                        .map(|(path, f)| format!("{}: f{f}", json(path)))
+                        .collect();
+                    format!(
+                        "{{ kind: \"list\", part: {}, binding: {}, collection: {}, key: {}, rows: {{ {} }} }}",
+                        r.part,
+                        json(&found.binding),
+                        json(&found.collection),
+                        json(&found.key),
+                        reads.join(", ")
+                    )
+                }
+            })
+            .collect();
+        source.push_str(&format!("  {}: [{}],\n", json(name), mine.join(", ")));
+    }
     source.push_str("};\n\nexport const commands = {\n");
     for command in commands {
         let mine: Vec<String> = transitions
@@ -621,6 +991,7 @@ fn page_module(
                 }
                 v
             }),
+        regions: regions.iter().map(|r| r.part).collect(),
         source,
     })
 }

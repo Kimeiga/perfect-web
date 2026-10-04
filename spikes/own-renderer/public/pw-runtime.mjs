@@ -498,10 +498,19 @@ for (const [binding, e] of Object.entries(parts.entries ?? {})) {
 
 let speculationModule = null;
 
-/** The page's speculation module, loaded with the first press that needs it. */
+/** The page's speculation module, loaded with the first press that needs it,
+ * and the renderer with it where a speculation renders a region (ADR-0172):
+ * a region is rendered between a batch's frames, so both are ready first. */
 function speculations() {
   if (!parts.speculation) return Promise.resolve(null);
-  speculationModule ??= import(parts.speculation);
+  speculationModule ??= Promise.all([
+    import(parts.speculation),
+    parts.regions ? renderModule() : null,
+  ]).then(([module, renderer]) => {
+    if (renderer) wasm = renderer;
+    speculationLoaded = module;
+    return module;
+  });
   return speculationModule;
 }
 
@@ -527,19 +536,21 @@ function render(module, binding) {
   for (const [part, read] of Object.entries(module.parts[binding] ?? {})) {
     setRange(addressOf([], Number(part)), textOf(read(value)));
   }
+  showRegions(module, binding, value, state.value);
 }
 
 let nextSpeculation = 0;
 
-/** Before a command's request: show each of its transitions this page can. */
-async function speculate(component, args) {
+/** Before a command's request: show each of its transitions this page can,
+ * each by the interaction its request carries (ADR-0172). */
+async function speculate(component, args, interaction) {
   const module = await speculations();
   const ids = [];
   for (const s of module?.commands?.[component] ?? []) {
     const state = current(module, s.binding);
     if (!state || state.value === undefined) continue;
     const id = nextSpeculation++;
-    state.pending.push({ id, transition: s.transition, args, until: undefined });
+    state.pending.push({ id, transition: s.transition, args, until: undefined, interaction });
     ids.push([s.binding, id]);
     render(module, s.binding);
     log.push(`speculated ${component} on ${s.binding}`);
@@ -578,7 +589,13 @@ function entryValue(frame) {
     state.raw = frame.value;
     state.value = undefined;
     const before = state.pending.length;
-    state.pending = state.pending.filter((p) => p.until === undefined || p.until > frame.version);
+    // A speculation the value includes is dropped (ADR-0172): by the
+    // interaction that committed it, which the value names whether or not
+    // the command's answer has come; or by the version its answer said.
+    const applied = new Set(frame.applied ?? []);
+    state.pending = state.pending.filter(
+      (p) => !applied.has(p.interaction) && (p.until === undefined || p.until > frame.version),
+    );
     if (before !== state.pending.length) {
       log.push(`reconciled ${binding} at version ${frame.version}`);
     }
@@ -586,13 +603,362 @@ function entryValue(frame) {
 }
 
 /** After a batch: a patch writes the authoritative text, and a speculation
- * still pending is shown over it again. */
+ * still pending is shown over it again. A region is shown as what the page
+ * holds when none is (ADR-0172): its list was shown as held before the
+ * batch, and the batch's patches made it what the page holds now. */
 async function reapplySpeculations() {
   if (!speculationModule) return;
   const module = await speculationModule;
   for (const [binding, state] of speculated) {
-    if (state.pending.length > 0) render(module, binding);
+    if (state.pending.length > 0 || module.regions?.[binding]?.length) render(module, binding);
   }
+}
+
+// --- ADR-0172: what a speculation renders again --------------------------
+//
+// A speculation reaches every part that reads its value. Text at the top of
+// the page is set by the module's own functions (ADR-0122). An attribute, a
+// block and a loop's rows are rendered by the browser's copy of the server's
+// renderer, from the speculated value, so the two agree by being one.
+//
+// A row the server rendered keeps its nodes, and focus with them: its parts
+// are set where they are, and one a speculation takes away is detached, not
+// destroyed. A row a speculation adds is the browser's, at an address the
+// browser's renderer derives, until the server's insert replaces it: the
+// server's addresses are a keyed hash under the deployment's key, which a
+// page does not hold.
+//
+// Before a batch of the server's patches applies, each list shows what the
+// page held again, so each patch finds the document it was derived from;
+// after, the speculation is shown again. A change's patches and its value
+// come in one batch (the server queues them in one hold), so the list's rows
+// are then the held value's, in its order.
+
+/** The renderer, and the speculation module, once loaded. */
+let wasm = null;
+let speculationLoaded = null;
+
+/** One call into the renderer: the request as JSON, the answer as text. */
+function renderCall(name, request) {
+  const bytes = new TextEncoder().encode(request);
+  const ptr = wasm.alloc(bytes.length);
+  new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
+  const code = wasm[name](ptr, bytes.length);
+  const out = new TextDecoder().decode(
+    new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()),
+  );
+  if (code !== 0) throw new Error(`${name} did not render: ${out}`);
+  return out;
+}
+
+/** A value as the renderer reads it: JSON, each `Int` written exactly. A
+ * `BigInt` has no JSON form of its own, and a number past 2^53 has no exact
+ * one. */
+function wire(v) {
+  if (typeof v === "bigint") return v.toString();
+  if (v === null || v === undefined) return "null";
+  if (Array.isArray(v)) return `[${v.map(wire).join(",")}]`;
+  if (typeof v === "object") {
+    return `{${Object.entries(v)
+      .map(([k, x]) => `${JSON.stringify(k)}:${wire(x)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v);
+}
+
+/** The list at `collection`, `cart.lines`, in its binding's value. */
+function listAt(value, collection) {
+  let v = value;
+  for (const field of collection.split(".").slice(1)) v = v?.[field];
+  return Array.isArray(v) ? v : [];
+}
+
+/** A row's key, at its path from the row: `item_id`. */
+function rowKey(item, path) {
+  let v = item;
+  for (const field of path.split(".").filter(Boolean)) v = v?.[field];
+  return String(v);
+}
+
+/** A row as the renderer reads it: its item, and what the row reads of it
+ * through a member, set whole by its path (ADR-0170). */
+function rowOf(region, item) {
+  const row = { ...item };
+  for (const [path, read] of Object.entries(region.rows ?? {})) row[path] = read(item);
+  return row;
+}
+
+/** What a region is rendered with: the value, and the page's signals. */
+function regionValues(binding, value) {
+  return `{${[[binding, value], ...signals]
+    .map(([k, v]) => `${JSON.stringify(k)}:${wire(v)}`)
+    .join(",")}}`;
+}
+
+/** The addresses of a loop's instances, in the document's order. */
+function instanceTokens(part) {
+  const loop = index.get(addressOf([], part));
+  const open = new RegExp(`^pw:s${part}@([A-Za-z0-9_-]+)$`);
+  const out = [];
+  for (let n = loop?.start?.nextSibling; n && n !== loop.end; n = n.nextSibling) {
+    const m = n.nodeType === Node.COMMENT_NODE && open.exec(n.data);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+/**
+ * loop part → its rows as the document shows them: each one's key, its
+ * address, the item it shows, whether the server rendered it, and its nodes
+ * while a speculation takes it away. Read from the document the first time a
+ * speculation shows the list, and again after each batch.
+ */
+const shownLists = new Map();
+
+function listRows(region, held) {
+  let state = shownLists.get(region.part);
+  if (!state) {
+    const tokens = instanceTokens(region.part);
+    state = {
+      rows: listAt(held, region.collection).map((item, i) => ({
+        key: rowKey(item, region.key),
+        token: tokens[i],
+        shown: item,
+        own: true,
+        detached: null,
+      })),
+    };
+    shownLists.set(region.part, state);
+  }
+  return state;
+}
+
+/** A row's nodes, its anchors included. */
+function rowNodes(part, token) {
+  const range = instanceRange(part, token);
+  return range ? instanceNodes(range) : [];
+}
+
+/**
+ * **Where focus goes when a row that has it goes** (ADR-0172): to the same
+ * control in the row after it, else in the row before it, else to what
+ * labels the region the list is in (WCAG 2.4.3). Until 2026-10-03 it went to
+ * the document's body, and a keyboard user had to find the cart again.
+ */
+function passFocus(nodes, part) {
+  const active = document.activeElement;
+  if (!active || !nodes.some((n) => n === active || n.contains?.(active))) return;
+  const owner = active.closest("[data-pw]")?.dataset.pw;
+  const open = new RegExp(`^pw:s${part}@`);
+  const isOpen = (n) => n?.nodeType === Node.COMMENT_NODE && open.test(n.data);
+  const control = (start) => {
+    const close = `pw:e${start.data.slice(`pw:s`.length)}`;
+    for (let n = start.nextSibling; n && !(n.nodeType === Node.COMMENT_NODE && n.data === close); n = n.nextSibling) {
+      if (n.nodeType !== Node.ELEMENT_NODE) continue;
+      const found = n.dataset?.pw === owner ? n : n.querySelector?.(`[data-pw="${owner}"]`);
+      if (found) return found;
+    }
+    return null;
+  };
+  let after = nodes[nodes.length - 1]?.nextSibling;
+  while (after && !isOpen(after)) after = after.nextSibling;
+  let before = nodes[0]?.previousSibling;
+  while (before && !isOpen(before)) before = before.previousSibling;
+  const labelled = nodes[0]?.parentElement?.closest("[aria-labelledby]");
+  const label = labelled && document.getElementById(labelled.getAttribute("aria-labelledby"));
+  const target = (after && control(after)) || (before && control(before)) || label;
+  target?.focus();
+}
+
+/** What changed in a row the document keeps, set where it is; the row
+ * rendered again, at its own address, where more than its text and its
+ * attributes changed. */
+function setRow(region, row, item, values) {
+  const template = JSON.stringify(parts.regions[region.part]);
+  const changes = JSON.parse(
+    renderCall(
+      "instance_changes",
+      `{"part":${template},"was":${wire(rowOf(region, row.shown))},"now":${wire(rowOf(region, item))},"values":${values}}`,
+    ),
+  );
+  if (changes === null) {
+    const html = renderCall(
+      "render_instance",
+      `{"part":${template},"item":${wire(rowOf(region, item))},"values":${values}}`,
+    );
+    const fresh = /^<!--pw:s\d+@([A-Za-z0-9_-]+)-->/.exec(html)?.[1];
+    const nodes = rowNodes(region.part, row.token);
+    const replaced = parseInstance(fresh ? html.replaceAll(`@${fresh}-->`, `@${row.token}-->`) : html);
+    nodes[0].before(...replaced);
+    for (const n of nodes) n.remove();
+    buildIndex();
+    return;
+  }
+  for (const [part, change] of changes) {
+    const at = { template: parts.schema, instances: [{ scope: region.part, instance: row.token }], part };
+    if ("text" in change) {
+      setRange(addressOf([[region.part, row.token]], part), change.text);
+    } else {
+      setAttributeAt(
+        at,
+        change.value === null
+          ? { op: "remove_attribute", name: change.attribute }
+          : { op: "set_attribute", name: change.attribute, value: change.value },
+      );
+    }
+  }
+}
+
+/** **A loop's rows, as `items` makes them** (ADR-0172): each row the
+ * document keeps set where it is, each it does not taken away, and each new
+ * one rendered by the browser, in the items' order. Focus in a row taken
+ * away passes on, unless the page is only showing what it holds before a
+ * batch, after which focus goes back to its row (`refocus`). */
+function showList(region, items, values, held, passing = true) {
+  const loop = index.get(addressOf([], region.part));
+  if (!loop?.start) return;
+  const state = listRows(region, held);
+  const wanted = items.map((item) => ({ key: rowKey(item, region.key), item }));
+  const keys = new Set(wanted.map((w) => w.key));
+  for (const row of state.rows) {
+    if (keys.has(row.key) || row.detached) continue;
+    const nodes = rowNodes(region.part, row.token);
+    if (passing) passFocus(nodes, region.part);
+    for (const n of nodes) n.remove();
+    if (row.own) row.detached = nodes;
+    else row.gone = true;
+  }
+  state.rows = state.rows.filter((row) => !row.gone);
+  buildIndex();
+  let after = loop.start;
+  const shown = [];
+  for (const w of wanted) {
+    let row = state.rows.find((r) => r.key === w.key);
+    if (!row) {
+      const html = renderCall(
+        "render_instance",
+        `{"part":${JSON.stringify(parts.regions[region.part])},"item":${wire(rowOf(region, w.item))},"values":${values}}`,
+      );
+      const nodes = parseInstance(html);
+      after.after(...nodes);
+      const token = /^pw:s\d+@([A-Za-z0-9_-]+)$/.exec(nodes[0]?.data ?? "")?.[1];
+      row = { key: w.key, token, shown: w.item, own: false, detached: null };
+      state.rows.push(row);
+      buildIndex();
+    } else {
+      if (row.detached) {
+        after.after(...row.detached);
+        row.detached = null;
+        buildIndex();
+      }
+      const nodes = rowNodes(region.part, row.token);
+      if (nodes[0] && nodes[0] !== after.nextSibling) {
+        moveNodes(after.parentNode, nodes, after.nextSibling);
+        buildIndex();
+      }
+      if (wire(rowOf(region, row.shown)) !== wire(rowOf(region, w.item))) {
+        setRow(region, row, w.item, values);
+      }
+      row.shown = w.item;
+    }
+    shown.push(row);
+    const nodes = rowNodes(region.part, row.token);
+    after = nodes[nodes.length - 1] ?? after;
+  }
+  state.rows = [...shown, ...state.rows.filter((r) => r.detached)];
+  bindEvents();
+}
+
+/** The last rendering of each block a speculation renders, so one rendered
+ * as it is is not replaced, and its nodes kept. */
+const shownBlocks = new Map();
+
+/** **Every region that reads `binding`, at `value`** (ADR-0172). */
+function showRegions(module, binding, value, held) {
+  const regions = module.regions?.[binding] ?? [];
+  if (regions.length === 0 || !wasm) return;
+  const values = regionValues(binding, value);
+  for (const region of regions) {
+    const template = JSON.stringify(parts.regions?.[region.part]);
+    if (region.kind === "list") {
+      showList(region, listAt(value, region.collection), values, held);
+    } else if (region.kind === "block") {
+      const html = renderCall("render_part", `{"part":${template},"values":${values}}`);
+      if (shownBlocks.get(region.part) !== html) {
+        shownBlocks.set(region.part, html);
+        replaceBlock(region.part, html);
+        buildIndex();
+        bindEvents();
+      }
+    } else if (region.kind === "attribute") {
+      const [name, written] = JSON.parse(
+        renderCall("attribute_value", `{"part":${template},"values":${values}}`),
+      );
+      setAttributeAt(
+        { template: parts.schema, instances: [], part: region.part },
+        written === null
+          ? { op: "remove_attribute", name }
+          : { op: "set_attribute", name, value: written },
+      );
+    }
+  }
+}
+
+/** The row of a speculated list that has focus, and the control in it:
+ * what focus goes back to once a batch has been applied (ADR-0172). */
+function focusedRow() {
+  const active = document.activeElement;
+  if (!active || active === document.body) return null;
+  for (const [part, state] of shownLists) {
+    for (const row of state.rows) {
+      if (row.detached) continue;
+      if (rowNodes(part, row.token).some((n) => n === active || n.contains?.(active))) {
+        return { part, key: row.key, owner: active.closest("[data-pw]")?.dataset.pw };
+      }
+    }
+  }
+  return null;
+}
+
+/** Focus back on its row's control, where the batch took it away; on what
+ * labels the list's region where the row is gone. */
+function refocus(focused) {
+  if (!focused) return;
+  const active = document.activeElement;
+  if (active && active !== document.body && active.isConnected) return;
+  const row = shownLists.get(focused.part)?.rows.find((r) => r.key === focused.key && !r.detached);
+  if (!row) {
+    const loop = index.get(addressOf([], focused.part));
+    const labelled = loop?.start?.parentElement?.closest("[aria-labelledby]");
+    document.getElementById(labelled?.getAttribute("aria-labelledby") ?? "")?.focus();
+    return;
+  }
+  for (const n of rowNodes(focused.part, row.token)) {
+    if (n.nodeType !== Node.ELEMENT_NODE) continue;
+    const control =
+      n.dataset?.pw === focused.owner ? n : n.querySelector?.(`[data-pw="${focused.owner}"]`);
+    if (control) {
+      control.focus();
+      return;
+    }
+  }
+}
+
+/** **Each list shown as the page holds it, before a batch's patches apply**
+ * (ADR-0172), and read from the document again after them. */
+function revertLists() {
+  if (!speculationLoaded || !wasm) return;
+  for (const [binding] of speculated) {
+    const state = current(speculationLoaded, binding);
+    if (!state || state.value === undefined) continue;
+    const values = regionValues(binding, state.value);
+    for (const region of speculationLoaded.regions?.[binding] ?? []) {
+      if (region.kind === "list" && shownLists.has(region.part)) {
+        showList(region, listAt(state.value, region.collection), values, state.value, false);
+      }
+    }
+  }
+  shownLists.clear();
 }
 
 // --- ADR-0130: signals ---------------------------------------------------
@@ -1251,10 +1617,11 @@ function bindEvents() {
             // Each command speculates before its request (ADR-0122), and its
             // speculation is resolved by the answer, whatever it is.
             command: async (component, args) => {
-              const ids = await speculate(component, args);
+              const interaction = `${press}-${calls++}`;
+              const ids = await speculate(component, args, interaction);
               let answer;
               try {
-                answer = await command(component, args, `${press}-${calls++}`);
+                answer = await command(component, args, interaction);
               } catch (error) {
                 await resolveSpeculation(ids, false);
                 throw error;
@@ -1509,6 +1876,11 @@ function applyFrame(frame) {
           }
           return;
         }
+        // A block a speculation renders too (ADR-0172): what the server
+        // rendered is what it shows now.
+        if (op.op === "replace_range" && !target.instances?.length) {
+          shownBlocks.set(target.part, op.html);
+        }
         if (op.op === "replace_text") {
           window.__pw.updated.push(key);
           log.push(`updated ${key} at version ${at}`);
@@ -1573,8 +1945,12 @@ let cursor = parts.cursor ?? 0;
  */
 function applyBatch(batch) {
   window.__pw.updated = [];
+  // The page's patches are derived from what it holds (ADR-0172), and focus
+  // in a row stays with its row through them.
+  const focused = focusedRow();
+  revertLists();
   for (const frame of batch.frames ?? []) applyFrame(frame);
-  reapplySpeculations();
+  reapplySpeculations().then(() => refocus(focused));
   // Advanced only AFTER applying. Advancing on receipt would acknowledge
   // frames a mid-batch failure never applied, and the server would drop them.
   cursor = batch.cursor ?? cursor;

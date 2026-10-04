@@ -267,6 +267,13 @@ pub enum StreamFrame {
         entry: ResourceEntryId,
         version: Version,
         value: serde_json::Value,
+        /// **The interactions whose commits this value includes** (ADR-0172),
+        /// most recent last: a page drops the speculation it made for one,
+        /// whichever comes first, this or the command's answer. Until
+        /// 2026-10-03 a value that came before its command's answer was
+        /// speculated on again, and showed the change twice.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        applied: Vec<String>,
     },
 }
 

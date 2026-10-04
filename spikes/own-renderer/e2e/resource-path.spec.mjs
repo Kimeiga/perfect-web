@@ -28,8 +28,12 @@ test("the command's response carries no cart value", async ({ page, request }) =
   // The claim, checked at its narrowest: if the response contained the number,
   // every test below would pass against a runtime that read it from there.
   await ready(page);
+  // The item as its button shows it (ADR-0172).
+  const item = JSON.parse(
+    await page.locator("#menu button").first().getAttribute("data-pw-captures"),
+  ).item;
   const response = await request.post("/command/store.page.add_to_cart", {
-    data: ["espresso", 1],
+    data: [item, 1],
     headers: { "pw-interaction": "response-1" },
   });
   const body = await response.json();

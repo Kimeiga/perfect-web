@@ -356,7 +356,7 @@ e9-values:
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.Store store.page.Menu store.page.Cart domain.line_count domain.display; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart domain.line_count domain.display domain.count domain.total domain.subtotal; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
@@ -2126,6 +2126,40 @@ e14-query-attributes:
        python3 scripts/query_attributes_mutations.py; \
      } > docs/evidence/E14/query-attributes.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/query-attributes.txt
+
+# ADR-0172: the cart lists its lines, and a speculation reaches every part
+# that reads it. The renderer's tests and its WebAssembly build's, the
+# compiler's, the transitions run under Node, the host's, the server's, the
+# cart in three engines, and the mutation controls.
+e14-cart-lines:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0172 - the cart lists its lines, and a speculation reaches every part that reads it"; echo; \
+       echo "produced by: just e14-cart-lines"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the renderer in the browser (runtime/pw-render-wasm)"; echo; \
+       cargo test --locked -p pw-render-wasm 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== an instance's changes, captures set in place (runtime/pw-render)"; echo; \
+       cargo test --locked -p pw-render --test instance_changes --test properties 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== regions, refusals, what a handler sends (compiler/pw-core)"; echo; \
+       cargo test --locked -p pw-core --test nested_lists --test handlers --test every_handler_is_resumable --test views_compose 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the transitions under Node, and each command against its reference (compiler/pw-conformance)"; echo; \
+       cargo test --locked -p pw-conformance --test speculation --test oracle 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a record and a list from a browser (runtime/pw-host)"; echo; \
+       cargo test --locked -p pw-host --features engine --test pleris_component --test list_arguments 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_lines_steps|a_line_records|a_sessions_changes|a_speculating_page|the_compiled_command_carries)|^test result'; \
+       echo; echo "== the cart in three engines (e2e/cart.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/cart.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/cart_lines_mutations.py)"; echo; \
+       python3 scripts/cart_lines_mutations.py; \
+     } > docs/evidence/E14/cart-lines.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/cart-lines.txt
 
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls

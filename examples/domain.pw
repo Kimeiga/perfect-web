@@ -64,6 +64,10 @@ fn count(n: PositiveInt) -> Int !{} { n.value }
 // The sum of two counts, for a transition that adds to a line (ADR-0122).
 fn added(a: PositiveInt, b: PositiveInt) -> PositiveInt !{} { PositiveInt(a.value + b.value) }
 
+// One fewer, for a line that holds more than one (ADR-0172). A line that
+// holds one goes instead: a `PositiveInt` holds no zero.
+fn fewer(n: PositiveInt) -> PositiveInt !{} { PositiveInt(n.value - 1) }
+
 type USD = USD { code: String }
 
 type Money<C> = Money { minor_units: Int }
@@ -133,8 +137,12 @@ type StoreError =
 
 // --- cart -----------------------------------------------------------------
 
+// A line of a cart: its item, as it was when the line was made, and how
+// many. The name and the price are recorded with the line (ADR-0172), as
+// charter §15.1's `unit_price` is: the line shows what was added.
 type CartLine = CartLine {
     item_id: MenuItemId,
+    name: String,
     quantity: PositiveInt,
     unit_price: Money<USD>,
 }
@@ -150,6 +158,16 @@ type Cart = Cart {
 // the host's value is this function's.
 fn line_count(cart: Cart) -> Int !{} {
     List.fold(cart.lines, 0, fn(n, line) n + line.quantity.count)
+}
+
+// **What a line costs** (ADR-0172): its price, as many times as it holds.
+fn total(line: CartLine) -> Money<USD> !{} {
+    Money { minor_units: line.unit_price.minor_units * line.quantity.value }
+}
+
+// **What a cart's lines cost together** (ADR-0172), before any fee.
+fn subtotal(cart: Cart) -> Money<USD> !{} {
+    Money { minor_units: List.fold(cart.lines, 0, fn(n, line) n + total(line).minor_units) }
 }
 
 type CartError =
@@ -254,9 +272,3 @@ type SyncError =
 // Whether two ids name one item. The representation is readable only here
 // (ADR-0048), so the comparison is written here (ADR-0122).
 fn same_item(a: MenuItemId, b: MenuItemId) -> Bool !{} { a.value == b.value }
-
-// **A line's price before the server has priced it** (ADR-0122). An
-// optimistic transition adds a line for an item the cart did not hold, and
-// the price is the server's to say: `add_to_cart` takes none. Zero until the
-// command's result replaces the speculation. No page renders it.
-fn unpriced() -> Money<USD> !{} { Money { minor_units: 0 } }

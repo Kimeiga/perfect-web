@@ -99,10 +99,24 @@
           "member": "domain.line_count"
         }
       ]
+    },
+    {
+      "part": 22,
+      "path": "cart.subtotal.display",
+      "binding": "cart",
+      "steps": [
+        {
+          "member": "domain.subtotal"
+        },
+        {
+          "member": "domain.display"
+        }
+      ]
     }
   ],
   "collections": [
-    "menu"
+    "menu",
+    "cart.lines"
   ],
   "signals": [
     {
@@ -112,11 +126,14 @@
   ],
   "live": [
     {
-      "part": 11,
+      "part": 24,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
+  ],
+  "blocks": [
+    23
   ],
   "streams": [
     {
@@ -140,7 +157,7 @@
       "streamed": true
     },
     {
-      "part": 13,
+      "part": 26,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -173,6 +190,35 @@
           "member": "domain.display"
         }
       ]
+    },
+    {
+      "collection": "cart.lines",
+      "binding": "line",
+      "path": "line.quantity.count",
+      "steps": [
+        {
+          "field": "quantity"
+        },
+        {
+          "member": "domain.count"
+        }
+      ]
+    },
+    {
+      "collection": "cart.lines",
+      "binding": "line",
+      "path": "line.total.display",
+      "steps": [
+        {
+          "member": "domain.total"
+        },
+        {
+          "member": "domain.display"
+        }
+      ]
     }
+  ],
+  "attributes": [
+    11
   ]
 }

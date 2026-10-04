@@ -8,9 +8,9 @@
 
 module Carts
 
-import domain.{ StoreId, Store, StoreError, Cart, CartLine, CartError, MenuItemId,
+import domain.{ StoreId, Store, StoreError, Cart, CartLine, CartError, MenuItem, MenuItemId,
     OrderId, OrderProgress, PositiveInt, Recommendation,
-    RecommendationError, PaymentError, TrackingError, same_item, added, unpriced }
+    RecommendationError, PaymentError, TrackingError, same_item, added, fewer }
 import List
 import capability.{ Session, SessionId }
 import browser.{ Element, MapHandle, MapError }
@@ -54,6 +54,14 @@ fn is_empty(s: Session<SessionId>) -> Bool !{ database.read<Carts> } {
 fn add(s: Session<SessionId>, item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError> !{ database.write<Carts> }
     host "store:data/carts#add"
 
+// One fewer of `item`; a line that holds one goes (ADR-0172).
+fn decrease(s: Session<SessionId>, item: MenuItemId) -> Result<Cart, CartError> !{ database.write<Carts> }
+    host "store:data/carts#decrease"
+
+// The line that holds `item`, gone (ADR-0172).
+fn remove(s: Session<SessionId>, item: MenuItemId) -> Result<Cart, CartError> !{ database.write<Carts> }
+    host "store:data/carts#remove"
+
 // Placing the order. Declared here because `R-030` called it and imported
 // nothing — the fixture whose subject is private data in a resume manifest was
 // also calling a name that did not exist.
@@ -69,13 +77,17 @@ fn add(s: Session<SessionId>, item: MenuItemId, quantity: PositiveInt) -> Result
 // `!{}` is the point: an optimistic transition runs on the client and is
 // discarded by restoring the value that was held, so it may not perform
 // anything an externally visible effect would leave behind.
-fn with_line(cart: Cart, item: MenuItemId, quantity: PositiveInt) -> Cart !{} {
-    let held = List.any(cart.lines, fn(line) same_item(line.item_id, item))
+//
+// A new line is made from the item as the page showed it, its name and its
+// price (ADR-0172): until 2026-10-03 the transition had the item's id alone,
+// and a line it made had no name and cost nothing until the server answered.
+fn with_line(cart: Cart, item: MenuItem, quantity: PositiveInt) -> Cart !{} {
+    let held = List.any(cart.lines, fn(line) same_item(line.item_id, item.id))
     if held {
-        Cart { lines: List.map(cart.lines, fn(line) grown(line, item, quantity)) }
+        Cart { lines: List.map(cart.lines, fn(line) grown(line, item.id, quantity)) }
     } else {
         Cart {
-            lines: List.concat(cart.lines, [CartLine { item_id: item, quantity: quantity, unit_price: unpriced() }]),
+            lines: List.concat(cart.lines, [CartLine { item_id: item.id, name: item.name, quantity: quantity, unit_price: item.price }]),
         }
     }
 }
@@ -83,10 +95,36 @@ fn with_line(cart: Cart, item: MenuItemId, quantity: PositiveInt) -> Cart !{} {
 // One line, grown by `quantity` when it holds `item` (ADR-0122).
 fn grown(line: CartLine, item: MenuItemId, quantity: PositiveInt) -> CartLine !{} {
     if same_item(line.item_id, item) {
-        CartLine { item_id: line.item_id, quantity: added(line.quantity, quantity), unit_price: line.unit_price }
+        CartLine { item_id: line.item_id, name: line.name, quantity: added(line.quantity, quantity), unit_price: line.unit_price }
     } else {
         line
     }
+}
+
+// **One more of `item`**, on the line that holds it (ADR-0172).
+fn with_more(cart: Cart, item: MenuItemId) -> Cart !{} {
+    Cart { lines: List.map(cart.lines, fn(line) grown(line, item, PositiveInt(1))) }
+}
+
+// **One fewer of `item`** (ADR-0172): the line that holds one goes, and one
+// that holds more holds one fewer.
+fn with_fewer(cart: Cart, item: MenuItemId) -> Cart !{} {
+    let kept = List.filter(cart.lines, fn(line) !(same_item(line.item_id, item) & line.quantity.count == 1))
+    Cart { lines: List.map(kept, fn(line) shrunk(line, item)) }
+}
+
+// One line, one fewer when it holds `item` (ADR-0172).
+fn shrunk(line: CartLine, item: MenuItemId) -> CartLine !{} {
+    if same_item(line.item_id, item) {
+        CartLine { item_id: line.item_id, name: line.name, quantity: fewer(line.quantity), unit_price: line.unit_price }
+    } else {
+        line
+    }
+}
+
+// **The line that holds `item`, gone** (ADR-0172).
+fn without(cart: Cart, item: MenuItemId) -> Cart !{} {
+    Cart { lines: List.filter(cart.lines, fn(line) !same_item(line.item_id, item)) }
 }
 
 fn checkout(id: Session<SessionId>) -> Result<Cart, CartError> !{ database.write<Carts> } {

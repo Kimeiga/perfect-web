@@ -724,20 +724,51 @@ pub(crate) fn backend_type(cx: &Context<'_>, ty: &ResolvedType, span: &Span) -> 
 }
 
 /// Can a browser send a value of this type to a command? A primitive, or an
-/// opaque type over one, which crosses as its representation (ADR-0033 §4).
+/// opaque type over one, which crosses as its representation (ADR-0033 §4); a
+/// list or a record of what it can send (ADR-0172).
 fn sendable(cx: &Context<'_>, t: &Type) -> bool {
+    sendable_within(cx, t, &mut BTreeSet::new())
+}
+
+/// [`sendable`], each record on the way remembered, so one that holds itself
+/// through a list is not walked for ever.
+fn sendable_within(cx: &Context<'_>, t: &Type, on_the_way: &mut BTreeSet<DefId>) -> bool {
     match t {
         Type::Int | Type::Float | Type::Bool | Type::Str => true,
-        Type::Nominal(def, _) => cx
-            .sigs
-            .type_decl(*def)
-            .and_then(|d| d.representation.as_ref())
-            .is_some_and(|r| {
-                matches!(
+        // A list of what a browser can send (ADR-0172).
+        Type::List(t) => sendable_within(cx, t, on_the_way),
+        Type::Nominal(def, _) => {
+            let Some(d) = cx.sigs.type_decl(*def) else {
+                return false;
+            };
+            if let Some(r) = d.representation.as_ref() {
+                return matches!(
                     ty_resolution(cx.sigs, r, &Span::default()),
                     Lowering::Lowered(Type::Int | Type::Float | Type::Bool | Type::Str)
-                )
-            }),
+                );
+            }
+            // **A record of what a browser can send** (ADR-0172): the item a
+            // page showed, which `add_to_cart` makes its new line from.
+            let Some(fields) = d.record.as_ref() else {
+                return false;
+            };
+            if !on_the_way.insert(*def) {
+                return true;
+            }
+            // A field crosses by its WIT name, and a host finds it in what a
+            // browser wrote by that name with each `-` a `_`. A name that
+            // would come back as another, `opensMinute` as `opens_minute`,
+            // is not sent: the host would not find it.
+            let all = fields.iter().all(|(name, f)| {
+                crate::wit::ident(name).replace('-', "_") == *name
+                    && matches!(
+                        ty_resolution(cx.sigs, f, &Span::default()),
+                        Lowering::Lowered(field) if sendable_within(cx, &field, on_the_way)
+                    )
+            });
+            on_the_way.remove(def);
+            all
+        }
         _ => false,
     }
 }
@@ -5179,8 +5210,9 @@ impl<'a> Lower<'a> {
                         construct: "a command parameter a browser cannot send",
                         span,
                         reason: format!(
-                            "argument {} of `{path}` is `{named}`; a handler sends primitives \
-                             and opaque types over them",
+                            "argument {} of `{path}` is `{named}`; a handler sends primitives, \
+                             opaque types over them, and lists and records of what it sends, \
+                             each field named in snake case",
                             i + 1
                         ),
                     };

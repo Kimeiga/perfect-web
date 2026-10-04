@@ -1424,3 +1424,16 @@ when it changes.
   top of a page.
 - The plan names each one, and a host sets it with `SetAttribute`, or
   removes a boolean one that goes, as the page's render writes it.
+
+[ADR-0172](DECISIONS/ADR-0172-the-cart-lists-its-lines.md):
+the cart lists its lines, and a speculation reaches every part that reads it.
+- Each line shows its name, − and + around its quantity, its total and
+  Remove, and the cart its subtotal (§15.3). `increase_in_cart`,
+  `decrease_in_cart` and `remove_from_cart` are optimistic and idempotent,
+  and `add_to_cart` takes the item the page showed, so a new line has its
+  name and price before the server answers.
+- The browser renders again each attribute, block and loop that reads a
+  speculated value, with the server's renderer, rows set where they are and
+  focus kept. A region reading what the browser does not hold is refused.
+- Corrections: a speculation whose value came before its answer was shown
+  twice, and two changes of one session could be sent at once.

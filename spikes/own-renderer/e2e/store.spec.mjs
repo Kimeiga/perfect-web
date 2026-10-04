@@ -62,11 +62,13 @@ test.describe("the document the server produced", () => {
     // their loop's 2, two instances 4 and two names 4 = 16. And what the store
     // and each item say of themselves (ADR-0166): 2, and 2 in each of three
     // instances = 8. And each item's price (ADR-0169): 2 in each of three
-    // instances = 6. 50 in all.
-    expect(shape.anchors).toBe(50);
+    // instances = 6. And the cart's own (ADR-0172): its lines' loop 2, its
+    // subtotal 2, its fees note's block 2 = 6. 56 in all.
+    expect(shape.anchors).toBe(56);
     // Three Add buttons and one Clear button. The Clear button exists so that
-    // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`.
-    expect(shape.anchoredElements, "the Add buttons and Clear").toBe(4);
+    // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
+    // the cart's empty message, whose `hidden` reads the cart (ADR-0172).
+    expect(shape.anchoredElements, "the Add buttons, Clear and the empty message").toBe(5);
     expect(shape.totalElements).toBeGreaterThan(20);
   });
 
@@ -146,14 +148,24 @@ test.describe("the update touches only what changed", () => {
       .toBeGreaterThan(0);
 
     const pw = await page.evaluate(() => window.__pw);
-    const cart = pw.parts.parts.find((p) => p.value === "cart.line_count");
-    // One ADDRESS, not one id: the cart part is outside every loop, so its
+    const part = (kind, value) =>
+      pw.parts.parts.find((p) => p.kind === kind && p.value === value).id;
+    // ADDRESSES, not ids: each cart part is outside every loop, so its
     // instance path is empty and it has exactly one live instance. The address
     // is `PartAddress::key` — schema, path, part — because the browser index
     // and `pw_document` must spell it the same way or a patch finds nothing.
-    expect(pw.updated, "exactly the cart's part").toEqual([
-      `${pw.parts.schema}/|${cart.id}`,
-    ]);
+    const at = (id) => `${pw.parts.schema}/|${id}`;
+    // The cart's parts, each what reads the cart (ADR-0172): its count, its
+    // subtotal, its first line, its empty message hidden, its fees shown.
+    expect([...pw.updated].sort(), "exactly the cart's parts").toEqual(
+      [
+        at(part("text", "cart.line_count")),
+        at(part("text", "cart.subtotal.display")),
+        `${at(part("each", "cart.lines"))}:insert_before`,
+        `${at(part("boolean_attribute", "cart.lines"))}:hidden`,
+        `${at(part("conditional", "cart.lines"))}:replace_range`,
+      ].sort(),
+    );
   });
 
   test("the menu's nodes keep their identity across the update", async ({ page }) => {

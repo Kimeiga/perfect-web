@@ -8,8 +8,8 @@
 //! names each such attribute, and a host sets it as it sets a text part.
 //!
 //! The store is the benchmark's, which does not change (ADR-0156), without
-//! `add_to_cart`'s speculation, which would not reach the attribute
-//! (ADR-0170).
+//! `add_to_cart`'s speculation, which these tests are not about. Until
+//! ADR-0172 it would not have reached the attribute (ADR-0170).
 
 use pw_core::check::Unit;
 use pw_core::lower::lower_file;

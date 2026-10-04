@@ -120,6 +120,8 @@ test.describe("the behavioural half", () => {
           window.__mutations.push({
             type: r.type,
             where: target?.id || target?.tagName || "?",
+            // Inside the cart's section, whose parts read the cart (ADR-0172).
+            cart: !!target?.closest("section[aria-labelledby='cart-heading']"),
             added: r.addedNodes.length,
             removed: r.removedNodes.length,
           });
@@ -139,11 +141,14 @@ test.describe("the behavioural half", () => {
 
     const mutations = await page.evaluate(() => window.__mutations);
     expect(mutations.length, "something was observed").toBeGreaterThan(0);
-    const elsewhere = mutations.filter((m) => m.where !== "cart-count");
+    // The cart's parts: its count, its lines, its subtotal, its messages
+    // (ADR-0172). Nothing else.
+    const elsewhere = mutations.filter((m) => !m.cart);
     expect(
       elsewhere,
-      "every mutation must be inside the cart's part; a replay would touch the menu",
+      "every mutation must be inside the cart's parts; a replay would touch the menu",
     ).toEqual([]);
+    expect(mutations.some((m) => m.where === "cart-count")).toBe(true);
   });
 
   test("the mutation observation can fail", async ({ page }) => {

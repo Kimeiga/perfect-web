@@ -2,10 +2,10 @@
 //!
 //! The store's `add_to_cart` declares `optimistic Cart(current_session()) as
 //! cart => Carts.with_line(cart, item, quantity)`, checked since ADR-0025 and
-//! executed by nothing until 2026-10-02. These compile the store page's
-//! speculation module and run it under Node: the transition the source
-//! states, over the value the server sends, and the page's own part read
-//! over the result.
+//! executed by nothing until 2026-10-02; a line's −, + and Remove declare
+//! theirs (ADR-0172). These compile the store page's speculation module and
+//! run it under Node: each transition the source states, over the value the
+//! server sends, and the page's own parts read over the result.
 
 use pw_conformance::units;
 use pw_core::backend::speculation::compile;
@@ -65,7 +65,7 @@ fn node(dir: &std::path::Path, script: &str) -> String {
 }
 
 #[test]
-fn the_stores_transition_runs_and_its_part_reads_the_result() {
+fn the_stores_transitions_run_and_its_parts_read_the_result() {
     let compiled = compile(&store(None)).expect("the store checks");
     assert_eq!(compiled.len(), 1, "one page speculates");
     let Encoding::Encoded(m) = &compiled[0].module else {
@@ -74,7 +74,12 @@ fn the_stores_transition_runs_and_its_part_reads_the_result() {
     assert_eq!(m.page, "store.page.StorePage");
     assert_eq!(
         m.commands,
-        ["store.page.add_to_cart"],
+        [
+            "store.page.add_to_cart",
+            "store.page.decrease_in_cart",
+            "store.page.increase_in_cart",
+            "store.page.remove_from_cart"
+        ],
         "clear_cart declares no optimistic clause, so it has no speculation"
     );
     assert_eq!(m.bindings.len(), 1);
@@ -89,32 +94,70 @@ fn the_stores_transition_runs_and_its_part_reads_the_result() {
         &dir,
         r#"
 import * as m from "./m.mjs";
-const held = m.decode.cart({ lines: [{ item_id: "espresso", quantity: 2, unit_price: { minor_units: 450 } }] });
-const [s] = m.commands["store.page.add_to_cart"];
-// The cart's one part, the count, whatever number the page gives it.
+const line = (item_id, name, quantity, minor_units) =>
+  ({ item_id, name, quantity, unit_price: { minor_units } });
+const held = m.decode.cart({ lines: [line("espresso", "Espresso", 2, 450)] });
+const run = (command, value, args) => m.commands[command][0].transition(value, args);
+// The cart's text at the top of the page: its count, then its subtotal.
 const reads = Object.values(m.parts.cart);
-if (reads.length !== 1) throw new Error(`the cart has ${reads.length} parts`);
-const [read] = reads;
-const more = s.transition(held, ["espresso", 1]);
-const other = s.transition(more, ["cortado", 3]);
+if (reads.length !== 2) throw new Error(`the cart has ${reads.length} parts`);
+const [count, subtotal] = reads;
+// What a row of the cart's lines reads through a member (ADR-0172).
+const list = m.regions.cart.find((r) => r.kind === "list");
+const rows = (v) =>
+  v.lines
+    .map((l) => `${l.name}x${list.rows["quantity.count"](l)}=${list.rows["total.display"](l)}`)
+    .join(" ");
+const espresso = { id: "espresso", name: "Espresso", description: "", price: { minor_units: 450 } };
+const cortado = { id: "cortado", name: "Cortado", description: "Short.", price: { minor_units: 375 } };
+const steps = [held];
+const step = (command, args) => steps.push(run(command, steps.at(-1), args));
+step("store.page.add_to_cart", [espresso, 1]);
+step("store.page.add_to_cart", [cortado, 3]);
+step("store.page.increase_in_cart", ["cortado"]);
+step("store.page.decrease_in_cart", ["espresso"]);
+step("store.page.remove_from_cart", ["espresso"]);
+const last = run("store.page.decrease_in_cart", m.decode.cart({ lines: [line("espresso", "Espresso", 1, 450)] }), ["espresso"]);
 const show = (v) => JSON.stringify(v, (_, x) => (typeof x === "bigint" ? Number(x) : x));
-console.log(String(read(held)), String(read(more)), String(read(other)));
+console.log(steps.map((v) => String(count(v))).join(" "));
+console.log(steps.map((v) => String(subtotal(v))).join(" "));
+console.log(steps.map(rows).join(" | "));
 console.log(show(held));
-console.log(show(other));
+console.log(show(steps[2]));
+console.log(show(last), String(count(last)), String(subtotal(last)));
 "#,
     );
     std::fs::remove_dir_all(&dir).ok();
     let lines: Vec<&str> = out.lines().collect();
-    assert_eq!(lines[0], "2 3 6", "the page's own count over each value");
     assert_eq!(
-        lines[1],
-        r#"{"lines":[{"item_id":"espresso","quantity":2,"unit_price":{"minor_units":450}}]}"#,
-        "the held value is not changed by a transition over it: restoring it is exact"
+        lines[0], "2 3 6 7 6 4",
+        "the page's own count over each value: add one, add three, one more, \
+         one fewer, a line gone"
+    );
+    assert_eq!(
+        lines[1], "$9.00 $13.50 $24.75 $28.50 $24.00 $15.00",
+        "and its subtotal, from each line's recorded price"
     );
     assert_eq!(
         lines[2],
-        r#"{"lines":[{"item_id":"espresso","quantity":3,"unit_price":{"minor_units":450}},{"item_id":"cortado","quantity":3,"unit_price":{"minor_units":0}}]}"#,
-        "a held item's line grows; a new item is a new, unpriced line"
+        "Espressox2=$9.00 | Espressox3=$13.50 | Espressox3=$13.50 Cortadox3=$11.25 | \
+         Espressox3=$13.50 Cortadox4=$15.00 | Espressox2=$9.00 Cortadox4=$15.00 | \
+         Cortadox4=$15.00",
+        "each row's count and total, as the list region computes them"
+    );
+    assert_eq!(
+        lines[3],
+        r#"{"lines":[{"item_id":"espresso","name":"Espresso","quantity":2,"unit_price":{"minor_units":450}}]}"#,
+        "the held value is not changed by a transition over it: restoring it is exact"
+    );
+    assert_eq!(
+        lines[4],
+        r#"{"lines":[{"item_id":"espresso","name":"Espresso","quantity":3,"unit_price":{"minor_units":450}},{"item_id":"cortado","name":"Cortado","quantity":3,"unit_price":{"minor_units":375}}]}"#,
+        "a held item's line grows; a new item's line has its name and price"
+    );
+    assert_eq!(
+        lines[5], r#"{"lines":[]} 0 $0.00"#,
+        "one fewer of a line that holds one: the line goes"
     );
 }
 

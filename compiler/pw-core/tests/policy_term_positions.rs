@@ -332,7 +332,7 @@ module t
 import Carts
 import Resources.{ Cart }
 import context.{ current_session }
-import domain.{ MenuItemId, PositiveInt, CartError }
+import domain.{ MenuItem, MenuItemId, PositiveInt, CartError }
 
 fn count(c: Cart) -> Int !{} { 0 }
 ";
@@ -343,12 +343,12 @@ fn count(c: Cart) -> Int !{} { 0 }
     // speculation is never replaced, PW5107.
     let ok = format!(
         "{HEAD}
-command good(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
+command good(item: MenuItem, quantity: PositiveInt) -> Result<Cart, CartError>
     requires    SignedIn
     optimistic  Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
     invalidates Cart(current_session())
 {{
-    Carts.add(current_session(), item, quantity)
+    Carts.add(current_session(), item.id, quantity)
 }}
 "
     );

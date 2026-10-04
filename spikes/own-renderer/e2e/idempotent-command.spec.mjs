@@ -48,8 +48,13 @@ test("two presses are two interactions", async ({ page }) => {
 
 test("a command request without an interaction is refused", async ({ page, request }) => {
   await ready(page);
+  // Well-formed arguments, the item as its button shows it (ADR-0172), so
+  // what is refused is the missing interaction.
+  const item = JSON.parse(
+    await page.locator("#menu button").first().getAttribute("data-pw-captures"),
+  ).item;
   const response = await request.post("/command/store.page.add_to_cart", {
-    data: ["espresso", 1],
+    data: [item, 1],
   });
   expect(response.status()).toBe(400);
   const body = await response.json();

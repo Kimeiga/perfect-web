@@ -451,6 +451,17 @@ struct Server {
     /// `store:data/carts#add` is its operation, and the compiled command calls
     /// it through the host.
     carts: Mutex<BTreeMap<String, Lines>>,
+    /// **Each session's committed interactions**, most recent last
+    /// (ADR-0172): what a value of its cart includes, which a page drops its
+    /// speculations by. As many as are kept for idempotency.
+    applied: Mutex<BTreeMap<String, std::collections::VecDeque<String>>>,
+    /// **One change of a session at a time** (ADR-0172): a command's commit
+    /// and the frames it fans out, so another command of the session cannot
+    /// land between the version a change is sent at, its value and the
+    /// interactions it names. Until 2026-10-03 two drains of one session
+    /// interleaved, and two values were sent at one version: a page took the
+    /// first, ignored the second, and lost a line until the next change.
+    sessions: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     /// The graph the compiler emitted: what each command emits and what each
     /// entry listens for. Read once; a test replaces it.
     graph: pw_materialize::Graph,
@@ -628,8 +639,23 @@ fn cart_entry(session: &str) -> ResourceEntryId {
 /// by the contract's own id so nothing here derives a name. Panics on a
 /// missing artifact rather than running without it: a command with no
 /// compiled body has no body at all now.
-/// A cart's lines, `(item, quantity)`, as the data layer holds them.
-type Lines = Vec<(String, i64)>;
+/// **A cart's line, as the data layer records it** (ADR-0172): its item, how
+/// many, and the item's name and price when the line was made, which the
+/// line shows from then on, as charter §15.1's `unit_price` says.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Line {
+    item: String,
+    quantity: i64,
+    name: String,
+    price: i64,
+}
+
+/// A cart's lines, as the data layer holds them.
+type Lines = Vec<Line>;
+
+/// **What a new line records of its item**, by the item's id: its name and
+/// its price in cents, as the stores' menus have them now (ADR-0172).
+type Catalog = BTreeMap<String, (String, i64)>;
 
 /// One compiled component: ready to run, and what its artifact imports.
 struct Loaded {
@@ -650,6 +676,14 @@ fn components() -> BTreeMap<String, Loaded> {
         "domain.line_count",
         // What a menu's row reads its price through (ADR-0169).
         "domain.display",
+        // A line's controls, and what the cart's lines read through
+        // (ADR-0172).
+        "store.page.increase_in_cart",
+        "store.page.decrease_in_cart",
+        "store.page.remove_from_cart",
+        "domain.count",
+        "domain.total",
+        "domain.subtotal",
     ] {
         let path = dir.join(format!("{id}.wasm"));
         let bytes = std::fs::read(&path).unwrap_or_else(|e| {
@@ -860,6 +894,8 @@ impl Server {
             materializer,
             graph,
             carts: Mutex::new(BTreeMap::new()),
+            applied: Mutex::new(BTreeMap::new()),
+            sessions: Mutex::new(BTreeMap::new()),
             components,
             menu: Mutex::new(default_menu()),
             dist,
@@ -946,8 +982,25 @@ impl Server {
             .lock()
             .expect("carts")
             .get(session)
-            .map(|lines| lines.iter().map(|(_, q)| q).sum())
+            .map(|lines| lines.iter().map(|l| l.quantity).sum())
             .unwrap_or(0)
+    }
+
+    /// **Each item a store holds now, with its name and price** (ADR-0172):
+    /// what a new line records. Store 47's menu as E7-P has changed it, and
+    /// store 48's.
+    fn catalog(&self) -> Arc<Catalog> {
+        let first = self.menu.lock().expect("menu").clone();
+        Arc::new(
+            first
+                .into_iter()
+                .chain(second_menu())
+                .map(|(id, name)| {
+                    let price = item_price(&id);
+                    (id, (name, price))
+                })
+                .collect(),
+        )
     }
 
     /// **Run one compiled command through the host.**
@@ -1051,7 +1104,7 @@ impl Server {
         args: &[Val],
         fail: bool,
     ) -> Result<(), String> {
-        let answered = self.command_answered(component_id, session, args, fail)?;
+        let answered = self.command_answered(component_id, session, args, fail, None)?;
         if answered.committed {
             return Ok(());
         }
@@ -1071,7 +1124,13 @@ impl Server {
         session: &str,
         args: &[Val],
         fail: bool,
+        interaction: Option<&str>,
     ) -> Result<Answered, String> {
+        // The session's one change at a time, through its frames (ADR-0172).
+        let session_lock = self.one_at_a_time(session);
+        let _one = session_lock
+            .lock()
+            .expect("one change of a session at a time");
         // One lock across the call and the commit: two presses in the same
         // instant both read the lines, and one of them would be lost —
         // `lazy-handler.spec.mjs` clicks twice concurrently to find exactly that.
@@ -1079,18 +1138,23 @@ impl Server {
             let mut carts = self.carts.lock().expect("carts");
             let current = carts.get(session).cloned().unwrap_or_default();
             let staged: Arc<Mutex<Option<Lines>>> = Arc::default();
-            let mut host = Self::data_layer(session, current, staged.clone(), fail);
+            let mut host = Self::data_layer(session, current, staged.clone(), fail, self.catalog());
             host.insert(
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
             );
             // Whether an item can be ordered now (charter §15.4), read inside
-            // the command that adds it.
+            // the command that adds it. One no store's menu has is not
+            // (ADR-0172): a page sends the item it showed, and a request can
+            // name any.
             let sold_out = self.sold_out.lock().expect("sold out").clone();
+            let catalog = self.catalog();
             host.insert(
                 "store:data/menus#is-available".to_string(),
                 Arc::new(move |args: &[Val]| match args {
-                    [Val::String(item)] => Ok(vec![Val::Bool(!sold_out.contains(item))]),
+                    [Val::String(item)] => Ok(vec![Val::Bool(
+                        catalog.contains_key(item) && !sold_out.contains(item),
+                    )]),
                     other => Err(format!("menus#is-available received {other:?}")),
                 }),
             );
@@ -1118,19 +1182,29 @@ impl Server {
                     why: None,
                 });
             };
-            let total: i64 = lines.iter().map(|(_, q)| q).sum();
+            let total: i64 = lines.iter().map(|l| l.quantity).sum();
             let emitted = events.clone();
             self.materializer.command(|tx| {
                 Materializer::set_state(tx, &format!("cart:{session}"), &total.to_string());
                 Ok::<_, String>(events)
             })?;
             carts.insert(session.to_string(), lines);
+            // What the cart's values include from now on, by the interaction
+            // that committed it (ADR-0172), recorded with the commit.
+            if let Some(interaction) = interaction {
+                let mut applied = self.applied.lock().expect("applied");
+                let mine = applied.entry(session.to_string()).or_default();
+                mine.push_back(interaction.to_string());
+                while mine.len() > INTERACTIONS_PER_SESSION {
+                    mine.pop_front();
+                }
+            }
             self.invalidate_queries(component_id, session, &emitted);
             // The materializer drains the committed event and regenerates the
             // entry it invalidates. The version moves because the RESOURCE
             // moved.
             drop(carts);
-            self.drain(session);
+            self.drain_held(session);
             Ok(Answered {
                 committed: true,
                 result,
@@ -1210,6 +1284,7 @@ impl Server {
                 session,
                 &args,
                 false,
+                interaction,
             )));
         };
         let id = interaction.ok_or_else(|| {
@@ -1250,7 +1325,8 @@ impl Server {
         let outcome = self
             .commands
             .try_command(&key, || {
-                answered(self.command_answered(component_id, session, &args, false)).kept()
+                answered(self.command_answered(component_id, session, &args, false, Some(id)))
+                    .kept()
             })
             .map_err(|e| format!("interaction `{id}`'s outcome is unknown: {e:?}"))?;
         Ok(Answered::from_kept(&outcome))
@@ -1269,6 +1345,7 @@ impl Server {
         current: Lines,
         staged: Arc<Mutex<Option<Lines>>>,
         fail: bool,
+        catalog: Arc<Catalog>,
     ) -> BTreeMap<String, HostFn> {
         let expired = || {
             vec![Val::Result(Err(Some(Box::new(Val::Variant(
@@ -1277,11 +1354,12 @@ impl Server {
             )))))]
         };
         let op = |name: &'static str,
-                  f: fn(&mut Lines, &[Val]) -> Result<(), String>|
+                  f: fn(&mut Lines, &[Val], &Catalog) -> Result<(), String>|
          -> (String, HostFn) {
             let this_session = session.to_string();
             let current = current.clone();
             let staged = staged.clone();
+            let catalog = catalog.clone();
             let run: HostFn = Arc::new(move |args: &[Val]| {
                 let Some(Val::String(s)) = args.first() else {
                     return Err(format!("carts#{name} received {args:?}"));
@@ -1294,7 +1372,7 @@ impl Server {
                 }
                 let mut staged = staged.lock().expect("staged");
                 let mut lines = staged.clone().unwrap_or_else(|| current.clone());
-                f(&mut lines, &args[1..])?;
+                f(&mut lines, &args[1..], &catalog)?;
                 let cart = cart_value(&lines);
                 if name != "current" {
                     *staged = Some(lines);
@@ -1304,24 +1382,59 @@ impl Server {
             (format!("store:data/carts#{name}"), run)
         };
         BTreeMap::from([
-            op("add", |lines, args| {
+            op("add", |lines, args, catalog| {
                 let [Val::String(item), Val::S64(quantity)] = args else {
                     return Err(format!("carts#add received {args:?}"));
                 };
-                match lines.iter_mut().find(|(i, _)| i == item) {
-                    Some((_, q)) => *q += quantity,
-                    None => lines.push((item.clone(), *quantity)),
+                match lines.iter_mut().find(|l| l.item == *item) {
+                    Some(line) => line.quantity += quantity,
+                    None => {
+                        // The line records its item as it is now (ADR-0172).
+                        let (name, price) = catalog
+                            .get(item)
+                            .cloned()
+                            .ok_or_else(|| format!("carts#add: no store has an item `{item}`"))?;
+                        lines.push(Line {
+                            item: item.clone(),
+                            quantity: *quantity,
+                            name,
+                            price,
+                        });
+                    }
                 }
                 Ok(())
             }),
-            op("clear", |lines, args| {
+            // One fewer; a line that holds one goes (ADR-0172). A line that
+            // is not there is not: another page took it away first.
+            op("decrease", |lines, args, _| {
+                let [Val::String(item)] = args else {
+                    return Err(format!("carts#decrease received {args:?}"));
+                };
+                if let Some(at) = lines.iter().position(|l| l.item == *item) {
+                    if lines[at].quantity > 1 {
+                        lines[at].quantity -= 1;
+                    } else {
+                        lines.remove(at);
+                    }
+                }
+                Ok(())
+            }),
+            // The line, gone (ADR-0172).
+            op("remove", |lines, args, _| {
+                let [Val::String(item)] = args else {
+                    return Err(format!("carts#remove received {args:?}"));
+                };
+                lines.retain(|l| l.item != *item);
+                Ok(())
+            }),
+            op("clear", |lines, args, _| {
                 if !args.is_empty() {
                     return Err(format!("carts#clear received {args:?}"));
                 }
                 lines.clear();
                 Ok(())
             }),
-            op("current", |_, args| {
+            op("current", |_, args, _| {
                 if !args.is_empty() {
                     return Err(format!("carts#current received {args:?}"));
                 }
@@ -1800,7 +1913,7 @@ impl Server {
             .get(session)
             .cloned()
             .unwrap_or_default();
-        let mut host = Self::data_layer(session, current, Arc::default(), false);
+        let mut host = Self::data_layer(session, current, Arc::default(), false, self.catalog());
         host.insert(
             "pw:host/session#read".to_string(),
             Self::session_operation(session),
@@ -2105,8 +2218,28 @@ impl Server {
         })
     }
 
-    /// Consume committed events and regenerate what they invalidate.
+    /// The lock a session's one change at a time holds (ADR-0172).
+    fn one_at_a_time(&self, session: &str) -> Arc<Mutex<()>> {
+        self.sessions
+            .lock()
+            .expect("sessions")
+            .entry(session.to_string())
+            .or_default()
+            .clone()
+    }
+
+    /// Consume committed events and regenerate what they invalidate, as the
+    /// session's one change at the time (ADR-0172).
     fn drain(&self, session: &str) {
+        let session_lock = self.one_at_a_time(session);
+        let _one = session_lock
+            .lock()
+            .expect("one change of a session at a time");
+        self.drain_held(session);
+    }
+
+    /// [`Server::drain`], by a caller that holds the session's lock.
+    fn drain_held(&self, session: &str) {
         let key = self.cart_key(session);
         let invalidated = self
             .materializer
@@ -2152,6 +2285,16 @@ impl Server {
         // What each of the session's pages shows now, from its queries
         // (ADR-0145), each read for its own document (ADR-0161), outside the
         // table.
+        // The interactions the values read next include (ADR-0172), read
+        // before them: one committed in between is named by its own change,
+        // which follows at once, and never by a value it is not in.
+        let applied: Vec<String> = self
+            .applied
+            .lock()
+            .expect("applied")
+            .get(session)
+            .map(|q| q.iter().cloned().collect())
+            .unwrap_or_default();
         let documents = documents_of(&self.pending.lock().expect("pending"), session);
         let mut read = Vec::new();
         for doc in documents {
@@ -2224,6 +2367,7 @@ impl Server {
                     entry: entry.clone(),
                     version,
                     value,
+                    applied: applied.clone(),
                 });
             }
         }
@@ -3729,22 +3873,26 @@ impl MenuOp {
 
 /// A cart as the WIT's `domain-cart` record: its lines, each with an item,
 /// a quantity and a unit price.
-fn cart_value(lines: &[(String, i64)]) -> Val {
+fn cart_value(lines: &[Line]) -> Val {
     Val::Record(vec![(
         "lines".into(),
         Val::List(
             lines
                 .iter()
-                .map(|(item, quantity)| {
+                .map(|line| {
                     Val::Record(vec![
-                        ("item-id".into(), Val::String(item.clone())),
-                        ("quantity".into(), Val::S64(*quantity)),
-                        // The item's price, as its menu row shows it
-                        // (ADR-0169). Until 2026-10-03 every line was
-                        // priced 450, whatever its item.
+                        ("item-id".into(), Val::String(line.item.clone())),
+                        // As the line recorded it (ADR-0172). A program whose
+                        // `CartLine` declares no name is not passed one
+                        // (ADR-0166).
+                        ("name".into(), Val::String(line.name.clone())),
+                        ("quantity".into(), Val::S64(line.quantity)),
+                        // The item's price when the line was made (ADR-0169,
+                        // ADR-0172). Until 2026-10-03 every line was priced
+                        // 450, whatever its item.
                         (
                             "unit-price".into(),
-                            Val::Record(vec![("minor-units".into(), Val::S64(item_price(item)))]),
+                            Val::Record(vec![("minor-units".into(), Val::S64(line.price))]),
                         ),
                     ])
                 })
@@ -5266,11 +5414,18 @@ fn serve_store(
                 Ok(served) => served,
                 Err(why) => return unavailable(stream, why),
             };
-        let speculation = server
-            .speculation
-            .as_ref()
-            .and_then(|m| m["module"].as_str())
-            .map(|module| (format!("/speculation/{module}"), entries));
+        let speculation = server.speculation.as_ref().and_then(|m| {
+            let module = m["module"].as_str()?;
+            // Each part the browser renders again with a speculation
+            // (ADR-0172), whose template the document carries.
+            let regions: Vec<u32> = m["regions"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|r| r.as_u64().map(|r| r as u32))
+                .collect();
+            Some((format!("/speculation/{module}"), entries, regions))
+        });
         let page = document(
             &rendered,
             &server.templates,
@@ -5595,7 +5750,7 @@ fn document(
     templates: &[Template],
     plan: &serde_json::Value,
     cursor: u64,
-    speculation: Option<(String, serde_json::Value)>,
+    speculation: Option<(String, serde_json::Value, Vec<u32>)>,
 ) -> String {
     let template = templates
         .iter()
@@ -5649,9 +5804,22 @@ fn document(
     if !keyed.is_empty() {
         manifest["keyed"] = serde_json::Value::Array(keyed);
     }
-    if let Some((module, entries)) = speculation {
+    if let Some((module, entries, regions)) = speculation {
         manifest["speculation"] = serde_json::Value::String(module);
         manifest["entries"] = entries;
+        // Each part a speculation renders again, as its template writes it
+        // (ADR-0172): the browser's copy of the renderer renders it from the
+        // speculated value.
+        let regions: serde_json::Map<String, serde_json::Value> = regions
+            .iter()
+            .filter_map(|id| {
+                let part = find_part(&template.chunks, *id)?;
+                Some((id.to_string(), serde_json::to_value(part).ok()?))
+            })
+            .collect();
+        if !regions.is_empty() {
+            manifest["regions"] = serde_json::Value::Object(regions);
+        }
     }
     // No `<` in a script element's text (ADR-0097).
     let json =
@@ -6353,7 +6521,7 @@ public query Store(",
             .lock()
             .expect("sold out")
             .insert("cortado".to_string());
-        let cortado = [serde_json::json!("cortado"), serde_json::json!(1)];
+        let cortado = [shown("cortado"), serde_json::json!(1)];
         let refused = s
             .command_answer(ADD, "a", &cortado, Some("press-1"))
             .expect("a well-formed request");
@@ -6778,6 +6946,23 @@ public query Store(",
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// **An item as the canonical store's menu row shows it** (ADR-0172):
+    /// what its Add sends `add_to_cart`.
+    fn shown(id: &str) -> serde_json::Value {
+        let name = default_menu()
+            .into_iter()
+            .chain(second_menu())
+            .find(|(i, _)| i == id)
+            .map(|(_, name)| name)
+            .unwrap_or_else(|| panic!("no item `{id}`"));
+        serde_json::json!({
+            "description": item_description(id),
+            "id": id,
+            "name": name,
+            "price": { "minor_units": item_price(id) },
+        })
     }
 
     /// One patch, as `operation@part[:instance frames]`, for an assertion.
@@ -7231,10 +7416,37 @@ public query Store(",
 
     const ADD: &str = "store.page.add_to_cart";
     const CLEAR: &str = "store.page.clear_cart";
+    const INCREASE: &str = "store.page.increase_in_cart";
+    const DECREASE: &str = "store.page.decrease_in_cart";
+    const REMOVE: &str = "store.page.remove_from_cart";
 
     /// `add_to_cart`'s arguments, as the component takes them.
     fn add(item: &str, quantity: i64) -> [Val; 2] {
         [Val::String(item.into()), Val::S64(quantity)]
+    }
+
+    /// `add_to_cart`'s arguments on the canonical store, which takes the
+    /// item as its menu row shows it (ADR-0172).
+    fn add_shown(item: &str, quantity: i64) -> [Val; 2] {
+        let shown = shown(item);
+        [
+            Val::Record(vec![
+                ("id".into(), Val::String(item.into())),
+                (
+                    "name".into(),
+                    Val::String(shown["name"].as_str().unwrap_or_default().into()),
+                ),
+                (
+                    "description".into(),
+                    Val::String(shown["description"].as_str().unwrap_or_default().into()),
+                ),
+                (
+                    "price".into(),
+                    Val::Record(vec![("minor-units".into(), Val::S64(item_price(item)))]),
+                ),
+            ]),
+            Val::S64(quantity),
+        ]
     }
 
     /// With the compiler's template IR, for a test whose second command
@@ -7271,7 +7483,7 @@ public query Store(",
     #[test]
     fn the_same_command_runs_where_the_capability_exists() {
         let s = server(dev_topology());
-        s.command(ADD, "session-1", &add("espresso", 1), false)
+        s.command(ADD, "session-1", &add_shown("espresso", 1), false)
             .expect("the dev origin grants the write");
         assert_eq!(s.cart_value("session-1"), 1);
     }
@@ -7283,16 +7495,28 @@ public query Store(",
     #[test]
     fn the_compiled_command_carries_its_arguments_to_the_data_layer() {
         let s = rendering_server();
-        s.command(ADD, "session-9", &add("cortado", 2), false)
+        s.command(ADD, "session-9", &add_shown("cortado", 2), false)
             .expect("runs");
-        s.command(ADD, "session-9", &add("espresso", 1), false)
+        s.command(ADD, "session-9", &add_shown("espresso", 1), false)
             .expect("runs");
-        s.command(ADD, "session-9", &add("cortado", 1), false)
+        s.command(ADD, "session-9", &add_shown("cortado", 1), false)
             .expect("runs");
         let lines = s.carts.lock().unwrap().get("session-9").cloned().unwrap();
         assert_eq!(
-            lines,
-            [("cortado".to_string(), 3), ("espresso".to_string(), 1)]
+            lines
+                .iter()
+                .map(|l| (l.item.as_str(), l.quantity))
+                .collect::<Vec<_>>(),
+            [("cortado", 3), ("espresso", 1)]
+        );
+        // Each recorded with its item's name and price when it was made
+        // (ADR-0172).
+        assert_eq!(
+            lines
+                .iter()
+                .map(|l| (l.name.as_str(), l.price))
+                .collect::<Vec<_>>(),
+            [("Cortado", 425), ("Espresso", 350)]
         );
         assert_eq!(s.cart_value("session-9"), 4);
         assert_eq!(
@@ -7302,6 +7526,134 @@ public query Store(",
         );
     }
 
+    /// A session's lines as the data layer holds them: each item and how
+    /// many.
+    fn quantities(s: &Server, session: &str) -> Vec<(String, i64)> {
+        s.carts
+            .lock()
+            .unwrap()
+            .get(session)
+            .map(|lines| lines.iter().map(|l| (l.item.clone(), l.quantity)).collect())
+            .unwrap_or_default()
+    }
+
+    /// **A line's −, + and Remove reach the data layer through their
+    /// compiled bodies** (ADR-0172): one more; one fewer, and at one the
+    /// line goes; the line gone. One fewer of a line that is no longer there
+    /// changes nothing: another page took it away first.
+    #[test]
+    fn a_lines_steps_reach_the_data_layer() {
+        let s = rendering_server();
+        let item = |id: &str| [Val::String(id.into())];
+        let at = |s: &Server| quantities(s, "session-9");
+        let owned = |want: &[(&str, i64)]| {
+            want.iter()
+                .map(|(i, q)| (i.to_string(), *q))
+                .collect::<Vec<_>>()
+        };
+        s.command(ADD, "session-9", &add_shown("cortado", 2), false)
+            .expect("runs");
+        s.command(ADD, "session-9", &add_shown("espresso", 1), false)
+            .expect("runs");
+        s.command(INCREASE, "session-9", &item("cortado"), false)
+            .expect("runs");
+        assert_eq!(at(&s), owned(&[("cortado", 3), ("espresso", 1)]));
+        s.command(DECREASE, "session-9", &item("cortado"), false)
+            .expect("runs");
+        assert_eq!(at(&s), owned(&[("cortado", 2), ("espresso", 1)]));
+        s.command(DECREASE, "session-9", &item("espresso"), false)
+            .expect("runs");
+        assert_eq!(at(&s), owned(&[("cortado", 2)]), "at one, the line goes");
+        s.command(DECREASE, "session-9", &item("espresso"), false)
+            .expect("a line no longer there is not an error");
+        assert_eq!(at(&s), owned(&[("cortado", 2)]));
+        s.command(REMOVE, "session-9", &item("cortado"), false)
+            .expect("runs");
+        assert_eq!(at(&s), owned(&[]));
+        // One more of an item that sold out since it was added is refused
+        // by name, as an add is, and nothing is written.
+        s.command(ADD, "session-9", &add_shown("cortado", 1), false)
+            .expect("runs");
+        s.sold_out.lock().unwrap().insert("cortado".into());
+        let refused = s
+            .command(INCREASE, "session-9", &item("cortado"), false)
+            .expect_err("sold out");
+        assert!(refused.contains("item-unavailable"), "{refused}");
+        assert_eq!(at(&s), owned(&[("cortado", 1)]));
+    }
+
+    /// **A session's changes come one at a time, each through its frames**
+    /// (ADR-0172). A command commits and its change is derived and queued
+    /// before the session's next change begins, and a document is served
+    /// after the change in progress. Until 2026-10-03 two drains of one
+    /// session could derive two patch sets against one document, and a
+    /// line the page showed was lost.
+    #[test]
+    fn a_sessions_changes_wait_for_the_one_in_progress() {
+        let s = rendering_server();
+        s.serve_document("session-9");
+        let lock = s.one_at_a_time("session-9");
+        let wait = std::time::Duration::from_millis(500);
+        std::thread::scope(|scope| {
+            let held = lock.lock().unwrap();
+            let command =
+                scope.spawn(|| s.command(ADD, "session-9", &add_shown("cortado", 1), false));
+            let served = scope.spawn(|| s.serve_document("session-9"));
+            std::thread::sleep(wait);
+            assert!(!command.is_finished(), "the command waits");
+            assert!(!served.is_finished(), "and so does the document");
+            assert!(quantities(&s, "session-9").is_empty(), "nothing committed");
+            // Another session's change does not wait for this one.
+            s.command(ADD, "session-10", &add_shown("cortado", 1), false)
+                .expect("runs");
+            drop(held);
+            command.join().unwrap().expect("runs");
+            served.join().unwrap();
+        });
+        assert_eq!(quantities(&s, "session-9"), [("cortado".to_string(), 1)]);
+    }
+
+    /// **What a line records is the store's, not the request's** (ADR-0172).
+    /// A page sends the item it showed, and a request can send any name and
+    /// any price for it, or an item no store has.
+    #[test]
+    fn a_line_records_the_stores_name_and_price_not_the_requests() {
+        let s = rendering_server();
+        let [_, quantity] = add_shown("cortado", 1);
+        let sent = |id: &str| {
+            Val::Record(vec![
+                ("id".into(), Val::String(id.into())),
+                ("name".into(), Val::String("Free coffee".into())),
+                ("description".into(), Val::String(String::new())),
+                (
+                    "price".into(),
+                    Val::Record(vec![("minor-units".into(), Val::S64(1))]),
+                ),
+            ])
+        };
+        s.command(
+            ADD,
+            "session-9",
+            &[sent("cortado"), quantity.clone()],
+            false,
+        )
+        .expect("runs");
+        let recorded = |s: &Server| {
+            s.carts.lock().unwrap()["session-9"]
+                .iter()
+                .map(|l| (l.name.clone(), l.price))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(recorded(&s), [("Cortado".to_string(), 425)]);
+        // An item no store has is not available: refused by name, before
+        // anything is written.
+        let refused = s
+            .command(ADD, "session-9", &[sent("free-coffee"), quantity], false)
+            .expect_err("no store has it");
+        assert!(refused.contains("item-unavailable"), "{refused}");
+        assert_eq!(recorded(&s), [("Cortado".to_string(), 425)]);
+    }
+
     /// **A failed command commits nothing.** The data layer answers
     /// `cart-expired`, the COMPONENT returns it, and neither the staged write
     /// nor its event survives — ADR-0019, now decided by what the compiled
@@ -7309,10 +7661,10 @@ public query Store(",
     #[test]
     fn a_failing_command_commits_neither_state_nor_event() {
         let s = rendering_server();
-        s.command(ADD, "session-3", &add("espresso", 1), false)
+        s.command(ADD, "session-3", &add_shown("espresso", 1), false)
             .expect("runs");
         let err = s
-            .command(ADD, "session-3", &add("cortado", 5), true)
+            .command(ADD, "session-3", &add_shown("cortado", 5), true)
             .expect_err("the data layer refuses");
         assert!(
             err.contains("cart-expired"),
@@ -7371,11 +7723,16 @@ public query Store(",
     #[test]
     fn a_browsers_arguments_are_typed_by_the_components_own_parameters() {
         let s = rendering_server();
+        // The item as its row shows it, a record (ADR-0172): a field the type
+        // does not declare is not passed in.
+        let cortado = shown("cortado");
+        let mut with_more = cortado.clone();
+        with_more["calories"] = serde_json::json!(5);
         let ran = s
             .command_json(
                 ADD,
                 "session-5",
-                &[serde_json::json!("cortado"), serde_json::json!(2)],
+                &[with_more, serde_json::json!(2)],
                 Some("press-1"),
             )
             .expect("well-formed");
@@ -7383,25 +7740,37 @@ public query Store(",
         assert_eq!(s.cart_value("session-5"), 2);
 
         // Refused before anything runs, each for its own reason.
+        let mut without_name = cortado.clone();
+        without_name
+            .as_object_mut()
+            .expect("a record")
+            .remove("name");
+        let mut priced_as_text = cortado.clone();
+        priced_as_text["price"]["minor_units"] = serde_json::json!("425");
         for (args, why) in [
+            (vec![cortado.clone()], "takes 2 argument(s); 1 were sent"),
             (
-                vec![serde_json::json!("cortado")],
-                "takes 2 argument(s); 1 were sent",
+                vec![serde_json::json!("cortado"), serde_json::json!(2)],
+                "expected an object",
             ),
             (
-                vec![serde_json::json!(2), serde_json::json!(2)],
-                "expected a string",
+                vec![without_name, serde_json::json!(2)],
+                "the record has no field `name`",
             ),
             (
-                vec![serde_json::json!("cortado"), serde_json::json!(1.5)],
+                vec![priced_as_text, serde_json::json!(2)],
+                "argument 1 (`arg0`).price.minor_units: expected an integer",
+            ),
+            (
+                vec![cortado.clone(), serde_json::json!(1.5)],
                 "expected an integer",
             ),
             (
-                vec![serde_json::json!("cortado"), serde_json::json!("2")],
+                vec![cortado.clone(), serde_json::json!("2")],
                 "expected an integer",
             ),
             (
-                vec![serde_json::json!("cortado"), serde_json::json!(u64::MAX)],
+                vec![cortado.clone(), serde_json::json!(u64::MAX)],
                 "is outside",
             ),
         ] {
@@ -7451,7 +7820,7 @@ public query Store(",
         s.command_json(
             ADD,
             "session-v",
-            &[serde_json::json!("cortado"), serde_json::json!(2)],
+            &[shown("cortado"), serde_json::json!(2)],
             Some("press-v"),
         )
         .expect("well-formed")
@@ -7473,7 +7842,10 @@ public query Store(",
             .collect();
         let [
             StreamFrame::EntryValue {
-                version: v, value, ..
+                version: v,
+                value,
+                applied,
+                ..
             },
         ] = values.as_slice()
         else {
@@ -7483,9 +7855,33 @@ public query Store(",
         assert_eq!(
             *value,
             serde_json::json!({ "lines": [
-                { "item_id": "cortado", "quantity": 2, "unit_price": { "minor_units": 425 } }
+                { "item_id": "cortado", "name": "Cortado", "quantity": 2, "unit_price": { "minor_units": 425 } }
             ] })
         );
+        // The presses the value includes (ADR-0172): the page drops their
+        // speculations, which it would otherwise show again over it.
+        assert_eq!(*applied, ["press-v"]);
+        drop(queue);
+        s.command_json(
+            INCREASE,
+            "session-v",
+            &[serde_json::json!("cortado")],
+            Some("press-v2"),
+        )
+        .expect("well-formed")
+        .expect("committed");
+        let queue = s.pending.lock().expect("pending");
+        let Some(StreamFrame::EntryValue { applied, value, .. }) = queue
+            [&latest(&queue, "session-v")]
+            .frames
+            .iter()
+            .map(|(_, f)| f)
+            .rfind(|f| matches!(f, StreamFrame::EntryValue { .. }))
+        else {
+            panic!("a second entry_value frame");
+        };
+        assert_eq!(*applied, ["press-v", "press-v2"]);
+        assert_eq!(value["lines"][0]["quantity"], 3);
         drop(queue);
 
         // The control: the same page, built without speculations.
@@ -7498,7 +7894,7 @@ public query Store(",
             .command_json(
                 ADD,
                 "session-w",
-                &[serde_json::json!("cortado"), serde_json::json!(1)],
+                &[shown("cortado"), serde_json::json!(1)],
                 Some("press-w"),
             )
             .expect("well-formed")
@@ -7540,7 +7936,7 @@ public query Store(",
             html.contains(STORE_NAME),
             "the Store query's name is rendered"
         );
-        s.command(ADD, "session-q", &add("cortado", 3), false)
+        s.command(ADD, "session-q", &add_shown("cortado", 3), false)
             .expect("runs");
         assert_eq!(
             s.part_text("session-q", "cart.line_count").as_deref(),
@@ -7600,7 +7996,7 @@ public query Store(",
         s.render_store("one");
         assert_eq!(calls(&s, "store:data/carts#current"), 2, "kept");
 
-        s.command(ADD, "one", &add("espresso", 1), false)
+        s.command(ADD, "one", &add_shown("espresso", 1), false)
             .expect("runs");
         assert!(
             s.render_store("one").contains(">1<"),
@@ -7627,7 +8023,7 @@ public query Store(",
                 let s = s.clone();
                 std::thread::spawn(move || {
                     for _ in 0..5 {
-                        s.command(ADD, "busy", &add("espresso", 1), false)
+                        s.command(ADD, "busy", &add_shown("espresso", 1), false)
                             .expect("commits");
                     }
                 })
@@ -7687,7 +8083,7 @@ public query Store(",
     #[test]
     fn a_retried_interaction_runs_its_command_once() {
         let s = rendering_server();
-        let espresso = [serde_json::json!("espresso"), serde_json::json!(1)];
+        let espresso = [shown("espresso"), serde_json::json!(1)];
         for _ in 0..3 {
             s.command_json(ADD, "session-r", &espresso, Some("press-a"))
                 .expect("well-formed")
@@ -7716,7 +8112,7 @@ public query Store(",
             .command_json(ADD, "session-r", &espresso, Some("a b"))
             .expect_err("malformed");
         assert!(err.contains("is not an interaction id"), "{err}");
-        let other = [serde_json::json!("cortado"), serde_json::json!(1)];
+        let other = [shown("cortado"), serde_json::json!(1)];
         let err = s
             .command_json(ADD, "session-r", &other, Some("press-a"))
             .expect_err("the same interaction is the same request");
@@ -7730,7 +8126,7 @@ public query Store(",
     #[test]
     fn interactions_kept_are_bounded_per_session() {
         let s = rendering_server();
-        let espresso = [serde_json::json!("espresso"), serde_json::json!(1)];
+        let espresso = [shown("espresso"), serde_json::json!(1)];
         let presses = INTERACTIONS_PER_SESSION + 40;
         for i in 0..presses {
             s.command_json(ADD, "session-b", &espresso, Some(&format!("p{i}")))
@@ -7754,7 +8150,7 @@ public query Store(",
     #[test]
     fn every_command_commits_its_state_and_its_event_together() {
         let s = rendering_server();
-        s.command(ADD, "session-6", &add("espresso", 3), false)
+        s.command(ADD, "session-6", &add_shown("espresso", 3), false)
             .expect("runs");
         assert_eq!(s.materializer.state("cart:session-6").as_deref(), Some("3"));
         s.command_json(CLEAR, "session-6", &[], Some("clear-1"))
@@ -7786,7 +8182,7 @@ public query Store(",
         );
         s.drain("session-7");
         let before = s.version("session-7");
-        s.command(ADD, "session-7", &add("espresso", 1), false)
+        s.command(ADD, "session-7", &add_shown("espresso", 1), false)
             .expect("runs");
         assert_ne!(s.version("session-7"), before, "the declared event");
 
@@ -7796,7 +8192,7 @@ public query Store(",
             .retain(|e| !(e.from == ADD && e.kind == pw_materialize::EdgeKind::Emits));
         s.drain("session-7");
         let before = s.version("session-7");
-        s.command(ADD, "session-7", &add("espresso", 1), false)
+        s.command(ADD, "session-7", &add_shown("espresso", 1), false)
             .expect("runs");
         assert_eq!(s.cart_value("session-7"), 1, "the write committed");
         assert_eq!(
@@ -7836,7 +8232,11 @@ public query Store(",
     fn a_document_whose_handlers_were_not_compiled_is_refused() {
         let s = rendering_server();
         let named = s.handler_identities();
-        assert_eq!(named.len(), 2, "add_to_cart and clear_cart: {named:?}");
+        assert_eq!(
+            named.len(),
+            5,
+            "add_to_cart, clear_cart, and a line's three (ADR-0172): {named:?}"
+        );
         assert_eq!(
             s.uncompiled_handlers(),
             named.iter().cloned().collect::<Vec<_>>(),
@@ -7896,7 +8296,7 @@ public query Store(",
         let s = rendering_server();
         s.serve_document("steady");
         for _ in 0..3_000 {
-            s.command(ADD, "steady", &add("espresso", 1), false)
+            s.command(ADD, "steady", &add_shown("espresso", 1), false)
                 .expect("runs");
             let mut queue = s.pending.lock().unwrap();
             let doc = latest(&queue, "steady");
@@ -7968,7 +8368,7 @@ public query Store(",
 
         // A visitor who comes back is served a whole document: their cart
         // entry is regenerated from state, not lost.
-        s.command(ADD, "visitor-7", &add("espresso", 2), false)
+        s.command(ADD, "visitor-7", &add_shown("espresso", 2), false)
             .expect("runs");
         let (html, cursor) = s.serve_document("visitor-7");
         assert!(cursor > 0);
@@ -8069,7 +8469,7 @@ public query Store(",
 
         // The development deployment knows SignedIn, so the ordinary demo
         // principal may execute it.
-        s.command(ADD, "signed-in-demo", &add("espresso", 1), false)
+        s.command(ADD, "signed-in-demo", &add_shown("espresso", 1), false)
             .expect("SignedIn is explicitly approved");
 
         // A predicate the deployment does not know is denied before the
@@ -8087,7 +8487,7 @@ public query Store(",
         requirement.predicate = "OwnsOrder".to_string();
         let before = s.cart_value("signed-in-demo");
         let err = s
-            .command(ADD, "signed-in-demo", &add("cortado", 1), false)
+            .command(ADD, "signed-in-demo", &add_shown("cortado", 1), false)
             .expect_err("unknown authorization must fail closed");
         assert!(err.contains("no authorization predicate"), "{err}");
         assert_eq!(s.cart_value("signed-in-demo"), before);
@@ -8131,7 +8531,7 @@ public query Store(",
         let (mut held, _) = listener.accept().expect("accept");
         std::thread::scope(|scope| {
             scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
-            s.command(ADD, session, &add("espresso", 1), false)
+            s.command(ADD, session, &add_shown("espresso", 1), false)
                 .expect("runs");
             std::thread::sleep(std::time::Duration::from_millis(300));
 
@@ -8313,7 +8713,8 @@ public query Store(",
                 .count()
         };
         let before = (sets(blue), sets(harbor));
-        s.command(ADD, "a", &add("drip", 1), false).expect("runs");
+        s.command(ADD, "a", &add_shown("drip", 1), false)
+            .expect("runs");
         assert_eq!((sets(blue) - before.0, sets(harbor) - before.1), (1, 1));
     }
 
@@ -8386,6 +8787,17 @@ public query Store(",
                 PatchOp::SetAttribute {
                     name: "aria-label".to_string(),
                     value: "Add Espresso Doppio".to_string()
+                },
+                // And what its Add captures, the item the page shows, which
+                // `add_to_cart` makes its line from (ADR-0172): set where it
+                // is, as the document writes it.
+                PatchOp::SetAttribute {
+                    name: "data-pw-captures".to_string(),
+                    value: pw_render::escape::attribute(
+                        &serde_json::json!({ "item": shown("espresso") })
+                            .to_string()
+                            .replace("\"Espresso\"", "\"Espresso Doppio\"")
+                    ),
                 },
             ]
         );
@@ -8648,7 +9060,7 @@ public query Store(",
         let s = rendering_server();
         let session = "two-tabs";
         let (_, first) = s.serve_document(session);
-        s.command(ADD, session, &add("espresso", 1), false)
+        s.command(ADD, session, &add_shown("espresso", 1), false)
             .expect("runs");
         let (_, _second) = s.serve_document(session);
         let queue = s.pending.lock().expect("pending");
@@ -8664,7 +9076,7 @@ public query Store(",
         let session = "both-tabs";
         let (_, first) = s.serve_document(session);
         let (_, second) = s.serve_document(session);
-        s.command(ADD, session, &add("espresso", 1), false)
+        s.command(ADD, session, &add_shown("espresso", 1), false)
             .expect("runs");
         let queue = s.pending.lock().expect("pending");
         for document in [first, second] {
@@ -8679,7 +9091,7 @@ public query Store(",
         // Control: another session's page hears nothing.
         drop(queue);
         let (_, other) = s.serve_document("elsewhere");
-        s.command(ADD, session, &add("espresso", 1), false)
+        s.command(ADD, session, &add_shown("espresso", 1), false)
             .expect("runs");
         assert!(
             s.pending.lock().expect("pending")[&("elsewhere".to_string(), other)]
@@ -8718,7 +9130,7 @@ public query Store(",
         let session = "applied";
         let (_, document) = s.serve_document(session);
         let doc: Doc = (session.to_string(), document);
-        s.command(ADD, session, &add("espresso", 1), false)
+        s.command(ADD, session, &add_shown("espresso", 1), false)
             .expect("runs");
         let applied = s.pending.lock().expect("pending")[&doc].last_seq;
         assert!(

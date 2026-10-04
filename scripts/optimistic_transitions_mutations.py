@@ -46,7 +46,8 @@ MUTANTS = [
     (
         "the transition drops a new item",
         CARTS,
-        "            lines: List.concat(cart.lines, [CartLine { item_id: item, quantity: quantity, unit_price: unpriced() }]),\n",
+        # Re-anchored by ADR-0172: a new line takes the item's name and price.
+        "            lines: List.concat(cart.lines, [CartLine { item_id: item.id, name: item.name, quantity: quantity, unit_price: item.price }]),\n",
         "            lines: cart.lines,\n",
     ),
     (

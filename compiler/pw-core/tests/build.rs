@@ -63,11 +63,16 @@ fn the_store_builds_every_artifact_from_source() {
     assert_eq!(
         components,
         [
-            // The member function a menu row's price is read through
-            // (ADR-0169), and the one the page's count is: each a component
-            // of its own since ADR-0125.
+            // The member functions the page reads through, each a component
+            // of its own since ADR-0125: a line's count, a price as text
+            // (ADR-0169), the cart's count, and a line's and the cart's
+            // totals (ADR-0172).
+            "domain.count",
             "domain.display",
             "domain.line_count",
+            // A cart's line and its cart, priced (ADR-0172).
+            "domain.subtotal",
+            "domain.total",
             "store.page.Cart",
             // The store's slots, since ADR-0165: each stream's query.
             "store.page.Estimate",
@@ -76,6 +81,10 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.Store",
             "store.page.add_to_cart",
             "store.page.clear_cart",
+            // A line's controls (ADR-0172).
+            "store.page.decrease_in_cart",
+            "store.page.increase_in_cart",
+            "store.page.remove_from_cart",
         ],
         "every command and query the page reaches, compiled and audited"
     );
@@ -110,7 +119,11 @@ fn the_store_builds_every_artifact_from_source() {
     );
 
     assert_eq!(b.templates.len(), 1, "StorePage");
-    assert_eq!(b.handlers.len(), 2, "add_to_cart and clear_cart");
+    assert_eq!(
+        b.handlers.len(),
+        5,
+        "add_to_cart, clear_cart, and a line's three (ADR-0172)"
+    );
     assert_eq!(
         b.contracts.len(),
         b.components.len(),

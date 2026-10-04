@@ -211,14 +211,15 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     let sigs = Signatures::build(&Workspace::build(&refs), &refs);
 
     let pairs = pw_core::resume_artifacts::generate(&app, &hirs[1], &sigs, "test-build");
-    // Two: `add_to_cart`, which captures the loop item, and `clear_cart`,
-    // which captures nothing and is resumable all the same. E7-L needs the
-    // second — with one handler, "the exact handler was fetched" is satisfied
-    // by any fetch at all.
+    // Five: `add_to_cart`, which captures the menu loop's item; a line's −,
+    // + and Remove (ADR-0172), which capture the cart loop's line's item id;
+    // and `clear_cart`, which captures nothing and is resumable all the same.
+    // E7-L needed a second handler: with one, "the exact handler was fetched"
+    // is satisfied by any fetch at all.
     assert_eq!(
         pairs.len(),
-        2,
-        "the store page declares two resumable handlers"
+        5,
+        "the store page declares five resumable handlers"
     );
     for (m, a) in &pairs {
         assert_eq!(
@@ -236,20 +237,21 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
         );
     }
 
-    // The two differ, which is what makes a loop-bound capture observable: one
-    // handler captures `item` and one captures nothing, and if the capture
-    // never reached the schema both would hash the same.
+    // Three schemas, which is what makes a loop-bound capture observable:
+    // one handler captures an `item`, three a line's `item_id`, and one
+    // nothing. If a capture never reached the schema, they would hash the
+    // same.
     let schemas: std::collections::BTreeSet<&str> = pairs
         .iter()
         .map(|(m, _)| m.capture_schema.as_str())
         .collect();
     assert_eq!(
         schemas.len(),
-        2,
+        3,
         "a loop-bound capture must reach the schema"
     );
 
     let handlers: std::collections::BTreeSet<&str> =
         pairs.iter().map(|(m, _)| m.handler.as_str()).collect();
-    assert_eq!(handlers.len(), 2, "and two handlers are two identities");
+    assert_eq!(handlers.len(), 5, "and five handlers are five identities");
 }

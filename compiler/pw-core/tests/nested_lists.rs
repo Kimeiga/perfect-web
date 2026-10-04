@@ -6,10 +6,11 @@
 //! development server failed at the cart's first change. A row's member read
 //! was planned only for a loop over a binding itself (ADR-0169).
 //!
-//! And a part a speculation would not reach is refused: the store's `cart`
+//! And a part a speculation would not reach was refused: the store's `cart`
 //! is speculated by `add_to_cart`'s `optimistic` clause (ADR-0122), and a
 //! loop over its lines would have shown the lines it held beside the count
-//! the speculation showed.
+//! the speculation showed. Since ADR-0172 the browser renders such a part
+//! again, and what it could not render is refused.
 //!
 //! The store is the benchmark's, which does not change (ADR-0156).
 
@@ -123,19 +124,73 @@ fn a_list_inside_a_querys_value_is_iterated_by_its_path() {
     );
 }
 
+/// The store page's speculation, built with `markup`.
+fn speculation(markup: &str) -> pw_core::backend::speculation::Compiled {
+    build(store(markup, true))
+        .speculations
+        .into_iter()
+        .find(|s| s.page == "store.page.StorePage")
+        .expect("the store page speculates")
+}
+
+/// The id of the part of `kind` that reads `value`, as the parts manifest
+/// lists it, in the store with `markup`.
+fn part_of(markup: &str, kind: &str, value: &str) -> u32 {
+    build(store(markup, true))
+        .templates
+        .iter()
+        .find(|t| t.path == "store.page.StorePage")
+        .expect("the store's template")
+        .manifest()
+        .into_iter()
+        .find(|e| e.kind == kind && e.value == value)
+        .unwrap_or_else(|| panic!("no {kind} part reads `{value}`"))
+        .id
+        .0
+}
+
 #[test]
-fn a_part_a_speculation_would_not_reach_is_refused() {
-    for (markup, what) in [
-        (LINES, "reads `cart.lines` in a loop's list"),
+fn a_part_that_reads_a_speculated_value_is_rendered_again() {
+    // ADR-0170 refused each of these, as a part the speculation would not
+    // reach. ADR-0172 renders each again in the browser, from the speculated
+    // value: a region.
+    for (markup, kind, value) in [
+        (LINES, "each", "cart.lines"),
         (
             "{#if cart.lines}<p>In your cart</p>{/if}",
-            "reads `cart.lines` in what a block decides by",
+            "conditional",
+            "cart.lines",
         ),
-        // ADR-0169 refuses this one too, as a member read no host computes
-        // in an attribute; the speculation's own refusal is listed with it.
         (
-            "<p title={cart.line_count}>count</p>",
-            "reads `cart.line_count` in an attribute",
+            "<p hidden={cart.lines}>Your cart is empty.</p>",
+            "boolean_attribute",
+            "cart.lines",
+        ),
+    ] {
+        let b = build(store(markup, true));
+        assert!(b.refusals().is_empty(), "{markup}: {:?}", b.refusals());
+        let s = speculation(markup);
+        let pw_core::backend::wasm::Encoding::Encoded(m) = &s.module else {
+            panic!("{markup}: {}", s.module);
+        };
+        assert_eq!(m.regions, [part_of(markup, kind, value)], "{markup}");
+    }
+}
+
+#[test]
+fn a_region_that_reads_what_the_browser_does_not_hold_is_refused() {
+    // The browser renders a region from the speculated value, the page's
+    // signals and the names bound inside it, as it renders a signal's block
+    // (ADR-0137). The store's name is none of them.
+    for (markup, what) in [
+        (
+            "<ul>{#each cart.lines as line (line.item_id)}\
+             <li>{line.quantity.count} from {store.name}</li>{/each}</ul>",
+            "reads `store.name` inside part",
+        ),
+        (
+            "{#if cart.lines}<p title={store.name}>In your cart</p>{/if}",
+            "reads `store.name` inside part",
         ),
     ] {
         let refused = build(store(markup, true)).refusals();
@@ -143,11 +198,55 @@ fn a_part_a_speculation_would_not_reach_is_refused() {
             refused
                 .iter()
                 .any(|r| r.starts_with("`store.page.StorePage`'s speculations:")
-                    && r.contains(what)
-                    && r.ends_with("which a speculation would not reach")),
+                    && r.contains(
+                        "a value a speculated region reads that the browser does not hold"
+                    )
+                    && r.contains(what)),
             "{markup}: {refused:#?}"
         );
     }
+}
+
+#[test]
+fn a_region_whose_handler_captures_what_the_browser_does_not_hold_is_refused() {
+    // The region writes what each handler in it captures. The handler sets a
+    // signal of the page's to the store's name, which the browser does not
+    // hold.
+    const LET: &str = "    let cart = query Cart(current_session())\n";
+    let markup = "{#if cart.lines}<button type=\"button\" \
+                  on:press={() => picked = store.name}>Name</button>{/if}";
+    let refused = build(|app: &str| {
+        assert_eq!(app.matches(LET).count(), 1, "the cart's anchor");
+        store(markup, true)(app).replace(LET, &format!("{LET}    signal picked: String = \"\"\n"))
+    })
+    .refusals();
+    assert!(
+        refused
+            .iter()
+            .any(|r| r.starts_with("`store.page.StorePage`'s speculations:")
+                && r.contains("a value a speculated region reads that the browser does not hold")
+                && r.contains("captures `store.name` inside part")),
+        "{refused:#?}"
+    );
+}
+
+#[test]
+fn a_speculated_value_read_in_a_block_no_region_renders_is_refused() {
+    // Inside the menu's rows, which read the menu and not the cart: nothing
+    // would render it again.
+    let markup = "<ul>{#each menu as item (item.id)}\
+                  <li hidden={cart.lines}>{item.name}</li>{/each}</ul>";
+    let refused = build(store(markup, true)).refusals();
+    assert!(
+        refused
+            .iter()
+            .any(|r| r.starts_with("`store.page.StorePage`'s speculations:")
+                && r.contains(
+                    "a speculated value read where this module does not render it again"
+                )
+                && r.contains("reads `cart.lines` inside a block")),
+        "{refused:#?}"
+    );
 }
 
 #[test]

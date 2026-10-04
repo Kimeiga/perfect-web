@@ -69,9 +69,14 @@ test("the exact handler is fetched on first interaction", async ({ page }) => {
   const fetched = watch(page);
   await ready(page);
   const ids = await identities(page);
-  expect(Object.keys(ids).sort(), "two handlers on this page").toEqual([
+  // Add and Clear, and a cart line's three (ADR-0172), which no line is
+  // rendered with yet.
+  expect(Object.keys(ids).sort(), "five handlers on this page").toEqual([
     "add_to_cart",
     "clear_cart",
+    "decrease_in_cart",
+    "increase_in_cart",
+    "remove_from_cart",
   ]);
 
   await page.locator("#menu button").first().click();

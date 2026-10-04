@@ -11,14 +11,17 @@
 //! What runs is the compiled body of
 //!
 //! ```text
-//! command add_to_cart(item: MenuItemId, quantity: PositiveInt) -> Result<Cart, CartError>
+//! command add_to_cart(item: MenuItem, quantity: PositiveInt) -> Result<Cart, CartError>
 //! {
-//!     if !Menus.is_available(item) {
-//!         return Err(CartError.ItemUnavailable(item))
+//!     if !Menus.is_available(item.id) {
+//!         return Err(CartError.ItemUnavailable(item.id))
 //!     }
-//!     Carts.add(current_session(), item, quantity)
+//!     Carts.add(current_session(), item.id, quantity)
 //! }
 //! ```
+//!
+//! The item is the one the page showed (ADR-0172), a record; the command
+//! writes by its id.
 //!
 //! The availability read is ADR-0157's: an item sold out since the page was
 //! rendered is refused by name, before anything is written.
@@ -84,6 +87,7 @@ fn cart(item: &str, quantity: i64) -> Val {
         "lines".into(),
         Val::List(vec![Val::Record(vec![
             ("item-id".into(), Val::String(item.into())),
+            ("name".into(), Val::String("Cortado".into())),
             ("quantity".into(), Val::S64(quantity)),
             (
                 "unit-price".into(),
@@ -91,6 +95,20 @@ fn cart(item: &str, quantity: i64) -> Val {
             ),
         ])]),
     )])
+}
+
+/// An item as the page showed it (ADR-0172), as the WIT's record fields name
+/// them: what `add_to_cart` is called with.
+fn item(id: &str) -> Val {
+    Val::Record(vec![
+        ("id".into(), Val::String(id.into())),
+        ("name".into(), Val::String("Cortado".into())),
+        ("description".into(), Val::String("Short.".into())),
+        (
+            "price".into(),
+            Val::Record(vec![("minor-units".into(), Val::S64(375))]),
+        ),
+    ])
 }
 
 /// What the host saw of each call, so a test can assert the COMPONENT made it.
@@ -220,7 +238,7 @@ fn an_export_not_declared_by_the_contract_cannot_be_invoked() {
         &limits(),
         &host(&calls, Val::Result(Ok(Some(Box::new(cart("cortado", 1)))))),
         &["pw:app/not-the-contract@0.1.0", "add-to-cart"],
-        &[Val::String("cortado".into()), Val::S64(1)],
+        &[item("cortado"), Val::S64(1)],
         approve_store_authorization,
     )
     .expect_err("an undeclared export path must fail closed");
@@ -242,7 +260,7 @@ fn requires_cannot_be_bypassed_by_the_raw_call_api() {
         &limits(),
         &host(&calls, Val::Result(Ok(Some(Box::new(cart("cortado", 1)))))),
         &[&interface, &function],
-        &[Val::String("cortado".into()), Val::S64(1)],
+        &[item("cortado"), Val::S64(1)],
     )
     .expect_err("a requires clause must be evaluated before the body can run");
     assert!(err.contains("authorization precondition"), "{err}");
@@ -302,7 +320,7 @@ fn the_compiled_command_runs_through_the_host() {
         &limits(),
         &host(&calls, returned.clone()),
         &[&interface, &function],
-        &[Val::String("cortado".into()), Val::S64(2)],
+        &[item("cortado"), Val::S64(2)],
     )
     .unwrap_or_else(|e| panic!("the compiled command must run: {e}"));
 
@@ -360,7 +378,7 @@ fn an_item_that_cannot_be_ordered_is_refused_before_anything_is_written() {
             false,
         ),
         &[&interface, &function],
-        &[Val::String("cortado".into()), Val::S64(1)],
+        &[item("cortado"), Val::S64(1)],
     )
     .expect("the call completes; the command's result is the refusal");
     println!("sold out: {out:?}");
@@ -399,7 +417,7 @@ fn a_data_layer_failure_is_the_commands_failure() {
         &limits(),
         &host(&calls, failed.clone()),
         &[&interface, &function],
-        &[Val::String("cortado".into()), Val::S64(1)],
+        &[item("cortado"), Val::S64(1)],
     )
     .expect("the call completes; the command's result is a failure");
     println!("a failing data layer: {out:?}");
@@ -436,7 +454,7 @@ fn an_ungranted_operation_is_refused_by_the_engine() {
         &limits(),
         &host(&calls, Val::Bool(false)),
         &[&interface, &function],
-        &[Val::String("cortado".into()), Val::S64(1)],
+        &[item("cortado"), Val::S64(1)],
     )
     .expect_err("the write is not linked");
     println!("ungranted write refused by the engine: {err}");
@@ -460,7 +478,7 @@ fn a_granted_operation_the_host_does_not_implement_is_refused() {
         &limits(),
         &ops,
         &[&interface, &function],
-        &[Val::String("cortado".into()), Val::S64(1)],
+        &[item("cortado"), Val::S64(1)],
     )
     .expect_err("granted is not implemented");
     assert!(err.contains("implements nothing"), "{err}");
@@ -485,7 +503,7 @@ fn the_instance_runs_within_its_fuel() {
         &starved,
         &host(&calls, Val::Result(Ok(Some(Box::new(cart("x", 1)))))),
         &[&interface, &function],
-        &[Val::String("cortado".into()), Val::S64(1)],
+        &[item("cortado"), Val::S64(1)],
     )
     .expect_err("one unit of fuel runs out");
     println!("starved of fuel: {err}");
@@ -496,53 +514,82 @@ fn the_instance_runs_within_its_fuel() {
 
 /// **A browser's arguments are typed by the component's own parameters.**
 ///
-/// The compiled handler for `add_to_cart(item.id, PositiveInt(1))` runs in the
-/// user's browser and sends `["cortado", 1]`. The host converts it by the
-/// parameter types the ARTIFACT declares, `(string, s64)`, and refuses anything
-/// else before the component runs.
+/// The compiled handler for `add_to_cart(item, PositiveInt(1))` runs in the
+/// user's browser and sends the item as the page showed it, and `1`
+/// (ADR-0172). The host converts them by the parameter types the ARTIFACT
+/// declares, a record and an `s64`, and refuses anything else before the
+/// component runs.
 #[test]
 fn json_arguments_are_typed_by_the_export_they_are_for() {
     let c = contract();
     let prepared = engine::Prepared::compile(&component()).expect("compiles");
     let [interface, function] = export(&c);
     let at = [interface.as_str(), function.as_str()];
+    let sent = |price: serde_json::Value| {
+        serde_json::json!({
+            "id": "cortado",
+            "name": "Cortado",
+            "description": "Short.",
+            "price": price,
+        })
+    };
+    let cortado = sent(serde_json::json!({ "minor_units": 375 }));
 
     let args = prepared
-        .arguments(&at, &[serde_json::json!("cortado"), serde_json::json!(2)])
+        .arguments(&at, &[cortado.clone(), serde_json::json!(2)])
         .expect("well-typed");
-    assert_eq!(args, vec![Val::String("cortado".into()), Val::S64(2)]);
+    assert_eq!(args, vec![item("cortado"), Val::S64(2)]);
+    // A field the record does not declare is not passed in.
+    let mut more = cortado.clone();
+    more["popular"] = serde_json::json!(true);
+    assert_eq!(
+        prepared
+            .arguments(&at, &[more, serde_json::json!(2)])
+            .expect("well-typed"),
+        args
+    );
 
+    let mut nameless = cortado.clone();
+    nameless.as_object_mut().unwrap().remove("name");
     for (json, why) in [
+        (vec![cortado.clone()], "takes 2 argument(s); 1 were sent"),
         (
-            vec![serde_json::json!("cortado")],
-            "takes 2 argument(s); 1 were sent",
-        ),
-        (
-            vec![
-                serde_json::json!("a"),
-                serde_json::json!(1),
-                serde_json::json!(1),
-            ],
+            vec![cortado.clone(), serde_json::json!(1), serde_json::json!(1)],
             "takes 2 argument(s); 3 were sent",
         ),
         (
-            vec![serde_json::json!(7), serde_json::json!(1)],
-            "expected a string",
+            vec![serde_json::json!("cortado"), serde_json::json!(1)],
+            "expected an object",
         ),
         (
-            vec![serde_json::json!("a"), serde_json::json!(1.5)],
+            vec![nameless, serde_json::json!(1)],
+            "the record has no field `name`",
+        ),
+        (
+            vec![
+                sent(serde_json::json!({ "minor_units": 1.5 })),
+                serde_json::json!(1),
+            ],
+            "arg0`).price.minor_units: expected an integer",
+        ),
+        (
+            vec![sent(serde_json::json!(375)), serde_json::json!(1)],
+            "expected an object",
+        ),
+        (
+            vec![cortado.clone(), serde_json::json!(1.5)],
             "expected an integer",
         ),
         (
-            vec![serde_json::json!("a"), serde_json::json!(true)],
+            vec![cortado.clone(), serde_json::json!(true)],
             "expected an integer",
         ),
         (
-            vec![serde_json::json!("a"), serde_json::json!(null)],
+            vec![cortado.clone(), serde_json::json!(null)],
             "expected an integer",
         ),
         (
-            vec![serde_json::json!("a"), serde_json::json!(u64::MAX)],
+            vec![cortado.clone(), serde_json::json!(u64::MAX)],
             "is outside",
         ),
     ] {
@@ -554,7 +601,7 @@ fn json_arguments_are_typed_by_the_export_they_are_for() {
     // The extremes of `s64` are the type's, not JavaScript's: the host takes
     // the whole range the parameter declares.
     let edge = prepared
-        .arguments(&at, &[serde_json::json!("a"), serde_json::json!(i64::MIN)])
+        .arguments(&at, &[cortado, serde_json::json!(i64::MIN)])
         .expect("in range");
     assert_eq!(edge[1], Val::S64(i64::MIN));
 }
@@ -615,7 +662,7 @@ fn sustained_calls_leave_memory_flat() {
                 &limits(),
                 &ops,
                 &[&interface, &function],
-                &[Val::String(format!("item-{n}")), Val::S64(n)],
+                &[item(&format!("item-{n}")), Val::S64(n)],
                 approve_store_authorization,
             )
             .expect("runs");

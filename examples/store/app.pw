@@ -142,7 +142,11 @@ session query Estimate(session: Session<SessionId>) -> Result<DeliveryEstimate, 
 // the round trip, and moves back if the add is refused. And the item's
 // availability is read again inside it: an item sold out since the page was
 // rendered is refused by name, and the page is told which (ADR-0157).
-command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+//
+// It takes the item as the page showed it (ADR-0172): a new line is made from
+// its name and its price before the server answers. The command writes by the
+// item's id alone, and the data layer records the item's own name and price.
+command add_to_cart(item: MenuItem, quantity: PositiveInt)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
@@ -151,10 +155,53 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     invalidates   Cart(current_session())
     emits         CartChanged(current_session())
 {
+    if !Menus.is_available(item.id) {
+        return Err(CartError.ItemUnavailable(item.id))
+    }
+    Carts.add(current_session(), item.id, quantity)
+}
+
+// **One more of a line's item** (charter §15.3, ADR-0172). A step, not a
+// quantity: two presses before the first answers are two. As `add_to_cart`,
+// the item's availability is read again inside it.
+command increase_in_cart(item: MenuItemId)
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    transaction   serializable
+    optimistic    Cart(current_session()) as cart => Carts.with_more(cart, item)
+    invalidates   Cart(current_session())
+    emits         CartChanged(current_session())
+{
     if !Menus.is_available(item) {
         return Err(CartError.ItemUnavailable(item))
     }
-    Carts.add(current_session(), item, quantity)
+    Carts.add(current_session(), item, PositiveInt(1))
+}
+
+// **One fewer of a line's item** (charter §15.3, ADR-0172): at one, the
+// line goes.
+command decrease_in_cart(item: MenuItemId)
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    optimistic    Cart(current_session()) as cart => Carts.with_fewer(cart, item)
+    invalidates   Cart(current_session())
+    emits         CartChanged(current_session())
+{
+    Carts.decrease(current_session(), item)
+}
+
+// **A line, gone** (charter §15.3, ADR-0172).
+command remove_from_cart(item: MenuItemId)
+    -> Result<Cart, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    optimistic    Cart(current_session()) as cart => Carts.without(cart, item)
+    invalidates   Cart(current_session())
+    emits         CartChanged(current_session())
+{
+    Carts.remove(current_session(), item)
 }
 
 // A SECOND handler on the same page, and the reason it exists is E7-L.
@@ -173,7 +220,10 @@ command clear_cart()
     Carts.clear(current_session())
 }
 
-page StorePage(id: StoreId) {
+// Private to the session that reads it (ADR-0172): its cart's lines are the
+// session's, and its handlers capture them, so a resume manifest must say to
+// whom what it carries is private. `cache private` alone names no one.
+session page StorePage(id: StoreId) {
     // Charter §15.3: the store's address, which gives its id (ADR-0160),
     // and an id that names no store is not found (ADR-0163).
     route        "/stores/{id}"
@@ -214,7 +264,7 @@ page StorePage(id: StoreId) {
                             <button
                                 type="button"
                                 aria-label="Add {item.name}"
-                                on:press={resumable(captures = { item }) => match add_to_cart(item.id, PositiveInt(1)) {
+                                on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
                                     Ok(_) => notice = "",
                                     Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
                                     Err(_) => notice = "That item could not be added.",
@@ -227,8 +277,53 @@ page StorePage(id: StoreId) {
                 </ul>
             </section>
 
-            <section aria-label="Cart">
+            <section aria-labelledby="cart-heading">
+                <!-- Focus comes here when the line that had it goes (ADR-0172). -->
+                <h2 id="cart-heading" tabindex="-1">Cart</h2>
                 <p aria-live="polite" aria-atomic="true">Items in cart: <span id="cart-count">{cart.line_count}</span></p>
+                <p id="cart-empty" hidden={cart.lines}>Your cart is empty.</p>
+                <ul id="cart-lines">
+                    {#each cart.lines as line (line.item_id)}
+                        <li>
+                            <span>{line.name}</span>
+                            <button
+                                type="button"
+                                aria-label="Decrease quantity of {line.name}"
+                                on:press={resumable(captures = { line }) => match decrease_in_cart(line.item_id) {
+                                    Ok(_) => notice = "",
+                                    Err(_) => notice = "That line could not be changed.",
+                                }}
+                            >
+                                −
+                            </button>
+                            <span>{line.quantity.count}</span>
+                            <button
+                                type="button"
+                                aria-label="Increase quantity of {line.name}"
+                                on:press={resumable(captures = { line }) => match increase_in_cart(line.item_id) {
+                                    Ok(_) => notice = "",
+                                    Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+                                    Err(_) => notice = "That line could not be changed.",
+                                }}
+                            >
+                                +
+                            </button>
+                            <span>{line.total.display}</span>
+                            <button
+                                type="button"
+                                aria-label="Remove {line.name}"
+                                on:press={resumable(captures = { line }) => match remove_from_cart(line.item_id) {
+                                    Ok(_) => notice = "",
+                                    Err(_) => notice = "That line could not be removed.",
+                                }}
+                            >
+                                Remove
+                            </button>
+                        </li>
+                    {/each}
+                </ul>
+                <p>Subtotal: <span id="cart-subtotal">{cart.subtotal.display}</span></p>
+                {#if cart.lines}<p id="cart-fees">Delivery fee and taxes are added at checkout.</p>{/if}
                 <p id="cart-notice" role="status">{notice}</p>
                 <button
                     id="clear-cart"

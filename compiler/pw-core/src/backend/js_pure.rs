@@ -820,8 +820,12 @@ impl<'p> Emitter<'p> {
         match ty {
             Type::Int => Ok(format!("{}({v})", self.uses("exact"))),
             Type::Float | Type::Str | Type::Bool => Ok(v.to_string()),
+            // A record or a list, as a signal's value is written (ADR-0172):
+            // each field by its Pleris name, each `Int` exact or a trap.
+            Type::List(_) => self.wire_value(v, ty),
             Type::Nominal(def, args) => match self.shape(*def, args).cloned() {
                 Some(Shape::Alias(of)) => self.wire(v, &of),
+                Some(Shape::Record { .. }) => self.wire_value(v, ty),
                 _ => Err(format!(
                     "a command argument of type {ty:?}, which a browser cannot send"
                 )),

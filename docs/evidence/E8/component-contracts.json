@@ -129,6 +129,35 @@
     ]
   },
   {
+    "component_id": "domain.count",
+    "capability_mapping": 1,
+    "abi_schema": "8aaf4448b4ac79d0",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "count",
+        "kind": "function",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/domain-count-api@0.1.0",
+          "function": "count"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "domain.display",
     "capability_mapping": 1,
     "abi_schema": "8d1fd3f0102ea01e",
@@ -190,6 +219,72 @@
         "component": {
           "interface": "pw:app/domain-line-count-api@0.1.0",
           "function": "line-count"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "domain.subtotal",
+    "capability_mapping": 1,
+    "abi_schema": "f91e2f7273509b3a",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "subtotal",
+        "kind": "function",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "argument 0",
+                "ty": "Cart"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/domain-subtotal-api@0.1.0",
+          "function": "subtotal"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "domain.total",
+    "capability_mapping": 1,
+    "abi_schema": "b34c0c8510993136",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "total",
+        "kind": "function",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/domain-total-api@0.1.0",
+          "function": "total"
         }
       }
     ]
@@ -672,6 +767,24 @@
         "kind": "component"
       },
       {
+        "interface": "pw:app/store.page.decrease_in_cart",
+        "name": "decrease_in_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.increase_in_cart",
+        "name": "increase_in_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.remove_from_cart",
+        "name": "remove_from_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
         "interface": "pw:host/session",
         "name": "read",
         "capability": "session.read",
@@ -1000,6 +1113,435 @@
         "component": {
           "interface": "pw:app/store-page-clear-cart-api@0.1.0",
           "function": "clear-cart",
+          "authorization": [
+            {
+              "predicate": "SignedIn"
+            }
+          ],
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.decrease_in_cart",
+    "capability_mapping": 1,
+    "abi_schema": "8ad56a870ecb332a",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/carts",
+        "name": "decrease",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Cart"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.CartError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "decrease_in_cart",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "result",
+                "ty": "Cart"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-decrease-in-cart-api@0.1.0",
+          "function": "decrease-in-cart",
+          "authorization": [
+            {
+              "predicate": "SignedIn"
+            }
+          ],
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.increase_in_cart",
+    "capability_mapping": 1,
+    "abi_schema": "69261a5c0182c363",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Menus"
+      },
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/carts",
+        "name": "add",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.PositiveInt"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Cart"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.CartError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/menus",
+        "name": "is-available",
+        "capability": "database.read<Menus>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Menus"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "increase_in_cart",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "result",
+                "ty": "Cart"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-increase-in-cart-api@0.1.0",
+          "function": "increase-in-cart",
+          "authorization": [
+            {
+              "predicate": "SignedIn"
+            }
+          ],
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.remove_from_cart",
+    "capability_mapping": 1,
+    "abi_schema": "800206716105eda8",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/carts",
+        "name": "remove",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Cart"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.CartError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "remove_from_cart",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "result",
+                "ty": "Cart"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-remove-from-cart-api@0.1.0",
+          "function": "remove-from-cart",
           "authorization": [
             {
               "predicate": "SignedIn"

@@ -21,7 +21,7 @@ The cart and command core holds:
 What is missing is mostly the store's breadth:
 - availability (since met inside the command, ADR-0157);
 - the route and more than one store;
-- the cart's per-line controls;
+- the cart's per-line controls (since met, ADR-0172);
 - the recommendation and estimate slots, which only T05's and T10's patches
   add;
 - most of §15.5's failure controls.
@@ -71,11 +71,11 @@ are fixed (ADR-0155):
 | item | status |
 |---|---|
 | route `/stores/:store_id` | met since ADR-0160-0163: `route "/stores/{id}"`, held to the page's parameters; served at it, each document reading its own; a second store; an unknown store answered 404, as the page declares (`not_found_on StoreError.NotFound`, PW0342) |
-| semantic heading, menu content early, cart summary slot | met (the cart as a count) |
+| semantic heading, menu content early, cart summary slot | met: since ADR-0172 the cart lists its lines, with its subtotal |
 | delivery estimate slot, recommendation slot | met since ADR-0165: each a named `<stream>` region, the estimate's said to a screen reader when it comes; painted before they are filled in WebKit too since ADR-0166 |
 | add item | met |
-| increment quantity | partial: pressing Add again grows the line; no per-line control |
-| decrement quantity, remove item | missing: the data layer has add, clear and current |
+| increment quantity | met since ADR-0172: each line's +, `increase_in_cart`, optimistic and idempotent, its item's availability read again |
+| decrement quantity, remove item | met since ADR-0172: each line's − and Remove; at one, − takes the line away; focus passes to the next line, or the cart's heading |
 | retry recoverable failure | partial: a failed handler load is retried on the next press; a command is never retried |
 | navigate away during a slow query | partial: run on T07's store (`e2e/keyed.spec.mjs`, ADR-0152); the canonical store has no slow keyed query |
 
@@ -119,7 +119,7 @@ are fixed (ADR-0155):
 | 12 | A's cart never observed by B | met |
 | 13 | shared caches hold no session or secret fields | partial: synthetic values only |
 | 14 | keyboard and screen-reader semantics | partial: since ADR-0168 each Add is named by its item, renamed with it, and the count is said in a polite live region (the cart's notice has one since ADR-0157); no automated audit |
-| 15 | focus preserved | met |
+| 15 | focus preserved | met, and since ADR-0172 through a speculation and the server's answer: a kept row's nodes stay, and focus in a row that goes passes on |
 | 16 | handler version mismatch recovers | partial: refused safely, the recovery not acted on (fixed) |
 | 17 | slow recommendations do not block Add | met since ADR-0165 in Chromium and Firefox, and in WebKit since ADR-0166, which gave the store enough text to be painted before its slots (`e2e/slots.spec.mjs`) |
 | 18 | last-known-good only for declared public data | partial: the materializer's tests; nothing limits the fallback to public data, and the server never serves one |
@@ -134,7 +134,8 @@ are fixed (ADR-0155):
    ADR-0163.
 3. ~~**The recommendation and estimate slots**~~ (tests 3 and 17): met by
    ADR-0165, and in WebKit by ADR-0166.
-4. **Decrement, remove, and a per-line list** (§15.3).
+4. ~~**Decrement, remove, and a per-line list**~~ (§15.3): met by
+   ADR-0172.
 5. **A command retried on a transport failure** (§15.4), with its
    interaction.
 6. **§15.5's missing controls.**

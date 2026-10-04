@@ -11,13 +11,22 @@
 //! # The ABI
 //!
 //! ```text
-//! alloc(len)              -> ptr     the caller writes a request here
-//! render_part(ptr, len)   -> code    0 rendered, 1 refused, 2 malformed
-//! out_ptr() / out_len()              the HTML, or why it was refused
+//! alloc(len)                  -> ptr   the caller writes a request here
+//! render_part(ptr, len)       -> code  0 done, 1 refused, 2 malformed
+//! render_instance(ptr, len)   -> code  one instance of a loop (ADR-0172)
+//! instance_changes(ptr, len)  -> code  what changed in one (ADR-0172)
+//! attribute_value(ptr, len)   -> code  an attribute as written (ADR-0172)
+//! out_ptr() / out_len()                the answer, or why it was refused
 //! ```
 //!
 //! A request is JSON: `{ "part": <a template part>, "values": { name: value } }`,
-//! each value in the wire form a page's signals are held in.
+//! each value in the wire form a page's signals are held in. An instance's
+//! request names its row as `item`; an instance's changes, its row before and
+//! after as `was` and `now`.
+//!
+//! A speculation's parts are rendered here too (ADR-0172): its rows, their
+//! changes and its attributes, from the speculated value, with the server's
+//! own escaping and anchors.
 
 use std::sync::Mutex;
 
@@ -57,31 +66,146 @@ pub extern "C" fn out_len() -> usize {
     OUT.lock().unwrap().len()
 }
 
-/// The request's part, rendered: `(0, html)`, `(1, why)` refused by the
-/// renderer, or `(2, why)` for a request that is not one.
-pub fn render(request: &[u8]) -> (u32, String) {
-    let Ok(request) = serde_json::from_slice::<serde_json::Value>(request) else {
-        return (2, "the request is not JSON".to_string());
-    };
-    let part: pw_render::ir::Part = match serde_json::from_value(request["part"].clone()) {
-        Ok(p) => p,
-        Err(e) => return (2, format!("the part: {e}")),
-    };
+/// **Render one instance of a loop** (ADR-0172).
+///
+/// # Safety
+///
+/// As [`render_part`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn render_instance(ptr: *const u8, len: usize) -> u32 {
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let (code, out) = instance(bytes);
+    *OUT.lock().unwrap() = out;
+    code
+}
+
+/// **What changed in one instance of a loop** (ADR-0172).
+///
+/// # Safety
+///
+/// As [`render_part`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn instance_changes(ptr: *const u8, len: usize) -> u32 {
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let (code, out) = changes(bytes);
+    *OUT.lock().unwrap() = out;
+    code
+}
+
+/// **An attribute's value, as the document writes it** (ADR-0172).
+///
+/// # Safety
+///
+/// As [`render_part`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn attribute_value(ptr: *const u8, len: usize) -> u32 {
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let (code, out) = attribute(bytes);
+    *OUT.lock().unwrap() = out;
+    code
+}
+
+/// A request read: its JSON, its part, and the values it gives, set into a
+/// rendering environment. `Err((2, why))` for a request that is not one.
+fn read(
+    request: &[u8],
+) -> Result<(serde_json::Value, pw_render::ir::Part, pw_render::Env), (u32, String)> {
+    let request = serde_json::from_slice::<serde_json::Value>(request)
+        .map_err(|_| (2, "the request is not JSON".to_string()))?;
+    let part: pw_render::ir::Part = serde_json::from_value(request["part"].clone())
+        .map_err(|e| (2, format!("the part: {e}")))?;
     let mut env = pw_render::Env::new();
     if let Some(values) = request["values"].as_object() {
         for (name, value) in values {
             env = env.set(name, pw_render::Value::from_wire(value));
         }
     }
-    let template = pw_render::Template {
+    Ok((request, part, env))
+}
+
+/// The one-part template a request's part is rendered in.
+fn template_of(part: pw_render::ir::Part) -> pw_render::Template {
+    pw_render::Template {
         path: String::new(),
         name: String::new(),
         params: Vec::new(),
         schema: String::new(),
         chunks: vec![pw_render::ir::Chunk::Dynamic(part)],
+    }
+}
+
+/// The request's part, rendered: `(0, html)`, `(1, why)` refused by the
+/// renderer, or `(2, why)` for a request that is not one.
+pub fn render(request: &[u8]) -> (u32, String) {
+    let (_, part, env) = match read(request) {
+        Ok(read) => read,
+        Err(refused) => return refused,
     };
-    match pw_render::render(&template, &env, &[]) {
+    match pw_render::render(&template_of(part), &env, &[]) {
         Ok(html) => (0, html),
+        Err(why) => (1, format!("{why:?}")),
+    }
+}
+
+/// One instance of the request's loop, for its `item`: `(0, html)`.
+pub fn instance(request: &[u8]) -> (u32, String) {
+    let (request, part, env) = match read(request) {
+        Ok(read) => read,
+        Err(refused) => return refused,
+    };
+    let Some(each) = part.id() else {
+        return (2, "the part is no loop".to_string());
+    };
+    let item = pw_render::Value::from_wire(&request["item"]);
+    match pw_render::render_instance(&template_of(part), each, &item, &env, &[]) {
+        Ok(html) => (0, html),
+        Err(why) => (1, format!("{why:?}")),
+    }
+}
+
+/// What changed in one instance, from `was` to `now`: `(0, json)`, the JSON
+/// each change as `[part, {"text": ..}]` or `[part, {"attribute": name,
+/// "value": ..}]`, or `null` where the instance must be rendered again.
+pub fn changes(request: &[u8]) -> (u32, String) {
+    let (request, part, env) = match read(request) {
+        Ok(read) => read,
+        Err(refused) => return refused,
+    };
+    let Some(each) = part.id() else {
+        return (2, "the part is no loop".to_string());
+    };
+    let was = pw_render::Value::from_wire(&request["was"]);
+    let now = pw_render::Value::from_wire(&request["now"]);
+    match pw_render::instance_changes(&template_of(part), each, &was, &now, &env, &[]) {
+        Ok(None) => (0, "null".to_string()),
+        Ok(Some(changes)) => {
+            let out: Vec<serde_json::Value> = changes
+                .into_iter()
+                .map(|(id, change)| match change {
+                    pw_render::InstanceChange::Text(text) => {
+                        serde_json::json!([id.0, { "text": text }])
+                    }
+                    pw_render::InstanceChange::Attribute { name, value } => {
+                        serde_json::json!([id.0, { "attribute": name, "value": value }])
+                    }
+                })
+                .collect();
+            (0, serde_json::Value::Array(out).to_string())
+        }
+        Err(why) => (1, format!("{why:?}")),
+    }
+}
+
+/// The request's attribute, as the document writes it: `(0, json)`, the JSON
+/// `[name, value]`, `value` `null` for a boolean attribute that is absent.
+pub fn attribute(request: &[u8]) -> (u32, String) {
+    let (_, part, env) = match read(request) {
+        Ok(read) => read,
+        Err(refused) => return refused,
+    };
+    match pw_render::attribute_value(&part, &env) {
+        Ok(Some((name, value))) => (0, serde_json::json!([name, value]).to_string()),
+        Ok(None) => (2, "the part is no attribute".to_string()),
         Err(why) => (1, format!("{why:?}")),
     }
 }
@@ -127,5 +251,138 @@ mod tests {
     fn a_request_that_is_not_one_is_refused() {
         assert_eq!(render(b"not json").0, 2);
         assert_eq!(render(br#"{ "part": 1, "values": {} }"#).0, 2);
+    }
+
+    use super::{attribute, changes, instance};
+    use pw_render::ir::{Chunk, Context, ElementId, Part, PartId, Segment};
+
+    /// `{#each cart.lines as line (line.id)}<li data-pw="0" aria-label="Remove
+    /// {line.name}"><span>{line.name}</span>{#if line.gift}..{/if}</li>{/each}`
+    fn lines() -> Part {
+        let st = |s: &str| Chunk::Static(s.to_string());
+        Part::Each {
+            id: PartId(0),
+            collection: "cart.lines".into(),
+            binding: "line".into(),
+            key: Some("id".into()),
+            body: vec![
+                st("<li data-pw=\"0\" "),
+                Chunk::Dynamic(Part::InterpolatedAttribute {
+                    id: PartId(1),
+                    owner: ElementId(0),
+                    name: "aria-label".into(),
+                    segments: vec![
+                        Segment::Static("Remove ".into()),
+                        Segment::Value("line.name".into()),
+                    ],
+                    context: Context::Attribute,
+                }),
+                st("><span>"),
+                Chunk::Dynamic(Part::Text {
+                    id: PartId(2),
+                    value: "line.name".into(),
+                    context: Context::Text,
+                }),
+                st("</span>"),
+                Chunk::Dynamic(Part::Conditional {
+                    id: PartId(3),
+                    value: "line.gift".into(),
+                    then: vec![st("<b>gift</b>")],
+                    otherwise: vec![],
+                }),
+                st("</li>"),
+            ],
+        }
+    }
+
+    fn request(fields: serde_json::Value) -> Vec<u8> {
+        let mut r = serde_json::json!({ "part": lines(), "values": {} });
+        for (k, v) in fields.as_object().expect("fields") {
+            r[k] = v.clone();
+        }
+        r.to_string().into_bytes()
+    }
+
+    /// The browser's instance is the server's, from one renderer: its
+    /// anchors, its escaping, its parts (ADR-0172).
+    #[test]
+    fn an_instance_is_rendered_as_the_server_renders_it() {
+        let item = serde_json::json!({ "id": "a", "name": "Tea & Cake", "gift": false });
+        let (code, html) = instance(&request(serde_json::json!({ "item": item })));
+        assert_eq!(code, 0, "{html}");
+        let env = pw_render::Env::new();
+        let template = super::template_of(lines());
+        let server = pw_render::render_instance(
+            &template,
+            PartId(0),
+            &pw_render::Value::from_wire(&item),
+            &env,
+            &[],
+        )
+        .expect("the server's");
+        assert_eq!(html, server);
+        assert!(
+            html.contains("aria-label=\"Remove Tea &amp; Cake\""),
+            "{html}"
+        );
+        assert!(
+            html.contains("<span><!--pw:s2-->Tea &amp; Cake<!--pw:e2--></span>"),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn what_changed_in_an_instance_is_each_part_set_where_it_is() {
+        let was = serde_json::json!({ "id": "a", "name": "Tea", "gift": false });
+        let now = serde_json::json!({ "id": "a", "name": "Green Tea", "gift": false });
+        let (code, out) = changes(&request(serde_json::json!({ "was": was, "now": now })));
+        assert_eq!(code, 0, "{out}");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&out).expect("JSON"),
+            serde_json::json!([
+                [1, { "attribute": "aria-label", "value": "Remove Green Tea" }],
+                [2, { "text": "Green Tea" }],
+            ])
+        );
+        // A block that changed: the instance is rendered again.
+        let gift = serde_json::json!({ "id": "a", "name": "Tea", "gift": true });
+        let (code, out) = changes(&request(serde_json::json!({ "was": was, "now": gift })));
+        assert_eq!((code, out.as_str()), (0, "null"));
+    }
+
+    #[test]
+    fn an_attribute_is_written_as_the_document_writes_it() {
+        let title = Part::Attribute {
+            id: PartId(4),
+            owner: ElementId(1),
+            name: "title".into(),
+            value: "cart.note".into(),
+            context: Context::Attribute,
+        };
+        let hidden = Part::BooleanAttribute {
+            id: PartId(5),
+            owner: ElementId(1),
+            name: "hidden".into(),
+            value: "cart.lines".into(),
+        };
+        let ask = |part: &Part, values: serde_json::Value| {
+            attribute(
+                serde_json::json!({ "part": part, "values": values })
+                    .to_string()
+                    .as_bytes(),
+            )
+        };
+        assert_eq!(
+            ask(&title, serde_json::json!({ "cart": { "note": "\"hot\"" } })),
+            (0, r#"["title","&quot;hot&quot;"]"#.to_string())
+        );
+        assert_eq!(
+            ask(&hidden, serde_json::json!({ "cart": { "lines": [1] } })),
+            (0, r#"["hidden",""]"#.to_string())
+        );
+        assert_eq!(
+            ask(&hidden, serde_json::json!({ "cart": { "lines": [] } })),
+            (0, r#"["hidden",null]"#.to_string())
+        );
     }
 }

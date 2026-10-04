@@ -310,8 +310,30 @@ fn the_stores_commands_agree_with_their_reference() {
     let u = store();
     // Whether the item can be ordered is read again inside the command, and
     // an item that cannot is refused by name, before anything is written
-    // (ADR-0157). Run with each answer, so each branch is compared.
+    // (ADR-0157). Run with each answer, so each branch is compared. The item
+    // is the one the page showed (ADR-0172); the command writes by its id.
     let add: Reference = |args, host| {
+        let id = field(&args[0], "id");
+        if host("store:data/menus#is-available", vec![id.clone()]) != Val::Bool(true) {
+            return Val::Result(Err(Some(Box::new(Val::Variant(
+                "item-unavailable".to_string(),
+                Some(Box::new(id)),
+            )))));
+        }
+        let session = host("pw:host/session#read", vec![]);
+        host("store:data/carts#add", vec![session, id, args[1].clone()])
+    };
+    let runnable = Runnable::new(compile(&u, "store.page.add_to_cart"));
+    differential("store.page.add_to_cart", &runnable, add, stocked(true));
+    differential(
+        "store.page.add_to_cart, sold out",
+        &runnable,
+        add,
+        stocked(false),
+    );
+    // One more of a line's item (ADR-0172): its availability read again, as
+    // `add_to_cart`'s is, and one added.
+    let increase: Reference = |args, host| {
         if host("store:data/menus#is-available", vec![args[0].clone()]) != Val::Bool(true) {
             return Val::Result(Err(Some(Box::new(Val::Variant(
                 "item-unavailable".to_string(),
@@ -321,16 +343,40 @@ fn the_stores_commands_agree_with_their_reference() {
         let session = host("pw:host/session#read", vec![]);
         host(
             "store:data/carts#add",
-            vec![session, args[0].clone(), args[1].clone()],
+            vec![session, args[0].clone(), Val::S64(1)],
         )
     };
-    let runnable = Runnable::new(compile(&u, "store.page.add_to_cart"));
-    differential("store.page.add_to_cart", &runnable, add, stocked(true));
+    let runnable = Runnable::new(compile(&u, "store.page.increase_in_cart"));
     differential(
-        "store.page.add_to_cart, sold out",
+        "store.page.increase_in_cart",
         &runnable,
-        add,
+        increase,
+        stocked(true),
+    );
+    differential(
+        "store.page.increase_in_cart, sold out",
+        &runnable,
+        increase,
         stocked(false),
+    );
+    // One fewer, and a line gone: the data layer's, by the session's cart.
+    differential(
+        "store.page.decrease_in_cart",
+        &Runnable::new(compile(&u, "store.page.decrease_in_cart")),
+        |args, host| {
+            let session = host("pw:host/session#read", vec![]);
+            host("store:data/carts#decrease", vec![session, args[0].clone()])
+        },
+        fixed,
+    );
+    differential(
+        "store.page.remove_from_cart",
+        &Runnable::new(compile(&u, "store.page.remove_from_cart")),
+        |args, host| {
+            let session = host("pw:host/session#read", vec![]);
+            host("store:data/carts#remove", vec![session, args[0].clone()])
+        },
+        fixed,
     );
     differential(
         "store.page.clear_cart",

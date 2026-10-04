@@ -143,8 +143,10 @@ MUTANTS = [
         "every item can be ordered",
         "cargo",
         SERVER,
-        "                    [Val::String(item)] => Ok(vec![Val::Bool(!sold_out.contains(item))]),\n",
-        "                    [Val::String(item)] => Ok(vec![Val::Bool(!sold_out.contains(item) || true)]),\n",
+        # Re-anchored by ADR-0172: an item can be ordered when a store has it
+        # and it is not sold out.
+        "                        catalog.contains_key(item) && !sold_out.contains(item),\n",
+        "                        true || (catalog.contains_key(item) && !sold_out.contains(item)),\n",
     ),
     (
         "a kept answer forgets null",

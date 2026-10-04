@@ -162,6 +162,14 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
         // And the one a menu's row reads `item.price.display` through
         // (ADR-0169).
         "domain.display",
+        // A line's controls, and what the cart's lines read through
+        // (ADR-0172).
+        "store.page.increase_in_cart",
+        "store.page.decrease_in_cart",
+        "store.page.remove_from_cart",
+        "domain.count",
+        "domain.total",
+        "domain.subtotal",
     ] {
         let fresh = pw_core::backend::component::compile(&units, id)
             .unwrap_or_else(|e| panic!("{id} compiles: {e}"));

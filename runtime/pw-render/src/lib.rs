@@ -565,6 +565,14 @@ pub fn instance_changes(
         emit(std::slice::from_ref(c), e, others, &mut out)?;
         Ok(out)
     };
+    // Each element's handlers in the row, whose captures are one attribute
+    // of it (ADR-0172).
+    let mut handlers: BTreeMap<ElementId, Vec<&Part>> = BTreeMap::new();
+    for c in body {
+        if let Chunk::Dynamic(p @ Part::Event { owner, .. }) = c {
+            handlers.entry(*owner).or_default().push(p);
+        }
+    }
     let mut out = Vec::new();
     for c in body {
         let Chunk::Dynamic(p) = c else { continue };
@@ -597,6 +605,28 @@ pub fn instance_changes(
                     && let Some((name, value)) = y
                 {
                     out.push((*id, InstanceChange::Attribute { name, value }));
+                }
+            }
+            // **What a handler captures is an attribute of its element**,
+            // which the runtime reads when the handler runs (ADR-0172): set
+            // where it is, as any attribute is, once for the element's
+            // handlers. Until 2026-10-03 it rendered the row again, and a
+            // renamed item's Add button lost its nodes.
+            Part::Event { id, owner, .. } => {
+                let run = handlers.get(owner).map(Vec::as_slice).unwrap_or_default();
+                if run.first().and_then(|p| p.id()) != Some(*id) {
+                    continue;
+                }
+                let x = captures_value(run, &before)?;
+                let y = captures_value(run, &after)?;
+                if x != y {
+                    out.push((
+                        *id,
+                        InstanceChange::Attribute {
+                            name: "data-pw-captures".into(),
+                            value: y,
+                        },
+                    ));
                 }
             }
             _ => {
@@ -657,9 +687,13 @@ fn capture_json(v: &Value, name: &str) -> Result<serde_json::Value, Blocked> {
                 .map(|i| capture_json(i, name))
                 .collect::<Result<_, _>>()?,
         ),
+        // Its fields. What a host computed for a row is set in it by a
+        // dotted path (ADR-0170), and is the page's to show, not the item's:
+        // a handler is given the item.
         Value::Record(fields) => serde_json::Value::Object(
             fields
                 .iter()
+                .filter(|(k, _)| !k.contains('.'))
                 .map(|(k, v)| Ok((k.clone(), capture_json(v, name)?)))
                 .collect::<Result<_, Blocked>>()?,
         ),
@@ -830,6 +864,15 @@ fn emit(chunks: &[Chunk], env: &Env, others: &[Template], out: &mut String) -> R
 /// two places is refused, not guessed between. Empty where nothing is
 /// captured.
 fn captures_attribute(parts: &[&Part], env: &Env) -> Result<String, Blocked> {
+    Ok(match captures_value(parts, env)? {
+        Some(value) => format!(" data-pw-captures=\"{value}\""),
+        None => String::new(),
+    })
+}
+
+/// [`captures_attribute`]'s value, as the document writes it, or none where
+/// nothing is captured.
+fn captures_value(parts: &[&Part], env: &Env) -> Result<Option<String>, Blocked> {
     let mut paths: BTreeMap<String, String> = BTreeMap::new();
     for p in parts {
         let Part::Event {
@@ -855,7 +898,7 @@ fn captures_attribute(parts: &[&Part], env: &Env) -> Result<String, Blocked> {
         }
     }
     if paths.is_empty() {
-        return Ok(String::new());
+        return Ok(None);
     }
     let mut object = serde_json::Map::new();
     for (path, at) in &paths {
@@ -863,10 +906,7 @@ fn captures_attribute(parts: &[&Part], env: &Env) -> Result<String, Blocked> {
         insert_at(&mut object, path, capture_json(v, path)?)?;
     }
     let json = serde_json::Value::Object(object).to_string();
-    Ok(format!(
-        " data-pw-captures=\"{}\"",
-        escape::attribute(&json)
-    ))
+    Ok(Some(escape::attribute(&json)))
 }
 
 fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Result<(), Blocked> {

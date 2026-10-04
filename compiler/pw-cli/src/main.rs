@@ -1194,6 +1194,8 @@ fn emit_speculations_command(paths: &[&String], out: &str) -> ExitCode {
             "module": format!("{}.mjs", m.page),
             "bindings": m.bindings,
             "commands": m.commands,
+            // Each part the browser renders again with it (ADR-0172).
+            "regions": m.regions,
         });
         for (file, text) in [
             (dir.join(format!("{}.mjs", m.page)), m.source.clone()),

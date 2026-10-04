@@ -166,12 +166,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           through `display`. Every other member read no host computes is a
           build refusal. Until 2026-10-03 the plan neither planned nor
           refused one, and a page that made one built, then failed to render.
-     4. **Decrement, remove, and a per-line cart.** Each line shows its
-        item's name, price and quantity, the line's total, and the cart's
-        total, with controls to decrement and remove. Acceptance: the
-        commands are idempotent and optimistic, as `add_to_cart` is; the
-        totals are the items' prices, which the data layer now prices lines
-        at (ADR-0169); three engines.
+     4. ~~Decrement, remove, and a per-line cart.~~ Done 2026-10-04
+        (ADR-0172, `just e14-cart-lines`): each line's name, − and +, total
+        and Remove, the cart's subtotal, optimistic and idempotent, in three
+        engines.
         - ~~A loop over a list inside a query's value~~ (ADR-0170,
           `just e14-nested-lists`): `cart.lines` by its path, its rows'
           member reads computed, and a part a speculation would not reach
@@ -179,16 +177,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - ~~An attribute at the top that reads a query's value~~
           (ADR-0171, `just e14-query-attributes`): set again when the value
           changes. Found designing the cart's empty message.
-        - **Next: a speculation reaches every part that reads it.** The
-          browser renders again a loop, a block or an attribute that reads a
-          speculated value. It sets an instance's parts where they are, so
-          focus stays, and an optimistic new row is provisional until the
-          server's insert replaces it. Its address is a keyed hash under the
-          deployment's key, which the browser does not hold.
-        - Then the cart's lines, with `add_to_cart` given the item as the
-          page showed it, so an optimistic line has its name and price. The
-          server writes by the item's id alone.
-     5. A command retried on a transport failure.
+        - ~~A speculation reaches every part that reads it, and the cart's
+          lines~~ (ADR-0172): the browser renders a loop, a block or an
+          attribute again from the speculated value, rows set where they
+          are. Corrections: a press shown twice when its value came before
+          its answer, and two changes of one session sent at once.
+     5. **Next: a command retried on a transport failure** (§15.4). A
+        request that gets no answer is sent again with the same
+        interaction, a bounded number of times; an answer, a refusal
+        included, is never retried. Acceptance: a dropped request is one
+        mutation, in three engines; a refused one is not sent again.
      6. §15.5's missing controls.
      7. Availability on the page before the press: `MenuItem.available`, and
         an `InventoryChanged` the menu hears.

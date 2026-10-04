@@ -200,11 +200,17 @@ test("the long poll opens a connection per batch", async ({ page }) => {
   for (const n of ["1", "2", "3"]) {
     await page.locator("#menu button").first().click();
     await expect(page.locator("#cart-count")).toHaveText(n);
-    // Each change's patch, not only its speculation (ADR-0122): the count
-    // moves before the round trip.
+    // Each change's patch to the count, not only its speculation (ADR-0122):
+    // the count moves before the round trip. The count's alone: a change
+    // sets the subtotal too (ADR-0172).
     await expect
       .poll(() =>
-        page.evaluate(() => window.__pw.log.filter((l) => l.startsWith("updated ")).length),
+        page.evaluate(() => {
+          const { parts, schema } = window.__pw.parts;
+          const count = parts.find((p) => p.value === "cart.line_count").id;
+          return window.__pw.log.filter((l) => l.startsWith(`updated ${schema}/|${count} at`))
+            .length;
+        }),
       )
       .toBe(Number(n));
   }
@@ -236,7 +242,8 @@ test("the frames carry no trace of which adapter delivered them", async ({ page 
 
   // `value` since ADR-0122: an `entry_value` frame's, a protocol field. And
   // `patches` since ADR-0145: a `patch_set`'s, each a target and an operation.
-  const FRAME_FIELDS = new Set(["frame", "protocol", "basis", "target", "operation", "entry", "version", "reason", "value", "patches"]);
+  // And `applied` since ADR-0172: the interactions an entry's value includes.
+  const FRAME_FIELDS = new Set(["frame", "protocol", "basis", "target", "operation", "entry", "version", "reason", "value", "patches", "applied"]);
   let checked = 0;
   for (const body of bodies) {
     for (const line of body.split("\n").filter(Boolean)) {

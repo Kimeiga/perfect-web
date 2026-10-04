@@ -10,7 +10,7 @@
 
 module cart.commands
 
-import domain.{ MenuItemId, PositiveInt, InteractionId, CartError }
+import domain.{ MenuItem, PositiveInt, InteractionId, CartError }
 
 import Carts
 import Menu
@@ -28,7 +28,9 @@ import context.{ current_session }
 // told A-004's cart that it had changed (ADR-0101).
 import Events.{ CartChanged }
 
-command add_to_cart(item: MenuItemId, quantity: PositiveInt)
+// The item as the page showed it (ADR-0172): its transition makes a new line
+// from the item's name and price, and the command writes by its id alone.
+command add_to_cart(item: MenuItem, quantity: PositiveInt)
     -> Result<domain.Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
@@ -42,9 +44,9 @@ command add_to_cart(item: MenuItemId, quantity: PositiveInt)
     // `Menu.is_available` answers a `Bool`, which has no failure for `?` to
     // return: this read `Menu.is_available(item)?` until 2026-09-26, when
     // `?`'s operand was first checked (ADR-0068).
-    let available = Menu.is_available(item)
+    let available = Menu.is_available(item.id)
     if !available {
-        return Err(CartError.ItemUnavailable(item))
+        return Err(CartError.ItemUnavailable(item.id))
     }
-    Carts.add(current_session(), item, quantity)
+    Carts.add(current_session(), item.id, quantity)
 }

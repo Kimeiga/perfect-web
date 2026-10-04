@@ -574,7 +574,7 @@ pub struct RowRead {
 /// **Whether the value read at `at` calls a member function** anywhere along
 /// its path (ADR-0169), as the value typer resolves each read in `origin`'s
 /// body. Typed once for each body.
-fn calls_a_member(
+pub(crate) fn calls_a_member(
     hirs: &[&Hir],
     ws: &Workspace,
     sigs: &Signatures,
