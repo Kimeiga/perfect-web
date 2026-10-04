@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `4b4200c`, with ADR-0185.
+**Reviewed:** 2026-10-04, against master `f19ce5a`, with ADR-0185 and its correction.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2500,11 +2500,11 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`4b4200c` (2026-10-04, ADR-0185): `just ci` passes locally, the workspace's
-1883 tests pass, and the browser suite passes 648 in three engines, with 3
-skipped. Its evidence is `docs/evidence/E14/ids.txt`, recorded at that
-commit: 12 of 12 mutants killed, the corpus at C10, and every program the
-repository checks clean. ADR-0184's is `shared-output.txt`, at `3e35870`;
+`f19ce5a` (2026-10-04, ADR-0185's correction): `just ci` passes locally,
+the workspace's 1883 tests pass, and the browser suite passes 648 in three
+engines, with 3 skipped. Its evidence is `docs/evidence/E14/ids.txt`,
+recorded again at that commit: 13 of 13 mutants killed, the corpus at C10,
+and every program the repository checks clean. ADR-0184's is `shared-output.txt`, at `3e35870`;
 ADR-0183's is `titles.txt`, at
 `7c7aba4`, with the corpus at C9; ADR-0182's is `accessibility.txt`, at
 `bbb4a1b`; ADR-0181's is `menu-categories.txt`, at
