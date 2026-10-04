@@ -2362,14 +2362,14 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`2c5366e` (2026-10-04, ADR-0176): `just ci` passes locally, the workspace's
-1821 tests pass, and the browser suite passes 589 in three engines, with 2
-skipped. Its evidence is `docs/evidence/E14/materializer-failure.txt`,
-recorded at that commit: 6 of 6 mutants killed. ADR-0175's is
-`connection-faults.txt`, at `bbaf6e9`, where its first run had killed 8 of
-10; ADR-0174's `test-controls.txt`, at `d22928f`; ADR-0173's
-`command-retry.txt`, at `99ddad2`; ADR-0172's `cart-lines.txt`, at `a7314bc`;
-ADR-0171's `query-attributes.txt`, at `f8bd455`; ADR-0170's
+`257b1a5` (2026-10-04, ADR-0177): `just ci` passes locally, the workspace's
+1826 tests pass, and the browser suite passes 592 in three engines, with 2
+skipped. Its evidence is `docs/evidence/E14/last-known-good.txt`, recorded
+at that commit: 11 of 11 mutants killed. ADR-0176's is
+`materializer-failure.txt`, at `2c5366e`; ADR-0175's `connection-faults.txt`,
+at `bbaf6e9`; ADR-0174's `test-controls.txt`, at `d22928f`; ADR-0173's
+`command-retry.txt`, at `99ddad2`; ADR-0172's `cart-lines.txt`, at
+`a7314bc`; ADR-0171's `query-attributes.txt`, at `f8bd455`; ADR-0170's
 `nested-lists.txt`, at `201ca0e`; and ADR-0169's `row-reads.txt`, at
 `36d263c`.
 
