@@ -1,0 +1,61 @@
+ADR-0182 - keyboard and screen-reader semantics remain valid
+
+produced by: just e14-accessibility
+commit: bbb4a1b9826062b42b984f51a6f9a1c54fd9697e
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the page, in three engines (e2e/accessibility.spec.mjs)
+
+  ✓   1 [chromium] › e2e/accessibility.spec.mjs:103:1 › the store keeps every rule as it is served, and after each kind of change (2.9s)
+  ✓   2 [webkit] › e2e/accessibility.spec.mjs:103:1 › the store keeps every rule as it is served, and after each kind of change (3.4s)
+  ✓   3 [firefox] › e2e/accessibility.spec.mjs:103:1 › the store keeps every rule as it is served, and after each kind of change (3.2s)
+  ✓   4 [chromium] › e2e/accessibility.spec.mjs:175:1 › another store, and a store that is not there, keep every rule (1.3s)
+  ✓   5 [webkit] › e2e/accessibility.spec.mjs:175:1 › another store, and a store that is not there, keep every rule (1.4s)
+  ✓   6 [firefox] › e2e/accessibility.spec.mjs:175:1 › another store, and a store that is not there, keep every rule (1.5s)
+  ✓   7 [chromium] › e2e/accessibility.spec.mjs:184:1 › the tree a screen reader reads is the page's (1.6s)
+  ✓   8 [webkit] › e2e/accessibility.spec.mjs:184:1 › the tree a screen reader reads is the page's (1.7s)
+  ✓   9 [firefox] › e2e/accessibility.spec.mjs:184:1 › the tree a screen reader reads is the page's (1.6s)
+  ✓  10 [chromium] › e2e/accessibility.spec.mjs:257:1 › every control is reached from the keyboard, in the order it is read, and shows its focus (1.1s)
+  ✓  11 [webkit] › e2e/accessibility.spec.mjs:257:1 › every control is reached from the keyboard, in the order it is read, and shows its focus (1.2s)
+  ✓  12 [firefox] › e2e/accessibility.spec.mjs:257:1 › every control is reached from the keyboard, in the order it is read, and shows its focus (1.2s)
+  ✓  13 [chromium] › e2e/accessibility.spec.mjs:292:1 › each control is pressed with Enter and with Space (1.2s)
+  ✓  14 [webkit] › e2e/accessibility.spec.mjs:292:1 › each control is pressed with Enter and with Space (1.3s)
+  ✓  15 [firefox] › e2e/accessibility.spec.mjs:292:1 › each control is pressed with Enter and with Space (1.5s)
+  ✓  16 [chromium] › e2e/accessibility.spec.mjs:310:1 › a live region is the same node from the start, and says each change once (2.9s)
+  ✓  17 [webkit] › e2e/accessibility.spec.mjs:310:1 › a live region is the same node from the start, and says each change once (3.0s)
+  ✓  18 [firefox] › e2e/accessibility.spec.mjs:310:1 › a live region is the same node from the start, and says each change once (3.0s)
+  ✓  19 [chromium] › e2e/accessibility.spec.mjs:378:1 › a change writes only what it changes (2.2s)
+  ✓  20 [webkit] › e2e/accessibility.spec.mjs:378:1 › a change writes only what it changes (2.3s)
+  ✓  22 [chromium] › e2e/accessibility.spec.mjs:418:1 › at 320 CSS pixels the page reflows, and keeps every rule (1.4s)
+  ✓  21 [firefox] › e2e/accessibility.spec.mjs:378:1 › a change writes only what it changes (2.4s)
+  ✓  24 [chromium] › e2e/accessibility.spec.mjs:432:1 › on a phone the page is laid out at the phone's width (685ms)
+  ✓  23 [webkit] › e2e/accessibility.spec.mjs:418:1 › at 320 CSS pixels the page reflows, and keeps every rule (1.5s)
+  ✓  26 [chromium] › e2e/accessibility.spec.mjs:466:1 › when motion is reduced, nothing on the page moves (932ms)
+  ✓  25 [firefox] › e2e/accessibility.spec.mjs:418:1 › at 320 CSS pixels the page reflows, and keeps every rule (1.6s)
+  ✓  27 [webkit] › e2e/accessibility.spec.mjs:432:1 › on a phone the page is laid out at the phone's width (832ms)
+  -  28 [firefox] › e2e/accessibility.spec.mjs:432:1 › on a phone the page is laid out at the phone's width
+  ✓  29 [webkit] › e2e/accessibility.spec.mjs:466:1 › when motion is reduced, nothing on the page moves (977ms)
+  ✓  30 [firefox] › e2e/accessibility.spec.mjs:466:1 › when motion is reduced, nothing on the page moves (1.0s)
+  1 skipped
+  29 passed (34.8s)
+
+== mutation controls (scripts/accessibility_mutations.py)
+
+baseline (browser): 10 passed, 0 failed
+the store's page has no viewport: KILLED (1 of 1 tests fail)
+the page that is not found has no viewport: KILLED (1 of 2 tests fail)
+the store's page says no language: KILLED (1 of 1 tests fail)
+a part's text is written again when it holds it already: KILLED (1 of 6 tests fail)
+an attribute is set again when it holds its value: KILLED (1 of 7 tests fail)
+a category's heading is a level down: KILLED (1 of 1 tests fail)
+every Add is named Add: KILLED (1 of 1 tests fail)
+the cart's section is named by an id nothing has: KILLED (1 of 1 tests fail)
+the cart's count is no live region: KILLED (1 of 6 tests fail)
+a control is first in the keyboard's order: KILLED (1 of 1 tests fail)
+an item's description is too faint to read: KILLED (1 of 1 tests fail)
+focus is not shown: KILLED (1 of 4 tests fail)
+the page is wider than a phone: KILLED (1 of 8 tests fail)
+a cart line moves in: KILLED (1 of 1 tests fail)
+14 of 14 mutants killed
