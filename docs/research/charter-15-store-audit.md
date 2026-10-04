@@ -98,10 +98,10 @@ are fixed (ADR-0155):
 | recommendations 1200 ms, estimate 400 ms | met (`/bench/recommendations`, `/bench/estimate`), and the store's page reads both since ADR-0165 |
 | store delay, cart delay | met since ADR-0174: `/bench/store?delay=`, every reader's, and `/bench/cart?delay=`, one session's |
 | one-shot database error | met since ADR-0174: `/bench/fail?next=write` or `next=read` fails the session's next cart write or read, once; the add of the server's own is retired |
-| one-shot network error | partial: aborts inside browser tests only |
+| one-shot network error | met since ADR-0175: `/bench/drop?next=command&at=before\|after` closes the session's next command connection with no answer; the page sends it again (ADR-0173) and it is one mutation |
 | forced stale item | met since ADR-0157: `POST /bench/stock?item=..&available=false` |
 | forced duplicate click | met (`idempotent-command.spec.mjs`, T08) |
-| forced reconnect | partial: a forgotten page is told to reload; a dropped connection ended the subscription (fixed) |
+| forced reconnect | met since ADR-0175: `/bench/reconnect?for=ms` ends the session's subscriptions and refuses new ones for a while; what changed meanwhile reaches the page when it is back |
 | materializer failure | partial: injected only in `pw-materialize`'s own tests |
 
 ## §15.6 Required tests

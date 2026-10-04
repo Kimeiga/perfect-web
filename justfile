@@ -2207,6 +2207,29 @@ e14-test-controls:
      } > docs/evidence/E14/test-controls.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/test-controls.txt
 
+# ADR-0175: charter §15.5's one-shot network error and forced reconnect,
+# made by the server. The server's tests over real connections, the page in
+# three engines, and the mutation controls.
+e14-connection-faults:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0175 - a network error and a forced reconnect, made by the server"; echo; \
+       echo "produced by: just e14-connection-faults"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the development server, over real connections (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_dropped_command|a_forced_reconnect)|^test result'; \
+       echo; echo "== the page, in three engines (e2e/connections.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/connections.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/connection_faults_mutations.py)"; echo; \
+       python3 scripts/connection_faults_mutations.py; \
+     } > docs/evidence/E14/connection-faults.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/connection-faults.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

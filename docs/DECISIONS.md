@@ -1458,3 +1458,12 @@ a store delay, a cart delay, and a one-shot database error.
 - Correction: the one test of a rolled-back command posted an add of the
   server's own from another session, so it could not fail. It is the page's
   own press now.
+
+[ADR-0175](DECISIONS/ADR-0175-a-network-error-and-a-forced-reconnect-the-server-makes.md):
+a network error and a forced reconnect, made by the server.
+- `/bench/drop?next=command&at=before|after` closes the session's next
+  command connection with no answer, before the command runs or after it
+  commits; `/bench/reconnect?for=ms` ends its subscriptions now and refuses
+  new ones for a while (charter §15.5).
+- A press survives either drop as one mutation, and a page cut off hears,
+  once back, what changed meanwhile, in three engines.

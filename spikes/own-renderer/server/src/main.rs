@@ -415,6 +415,28 @@ struct CartFaults {
     fail_read: bool,
 }
 
+/// **What one session's connections meet** (charter §15.5, ADR-0175).
+#[derive(Debug, Clone, Default)]
+struct ConnectionFaults {
+    /// The next command's connection, closed with no answer: before the
+    /// command runs, or after it has committed. Once.
+    drop_command: Option<DropAt>,
+    /// When the session's subscriptions were last cut off: each one open
+    /// then ends.
+    cut_from: Option<std::time::Instant>,
+    /// Until when each new subscription is closed at once.
+    cut_until: Option<std::time::Instant>,
+}
+
+/// Where a command's connection is dropped (ADR-0175).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DropAt {
+    /// The request read, and nothing run.
+    Before,
+    /// The command run, and committed if it did, and its answer not sent.
+    After,
+}
+
 /// **The estimator the store's data layer reaches, for one session** (E14,
 /// T10): what `store:data/estimates#current` answers, after how long, and how
 /// it fails. A test sets it through `/bench/estimate`.
@@ -568,6 +590,11 @@ struct Server {
     /// and its next read fail. A test sets them through `/bench/cart` and
     /// `/bench/fail`.
     cart_faults: Arc<Mutex<BTreeMap<String, CartFaults>>>,
+    /// **What each session's connections meet** (charter §15.5's one-shot
+    /// network error and forced reconnect, ADR-0175): whether its next
+    /// command's connection is dropped, and when its subscriptions are cut
+    /// off. A test sets them through `/bench/drop` and `/bench/reconnect`.
+    connection_faults: Mutex<BTreeMap<String, ConnectionFaults>>,
     /// **Each document's keyed reads** (ADR-0152, ADR-0161).
     keyed: Mutex<BTreeMap<Doc, Keyed>>,
     /// **The menu's categories** (E14, T07): which is slow, and how slow.
@@ -932,6 +959,7 @@ impl Server {
             sold_out: Mutex::new(std::collections::BTreeSet::new()),
             store_delay_ms: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cart_faults: Arc::new(Mutex::new(BTreeMap::new())),
+            connection_faults: Mutex::new(BTreeMap::new()),
             keyed: Mutex::new(BTreeMap::new()),
             categories: Mutex::new(Categories::default()),
             category_stopped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
@@ -1358,6 +1386,31 @@ impl Server {
             })
             .map_err(|e| format!("interaction `{id}`'s outcome is unknown: {e:?}"))?;
         Ok(Answered::from_kept(&outcome))
+    }
+
+    /// **Whether the session's next command connection is dropped, and
+    /// where** (ADR-0175): taken, so it is dropped once.
+    fn take_command_drop(&self, session: &str) -> Option<DropAt> {
+        self.connection_faults
+            .lock()
+            .expect("connection faults")
+            .get_mut(session)
+            .and_then(|f| f.drop_command.take())
+    }
+
+    /// **Is a subscription of the session's, opened at `opened`, cut off
+    /// now?** (ADR-0175): cut since it opened, or inside a window in which
+    /// every new one is closed.
+    fn cut_off(&self, session: &str, opened: std::time::Instant) -> bool {
+        self.connection_faults
+            .lock()
+            .expect("connection faults")
+            .get(session)
+            .is_some_and(|f| {
+                f.cut_from.is_some_and(|from| from > opened)
+                    || f.cut_until
+                        .is_some_and(|until| std::time::Instant::now() < until)
+            })
     }
 
     /// **The session's cart operations, as its faults make them**
@@ -4708,7 +4761,18 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     .eq_ignore_ascii_case("pw-interaction")
                     .then(|| v.trim().to_string())
             });
-            match server.command_answer(id, &session, &args, interaction.as_deref()) {
+            // Charter §15.5's one-shot network error (ADR-0175): the
+            // connection closed with no answer, before the command runs, or
+            // after it has committed.
+            let drop_at = server.take_command_drop(&session);
+            if drop_at == Some(DropAt::Before) {
+                return;
+            }
+            let answer = server.command_answer(id, &session, &args, interaction.as_deref());
+            if drop_at == Some(DropAt::After) {
+                return;
+            }
+            match answer {
                 // A malformed request: nothing ran.
                 Err(e) => {
                     let why = serde_json::Value::String(e);
@@ -5032,6 +5096,57 @@ fn handle(server: &Server, mut stream: TcpStream) {
             server
                 .queries
                 .evict_where(|k| k.key == own || k.key.starts_with(&format!("{own}\u{1f}")));
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **A one-shot network error** (charter §15.5, ADR-0175): this
+        // session's next command connection is closed with no answer,
+        // before the command runs (`at=before`) or after it has committed
+        // (`at=after`). Once.
+        ("POST", "/bench/drop") => {
+            let q = |k: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{k}=")))
+            };
+            let at = match (q("next"), q("at")) {
+                (Some("command"), Some("before")) => DropAt::Before,
+                (Some("command"), Some("after")) => DropAt::After,
+                _ => {
+                    respond_json(
+                        &mut stream,
+                        400,
+                        &session,
+                        fresh,
+                        "{\"error\":\"next is `command`, and at is `before` or `after`\"}",
+                    );
+                    return;
+                }
+            };
+            server
+                .connection_faults
+                .lock()
+                .expect("connection faults")
+                .entry(session.clone())
+                .or_default()
+                .drop_command = Some(at);
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **A forced reconnect** (charter §15.5, ADR-0175): this session's
+        // open subscriptions end now, with no more bytes, and each new one
+        // is closed at once for `for` milliseconds. What is queued meanwhile
+        // is the page's when it subscribes again.
+        ("POST", "/bench/reconnect") => {
+            let window = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("for="))
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
+            let now = std::time::Instant::now();
+            let mut faults = server.connection_faults.lock().expect("connection faults");
+            let mine = faults.entry(session.clone()).or_default();
+            mine.cut_from = Some(now);
+            mine.cut_until = Some(now + std::time::Duration::from_millis(window));
+            drop(faults);
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
         ("POST", "/bench/estimate") => {
@@ -5419,7 +5534,12 @@ fn stream_open(
 
     // Bounded, like the long poll: a held connection is a held thread, and
     // three engine families times six workers is eighteen of them.
+    let opened = std::time::Instant::now();
     for _ in 0..80 {
+        // Cut off since it opened (ADR-0175): it ends, with no more bytes.
+        if server.cut_off(session, opened) {
+            return;
+        }
         let batch = {
             let mut queue = server.pending.lock().expect("pending");
             let Some(waiting) = queue.get_mut(&doc) else {
@@ -5477,6 +5597,13 @@ fn stream_frames(
     // The document the page is (ADR-0161): its number, which was its first
     // cursor. A page that names none is no document this server served.
     let document = number("doc").unwrap_or(0);
+    // Charter §15.5's forced reconnect (ADR-0175): cut off, the
+    // subscription is closed at once, with no answer. What was queued
+    // meanwhile is the page's when it subscribes again.
+    let opened = std::time::Instant::now();
+    if server.cut_off(session, opened) {
+        return;
+    }
     let doc: Doc = (session.to_string(), document);
 
     // One route, two adapters. The frames are the same either way — see
@@ -5493,6 +5620,10 @@ fn stream_frames(
     }
 
     for _ in 0..40 {
+        // Cut off since it opened (ADR-0175): no answer.
+        if server.cut_off(session, opened) {
+            return;
+        }
         {
             let mut queue = server.pending.lock().expect("pending");
             let waiting = queue
@@ -7862,6 +7993,166 @@ public query Store(",
             .store(0, std::sync::atomic::Ordering::SeqCst);
         s.query_clock.0.advance(30_001);
         assert!(timed("quick") < second, "cleared");
+    }
+
+    /// A request through [`handle`], as a page sends one: what came back,
+    /// and nothing when the connection was closed with no answer.
+    fn posted(s: &Server, path: &str, session: &str, interaction: &str, body: &str) -> String {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let at = listener.local_addr().expect("address");
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let (stream, _) = listener.accept().expect("accept");
+                handle(s, stream);
+            });
+            let mut client = TcpStream::connect(at).expect("connect");
+            client
+                .write_all(
+                    format!(
+                        "POST {path} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
+                         pw-interaction: {interaction}\r\ncontent-type: application/json\r\n\
+                         content-length: {}\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                )
+                .expect("request");
+            let mut answer = String::new();
+            let _ = client.read_to_string(&mut answer);
+            answer
+        })
+    }
+
+    /// **A one-shot network error** (charter §15.5, ADR-0175): the session's
+    /// next command connection is closed with no answer, before the command
+    /// runs or after it has committed. Sent again with the same interaction,
+    /// the request is answered with what happened, once.
+    #[test]
+    fn a_dropped_command_connection_is_answered_by_nothing() {
+        let s = rendering_server();
+        let body = serde_json::json!([shown("cortado"), 1]).to_string();
+        let path = format!("/command/{ADD}");
+        let drop = |at: DropAt| {
+            s.connection_faults
+                .lock()
+                .unwrap()
+                .entry("session-9".into())
+                .or_default()
+                .drop_command = Some(at);
+        };
+        drop(DropAt::Before);
+        assert_eq!(
+            posted(&s, &path, "session-9", "press-1", &body),
+            "",
+            "no answer"
+        );
+        assert_eq!(quantities(&s, "session-9"), [], "and nothing ran");
+        let again = posted(&s, &path, "session-9", "press-1", &body);
+        assert!(again.contains("\"committed\":true"), "{again}");
+        assert_eq!(quantities(&s, "session-9"), [("cortado".to_string(), 1)]);
+
+        drop(DropAt::After);
+        assert_eq!(
+            posted(&s, &path, "session-9", "press-2", &body),
+            "",
+            "no answer"
+        );
+        assert_eq!(
+            quantities(&s, "session-9"),
+            [("cortado".to_string(), 2)],
+            "but it committed"
+        );
+        let again = posted(&s, &path, "session-9", "press-2", &body);
+        assert!(again.contains("\"committed\":true"), "{again}");
+        assert_eq!(
+            quantities(&s, "session-9"),
+            [("cortado".to_string(), 2)],
+            "once"
+        );
+    }
+
+    /// **A forced reconnect** (charter §15.5, ADR-0175): the session's open
+    /// subscription ends at once; a new one is closed with no answer for the
+    /// cut's window; and one after it is sent what was queued meanwhile.
+    #[test]
+    fn a_forced_reconnect_ends_a_subscription_and_refuses_new_ones_for_its_window() {
+        let s = rendering_server();
+        let session = "cut";
+        let (_, document) = s.serve_document(session);
+        let ms = std::time::Duration::from_millis;
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let mut page = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
+        let (mut held, _) = listener.accept().expect("accept");
+        std::thread::scope(|scope| {
+            let open =
+                scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
+            std::thread::sleep(ms(100));
+            assert!(!open.is_finished(), "held open");
+            let cut = std::time::Instant::now();
+            {
+                let mut faults = s.connection_faults.lock().unwrap();
+                let mine = faults.entry(session.into()).or_default();
+                mine.cut_from = Some(cut);
+                mine.cut_until = Some(cut + ms(800));
+            }
+            open.join().expect("ended");
+            assert!(cut.elapsed() < ms(300), "it ended at once");
+        });
+        // What the server wrote before it ended: its end of the connection
+        // closed, as `handle` closes it when the subscription returns.
+        drop(held);
+        page.set_read_timeout(Some(ms(2000))).expect("timeout");
+        let mut written = String::new();
+        let _ = page.read_to_string(&mut written);
+        assert!(written.starts_with("HTTP/1.1 200"), "{written}");
+        assert!(
+            !written.contains("\"frames\""),
+            "and nothing after: {written}"
+        );
+
+        // A change made while the page is cut off.
+        s.command(ADD, session, &add_shown("espresso", 1), false)
+            .expect("runs");
+        let poll = format!("/stream?doc={document}&since={document}");
+        let refused = fetched_as(&s, &poll, Some(session));
+        assert_eq!(
+            refused.iter().map(|(_, c)| c.as_str()).collect::<String>(),
+            "",
+            "a new one, inside the window: no answer"
+        );
+        std::thread::sleep(ms(800));
+        let served = fetched_as(&s, &poll, Some(session))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect::<String>();
+        assert!(
+            served.starts_with("HTTP/1.1 200") && served.contains("\"frames\""),
+            "after it, what was queued: {served}"
+        );
+
+        // A long poll held when the cut comes ends at once too, unanswered.
+        let session = "cut-poll";
+        let (_, document) = s.serve_document(session);
+        let poll = format!("/stream?doc={document}&since={document}");
+        std::thread::scope(|scope| {
+            let held = scope.spawn(|| fetched_as(&s, &poll, Some(session)));
+            std::thread::sleep(ms(100));
+            assert!(!held.is_finished(), "held");
+            let cut = std::time::Instant::now();
+            s.connection_faults
+                .lock()
+                .unwrap()
+                .entry(session.into())
+                .or_default()
+                .cut_from = Some(cut);
+            let answered = held.join().expect("ended");
+            assert!(cut.elapsed() < ms(300), "it ended at once");
+            assert_eq!(
+                answered.iter().map(|(_, c)| c.as_str()).collect::<String>(),
+                "",
+                "unanswered"
+            );
+        });
     }
 
     /// **What a line records is the store's, not the request's** (ADR-0172).

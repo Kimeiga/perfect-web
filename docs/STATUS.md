@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `461ef0a`, with ADR-0174.
+**Reviewed:** 2026-10-04, against master `702d612`, with ADR-0175.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,14 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0175, 2026-10-04: a network error and a forced reconnect, made by the
+server** (charter §15.5, part of the audit's sixth gap).
+`/bench/drop?next=command&at=before|after` closes the session's next command
+connection with no answer; `/bench/reconnect?for=ms` ends its subscriptions
+and refuses new ones for a while. A press survives either drop as one
+mutation, and a page cut off hears what changed meanwhile. 10 mutants
+(`just e14-connection-faults`).
 
 **Correction, ADR-0174, 2026-10-04: the one test of a rolled-back command
 could not fail**
@@ -2791,9 +2799,8 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **§15.5's remaining controls** (the audit's sixth gap): a one-shot
-   network error the server makes, a forced reconnect, and a materializer
-   failure, each seen end to end.
+1. **A materializer failure, end to end** (§15.5's last control): a
+   regeneration that fails must not leave a committed change undelivered.
 2. **Last-known-good for declared public data** (test 18, the audit's
    seventh gap): a rule limiting it to public data, and the server serving
    it.
