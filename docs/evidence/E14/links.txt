@@ -1,0 +1,46 @@
+ADR-0189 - a <link> is written where HTML allows it
+
+produced by: just e14-links
+commit: 699900d6b3d8258029c94d7556abb7873c073cd3
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the rule (compiler/pw-core/tests/links.rs)
+
+test a_link_the_head_holds_is_refused_in_markup ... ok
+test a_link_html_allows_in_the_body_is_written_where_it_is ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+== the corpus at C12 (corpus-check, generality.rs, checking_source.rs)
+
+accepted: 28 files
+accepted: 28/28 charter §16 categories covered
+rejected: 53 files
+rejected: 53/53 charter §16 categories covered
+corpus-check: OK
+test every_rejected_fixture_emits_only_its_own_defect ... ok
+test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
+test every_diagnostic_carries_what_charter_16_3_requires ... ok
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.16s
+test generality_is_reported_separately_from_conformance ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.64s
+
+== every program the repository checks
+
+pw check: 68 file(s), no diagnostics
+pw check: 50 file(s), no diagnostics
+pw check: 26 file(s), no diagnostics
+pw check: 42 file(s), no diagnostics
+
+== mutation controls (scripts/links_mutations.py)
+
+baseline: 2 passed, 0 failed
+the rule is not run: KILLED (1 of 2 tests fail)
+a relation the head holds is let through: KILLED (1 of 2 tests fail)
+relations are compared by their case: KILLED (1 of 2 tests fail)
+a link with no relation and no item's property is let through: KILLED (1 of 2 tests fail)
+a relation and an item's property at once are let through: KILLED (1 of 2 tests fail)
+a blank relation is let through: KILLED (1 of 2 tests fail)
+a relation computed in place is let through: KILLED (1 of 2 tests fail)
+a stylesheet is refused: KILLED (1 of 2 tests fail)
+an item's property is refused: KILLED (1 of 2 tests fail)
+9 of 9 mutants killed

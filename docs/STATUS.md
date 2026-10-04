@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `673ae11`, with ADR-0188.
+**Reviewed:** 2026-10-04, against master `699900d`, with ADR-0189.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2571,11 +2571,13 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`673ae11` (2026-10-04, ADR-0188): `just ci` passes locally, the
-workspace's 1894 tests pass, and the browser suite passes 674 in three
-engines, with 13 skipped. Its evidence is
-`docs/evidence/E14/runtime-size.txt`, recorded at that commit: the sizes as
-served and as sent, and 2 of 2 controls failing their bounds. E7's record,
+`699900d` (2026-10-04, ADR-0189): `just ci` passes locally, and the
+workspace's 1896 tests pass. Its evidence is `docs/evidence/E14/links.txt`,
+recorded at that commit: 9 of 9 mutants killed, the corpus at C12, and every
+program the repository checks clean. ADR-0189 changes no page, so the
+browser suite is `673ae11`'s: 674 passed in three engines, with 13 skipped.
+ADR-0188's is `runtime-size.txt`, at `673ae11`: the sizes as served and as
+sent, and 2 of 2 controls failing their bounds. E7's record,
 `docs/evidence/E7/performance.txt`, is recorded again at that commit, the
 first time since 2026-08-07: gate items 7 to 10 pass. ADR-0187's is
 `stable-layout.txt`, at `bdb3330`: the page in three engines, E7's gate item
