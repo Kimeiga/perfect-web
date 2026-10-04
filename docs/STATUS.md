@@ -2337,13 +2337,13 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`d22928f` (2026-10-04, ADR-0174): `just ci` passes locally, the workspace's
-1818 tests pass, and the browser suite passes 577 in three engines, with 2
-skipped. Its evidence is `docs/evidence/E14/test-controls.txt`, recorded at
-that commit: 10 of 10 mutants killed, one by the harness's bound (every
-cart read waiting a second, the server's suite ran past twenty minutes).
-ADR-0173's evidence is `command-retry.txt`, at `99ddad2`, where its own
-commit `6760ef2` had failed one browser test; ADR-0172's `cart-lines.txt`,
+`bbaf6e9` (2026-10-04, ADR-0175): `just ci` passes locally, the workspace's
+1820 tests pass, and the browser suite passes 586 in three engines, with 2
+skipped. Its evidence is `docs/evidence/E14/connection-faults.txt`, recorded
+at that commit: 10 of 10 mutants killed. Their first run, at ADR-0175's own
+commit `40d0b85`, killed 8, and `bbaf6e9` strengthened the two tests that let
+the others live. ADR-0174's evidence is `test-controls.txt`, at `d22928f`;
+ADR-0173's `command-retry.txt`, at `99ddad2`; ADR-0172's `cart-lines.txt`,
 at `a7314bc`; ADR-0171's `query-attributes.txt`, at `f8bd455`; ADR-0170's
 `nested-lists.txt`, at `201ca0e`; and ADR-0169's `row-reads.txt`, at
 `36d263c`.

@@ -1,0 +1,33 @@
+ADR-0175 - a network error and a forced reconnect, made by the server
+
+produced by: just e14-connection-faults
+commit: bbaf6e9aaa550b86ac3ef2127966caa9c40b22a9
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the development server, over real connections (pw-dev-server)
+
+test tests::a_dropped_command_connection_is_answered_by_nothing ... ok
+test tests::a_forced_reconnect_ends_a_subscription_and_refuses_new_ones_for_its_window ... ok
+test result: ok. 91 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.80s
+
+== the page, in three engines (e2e/connections.spec.mjs)
+
+  9 passed (23.6s)
+
+== mutation controls (scripts/connection_faults_mutations.py)
+
+baseline (server): 91 passed, 0 failed
+baseline (browser): 3 passed, 0 failed
+the drop is not taken [server]: KILLED (1 of 91 tests fail)
+`before` runs the command [server]: KILLED (1 of 91 tests fail)
+`after` sends the answer [server]: KILLED (1 of 91 tests fail)
+an open stream is not ended [server]: KILLED (1 of 91 tests fail)
+an open long poll is not ended [server]: KILLED (1 of 91 tests fail)
+a new subscription is not refused [server]: KILLED (1 of 91 tests fail)
+the window refuses nothing [server]: KILLED (1 of 91 tests fail)
+a cut ends what opened after it [server]: KILLED (1 of 91 tests fail)
+`/bench/drop` arms nothing [browser]: KILLED (2 of 3 tests fail)
+`/bench/reconnect` cuts nothing [server]: KILLED (1 of 91 tests fail)
+10 of 10 mutants killed
