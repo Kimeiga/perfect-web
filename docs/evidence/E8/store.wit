@@ -223,6 +223,7 @@ world store-page-remove-from-cart {
 package pw:types {
     interface types {
         type capability-session-id = string;
+        type clock-instant = s64;
         type domain-store-id = string;
         type domain-menu-item-id = string;
         type domain-order-id = string;
@@ -273,7 +274,9 @@ package pw:types {
             label: string,
         }
         record domain-delivery-estimate {
-            minutes: s64,
+            min-minutes: domain-positive-int,
+            max-minutes: domain-positive-int,
+            generated-at: clock-instant,
         }
         variant domain-estimate-error {
             no-coverage,

@@ -1510,3 +1510,11 @@ boundary holds it.
   layer's answer before the component reads it.
 - Measured before: a forged quantity of 0 committed a line of nothing, and
   −3 a line of minus three.
+
+[ADR-0180](DECISIONS/ADR-0180-a-delivery-estimate-is-a-range.md):
+a delivery estimate is a range, and says when it was made.
+- Charter §15.1: `DeliveryEstimate { min_minutes: PositiveInt, max_minutes:
+  PositiveInt, generated_at: Instant }`, and the platform's `clock` declares
+  `Instant`. An estimate of 0 minutes is a failed read (ADR-0179).
+- The slot says "Delivery in 25 to 35 min", in words: an en dash in a range
+  is read unreliably by screen readers.

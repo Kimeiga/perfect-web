@@ -35,8 +35,8 @@ test("the slots come after the store's own content (test 3)", async ({ page, req
   await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
   await expect(page.locator("#menu li")).toHaveCount(3);
   // Then each slot, filled where it is. The estimate is said to a screen
-  // reader when it comes.
-  await expect(delivery(page)).toHaveText("Delivery in 25 min");
+  // reader when it comes: a range, in words (ADR-0180).
+  await expect(delivery(page)).toHaveText("Delivery in 25 to 35 min");
   await expect(delivery(page)).toHaveAttribute("aria-live", "polite");
   await expect(recommendations(page).getByRole("listitem")).toHaveText(["Cortado", "Cold Brew"]);
 });
@@ -72,6 +72,21 @@ test("an estimate that fails says so, and the page still works", async ({ page }
   await ready(page);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
+});
+
+test("an estimate is a range, and one of no minutes is refused", async ({ page }) => {
+  // ADR-0180: the least and the most minutes, in words. Each is a
+  // `PositiveInt`, so an estimator's answer of 0 breaks its invariant, which
+  // the host refuses as a failed read (ADR-0179): the slot says so.
+  await page.goto("/stores/47");
+  const ranged = await page.request.post("/bench/estimate?minutes=15&max=45&delay=0");
+  expect(ranged.ok()).toBe(true);
+  await page.goto("/stores/47");
+  await expect(delivery(page)).toHaveText("Delivery in 15 to 45 min");
+  const none = await page.request.post("/bench/estimate?minutes=0&delay=0");
+  expect(none.ok()).toBe(true);
+  await page.goto("/stores/47");
+  await expect(delivery(page)).toHaveText("Delivery estimate unavailable");
 });
 
 test("the store is shown before its slots are filled", async ({ page, request }) => {

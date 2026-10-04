@@ -437,6 +437,15 @@ enum DropAt {
     After,
 }
 
+/// **The wall clock, as an `Instant` holds it** (ADR-0180): the
+/// milliseconds since 1970-01-01T00:00Z.
+fn wall_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
+        .unwrap_or(0)
+}
+
 /// **The estimator the store's data layer reaches, for one session** (E14,
 /// T10): what `store:data/estimates#current` answers, after how long, and how
 /// it fails. A test sets it through `/bench/estimate`.
@@ -447,7 +456,10 @@ struct Estimator {
     /// `declared`: the query's declared error. Anything else: the call itself
     /// fails, as an estimator that is down does.
     fail: Option<String>,
+    /// The least minutes a delivery takes, and the most (ADR-0180): 10 more
+    /// unless a test says.
     minutes: i64,
+    max_minutes: Option<i64>,
 }
 
 impl Default for Estimator {
@@ -456,6 +468,7 @@ impl Default for Estimator {
             delay_ms: 400,
             fail: None,
             minutes: 25,
+            max_minutes: None,
         }
     }
 }
@@ -2130,10 +2143,19 @@ impl Server {
                         None,
                     )))))]),
                     Some(_) => Err("the estimator is down".to_string()),
-                    None => Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![(
-                        "minutes".into(),
-                        Val::S64(estimator.minutes),
-                    )])))))]),
+                    // A range, and when it was made (ADR-0180). And `minutes`,
+                    // which the benchmark's own store still reads (ADR-0156):
+                    // a program is passed the fields its type declares
+                    // (ADR-0166).
+                    None => Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![
+                        ("minutes".into(), Val::S64(estimator.minutes)),
+                        ("min-minutes".into(), Val::S64(estimator.minutes)),
+                        (
+                            "max-minutes".into(),
+                            Val::S64(estimator.max_minutes.unwrap_or(estimator.minutes + 10)),
+                        ),
+                        ("generated-at".into(), Val::S64(wall_millis())),
+                    ])))))]),
                 }
             }),
         );
@@ -5457,6 +5479,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             if let Some(m) = q("minutes").and_then(|v| v.parse().ok()) {
                 set.minutes = m;
             }
+            set.max_minutes = q("max").and_then(|v| v.parse().ok());
             server
                 .estimators
                 .lock()
@@ -7002,6 +7025,7 @@ public query Store(",
                 delay_ms: 0,
                 fail: fail.map(str::to_string),
                 minutes,
+                max_minutes: None,
             },
         );
     }
@@ -10305,6 +10329,41 @@ public query Store(",
             .join(" ")
     }
 
+    /// **A delivery estimate is a range, said in words** (ADR-0180, charter
+    /// §15.1): its least and most minutes, as the estimator answers them, 10
+    /// apart unless it says. Each is a `PositiveInt`, so an estimator's answer
+    /// of 0 minutes breaks its invariant, which the host refuses (ADR-0179):
+    /// the slot says the estimate is unavailable, and the page is served. The
+    /// answer must carry when it was made, `generated_at`, or the read fails
+    /// by name (ADR-0166).
+    #[test]
+    fn a_delivery_estimate_is_a_range() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        recommend(&s, 0, None);
+        let page = |session: &str| -> String {
+            fetched_as(&s, "/stores/47", Some(session))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        estimate(&s, "a", None, 20);
+        assert_eq!(slot(&page("a"), "Delivery"), "Delivery in 20 to 30 min");
+        s.estimators.lock().expect("estimators").insert(
+            "b".to_string(),
+            Estimator {
+                delay_ms: 0,
+                fail: None,
+                minutes: 15,
+                max_minutes: Some(45),
+            },
+        );
+        assert_eq!(slot(&page("b"), "Delivery"), "Delivery in 15 to 45 min");
+        estimate(&s, "c", None, 0);
+        let refused = page("c");
+        assert!(refused.starts_with("HTTP/1.1 200"), "{refused}");
+        assert_eq!(slot(&refused, "Delivery"), "Delivery estimate unavailable");
+    }
+
     /// **The store's slots come after its own content, in the same
     /// response** (charter §15.3, §15.6 test 3, ADR-0165): its name, menu
     /// and cart, with each slot pending, and then each slot's arm as its
@@ -10319,6 +10378,7 @@ public query Store(",
                 delay_ms: 200,
                 fail: None,
                 minutes: 30,
+                max_minutes: None,
             },
         );
         let chunks = fetched_as(&s, "/stores/47", Some("a"));
@@ -10349,7 +10409,8 @@ public query Store(",
             "{recommended:?}"
         );
         assert!(estimated < recommended, "{estimated:?} {recommended:?}");
-        assert_eq!(slot(&whole, "Delivery"), "Delivery in 30 min");
+        // A range, in words (ADR-0180).
+        assert_eq!(slot(&whole, "Delivery"), "Delivery in 30 to 40 min");
         assert_eq!(slot(&whole, "Recommendations"), "Cortado Cold Brew");
         assert!(whole.ends_with("</template></body>\n</html>\n"), "{whole}");
         // An estimator that is down fills its slot with the failure, and the

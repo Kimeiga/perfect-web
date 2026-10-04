@@ -31,13 +31,14 @@ ENGINE = ROOT / "runtime/pw-host/src/lib.rs"
 STORE = ROOT / "examples/store/app.pw"
 
 # The view from the store's description to its items'.
+# Re-anchored by ADR-0180, whose estimate is a range.
 BOTH_DESCRIPTIONS = (
     "            <p id=\"store-description\">{store.description}</p>\n"
     "\n"
     "            <section aria-label=\"Delivery\" aria-live=\"polite\">\n"
     "                <stream query={Estimate(current_session())}>\n"
     "                    <placeholder><p>Estimating delivery</p></placeholder>\n"
-    "                    <ready as={estimate}><p>Delivery in {estimate.minutes} min</p></ready>\n"
+    "                    <ready as={estimate}><p>Delivery in {estimate.min_minutes} to {estimate.max_minutes} min</p></ready>\n"
     "                    <failed><p>Delivery estimate unavailable</p></failed>\n"
     "                </stream>\n"
     "            </section>\n"

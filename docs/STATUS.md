@@ -13,6 +13,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0180, 2026-10-04: a delivery estimate is a range, and says when it
+was made** (charter §15.1). `DeliveryEstimate { min_minutes: PositiveInt,
+max_minutes: PositiveInt, generated_at: Instant }`, and the platform's
+`clock` declares `Instant`. The slot says "Delivery in 25 to 35 min", in
+words, since screen readers read an en dash in a range unreliably. An
+estimator's answer of 0 minutes is refused by the host (ADR-0179), and the
+slot says the estimate is unavailable. 6 mutants (`just
+e14-estimate-range`).
+
 **ADR-0179, 2026-10-04: an opaque type states its invariant, and every
 construction and every boundary holds it** (charter §15.1's `PositiveInt`,
 §7.1's "explicit decoding at every external boundary").
@@ -2871,10 +2880,10 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **§15.1's remaining fields** (the audit's eighth gap): `category` and
-   `menu_version`, and `DeliveryEstimate`'s range. `available` is met by
-   ADR-0178, and `PositiveInt` checked at every construction and boundary
-   by ADR-0179.
+1. **§15.1's remaining fields** (the audit's eighth gap): `MenuItem.category`
+   and `store_id`, and `Store.menu_version`. `available` is met by ADR-0178,
+   `PositiveInt` checked at every construction and boundary by ADR-0179, and
+   `DeliveryEstimate`'s range by ADR-0180.
 2. **Accessibility** (test 14, the audit's ninth gap): an automated audit of
    the store's page in three engines.
 3. **Tests 2 and 13** (the audit's tenth gap): the running store's shared

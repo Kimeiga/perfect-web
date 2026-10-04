@@ -10,6 +10,12 @@
 
 module clock
 
+// **A point in time** (ADR-0180, charter §15.1's `generated_at`): the
+// milliseconds since 1970-01-01T00:00Z, as a wall clock reads them. One
+// `Int`, so two order and subtract; no invariant, since an instant before
+// 1970 is still one.
+opaque type Instant = Int
+
 fn now() -> Int !{ clock.read } { 0 }
 
 // `clock.wall` and `clock.read` are different effects because they break

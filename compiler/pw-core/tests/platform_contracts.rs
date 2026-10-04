@@ -431,7 +431,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-04: `examples/domain.pw`'s `PositiveInt` states its invariant,
     // `value >= 1`, which every construction is shown to hold and every
     // boundary checks, and `fewer` answers an `Option` (ADR-0179).
-    const EXPECTED: u64 = 0x4b70269234f06755;
+    // 2026-10-04: `clock` declares `Instant`, a point in time, and
+    // `examples/domain.pw`'s `DeliveryEstimate` is a range, `min_minutes` to
+    // `max_minutes`, each a `PositiveInt`, and when it was made,
+    // `generated_at` (ADR-0180, charter §15.1).
+    const EXPECTED: u64 = 0x9d7fff4e8b11c10f;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

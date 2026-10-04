@@ -502,7 +502,29 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "min-minutes"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          },
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "max-minutes"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
       }
     ],
     "exports": [

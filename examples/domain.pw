@@ -22,6 +22,8 @@ module domain
 
 // `line_count` sums a cart's quantities (ADR-0048).
 import List
+// When a delivery estimate was made (ADR-0180).
+import clock.{ Instant }
 
 // --- identities -----------------------------------------------------------
 //
@@ -254,8 +256,15 @@ type OrderState =
 // nothing, until the value relations made an unresolved annotation an error.
 type PaymentReceipt = PaymentReceipt { order: OrderId, amount: Money<USD> }
 
-// A delivery estimate and why one could not be made (R-025).
-type DeliveryEstimate = DeliveryEstimate { minutes: Int }
+// A delivery estimate and why one could not be made (R-025). A range, as
+// a courier, a kitchen and the traffic each vary, and when it was made
+// (ADR-0180, charter §15.1). Each bound is a `PositiveInt`, so an estimator's
+// answer of 0 minutes is a failed read (ADR-0179).
+type DeliveryEstimate = DeliveryEstimate {
+    min_minutes: PositiveInt,
+    max_minutes: PositiveInt,
+    generated_at: Instant,
+}
 
 type EstimateError =
     | NoCoverage

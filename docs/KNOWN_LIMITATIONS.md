@@ -332,6 +332,8 @@ awaited in order. What remains:
   re-rendering the element leaves the old value there: for example, E7-P's
   keyed rename, which replaces only the item's text. The store's handler reads
   only `item.id`, the loop's key, which a keyed patch never changes.
+- **No invariant relates two fields** (ADR-0180): a delivery estimate's
+  least minutes are at most its most because its estimator says so.
 - **An opaque type's invariant is bounds on an `Int`** (ADR-0179). `where
   value >= 1` is checked at every construction, by the build, and at every
   boundary, by the host. A `String`'s length, or any other predicate, is

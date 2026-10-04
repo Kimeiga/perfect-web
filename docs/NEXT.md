@@ -213,10 +213,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
           every construction is shown to hold it at build (PW0622), and the
           host checks a command's arguments and a data layer's answers. A
           forged quantity of 0 is refused, in three engines.
-        - **Next: `category` and `menu_version`, and `DeliveryEstimate`'s
-          range** (`min_minutes` and `max_minutes`, each a `PositiveInt`,
-          and `generated_at`). Acceptance: the menu is grouped by category,
-          and the estimate shows its range, in three engines.
+        - ~~`DeliveryEstimate`'s range~~ (ADR-0180, `just
+          e14-estimate-range`): `min_minutes` and `max_minutes`, each a
+          `PositiveInt`, and `generated_at`, an `Instant`; the slot says
+          the range in words, in three engines.
+        - **Next: `MenuItem.category` and `store_id`, and
+          `Store.menu_version`.** Acceptance: the menu is grouped by its
+          category, each item kept where it is when the menu changes, in
+          three engines.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for

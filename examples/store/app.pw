@@ -250,7 +250,9 @@ session page StorePage(id: StoreId) {
     // Charter §15.3's slots (ADR-0165), the estimate and the recommendations,
     // are each a `<stream>`: they come in the same response, after the
     // store's own content, and hold up neither it nor an Add. The estimate,
-    // when it comes, is said to a screen reader.
+    // when it comes, is said to a screen reader: a range, "25 to 35", in
+    // words, since an en dash between two numbers is read unreliably
+    // (ADR-0180).
 
     view {
         <main>
@@ -260,7 +262,7 @@ session page StorePage(id: StoreId) {
             <section aria-label="Delivery" aria-live="polite">
                 <stream query={Estimate(current_session())}>
                     <placeholder><p>Estimating delivery</p></placeholder>
-                    <ready as={estimate}><p>Delivery in {estimate.minutes} min</p></ready>
+                    <ready as={estimate}><p>Delivery in {estimate.min_minutes} to {estimate.max_minutes} min</p></ready>
                     <failed><p>Delivery estimate unavailable</p></failed>
                 </stream>
             </section>
