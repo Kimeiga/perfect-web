@@ -73,9 +73,10 @@ MUTANTS = [
     (
         "a command is not awaited",
         JS_PURE,
-        # Re-anchored by ADR-0157: the answer is bound, then decoded.
-        '"const {answered} = await context.command({}, [{}]);"',
-        '"const {answered} = context.command({}, [{}]);"',
+        # Re-anchored by ADR-0157: the answer is bound, then decoded; and by
+        # ADR-0173: how it is sent again follows its arguments.
+        '"const {answered} = await context.command({}, [{}]{how});"',
+        '"const {answered} = context.command({}, [{}]{how});"',
     ),
     (
         "a handler that calls no command is compiled",

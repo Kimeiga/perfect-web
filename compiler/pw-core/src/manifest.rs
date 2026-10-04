@@ -303,7 +303,7 @@ fn parse_duration(v: &str) -> Option<Millis> {
 
 /// `forever`, `transport_only(max = 2, jitter = true)`,
 /// `bounded_exponential(max = 3, jitter = true)`.
-fn parse_retry(v: &str) -> Option<Retry> {
+pub(crate) fn parse_retry(v: &str) -> Option<Retry> {
     let v = v.trim();
     if v == "forever" {
         return Some(Retry::Forever);

@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `0c7e80b`, with ADR-0172.
+**Reviewed:** 2026-10-04, against master `ff803bf`, with ADR-0173.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,25 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0173, 2026-10-04: PW0312 let `transport_only` retry a
+command that is not idempotent**
+([ADR-0173](DECISIONS/ADR-0173-a-command-is-sent-again-where-no-answer-came.md)).
+It refused a retried mutation without `idempotent_by` except under
+`transport_only`, as though a transport failure said the request never
+arrived. A browser's `fetch` fails alike whether the request never left or
+its answer was lost after the server committed. A command that is retried
+is idempotent now, whatever it retries on; R-014's expected message already
+said so. `retry none`, which PW0312 also refused, is not a retry.
+
+**ADR-0173, 2026-10-04: a command is sent again where no answer came** (the
+audit's fifth gap, §15.4). The compiled handler passes the command's `retry`
+clause where it sends it, and the runtime sends the request again with the
+same interaction, as many times as the clause allows; the host answers it
+with the first's outcome (ADR-0121). An answer of any kind is never sent
+again. The store's commands declare `retry transport_only(max = 2, jitter =
+true)`. 10 mutants (`just e14-command-retry`); the retry tests pass in three
+engines.
 
 **Correction, ADR-0172, 2026-10-04: a press could be shown twice, and a
 session's changes could cross**
@@ -2751,13 +2770,14 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **A command retried on a transport failure** (§15.4, the audit's fifth
-   gap), with its interaction, so a retry is the same mutation.
-2. **§15.5's missing controls** (the audit's sixth gap): store and cart
+1. **§15.5's missing controls** (the audit's sixth gap): store and cart
    delays, and a one-shot error for the next real command or read.
-3. **Last-known-good for declared public data** (test 18, the audit's
+2. **Last-known-good for declared public data** (test 18, the audit's
    seventh gap): a rule limiting it to public data, and the server serving
    it.
+3. **§15.1's remaining fields** (the audit's eighth gap): `available`,
+   `category` and `menu_version` on `MenuItem`, `DeliveryEstimate`'s range,
+   and `PositiveInt` checked at the boundary.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

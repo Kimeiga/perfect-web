@@ -5238,12 +5238,31 @@ impl<'a> Lower<'a> {
                 },
                 None => Type::Unit,
             };
+            // How the handler sends it again when no answer came (ADR-0173),
+            // as its `retry` clause says. `retry forever` is refused before
+            // anything is compiled (PW0313), and `retry none` sends it once.
+            let resend = decl
+                .policy("retry")
+                .and_then(|p| crate::manifest::parse_retry(&p.value))
+                .and_then(|r| match r {
+                    crate::manifest::Retry::Bounded {
+                        strategy,
+                        max,
+                        jitter,
+                    } => Some(super::ir::Resend {
+                        max,
+                        exponential: strategy != "fixed",
+                        jitter,
+                    }),
+                    crate::manifest::Retry::None | crate::manifest::Retry::Forever => None,
+                });
             let result = self.fresh();
             return Lowering::Lowered(self.push(Instr::Command {
                 result,
                 command,
                 args: lowered,
                 ty,
+                resend,
             }));
         }
 

@@ -150,6 +150,7 @@ command add_to_cart(item: MenuItem, quantity: PositiveInt)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
     transaction   serializable
     optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
     invalidates   Cart(current_session())
@@ -168,6 +169,7 @@ command increase_in_cart(item: MenuItemId)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
     transaction   serializable
     optimistic    Cart(current_session()) as cart => Carts.with_more(cart, item)
     invalidates   Cart(current_session())
@@ -185,6 +187,7 @@ command decrease_in_cart(item: MenuItemId)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
     optimistic    Cart(current_session()) as cart => Carts.with_fewer(cart, item)
     invalidates   Cart(current_session())
     emits         CartChanged(current_session())
@@ -197,6 +200,7 @@ command remove_from_cart(item: MenuItemId)
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
     optimistic    Cart(current_session()) as cart => Carts.without(cart, item)
     invalidates   Cart(current_session())
     emits         CartChanged(current_session())
@@ -214,6 +218,7 @@ command clear_cart()
     -> Result<Cart, CartError>
     requires      SignedIn
     idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
     invalidates   Cart(current_session())
     emits         CartChanged(current_session())
 {
@@ -229,7 +234,7 @@ session page StorePage(id: StoreId) {
     route        "/stores/{id}"
     not_found_on StoreError.NotFound
     placement    origin
-    cache private
+    cache        private
 
     let store = query Store(id)
     let menu = query Menu(id)

@@ -431,6 +431,13 @@ awaited in order. What remains:
 - **A browser sends a record field by field** (ADR-0172), each field named
   as the host finds it: a record with a field whose name would come back as
   another, `opensMinute`, is refused. A variant is not sent.
+- **A command's request that hangs waits** (ADR-0173). A command declares
+  no `timeout`, so a request with its connection open and no answer is not
+  a failure, and is not sent again.
+- **A press whose resends all fail says nothing a reader hears** (ADR-0173).
+  Its control is marked and its line goes; a handler cannot match "not
+  sent". The runtime sends again without asking whether the browser is
+  online.
 - **Each Add carries the whole item** (ADR-0172), its description too,
   though the command reads its id and the transition its name and price. A
   narrower record is the program's to declare.

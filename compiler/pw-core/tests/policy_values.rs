@@ -219,8 +219,7 @@ fn an_operator_is_given_its_arguments() {
     clean(&retry("none"));
 }
 
-/// A retry that is not idempotent may retry only a transport failure, and
-/// which operator a value applies is the operator's identity, not its
+/// Which operator a value applies is the operator's identity, not its
 /// spelling's prefix.
 #[test]
 fn only_transport_only_is_transport_only() {
@@ -231,7 +230,24 @@ fn only_transport_only_is_transport_only() {
             "PW0312",
         ],
     );
-    clean(&command("retry transport_only(max = 2)"));
+    clean(&command("idempotent_by Tag\nretry transport_only(max = 2)"));
+}
+
+/// **A command that is retried is idempotent, whatever its policy**
+/// (ADR-0173). A request that failed in transit may have arrived, and its
+/// sender cannot tell. Until 2026-10-04 `transport_only` was let through.
+#[test]
+fn a_retried_command_is_idempotent_whatever_it_retries_on() {
+    for retry in [
+        "retry transport_only(max = 2, jitter = true)",
+        "retry bounded_exponential(max = 3, jitter = true)",
+        "retry fixed(max = 3)",
+    ] {
+        says(&command(retry), &["PW0312"]);
+        clean(&command(&format!("idempotent_by Tag\n{retry}")));
+    }
+    // `retry none` retries nothing.
+    clean(&command("retry none"));
 }
 
 #[test]

@@ -106,12 +106,11 @@ MUTANTS = [
         "        .filter(|p| !covered.contains(p))",
         "        .filter(|p| !key_text.contains(p.as_str()))",
     ),
-    (
-        "transport_only is found by its prefix",
-        RULES,
-        "        && !crate::policy::applied(\"retry\", &r.value)\n            .is_some_and(|o| o.id == \"policy.retry.transport_only\")",
-        "        && !r.value.starts_with(\"transport_only\")",
-    ),
+    # Retired by ADR-0173: "transport_only is found by its prefix". PW0312
+    # reads no operator now: a command that is retried is idempotent,
+    # whatever it retries on. That an operator is its name and not a prefix
+    # of one is `policy_values.rs`'s `only_transport_only_is_transport_only`,
+    # through PW0335.
 ]
 
 TESTS = [

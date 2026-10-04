@@ -995,7 +995,11 @@ impl<'p> Emitter<'p> {
             // decoded as its declared result (ADR-0157): `Ok`, or the
             // declared `Err` the handler can show.
             Instr::Command {
-                command, args, ty, ..
+                command,
+                args,
+                ty,
+                resend,
+                ..
             } => {
                 if !self.handler {
                     return Err(format!(
@@ -1010,9 +1014,25 @@ impl<'p> Emitter<'p> {
                 // Sent first, on a line of its own: a decoder may not read
                 // what it is given at all (`Unit`), and the command is sent
                 // whatever its answer's type.
+                // And how it is sent again where no answer came (ADR-0173),
+                // as the command declares it: the runtime sends it, and only
+                // it knows that no answer came.
+                let how = match resend {
+                    Some(r) => format!(
+                        ", {{ retry: {{ max: {}, backoff: {}, jitter: {} }} }}",
+                        r.max,
+                        json(if r.exponential {
+                            "exponential"
+                        } else {
+                            "fixed"
+                        }),
+                        r.jitter
+                    ),
+                    None => String::new(),
+                };
                 let answered = format!("{r}_answer");
                 self.line(&format!(
-                    "const {answered} = await context.command({}, [{}]);",
+                    "const {answered} = await context.command({}, [{}]{how});",
                     json(command),
                     sent.join(", ")
                 ));

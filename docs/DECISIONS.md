@@ -1437,3 +1437,15 @@ the cart lists its lines, and a speculation reaches every part that reads it.
   focus kept. A region reading what the browser does not hold is refused.
 - Corrections: a speculation whose value came before its answer was shown
   twice, and two changes of one session could be sent at once.
+
+[ADR-0173](DECISIONS/ADR-0173-a-command-is-sent-again-where-no-answer-came.md):
+a command is sent again where no answer came, and a command that is retried
+is idempotent.
+- The compiled handler passes the command's `retry` clause where it sends
+  it, and the runtime sends the request again, with the same interaction,
+  as many times as the clause allows. An answer of any kind is never sent
+  again. The store's commands declare `retry transport_only(max = 2,
+  jitter = true)` (§15.4).
+- Correction: PW0312 let `transport_only` retry a command that is not
+  idempotent, though a browser cannot tell a request never sent from one
+  whose answer was lost.

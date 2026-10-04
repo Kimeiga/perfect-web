@@ -76,7 +76,7 @@ are fixed (ADR-0155):
 | add item | met |
 | increment quantity | met since ADR-0172: each line's +, `increase_in_cart`, optimistic and idempotent, its item's availability read again |
 | decrement quantity, remove item | met since ADR-0172: each line's − and Remove; at one, − takes the line away; focus passes to the next line, or the cart's heading |
-| retry recoverable failure | partial: a failed handler load is retried on the next press; a command is never retried |
+| retry recoverable failure | met since ADR-0173 for a command: sent again where no answer came, as its `retry` clause bounds it; a failed handler load is retried on the next press |
 | navigate away during a slow query | partial: run on T07's store (`e2e/keyed.spec.mjs`, ADR-0152); the canonical store has no slow keyed query |
 
 ## §15.4 `add_to_cart`
@@ -89,7 +89,7 @@ are fixed (ADR-0155):
 | optimistic transition, rollback on rejection | met (ADR-0122, ADR-0025) |
 | invalidates the private cart | met |
 | revalidates availability before commit | met since ADR-0157: `Menus.is_available(item)` inside the command, refused with `CartError.ItemUnavailable(item)` before anything is written |
-| bounded retry for transport failures only | missing: no `retry` clause, and the runtime sends each request once (ADR-0154 makes a retry safe) |
+| bounded retry for transport failures only | met since ADR-0173: `retry transport_only(max = 2, jitter = true)`, sent again by the runtime where no answer came, never where one did |
 
 ## §15.5 Delays and failure injection
 
@@ -136,8 +136,8 @@ are fixed (ADR-0155):
    ADR-0165, and in WebKit by ADR-0166.
 4. ~~**Decrement, remove, and a per-line list**~~ (§15.3): met by
    ADR-0172.
-5. **A command retried on a transport failure** (§15.4), with its
-   interaction.
+5. ~~**A command retried on a transport failure**~~ (§15.4): met by
+   ADR-0173.
 6. **§15.5's missing controls.**
 7. **Last-known-good** (test 18): a rule limiting it to public data, and
    the server serving it.

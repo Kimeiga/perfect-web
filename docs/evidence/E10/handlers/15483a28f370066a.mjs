@@ -8,7 +8,7 @@ export const name = "decrease_in_cart";
 export const handler = "15483a28f370066a";
 export async function run(context) {
   const v0 = context.captures["line"]["item_id"];
-  const v1_answer = await context.command("store.page.decrease_in_cart", [v0]);
+  const v1_answer = await context.command("store.page.decrease_in_cart", [v0], { retry: { max: 2, backoff: "exponential", jitter: true } });
   const v1 = ((c) => { switch (c.$case) { case "ok": return { $case: "ok", value: undefined }; case "err": return { $case: "err", value: ((c) => { switch (c.$case) { case "item-unavailable": return { $case: "item-unavailable", value: c.value }; case "quantity-too-large": return { $case: "quantity-too-large" }; case "cart-expired": return { $case: "cart-expired" }; default: throw new Error("trap: no such case " + c.$case); } })(c.value) }; default: throw new Error("trap: no such case " + c.$case); } })(v1_answer);
   let v8;
   switch (v1.$case) {

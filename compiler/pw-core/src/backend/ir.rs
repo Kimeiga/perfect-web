@@ -162,6 +162,17 @@ pub enum Const {
     Unit,
 }
 
+/// **How a handler sends a command again when no answer came** (ADR-0173),
+/// from the command's `retry` clause: at most `max` more times, each after a
+/// delay that doubles (`exponential`) or does not, drawn at random below it
+/// where the clause says `jitter`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Resend {
+    pub max: u32,
+    pub exponential: bool,
+    pub jitter: bool,
+}
+
 /// One instruction. Every one names the value it produces and that value's
 /// type, so a consumer never infers either.
 #[derive(Debug, Clone, PartialEq)]
@@ -365,6 +376,9 @@ pub enum Instr {
         command: String,
         args: Vec<ValueId>,
         ty: Type,
+        /// How the handler sends it again when no answer came, as its
+        /// declaration's `retry` says (ADR-0173). `None`: once.
+        resend: Option<Resend>,
     },
     /// **A page's signal, read** (ADR-0130): the value the browser holds now,
     /// through the handler's context. Only a handler's body holds one.

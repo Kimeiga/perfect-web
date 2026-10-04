@@ -2161,6 +2161,29 @@ e14-cart-lines:
      } > docs/evidence/E14/cart-lines.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/cart-lines.txt
 
+# ADR-0173: a command is sent again where no answer came, and a command that
+# is retried is idempotent. The checker's and the compiler's tests, the
+# retries in three engines, and the mutation controls.
+e14-command-retry:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0173 - a command is sent again where no answer came"; echo; \
+       echo "produced by: just e14-command-retry"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a retried command is idempotent; what a handler passes (compiler/pw-core)"; echo; \
+       cargo test --locked -p pw-core --test policy_values --test handlers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== sent again where no answer came, in three engines (e2e/retry.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/retry.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/command_retry_mutations.py)"; echo; \
+       python3 scripts/command_retry_mutations.py; \
+     } > docs/evidence/E14/command-retry.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/command-retry.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

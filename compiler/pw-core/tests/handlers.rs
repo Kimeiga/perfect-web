@@ -176,6 +176,10 @@ fn sent(v: &serde_json::Value) -> &serde_json::Value {
     &v["sent"]
 }
 
+/// How the store's commands are sent again (ADR-0173), as each declares:
+/// `retry transport_only(max = 2, jitter = true)`.
+const RESEND: &str = "], { retry: { max: 2, backoff: \"exponential\", jitter: true } });";
+
 #[test]
 fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
     let modules = modules(&store_units());
@@ -198,6 +202,14 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
     let add = &modules["add_to_cart"];
     println!("{}", add.source);
     assert_eq!(add.commands, ["store.page.add_to_cart"]);
+    // Sent again where no answer came, as `retry transport_only(max = 2,
+    // jitter = true)` says (ADR-0173).
+    assert!(
+        add.source
+            .contains("await context.command(\"store.page.add_to_cart\", [((o) => ({ \"id\"")
+            && add.source.contains(RESEND),
+        "the item and the quantity, then how it is sent again"
+    );
     assert!(
         add.source.contains(&format!(
             "export const name = \"add_to_cart\";\n\
@@ -306,6 +318,10 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
         let m = &modules[name];
         let command = format!("store.page.{name}");
         assert_eq!(m.commands, [command.as_str()]);
+        assert!(
+            m.source.contains(RESEND),
+            "{name} sends as its command declares"
+        );
         let ok = run(m, line);
         assert_eq!(sent(&ok), &serde_json::json!([[command, ["espresso"]]]));
         assert_eq!(ok["set"], serde_json::json!([["notice", ""]]), "{name}");
@@ -427,6 +443,12 @@ command Rename(id: Sku, name: String) -> Int { 0 }
 command Ship(p: Pack) -> Int { 0 }
 command Order(item: Item) -> Int { 0 }
 command Tag(names: List<String>, packs: List<Pack>) -> Int { 0 }
+command Resent(id: Sku) -> Int
+    idempotent_by Sku
+    retry         fixed(max = 3)
+{
+    0
+}
 command Choose(s: Size) -> Int { 0 }
 command Stack(c: Crate) -> Int { 0 }
 command Open(h: Hours) -> Int { 0 }
@@ -644,6 +666,29 @@ fn a_value_the_handler_did_not_capture_is_not_read() {
         !matches!(shop("Buy(sku, Qty(1))"), Encoding::Encoded(_)),
         "a value no capture carries compiled"
     );
+}
+
+/// **A command is sent again as its `retry` clause says** (ADR-0173): the
+/// handler passes the policy where it sends the command, and the runtime,
+/// which alone knows that no answer came, sends it again. A command with no
+/// clause is passed none.
+#[test]
+fn a_command_is_sent_again_as_its_retry_clause_says() {
+    let m = compiled("Resent(item.id)");
+    assert!(
+        m.source.contains(
+            "await context.command(\"shop.ui.Resent\", [v0], \
+             { retry: { max: 3, backoff: \"fixed\", jitter: false } });"
+        ),
+        "{}",
+        m.source
+    );
+    assert_eq!(
+        sent(&run(&m, ITEM)),
+        &serde_json::json!([["shop.ui.Resent", ["a"]]])
+    );
+    let once = compiled("Buy(item.id, Qty(1))");
+    assert!(!once.source.contains("retry"), "{}", once.source);
 }
 
 /// **A record is sent field by field, and a list element by element**

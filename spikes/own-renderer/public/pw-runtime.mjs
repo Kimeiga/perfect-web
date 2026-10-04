@@ -449,22 +449,55 @@ function loadHandler(identity) {
  * and refuses anything else. A refusal is thrown, so the press fails visibly.
  * A command that ran and did not commit is not a refusal: the page learns what
  * happened from the resource, as it does when a command commits.
+ *
+ * **Sent again where no answer came** (ADR-0173), as the command's `retry`
+ * clause says, which the compiled handler passes: the request may not have
+ * arrived, or its answer may have been lost after the server committed, and
+ * nothing here can tell which. Sent again with the same interaction, a
+ * command the server ran answers with its first outcome (ADR-0121). An
+ * answer of any kind, a refusal included, is an outcome, and never sent
+ * again.
  */
-async function command(component, args, interaction) {
-  const response = await fetch(`/command/${encodeURIComponent(component)}`, {
-    method: "POST",
-    // The interaction this request belongs to (ADR-0121). One per press and
-    // per command the press calls, made here and never by the handler, and
-    // carried unchanged by any retry of this request: a command declared
-    // `idempotent_by InteractionId` runs once for it however many times the
-    // request is sent.
-    headers: { "content-type": "application/json", "pw-interaction": interaction },
-    body: JSON.stringify(args),
-  });
-  if (!response.ok) {
-    throw new Error(`command ${component} refused: HTTP ${response.status}`);
+async function command(component, args, interaction, retry) {
+  for (let attempt = 0; ; attempt += 1) {
+    let response;
+    let body;
+    try {
+      response = await fetch(`/command/${encodeURIComponent(component)}`, {
+        method: "POST",
+        // The interaction this request belongs to (ADR-0121). One per press
+        // and per command the press calls, made here and never by the
+        // handler, and carried unchanged by any retry of this request: a
+        // command declared `idempotent_by InteractionId` runs once for it
+        // however many times the request is sent.
+        headers: { "content-type": "application/json", "pw-interaction": interaction },
+        body: JSON.stringify(args),
+      });
+      // An answer cut off in transit is no answer.
+      if (response.ok) body = await response.text();
+    } catch (error) {
+      if (!retry || attempt >= retry.max) throw error;
+      log.push(`resent ${component}: no answer (${error.message ?? error})`);
+      await new Promise((resolve) => setTimeout(resolve, resendDelay(retry, attempt)));
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(`command ${component} refused: HTTP ${response.status}`);
+    }
+    return JSON.parse(body);
   }
-  return response.json();
+}
+
+/**
+ * How long to wait before sending a command again (ADR-0173): a second,
+ * doubling with each attempt where the clause says `exponential`, as
+ * TanStack Query waits between retries (`Math.min(1000 * 2 ** n, 30000)`),
+ * and drawn at random below that where it says `jitter`, so that pages that
+ * lost one connection do not all send again at once.
+ */
+function resendDelay(retry, attempt) {
+  const bound = Math.min(retry.backoff === "fixed" ? 1000 : 1000 * 2 ** attempt, 30000);
+  return retry.jitter ? Math.random() * bound : bound;
 }
 
 // --- ADR-0122: optimistic transitions -----------------------------------
@@ -1616,12 +1649,12 @@ function bindEvents() {
             set: (name, value) => setSignal(instance(name), value, { el, event }),
             // Each command speculates before its request (ADR-0122), and its
             // speculation is resolved by the answer, whatever it is.
-            command: async (component, args) => {
+            command: async (component, args, how = {}) => {
               const interaction = `${press}-${calls++}`;
               const ids = await speculate(component, args, interaction);
               let answer;
               try {
-                answer = await command(component, args, interaction);
+                answer = await command(component, args, interaction, how.retry);
               } catch (error) {
                 await resolveSpeculation(ids, false);
                 throw error;

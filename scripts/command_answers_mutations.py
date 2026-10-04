@@ -73,11 +73,12 @@ MUTANTS = [
         "the command is sent where its answer is decoded",
         "cargo",
         JS,
+        # Re-anchored by ADR-0173: how it is sent again follows its arguments.
         "                let answered = format!(\"{r}_answer\");\n"
         "                self.line(&format!(\n"
-        "                    \"const {answered} = await context.command({}, [{}]);\",\n",
+        "                    \"const {answered} = await context.command({}, [{}]{how});\",\n",
         "                let answered = format!(\n"
-        "                    \"(await context.command({}, [{}]))\",\n"
+        "                    \"(await context.command({}, [{}]{how}))\",\n"
         "                    json(command),\n"
         "                    sent.join(\", \")\n"
         "                );\n"

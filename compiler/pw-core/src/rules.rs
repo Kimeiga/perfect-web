@@ -289,12 +289,17 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     }
 
     // --- PW0303: retry without idempotency ----------------------------------
+    //
+    // Whatever the policy retries on (ADR-0173). A request that failed in
+    // transit may have arrived, and whoever sent it cannot tell: a browser's
+    // `fetch` fails alike whether the request never left or its answer was
+    // lost after the server committed. Until 2026-10-04 `transport_only` was
+    // let through, as though a transport failure said the server never saw
+    // the request. `retry none` retries nothing.
     if let Some(r) = policy(policies, "retry")
         && noun == "command"
         && policy(policies, "idempotent_by").is_none()
-        // The operator, not the spelling's prefix (ADR-0089).
-        && !crate::policy::applied("retry", &r.value)
-            .is_some_and(|o| o.id == "policy.retry.transport_only")
+        && r.value.trim() != "none"
     {
         out.push(
             err(
@@ -307,9 +312,15 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
                 ),
                 r.span.clone(),
             )
-            .related(name_span.clone(), "declared here with no `idempotent_by` key")
-            .explain("retrying a non-idempotent mutation can apply it more than once")
-            .repair("add `idempotent_by InteractionId`, or restrict the policy to `retry transport_only(..)`"),
+            .related(
+                name_span.clone(),
+                "declared here with no `idempotent_by` key",
+            )
+            .explain(
+                "retrying a non-idempotent mutation can apply it more than once: a request \
+                 that failed in transit may have arrived, and its sender cannot tell",
+            )
+            .repair("add `idempotent_by InteractionId`"),
         );
     }
 
