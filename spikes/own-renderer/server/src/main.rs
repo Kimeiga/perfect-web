@@ -8088,13 +8088,10 @@ public query Store(",
                 scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
             std::thread::sleep(ms(100));
             assert!(!open.is_finished(), "held open");
+            // Through the control, as a test arms it.
             let cut = std::time::Instant::now();
-            {
-                let mut faults = s.connection_faults.lock().unwrap();
-                let mine = faults.entry(session.into()).or_default();
-                mine.cut_from = Some(cut);
-                mine.cut_until = Some(cut + ms(800));
-            }
+            let armed = posted(&s, "/bench/reconnect?for=800", session, "cut-1", "");
+            assert!(armed.starts_with("HTTP/1.1 200"), "{armed}");
             open.join().expect("ended");
             assert!(cut.elapsed() < ms(300), "it ended at once");
         });
@@ -8120,6 +8117,18 @@ public query Store(",
             "",
             "a new one, inside the window: no answer"
         );
+        // A stream too, which would otherwise be sent its head before its
+        // first look, and be asked for again at once.
+        let streamed = fetched_as(
+            &s,
+            &format!("/stream?mode=stream&doc={document}&since={document}"),
+            Some(session),
+        );
+        assert_eq!(
+            streamed.iter().map(|(_, c)| c.as_str()).collect::<String>(),
+            "",
+            "a new stream, inside the window: not even its head"
+        );
         std::thread::sleep(ms(800));
         let served = fetched_as(&s, &poll, Some(session))
             .into_iter()
@@ -8129,6 +8138,33 @@ public query Store(",
             served.starts_with("HTTP/1.1 200") && served.contains("\"frames\""),
             "after it, what was queued: {served}"
         );
+
+        // With no window, a blip: what is open ends at once, and a page that
+        // asks again is served at once.
+        let session = "blip";
+        let (_, document) = s.serve_document(session);
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let _page = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
+        let (mut held, _) = listener.accept().expect("accept");
+        std::thread::scope(|scope| {
+            let open =
+                scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
+            std::thread::sleep(ms(100));
+            let cut = std::time::Instant::now();
+            let armed = posted(&s, "/bench/reconnect?for=0", session, "blip-1", "");
+            assert!(armed.starts_with("HTTP/1.1 200"), "{armed}");
+            open.join().expect("ended");
+            assert!(cut.elapsed() < ms(300), "it ended at once");
+        });
+        let again = fetched_as(
+            &s,
+            &format!("/stream?doc={document}&since={document}"),
+            Some(session),
+        )
+        .into_iter()
+        .map(|(_, c)| c)
+        .collect::<String>();
+        assert!(again.starts_with("HTTP/1.1 200"), "served at once: {again}");
 
         // A long poll held when the cut comes ends at once too, unanswered.
         let session = "cut-poll";

@@ -30,8 +30,10 @@ error and a forced reconnect, which were partial.
    interaction, and the host answers it with what happened (ADR-0121).
 2. **`POST /bench/reconnect?for=ms`: a forced reconnect.** The session's
    open subscriptions, a stream or a long poll, end now with no more bytes.
-   Each new one is closed at once, unanswered, for `ms` milliseconds. What is
-   queued meanwhile is the page's when it subscribes again, from its cursor
+   Each new one is closed at once, unanswered, for `ms` milliseconds, a
+   stream before its head as a long poll is. With `for=0` it is a blip: what
+   is open ends, and the page that asks again is served. What is queued
+   meanwhile is the page's when it subscribes again, from its cursor
    (ADR-0139).
 
 Both are the session's own, so a suite that uses them shares its host.
@@ -54,16 +56,24 @@ Recorded by `just e14-connection-faults` in
   - a dropped command connection is answered by nothing: before, and
     nothing ran; after, and the line was committed. Sent again with the
     same interaction, each is answered, and the line is there once;
-  - a forced reconnect ends an open stream and an open long poll at once.
-    A new subscription inside the window is closed unanswered, and one
-    after it is sent what was queued.
+  - a forced reconnect, armed through its control, ends an open stream and
+    an open long poll at once. A new subscription inside the window, a
+    stream or a long poll, is closed unanswered, and one after it is sent
+    what was queued. With no window, an open stream ends and the next is
+    served at once.
 - `e2e/connections.spec.mjs`, in Chromium, Firefox and WebKit:
   - a command whose connection is dropped before it runs is sent again, and
     is one line;
   - one dropped after it commits is sent again, and is one line;
   - a page cut off from its subscription hears, once it is back, what
     changed meanwhile.
-- `scripts/connection_faults_mutations.py`: 10 mutants.
+- `scripts/connection_faults_mutations.py`: 10 mutants. Their first run, at
+  `40d0b85`, killed 8. The server's test had refused only a long poll inside
+  the window, which its own loop ends anyway; a stream is sent its head
+  first. And the browser's test of the control passed by chance: a page's
+  held stream ends within two seconds of itself, mostly inside the window.
+  The server's test now refuses a stream, and arms the control while a
+  stream is held, with a window and without one.
 
 ## Not claimed
 

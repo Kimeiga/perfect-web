@@ -10,8 +10,11 @@ Each mutant undoes one piece:
   after it too;
 - the controls: `/bench/drop` arms nothing; `/bench/reconnect` cuts nothing.
 
-A drop or cut mutant must fail the development server's tests, all of them
-run; a control mutant, `e2e/connections.spec.mjs` in Chromium.
+A drop or cut mutant, and `/bench/reconnect`'s, must fail the development
+server's tests, all of them run; `/bench/drop`'s, `e2e/connections.spec.mjs`
+in Chromium. A page's held stream ends within two seconds of itself, so a
+reconnect that cut nothing could pass in a browser by chance: the server's
+test arms it through the control while a stream is held, and sees it end.
 
 Run from the repository root; `just e14-connection-faults` records the
 output. The source is restored after every mutant, whatever happens.
@@ -109,7 +112,7 @@ MUTANTS = [
     ),
     (
         "`/bench/reconnect` cuts nothing",
-        "browser",
+        "server",
         SERVER,
         "            mine.cut_from = Some(now);\n",
         "            mine.cut_from = None;\n"
