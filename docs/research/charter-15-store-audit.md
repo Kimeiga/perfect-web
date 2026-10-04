@@ -119,7 +119,7 @@ are fixed (ADR-0155):
 | 11 | `MenuChanged(store_47)` invalidates store 47 only | met since ADR-0162 for pages, end to end in three engines (`e2e/stores.spec.mjs`), and in `pw-materialize`'s tests; since ADR-0164 for the query cache too, which had dropped every store's kept menu |
 | 12 | A's cart never observed by B | met |
 | 13 | shared caches hold no session or secret fields | partial: synthetic values only |
-| 14 | keyboard and screen-reader semantics | partial: since ADR-0168 each Add is named by its item, renamed with it, and the count is said in a polite live region (the cart's notice has one since ADR-0157); no automated audit |
+| 14 | keyboard and screen-reader semantics | met since ADR-0182: the store read by axe's and WCAG 2.2 AA's rules in three engines, as served and after each kind of change, with the keyboard, the accessibility tree, live regions said once, reflow, a phone's width and reduced motion (`e2e/accessibility.spec.mjs`); its title, the store's name, since ADR-0183. Each Add is named by its item since ADR-0168 |
 | 15 | focus preserved | met, and since ADR-0172 through a speculation and the server's answer: a kept row's nodes stay, and focus in a row that goes passes on |
 | 16 | handler version mismatch recovers | partial: refused safely, the recovery not acted on (fixed) |
 | 17 | slow recommendations do not block Add | met since ADR-0165 in Chromium and Firefox, and in WebKit since ADR-0166, which gave the store enough text to be painted before its slots (`e2e/slots.spec.mjs`) |
