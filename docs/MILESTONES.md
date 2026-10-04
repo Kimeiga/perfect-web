@@ -51,7 +51,7 @@ evidence; see ADR-0011.
 | **E11** | Multi-node MacBook network lab | not started — after E14 (ADR-0119) |
 | **E12** | HTTP/3 and prioritized application delivery | not started — after E14 (ADR-0119) |
 | **E13** | Servo and native browser primitive experiments | not started — after E14 (ADR-0119) |
-| **E14** | Developer tooling, semantic diffs, AI benchmark | **CURRENT, started 2026-10-02**, ahead of E11–E13 by ruling (ADR-0119). Plan: `docs/milestones/E14.md`. No gate item met |
+| **E14** | Developer tooling, semantic diffs, AI benchmark | **CURRENT, started 2026-10-02**, ahead of E11–E13 by ruling (ADR-0119). Plan: `docs/milestones/E14.md`. Gate items 1, 2 and 5 recorded over all twelve tasks (`0c608dc`, again at `4f75868`). Items 3 and 4 wait on E14-E's agent runs, whose models and budget are the owner's to choose. The charter §15 store audit is closed (ADR-0157 to ADR-0184) |
 | **E15** | Hardening, production research, standards path | not started |
 
 ### What changed at the E0 → E1 boundary
