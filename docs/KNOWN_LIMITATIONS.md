@@ -548,6 +548,24 @@ is taken as a name, though it may be empty when the page runs. A label in a
 page for a field in a view is refused, though HTML allows it. `title` and a
 placeholder name nothing, though axe-core accepts both.
 
+**Test 14's audit is the store's page, by rules a test decides**
+(ADR-0182). The spec reads the store in three engines, as served and after
+each kind of change, by axe's and WCAG 2.2 AA's rules that apply to it.
+Not covered:
+- **The title.** The store's page is titled "Store" for every store, which
+  fails WCAG 2.4.2 (F25). A page cannot declare its title yet (ADR-0183).
+- **axe-core itself.** It is not installed: that needs the owner's OK for a
+  network install.
+- **A person with a screen reader.** The procedure is in
+  `docs/research/screen-reader-smoke-test.md`, and no one has run it yet.
+- **Target size at AAA** (44 by 44 pixels). The store's buttons are the
+  browsers' own, about 20 pixels tall.
+- **Forced colors, text spacing, and text zoomed alone.**
+- **The other pages**: the demos' and the kiokun slice's.
+- **A phone's layout in Firefox**, which Playwright does not emulate.
+- **Duplicate ids and ARIA references at build.** Charter §8.2 gives these
+  to the compiler, which checks only what names a form control (PW5014).
+
 **A handler that is not a lambda is refused at build** (ADR-0134).
 `on:submit={save}` has no code to run until the event is passed to a
 handler (ADR-0131); `pw build` refuses it with the repair, and `pw check`

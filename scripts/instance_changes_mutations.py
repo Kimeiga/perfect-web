@@ -113,8 +113,9 @@ MUTANTS = [
         "an attribute is set as written, not as parsed",
         "browser",
         RUNTIME,
-        "  element.setAttribute(op.name, parsed.content.firstChild.getAttribute(op.name) ?? \"\");\n",
-        "  element.setAttribute(op.name, op.value);\n",
+        # Re-anchored by ADR-0182, which sets it only when it changes.
+        "  const value = parsed.content.firstChild.getAttribute(op.name) ?? \"\";\n",
+        "  const value = op.value;\n",
     ),
     (
         "an instance already in place is moved",

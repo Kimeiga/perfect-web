@@ -62,6 +62,9 @@ const MUTATING = [
   "cart",
   // ADR-0174: the store's delay, which a test sets, is one per server.
   "controls",
+  // ADR-0182: an item sold out, and the menu's changes, which the
+  // accessibility audit reads the page after, are one per server.
+  "accessibility",
 ];
 
 export const MUTABLE_PORTS = Object.fromEntries(

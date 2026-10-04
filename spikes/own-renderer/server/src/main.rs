@@ -4405,8 +4405,10 @@ impl From<Unread> for String {
 }
 
 /// **What a page whose address names nothing is answered** (ADR-0163), with
-/// 404: accessible, and nothing of the page's.
+/// 404: accessible, laid out at a phone's width (ADR-0182), and nothing of
+/// the page's.
 const NOT_FOUND_PAGE: &str = "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
      <title>Not found</title>\n</head>\n<body>\n<main>\n<h1>Not found</h1>\n\
      <p>Nothing is at this address.</p>\n</main>\n</body>\n</html>\n";
 
@@ -6251,6 +6253,7 @@ fn signal_document(
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{}</title>\n</head>\n<body>\n{body}\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
@@ -6408,8 +6411,11 @@ fn document(
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
+    // Laid out at a phone's width, as every page this host serves is
+    // (ADR-0182).
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>Store</title>\n</head>\n<body>\n{body}\n\
          <style>{STYLE}</style>\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\

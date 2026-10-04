@@ -146,8 +146,19 @@ are fixed (ADR-0155):
    construction and boundary by ADR-0179, `DeliveryEstimate`'s range by
    ADR-0180, and a category and a store for each item by ADR-0181, which
    rules a menu's version and a cart's identity the runtime's.
-9. **Accessibility** (test 14): an automated audit. Each Add named by its
-   item, and a live region for the count, are met by ADR-0168.
+9. ~~**Accessibility** (test 14)~~: met by ADR-0182, but for the title. Each
+   Add named by its item, and a live region for the count, were met by
+   ADR-0168.
+   - The audit reads the store in three engines, as served and after each
+     kind of change, and tests the keyboard, the accessibility tree, live
+     regions, reflow, a phone's width and reduced motion.
+   - It found that one Add said its count up to four times, and that no page
+     had a viewport. Both are fixed by ADR-0182.
+   - Left open: the store's title is "Store" for every store (WCAG 2.4.2).
+     A page declaring its title is ADR-0183.
+   - Seen on the way, not an accessibility finding: store 48's page shows a
+     line added at store 47. §15.1's `Cart` names no store, so a cart is the
+     session's, across stores, as the charter has it.
 10. **Tests 2 and 13** against the running store's shared output.
 
 The benchmark's Pleris store is its own copy since ADR-0156, so changing

@@ -2389,6 +2389,27 @@ e14-menu-categories:
      } > docs/evidence/E14/menu-categories.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/menu-categories.txt
 
+# ADR-0182: keyboard and screen-reader semantics remain valid (charter §15.6
+# test 14). The store's page in three engines, as served and after each kind
+# of change, and the mutation controls.
+e14-accessibility:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0182 - keyboard and screen-reader semantics remain valid"; echo; \
+       echo "produced by: just e14-accessibility"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the page, in three engines (e2e/accessibility.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/accessibility.spec.mjs --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/accessibility_mutations.py)"; echo; \
+       python3 scripts/accessibility_mutations.py; \
+     } > docs/evidence/E14/accessibility.txt
+    @grep -E "passed|mutants killed" docs/evidence/E14/accessibility.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

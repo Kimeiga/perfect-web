@@ -253,13 +253,16 @@ fn main() -> std::process::ExitCode {
 
 /// The document shell.
 ///
-/// Minimal on purpose: a doctype, a charset, a language and a title. Anything
-/// more would be this binary deciding what a page contains, and the page is the
-/// `.pw` file's business.
+/// Minimal on purpose: a doctype, a charset, a language, the viewport and a
+/// title. Anything more would be this binary deciding what a page contains,
+/// and the page is the `.pw` file's business.
 ///
 /// The doctype matters and is not decoration — without it the browser parses in
 /// quirks mode, where the tree and the layout both differ, so gate 4 would be
-/// measuring a document nobody ships.
+/// measuring a document nobody ships. The viewport is the same for a phone
+/// (ADR-0182): without it a phone lays the page out 980 CSS pixels wide and
+/// shows it shrunk, where text is too small to read until it is zoomed, and
+/// zoomed it scrolls sideways.
 fn document(
     title: &str,
     body: &str,
@@ -299,6 +302,7 @@ fn document(
     }
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{}</title>\n{head}</head>\n<body>\n{body}\n{tail}</body>\n</html>\n",
         pw_render::escape::text(title)
     )

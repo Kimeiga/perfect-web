@@ -108,10 +108,17 @@ function addressesFor(part) {
  *
  * The anchors are never touched, so the part keeps its identity across the
  * update — which is what lets it be updated again.
+ *
+ * A range that holds the text already is left as it is (ADR-0182). Text
+ * written again, the same, is a change to a live region, and a screen reader
+ * says the region again: one Add said "Items in cart: 1" up to four times,
+ * written by its speculation, its answer and the cart's new value. Left as it
+ * is, a selection in it stays too.
  */
 function setRange(address, text) {
   const r = index.get(address);
   if (!r?.start) return false;
+  if (holdsText(r, text)) return true;
   let n = r.start.nextSibling;
   while (n && n !== r.end) {
     const next = n.nextSibling;
@@ -120,6 +127,16 @@ function setRange(address, text) {
   }
   r.end.parentNode.insertBefore(document.createTextNode(text), r.end);
   return true;
+}
+
+/** Whether a range holds `text`, and nothing but text. */
+function holdsText(r, text) {
+  let shown = "";
+  for (let n = r.start.nextSibling; n && n !== r.end; n = n.nextSibling) {
+    if (n.nodeType !== Node.TEXT_NODE) return false;
+    shown += n.data;
+  }
+  return shown === text;
 }
 
 /**
@@ -1804,7 +1821,10 @@ function setAttributeAt(address, op) {
   }
   const parsed = document.createElement("template");
   parsed.innerHTML = `<i ${op.name}="${op.value}"></i>`;
-  element.setAttribute(op.name, parsed.content.firstChild.getAttribute(op.name) ?? "");
+  const value = parsed.content.firstChild.getAttribute(op.name) ?? "";
+  // A value set again, the same, is a change all the same, and a control's
+  // name changed is said again where it has focus (ADR-0182).
+  if (element.getAttribute(op.name) !== value) element.setAttribute(op.name, value);
   return true;
 }
 

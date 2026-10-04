@@ -13,6 +13,26 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0182, 2026-10-04: keyboard and screen-reader semantics remain valid**
+(charter §15.6 test 14, the audit's ninth gap).
+- **The spec.** `e2e/accessibility.spec.mjs` reads the store in Chromium,
+  Firefox and WebKit by axe's and WCAG 2.2 AA's rules, as served and after
+  each kind of change. It also tests:
+  - the keyboard's order and presses, and focus shown;
+  - the whole accessibility tree;
+  - live regions kept and each change said once;
+  - reflow at 320 pixels, a phone's width, and reduced motion.
+- **What it found, and what changed.**
+  - One Add said "Items in cart: 1" up to four times. The runtime now writes
+    a part only when what it shows changes.
+  - No page had a viewport. Every page now does.
+- **Left open.**
+  - The store's title is "Store" for every store (WCAG 2.4.2). A page
+    declaring its title is ADR-0183, next.
+  - Installing axe-core is recommended to the owner.
+
+14 mutants (`just e14-accessibility`).
+
 **ADR-0181, 2026-10-04: a menu is grouped by its category, and a list inside
 a row is changed where it is** (charter §15.1, the end of the audit's eighth
 gap). `MenuItem` declares its `store_id` and its `category`, and the store's

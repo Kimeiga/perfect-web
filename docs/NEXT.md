@@ -222,10 +222,21 @@ E14 comes before E11-E13. Its plan, controls and task list are
           category, a list inside a row changed where it is, and every menu
           change derived from the menu's values, in three engines. A menu's
           version and a cart's identity stay the runtime's.
-     9. **Next: accessibility** (test 14): an automated audit of the store's
-        page in three engines, of its states (a cart with lines, a sold-out
-        item, a refused press). Acceptance: no violation the audit reports,
-        and each a test where one was found.
+     9. ~~Accessibility (test 14)~~ (ADR-0182, `just e14-accessibility`):
+        the store is read by axe's and WCAG 2.2 AA's rules in three engines,
+        as served and after each kind of change. The spec also tests the
+        keyboard, the tree a screen reader reads, live regions, reflow, a
+        phone's width and reduced motion. It found that one Add said its
+        count up to four times, and that no page had a viewport.
+        - **Next: a page declares its title** (ADR-0183). The store's title
+          is "Store" for every store, WCAG 2.4.2's failure F25.
+          - A page served at a route declares its title from its values,
+            and the build refuses one that does not.
+          - The store's title is its name, and a change to the name reaches
+            the title, in three engines.
+    10. **Tests 2 and 13** against the running store's shared output: the
+        static public shell holds no private cart data, and the shared
+        cache holds no session or secret field.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for

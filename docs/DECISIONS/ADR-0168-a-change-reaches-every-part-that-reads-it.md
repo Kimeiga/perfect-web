@@ -105,5 +105,6 @@ found that a change did not reach an attribute.
   that does refuses and reloads. Making the single form refuse too is its own
   ruling.
 - **Test 14's automated audit** (axe-core or similar) is not run yet.
+  ADR-0182 runs one.
 - **A row's block, or what its handler captures, changing in place.** The
   row is rendered again, as before.

@@ -1528,3 +1528,14 @@ is.
   keyed list's change, a list inside a row diffed where it is; every menu
   change is derived from the menu's values, E7-P's operations included.
 - A menu's version and a cart's identity stay the runtime's, not fields.
+
+[ADR-0182](DECISIONS/ADR-0182-keyboard-and-screen-reader-semantics-remain-valid.md):
+keyboard and screen-reader semantics remain valid.
+- Charter §15.6 test 14: the store read by axe's and WCAG 2.2 AA's rules in
+  Chromium, Firefox and WebKit, as served and after each kind of change; the
+  keyboard's order and presses, the accessibility tree, live regions, reflow,
+  a phone's width and reduced motion.
+- The runtime writes a part only when what it shows changes: one Add said
+  "Items in cart: 1" up to four times. Every page has a viewport.
+- The store's title, "Store" for every store, is the page's to declare
+  (ADR-0183); axe-core itself is the owner's to install.
