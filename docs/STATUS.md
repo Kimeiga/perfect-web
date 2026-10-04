@@ -2256,10 +2256,11 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`201ca0e` (2026-10-03, ADR-0170): `just ci` passes locally, the workspace's
-1796 tests pass, and the browser suite passes 529, with 2 skipped. Its
-evidence is `docs/evidence/E14/nested-lists.txt`, recorded at that commit;
-ADR-0169's is `row-reads.txt`, at `36d263c`.
+`f8bd455` (2026-10-03, ADR-0171): `just ci` passes locally, the workspace's
+1800 tests pass, and the browser suite passes 529, with 2 skipped. Its
+evidence is `docs/evidence/E14/query-attributes.txt`, recorded at that
+commit; ADR-0170's is `nested-lists.txt`, at `201ca0e`, and ADR-0169's
+`row-reads.txt`, at `36d263c`.
 
 E14's gate items 1, 2 and 5 are recorded over all twelve tasks at `0c608dc`,
 and again at `4f75868` for what it changed: T08's controls, ADR-0153's and
