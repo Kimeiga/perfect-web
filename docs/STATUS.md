@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `30f5b45`, with ADR-0179.
+**Reviewed:** 2026-10-04, against master `6ef776a`, with ADR-0180.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2416,11 +2416,11 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`30f5b45` (2026-10-04, ADR-0179): `just ci` passes locally, the workspace's
-1857 tests pass, and the browser suite passes 601 in three engines, with 2
-skipped. Its evidence is `docs/evidence/E14/invariants.txt`, recorded at
-that commit: 25 of 25 mutants killed. ADR-0178's is `availability.txt`, at
-`344f331`; ADR-0177's `last-known-good.txt`, at `257b1a5`; ADR-0176's
+`6ef776a` (2026-10-04, ADR-0180): `just ci` passes locally, the workspace's
+1858 tests pass, and the browser suite passes 604 in three engines, with 2
+skipped. Its evidence is `docs/evidence/E14/estimate-range.txt`, recorded at
+that commit: 6 of 6 mutants killed. ADR-0179's is `invariants.txt`, at
+`30f5b45`; ADR-0178's `availability.txt`, at `344f331`; ADR-0177's `last-known-good.txt`, at `257b1a5`; ADR-0176's
 `materializer-failure.txt`, at `2c5366e`;
 ADR-0175's `connection-faults.txt`, at `bbaf6e9`; ADR-0174's
 `test-controls.txt`, at `d22928f`; ADR-0173's
