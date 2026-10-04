@@ -13,6 +13,32 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0178, 2026-10-04: whether an item can be ordered is shown before the
+press, and a change to it reaches every page open** (charter §15.1 and
+§15.2, the first part of the audit's eighth gap). `MenuItem` declares
+`available`, which the data layer fills with what the command reads. A
+sold-out row says "Sold out" and has no Add. A stock change is
+`InventoryChanged(store, item)`, which the store's `Menu` query now hears,
+and `/bench/stock?tell=true` tells every page open, which renders that row
+again where it is. 14 mutants (`just e14-availability`).
+
+**Correction, ADR-0178, 2026-10-04: a new version of the shared menu could
+leave the pages open a version behind**
+([ADR-0178](DECISIONS/ADR-0178-whether-an-item-can-be-ordered-is-shown-before-the-press.md)).
+- ADR-0150 rendered the menu's fragment again for a document whose menu
+  read differed, and told no page open. Later changes were derived from the
+  new version, which those pages did not have.
+- Nothing changed the menu without an event until availability did. A page
+  open across an untold sale then kept the item's Add, even through a later
+  told change of it.
+- Now every new version reaches every page that shows it, as the whole
+  difference from what it showed.
+
+Also found: with the Add inside a block, a rename would have rendered the
+row again. The renderer now looks into a block that decides as it did. And
+the value analysis decided nothing of a listener's `_`, which the store's
+`Menu` now writes.
+
 **ADR-0177, 2026-10-04: a public read whose origin fails is answered with
 the last value kept** (charter §15.6 test 18, the audit's seventh gap).
 `fallback last_known_good` was checked for its value and read by nothing,

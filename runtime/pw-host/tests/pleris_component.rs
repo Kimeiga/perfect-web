@@ -108,6 +108,7 @@ fn item(id: &str) -> Val {
             "price".into(),
             Val::Record(vec![("minor-units".into(), Val::S64(375))]),
         ),
+        ("available".into(), Val::Bool(true)),
     ])
 }
 
@@ -531,6 +532,7 @@ fn json_arguments_are_typed_by_the_export_they_are_for() {
             "name": "Cortado",
             "description": "Short.",
             "price": price,
+            "available": true,
         })
     };
     let cortado = sent(serde_json::json!({ "minor_units": 375 }));

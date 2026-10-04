@@ -168,6 +168,8 @@ fn a_list_s_rows_and_a_declared_error_are_read_through_their_types() {
                 "price".to_string(),
                 Val::Record(vec![("minor-units".into(), Val::S64(450))]),
             ),
+            // Whether it can be ordered (ADR-0178).
+            ("available".to_string(), Val::Bool(true)),
         ];
         if extra {
             fields.push(("calories".into(), Val::S64(5)));

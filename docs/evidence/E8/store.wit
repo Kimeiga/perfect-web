@@ -231,6 +231,7 @@ package pw:types {
             name: string,
             description: string,
             price: domain-money,
+            available: bool,
         }
         type domain-positive-int = s64;
         record domain-money {

@@ -47,7 +47,8 @@ are fixed (ADR-0155):
 | MenuItem.id, name | met |
 | MenuItem.description | met since ADR-0166 |
 | MenuItem.price | met since ADR-0169: `Money<USD>`, shown in each row as `item.price.display`, and the price the data layer gives a cart's line (it gave every line 450 until then) |
-| MenuItem.store_id, available, category | missing; a category exists only in T07's setup |
+| MenuItem.available | met since ADR-0178: what `menus#is-available` answers, shown in each row before the press |
+| MenuItem.store_id, category | missing; a category exists only in T07's setup |
 | Cart.id, consumer_id, version | missing as fields: a cart is keyed by its session, and its version is the runtime's entry version |
 | Cart.items | partial: `lines: List<CartLine>` |
 | CartLine.item_id, unit_price | met (`Money<USD>`) |
@@ -59,7 +60,7 @@ are fixed (ADR-0155):
 | data | status |
 |---|---|
 | store and public menu | partial: shared queries and a public materialized fragment; the edge placement is declared, not run (one origin node) |
-| item availability | partial: read inside `add_to_cart` since ADR-0157; the page does not show it, and `MenuFragment` listens for `InventoryChanged`, which nothing emits |
+| item availability | met since ADR-0178: read inside `add_to_cart` (ADR-0157), shown in the shared menu, and a stock change is `InventoryChanged`, which the `Menu` query and its fragment hear, told to every page open |
 | recommendations | met since ADR-0165: public, shared, kept ten minutes and dropped by `MenuChanged(id)`, streamed |
 | delivery estimate | met since ADR-0165: the session's, private, kept for no time, streamed |
 | cart | met: a `session` query, `read_your_writes`, `cache private`, keyed by session; `consistency` is not enforced as a mode |
@@ -128,8 +129,8 @@ are fixed (ADR-0155):
 
 1. ~~**Item availability, end to end**~~ (§15.4, §15.5, test 10): met by
    ADR-0157, a check before commit, a stale-item control, and the typed
-   error returned to the page. What remains is §15.1's and §15.2's:
-   `available` on `MenuItem`, shown before the press.
+   error returned to the page; and §15.1's and §15.2's by ADR-0178:
+   `available` on `MenuItem`, shown before the press, and told.
 2. ~~**The route, and more than one store**~~ (§15.3): met by ADR-0160 to
    ADR-0163.
 3. ~~**The recommendation and estimate slots**~~ (tests 3 and 17): met by
@@ -141,12 +142,13 @@ are fixed (ADR-0155):
 6. ~~**§15.5's missing controls.**~~ Met by ADR-0174 to ADR-0176.
 7. ~~**Last-known-good** (test 18)~~: met by ADR-0177.
 8. **§15.1's fields**, and `PositiveInt` checked at the boundary. The
-   descriptions are met by ADR-0166, and the price by ADR-0169. Still
-   missing: `available`, `category` and `menu_version`; and
-   `DeliveryEstimate`'s range.
+   descriptions are met by ADR-0166, the price by ADR-0169, and
+   `available` by ADR-0178. Still missing: `category` and `menu_version`;
+   and `DeliveryEstimate`'s range.
 9. **Accessibility** (test 14): an automated audit. Each Add named by its
    item, and a live region for the count, are met by ADR-0168.
 10. **Tests 2 and 13** against the running store's shared output.
 
-Changing the store's markup moves the context every benchmark task's patch
-is anchored on, so items 1-4 and 9 re-base the tasks' patches with them.
+The benchmark's Pleris store is its own copy since ADR-0156, so changing
+the canonical store's markup moves no task's patch. Until then, items 1-4
+and 9 would have re-based the tasks' patches with them.

@@ -26,16 +26,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 STORE = ROOT / "examples/store/app.pw"
 
-EVENT = (
-    "        self.invalidate_queries(\n"
-    "            \"\",\n"
-    "            \"\",\n"
-    "            &[pw_materialize::Event::new(\n"
-    "                \"Events.MenuChanged\",\n"
-    "                &[STORE_ID],\n"
-    "            )],\n"
-    "        );\n"
-)
+# Re-anchored by ADR-0178, whose stock change is an event of its own.
+EVENT = "        self.invalidate_queries(\"\", \"\", &[event]);\n"
 
 # (what, file, anchor, replacement)
 MUTANTS = [
@@ -54,23 +46,27 @@ MUTANTS = [
     (
         "the event names no store",
         SERVER,
-        "                \"Events.MenuChanged\",\n                &[STORE_ID],\n",
-        "                \"Events.MenuChanged\",\n                &[],\n",
+        # Re-anchored by ADR-0178.
+        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[STORE_ID]),\n",
+        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[]),\n",
     ),
     (
         "the event is another store's",
         SERVER,
-        "                \"Events.MenuChanged\",\n                &[STORE_ID],\n",
-        "                \"Events.MenuChanged\",\n                &[SECOND_STORE.0],\n",
+        # Re-anchored by ADR-0178.
+        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[STORE_ID]),\n",
+        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[SECOND_STORE.0]),\n",
     ),
     (
         "the store's menu declares no invalidation",
         STORE,
-        # Re-anchored by ADR-0165, whose recommendations declare it too.
-        "    invalidates_on MenuChanged(id)\n"
+        # Re-anchored by ADR-0165, whose recommendations declare it too, and
+        # by ADR-0178, whose menu listens for a stock change as well.
+        "    invalidates_on MenuChanged(id), InventoryChanged(id, _)\n"
         "    concurrency    one_per_key\n"
         "    on_key_change  cancel\n"
         "    timeout        2.seconds\n",
+        "    invalidates_on InventoryChanged(id, _)\n"
         "    concurrency    one_per_key\n"
         "    on_key_change  cancel\n"
         "    timeout        2.seconds\n",

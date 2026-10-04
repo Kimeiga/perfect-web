@@ -425,7 +425,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // store's cart lists its lines, each with − and +, its total, and the
     // cart's subtotal (ADR-0172). `unpriced` is removed: a new line takes the
     // item's price, as the page showed it.
-    const EXPECTED: u64 = 0xb62fd3a8a1c996b2;
+    // 2026-10-04: `examples/domain.pw`'s `MenuItem` declares `available`,
+    // charter §15.1's, which the menu's row decides its Add by, before the
+    // press (ADR-0178).
+    const EXPECTED: u64 = 0xf3877da4004b7cff;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

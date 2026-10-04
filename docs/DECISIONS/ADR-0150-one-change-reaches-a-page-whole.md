@@ -44,6 +44,10 @@ showed the old fragment: its source changed and its freshness was then spent.
    is rendered again, as a new version, when the value it would show differs.
    A page already open is not patched for such a change: no event announced
    it. A new document shows it.
+
+   Superseded in part by ADR-0178: the pages open are told first, since the
+   fragment is one version for every reader and later changes were derived
+   from the new one.
 3. **The browser suite's evidence records a failure's expected and received
    values**, so the next intermittent failure says what it saw.
 

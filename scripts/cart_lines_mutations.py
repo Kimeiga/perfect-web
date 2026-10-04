@@ -196,9 +196,10 @@ MUTANTS = [
         "a handler's captures are not set where they are",
         "render",
         RENDER,
-        "                let y = captures_value(run, &after)?;\n"
+        # Re-anchored by ADR-0178, which looks into a block that decides.
+        "                let y = captures_value(run, after)?;\n"
         "                if x != y {\n",
-        "                let y = captures_value(run, &after)?;\n"
+        "                let y = captures_value(run, after)?;\n"
         "                if false && x != y {\n",
     ),
     (

@@ -560,21 +560,51 @@ pub fn instance_changes(
         env.with(binding, item.clone()).within(*id, token)
     };
     let (before, after) = (scoped(was), scoped(now));
+    // Each element's handlers in the row, whose captures are one attribute
+    // of it (ADR-0172), wherever in the row the element is.
+    let mut handlers: BTreeMap<ElementId, Vec<&Part>> = BTreeMap::new();
+    handlers_within(body, &mut handlers);
+    let mut out = Vec::new();
+    if !changes_within(body, &before, &after, &handlers, others, &mut out)? {
+        return Ok(None);
+    }
+    Ok(Some(out))
+}
+
+/// Every event part in `chunks`, and in the blocks inside them, by its
+/// element.
+fn handlers_within<'t>(chunks: &'t [Chunk], out: &mut BTreeMap<ElementId, Vec<&'t Part>>) {
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if let Part::Event { owner, .. } = p {
+            out.entry(*owner).or_default().push(p);
+        }
+        for inner in p.nested() {
+            handlers_within(inner, out);
+        }
+    }
+}
+
+/// **What changed in `chunks`, each part set where it is** (ADR-0168), into
+/// `out`; `false` where the instance must be rendered again. A conditional
+/// that decides as it did is looked into, and its branch's parts are set
+/// where they are (ADR-0178): until 2026-10-04 any change inside a block
+/// rendered the row again, and a renamed item whose Add sat in one lost its
+/// button's node.
+fn changes_within(
+    chunks: &[Chunk],
+    before: &Env,
+    after: &Env,
+    handlers: &BTreeMap<ElementId, Vec<&Part>>,
+    others: &[Template],
+    out: &mut Vec<(PartId, InstanceChange)>,
+) -> Result<bool, Blocked> {
     let rendered = |c: &Chunk, e: &Env| -> Result<String, Blocked> {
         let mut out = String::new();
         emit(std::slice::from_ref(c), e, others, &mut out)?;
         Ok(out)
     };
-    // Each element's handlers in the row, whose captures are one attribute
-    // of it (ADR-0172).
-    let mut handlers: BTreeMap<ElementId, Vec<&Part>> = BTreeMap::new();
-    for c in body {
-        if let Chunk::Dynamic(p @ Part::Event { owner, .. }) = c {
-            handlers.entry(*owner).or_default().push(p);
-        }
-    }
-    let mut out = Vec::new();
-    for c in body {
+    for c in chunks {
         let Chunk::Dynamic(p) = c else { continue };
         let text = |e: &Env, value: &String| match e.get(value) {
             Some(Value::Raw { .. }) => Ok(None),
@@ -584,23 +614,23 @@ pub fn instance_changes(
             }),
         };
         match p {
-            Part::Text { id, value, .. } => match (text(&before, value)?, text(&after, value)?) {
+            Part::Text { id, value, .. } => match (text(before, value)?, text(after, value)?) {
                 (Some(x), Some(y)) => {
                     if x != y {
                         out.push((*id, InstanceChange::Text(y)));
                     }
                 }
                 _ => {
-                    if rendered(c, &before)? != rendered(c, &after)? {
-                        return Ok(None);
+                    if rendered(c, before)? != rendered(c, after)? {
+                        return Ok(false);
                     }
                 }
             },
             Part::Attribute { id, .. }
             | Part::BooleanAttribute { id, .. }
             | Part::InterpolatedAttribute { id, .. } => {
-                let x = attribute_value(p, &before)?;
-                let y = attribute_value(p, &after)?;
+                let x = attribute_value(p, before)?;
+                let y = attribute_value(p, after)?;
                 if x != y
                     && let Some((name, value)) = y
                 {
@@ -617,8 +647,8 @@ pub fn instance_changes(
                 if run.first().and_then(|p| p.id()) != Some(*id) {
                     continue;
                 }
-                let x = captures_value(run, &before)?;
-                let y = captures_value(run, &after)?;
+                let x = captures_value(run, before)?;
+                let y = captures_value(run, after)?;
                 if x != y {
                     out.push((
                         *id,
@@ -629,14 +659,36 @@ pub fn instance_changes(
                     ));
                 }
             }
+            Part::Conditional {
+                value,
+                then,
+                otherwise,
+                ..
+            } => {
+                let decides = |e: &Env| -> Result<bool, Blocked> {
+                    e.get(value)
+                        .ok_or(Blocked::MissingValue {
+                            path: value.clone(),
+                        })?
+                        .condition(value)
+                };
+                let (x, y) = (decides(before)?, decides(after)?);
+                if x != y {
+                    return Ok(false);
+                }
+                let branch = if x { then } else { otherwise };
+                if !changes_within(branch, before, after, handlers, others, out)? {
+                    return Ok(false);
+                }
+            }
             _ => {
-                if rendered(c, &before)? != rendered(c, &after)? {
-                    return Ok(None);
+                if rendered(c, before)? != rendered(c, after)? {
+                    return Ok(false);
                 }
             }
         }
     }
-    Ok(Some(out))
+    Ok(true)
 }
 
 pub fn instance_token_of(each: PartId, item: &Value, key_field: &str, env: &Env) -> InstanceToken {

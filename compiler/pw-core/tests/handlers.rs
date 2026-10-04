@@ -217,13 +217,14 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
              export async function run(context) {{\n\
              \x20 const v0 = ((o) => ({{ \"id\": o[\"id\"], \"name\": o[\"name\"], \
              \"description\": o[\"description\"], \"price\": ((o) => ({{ \"minor_units\": \
-             BigInt(o[\"minor_units\"]) }}))(o[\"price\"]) }}))(context.captures[\"item\"]);\n",
+             BigInt(o[\"minor_units\"]) }}))(o[\"price\"]), \"available\": o[\"available\"] \
+             }}))(context.captures[\"item\"]);\n",
             id = add.identity
         )),
         "the captured item, read whole, field by field, its `Int` as a BigInt \
-         (ADR-0172)"
+         (ADR-0172), with whether it is available (ADR-0178)"
     );
-    let item = r#"{"item":{"id":"espresso","name":"Espresso","description":"Short.","price":{"minor_units":350}}}"#;
+    let item = r#"{"item":{"id":"espresso","name":"Espresso","description":"Short.","price":{"minor_units":350},"available":true}}"#;
     // Answered `Ok`, without the cart (ADR-0157): the notice is cleared. The
     // item is sent as the page showed it, and `PositiveInt(1)` as its
     // representation.
@@ -237,7 +238,8 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
                     "id": "espresso",
                     "name": "Espresso",
                     "description": "Short.",
-                    "price": { "minor_units": 350 }
+                    "price": { "minor_units": 350 },
+                    "available": true
                 },
                 1
             ]

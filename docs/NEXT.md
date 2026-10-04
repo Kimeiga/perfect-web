@@ -202,13 +202,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
         `just e14-last-known-good`): PW0343, the query runtime's fallback for
         public data alone, and the store's page shown with its last store
         kept while its origin fails, in three engines.
-     8. **Next: §15.1's remaining fields.** `MenuItem.available`,
-        `category` and `menu_version`; `DeliveryEstimate`'s range; and
-        `PositiveInt` checked where a request gives one. Acceptance: the
-        page shows an item that cannot be ordered as such before the press,
-        a quantity of 0 or less is refused at the host, in three engines.
-     7. Availability on the page before the press: `MenuItem.available`, and
-        an `InventoryChanged` the menu hears.
+     8. **Next: §15.1's remaining fields.**
+        - ~~`MenuItem.available`, shown before the press, and told~~
+          (ADR-0178, `just e14-availability`): a sold-out row has no Add,
+          and a stock change reaches every page open, in three engines.
+          Correction: a new version of the shared menu could leave the
+          pages open a version behind.
+        - **Next: `PositiveInt` checked where a request gives one.**
+          Acceptance: a quantity of 0 or less is refused at the host, and
+          by the compiled handler, in three engines.
+        - Then `category` and `menu_version`, and `DeliveryEstimate`'s
+          range.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for

@@ -294,6 +294,15 @@
     },
     {
       "from": "store.page.Menu",
+      "to": "Events.InventoryChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id",
+        "_"
+      ]
+    },
+    {
+      "from": "store.page.Menu",
       "to": "Events.MenuChanged",
       "kind": "invalidated_by",
       "key": [

@@ -1691,6 +1691,8 @@ impl Server {
             [Val::String(_)] => Ok(not_found()),
             other => Err(format!("stores#get received {other:?}")),
         });
+        // What can be ordered now (ADR-0178), as the menu's rows say.
+        let sold_out = self.sold_out.lock().expect("sold out").clone();
         let for_store: HostFn = Arc::new(move |args: &[Val]| match args {
             [Val::String(id)] if store_named(id).is_some() => {
                 let items = match id.as_str() {
@@ -1718,6 +1720,9 @@ impl Server {
                                         Val::S64(item_price(id)),
                                     )]),
                                 ),
+                                // Whether it can be ordered now (ADR-0178):
+                                // what `menus#is-available` answers.
+                                ("available".into(), Val::Bool(!sold_out.contains(id))),
                             ])
                         })
                         .collect(),
@@ -2677,36 +2682,44 @@ impl Server {
         self.rendered_value("menu", &menu)
     }
 
-    /// The menu fragment's bytes, materialized once and reused.
+    /// The menu fragment's bytes, materialized once and reused, and the rows
+    /// they show.
     ///
-    /// Regenerated only when the entry is stale, and stored in the
-    /// materializer under the PUBLIC entry key. Two readers get the same bytes
-    /// because they are the same bytes — the entry is read, not re-rendered —
-    /// and that is what makes `cache shared` a fact about the system rather
-    /// than a claim about two renders agreeing.
-    fn menu_fragment(&self, store: &str, rows: &Value) -> String {
+    /// Stored in the materializer under the PUBLIC entry key. Two readers get
+    /// the same bytes because they are the same bytes — the entry is read,
+    /// not re-rendered — and that is what makes `cache shared` a fact about
+    /// the system rather than a claim about two renders agreeing.
+    ///
+    /// What a new document shows of the menu is what the store's open pages
+    /// show. A change to it reaches them first (`refresh_menu`, ADR-0178),
+    /// and is never made here, where they would not hear of it: until
+    /// 2026-10-04 a document whose `Menu` read differed rendered the
+    /// fragment again, and the pages open kept the version before (ADR-0150).
+    /// `rows` is the query's value, which the fragment is first rendered
+    /// from.
+    fn menu_fragment(&self, store: &str, rows: &Value) -> (String, Value) {
         let key = self.menu_key(store);
-        // Kept while it shows the `Menu` query's value. Until 2026-10-03 it
-        // was kept until a command invalidated it, so a value that changed at
-        // its source, read again once its freshness was spent, was not what
-        // a new document showed.
         let mut rendered_from = self.menu_rendered_from.lock().expect("rendered from");
+        let from = rendered_from.get(store).cloned();
         if let Some(entry) = self.materializer.entry(&key)
             && !entry.stale
-            && rendered_from.get(store).is_some_and(|was| was == rows)
+            && let Some(from) = &from
         {
-            return entry.body;
+            return (entry.body, from.clone());
         }
+        // Rendered first, or again where its entry was dropped: from what the
+        // pages show, where a page shows it.
+        let from = from.unwrap_or_else(|| rows.clone());
         let (template, part) = self.menu_part();
-        let env = self.menu_env(store, rows);
+        let env = self.menu_env(store, &from);
         let html = pw_render::render_part(template, part, &env, &self.templates)
             .expect("the menu fragment renders");
         self.clock.advance(1);
         self.materializer.invalidate(&key, 0);
         self.materializer
             .regenerate(&key, None, || Ok(html.clone()));
-        rendered_from.insert(store.to_string(), rows.clone());
-        html
+        rendered_from.insert(store.to_string(), from.clone());
+        (html, from)
     }
 
     /// The public entry whose version every patch to a store's menu is
@@ -2724,14 +2737,19 @@ impl Server {
         )
     }
 
-    /// Regenerate the menu entry and broadcast one structural patch per
-    /// subscriber.
+    /// **A change to store 47's menu, told to every page that shows it**
+    /// (E7-P): the change applied, the fragment rendered again as a new
+    /// version, and one patch set for every reader, since a public fragment
+    /// has one identity and so one set of instance tokens.
     ///
-    /// Per subscriber, because an instance token is scoped to the DOCUMENT it
-    /// appears in: two sessions render the same item at different tokens, and
-    /// a single broadcast frame would address at most one of them. The
-    /// alternative — one shared token — is the public-fragment case, and it is
-    /// a different partition rather than a shortcut for this one.
+    /// The patches are the whole difference between what the open pages show
+    /// and the menu now (ADR-0178): the change's own structural patch, where
+    /// it moves the list, as E7-P makes it; then every row that differs from
+    /// what the pages show, set where it is or rendered again where it is,
+    /// as a session's list is (ADR-0145, ADR-0168). Until 2026-10-04 a change
+    /// sent its own patch alone, and anything that had changed at the
+    /// source unannounced was drawn into the fragment and never reached a
+    /// page already open.
     fn broadcast_menu(&self, op: MenuOp) -> Result<(), String> {
         // A departed visitor is forgotten before the fan-out, so a change is
         // not queued for pages nobody is reading.
@@ -2769,20 +2787,67 @@ impl Server {
         // that declares `invalidates_on MenuChanged(id)` for this store, and
         // no other store's (§15.6 test 11, ADR-0164). Until 2026-10-03 every
         // store's kept `Menu` was dropped here, by the query's name.
-        self.invalidate_queries(
-            "",
-            "",
-            &[pw_materialize::Event::new(
-                "Events.MenuChanged",
-                &[STORE_ID],
-            )],
-        );
+        // A stock change is `InventoryChanged(47, item)` (ADR-0178), which
+        // the store's `Menu` and its fragment listen for.
+        let event = match &op {
+            MenuOp::Stock { id } => {
+                pw_materialize::Event::new("Events.InventoryChanged", &[STORE_ID, id.as_str()])
+            }
+            _ => pw_materialize::Event::new("Events.MenuChanged", &[STORE_ID]),
+        };
+        self.invalidate_queries("", "", &[event]);
 
-        // The fragment is re-materialized, in its own domain, once.
-        // The menu E7-P changes is store 47's (ADR-0162).
+        // The menu E7-P changes is store 47's (ADR-0162), read again with
+        // the change.
         let items = self.menu_rows(STORE_ID)?;
         let (template, part) = self.menu_part();
         let env = self.menu_env(STORE_ID, &items);
+        // The change's own patch, where it moves the list: an insert at its
+        // anchor, a removal, a move. A rename's and a stock change's are its
+        // row's, below: reinserting a renamed item would also work visually,
+        // and destroy the node, which is the distinction E7-P exists to make.
+        let structural = match &op {
+            MenuOp::Rename { .. } | MenuOp::Stock { .. } => None,
+            _ => Some(Targeted {
+                target: self.menu_address(),
+                operation: op
+                    .patch(template, part, &items, &env, &self.templates)
+                    .map_err(|b| format!("{b:?}"))?,
+            }),
+        };
+        // What the pages show once it applies, and every other difference
+        // from the menu now.
+        let after = op.shown_after(rows(&before), rows(&items))?;
+        let rest = list_patches(
+            template,
+            &self.menu_address().template,
+            "menu",
+            &after,
+            rows(&items),
+            &env,
+            &self.templates,
+        )?;
+        let patches: Vec<Targeted> = structural.into_iter().chain(rest).collect();
+        if std::env::var("PW_TRACE").is_ok() {
+            eprintln!("broadcast {:?} to {} document(s)", op, queue.len());
+        }
+        self.tell_menu(&mut queue, STORE_ID, &items, patches)
+    }
+
+    /// **A store's menu fragment rendered again from `items`, and the pages
+    /// that show it told**, in the subscriber table the caller holds: the
+    /// fragment, regenerated once in its own domain, is a new version, and
+    /// `patches` take each page of the store from what it showed to it.
+    /// Nothing is sent where nothing a page shows changed.
+    fn tell_menu(
+        &self,
+        queue: &mut BTreeMap<Doc, Subscriber>,
+        store: &str,
+        items: &Value,
+        patches: Vec<Targeted>,
+    ) -> Result<(), String> {
+        let (template, part) = self.menu_part();
+        let env = self.menu_env(store, items);
         let html = pw_render::render_part(template, part, &env, &self.templates)
             .map_err(|b| format!("{b:?}"))?;
         self.clock.advance(1);
@@ -2790,61 +2855,26 @@ impl Server {
         // without this the fragment kept its first rendering and every
         // document served after a change showed the old menu, while pages
         // already open were patched (found 2026-10-02, ADR-0127).
-        self.materializer.invalidate(&self.menu_key(STORE_ID), 0);
+        self.materializer.invalidate(&self.menu_key(store), 0);
         self.materializer
-            .regenerate(&self.menu_key(STORE_ID), None, || Ok(html));
+            .regenerate(&self.menu_key(store), None, || Ok(html));
         self.menu_rendered_from
             .lock()
             .expect("rendered from")
-            .insert(STORE_ID.to_string(), items.clone());
-
-        let entry = ResourceEntryId::derive(&menu_identity(STORE_ID), &IDENTITY);
-        let version = self.menu_version(STORE_ID);
-
-        // ONE patch, for every reader.
-        //
-        // A public fragment has one identity, so its instances have one set of
-        // tokens, so one address reaches every document containing it. The
-        // previous version derived a patch per subscriber because the fragment
-        // inherited each document's domain — which was per-session bytes for a
-        // shared cache entry, dressed up as a broadcast.
-        //
-        // A rename sets each part of the item's instance that reads what
-        // changed, its text and its attributes alike (ADR-0168). Until
-        // 2026-10-03 it set the name's text and nothing else, so an Add
-        // button kept the name of the item it was before.
-        let patches: Vec<Targeted> = match &op {
-            MenuOp::Rename { id, .. } => {
-                let row = |rows: &Value| {
-                    row_of(rows, id).ok_or_else(|| format!("no item {id} to rename"))
-                };
-                let (was, now) = (row(&before)?, row(&items)?);
-                let token = pw_render::instance_token_of(part, &now, "id", &env);
-                let changes =
-                    pw_render::instance_changes(template, part, &was, &now, &env, &self.templates)
-                        .map_err(|b| format!("{b:?}"))?
-                        .ok_or_else(|| format!("renaming {id} changes more than its text"))?;
-                instance_patches(&self.menu_address().template, part, &token, changes)
-            }
-            _ => vec![Targeted {
-                target: self.menu_address(),
-                operation: op
-                    .patch(template, part, &items, &env, &self.templates)
-                    .map_err(|b| format!("{b:?}"))?,
-            }],
-        };
-
+            .insert(store.to_string(), items.clone());
+        if patches.is_empty() {
+            return Ok(());
+        }
+        let entry = ResourceEntryId::derive(&menu_identity(store), &IDENTITY);
+        let version = self.menu_version(store);
         // To each document that shows the store (§15.6 test 11): another
         // store's menu is not this one's.
         let params = self.params.lock().expect("params");
         let readers = |doc: &Doc| {
             params
                 .get(doc)
-                .is_some_and(|p| p.get("id").map(String::as_str) == Some(STORE_ID))
+                .is_some_and(|p| p.get("id").map(String::as_str) == Some(store))
         };
-        if std::env::var("PW_TRACE").is_ok() {
-            eprintln!("broadcast {:?} to {} document(s)", op, queue.len());
-        }
         for (_, waiting) in queue.iter_mut().filter(|(doc, _)| readers(doc)) {
             waiting.push(StreamFrame::ResourceChanged {
                 protocol: CURRENT,
@@ -2867,6 +2897,59 @@ impl Server {
             });
         }
         Ok(())
+    }
+
+    /// **A store's menu fragment brought to its query's value, and the pages
+    /// that show it told** (ADR-0178), before a document of the store is
+    /// read, so the document shows what they do.
+    ///
+    /// ADR-0150 rendered the fragment again for a new document whose `Menu`
+    /// read differed from what it was rendered from, and told no page open:
+    /// no event had announced the change. But the fragment is one version
+    /// for every reader, and the pages kept the one before, while every
+    /// change after was derived from the new one. A rename then left an
+    /// item's Add with its old name on those pages, and a sold-out item's
+    /// Add on them for good.
+    ///
+    /// The query's value is read outside the subscriber table, as a
+    /// document's is (ADR-0151). A change told meanwhile was read after this
+    /// one, and is what the pages show then; this one stands down.
+    fn refresh_menu(&self, store: &str) -> Result<(), String> {
+        let seen = self
+            .menu_rendered_from
+            .lock()
+            .expect("rendered from")
+            .get(store)
+            .cloned();
+        // Never rendered: no page shows it, and the document renders it.
+        let Some(seen) = seen else { return Ok(()) };
+        let items = self.menu_rows(store)?;
+        if items == seen {
+            return Ok(());
+        }
+        self.forget_idle_subscribers();
+        let mut queue = self.pending.lock().expect("pending");
+        let now_shown = self
+            .menu_rendered_from
+            .lock()
+            .expect("rendered from")
+            .get(store)
+            .cloned();
+        if now_shown.as_ref() != Some(&seen) {
+            return Ok(());
+        }
+        let (template, _) = self.menu_part();
+        let env = self.menu_env(store, &items);
+        let patches = list_patches(
+            template,
+            &self.menu_address().template,
+            "menu",
+            rows(&seen),
+            rows(&items),
+            &env,
+            &self.templates,
+        )?;
+        self.tell_menu(&mut queue, store, &items, patches)
     }
 
     /// The document, and an empty queue for whoever receives it.
@@ -2924,6 +3007,15 @@ impl Server {
     ) -> Result<(String, u64, serde_json::Value, Env), Unread> {
         self.drain(session);
         self.forget_idle_subscribers();
+        // The store's menu brought to its query's value first, and the pages
+        // that show it told (ADR-0178), before this document is a reader:
+        // it is then rendered from what they show.
+        if let Some(store) = params.get("id")
+            && let Err(why) = self.refresh_menu(store)
+            && std::env::var("PW_TRACE").is_ok()
+        {
+            eprintln!("the menu of {store} was not brought up to date: {why}");
+        }
         // The document's values are read, and it is rendered, OUTSIDE the
         // subscriber table (ADR-0151). Until 2026-10-03 the table was held
         // throughout, so a page waiting for a slow query kept every other
@@ -3601,7 +3693,8 @@ impl Server {
         let rows = self
             .rendered_value("menu", &bindings["menu"])
             .unwrap_or_else(|e| panic!("the menu's rows: {e}"));
-        let fragment = self.menu_fragment(store, &rows);
+        // The rows the fragment shows, which the open pages do (ADR-0178).
+        let (fragment, rows) = self.menu_fragment(store, &rows);
         // Each binding's whole value, so a block a query decides, and what is
         // inside it, reads any field of it (ADR-0146), and each row what it
         // reads through a member (ADR-0169).
@@ -3975,6 +4068,12 @@ enum MenuOp {
         id: String,
         name: String,
     },
+    /// Whether one item can be ordered changed (ADR-0178): its row is shown
+    /// again, as the data layer now answers for it. The menu's items are
+    /// as they were.
+    Stock {
+        id: String,
+    },
 }
 
 impl MenuOp {
@@ -4032,8 +4131,59 @@ impl MenuOp {
                 let at = Self::position(items, id)?;
                 items[at].1 = name.clone();
             }
+            MenuOp::Stock { id } => {
+                Self::position(items, id)?;
+            }
         }
         Ok(())
+    }
+
+    /// **What the open pages show once this change's own patch applies**
+    /// (ADR-0178): the rows they showed, with the item inserted, removed or
+    /// moved where `apply` puts it. An inserted item is its row in `now`.
+    /// Every other row is as the pages showed it, so what differs from `now`
+    /// is what the change did not say.
+    fn shown_after(&self, shown: &[Value], now: &[Value]) -> Result<Vec<Value>, String> {
+        let key = |r: &Value| match r {
+            Value::Record(f) => match f.get("id") {
+                Some(Value::Text(id)) => Some(id.clone()),
+                _ => None,
+            },
+            _ => None,
+        };
+        let position = |rows: &[Value], id: &str| {
+            rows.iter()
+                .position(|r| key(r).as_deref() == Some(id))
+                .ok_or_else(|| format!("no item `{id}` shown"))
+        };
+        let mut rows = shown.to_vec();
+        match self {
+            MenuOp::Insert { id, at, before, .. } => {
+                let row = now[position(now, id)?].clone();
+                let at = match at {
+                    Some(a) => {
+                        let p = position(&rows, a)?;
+                        if *before { p } else { p + 1 }
+                    }
+                    None if *before => 0,
+                    None => rows.len(),
+                };
+                rows.insert(at, row);
+            }
+            MenuOp::Remove { id } => {
+                rows.remove(position(&rows, id)?);
+            }
+            MenuOp::Move { id, after } => {
+                let item = rows.remove(position(&rows, id)?);
+                let to = match after {
+                    None => 0,
+                    Some(a) => position(&rows, a)? + 1,
+                };
+                rows.insert(to, item);
+            }
+            MenuOp::Rename { .. } | MenuOp::Stock { .. } => {}
+        }
+        Ok(rows)
     }
 
     /// The patch describing this change, with markup the renderer produced.
@@ -4069,13 +4219,12 @@ impl MenuOp {
                 instance: token(id),
                 after: after.as_deref().map(token),
             },
-            // A rename sets the parts of its item's instance where they are,
-            // which `broadcast_menu` derives from the template (ADR-0168):
-            // reinserting the item would also work visually, and destroy the
-            // node, which is the distinction E7-P exists to make.
-            MenuOp::Rename { .. } => {
+            // A rename and a stock change set their item's row where it is,
+            // or render it again where it is, which `broadcast_menu` derives
+            // from what the pages show (ADR-0168, ADR-0178).
+            MenuOp::Rename { .. } | MenuOp::Stock { .. } => {
                 return Err(pw_render::Blocked::UnrepresentedConstruct {
-                    reason: "a rename's patches are its instance's parts".into(),
+                    reason: "a row's change is its instance's, not the list's".into(),
                     at: template.path.clone(),
                 });
             }
@@ -4592,6 +4741,14 @@ fn row_of(rows: &Value, id: &str) -> Option<Value> {
         .cloned()
 }
 
+/// A list's rows, or none where the value is no list.
+fn rows(v: &Value) -> &[Value] {
+    match v {
+        Value::List(rows) => rows,
+        _ => &[],
+    }
+}
+
 /// A row with its key alone: what an instance's token is derived from.
 fn key_row(id: &str) -> Value {
     Value::Record([("id".to_string(), Value::Text(id.into()))].into())
@@ -5032,11 +5189,28 @@ fn handle(server: &Server, mut stream: TcpStream) {
             };
             let mut sold_out = server.sold_out.lock().expect("sold out");
             if param("available").as_deref() == Some("false") {
-                sold_out.insert(item);
+                sold_out.insert(item.clone());
             } else {
                 sold_out.remove(&item);
             }
             drop(sold_out);
+            // Told (ADR-0178): `InventoryChanged(47, item)`, and every page
+            // that shows the store sees the item as it is now. Untold, it is
+            // §15.5's forced stale item: a page shows what it was, and the
+            // command that adds it refuses it (ADR-0157).
+            if param("tell").as_deref() == Some("true")
+                && let Err(e) = server.broadcast_menu(MenuOp::Stock { id: item })
+            {
+                let why = serde_json::Value::String(e);
+                respond_json(
+                    &mut stream,
+                    409,
+                    &session,
+                    fresh,
+                    &format!("{{\"refused\":{why}}}"),
+                );
+                return;
+            }
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
         // Which of the menu's categories is slow, and how slow (E14, T07):
@@ -6893,6 +7067,21 @@ public query Store(",
         let (after, _) = s.serve_document("b");
         assert!(!visible(&after).contains("Cortado"), "{after}");
         assert!(visible(&after).contains("Espresso"), "{after}");
+        // And the page open is told first, the item removed where it is
+        // (ADR-0178). Until 2026-10-04 it kept the fragment's version before.
+        let queue = s.pending.lock().expect("pending");
+        let (_, waiting) = queue
+            .iter()
+            .find(|((session, _), _)| session == "a")
+            .expect("the page open");
+        assert!(
+            waiting.frames.iter().any(|(_, f)| matches!(
+                f,
+                StreamFrame::Patch(p) if matches!(p.operation, PatchOp::RemoveInstance { .. })
+            )),
+            "{:?}",
+            waiting.frames
+        );
     }
 
     /// T09's store: a notice board the page reads, kept five minutes.
@@ -7381,6 +7570,7 @@ public query Store(",
             "id": id,
             "name": name,
             "price": { "minor_units": item_price(id) },
+            "available": true,
         })
     }
 
@@ -7863,6 +8053,8 @@ public query Store(",
                     "price".into(),
                     Val::Record(vec![("minor-units".into(), Val::S64(item_price(item)))]),
                 ),
+                // As the page showed it: one it could order (ADR-0178).
+                ("available".into(), Val::Bool(true)),
             ]),
             Val::S64(quantity),
         ]
@@ -8431,6 +8623,7 @@ public query Store(",
                     "price".into(),
                     Val::Record(vec![("minor-units".into(), Val::S64(1))]),
                 ),
+                ("available".into(), Val::Bool(true)),
             ])
         };
         s.command(
@@ -9605,6 +9798,305 @@ public query Store(",
         );
         // Each inside the espresso's own instance, which keeps its nodes.
         assert!(set.patches.iter().all(|p| p.target.instances.len() == 1));
+    }
+
+    /// Every patch operation queued for one document, in order: each patch
+    /// alone and each set's.
+    fn operations_for(s: &Server, session: &str, document: u64) -> Vec<Targeted> {
+        let queue = s.pending.lock().expect("pending");
+        queue[&(session.to_string(), document)]
+            .frames
+            .iter()
+            .flat_map(|(_, f)| match f {
+                StreamFrame::Patch(p) => vec![Targeted {
+                    target: p.target.clone(),
+                    operation: p.operation.clone(),
+                }],
+                StreamFrame::PatchSet(set) => set.patches.clone(),
+                _ => Vec::new(),
+            })
+            .collect()
+    }
+
+    /// An item's instance in store 47's menu fragment, as the open pages
+    /// address it.
+    fn menu_instance(s: &Server, id: &str) -> pw_document::InstanceToken {
+        let (_, part) = s.menu_part();
+        let env = s.menu_env(STORE_ID, &Value::List(Vec::new()));
+        pw_render::instance_token_of(part, &key_row(id), "id", &env)
+    }
+
+    /// The row an operation renders again, where it is one.
+    fn rendered_row(op: &PatchOp) -> Option<&str> {
+        match op {
+            PatchOp::InsertAfter { html, .. } | PatchOp::InsertBefore { html, .. } => Some(html),
+            _ => None,
+        }
+    }
+
+    /// **A sold-out item is shown so, before the press** (ADR-0178, charter
+    /// §15.1's `available`): its row says it is sold out, and has no Add to
+    /// press. The others are as they were.
+    #[test]
+    fn a_sold_out_item_is_shown_so_and_has_no_add() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("cortado".to_string());
+        let (html, _) = s.serve_store_document("a", STORE_ID).expect("served");
+        let said = visible(&html)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            said.contains("Cortado Espresso cut with an equal part of warm milk. $4.25 Sold out"),
+            "{said}"
+        );
+        assert!(!html.contains("aria-label=\"Add Cortado\""), "{html}");
+        assert!(html.contains("aria-label=\"Add Espresso\""), "{html}");
+        assert!(html.contains("aria-label=\"Add Cold Brew\""), "{html}");
+        assert_eq!(said.matches("Sold out").count(), 1, "{said}");
+    }
+
+    /// **A stock change, told, reaches every page that shows the store**
+    /// (ADR-0178, charter §15.2: availability is event invalidated). The
+    /// item's row is rendered again where it is, since the block it shows
+    /// decides otherwise, and no other row is touched. Back in stock, its
+    /// Add comes back the same way.
+    #[test]
+    fn a_stock_change_told_renders_its_row_again_where_it_is() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
+        let (_, other) = s.serve_store_document("b", "48").expect("served");
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("cortado".to_string());
+        s.broadcast_menu(MenuOp::Stock {
+            id: "cortado".to_string(),
+        })
+        .expect("told");
+        let ops = operations_for(&s, "a", document);
+        let (cortado, espresso) = (menu_instance(&s, "cortado"), menu_instance(&s, "espresso"));
+        assert_eq!(ops.len(), 2, "{ops:?}");
+        assert_eq!(
+            ops[0].operation,
+            PatchOp::RemoveInstance {
+                instance: cortado.clone()
+            }
+        );
+        let PatchOp::InsertAfter { instance, html } = &ops[1].operation else {
+            panic!("rendered again after espresso: {ops:?}");
+        };
+        assert_eq!(instance.as_ref(), Some(&espresso));
+        assert!(
+            html.contains("Sold out") && !html.contains("<button"),
+            "{html}"
+        );
+        // Another store's page is not told of store 47's stock.
+        assert!(operations_for(&s, "b", other).is_empty());
+        // A document served now shows it, with no frame of its own.
+        let (now, later) = s.serve_store_document("c", STORE_ID).expect("served");
+        assert!(visible(&now).contains("Sold out"), "{now}");
+        assert!(operations_for(&s, "c", later).is_empty());
+
+        s.sold_out.lock().expect("sold out").clear();
+        s.broadcast_menu(MenuOp::Stock {
+            id: "cortado".to_string(),
+        })
+        .expect("told");
+        let back = operations_for(&s, "c", later);
+        assert_eq!(back.len(), 2, "{back:?}");
+        assert_eq!(
+            back[0].operation,
+            PatchOp::RemoveInstance { instance: cortado }
+        );
+        let row = rendered_row(&back[1].operation).expect("rendered again");
+        assert!(row.contains("aria-label=\"Add Cortado\""), "{row}");
+        // An item no store has is refused, and nothing is sent.
+        assert!(
+            s.broadcast_menu(MenuOp::Stock {
+                id: "matcha".to_string()
+            })
+            .is_err()
+        );
+        assert_eq!(operations_for(&s, "c", later).len(), 2);
+    }
+
+    /// **Untold, a stock change is §15.5's forced stale item** (ADR-0157):
+    /// a page shows the item as it was, and so does a document served while
+    /// the menu kept is fresh. Once it is read again, a new document shows
+    /// it, and the pages open are told first (ADR-0178): until then they
+    /// kept the fragment's version before, while every change after was
+    /// derived from the new one (ADR-0150).
+    #[test]
+    fn an_untold_stock_change_reaches_the_open_pages_when_the_menu_is_read_again() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("cortado".to_string());
+        let (stale, _) = s.serve_store_document("b", STORE_ID).expect("served");
+        assert!(stale.contains("aria-label=\"Add Cortado\""), "{stale}");
+        assert!(operations_for(&s, "a", document).is_empty());
+        // The menu's freshness spent: it is read again.
+        s.queries.invalidate("store.page.Menu");
+        let (fresh, _) = s.serve_store_document("c", STORE_ID).expect("served");
+        assert!(!fresh.contains("aria-label=\"Add Cortado\""), "{fresh}");
+        assert!(visible(&fresh).contains("Sold out"), "{fresh}");
+        let told = operations_for(&s, "a", document);
+        assert_eq!(told.len(), 2, "{told:?}");
+        assert_eq!(
+            told[0].operation,
+            PatchOp::RemoveInstance {
+                instance: menu_instance(&s, "cortado")
+            }
+        );
+        assert!(rendered_row(&told[1].operation).is_some_and(|r| r.contains("Sold out")));
+    }
+
+    /// **A change tells the pages the whole difference** (ADR-0178): what
+    /// changed at the source unannounced, and was read again with it, is
+    /// sent with it. Until 2026-10-04 a rename sent its own row's parts, and
+    /// a sold-out item drawn into the fragment with it kept its Add on the
+    /// pages open.
+    #[test]
+    fn a_change_sends_what_changed_unannounced_with_it() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("cold-brew".to_string());
+        s.broadcast_menu(MenuOp::Rename {
+            id: "espresso".to_string(),
+            name: "Espresso Doppio".to_string(),
+        })
+        .expect("renamed");
+        let ops = operations_for(&s, "a", document);
+        let espresso = menu_instance(&s, "espresso");
+        let renamed: Vec<&Targeted> = ops
+            .iter()
+            .filter(|t| t.target.instances.first().map(|f| &f.instance) == Some(&espresso))
+            .collect();
+        assert!(
+            renamed.iter().any(|t| t.operation
+                == PatchOp::ReplaceText {
+                    text: "Espresso Doppio".to_string()
+                }),
+            "{ops:?}"
+        );
+        assert!(
+            ops.iter().any(|t| t.operation
+                == PatchOp::RemoveInstance {
+                    instance: menu_instance(&s, "cold-brew")
+                }),
+            "{ops:?}"
+        );
+        assert!(
+            ops.iter()
+                .filter_map(|t| rendered_row(&t.operation))
+                .any(|r| r.contains("Cold Brew") && r.contains("Sold out")),
+            "{ops:?}"
+        );
+    }
+
+    /// **A structural change, and what changed unannounced with it**
+    /// (ADR-0178): E7-P's insert keeps its own patch, at its anchor, and the
+    /// rows that differ from what the pages show follow it.
+    #[test]
+    fn an_insert_keeps_its_anchor_and_sends_the_rest() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("espresso".to_string());
+        s.broadcast_menu(MenuOp::Insert {
+            id: "flat-white".to_string(),
+            name: "Flat White".to_string(),
+            at: Some("cortado".to_string()),
+            before: true,
+        })
+        .expect("inserted");
+        let ops = operations_for(&s, "a", document);
+        let PatchOp::InsertBefore { instance, html } = &ops[0].operation else {
+            panic!("the insert first, at its anchor: {ops:?}");
+        };
+        assert_eq!(instance.as_ref(), Some(&menu_instance(&s, "cortado")));
+        assert!(html.contains("Flat White"), "{html}");
+        assert_eq!(
+            ops[1].operation,
+            PatchOp::RemoveInstance {
+                instance: menu_instance(&s, "espresso")
+            }
+        );
+        assert!(rendered_row(&ops[2].operation).is_some_and(|r| r.contains("Sold out")));
+        assert_eq!(ops.len(), 3, "{ops:?}");
+    }
+
+    /// **A stock change is `InventoryChanged`, not `MenuChanged`** (ADR-0178):
+    /// it drops store 47's kept menu, which listens for it, and not its
+    /// recommendations, which listen for the menu's own changes (ADR-0165)
+    /// and are slow to ask for.
+    #[test]
+    fn a_stock_change_drops_the_menu_and_not_the_recommendations() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        recommend(&s, 0, None);
+        for session in ["a", "b"] {
+            estimate(&s, session, None, 25);
+        }
+        let page = |session: &str| -> String {
+            fetched_as(&s, "/stores/47", Some(session))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        let asks = || calls(&s, "store:data/recommendations#for-store");
+        let menus = || calls(&s, "store:data/menus#for-store");
+        page("a");
+        let (asked, read) = (asks(), menus());
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("cortado".to_string());
+        s.broadcast_menu(MenuOp::Stock {
+            id: "cortado".to_string(),
+        })
+        .expect("told");
+        let shown = page("b");
+        assert!(visible(&shown).contains("Sold out"), "{shown}");
+        assert_eq!(menus(), read + 1, "the menu was read again, once");
+        assert_eq!(asks(), asked, "a stock change asked the recommender again");
+    }
+
+    /// **A document shows what the open pages show** (ADR-0178): read
+    /// without the menu first brought to its query's value, as one read in
+    /// the moment between the two would be, it is rendered from what they
+    /// show, and the fragment is not rendered again behind their backs.
+    /// Until 2026-10-04 it was (ADR-0150), and they kept the version before.
+    #[test]
+    fn a_document_read_behind_a_change_shows_what_the_open_pages_show() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
+        let version = s.menu_version(STORE_ID);
+        s.sold_out
+            .lock()
+            .expect("sold out")
+            .insert("cortado".to_string());
+        s.queries.invalidate("store.page.Menu");
+        // Read, not served: no refresh before it.
+        let read = s.render_store("b");
+        assert!(read.contains("aria-label=\"Add Cortado\""), "{read}");
+        assert_eq!(s.menu_version(STORE_ID), version, "rendered again, untold");
+        assert!(operations_for(&s, "a", document).is_empty());
+        // Served, the pages are told first, and it shows the change.
+        let (served, _) = s.serve_store_document("c", STORE_ID).expect("served");
+        assert!(!served.contains("aria-label=\"Add Cortado\""), "{served}");
+        assert!(s.menu_version(STORE_ID) > version);
+        assert_eq!(operations_for(&s, "a", document).len(), 2);
     }
 
     /// **Each menu row shows its price** (ADR-0169, charter §15.1): what the

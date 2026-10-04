@@ -53,12 +53,14 @@ MUTANTS = [
         "a block that changed is set in place",
         "render",
         RENDER,
+        # Re-anchored by ADR-0178: a block that decides is looked into, and
+        # any other, a list inside the row, is what this one is now.
         "            _ => {\n"
-        "                if rendered(c, &before)? != rendered(c, &after)? {\n"
-        "                    return Ok(None);\n",
+        "                if rendered(c, before)? != rendered(c, after)? {\n"
+        "                    return Ok(false);\n",
         "            _ => {\n"
-        "                if false && rendered(c, &before)? != rendered(c, &after)? {\n"
-        "                    return Ok(None);\n",
+        "                if false && rendered(c, before)? != rendered(c, after)? {\n"
+        "                    return Ok(false);\n",
     ),
     (
         "an attribute's value is not the one the document writes",
@@ -71,16 +73,18 @@ MUTANTS = [
         "a rename sets the name's text alone",
         "server",
         SERVER,
-        "                instance_patches(&self.menu_address().template, part, &token, changes)\n",
-        "                instance_patches(\n"
-        "                    &self.menu_address().template,\n"
-        "                    part,\n"
-        "                    &token,\n"
-        "                    changes\n"
-        "                        .into_iter()\n"
-        "                        .filter(|(_, c)| matches!(c, pw_render::InstanceChange::Text(_)))\n"
-        "                        .collect(),\n"
-        "                )\n",
+        # Re-anchored by ADR-0178: a rename's patches are its row's, as the
+        # whole menu's difference is derived, which a session's list's are.
+        "                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),\n",
+        "                        Some(changes) => out.extend(instance_patches(\n"
+        "                            schema,\n"
+        "                            each,\n"
+        "                            &t,\n"
+        "                            changes\n"
+        "                                .into_iter()\n"
+        "                                .filter(|(_, c)| matches!(c, pw_render::InstanceChange::Text(_)))\n"
+        "                                .collect(),\n"
+        "                        )),\n",
     ),
     (
         "the menu control decodes only spaces",

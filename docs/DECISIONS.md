@@ -1485,3 +1485,15 @@ a public read whose origin fails is answered with the last value kept.
   value's; the store's `Store` and `Menu` declare it.
 - `/bench/store?fail=next` fails the store's origin once; the page is shown
   with the last store kept, and a session's cart never is.
+
+[ADR-0178](DECISIONS/ADR-0178-whether-an-item-can-be-ordered-is-shown-before-the-press.md):
+whether an item can be ordered is shown before the press, and a change to it
+reaches every page open.
+- Charter §15.1 and §15.2. `MenuItem.available`; a sold-out row says so and
+  has no Add; a stock change is `InventoryChanged`, which the `Menu` query
+  hears; `/bench/stock?tell=true` tells.
+- Every new version of the shared menu fragment reaches the pages that show
+  it, as the whole difference, amending ADR-0150: a change at the source
+  that a document read had left the pages open a version behind.
+- The renderer looks into a block that decides as it did; the value
+  analysis types a listener's `_` as any value.

@@ -232,6 +232,57 @@ fn v1_a_call_inside_a_policy_term_is_checked_with_its_binder_typed() {
     );
 }
 
+#[test]
+fn v1_a_listeners_wildcard_is_decided_and_its_parameters_are_checked() {
+    // `invalidates_on Changed(id, _)`: `_` is matched by every value at its
+    // position (ADR-0091), so its relation agrees. Until ADR-0178 it was
+    // typed as a name nothing declares, and stayed undecided: silent, which
+    // is also what an analysis that never ran is.
+    let src = |key: &str| {
+        format!(
+            "module l\n\nevent Changed(store: Int, item: String)\n\n\
+             query Menu(id: Int) -> Int\n    invalidates_on {key}\n{{\n    id\n}}\n"
+        )
+    };
+    let outcomes_of = |s: &str, target: &str| {
+        let hir = lower_file(s, &parse_tree(s).green);
+        let units = vec![Unit {
+            path: "t.pw".into(),
+            src: s.into(),
+            hir,
+        }];
+        pw_core::values::analysis(&units)
+            .remove(0)
+            .1
+            .into_iter()
+            .filter(|r| r.kind == RelationKind::Argument && r.target.ends_with(target))
+            .map(|r| r.outcome)
+            .collect::<Vec<_>>()
+    };
+    let outcomes = |s: &str| outcomes_of(s, "Changed");
+    assert_eq!(
+        outcomes(&src("Changed(id, _)")),
+        [Outcome::Agree, Outcome::Agree]
+    );
+    // A parameter of another type than the event's value at its position is
+    // compared with nothing it can equal.
+    let bad = outcomes(&src("Changed(_, id)"));
+    assert_eq!(bad[0], Outcome::Agree);
+    assert!(matches!(bad[1], Outcome::Disagree { .. }), "{bad:?}");
+    assert_eq!(codes(&src("Changed(_, id)")), ["PW0605"]);
+    assert!(codes(&src("Changed(id, _)")).is_empty());
+    // Where a key is evaluated, `_` names nothing (PW0021) and decides
+    // nothing: only a listener binds.
+    let evaluated = "module l\n\ntype C = C { n: Int }\ntype E = | Bad\n\n\
+                     query Current(k: Int) -> Result<C, E> { todo }\n\n\
+                     command add(k: Int) -> Result<C, E>\n    invalidates Current(_)\n{\n    todo\n}\n";
+    assert_eq!(
+        outcomes_of(evaluated, "Current"),
+        [Outcome::Undecided(pw_core::values::Undecided::Unknown)]
+    );
+    assert_eq!(codes(evaluated), ["PW0021"]);
+}
+
 // --- V2: generic calls ------------------------------------------------------------
 
 #[test]

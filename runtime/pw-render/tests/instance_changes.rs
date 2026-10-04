@@ -240,3 +240,153 @@ fn what_a_handler_captures_is_set_where_it_is() {
         Some(vec![])
     );
 }
+
+/// `{#each items as item (item.id)}<li>{#if item.new}<b>{item.name}</b>
+/// {:else}<i data-pw="2" title={item.note}>{item.name}</i>{/if}</li>{/each}`
+fn branches() -> Template {
+    let st = |s: &str| Chunk::Static(s.to_string());
+    let name = |id: u32| {
+        Chunk::Dynamic(Part::Text {
+            id: PartId(id),
+            value: "item.name".into(),
+            context: Context::Text,
+        })
+    };
+    Template {
+        path: "t.C".into(),
+        name: "C".into(),
+        params: vec![],
+        schema: "s".into(),
+        chunks: vec![Chunk::Dynamic(Part::Each {
+            id: PartId(0),
+            collection: "items".into(),
+            binding: "item".into(),
+            key: Some("id".into()),
+            body: vec![
+                st("<li>"),
+                Chunk::Dynamic(Part::Conditional {
+                    id: PartId(1),
+                    value: "item.new".into(),
+                    then: vec![st("<b>"), name(2), st("</b>")],
+                    otherwise: vec![
+                        st("<i data-pw=\"2\" "),
+                        Chunk::Dynamic(Part::Attribute {
+                            id: PartId(3),
+                            owner: ElementId(2),
+                            name: "title".into(),
+                            value: "item.note".into(),
+                            context: Context::Attribute,
+                        }),
+                        st(">"),
+                        name(4),
+                        st("</i>"),
+                    ],
+                }),
+                st("</li>"),
+            ],
+        })],
+    }
+}
+
+/// **A block that decides as it did is set where it is** (ADR-0178): the
+/// parts of the branch it shows, text and attributes alike. Until 2026-10-04
+/// any change inside a block rendered the row again.
+#[test]
+fn a_block_that_decides_as_it_did_is_set_where_it_is() {
+    let changes = |was: &Value, now: &Value| {
+        instance_changes(&branches(), PartId(0), was, now, &Env::new(), &[]).expect("derived")
+    };
+    assert_eq!(
+        changes(
+            &item("Tea", "hot", false, false),
+            &item("Green Tea", "cold", false, false)
+        ),
+        Some(vec![
+            (
+                PartId(3),
+                InstanceChange::Attribute {
+                    name: "title".into(),
+                    value: Some("cold".into()),
+                }
+            ),
+            (PartId(4), InstanceChange::Text("Green Tea".into())),
+        ])
+    );
+    // The other branch, as it was.
+    assert_eq!(
+        changes(
+            &item("Tea", "hot", false, true),
+            &item("Green Tea", "hot", false, true)
+        ),
+        Some(vec![(PartId(2), InstanceChange::Text("Green Tea".into()))])
+    );
+    // A block that decides otherwise is rendered again.
+    assert_eq!(
+        changes(
+            &item("Tea", "hot", false, false),
+            &item("Tea", "hot", false, true)
+        ),
+        None
+    );
+}
+
+/// `{#each items as item (item.id)}<li>{#each item.tags as tag}<i>{tag}</i>
+/// {/each}</li>{/each}`
+fn tagged() -> Template {
+    let st = |s: &str| Chunk::Static(s.to_string());
+    Template {
+        path: "t.D".into(),
+        name: "D".into(),
+        params: vec![],
+        schema: "s".into(),
+        chunks: vec![Chunk::Dynamic(Part::Each {
+            id: PartId(0),
+            collection: "items".into(),
+            binding: "item".into(),
+            key: Some("id".into()),
+            body: vec![
+                st("<li>"),
+                Chunk::Dynamic(Part::Each {
+                    id: PartId(1),
+                    collection: "item.tags".into(),
+                    binding: "tag".into(),
+                    key: None,
+                    body: vec![
+                        st("<i>"),
+                        Chunk::Dynamic(Part::Text {
+                            id: PartId(2),
+                            value: "tag".into(),
+                            context: Context::Text,
+                        }),
+                        st("</i>"),
+                    ],
+                }),
+                st("</li>"),
+            ],
+        })],
+    }
+}
+
+/// **Any other block that changed renders the row again** (ADR-0168): only
+/// a block that decides is looked into (ADR-0178), and a list inside the row
+/// is not one.
+#[test]
+fn a_list_inside_the_row_that_changed_renders_the_row_again() {
+    let row = |tags: &[&str]| {
+        Value::Record(
+            [
+                ("id".to_string(), Value::Text("a".into())),
+                (
+                    "tags".to_string(),
+                    Value::List(tags.iter().map(|t| Value::Text((*t).into())).collect()),
+                ),
+            ]
+            .into(),
+        )
+    };
+    let changes = |was: &Value, now: &Value| {
+        instance_changes(&tagged(), PartId(0), was, now, &Env::new(), &[]).expect("derived")
+    };
+    assert_eq!(changes(&row(&["hot"]), &row(&["hot"])), Some(vec![]));
+    assert_eq!(changes(&row(&["hot"]), &row(&["hot", "new"])), None);
+}

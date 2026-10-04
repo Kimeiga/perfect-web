@@ -1077,8 +1077,21 @@ impl<'a> Typer<'a> {
     fn name(&self, id: ExprId, n: &str) -> Ty {
         match self.lexical.binder(id) {
             Some(b) => self.local(b),
+            // A listener's `_` is matched by every value at its position, as
+            // the materializer compares it (ADR-0091): a value of any type.
+            // Until ADR-0178 it was typed as a name nothing declares, and
+            // `invalidates_on InventoryChanged(id, _)` stayed undecided.
+            None if n == "_" && self.listens_with(id) => Ty::Any,
             None => self.global(n),
         }
+    }
+
+    /// Is `id` an argument of a listener's key, which binds rather than
+    /// evaluates (ADR-0091)?
+    fn listens_with(&self, id: ExprId) -> bool {
+        self.decl
+            .roots_in(crate::hir::ExecutionContext::Listener)
+            .any(|(_, r)| r.root == id)
     }
 
     /// The type a binding holds, as far as it is known.

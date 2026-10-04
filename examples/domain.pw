@@ -45,12 +45,14 @@ opaque type InteractionId = String
 //
 // Its description since ADR-0166, charter §15.1's: what the item is, which a
 // menu's row shows under its name. Its price since ADR-0169, which the row
-// shows as `price.display`.
+// shows as `price.display`. Whether it can be ordered since ADR-0178, which
+// the row decides its Add by, before the press.
 type MenuItem = MenuItem {
     id: MenuItemId,
     name: String,
     description: String,
     price: Money<USD>,
+    available: Bool,
 }
 
 // --- quantities -----------------------------------------------------------

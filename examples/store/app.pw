@@ -44,7 +44,7 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, Interacti
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
     EstimateError }
 import capability.{ Session, SessionId }
-import Events.{ CartChanged, MenuChanged }
+import Events.{ CartChanged, MenuChanged, InventoryChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -56,7 +56,7 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
     consistency    snapshot
     cache          shared
     key            id
-    invalidates_on MenuChanged(id)
+    invalidates_on MenuChanged(id), InventoryChanged(id, _)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -272,17 +272,22 @@ session page StorePage(id: StoreId) {
                             <span>{item.name}</span>
                             <p>{item.description}</p>
                             <p>{item.price.display}</p>
-                            <button
-                                type="button"
-                                aria-label="Add {item.name}"
-                                on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
-                                    Ok(_) => notice = "",
-                                    Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
-                                    Err(_) => notice = "That item could not be added.",
-                                }}
-                            >
-                                Add
-                            </button>
+                            <!-- Whether it can be ordered, before the press (ADR-0178). -->
+                            {#if item.available}
+                                <button
+                                    type="button"
+                                    aria-label="Add {item.name}"
+                                    on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
+                                        Ok(_) => notice = "",
+                                        Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+                                        Err(_) => notice = "That item could not be added.",
+                                    }}
+                                >
+                                    Add
+                                </button>
+                            {:else}
+                                <p>Sold out</p>
+                            {/if}
                         </li>
                     {/each}
                 </ul>

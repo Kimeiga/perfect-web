@@ -26,8 +26,9 @@ agreement:
   needed). Until 2026-09-26 no case had a type, and `Shape.Bogus(1)` passed.
 - **What the value relations still leave undecided** since ADR-0065, which
   typed a value that holds at every type (`None`, `[]`, `todo`, ..): 1 of the
-  store's relations, 1 of kiokun's, 18 of the accepted corpus's. Each is its
-  own construct:
+  store's relations, 1 of kiokun's, 17 of the accepted corpus's. Since
+  ADR-0178 a listener's `_` is decided, which had left two of the store's
+  undecided and one of the corpus's. Each is its own construct:
   - a `measure { .. }` block;
   - a dimensioned literal (`8.px`);
   - a `derived` value;
@@ -208,10 +209,11 @@ refused by name:
 - **What a page shows is recorded per session** (ADR-0151, as before it).
   Two pages of one session read at once are both served, and the later is
   the one later changes are derived against.
-- **A fragment changed at its source reaches new documents only**
-  (ADR-0150). When a shared fragment's query value changes with no event, a
-  page already open keeps what it showed: nothing announced the change to
-  patch it with.
+- **A fragment changed at its source reaches the pages when a document
+  reads it** (ADR-0150, ADR-0178). When a shared fragment's query value
+  changes with no event, the pages open are told once a new document reads
+  the change: within the query's freshness, or not at all for a store no
+  one opens.
 - **`pw diff`'s limits** (ADR-0149):
   - **Effects are the declared rows.** A query's inferred effects appear as
     its component's capabilities.
@@ -431,6 +433,11 @@ awaited in order. What remains:
 - **A browser sends a record field by field** (ADR-0172), each field named
   as the host finds it: a record with a field whose name would come back as
   another, `opensMinute`, is refused. A variant is not sent.
+- **Availability is a `Bool`** (ADR-0178), as charter §15.1 declares: no
+  count of what is left. The store's recommendations are not asked again for
+  a stock change, and may name an item sold out since; a cart line is not
+  marked when its item sells out, and the command refuses a further
+  increase.
 - **A page does not say what it shows was the last kept** (ADR-0177).
   While a public query's origin fails, its last value is shown, and nothing
   tells the reader it is from before. `fallback empty` is checked and read
