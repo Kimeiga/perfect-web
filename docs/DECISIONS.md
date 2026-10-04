@@ -1467,3 +1467,12 @@ a network error and a forced reconnect, made by the server.
   new ones for a while (charter §15.5).
 - A press survives either drop as one mutation, and a page cut off hears,
   once back, what changed meanwhile, in three engines.
+
+[ADR-0176](DECISIONS/ADR-0176-a-regeneration-that-fails-sends-nothing-and-is-tried-again.md):
+a regeneration that fails sends nothing, and is tried again.
+- `/bench/materializer?fail=next` fails the session's next regeneration
+  (charter §15.5). A failed one sends nothing, its stale entry is tried
+  again at the session's next drain, which a page's subscription request
+  makes, and the commit's answer names a version a later one passes.
+- Correction: a failed regeneration's frames went out at a version that had
+  not moved, and the page ended a line short, with no error.

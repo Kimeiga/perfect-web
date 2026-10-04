@@ -595,6 +595,10 @@ struct Server {
     /// command's connection is dropped, and when its subscriptions are cut
     /// off. A test sets them through `/bench/drop` and `/bench/reconnect`.
     connection_faults: Mutex<BTreeMap<String, ConnectionFaults>>,
+    /// **The sessions whose next regeneration fails** (charter §15.5's
+    /// materializer failure, ADR-0176), once each. A test sets one through
+    /// `/bench/materializer`.
+    materializer_faults: Mutex<std::collections::BTreeSet<String>>,
     /// **Each document's keyed reads** (ADR-0152, ADR-0161).
     keyed: Mutex<BTreeMap<Doc, Keyed>>,
     /// **The menu's categories** (E14, T07): which is slow, and how slow.
@@ -960,6 +964,7 @@ impl Server {
             store_delay_ms: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cart_faults: Arc::new(Mutex::new(BTreeMap::new())),
             connection_faults: Mutex::new(BTreeMap::new()),
+            materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
             categories: Mutex::new(Categories::default()),
             category_stopped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
@@ -2385,12 +2390,18 @@ impl Server {
         let invalidated = self
             .materializer
             .drain(&self.graph, std::slice::from_ref(&key));
-        // Nothing changed since the session's entry was made: nothing to
-        // read (ADR-0174). Until 2026-10-04 every document read the cart
-        // here and then again to render it, and a one-shot read error met
-        // this read, which no one sees, rather than the page's.
-        let existing = self.materializer.entry(&key).is_some();
-        if existing && invalidated.is_empty() {
+        // Nothing changed since the session's entry was made, and it is
+        // current: nothing to read (ADR-0174). Until 2026-10-04 every
+        // document read the cart here and then again to render it, and a
+        // one-shot read error met this read, which no one sees, rather than
+        // the page's. An entry whose regeneration failed is stale, and is
+        // tried again here (ADR-0176): the materializer reports an entry as
+        // invalidated only when it was current, so until then a session
+        // whose regeneration failed was sent nothing again.
+        let entry = self.materializer.entry(&key);
+        let existing = entry.is_some();
+        let stale = entry.as_ref().is_some_and(|e| e.stale);
+        if existing && !stale && invalidated.is_empty() {
             return;
         }
         // The count the page shows, as the page computes it: the cart query's
@@ -2415,15 +2426,40 @@ impl Server {
         // than keeping a counter is what keeps the version the MATERIALIZER's.
         let because = invalidated.first().map(|(_, id)| *id);
         self.clock.advance(1);
-        self.materializer
-            .regenerate(&key, because, || Ok(value.to_string()));
+        // Charter §15.5's materializer failure (ADR-0176), as a test arms it.
+        let failing = self
+            .materializer_faults
+            .lock()
+            .expect("materializer faults")
+            .remove(session);
+        let regenerated = self.materializer.regenerate(&key, because, || {
+            if failing {
+                Err("the materializer failed".to_string())
+            } else {
+                Ok(value.to_string())
+            }
+        });
+        // A regeneration that failed sends nothing (ADR-0176). The entry
+        // stays stale, the page keeps what it shows, and the session's next
+        // drain, which its next subscription request makes, tries again.
+        // Until 2026-10-04 its frames were sent at the version that had not
+        // moved: the page ignored them as advancing nothing, while the
+        // server took it to show them, and its next patch left it a line
+        // short.
+        if regenerated == pw_materialize::Regenerated::Failed {
+            if std::env::var("PW_TRACE").is_ok() {
+                eprintln!("drain session={session}: the regeneration failed; tried again next");
+            }
+            return;
+        }
 
-        // Frames only for an INVALIDATION. The first materialization is the
-        // value the document was rendered with, and a frame for it would tell
-        // the browser to replace a part with what it already shows — harmless
+        // Frames only for an INVALIDATION, now or one whose regeneration
+        // failed before (ADR-0176). The first materialization is the value
+        // the document was rendered with, and a frame for it would tell the
+        // browser to replace a part with what it already shows — harmless
         // here, and wrong in general because it spends a version the page then
         // treats as the newest it has seen.
-        if invalidated.is_empty() {
+        if !existing {
             return;
         }
 
@@ -3013,7 +3049,21 @@ impl Server {
     /// The versions a committed command's writes produced (ADR-0122): what a
     /// page reconciles a speculation against.
     fn committed_basis(&self, session: &str) -> serde_json::Value {
-        serde_json::json!([{ "entry": cart_entry(session), "version": self.version(session) }])
+        // Where the entry's regeneration failed (ADR-0176), the version it
+        // was tried at, which any regeneration after it passes: the page
+        // keeps its speculation until the value that includes the commit
+        // comes. The version that had not moved would tell it that the value
+        // it holds includes the commit, which it does not.
+        let stale = self
+            .materializer
+            .entry(&self.cart_key(session))
+            .is_some_and(|e| e.stale);
+        let version = if stale {
+            Version(self.clock.now())
+        } else {
+            self.version(session)
+        };
+        serde_json::json!([{ "entry": cart_entry(session), "version": version }])
     }
 
     /// Every handler identity this build's templates name.
@@ -5149,6 +5199,26 @@ fn handle(server: &Server, mut stream: TcpStream) {
             drop(faults);
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
+        // **A materializer failure** (charter §15.5, ADR-0176): this
+        // session's next regeneration of its cart's entry fails. Once.
+        ("POST", "/bench/materializer") => {
+            if !query.split('&').any(|p| p == "fail=next") {
+                respond_json(
+                    &mut stream,
+                    400,
+                    &session,
+                    fresh,
+                    "{\"error\":\"fail is `next`\"}",
+                );
+                return;
+            }
+            server
+                .materializer_faults
+                .lock()
+                .expect("materializer faults")
+                .insert(session.clone());
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
         ("POST", "/bench/estimate") => {
             let q = |k: &str| {
                 query
@@ -5604,6 +5674,9 @@ fn stream_frames(
     if server.cut_off(session, opened) {
         return;
     }
+    // A regeneration that failed is tried again (ADR-0176) when the page
+    // next asks: its change reaches it within one subscription.
+    server.drain(session);
     let doc: Doc = (session.to_string(), document);
 
     // One route, two adapters. The frames are the same either way — see
@@ -8189,6 +8262,60 @@ public query Store(",
                 "unanswered"
             );
         });
+    }
+
+    /// **A materializer failure** (charter §15.5, ADR-0176): a regeneration
+    /// that fails sends nothing at the version that did not move, and the
+    /// commit's answer names a version a later one passes. The session's
+    /// next drain tries again, and sends the change.
+    #[test]
+    fn a_regeneration_that_fails_sends_nothing_and_is_tried_again() {
+        let s = speculating_server();
+        let session = "failing";
+        s.serve_document_with_entries(session).expect("served");
+        let values = |s: &Server| -> Vec<(u64, serde_json::Value)> {
+            let queue = s.pending.lock().expect("pending");
+            queue[&latest(&queue, session)]
+                .frames
+                .iter()
+                .filter_map(|(_, f)| match f {
+                    StreamFrame::EntryValue { version, value, .. } => {
+                        Some((version.0, value.clone()))
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+        let before = s.version(session);
+        // Through the control, as a test arms it.
+        let armed = posted(&s, "/bench/materializer?fail=next", session, "arm-1", "");
+        assert!(armed.starts_with("HTTP/1.1 200"), "{armed}");
+        s.command_json(
+            ADD,
+            session,
+            &[shown("espresso"), serde_json::json!(1)],
+            Some("press-1"),
+        )
+        .expect("well-formed")
+        .expect("committed");
+        assert_eq!(values(&s), [], "nothing sent");
+        assert_eq!(s.version(session), before, "the version did not move");
+        let promised = s.committed_basis(session)[0]["version"]
+            .as_u64()
+            .expect("a version");
+        assert!(promised > before.0, "the answer names one a later passes");
+
+        // Tried again, as the page's next subscription request does.
+        s.drain(session);
+        let sent = values(&s);
+        let [(version, value)] = sent.as_slice() else {
+            panic!("one value, got {sent:?}");
+        };
+        assert!(*version >= promised, "{version} >= {promised}");
+        assert_eq!(value["lines"][0]["item_id"], "espresso");
+        // And once: a drain with nothing changed sends nothing more.
+        s.drain(session);
+        assert_eq!(values(&s).len(), 1);
     }
 
     /// **What a line records is the store's, not the request's** (ADR-0172).

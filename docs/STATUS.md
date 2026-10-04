@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `702d612`, with ADR-0175.
+**Reviewed:** 2026-10-04, against master `c710aac`, with ADR-0176.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,22 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**Correction, ADR-0176, 2026-10-04: a materializer failure left a page a
+line short, silently**
+([ADR-0176](DECISIONS/ADR-0176-a-regeneration-that-fails-sends-nothing-and-is-tried-again.md)).
+Measured with this ruling's control: after a failed regeneration, two
+presses showed one line, with no error and no reload. Three causes:
+- the failed regeneration's frames went out at a version that had not
+  moved, which the page ignores while the server took it to show them;
+- the commit's answer named that version, so the page dropped its line;
+- the stale entry was never tried again.
+
+Now a failed regeneration sends nothing, its entry is tried again at the
+session's next drain (which a page's subscription request makes), and the
+answer names a version a later regeneration passes. `/bench/materializer
+?fail=next` is §15.5's last control. 6 mutants
+(`just e14-materializer-failure`).
 
 **ADR-0175, 2026-10-04: a network error and a forced reconnect, made by the
 server** (charter §15.5, part of the audit's sixth gap).
@@ -2799,14 +2815,14 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **A materializer failure, end to end** (§15.5's last control): a
-   regeneration that fails must not leave a committed change undelivered.
-2. **Last-known-good for declared public data** (test 18, the audit's
-   seventh gap): a rule limiting it to public data, and the server serving
-   it.
-3. **§15.1's remaining fields** (the audit's eighth gap): `available`,
+1. **Last-known-good for declared public data** (test 18, the audit's
+   seventh gap), now that a read can be made to fail (ADR-0174): a rule
+   limiting it to public data, and the server serving it.
+2. **§15.1's remaining fields** (the audit's eighth gap): `available`,
    `category` and `menu_version` on `MenuItem`, `DeliveryEstimate`'s range,
    and `PositiveInt` checked at the boundary.
+3. **Accessibility** (test 14, the audit's ninth gap): an automated audit of
+   the store's page in three engines.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

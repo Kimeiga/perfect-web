@@ -195,9 +195,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
           reconnect~~ (ADR-0175, `just e14-connection-faults`): a press
           survives either drop as one mutation, and a page cut off hears
           what changed meanwhile, in three engines.
-        - **Next: a materializer failure, end to end.** A regeneration that
-          fails must not leave a committed change undelivered: today the
-          entry stays stale until something else drains the session.
+        - ~~A materializer failure, end to end~~ (ADR-0176,
+          `just e14-materializer-failure`). Correction: a failed
+          regeneration left a page a line short, silently.
+     7. **Next: last-known-good for declared public data** (test 18). A
+        public query that declares a last-known-good fallback serves its
+        last good value when its read fails (`/bench/fail?next=read`'s kind,
+        for the store or the menu), and a private one never does. Acceptance:
+        the menu shown from its last good value while its read fails, the
+        cart refused rather than served stale, and PW rules that keep the
+        fallback to public data, in three engines.
      7. Availability on the page before the press: `MenuItem.available`, and
         an `InventoryChanged` the menu hears.
 

@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0174: charter §15.5's store delay, cart delay
-and one-shot database error.
+"""Mutation controls for ADR-0176: a regeneration that fails sends nothing,
+and is tried again.
 
 Each mutant undoes one piece:
-- the fault: not consumed, so it fails every time; another session's
-  taken; a write's taken by a read; the cart's delay not waited, or
-  waited by every session; the store's delay not waited;
-- the drain: a document's drain reads the cart when nothing changed, so a
-  one-shot read error meets a read nobody sees;
-- the controls: `/bench/fail?next=write` arms nothing; `/bench/cart` sets
-  another session's delay; `/bench/store` leaves the kept store in place.
+- the drain: a failed regeneration's frames sent at the version that did
+  not move; a stale entry not tried again; a regeneration tried again that
+  sends nothing;
+- the answer: the commit names the version that did not move;
+- the subscription: a page's request does not drain its session;
+- the control: `/bench/materializer` arms nothing.
 
-A fault or drain mutant must fail the development server's tests, all of
-them run; a control mutant, `e2e/controls.spec.mjs` and
-`e2e/resource-path.spec.mjs` in Chromium.
+A drain, answer or control mutant must fail the development server's tests,
+all of them run; the subscription's, `e2e/materializer.spec.mjs` in
+Chromium.
 
-Run from the repository root; `just e14-test-controls` records the output.
-The source is restored after every mutant, whatever happens.
+Run from the repository root; `just e14-materializer-failure` records the
+output. The source is restored after every mutant, whatever happens.
 """
 
 import os
@@ -32,100 +31,55 @@ SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
     (
-        "a fault is not consumed",
+        "a failed regeneration's frames are sent",
         "server",
         SERVER,
-        "                            std::mem::take(if writes {\n",
-        "                            *(if writes {\n",
+        "        if regenerated == pw_materialize::Regenerated::Failed {\n",
+        "        if false && regenerated == pw_materialize::Regenerated::Failed {\n",
     ),
     (
-        "another session's fault is taken",
+        "a stale entry is not tried again",
         "server",
         SERVER,
-        "                        let mut mine = all.get_mut(&session);\n",
-        "                        let mut mine = all.values_mut().next();\n",
+        "        if existing && !stale && invalidated.is_empty() {\n",
+        "        if existing && invalidated.is_empty() {\n",
     ),
     (
-        "a write's fault is taken by a read",
+        "a regeneration tried again sends nothing",
         "server",
         SERVER,
-        "                                &mut m.fail_write\n"
-        "                            } else {\n"
-        "                                &mut m.fail_read\n",
-        "                                &mut m.fail_read\n"
-        "                            } else {\n"
-        "                                &mut m.fail_write\n",
+        "        if !existing {\n",
+        "        if !existing || invalidated.is_empty() {\n",
     ),
     (
-        "the cart's delay is not waited",
+        "the answer names the version that did not move",
         "server",
         SERVER,
-        "                    if delay > 0 {\n"
-        "                        std::thread::sleep(std::time::Duration::from_millis(delay));\n"
-        "                    }\n"
-        "                    op(args)\n",
-        "                    op(args)\n",
+        "        let version = if stale {\n",
+        "        let version = if false && stale {\n",
     ),
     (
-        "every session waits a cart's delay",
-        "server",
+        "a page's request does not drain its session",
+        "browser",
         SERVER,
-        "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
-        "                            .unwrap_or_default()\n",
-        "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
-        "                            .unwrap_or(1000)\n",
-    ),
-    (
-        "the store's delay is not waited",
-        "server",
-        SERVER,
-        "                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst);\n",
-        "                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst) * 0;\n",
-    ),
-    (
-        "a drain reads the cart when nothing changed",
-        "server",
-        SERVER,
-        # Re-anchored by ADR-0176: a stale entry is read, to be tried again.
-        "        if existing && !stale && invalidated.is_empty() {\n"
-        "            return;\n"
-        "        }\n",
+        "    server.drain(session);\n",
         "",
     ),
     (
-        "`next=write` arms nothing",
-        "browser",
+        "`/bench/materializer` arms nothing",
+        "server",
         SERVER,
-        "                Some(\"write\") => mine.fail_write = true,\n",
-        "                Some(\"write\") => {}\n",
-    ),
-    (
-        "`/bench/cart` sets another session's delay",
-        "browser",
-        SERVER,
-        "                .entry(session.clone())\n"
-        "                .or_default()\n"
-        "                .delay_ms = delay;\n",
-        "                .entry(\"nobody\".to_string())\n"
-        "                .or_default()\n"
-        "                .delay_ms = delay;\n",
-    ),
-    (
-        "`/bench/store` leaves the kept store in place",
-        "browser",
-        SERVER,
-        "                .store(delay, std::sync::atomic::Ordering::SeqCst);\n"
-        "            let resources: std::collections::BTreeSet<String> = server\n",
-        "                .store(delay, std::sync::atomic::Ordering::SeqCst);\n"
-        "            let resources = std::collections::BTreeSet::<String>::new();\n"
-        "            let _kept: std::collections::BTreeSet<String> = server\n",
+        "                .insert(session.clone());\n"
+        "            respond_json(&mut stream, 200, &session, fresh, \"{}\");\n",
+        "                .remove(&session);\n"
+        "            respond_json(&mut stream, 200, &session, fresh, \"{}\");\n",
     ),
 ]
 
 CARGO = {
     "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
 }
-BROWSER = ["e2e/controls.spec.mjs", "e2e/resource-path.spec.mjs", "--project=chromium"]
+BROWSER = ["e2e/materializer.spec.mjs", "--project=chromium"]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.

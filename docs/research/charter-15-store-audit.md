@@ -102,7 +102,7 @@ are fixed (ADR-0155):
 | forced stale item | met since ADR-0157: `POST /bench/stock?item=..&available=false` |
 | forced duplicate click | met (`idempotent-command.spec.mjs`, T08) |
 | forced reconnect | met since ADR-0175: `/bench/reconnect?for=ms` ends the session's subscriptions and refuses new ones for a while; what changed meanwhile reaches the page when it is back |
-| materializer failure | partial: injected only in `pw-materialize`'s own tests |
+| materializer failure | met since ADR-0176: `/bench/materializer?fail=next` fails the session's next regeneration; it sends nothing, is tried again at the next drain, and the change reaches the page |
 
 ## §15.6 Required tests
 
@@ -138,7 +138,7 @@ are fixed (ADR-0155):
    ADR-0172.
 5. ~~**A command retried on a transport failure**~~ (§15.4): met by
    ADR-0173.
-6. **§15.5's missing controls.**
+6. ~~**§15.5's missing controls.**~~ Met by ADR-0174 to ADR-0176.
 7. **Last-known-good** (test 18): a rule limiting it to public data, and
    the server serving it.
 8. **§15.1's fields**, and `PositiveInt` checked at the boundary. The
