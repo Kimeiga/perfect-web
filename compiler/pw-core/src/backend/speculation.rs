@@ -83,7 +83,15 @@ struct Region {
     /// The speculated binding it reads: `cart`.
     binding: String,
     part: u32,
-    kind: crate::template_ir::ReadKind,
+    kind: RegionKind,
+}
+
+/// What the browser renders again with a speculation (ADR-0172).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RegionKind {
+    Attribute,
+    Block,
+    List,
 }
 
 /// **A speculated loop's rows** (ADR-0172): what the browser needs to render
@@ -598,10 +606,29 @@ fn page_module(
         if read.nested || !speculates(root) || regions.iter().any(|r| r.part == read.part.0) {
             continue;
         }
+        let kind = match read.kind {
+            crate::template_ir::ReadKind::Attribute => RegionKind::Attribute,
+            crate::template_ir::ReadKind::Subject => RegionKind::Block,
+            crate::template_ir::ReadKind::List => RegionKind::List,
+            // **A title that reads a speculated value** (ADR-0183): the
+            // browser renders no title again from a speculation, so the
+            // title would say what the value was while the page around it
+            // says what it is about to be.
+            crate::template_ir::ReadKind::Title => {
+                return Encoding::Unsupported {
+                    construct: "a title that reads a speculated value",
+                    reason: format!(
+                        "`{page}`'s title reads `{}`, which a speculation changes before \
+                         the server answers, and the browser renders no title again from one",
+                        read.path
+                    ),
+                };
+            }
+        };
         regions.push(Region {
             binding: root.to_string(),
             part: read.part.0,
-            kind: read.kind,
+            kind,
         });
     }
     // What a region holds, the browser renders from what it holds: the
@@ -689,10 +716,7 @@ fn page_module(
     // the row whole, by its path (ADR-0170).
     let mut typed = BTreeMap::new();
     let mut rows: Vec<Rows> = Vec::new();
-    for region in regions
-        .iter()
-        .filter(|r| r.kind == crate::template_ir::ReadKind::List)
-    {
+    for region in regions.iter().filter(|r| r.kind == RegionKind::List) {
         let Some(crate::template_ir::Part::Each {
             binding,
             collection,
@@ -904,13 +928,13 @@ fn page_module(
             .iter()
             .filter(|r| r.binding == *name)
             .map(|r| match r.kind {
-                crate::template_ir::ReadKind::Attribute => {
+                RegionKind::Attribute => {
                     format!("{{ kind: \"attribute\", part: {} }}", r.part)
                 }
-                crate::template_ir::ReadKind::Subject => {
+                RegionKind::Block => {
                     format!("{{ kind: \"block\", part: {} }}", r.part)
                 }
-                crate::template_ir::ReadKind::List => {
+                RegionKind::List => {
                     let found = rows
                         .iter()
                         .find(|rows| rows.part == r.part)

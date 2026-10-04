@@ -111,15 +111,11 @@ const EXPECTED_TO_PASS: &[(&str, Why, &str)] = &[
          statement about a declared unsafe capability, and the old text had no \
          declaration to be incomplete about — it was caught only by spelling.",
     ),
-    (
-        "R-023",
-        Why::FixtureDidNotExpressIt,
-        "its old text declared no route at all, so there was no route table \
-         for a link to be dead relative to. `dead_internal_link` is a RELATION \
-         between a link and a route table, and the old file contained only one \
-         half of it — so the old text did not express the invariant it \
-         declared, and its silence is correct rather than a gap.",
-    ),
+    // R-023 was here until 2026-10-04: its old text declared no route, so
+    // there was no route table for its link to be dead relative to. A-025,
+    // the accepted page that states its title (ADR-0183), declares a route
+    // in the program every old text is checked in, and the old link is dead
+    // relative to it: the old text is caught for its invariant again.
 ];
 
 fn library() -> Vec<(String, String)> {
@@ -414,6 +410,54 @@ fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// **C9: a page states its title** (ADR-0183, `docs/CORPUS.md` §C9).
+///
+/// R-023's page is served at a route, so it gained a `<title>`: PW5029 now
+/// refuses a page served at a route that states none. Its old text must still
+/// be caught for its declared invariant, `dead_internal_link`, now beside
+/// `title_missing` for the title the repair added; and the routed pages of
+/// the link rule's other fixtures, refused for the title alone.
+#[test]
+fn the_c9_texts_are_still_caught_for_their_invariant_and_refused_for_the_title() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/history/C9");
+    let read = |path: &str| std::fs::read_to_string(root.join(path)).expect(path);
+    let symbols = |name: &str, src: &str| -> Vec<&'static str> {
+        check_sources(&c8_program(name, src))
+            .into_iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, d)| d.iter().map(|d| d.symbol()).collect())
+            .unwrap_or_default()
+    };
+    let name = "R-023-dead-internal-route.pw";
+    let old = symbols(name, &read(name));
+    assert!(
+        old.contains(&"dead_internal_link") && old.contains(&"title_missing"),
+        "{name}: its C9 text reports {old:?}"
+    );
+    // The link rule's GENERAL and NEIGHBOUR witnesses, and its rule fixture:
+    // the same programs, each refused for the title it did not state.
+    for (path, expected) in [
+        (
+            "generality/dead_internal_link/caught.pw",
+            &["dead_internal_link", "title_missing"][..],
+        ),
+        (
+            "generality/dead_internal_link/neighbour.pw",
+            &["title_missing"][..],
+        ),
+        (
+            "rules/routes/link-to-declared-route.pw",
+            &["title_missing"][..],
+        ),
+    ] {
+        let name = path.rsplit('/').next().expect("a file name");
+        let mut got = symbols(name, &read(path));
+        got.sort();
+        got.dedup();
+        assert_eq!(got, expected, "{path}");
+    }
 }
 
 /// A C8 fixture's program: the library, the accepted modules it imports, and

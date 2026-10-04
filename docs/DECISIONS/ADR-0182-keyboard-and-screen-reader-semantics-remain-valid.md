@@ -162,7 +162,8 @@ Also:
 
 ## Not claimed
 
-- **WCAG 2.4.2 for the store's title** (decision 6, ADR-0183).
+- **WCAG 2.4.2 for the store's title** (decision 6). Met by ADR-0183: a page
+  states its title, and the store's is its name.
 - **axe-core's own run** (decision 5).
 - **A screen reader run by a person**: the procedure is written, and no one
   has run it.

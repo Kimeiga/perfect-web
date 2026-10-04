@@ -1539,3 +1539,15 @@ keyboard and screen-reader semantics remain valid.
   "Items in cart: 1" up to four times. Every page has a viewport.
 - The store's title, "Store" for every store, is the page's to declare
   (ADR-0183); axe-core itself is the owner's to install.
+
+[ADR-0183](DECISIONS/ADR-0183-a-page-states-its-title.md):
+a page states its title.
+- `<title>{store.name}</title>` at the top of a page's view: the host writes it
+  into the document's head, and a change to what it reads is set as text,
+  as `document.title`. Store 47's page is "Blue Bottle", not "Store" (WCAG
+  2.4.2, F25).
+- PW5029: a page served at a route states its title. PW5030: a title is the
+  page's, once, at the top of its view, written as text and values. A title
+  that reads a signal or a speculated value is refused at build.
+- Corpus C9: A-025, R-047 and R-048; four routed fixtures given a title;
+  generality 33 / 33.

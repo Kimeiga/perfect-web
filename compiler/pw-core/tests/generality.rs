@@ -540,10 +540,11 @@ fn generality_is_reported_separately_from_conformance() {
     //
     // 31 / 31 since 2026-10-02: ADR-0128 closed the one invariant with a
     // known gap, `private_in_shared_materialization`, by reading what a
-    // declaration is given.
+    // declaration is given. 33 / 33 since 2026-10-04: ADR-0183's two,
+    // `title_missing` and `title_misplaced`, each with a GENERAL witness.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (31, 0, 0),
+        (33, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."

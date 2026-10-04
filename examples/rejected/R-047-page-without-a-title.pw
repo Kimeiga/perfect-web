@@ -1,0 +1,28 @@
+// @corpus: rejected
+// @id: R-047
+// @category: page served at a route without a title
+// @rule: PW5029
+// @invariant: title_missing
+// @charter: §15.6 test 14, §17.4
+// @milestone: 14
+// @expect-error: `StoreOverview` is served at `/stores/{id}` and states no title
+// @expect-error: a page served at a route states its title
+//
+// A page that does not say what it is. The host has nothing to title it with
+// but a word, and every store's page was "Store" until ADR-0183: a screen
+// reader says the title first, and a person with three stores open in three
+// tabs could not tell them apart. WCAG 2.4.2 asks every page for a title that
+// identifies it, and names this failure F25.
+
+module store.overview_untitled
+
+import domain.{ StoreId }
+
+page StoreOverview(id: StoreId) !{} {
+    route "/stores/{id}"
+    view {
+        <main>
+            <h1>Store</h1>
+        </main>
+    }
+}

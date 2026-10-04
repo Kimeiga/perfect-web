@@ -28,7 +28,7 @@ it. A run is recorded at the end, one row per screen reader and browser.
 
 | # | Do | Should hear |
 |---|---|---|
-| 1 | Load the page. | The page's title, "Store". (ADR-0183 is to make it the store's name: WCAG 2.4.2.) |
+| 1 | Load the page. | The page's title, the store's name: "Blue Bottle" (ADR-0183, WCAG 2.4.2). |
 | 2 | List the landmarks (VoiceOver rotor; NVDA D). | Main; regions Delivery, Menu, Cart, Recommendations. |
 | 3 | List the headings (VoiceOver rotor; NVDA H). | "Blue Bottle", level 1; "Coffee", level 2; "Cart", level 2. |
 | 4 | Wait for the estimate. | "Delivery in 25 to 35 min", once, without moving. "To", not a dash. |

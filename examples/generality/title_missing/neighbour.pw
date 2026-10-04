@@ -1,0 +1,14 @@
+// @status: NEIGHBOUR
+// @invariant: title_missing
+// @dimension: valid neighbour — a page with no route, which its host names
+//
+// A page served at no route of its own is titled by the host that serves it,
+// as every page was before ADR-0183, and is not refused for stating none.
+
+module generality.title_unrouted
+
+import domain.{ StoreId }
+
+page Preview(id: StoreId) !{} {
+    view { <main><h1>Preview</h1></main> }
+}

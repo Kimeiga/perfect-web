@@ -244,6 +244,7 @@ fn rendered_again(
                 })
                 .collect(),
             Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
+            Part::Title { pieces, .. } => title_reads(pieces),
             // A stream's query's arguments, each a value's path or an
             // invocation-context call (ADR-0148).
             Part::Stream { args, .. } => {
@@ -391,8 +392,21 @@ fn own_reads(p: &crate::template_ir::Part) -> Vec<String> {
             .collect(),
         Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
         Part::Stream { args, .. } => args.iter().filter(|a| !a.ends_with(')')).cloned().collect(),
+        Part::Title { pieces, .. } => title_reads(pieces),
         Part::Event { .. } | Part::Blocked { .. } => Vec::new(),
     }
+}
+
+/// **What a page's title reads** (ADR-0183): each value among its pieces.
+fn title_reads(pieces: &[crate::template_ir::TitlePiece]) -> Vec<String> {
+    use crate::template_ir::TitlePiece;
+    pieces
+        .iter()
+        .filter_map(|p| match p {
+            TitlePiece::Value(v) => Some(v.clone()),
+            TitlePiece::Text(_) => None,
+        })
+        .collect()
 }
 
 /// **Does the browser set this part in place when its signal changes?**
@@ -559,6 +573,11 @@ pub struct PageValues {
     /// block, and one in a row with its row.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attributes: Vec<u32>,
+    /// **The page's title** (ADR-0183), by its part: a host writes it into
+    /// the document's head from the bindings' values, and sets it again when
+    /// what it reads changes, as it sets a text part.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<u32>,
 }
 
 /// **A row's read through a member function** (ADR-0169): `{item.price.display}`
@@ -1300,6 +1319,7 @@ fn plan(
             crate::template_ir::ReadKind::Attribute => "an attribute",
             crate::template_ir::ReadKind::Subject => "what a block decides by",
             crate::template_ir::ReadKind::List => "a loop's list",
+            crate::template_ir::ReadKind::Title => "the page's title",
         };
         let row = row_read(
             hirs,
@@ -1386,6 +1406,15 @@ fn plan(
     // An attribute a signal decides, set in place (ADR-0142).
     live_attributes(&template.chunks, &signals, false, &mut live);
     live.sort_by_key(|l| l.part);
+    // **The page's title** (ADR-0183), from its parameters and its queries'
+    // values. One that reads a signal is refused when the signals compile:
+    // the browser sets no title from one (ADR-0137).
+    let title = template.chunks.iter().find_map(|c| match c {
+        crate::template_ir::Chunk::Dynamic(crate::template_ir::Part::Title { id, .. }) => {
+            Some(id.0)
+        }
+        _ => None,
+    });
     // Each region that shows a query's state (ADR-0148), and a view's
     // signal held inside one, which nothing would render again.
     let streams = planned_streams(hirs, &template.chunks, &params, &signals)?;
@@ -1416,6 +1445,7 @@ fn plan(
             streams,
             rows,
             attributes,
+            title,
         },
         members,
     ))

@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: title_misplaced
+// @dimension: valid neighbour — a title after `<main>`, of text and a value
+//
+// Where among the view's top elements the title is written does not matter:
+// its host writes it into the head, and numbers it after the rest.
+
+module generality.title_last
+
+import domain.{ StoreId }
+
+page Hours(id: StoreId) !{} {
+    route "/stores/{id}/hours"
+    view {
+        <main><h1>Hours</h1></main>
+        <title>Hours of {id}</title>
+    }
+}

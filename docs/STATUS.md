@@ -13,6 +13,23 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0183, 2026-10-04: a page states its title** (WCAG 2.4.2, which
+ADR-0182 left open).
+- **The language.** `<title>{store.name}</title>` at the top of a page's view.
+  The host writes it into the document's head, and a change to what it
+  reads is set as `document.title`. Store 47's page is "Blue Bottle", where
+  every store's page was "Store".
+- **The rules.**
+  - PW5029 refuses a page served at a route that states no title.
+  - PW5030 refuses a title anywhere but once at the top of a page's view, as
+    text and values.
+  - A title that reads a signal, or a value a press speculates, is refused
+    at build.
+- **Corpus C9.** A-025, R-047 and R-048 are added, and four routed fixtures
+  are given a title. **Generality is 33 / 33.**
+
+16 mutants (`just e14-titles`).
+
 **ADR-0182, 2026-10-04: keyboard and screen-reader semantics remain valid**
 (charter §15.6 test 14, the audit's ninth gap).
 - **The spec.** `e2e/accessibility.spec.mjs` reads the store in Chromium,
@@ -27,8 +44,8 @@ and budget.
     a part only when what it shows changes.
   - No page had a viewport. Every page now does.
 - **Left open.**
-  - The store's title is "Store" for every store (WCAG 2.4.2). A page
-    declaring its title is ADR-0183, next.
+  - The store's title was "Store" for every store (WCAG 2.4.2): met by
+    ADR-0183.
   - Installing axe-core is recommended to the owner.
 
 14 mutants (`just e14-accessibility`).

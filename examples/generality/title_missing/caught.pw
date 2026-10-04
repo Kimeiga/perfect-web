@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: title_missing
+//
+// Structurally different from R-047: the page writes a `<title>`, at the top
+// of its view, and it holds only whitespace. A title that says nothing states
+// no title, and the browser would show the address in its place.
+
+module generality.title_blank
+
+import domain.{ StoreId }
+
+page Hours(id: StoreId) !{} {
+    route "/stores/{id}/hours"
+    view {
+        <title> </title>
+        <main><h1>Hours</h1></main>
+    }
+}

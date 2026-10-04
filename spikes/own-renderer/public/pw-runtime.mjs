@@ -94,6 +94,10 @@ function buildIndex() {
       }
     }
   }
+  // The page's title (ADR-0183): the document's, with no range in the body.
+  for (const p of parts.parts ?? []) {
+    if (p.kind === "title") index.set(addressOf([], p.id), { title: true });
+  }
   return index.size;
 }
 
@@ -117,6 +121,11 @@ function addressesFor(part) {
  */
 function setRange(address, text) {
   const r = index.get(address);
+  // The page's title is the document's (ADR-0183), set as it is shown.
+  if (r?.title) {
+    if (document.title !== text) document.title = text;
+    return true;
+  }
   if (!r?.start) return false;
   if (holdsText(r, text)) return true;
   let n = r.start.nextSibling;

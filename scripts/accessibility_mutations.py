@@ -47,9 +47,10 @@ MUTANTS = [
     (
         "the store's page has no viewport",
         SERVER,
+        # Re-anchored by ADR-0183, which titles the page as it states.
         r"""         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>Store</title>""",
-        r"""         <title>Store</title>""",
+         <title>{title}</title>""",
+        r"""         <title>{title}</title>""",
     ),
     (
         "the page that is not found has no viewport",
@@ -61,12 +62,13 @@ MUTANTS = [
     (
         "the store's page says no language",
         SERVER,
+        # Re-anchored by ADR-0183.
         r"""        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>Store</title>""",
+         <title>{title}</title>""",
         r"""        "<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>Store</title>""",
+         <title>{title}</title>""",
     ),
     (
         "a part's text is written again when it holds it already",

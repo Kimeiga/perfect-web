@@ -2410,6 +2410,37 @@ e14-accessibility:
      } > docs/evidence/E14/accessibility.txt
     @grep -E "passed|mutants killed" docs/evidence/E14/accessibility.txt
 
+# ADR-0183: a page states its title. The compiler's, the renderer's and the
+# server's tests, the corpus at C9, the page in three engines, and the
+# mutation controls.
+e14-titles:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0183 - a page states its title"; echo; \
+       echo "produced by: just e14-titles"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/titles.rs)"; echo; \
+       cargo test --locked -p pw-core --test titles 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus at C9 (corpus-check, corpus_history.rs, generality.rs, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test corpus_history --test generality --test checking_source 2>&1 \
+         | grep -E '^test (the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|generality-tested'; \
+       echo; echo "== the renderer (runtime/pw-render/tests/titles.rs)"; echo; \
+       cargo test --locked -p pw-render --test titles 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_store_s_page_is_titled|a_title_that_changed)|^test result'; \
+       echo; echo "== the page, in three engines (e2e/accessibility.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/accessibility.spec.mjs --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/titles_mutations.py)"; echo; \
+       python3 scripts/titles_mutations.py; \
+     } > docs/evidence/E14/titles.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/titles.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

@@ -50,7 +50,7 @@ fn declarations() -> String {
 }
 
 /// The store page, its `not_found_on` clause `clause` (none when empty),
-/// reading the store and its hours.
+/// reading the store and its hours, and stating its title (ADR-0183).
 fn page(clause: &str) -> String {
     let clause = match clause {
         "" => String::new(),
@@ -59,7 +59,8 @@ fn page(clause: &str) -> String {
     format!(
         "page P(id: StoreId) {{\n    route \"/stores/{{id}}\"\n{clause}    cache private\n\n    \
          let store = query Store(id)\n    let hours = query Hours(id)\n\n    \
-         view {{\n        <main><h1>{{store.name}}</h1><p>{{hours}}</p></main>\n    }}\n}}\n"
+         view {{\n        <title>{{store.name}}</title>\n        \
+         <main><h1>{{store.name}}</h1><p>{{hours}}</p></main>\n    }}\n}}\n"
     )
 }
 
@@ -133,6 +134,7 @@ fn a_query_the_page_reads_can_answer_it() {
     // with it.
     let src = program("StoreError.NotFound")
         .replace("-> Result<Shop, StoreError>", "-> Map<String, StoreError>")
+        .replace("<title>{store.name}</title>", "<title>Store</title>")
         .replace("<h1>{store.name}</h1>", "<h1>Store</h1>");
     assert_eq!(
         reported(&src),

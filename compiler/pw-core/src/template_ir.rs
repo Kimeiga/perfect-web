@@ -173,6 +173,9 @@ pub enum Anchor {
     /// For attributes, boolean attributes and handlers, where the thing being
     /// updated belongs to an element that already exists.
     Element,
+    /// The document itself (ADR-0183): a page's title, which its host writes
+    /// into `<head>` and the browser's runtime sets as `document.title`.
+    Document,
 }
 
 /// One dynamic hole in a template.
@@ -326,6 +329,11 @@ pub enum Part {
         path: String,
         args: Vec<(String, String)>,
     },
+    /// `<title>{store.name}</title>` at the top of a page's view (ADR-0183):
+    /// the page's title. Its host writes it into the document's `<head>`,
+    /// not where it is written, so it renders nothing in the body. Numbered
+    /// after every other part of the page, so writing one moves no other.
+    Title { id: PartId, pieces: Vec<TitlePiece> },
     /// Verbatim bytes.
     ///
     /// Reachable only from a value whose type carries the raw-HTML capability.
@@ -372,6 +380,18 @@ pub struct StreamArm {
     pub body: Vec<Chunk>,
 }
 
+/// A piece of a page's title (ADR-0183): text as written, or a value's path.
+///
+/// Not escaped: a title is text. Its host escapes it where it writes it into
+/// `<title>`, and the browser's runtime sets it as `document.title`, which
+/// takes text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "piece", content = "value")]
+pub enum TitlePiece {
+    Text(String),
+    Value(String),
+}
+
 /// A piece of an interpolated attribute: text as written, or a value's path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "segment", content = "value")]
@@ -416,7 +436,8 @@ impl Part {
             | Part::Stream { id, .. }
             | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
-            | Part::RawHtml { id, .. } => *id,
+            | Part::RawHtml { id, .. }
+            | Part::Title { id, .. } => *id,
             Part::Blocked { .. } => return None,
         })
     }
@@ -446,6 +467,7 @@ impl Part {
             | Part::Stream { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
+            Part::Title { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
         })
     }
@@ -463,6 +485,7 @@ impl Part {
             Part::InterpolatedAttribute { .. } => "interpolated_attribute",
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
+            Part::Title { .. } => "title",
             Part::Blocked { .. } => "blocked",
         }
     }
@@ -597,6 +620,8 @@ pub enum ReadKind {
     Subject,
     /// The list an `{#each}` iterates.
     List,
+    /// A value a page's `<title>` reads (ADR-0183).
+    Title,
 }
 
 /// Where a [`Read`] is written.
@@ -733,6 +758,15 @@ impl Template {
                         Part::Component { path, .. } => path.clone(),
                         // The query whose state the region shows.
                         Part::Stream { query, .. } => query.clone(),
+                        // Every value the title reads, in order.
+                        Part::Title { pieces, .. } => pieces
+                            .iter()
+                            .filter_map(|p| match p {
+                                TitlePiece::Value(v) => Some(v.as_str()),
+                                TitlePiece::Text(_) => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
                         Part::Blocked { .. } => String::new(),
                     },
                     name: match p {
@@ -933,8 +967,16 @@ pub fn lowered(
         provided,
         signals,
     };
-    for root in roots_of(body) {
+    // A page's title is lowered after the rest of its view, wherever it is
+    // written, so writing one moves no other part's number (ADR-0183).
+    let (titles, rest): (Vec<NodeId>, Vec<NodeId>) = roots_of(body)
+        .into_iter()
+        .partition(|r| decl.kind == crate::hir::DeclKind::Page && is_title(body, *r));
+    for root in rest {
         lower_node(body, root, &ctx, &mut ix, &mut chunks);
+    }
+    for title in titles {
+        chunks.push(Chunk::Dynamic(lower_title(body, title, &ctx, &mut ix)));
     }
     let chunks = coalesce(chunks);
     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
@@ -1175,6 +1217,46 @@ fn roots_of(body: &Body) -> Vec<NodeId> {
     roots
 }
 
+/// Whether a node is a `<title>` element: exactly, as `<Title>` is a view
+/// (ADR-0072).
+fn is_title(body: &Body, n: NodeId) -> bool {
+    matches!(body.node(n), Node::Element { tag, .. } if tag == "title")
+}
+
+/// **A page's title** (ADR-0183): its text as written, and each value it
+/// reads by its path. Anything else in it is refused at check (PW5030), and
+/// blocked here.
+fn lower_title(body: &Body, n: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer) -> Part {
+    let blocked = |reason: &str| Part::Blocked {
+        reason: reason.to_string(),
+        at: "<title>".to_string(),
+    };
+    let Node::Element { children, .. } = body.node(n) else {
+        return blocked("a title is an element");
+    };
+    let mut pieces = Vec::new();
+    let mut values = Vec::new();
+    for c in children {
+        match body.node(*c) {
+            Node::Text(t) => pieces.push(TitlePiece::Text(t.clone())),
+            Node::Interpolation(e) => {
+                let Some(path) = value_path(body, *e) else {
+                    return blocked("a value in a title is read by its path");
+                };
+                let path = ctx.read(path);
+                values.push((path.clone(), *e));
+                pieces.push(TitlePiece::Value(path));
+            }
+            _ => return blocked("a title holds text and values (PW5030)"),
+        }
+    }
+    let id = ix.part();
+    for (path, e) in values {
+        ix.read(id, &path, ReadKind::Title, ReadAt::Expr(e), ctx);
+    }
+    Part::Title { id, pieces }
+}
+
 /// Adjacent `Static` chunks become one.
 ///
 /// Not an optimisation: it is what makes the output deterministic to compare.
@@ -1320,6 +1402,15 @@ fn lower_element(
     // was refused here, and only the Marko adapter rendered one (ADR-0075).
     if tag == "stream" {
         lower_stream(body, attrs, children, ctx, ix, out);
+        return;
+    }
+    // A title anywhere but at the top of a page's view (ADR-0183): refused
+    // at check (PW5030), and written nowhere.
+    if tag == "title" {
+        out.push(Chunk::Dynamic(Part::Blocked {
+            reason: "a title is the page's, at the top of its view (PW5030)".to_string(),
+            at: "<title>".to_string(),
+        }));
         return;
     }
     // Not compiled by this renderer (ADR-0075): an element that mounts a
@@ -2332,6 +2423,20 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                         } => {
                             feed(h, value.as_bytes());
                             feed(h, capability.as_bytes());
+                        }
+                        Part::Title { pieces, .. } => {
+                            for p in pieces {
+                                match p {
+                                    TitlePiece::Text(t) => {
+                                        feed(h, b"T");
+                                        feed(h, t.as_bytes());
+                                    }
+                                    TitlePiece::Value(v) => {
+                                        feed(h, b"V");
+                                        feed(h, v.as_bytes());
+                                    }
+                                }
+                            }
                         }
                         Part::Blocked { reason, at } => {
                             feed(h, reason.as_bytes());

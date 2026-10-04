@@ -17,8 +17,5 @@ view Links(id: StoreId) !{} {
 
 page Detail(id: StoreId) !{} {
     route "/stores/{id}/menu"
-    view {
-        <title>Menu</title>
-        <main><h1>Menu</h1></main>
-    }
+    view { <main><h1>Menu</h1></main> }
 }

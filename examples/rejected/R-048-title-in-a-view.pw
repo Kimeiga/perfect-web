@@ -1,0 +1,20 @@
+// @corpus: rejected
+// @id: R-048
+// @category: title outside the top of a page's view
+// @rule: PW5030
+// @invariant: title_misplaced
+// @charter: §15.6 test 14, §17.4
+// @milestone: 14
+// @expect-error: `<title>` in the view `Heading` titles every page that composes it
+// @expect-error: a title is the page's: once, at the top of its view, written as text and values
+//
+// A title is what a page says it is (ADR-0183). One written in a view would
+// title every page the view is composed into, the same, and a page that
+// composed two would have two titles, of which the browser shows the first.
+
+module store.heading
+
+view Heading() !{} {
+    <title>Store</title>
+    <h1>Store</h1>
+}

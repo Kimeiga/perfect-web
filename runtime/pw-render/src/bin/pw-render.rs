@@ -230,7 +230,16 @@ fn main() -> std::process::ExitCode {
                 return std::process::ExitCode::FAILURE;
             }
         };
-        let title = flag("--wrap").unwrap_or_else(|| t.name.clone());
+        // The page's own title, where it states one (ADR-0183). A view
+        // rendered as a document is titled by `--wrap`, or by its name.
+        let title = match pw_render::title_text(t, &env) {
+            Ok(Some(title)) => title,
+            Ok(None) => flag("--wrap").unwrap_or_else(|| t.name.clone()),
+            Err(e) => {
+                eprintln!("pw-render: {}: its title: {e}", t.path);
+                return std::process::ExitCode::FAILURE;
+            }
+        };
         let manifest = t.manifest();
         let page = document(
             &title,

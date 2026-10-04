@@ -135,6 +135,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(code_in_markup(&u.hir));
         // ADR-0167: a comment in markup is `<!-- -->`.
         per_unit.extend(comment_as_text(&u.hir));
+        // ADR-0183: a page states its title.
+        per_unit.extend(titles(&u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0107: a cache key names each parameter its entry depends on.
@@ -2189,6 +2191,157 @@ fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, crate::h
 /// in HTML and JSX. A line of text that begins with one reads as a comment
 /// and would be shown, so it is refused, as `eslint-plugin-react`'s
 /// `jsx-no-comment-textnodes` refuses it in JSX.
+/// **A page states its title** (ADR-0183): `<title>` at the top of its view,
+/// beside `<main>`, as text and the values the page reads. The host writes
+/// it into the document's head. Until 2026-10-04 a page could not say what
+/// it is, and every store's page was titled "Store" by the host (WCAG 2.4.2,
+/// failure F25; found by ADR-0182's audit).
+///
+/// PW5029 refuses a page served at a route that states no title. PW5030
+/// refuses a `<title>` anywhere else: in a view, which would title every
+/// page that composes it; inside an element or a block; a second one; or one
+/// that holds more than text and values.
+fn titles(hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        let page = decl.kind == DeclKind::Page;
+        let mut stated = None;
+        for n in body.walk_markup(&roots) {
+            let Node::Element { tag, children, .. } = body.node(n) else {
+                continue;
+            };
+            // `<title>` exactly: `<Title>` is a view (ADR-0072).
+            if tag != "title" {
+                continue;
+            }
+            // What the title holds besides text and the values it reads.
+            let other = children.iter().find_map(|c| match body.node(*c) {
+                Node::Text(_) => None,
+                Node::Interpolation(e) => crate::template_ir::value_path_of(body, *e)
+                    .is_none()
+                    .then(|| "a value computed in place".to_string()),
+                Node::Element { tag, .. } => Some(format!("`<{tag}>`")),
+                Node::Block { .. } | Node::Branch { .. } => Some("a block".to_string()),
+            });
+            let misplaced = if !page {
+                let kind = match decl.kind {
+                    DeclKind::View => "view",
+                    DeclKind::Component => "component",
+                    _ => "declaration",
+                };
+                Some(format!(
+                    "`<title>` in the {kind} `{}` titles every page that composes it",
+                    decl.name
+                ))
+            } else if !roots.contains(&n) {
+                Some(format!(
+                    "`<title>` in `{}` is inside an element or a block, not at the top of its view",
+                    decl.name
+                ))
+            } else if stated.is_some() {
+                Some(format!("`{}` states a second `<title>`", decl.name))
+            } else if let Some(other) = other {
+                Some(format!(
+                    "`<title>` in `{}` holds {other}, and a title is text and values",
+                    decl.name
+                ))
+            } else {
+                stated = Some(n);
+                None
+            };
+            let Some(message) = misplaced else { continue };
+            out.push(Diagnostic {
+                code: crate::codes::TITLE_MISPLACED.id,
+                invariant: crate::codes::TITLE_MISPLACED.invariant,
+                reason: "title_misplaced",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: body.node_span(n),
+                related: vec![Related {
+                    span: hir.decl_span(decl_id),
+                    label: format!("`{}` renders this", decl.name),
+                }],
+                explanation: Some(
+                    "A page's title is the page's statement of what it is, and the \
+                     host writes it into the document's head from the page's values. \
+                     One in a view would title every page that composes the view; one \
+                     inside an element or a block, or a second, would leave which is \
+                     the title to chance; and a title holds text, which a screen \
+                     reader says first."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write one `<title>` at the top of the page's view, beside \
+                                  `<main>`, as text and values: `<title>{store.name}</title>`"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+        // A title with neither text nor a value states nothing.
+        let blank = stated.is_some_and(|t| match body.node(t) {
+            Node::Element { children, .. } => children
+                .iter()
+                .all(|c| matches!(body.node(*c), Node::Text(s) if s.trim().is_empty())),
+            _ => false,
+        });
+        if !page || !(stated.is_none() || blank) {
+            continue;
+        }
+        let Some(route) = crate::routes::declared_route(hir, decl) else {
+            continue;
+        };
+        // Where the title goes: the page's view.
+        let view = body
+            .walk()
+            .into_iter()
+            .find(|e| matches!(body.expr(*e), Expr::Template { .. }))
+            .map(|e| body.expr_span(e))
+            .unwrap_or_else(|| hir.decl_span(decl_id));
+        out.push(Diagnostic {
+            code: crate::codes::TITLE_MISSING.id,
+            invariant: crate::codes::TITLE_MISSING.invariant,
+            reason: "title_missing",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!("`{}` is served at `{route}` and states no title", decl.name),
+            primary_span: match stated {
+                Some(t) => body.node_span(t),
+                None => hir.decl_span(decl_id),
+            },
+            related: vec![Related {
+                span: view,
+                label: format!("`{}`'s view, at whose top its title is written", decl.name),
+            }],
+            explanation: Some(
+                "A screen reader says a page's title first, and a person tells pages \
+                 apart by it, in tabs, history and bookmarks. A page that states none is \
+                 titled by its host, which knows only what kind of page it is: every \
+                 store's page was \"Store\", which WCAG 2.4.2 names failure F25."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: format!(
+                    "write `<title>` at the top of `{}`'s view, from what it shows: \
+                     `<title>{{store.name}}</title>`",
+                    decl.name
+                ),
+                replacement: None,
+            }],
+        });
+    }
+    out
+}
+
 fn comment_as_text(hir: &Hir) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for (decl_id, decl) in hir.all_decls() {

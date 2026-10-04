@@ -46,6 +46,10 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "post-paint non-layout work",
     "semantically independent contained subtree",
     "audited imperative widget escape",
+    // ADR-0183, corpus C9: a page states its title. A user-facing invariant
+    // the compiler gained, which by the architect's ruling of 2026-08-06
+    // (below) has its canonical accepted and rejected specification.
+    "page states its title",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -110,6 +114,9 @@ const REJECTED_CATEGORIES: &[&str] = &[
     // The denominator has to grow, or it stops meaning "all invariants".
     "private dependency of a shared materialization",
     "dependency graph edge to an undeclared target",
+    // ADR-0183, corpus C9: PW5029 and PW5030.
+    "page served at a route without a title",
+    "title outside the top of a page's view",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

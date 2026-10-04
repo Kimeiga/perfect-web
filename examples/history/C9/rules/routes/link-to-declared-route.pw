@@ -9,10 +9,7 @@ import domain.{ StoreId }
 
 page Overview(id: StoreId) !{} {
     route "/stores/{id}"
-    view {
-        <title>Store</title>
-        <main><h1>Store</h1></main>
-    }
+    view { <main><h1>Store</h1></main> }
 }
 
 view Links(id: StoreId) !{} {

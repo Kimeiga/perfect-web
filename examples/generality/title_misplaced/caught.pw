@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: title_misplaced
+//
+// Structurally different from R-048: the title is a page's, not a view's, and
+// it is inside the page's `<main>`. A title in the body is nothing a host
+// writes into the head. The page declares no route, so that stating no title
+// at the top is not refused here as well.
+
+module generality.title_nested
+
+import domain.{ StoreId }
+
+page Hours(id: StoreId) !{} {
+    view {
+        <main>
+            <title>Hours</title>
+            <h1>Hours</h1>
+        </main>
+    }
+}

@@ -40,7 +40,9 @@ pub use identity::{
     Anchor, ElementId, IdentityDomain, InstanceFrame, InstancePath, InstanceToken, LocalPartId,
     PartAddress, Partition, TemplateSchemaId,
 };
-pub use ir::{Arm, Chunk, Context, Part, PartEntry, PartId, Segment, StreamArm, Template};
+pub use ir::{
+    Arm, Chunk, Context, Part, PartEntry, PartId, Segment, StreamArm, Template, TitlePiece,
+};
 
 use std::collections::BTreeMap;
 
@@ -1119,6 +1121,45 @@ pub fn render(t: &Template, env: &Env, others: &[Template]) -> Result<String, Bl
     Ok(out)
 }
 
+/// **A page's title, as text** (ADR-0183): its text, and each value by its
+/// path, with its whitespace collapsed and trimmed as a browser's
+/// `document.title` reads it. Its host writes it into `<title>`, escaped,
+/// and the browser's runtime sets it as `document.title`, so what a page is
+/// served with and what a change sets are one text. `None` for a template
+/// that states no title.
+pub fn title_text(t: &Template, env: &Env) -> Result<Option<String>, Blocked> {
+    let Some(pieces) = t.chunks.iter().find_map(|c| match c {
+        Chunk::Dynamic(Part::Title { pieces, .. }) => Some(pieces),
+        _ => None,
+    }) else {
+        return Ok(None);
+    };
+    let mut text = String::new();
+    for piece in pieces {
+        match piece {
+            TitlePiece::Text(t) => text.push_str(t),
+            TitlePiece::Value(path) => {
+                let v = env
+                    .get(path)
+                    .ok_or(Blocked::MissingValue { path: path.clone() })?;
+                if let Value::Raw { .. } = v {
+                    return Err(Blocked::UnrepresentedConstruct {
+                        reason: "a title is text, and this value is HTML".to_string(),
+                        at: format!("<title>{{{path}}}</title>"),
+                    });
+                }
+                let s = v
+                    .as_str()
+                    .ok_or(Blocked::MissingValue { path: path.clone() })?;
+                text.push_str(&s);
+            }
+        }
+    }
+    Ok(Some(
+        text.split_ascii_whitespace().collect::<Vec<_>>().join(" "),
+    ))
+}
+
 fn emit(chunks: &[Chunk], env: &Env, others: &[Template], out: &mut String) -> Result<(), Blocked> {
     let mut i = 0;
     while i < chunks.len() {
@@ -1213,6 +1254,10 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
             reason: reason.clone(),
             at: at.clone(),
         }),
+
+        // Written into the document's head by its host (`title_text`), not
+        // where the page writes it (ADR-0183).
+        Part::Title { .. } => Ok(()),
 
         Part::Text { id, value, context } => {
             let v = env.get(value).ok_or(Blocked::MissingValue {

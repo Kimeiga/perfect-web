@@ -475,6 +475,13 @@ codes! {
     // showed it (found by ADR-0165).
     COMMENT_AS_TEXT = "PW5028" / comment_as_text / 1, Markup,
         "a comment in markup is `<!-- -->`: text that reads as one would be shown";
+    // ADR-0183: every store's page was titled "Store" by the host, since a
+    // page could not say what it is (WCAG 2.4.2, failure F25; found by
+    // ADR-0182's audit).
+    TITLE_MISSING = "PW5029" / title_missing / 1, Markup,
+        "a page served at a route states its title";
+    TITLE_MISPLACED = "PW5030" / title_misplaced / 1, Markup,
+        "a title is the page's: once, at the top of its view, written as text and values";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

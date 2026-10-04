@@ -26,11 +26,11 @@ fn program(pages: &str) -> String {
     format!("module t\n\nopaque type StoreId = String\n\n{pages}")
 }
 
-/// A page with `params`, served at `route`.
+/// A page with `params`, served at `route`, stating its title (ADR-0183).
 fn page(name: &str, params: &str, route: &str) -> String {
     format!(
         "page {name}({params}) {{\n    route \"{route}\"\n    cache private\n\n    \
-         view {{\n        <main><h1>Store</h1></main>\n    }}\n}}\n\n"
+         view {{\n        <title>Store</title>\n        <main><h1>Store</h1></main>\n    }}\n}}\n\n"
     )
 }
 

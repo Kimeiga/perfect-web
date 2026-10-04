@@ -91,7 +91,7 @@ impl std::fmt::Display for TemplateSchemaId {
 
 /// How a part is anchored in the document.
 ///
-/// Two wire encodings of one concept, chosen per part KIND rather than one
+/// Wire encodings of one concept, chosen per part KIND rather than one
 /// forced onto all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -101,6 +101,9 @@ pub enum Anchor {
     Range,
     /// The owning element carries `data-pw`.
     Element,
+    /// The document itself (ADR-0183): a page's title, which its host writes
+    /// into `<head>` and the browser's runtime sets as `document.title`.
+    Document,
 }
 
 /// One frame of an instance path: a repeatable scope, and which instance.

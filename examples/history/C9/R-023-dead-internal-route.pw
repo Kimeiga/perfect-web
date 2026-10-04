@@ -19,10 +19,7 @@ import domain.{ StoreId }
 // what the program declares, so there has to be something declared.
 page StoreOverview(id: StoreId) !{} {
     route "/stores/{id}"
-    view {
-        <title>Store</title>
-        <main><h1>Store</h1></main>
-    }
+    view { <main><h1>Store</h1></main> }
 }
 
 view StoreLinks(id: StoreId) !{} {

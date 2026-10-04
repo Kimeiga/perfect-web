@@ -584,3 +584,40 @@ The history question is unchanged: the rejected fixtures' old texts in `C8` stil
 fail for their declared invariant, now also with `PW0026` for the missing
 import that each repair added. That is the evidence the repairs removed an
 obstruction, not the defect.
+
+## C9: a page states its title, 2026-10-04
+
+Opened because the specification changed. A page served at a route states
+its title (`PW5029`), and a title is the page's: once, at the top of its
+view, written as text and values (`PW5030`).
+[ADR-0183](DECISIONS/ADR-0183-a-page-states-its-title.md) is the decision. No
+invariant is retired, and no `@expect-error` line changed.
+
+```text
+Corpus version:            C9
+Accepted programs:         25
+Rejected programs:         48
+Charter categories:        25/25 accepted, 48/48 rejected
+Generality at open:        33/33 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-025 | added: a page served at a route states its title, from its values | new category, `page states its title` |
+| R-047 | added: a page served at a route states none (`PW5029`) | new category |
+| R-048 | added: a title in a view (`PW5030`) | new category |
+| R-023 | its page, served at a route, gained `<title>Store</title>` | missing context |
+| `dead_internal_link`'s GENERAL and NEIGHBOUR witnesses | their pages, served at routes, gained a title | missing context |
+| `rules/routes/link-to-declared-route.pw` | its page gained a title | missing context |
+| `title_missing`, `title_misplaced` | a GENERAL and a NEIGHBOUR witness each | new invariants |
+
+The old texts of the four changed fixtures are in `examples/history/C9/`.
+`corpus_history.rs` checks them:
+- R-023's is still caught for `dead_internal_link`, now beside
+  `title_missing`;
+- the other three are refused for the title alone.
+
+R-023's C0 entry in `EXPECTED_TO_PASS` is retired. Its old text declared no
+route, so its link was dead relative to nothing. A-025 now declares a route
+in the program every old text is checked in, so the old link is dead
+relative to it, and the C0 text is caught for its invariant again.

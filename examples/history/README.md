@@ -18,4 +18,10 @@ would stop being rejected, and this test is what notices.
 
 A fixture whose old text is EXPECTED to pass now (because the change corrected
 a genuinely wrong specification) belongs in `EXPECTED_TO_PASS` in that test,
-with the reason written next to it. There is currently one.
+with the reason written next to it. There are six, each with its reason
+there; R-023's left it in C9, when A-025 gave the program a route table its
+old link is dead relative to.
+
+`C8/` holds the texts before the value relations' first run, and `C9/` the
+routed pages' before each stated its title (ADR-0183). Each version is
+recorded in `docs/CORPUS.md`.

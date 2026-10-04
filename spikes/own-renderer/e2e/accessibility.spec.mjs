@@ -181,6 +181,52 @@ test("another store, and a store that is not there, keep every rule", async ({ p
   expect(await audit(page), "not found").toEqual([]);
 });
 
+test("each page is titled by what it is, and a change to its title is shown once", async ({
+  page,
+}) => {
+  // ADR-0183: the page states its title, from its values. Until 2026-10-04
+  // every store's page was "Store" (WCAG 2.4.2, F25).
+  await ready(page);
+  await expect(page).toHaveTitle("Blue Bottle");
+  // A change to what the title reads is a patch to the title's part, which
+  // the runtime sets as the document's title; one that changes nothing
+  // writes nothing (ADR-0182).
+  const { schema, title } = await page.evaluate(() => ({
+    schema: window.__pw.parts.schema,
+    title: window.__pw.parts.parts.find((p) => p.kind === "title"),
+  }));
+  expect(title).toMatchObject({ anchor: "document", value: "store.name" });
+  await page.evaluate(() => {
+    window.__titled = 0;
+    new MutationObserver(() => (window.__titled += 1)).observe(document.head, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
+  const patch = (version, text) =>
+    page.evaluate(
+      ({ schema, part, version, text }) =>
+        window.__pwTestApply({
+          frame: "patch",
+          protocol: 1,
+          basis: { resources: [{ entry: "a-test-title", version }] },
+          target: { template: schema, instances: [], part },
+          operation: { op: "replace_text", text },
+        }),
+      { schema, part: title.id, version, text },
+    );
+  await patch(1, "Blue Bottle Coffee");
+  await expect(page).toHaveTitle("Blue Bottle Coffee");
+  await patch(2, "Blue Bottle Coffee");
+  await expect.poll(() => page.evaluate(() => window.__titled)).toBe(1);
+  // Each store's its own, and the page that is not found says so.
+  await ready(page, "/stores/48");
+  await expect(page).toHaveTitle("Harbor Coffee");
+  await page.goto("/stores/999");
+  await expect(page).toHaveTitle("Not found");
+});
+
 test("the tree a screen reader reads is the page's", async ({ page, request }) => {
   // Read in each engine by Playwright's reading of WAI-ARIA and accname:
   // roles, names, levels and text, every node of them.

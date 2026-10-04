@@ -370,6 +370,8 @@ struct Shown {
     /// by its part: its name, and its value as written, or none for a
     /// boolean one that is absent (ADR-0171).
     attributes: BTreeMap<u32, (String, Option<String>)>,
+    /// The page's title, by its part, as its text (ADR-0183).
+    title: Option<(u32, String)>,
 }
 
 /// **The recommender the store's data layer reaches** (ADR-0148): what
@@ -3355,8 +3357,12 @@ impl Server {
         );
         let body = pw_render::render(template, &env, &self.templates)
             .map_err(|e| format!("`{path}` does not render: {e:?}"))?;
+        // The page's own title, or its name where it states none (ADR-0183).
+        let title = pw_render::title_text(template, &env)
+            .map_err(|e| format!("`{path}`'s title does not render: {e:?}"))?
+            .unwrap_or_else(|| template.name.clone());
         Ok((
-            signal_document(&body, template, plan, &self.templates),
+            signal_document(&body, &title, template, plan, &self.templates),
             env,
             template,
         ))
@@ -3892,6 +3898,13 @@ impl Server {
                 .ok_or_else(|| format!("part {id} is no attribute"))?;
             shown.attributes.insert(id, written);
         }
+        // The page's title, as the document's head writes it (ADR-0183).
+        if let Some(id) = self.plan["title"].as_u64() {
+            let title = pw_render::title_text(template, &env)
+                .map_err(|b| format!("the title: {b:?}"))?
+                .ok_or_else(|| format!("the plan's title {id} is no part"))?;
+            shown.title = Some((id as u32, title));
+        }
         Ok(shown)
     }
 
@@ -3916,6 +3929,18 @@ impl Server {
                     operation: PatchOp::ReplaceText { text: text.clone() },
                 });
             }
+        }
+        // The page's title, set as text is (ADR-0183): the browser sets it
+        // as `document.title`.
+        if let Some((id, title)) = &now.title
+            && was.title.as_ref().map(|(_, t)| t) != Some(title)
+        {
+            out.push(Targeted {
+                target: PartAddress::new(&schema, LocalPartId(*id)),
+                operation: PatchOp::ReplaceText {
+                    text: title.clone(),
+                },
+            });
         }
         let env = self.document_env(session, store, bindings);
         for (list, items) in &now.lists {
@@ -6012,8 +6037,16 @@ fn serve_store(
                 .collect();
             Some((format!("/speculation/{module}"), entries, regions))
         });
+        // The page's title, from the values it was rendered with
+        // (ADR-0183). A store's program that states none, the benchmark's
+        // copy, is titled as every store's page was.
+        let title = match pw_render::title_text(server.store_template(), &env) {
+            Ok(title) => title.unwrap_or_else(|| "Store".to_string()),
+            Err(why) => return unavailable(stream, Unread::Failed(format!("its title: {why:?}"))),
+        };
         let page = document(
             &rendered,
+            &title,
             &server.templates,
             &server.plan,
             cursor,
@@ -6231,6 +6264,7 @@ fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
 /// renders when it changes.
 fn signal_document(
     body: &str,
+    title: &str,
     template: &Template,
     plan: &serde_json::Value,
     templates: &[Template],
@@ -6257,7 +6291,7 @@ fn signal_document(
          <title>{}</title>\n</head>\n<body>\n{body}\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
-        pw_render::escape::text(&template.name)
+        pw_render::escape::text(title)
     )
 }
 
@@ -6331,9 +6365,11 @@ fn resume_manifest(templates: &[Template]) -> serde_json::Value {
     })
 }
 
-/// The document shell, with the parts manifest and the runtime.
+/// The document shell, with the parts manifest and the runtime: titled as
+/// the page states (ADR-0183).
 fn document(
     body: &str,
+    title: &str,
     templates: &[Template],
     plan: &serde_json::Value,
     cursor: u64,
@@ -6416,10 +6452,11 @@ fn document(
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>Store</title>\n</head>\n<body>\n{body}\n\
+         <title>{title}</title>\n</head>\n<body>\n{body}\n\
          <style>{STYLE}</style>\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
-         {RUNTIME}\n{DOCUMENT_END}"
+         {RUNTIME}\n{DOCUMENT_END}",
+        title = pw_render::escape::text(title)
     )
 }
 
@@ -10455,6 +10492,99 @@ public query Store(",
         assert_eq!(slot(&refused, "Delivery"), "Delivery estimate unavailable");
     }
 
+    /// **A store's page is titled by its name** (ADR-0183): the page states
+    /// its title, `<title>{store.name}</title>`, and the host writes it into
+    /// the document's head from the page's values. Until 2026-10-04 every
+    /// store's page was "Store" (WCAG 2.4.2, F25).
+    #[test]
+    fn a_store_s_page_is_titled_by_its_name() {
+        let title_of = |s: &Server, path: &str| -> String {
+            let whole: String = fetched_as(s, path, Some("a"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect();
+            whole
+                .split("<title>")
+                .nth(1)
+                .and_then(|t| t.split("</title>").next())
+                .unwrap_or_else(|| panic!("no title: {whole}"))
+                .to_string()
+        };
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        recommend(&s, 0, None);
+        assert_eq!(title_of(&s, "/stores/47"), "Blue Bottle");
+        assert_eq!(title_of(&s, "/stores/48"), "Harbor Coffee");
+        // Escaped where it is written: a title is text.
+        let named = served_from_patches_in(
+            "examples",
+            |app| {
+                app.replace(
+                    "<title>{store.name}</title>",
+                    "<title>{store.name} & more</title>",
+                )
+            },
+            &[],
+        );
+        recommend(&named, 0, None);
+        assert_eq!(title_of(&named, "/stores/47"), "Blue Bottle &amp; more");
+        // Control: a store's program that states none, the benchmark's copy,
+        // is titled as every store's page was.
+        let untitled = served_from(|app| app.to_string(), None);
+        assert_eq!(title_of(&untitled, "/"), "Store");
+    }
+
+    /// **A title that changed is set as text** (ADR-0183), at the title's
+    /// address, which the browser sets as `document.title`. One that did not
+    /// change is not set.
+    #[test]
+    fn a_title_that_changed_is_set_as_its_text() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let id = s.plan["title"]
+            .as_u64()
+            .expect("the plan names the page's title") as u32;
+        let shown = |title: &str| Shown {
+            title: Some((id, title.to_string())),
+            ..Shown::default()
+        };
+        // A document of the store's, which gives its page an `id`.
+        s.serve_store_document("a", STORE_ID).expect("served");
+        let doc = documents_of(&s.pending.lock().expect("pending"), "a")
+            .pop()
+            .expect("a document");
+        let bindings = s.bindings("a", doc.1).expect("read");
+        let changed = s
+            .derive(
+                "a",
+                STORE_ID,
+                &bindings,
+                &shown("Blue Bottle"),
+                &shown("Blue Bottle Coffee"),
+            )
+            .expect("derived");
+        assert_eq!(
+            changed,
+            [Targeted {
+                target: PartAddress::new(
+                    &TemplateSchemaId(s.store_template().schema.clone()),
+                    LocalPartId(id)
+                ),
+                operation: PatchOp::ReplaceText {
+                    text: "Blue Bottle Coffee".to_string()
+                },
+            }]
+        );
+        let same = s
+            .derive(
+                "a",
+                STORE_ID,
+                &bindings,
+                &shown("Blue Bottle"),
+                &shown("Blue Bottle"),
+            )
+            .expect("derived");
+        assert!(same.is_empty(), "{same:?}");
+    }
+
     /// **The store's slots come after its own content, in the same
     /// response** (charter §15.3, §15.6 test 3, ADR-0165): its name, menu
     /// and cart, with each slot pending, and then each slot's arm as its
@@ -10717,13 +10847,14 @@ public query Store(",
         assert!(body.contains("<p id=\"shown\">open</p>"), "{body}");
         // ... and the document says what the browser holds and renders again.
         let templates = vec![template];
-        let manifest = manifest_of(&document(&body, &templates, &plan, 3, None));
+        let manifest = manifest_of(&document(&body, "Store", &templates, &plan, 3, None));
         assert_eq!(manifest["signals"], serde_json::json!({ "open": true }));
         assert_eq!(manifest["live"][0]["part"], 0);
         assert!(manifest["blocks"]["0"]["then"].is_array(), "{manifest}");
         // Control: a page with no signals carries none of it.
         let manifest = manifest_of(&document(
             &body,
+            "Store",
             &templates,
             &serde_json::json!({}),
             3,

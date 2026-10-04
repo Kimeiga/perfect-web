@@ -5,9 +5,10 @@
 // Each rule is axe-core's, or WCAG 2.2's at level AA, under the same name:
 // what the document, its landmarks, headings and lists are; ids and what
 // names them; ARIA's attributes, values and roles; what names each control
-// and whether its name holds the words it shows; target size; contrast.
-// Two are this page's own, and say so. axe-core itself is not run here: it
-// is not installed, and installing it is the owner's call (ADR-0182).
+// and whether its name holds the words it shows; target size; contrast; and
+// a title that names the page (ADR-0183). Two are this page's own, and say
+// so. axe-core itself is not run here: it is not installed, and installing
+// it is the owner's call (ADR-0182).
 
 /** Every way the document breaks a rule, as `rule: element detail`; none,
  * when it breaks none. Self-contained, as `page.evaluate` sends its source. */
@@ -76,6 +77,13 @@ export function violations() {
   const lang = document.documentElement.lang;
   if (!/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{1,8})*$/.test(lang)) say("html-lang-valid", document, `"${lang}"`);
   if (!squash(document.title)) say("document-title", document);
+  // WCAG 2.4.2: a title that identifies the page. One title for many pages
+  // is its failure F25, which presence alone does not find: this page's
+  // title names its heading (ADR-0183).
+  const heading = document.querySelector("h1");
+  if (heading && !squash(document.title).toLowerCase().includes(squash(contentText(heading)).toLowerCase())) {
+    say("document-title-identifies", document, `"${document.title}" does not name "${squash(contentText(heading))}"`);
+  }
   // Laid out at a phone's width, and zoomed as far as a person needs.
   const viewport = document.querySelector('meta[name="viewport"]');
   if (!viewport) {

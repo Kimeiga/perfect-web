@@ -63,12 +63,13 @@ MUTANTS = [
         "no region is collected",
         "core",
         SPECULATION,
+        # Re-anchored by ADR-0183, whose regions have a kind of their own.
         "        regions.push(Region {\n"
         "            binding: root.to_string(),\n"
         "            part: read.part.0,\n"
-        "            kind: read.kind,\n"
+        "            kind,\n"
         "        });\n",
-        "        let _ = (root, read.kind);\n",
+        "        let _ = (root, kind);\n",
     ),
     (
         "a region's read of what the browser does not hold is not refused",

@@ -195,6 +195,10 @@ pub enum Part {
         path: String,
         args: Vec<(String, String)>,
     },
+    /// `<title>{store.name}</title>` at the top of a page's view (ADR-0183):
+    /// the page's title. Its host writes it into the document's `<head>`
+    /// ([`crate::title_text`]), so it renders nothing in the body.
+    Title { id: PartId, pieces: Vec<TitlePiece> },
     /// Verbatim bytes.
     ///
     /// Reachable only from a value whose type carries the raw-HTML capability.
@@ -240,6 +244,15 @@ pub struct StreamArm {
     pub body: Vec<Chunk>,
 }
 
+/// A piece of a page's title (ADR-0183): text as written, or a value's path.
+/// Not escaped: a title is text, escaped where it is written into `<title>`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "piece", content = "value")]
+pub enum TitlePiece {
+    Text(String),
+    Value(String),
+}
+
 /// A piece of an interpolated attribute: text escaped at build time, or a
 /// value's path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,7 +296,8 @@ impl Part {
             | Part::Stream { id, .. }
             | Part::InterpolatedAttribute { id, .. }
             | Part::Component { id, .. }
-            | Part::RawHtml { id, .. } => *id,
+            | Part::RawHtml { id, .. }
+            | Part::Title { id, .. } => *id,
             Part::Blocked { .. } => return None,
         })
     }
@@ -313,6 +327,7 @@ impl Part {
             | Part::Stream { .. }
             | Part::Component { .. }
             | Part::RawHtml { .. } => Anchor::Range,
+            Part::Title { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
         })
     }
@@ -330,6 +345,7 @@ impl Part {
             Part::InterpolatedAttribute { .. } => "interpolated_attribute",
             Part::Component { .. } => "component",
             Part::RawHtml { .. } => "raw_html",
+            Part::Title { .. } => "title",
             Part::Blocked { .. } => "blocked",
         }
     }
@@ -435,6 +451,15 @@ impl Template {
                         Part::Event { handler, .. } => handler.clone(),
                         Part::Component { path, .. } => path.clone(),
                         Part::Stream { query, .. } => query.clone(),
+                        // Every value the title reads, in order.
+                        Part::Title { pieces, .. } => pieces
+                            .iter()
+                            .filter_map(|p| match p {
+                                TitlePiece::Value(v) => Some(v.as_str()),
+                                TitlePiece::Text(_) => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
                         Part::Blocked { .. } => String::new(),
                     },
                     name: match p {

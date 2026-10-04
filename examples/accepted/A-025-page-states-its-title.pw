@@ -1,0 +1,29 @@
+// @corpus: accepted
+// @id: A-025
+// @category: page states its title
+// @charter: §15.6 test 14, §17.4
+// @milestone: 14
+//
+// A page served at a route says what it is: `<title>` at the top of its view,
+// from the values it reads (ADR-0183). The host writes it into the document's
+// head, and a change to what it reads reaches it as a change reaches any
+// part. WCAG 2.4.2 asks for a title that identifies the page: this one names
+// the store, which no other store's page does.
+
+module store.overview
+
+import domain.{ StoreId }
+import Resources.{ Store }
+
+page StoreOverview(id: StoreId) {
+    route "/stores/{id}/overview"
+
+    let store = query Store(id)
+
+    view {
+        <title>{store.name}, overview</title>
+        <main>
+            <h1>{store.name}</h1>
+        </main>
+    }
+}

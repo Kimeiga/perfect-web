@@ -5,7 +5,7 @@
     "params": [
       "id"
     ],
-    "schema": "c3047f51db63b614",
+    "schema": "b852db974255acf2",
     "chunks": [
       {
         "chunk": "static",
@@ -587,6 +587,19 @@
       {
         "chunk": "static",
         "value": "\n            </section>\n        </main>"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "title",
+          "id": 33,
+          "pieces": [
+            {
+              "piece": "value",
+              "value": "store.name"
+            }
+          ]
+        }
       }
     ]
   }

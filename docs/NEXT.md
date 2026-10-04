@@ -228,15 +228,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
         keyboard, the tree a screen reader reads, live regions, reflow, a
         phone's width and reduced motion. It found that one Add said its
         count up to four times, and that no page had a viewport.
-        - **Next: a page declares its title** (ADR-0183). The store's title
-          is "Store" for every store, WCAG 2.4.2's failure F25.
-          - A page served at a route declares its title from its values,
-            and the build refuses one that does not.
-          - The store's title is its name, and a change to the name reaches
-            the title, in three engines.
-    10. **Tests 2 and 13** against the running store's shared output: the
-        static public shell holds no private cart data, and the shared
-        cache holds no session or secret field.
+        - ~~A page states its title~~ (ADR-0183, `just e14-titles`):
+          `<title>` at the top of a page's view, written into the head and
+          set again as `document.title`; PW5029 and PW5030; corpus C9. The
+          store's title is its name, in three engines.
+    10. **Next: tests 2 and 13** against the running store's shared output:
+        the static public shell holds no private cart data, and the shared
+        cache holds no session or secret field. Acceptance: each read from
+        what the running store serves and keeps, in three engines where a
+        page is involved, with a control that fails when a session's value
+        is put there.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for
