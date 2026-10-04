@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `bdb3330`, with ADR-0187.
+**Reviewed:** 2026-10-04, against master `673ae11`, with ADR-0188.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2559,12 +2559,15 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`bdb3330` (2026-10-04, ADR-0187): `just ci` passes locally, the
-workspace's 1894 tests pass, and the browser suite passes 671 in three
-engines, with 7 skipped. Its evidence is
-`docs/evidence/E14/stable-layout.txt`, recorded at that commit: the page in
-three engines, E7's gate item 10 alone in Chromium, and 6 of 6 mutants
-killed. ADR-0186's `metadata.txt` and ADR-0182's `accessibility.txt` are
+`673ae11` (2026-10-04, ADR-0188): `just ci` passes locally, the
+workspace's 1894 tests pass, and the browser suite passes 674 in three
+engines, with 13 skipped. Its evidence is
+`docs/evidence/E14/runtime-size.txt`, recorded at that commit: the sizes as
+served and as sent, and 2 of 2 controls failing their bounds. E7's record,
+`docs/evidence/E7/performance.txt`, is recorded again at that commit, the
+first time since 2026-08-07: gate items 7 to 10 pass. ADR-0187's is
+`stable-layout.txt`, at `bdb3330`: the page in three engines, E7's gate item
+10 alone in Chromium, and 6 of 6 mutants killed. ADR-0186's `metadata.txt` and ADR-0182's `accessibility.txt` are
 recorded again at that commit, their mutants re-anchored on the moved
 style: 34 of 34 and 14 of 14 killed. ADR-0183's `titles.txt` is at
 `a8b95af`, 16 of 16 killed. ADR-0185's is `ids.txt`, at `f19ce5a`,

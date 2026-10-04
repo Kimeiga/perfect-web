@@ -1,6 +1,7 @@
 E7 gate items 7-10 — the own renderer's cost, measured
 
 produced by: just e7-performance
+commit:      673ae11658a8267af800bd65e34ce3c986da7f30
 engine:      chromium (Long Animation Frame API is Chromium-only)
 workers:     1 (a loaded machine measures the load)
 
@@ -8,21 +9,26 @@ Every number below has a negative control in the same session:
   the forced-layout detector is shown going red on a deliberate thrash;
   the layout-read counter is shown counting a deliberate read;
   the uncontained large menu is shown costing measurable time.
+The size bounds are shown failing on a grown runtime and renderer by
+scripts/runtime_size_mutations.py, in a run of their own (ADR-0188).
 
-  static-route-script-bytes=0 wasm-bytes=0
-  interactive-script-bytes=28471
-  interactive-wasm-bytes=74222
-  script 28471 http://127.0.0.1:3148/pw-runtime.mjs
-  wasm 74222 http://127.0.0.1:3148/pw-resume.wasm
-  activation-ms=22.70
+  activation-ms=19.80
   interaction-long-frames=0 worst-ms=0.0 forced-attr-exposed=false
-  control-long-frames=1 worst-ms=150.8
+  control-long-frames=1 worst-ms=150.9
   runtime-layout-reads=0
   large-menu-items=1000
   large-menu-content-visibility=auto
-  large-menu-first-layout-ms-visible=10.8 samples=[9.9,10.8,19.4,9.2,10.8]
-  large-menu-first-layout-ms-contained=1.8 samples=[1.5,1.9,1.8,1.6,1.8]
+  large-menu-contained=972
+  large-menu-first-layout-ms-visible=15.6 samples=[15.9,13.8,17.8,15.6,13.9]
+  large-menu-first-layout-ms-contained=1.9 samples=[1.8,1.9,2.1,2.4,1.8]
+  large-menu-first-layout-ms-as-served=2.4 samples=[2.3,2.6,2.4,2.5,2.3]
+  static-route-script-bytes=0 wasm-bytes=0
+  interactive-script-bytes=84822 brotli=23244
+  interactive-wasm-bytes=56517 brotli=20885
+  script 84822 gzip=27133 brotli=23244 http://127.0.0.1:3148/pw-runtime.mjs
+  wasm 56517 gzip=24439 brotli=20885 http://127.0.0.1:3148/pw-resume.wasm
+  renderer-wasm-bytes=343721 gzip=104734 brotli=82888
 
-  ✓  6 [chromium] › e2e/performance.spec.mjs:317:1 › gate 10: a thousand-item menu keeps a bounded rendering cost (1.2s)
+  ✓  7 [chromium] › e2e/runtime-size.spec.mjs:105:1 › gate 7d: the renderer a page fetches to render a block again is bounded as it is sent (1.1s)
 
-  6 passed (8.3s)
+  7 passed (30.6s)

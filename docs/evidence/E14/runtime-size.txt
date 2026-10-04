@@ -1,0 +1,27 @@
+ADR-0188 - a page's runtime is bounded as it is sent, in every run
+
+produced by: just e14-runtime-size
+commit: 673ae11658a8267af800bd65e34ce3c986da7f30
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the sizes, as served and as sent (e2e/runtime-size.spec.mjs, Chromium)
+
+EVIDENCE static-route-script-bytes=0 wasm-bytes=0
+  ✓  1 [chromium] › e2e/runtime-size.spec.mjs:74:1 › gate 7a: the static route ships no browser runtime (767ms)
+EVIDENCE interactive-script-bytes=84822 brotli=23244
+EVIDENCE interactive-wasm-bytes=56517 brotli=20885
+EVIDENCE  script 84822 gzip=27133 brotli=23244 http://127.0.0.1:3148/pw-runtime.mjs
+EVIDENCE  wasm 56517 gzip=24439 brotli=20885 http://127.0.0.1:3148/pw-resume.wasm
+  ✓  2 [chromium] › e2e/runtime-size.spec.mjs:89:1 › gate 7b: the interactive route's runtime is bounded as it is sent (2.6s)
+EVIDENCE renderer-wasm-bytes=343721 gzip=104734 brotli=82888
+  ✓  3 [chromium] › e2e/runtime-size.spec.mjs:105:1 › gate 7d: the renderer a page fetches to render a block again is bounded as it is sent (1.3s)
+  3 passed (8.9s)
+
+== controls (scripts/runtime_size_mutations.py)
+
+baseline: 3 passed, 0 failed
+the runtime's script grows by 48 KB that do not compress: KILLED (1 of 3 tests fail)
+the renderer grows by 64 KB that do not compress: KILLED (1 of 3 tests fail)
+2 of 2 mutants killed
